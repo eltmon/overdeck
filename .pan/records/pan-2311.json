@@ -132,8 +132,8 @@
     ],
     "recordedAt": "2026-07-04T14:36:30.293Z"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "cli-reconcile-merges": "completed",
     "cli-reconcile-merges.ac1": "completed",
@@ -163,14 +163,22 @@
   },
   "pipeline": {
     "issueId": "PAN-2311",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T16:22:56.075Z",
+    "updatedAt": "2026-07-04T16:32:41.756Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-07-04T16:32:10.717Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2317",
+    "reviewedAtCommit": "9dc343287c6b54e61b03346bbce6a43053b8dcc5",
     "lastVerifiedCommit": "6c152322ed60d9cc1f75d615c0e455108b71d927"
   },
   "closeOut": {
@@ -186,8 +194,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 34093,
-            "output": 1746,
+            "input": 36746,
+            "output": 2231,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -202,9 +210,9 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 303749,
-            "output": 12621,
-            "cacheRead": 4587520,
+            "input": 510684,
+            "output": 20975,
+            "cacheRead": 7739392,
             "cacheWrite": 0
           }
         }
@@ -217,8 +225,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 34093,
-          "output": 1746,
+          "input": 36746,
+          "output": 2231,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -229,15 +237,15 @@
           "cacheWrite": 227601
         },
         "custom/kimi-k2.7-code": {
-          "input": 303749,
-          "output": 12621,
-          "cacheRead": 4587520,
+          "input": 510684,
+          "output": 20975,
+          "cacheRead": 7739392,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 10.918967,
-        "pricingAsOf": "2026-07-04T16:22:56.092Z"
+        "usd": 11.747829,
+        "pricingAsOf": "2026-07-04T16:32:41.960Z"
       }
     },
     "merges": [
@@ -246,5 +254,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T18:03:53.979Z",
-  "updated": "2026-07-04T16:22:56.099Z"
+  "updated": "2026-07-04T16:32:41.974Z"
 }
