@@ -76,31 +76,14 @@
       "reason": "feedback",
       "note": "[2026-07-04T15:07Z] review-agent → CHANGES-REQUESTED — seq 4",
       "timestamp": "2026-07-04T15:07:29.456Z"
-    }
-  ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-04T14:56:23Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2311\n\nremote-only feature/strike branches are not verified or deleted\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2311 -m \"Fixed review issues\"`"
     },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-04T14:56:24Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2311\n\nremote-only feature/strike branches are not verified or deleted\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2311 -m \"Fixed review issues\"`"
-    },
-    {
-      "seq": 4,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-04T15:07:29Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2311\n\nremote branch delete uses local containment without verifying origin ref\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2311 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T15:15:07.703Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/drafts/pan-2311.md",
@@ -175,17 +158,17 @@
   },
   "pipeline": {
     "issueId": "PAN-2311",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T15:07:27.599Z",
-    "reviewNotes": "remote branch delete uses local containment without verifying origin ref",
+    "updatedAt": "2026-07-04T15:15:11.513Z",
+    "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
     "inspectNotes": "Inspection passed for bead workspace-qaa0a. Spec fidelity: merge-fulfillment verifier matches the vBRIEF item by reading tracked PR state, checking feature/pan-<id> and strike/pan-<id> ancestry against origin/main, returning merged/stranded/unknown, and never using git log --grep. Constraint compliance: no prohibited workspace/project patterns found in the changed files.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2317",
-    "lastVerifiedCommit": "32b46862a9c718a8f1ef222cfab1730edc02db0f",
+    "lastVerifiedCommit": "686d5bb4b594cceb7345e4e7e738847116d8f0a9",
     "reviewRequestedAt": "2026-07-04T14:37:01.135Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -281,7 +264,7 @@
       },
       "costAtCloseOut": {
         "usd": 9.708286,
-        "pricingAsOf": "2026-07-04T15:07:27.626Z"
+        "pricingAsOf": "2026-07-04T15:15:11.540Z"
       }
     },
     "merges": [
@@ -290,5 +273,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T18:03:53.979Z",
-  "updated": "2026-07-04T15:07:29.456Z"
+  "updated": "2026-07-04T15:15:11.551Z"
 }
