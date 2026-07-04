@@ -126,6 +126,8 @@ const postBootReconciliationDecisionRoute = HttpRouter.add(
       perAgent,
       resumed,
       outcomes: result.outcomes,
+      skipped: result.skipped,
+      deferred: result.deferred,
       count: resumed.length,
     });
   })),

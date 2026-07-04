@@ -11,9 +11,18 @@ export interface BootReconciliationOutcome {
   reason: BootReconciliationOutcomeReason;
 }
 
+export type BootReconciliationDecisionSkipBreakdown = {
+  workspace_missing: number;
+  merged: number;
+  completed: number;
+  other: number;
+};
+
 export interface BootReconciliationApplyResult {
   resumed: string[];
   outcomes: BootReconciliationOutcome[];
+  skipped: BootReconciliationDecisionSkipBreakdown;
+  deferred: number;
 }
 
 interface BootReconciliationOutcomeAgent {

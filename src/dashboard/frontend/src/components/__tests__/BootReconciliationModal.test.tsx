@@ -134,6 +134,13 @@ describe('BootReconciliationModal', () => {
             ok: true,
             count: 0,
             resumed: [],
+            skipped: {
+              workspace_missing: 28,
+              merged: 3,
+              completed: 5,
+              other: 0,
+            },
+            deferred: 2,
             outcomes: [
               {
                 id: 'agent-pan-2076',
@@ -149,6 +156,13 @@ describe('BootReconciliationModal', () => {
             ok: true,
             count: 2,
             resumed: ['agent-pan-2076', 'agent-pan-2077'],
+            skipped: {
+              workspace_missing: 0,
+              merged: 1,
+              completed: 0,
+              other: 1,
+            },
+            deferred: 1,
             outcomes: [
               {
                 id: 'agent-pan-2079',
@@ -175,7 +189,9 @@ describe('BootReconciliationModal', () => {
         body: JSON.stringify({ decision: 'resume_all' }),
       }),
     ));
-    expect(await screen.findByText('Boot decision saved. Resumed 0 — 1 skipped (1 no resumable session).')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Boot decision saved. No agents resumed — 28 workspace missing, 3 already merged, 5 completed, 2 deferred.'),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('boot-reconciliation-hold-all'));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
@@ -186,7 +202,7 @@ describe('BootReconciliationModal', () => {
       }),
     ));
     expect(
-      await screen.findByText('Boot decision saved. Resumed 2 — 1 skipped (1 deferred by concurrency limit).'),
+      await screen.findByText('Boot decision saved. Resuming 2 agents. Also skipped 1 already merged, 1 not resumable, 1 deferred.'),
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('boot-reconciliation-freeze'));
