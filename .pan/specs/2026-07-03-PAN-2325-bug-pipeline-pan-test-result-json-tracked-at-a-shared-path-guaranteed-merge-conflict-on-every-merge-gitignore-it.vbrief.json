@@ -4,17 +4,17 @@
     "created": "2026-07-03T21:25:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2325: gitignore + untrack .pan/test/result.json so it stops causing a guaranteed merge conflict on every merge",
-    "updated": "2026-07-03T21:24:33.152Z"
+    "updated": "2026-07-04T18:13:48.326Z"
   },
   "plan": {
     "id": "pan-2325",
     "title": "bug(pipeline): .pan/test/result.json tracked at a shared path → guaranteed merge conflict on EVERY merge (gitignore it)",
-    "status": "running",
+    "status": "completed",
     "uid": "b3f4c2a1-8d7e-4f6a-9c2b-1e5a7d3f9b04",
     "author": "agent:claude-opus-4-8",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-03T21:25:00.000Z",
-    "updated": "2026-07-03T21:24:33.152Z",
+    "updated": "2026-07-04T18:13:48.326Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2325",
@@ -193,5 +193,5 @@
       "canonicalFilename": "2026-07-03-PAN-2325-bug-pipeline-pan-test-result-json-tracked-at-a-shared-path-guaranteed-merge-conflict-on-every-merge-gitignore-it.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
