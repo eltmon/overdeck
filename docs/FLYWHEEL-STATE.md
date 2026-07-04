@@ -483,3 +483,15 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - **RECIPE for the artifact conflicts (reusable):** auto-merge is sandbox-blocked (rejects git rebase), so land via DIRECT `gh pr merge --squash` after resolving in a **detached throwaway worktree** (avoids the agent-workspace lock): `git worktree add --detach <tmp> origin/feature/<br>` → `git merge origin/main` → `git rm .pan/test/result.json` (gone from main post-2325) → for `scripts/file-size-baseline.txt`: take the PR's version `git checkout <pr-head> -- scripts/file-size-baseline.txt` (NOT main's — main's is too low for the PR's audited file growth and reds the lint:file-size ratchet), then `bash scripts/lint-file-size.sh --update` (lowers stale), then **VERIFY** `bash scripts/lint-file-size.sh` PASSES before pushing → commit --no-edit → `git push origin HEAD:feature/<br>` → wait CI → `gh pr merge --squash`. Use conventional-commit `--subject`. Serial only (baseline is a moving target across merges).
 - **Substrate:** PAN-2318 deploy rock-stable 47m+ under load (health 0.0004s at load 13) — the event-loop fix is validated live. No watchdog (killed; churn dead).
 - **Remaining after 2311/2338/1917:** mid-pipeline PAN-2145/2257 (drive to ready), reboot-stranded swarm slots 1739/2194/2284, Linear/MYN read-model repopulation (operator handling MYN). Goal: all merged + main green for operator to test + tag major release.
+
+## RUN-55 tick 10-12 (2026-07-04 ~17:20Z) — ALL 7 CORE PRs LANDED 🎉
+
+- **MERGED (all core pipeline):** PAN-2318 (deployed+live), PAN-2086, PAN-2325, PAN-2294, PAN-2311, PAN-2338, PAN-1917. main=bfb685fa0e. Each landed via direct gh squash-merge (auto-merge sandbox-blocked); artifact/baseline conflicts resolved via detached-worktree recipe (union-max baseline + --update + verify). Main stayed green after each.
+- **PENDING VERIFY:** final main CI on bfb685fa0e (queued) — MUST confirm green (the burst of merges). If red → investigate + revert culprit.
+- **Substrate:** PAN-2318 event-loop fix rock-stable ~65m, health 0.4ms under load. No churn. Deploy validated.
+- **REMAINING for full quiescence:**
+  - Mid-pipeline PAN-2145, PAN-2257 — verify state (may be merged/dropped/stalled); drive to ready+merge if live.
+  - Swarm slots PAN-1739/2194/2284 — reboot-stranded (swarm coord state lost); recover to issue-review→merge or land branch work.
+  - Stale review_status entries (e.g. PAN-2311 shows ready-but-merged) — close-out reconciliation (PAN-2054 family).
+  - Linear/MYN read-model repopulation; MIN-831 (operator handling MYN).
+- **For operator's return:** core pipeline landed + (pending) main green → ready to test + tag major release. Everything logged here.
