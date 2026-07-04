@@ -69,8 +69,10 @@ export class CacheService {
   private readonly l1TtlMs = 10_000; // 10 seconds
 
   constructor() {
+    const t0 = performance.now();
     this.db = openDatabase(CACHE_DB_PATH);
     this.db.pragma('journal_mode = WAL');
+    console.log(`[boot-timing] cache.db opened (WAL replay) at +${Math.round(performance.now() - t0)}ms`);
     this.createSchema();
   }
 

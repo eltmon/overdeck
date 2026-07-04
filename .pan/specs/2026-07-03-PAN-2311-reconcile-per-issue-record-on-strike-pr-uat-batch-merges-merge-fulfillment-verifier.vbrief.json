@@ -4,7 +4,7 @@
     "created": "2026-07-03T16:36:59Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2311: strike-PR / UAT-batch merges don't reconcile per-issue record (mergeStatus/labels/branches) + merge-fulfillment verifier",
-    "updated": "2026-07-03T17:07:02.407Z"
+    "updated": "2026-07-04T14:20:59.000Z"
   },
   "plan": {
     "id": "pan-2311",
@@ -12,9 +12,9 @@
     "status": "running",
     "uid": "c97d1738-ad5c-4d35-9c5a-1ed314e29fbe",
     "author": "agent:claude-opus-4-8",
-    "sequence": 4,
+    "sequence": 6,
     "created": "2026-07-03T16:36:59Z",
-    "updated": "2026-07-03T17:07:02.407Z",
+    "updated": "2026-07-04T14:20:59.000Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2311",

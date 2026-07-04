@@ -5,12 +5,12 @@ const mocks = vi.hoisted(() => ({
   execFile: vi.fn(),
   getAgentRuntimeState: vi.fn(),
   getGitHubConfig: vi.fn(),
-  getReviewStatusSync: vi.fn(),
   issueService: {
     getIssues: vi.fn(),
   },
   listProjectsSync: vi.fn(),
   listSessionNames: vi.fn(),
+  loadReadyForMergeFlags: vi.fn(),
   openPullRequests: [] as unknown[],
   resolveAgentGitInfo: vi.fn(),
   resolveProjectFromIssueSync: vi.fn(),
@@ -34,7 +34,7 @@ vi.mock('../../../../../src/lib/tmux.js', () => ({
 }));
 
 vi.mock('../../../../../src/dashboard/server/review-status.js', () => ({
-  getReviewStatusSync: mocks.getReviewStatusSync,
+  loadReadyForMergeFlags: mocks.loadReadyForMergeFlags,
 }));
 
 vi.mock('../../../../../src/dashboard/server/services/git-info.js', () => ({
@@ -67,7 +67,7 @@ beforeEach(() => {
     lastActivity: '2026-06-27T00:00:00.000Z',
   }));
   mocks.getGitHubConfig.mockReturnValue({ repos: [] });
-  mocks.getReviewStatusSync.mockReturnValue(null);
+  mocks.loadReadyForMergeFlags.mockReturnValue(new Map());
   mocks.listProjectsSync.mockReturnValue([
     { key: 'overdeck', config: { name: 'overdeck', path: '/tmp/overdeck', issue_prefix: 'PAN' } },
   ]);
@@ -308,6 +308,61 @@ describe('resource-discovery terminal issue filtering', () => {
     );
     expect(withOpenPr.map((issue) => issue.issueId)).toEqual(['PAN-2054']);
     expect(withOpenPr[0]?.resourceSources).toContain('pr');
+  });
+});
+
+describe('resource-discovery review-status batching', () => {
+  it('loads review status only for active tree candidates instead of every terminal tracker issue', async () => {
+    const terminalIssues = Array.from({ length: 1000 }, (_, index) => ({
+      identifier: `PAN-${10_000 + index}`,
+      title: `Terminal ${index}`,
+      state: 'closed',
+      rawTrackerState: 'CLOSED',
+    }));
+    const activeIssues = Array.from({ length: 10 }, (_, index) => ({
+      identifier: `PAN-${20_000 + index}`,
+      title: `Active ${index}`,
+      state: 'in_progress',
+      rawTrackerState: 'In Progress',
+    }));
+    mocks.issueService.getIssues.mockReturnValue([...terminalIssues, ...activeIssues]);
+
+    const discovered = await discoverResourceAllocatedIssues();
+
+    const activeIds = activeIssues.map((issue) => issue.identifier);
+    expect(mocks.loadReadyForMergeFlags).toHaveBeenCalledTimes(1);
+    expect(mocks.loadReadyForMergeFlags).toHaveBeenCalledWith(activeIds);
+    expect(discovered.map((issue) => issue.issueId)).toEqual(activeIds);
+  });
+
+  it('loads ready-for-merge status for a terminal issue that still has an open PR', async () => {
+    mocks.issueService.getIssues.mockReturnValue([
+      {
+        identifier: 'PAN-2054',
+        title: 'Closed with open PR',
+        state: 'closed',
+        rawTrackerState: 'CLOSED',
+      },
+    ]);
+    mocks.getGitHubConfig.mockReturnValue({ repos: [{ owner: 'eltmon', repo: 'overdeck' }] });
+    mocks.openPullRequests = [
+      {
+        number: 2054,
+        title: 'PAN-2054 PR',
+        url: 'https://github.com/eltmon/overdeck/pull/2054',
+        state: 'OPEN',
+        isDraft: false,
+        headRefName: 'PAN-2054',
+        baseRefName: 'main',
+      },
+    ];
+    mocks.loadReadyForMergeFlags.mockReturnValue(new Map([['PAN-2054', true]]));
+
+    const discovered = await discoverResourceAllocatedIssues();
+
+    expect(mocks.loadReadyForMergeFlags).toHaveBeenCalledWith(['PAN-2054']);
+    expect(discovered.map((issue) => issue.issueId)).toEqual(['PAN-2054']);
+    expect(discovered[0]?.readyForMerge).toBe(true);
   });
 });
 
