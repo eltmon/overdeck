@@ -244,6 +244,26 @@ describe('PAN-1908 reactive liveness handlers', () => {
       expect(mockResumeAgent).not.toHaveBeenCalled();
     });
 
+    it('reconciles a live tmux session before applying merged terminal skips', async () => {
+      const state = makeState();
+      mockGetAgentStateSync.mockReturnValue(state);
+      mockGetReviewStatusSync.mockReturnValue({
+        issueId: 'PAN-1908',
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        mergeStatus: 'merged',
+        readyForMerge: false,
+      });
+      mockSessionExists.mockResolvedValue(true);
+
+      const result = await handleAgentStoppedEvent('agent-pan-1908');
+
+      expect(result).toBeNull();
+      expect(mockMarkAgentRunningState).toHaveBeenCalledWith(state);
+      expect(mockSaveAgentState).toHaveBeenCalledWith(state);
+      expect(mockResumeAgent).not.toHaveBeenCalled();
+    });
+
     it('skips a completed done-handoff agent when review and test passed', async () => {
       mockExistingPaths.add('/tmp/agents/agent-pan-1908/completed');
       mockGetAgentStateSync.mockReturnValue(makeState());

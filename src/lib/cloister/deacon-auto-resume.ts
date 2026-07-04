@@ -655,13 +655,8 @@ export async function handleAgentStoppedEvent(
   }
 
   const terminalSkipReason = bootReconciliationSkipReason(state);
-  if (terminalSkipReason !== null) {
-    const suffix = terminalSkipReason === 'workspace_missing'
-      ? `workspace missing (${state.workspace || 'undefined'})`
-      : terminalSkipReason === 'merged'
-        ? 'already merged or merge-ready'
-        : 'completed marker exists and review/test passed';
-    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — ${suffix}`);
+  if (terminalSkipReason === 'workspace_missing') {
+    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — workspace missing (${state.workspace || 'undefined'})`);
     return null;
   }
 
@@ -673,6 +668,14 @@ export async function handleAgentStoppedEvent(
     deps.notifyAgentStatusChanged(state, previousStatus, true);
     const msg = `Reconciled ${agentId} (${previousStatus}→running; tmux session alive)`;
     logDeaconEventSync(`handleAgentStoppedEvent: ${msg}`);
+    return null;
+  }
+
+  if (terminalSkipReason !== null) {
+    const suffix = terminalSkipReason === 'merged'
+      ? 'already merged or merge-ready'
+      : 'completed marker exists and review/test passed';
+    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — ${suffix}`);
     return null;
   }
 
