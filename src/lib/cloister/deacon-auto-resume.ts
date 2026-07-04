@@ -3,6 +3,7 @@ import { join } from 'path';
 import { cpus, loadavg } from 'os';
 import { Effect } from 'effect';
 import { isStartingWithinGrace } from './agent-grace.js';
+import { resumedBootReconciliationOutcome, skippedBootReconciliationOutcome, skippedBootReconciliationOutcomes, type BootReconciliationApplyResult, type BootReconciliationOutcome } from './boot-reconciliation-outcomes.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { getConcurrencyLimits, countRunningAgents, workResumeSlotsAvailable } from './concurrency.js';
 import {
@@ -47,24 +48,7 @@ export interface AutoResumeNotifierDeps {
   notifyAgentStatusChanged: (state: AgentState, previousStatus?: AgentState['status'], hasLiveTmuxSession?: boolean) => void;
 }
 
-export type BootReconciliationOutcomeReason =
-  | 'resumed'
-  | 'no-resumable-session'
-  | 'deferred-concurrency'
-  | 'deferred-load';
-
-export interface BootReconciliationOutcome {
-  id: string;
-  issueId: string;
-  outcome: 'resumed' | 'skipped';
-  reason: BootReconciliationOutcomeReason;
-}
-
-export interface BootReconciliationApplyResult {
-  resumed: string[];
-  outcomes: BootReconciliationOutcome[];
-}
-
+export type { BootReconciliationApplyResult, BootReconciliationOutcome, BootReconciliationOutcomeReason } from './boot-reconciliation-outcomes.js';
 const orphanFailureRecordedForAutoResume = new Set<string>();
 const appliedBootReconciliationDecisions = new Set<string>();
 
@@ -942,27 +926,13 @@ export async function applyBootReconciliationDecision(
     const agent = candidates[index];
     if (resumeAttempts >= workSlots) {
       logDeaconEventSync(`applyBootReconciliationDecision: work concurrency cap reached (running=${runningBefore.work}, max=${concurrencyLimits.maxWorkAgents}, slots=${workSlots}); deferring remaining candidates`);
-      for (const remaining of candidates.slice(index)) {
-        outcomes.push({
-          id: remaining.id,
-          issueId: remaining.issueId,
-          outcome: 'skipped',
-          reason: 'deferred-concurrency',
-        });
-      }
+      outcomes.push(...skippedBootReconciliationOutcomes(candidates.slice(index), 'deferred-concurrency'));
       break;
     }
     const load1 = loadavg()[0];
     if (load1 > loadCeiling) {
       logDeaconEventSync(`applyBootReconciliationDecision: load gate tripped (load1=${load1.toFixed(2)} > ${loadCeiling.toFixed(2)} = ${cores} cores * ${RESUME_LOAD_FACTOR}); deferring remaining candidates`);
-      for (const remaining of candidates.slice(index)) {
-        outcomes.push({
-          id: remaining.id,
-          issueId: remaining.issueId,
-          outcome: 'skipped',
-          reason: 'deferred-load',
-        });
-      }
+      outcomes.push(...skippedBootReconciliationOutcomes(candidates.slice(index), 'deferred-load'));
       break;
     }
     if (resumeAttempts > 0) {
@@ -976,20 +946,10 @@ export async function applyBootReconciliationDecision(
     );
     if (result) {
       resumed.push(result);
-      outcomes.push({
-        id: agent.id,
-        issueId: agent.issueId,
-        outcome: 'resumed',
-        reason: 'resumed',
-      });
+      outcomes.push(resumedBootReconciliationOutcome(agent));
       resumeAttempts++;
     } else {
-      outcomes.push({
-        id: agent.id,
-        issueId: agent.issueId,
-        outcome: 'skipped',
-        reason: 'no-resumable-session',
-      });
+      outcomes.push(skippedBootReconciliationOutcome(agent, 'no-resumable-session'));
     }
   }
 

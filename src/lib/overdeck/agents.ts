@@ -7,12 +7,11 @@ import { and, eq } from 'drizzle-orm';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
-import { Db, EventBus, Records, Tmux } from './infra.js';
+import { Db, EventBus, Records, Tmux, getOverdeckDatabaseSync } from './infra.js';
 import { IssueId } from './issues.js';
-import type { Stage } from './issues.js';
-import { getOverdeckDatabaseSync } from './infra.js';
 import { getOverdeckHome } from '../paths.js';
 import type { AgentState } from '../agents.js';
+export { getIssueStageSync, isTerminalIssueStage } from './issue-stage-sync.js';
 
 // ── Local table definitions (mirrors overdeck-schema.ts — no FK/index annotations here) ─
 
@@ -954,20 +953,6 @@ export function countAgentsByStatusRole(status: string, role: string): number {
     `SELECT COUNT(*) AS n FROM agents WHERE status = ? AND role = ?`,
   ).get(status, role) as { n: number } | undefined;
   return row?.n ?? 0;
-}
-
-export function getIssueStageSync(issueId: string): string | null {
-  const db = getOverdeckDatabaseSync();
-  const row = db.prepare(
-    `SELECT stage FROM issues WHERE id = ?`,
-  ).get(issueId) as { stage: string } | undefined;
-  return row?.stage ?? null;
-}
-
-const TERMINAL_ISSUE_STAGES = new Set<Stage>(['verifying_on_main', 'closed', 'cancelled']);
-
-export function isTerminalIssueStage(stage: string | null): boolean {
-  return TERMINAL_ISSUE_STAGES.has(stage as Stage);
 }
 
 /**
