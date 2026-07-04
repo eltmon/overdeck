@@ -495,3 +495,12 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
   - Stale review_status entries (e.g. PAN-2311 shows ready-but-merged) — close-out reconciliation (PAN-2054 family).
   - Linear/MYN read-model repopulation; MIN-831 (operator handling MYN).
 - **For operator's return:** core pipeline landed + (pending) main green → ready to test + tag major release. Everything logged here.
+
+## RUN-55 tick 13 (2026-07-04 ~17:33Z) — PIPELINE DRAINED: 9 PRs landed, main GREEN
+
+- **FINAL MAIN CI on bfb685fa0e (7-PR burst): GREEN** ✅ — the whole core landing did NOT break main.
+- **PAN-2145 MERGED** (#2332, conversations.ts god-file decomposition) → main=f2a585518f. 9 PRs total landed: PAN-2318(deployed), 2086, 2325, 2294, 2311, 2338, 1917, 2257, 2145.
+- **Substrate:** PAN-2318 event-loop fix stable ~78m, health 0.5ms, load ~1.3. Deploy fully validated. No churn.
+- **ONLY REMAINING — swarm slots need operator decision:** PAN-1739/2194/2284 have branch work pushed but **NO PRs** (reboot lost swarm coordination that creates issue-level PRs). Landing them = create PRs + put through review (they're swarm slots, never issue-reviewed). Held back from rushing UNREVIEWED work into the stability release. Operator's call: land (I create PRs + shepherd review) vs defer post-release.
+- **Minor residue:** stale review_status entries (PAN-2311/2145 show ready-but-merged) — will reconcile via postMergeLifecycle. Linear/MYN read-model (MIN-831 operator-handled).
+- **RELEASE READINESS:** core + mid-pipeline landed, main green, fix deployed → ready for operator to test + tag major release once they decide on the swarm slots.
