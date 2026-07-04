@@ -6,7 +6,13 @@ import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { extractTeamPrefix, loadProjectsConfigSync, PROJECTS_CONFIG_FILE, getIssuePrefix } from '../../lib/projects.js';
-import { backfillAgentsSync } from '../../lib/overdeck/agents.js';
+import {
+  backfillAgentsSync,
+  getIssueStageSync,
+  isTerminalIssueStage,
+  listAllAgentsSync,
+  removeAgentSync,
+} from '../../lib/overdeck/agents.js';
 import {
   DatabaseProvisionerError,
   getDatabaseProvisioner,
@@ -105,6 +111,11 @@ export function registerDbCommands(program: Command): void {
     .option('--verbose', 'Log each processed agent')
     .action(rebuildAgentsCommand);
 
+  db.command('gc-agents')
+    .description('Remove stopped work-agent rows for terminal issues')
+    .option('--dry-run', 'Show what would be removed without writing')
+    .action(gcAgentsCommand);
+
   db.command('rebuild')
     .description('Reconstruct the dashboard cache from git + GitHub sources (PAN-1920)')
     .option('--verbose', 'Log each enumerated issue and agent')
@@ -123,6 +134,28 @@ export function registerDbCommands(program: Command): void {
     .option('--dry-run', 'Show what would be restored without writing')
     .option('--verbose', 'Log each processed issue')
     .action(restoreVerdictsCommand);
+}
+
+async function gcAgentsCommand(options: { dryRun?: boolean }): Promise<void> {
+  const candidates = listAllAgentsSync()
+    .filter((agent) =>
+      agent.role === 'work'
+      && agent.status === 'stopped'
+      && isTerminalIssueStage(getIssueStageSync(agent.issueId)),
+    );
+  const ids = candidates.map((agent) => agent.id);
+
+  if (options.dryRun) {
+    console.log(`Would reap ${ids.length} agent(s).`);
+    for (const id of ids) console.log(`  ${id}`);
+    return;
+  }
+
+  for (const id of ids) {
+    removeAgentSync(id);
+  }
+  console.log(`Reaped ${ids.length} agent(s).`);
+  for (const id of ids) console.log(`  ${id}`);
 }
 
 async function snapshotCommand(options: {
