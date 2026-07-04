@@ -377,6 +377,9 @@ export async function verifyIssueMergeFulfillment(
   }
 
   if (sawExistingBranch) {
+    if (prResult.errorEvidence) {
+      return { verdict: 'unknown', evidence: prResult.errorEvidence };
+    }
     return { verdict: 'stranded', evidence: `${normalized} has a branch that is not an ancestor of origin/main and no merged PR was found` };
   }
 
@@ -398,7 +401,7 @@ export async function reconcileMergedIssue(
   const mergedDeps = resolveDeps(deps);
   const record = mergedDeps.readRecord(project, normalized);
 
-  if (record?.pipeline?.mergeStatus === 'merged') {
+  if (record?.pipeline?.mergeStatus === 'merged' && !opts.closed) {
     return {
       issueId: normalized,
       dryRun,
@@ -410,16 +413,24 @@ export async function reconcileMergedIssue(
 
   const actions: string[] = [];
   if (dryRun) {
-    actions.push('would set mergeStatus=merged, reviewStatus=passed, readyForMerge=false');
+    if (record?.pipeline?.mergeStatus === 'merged') {
+      actions.push('would skip status update: record already has mergeStatus=merged');
+    } else {
+      actions.push('would set mergeStatus=merged, reviewStatus=passed, readyForMerge=false');
+    }
     actions.push('would apply merged label');
     if (opts.closed) actions.push('would apply closed-out label');
   } else {
-    mergedDeps.setReviewStatus(normalized, {
-      mergeStatus: 'merged',
-      reviewStatus: 'passed',
-      readyForMerge: false,
-    });
-    actions.push('set mergeStatus=merged, reviewStatus=passed, readyForMerge=false');
+    if (record?.pipeline?.mergeStatus === 'merged') {
+      actions.push('skipped status update: record already has mergeStatus=merged');
+    } else {
+      mergedDeps.setReviewStatus(normalized, {
+        mergeStatus: 'merged',
+        reviewStatus: 'passed',
+        readyForMerge: false,
+      });
+      actions.push('set mergeStatus=merged, reviewStatus=passed, readyForMerge=false');
+    }
 
     const labelResult = await mergedDeps.cleanupMergedLabels(lifecycleContext(normalized, project));
     actions.push(labelResult.success ? 'applied merged label' : `merged label cleanup failed: ${labelResult.error ?? 'unknown error'}`);
@@ -493,7 +504,7 @@ async function reconcileOneFulfilledMerge(
   await reconcileMergedIssue(
     normalized,
     project,
-    { closed: shouldApplyClosedOutLabel(record), dryRun: options.dryRun },
+    { closed: true, dryRun: options.dryRun },
     {
       ...deps,
       readRecord: () => record,

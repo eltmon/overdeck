@@ -26,9 +26,92 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T23:02:11.442Z"
+    },
+    {
+      "timestamp": "2026-07-04T14:37:01.133Z",
+      "reason": "end",
+      "note": "Anomalies: pan sync-main reported the three expected conflicts but did not leave conflict markers, so I performed the equivalent git merge origin/main and resolved scripts/file-size-baseline.txt, tests/unit/lib/pan-444-post-merge-step0.test.ts, and tests/unit/lib/webhook-handlers.test.ts. The first full npm test run failed under sandbox with spawnSync /bin/sh EPERM; reran with normal subprocess permissions and it passed. No deviations beyond manual merge resolution after sync-main conflict reporting. Delivered: branch is synced with origin/main, conflict resolutions preserve both main's PR cache/GitHub App assertions and PAN-2311 strike merge behavior, full gates passed, branch pushed."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T14:37:01.425Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-04T14:37Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-04T14:37:55.410Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-04T14:38Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-04T14:38:00.912Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T14:38:01.641Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-04T14:37:55Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2311\n\nreconcile can skip closed-out label and verifier can false-strand on PR lookup errors\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2311 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-04T14:38:00Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2311\n\nreconcile can skip closed-out label and verifier can false-strand on PR lookup errors\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2311 -m \"Fixed review issues\"`"
+    }
+  ],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/drafts/pan-2311.md",
+      ".pan/records/pan-2311.json",
+      "scripts/file-size-baseline.txt",
+      "src/lib/cloister/merge-verification.ts",
+      "tests/unit/lib/cloister/uat-promote.test.ts",
+      "tests/unit/lib/pan-444-post-merge-step0.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/lib/cloister/__tests__/uat-promote.test.ts"
+    ],
+    "declaredScope": [
+      "src/cli/commands/db.ts",
+      "src/cli/commands/done.ts",
+      "src/dashboard/server/routes/specialists/shared.ts",
+      "src/lib/cloister/__tests__/uat-promote.test.ts",
+      "src/lib/cloister/merge-agent.ts",
+      "src/lib/cloister/uat-promote.ts",
+      "src/lib/pan-dir/__tests__/merge-fulfillment.test.ts",
+      "src/lib/pan-dir/merge-fulfillment.ts",
+      "src/lib/webhook-handlers.ts",
+      "tests/unit/lib/webhook-handlers.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".pan/drafts/pan-2311.md",
+      ".pan/records/pan-2311.json",
+      "scripts/file-size-baseline.txt",
+      "src/cli/commands/db.ts",
+      "src/cli/commands/done.ts",
+      "src/dashboard/server/routes/specialists/shared.ts",
+      "src/lib/cloister/merge-agent.ts",
+      "src/lib/cloister/merge-verification.ts",
+      "src/lib/cloister/uat-promote.ts",
+      "src/lib/pan-dir/__tests__/merge-fulfillment.test.ts",
+      "src/lib/pan-dir/merge-fulfillment.ts",
+      "src/lib/webhook-handlers.ts",
+      "tests/unit/lib/cloister/uat-promote.test.ts",
+      "tests/unit/lib/pan-444-post-merge-step0.test.ts",
+      "tests/unit/lib/webhook-handlers.test.ts"
+    ],
+    "recordedAt": "2026-07-04T14:36:30.293Z"
+  },
   "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
@@ -60,16 +143,18 @@
   },
   "pipeline": {
     "issueId": "PAN-2311",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T14:20:52.116Z",
+    "updatedAt": "2026-07-04T14:40:31.477Z",
+    "reviewNotes": "reconcile can skip closed-out label and verifier can false-strand on PR lookup errors",
     "inspectNotes": "Inspection passed for bead workspace-qaa0a. Spec fidelity: merge-fulfillment verifier matches the vBRIEF item by reading tracked PR state, checking feature/pan-<id> and strike/pan-<id> ancestry against origin/main, returning merged/stranded/unknown, and never using git log --grep. Constraint compliance: no prohibited workspace/project patterns found in the changed files.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2317",
-    "reviewRequestedAt": "2026-07-03T17:44:42.147Z",
+    "lastVerifiedCommit": "bbc0ecd77c33a254ed45a579117c959e02e367e4",
+    "reviewRequestedAt": "2026-07-04T14:37:01.135Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/drafts/pan-2311.md",
@@ -111,7 +196,7 @@
         "tests/unit/lib/pan-444-post-merge-step0.test.ts",
         "tests/unit/lib/webhook-handlers.test.ts"
       ],
-      "recordedAt": "2026-07-03T17:44:10.724Z"
+      "recordedAt": "2026-07-04T14:36:30.293Z"
     }
   },
   "closeOut": {
@@ -127,8 +212,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 26138,
-            "output": 818,
+            "input": 31388,
+            "output": 1019,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -150,8 +235,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 26138,
-          "output": 818,
+          "input": 31388,
+          "output": 1019,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -164,7 +249,7 @@
       },
       "costAtCloseOut": {
         "usd": 9.708286,
-        "pricingAsOf": "2026-07-04T14:20:52.135Z"
+        "pricingAsOf": "2026-07-04T14:40:31.528Z"
       }
     },
     "merges": [
@@ -173,5 +258,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T18:03:53.979Z",
-  "updated": "2026-07-04T14:20:52.136Z"
+  "updated": "2026-07-04T14:40:31.534Z"
 }

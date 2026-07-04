@@ -150,6 +150,20 @@ describe('verifyIssueMergeFulfillment', () => {
     });
   });
 
+  it('returns unknown instead of stranded when PR lookup fails and the branch is unmerged', async () => {
+    const deps = makeDeps({
+      record: record({ prUrl: 'https://github.com/eltmon/overdeck/pull/123', prNumber: 123 }),
+      prError: true,
+      existingBranches: ['feature/pan-123'],
+      mergedBranches: [],
+    });
+
+    await expect(verifyIssueMergeFulfillment('PAN-123', project, deps)).resolves.toEqual({
+      verdict: 'unknown',
+      evidence: 'PAN-123 PR #123 state could not be resolved via gh: gh unavailable',
+    });
+  });
+
   it('returns stranded when a branch exists but is not an ancestor of origin/main', async () => {
     const deps = makeDeps({
       existingBranches: ['strike/pan-123'],
@@ -309,10 +323,10 @@ describe('reconcileMergedIssue', () => {
     ]);
   });
 
-  it('does not write when the issue record is already merged', async () => {
+  it('does not write when the issue record is already merged and no label repair is requested', async () => {
     const deps = makeDeps({ record: record({ mergeStatus: 'merged' }) });
 
-    const result = await reconcileMergedIssue('PAN-123', project, { closed: true }, deps);
+    const result = await reconcileMergedIssue('PAN-123', project, {}, deps);
 
     expect(result).toEqual({
       issueId: 'PAN-123',
@@ -324,6 +338,26 @@ describe('reconcileMergedIssue', () => {
     expect(deps.setReviewStatus).not.toHaveBeenCalled();
     expect(deps.cleanupMergedLabels).not.toHaveBeenCalled();
     expect(deps.commands).toEqual([]);
+  });
+
+  it('repairs labels for an already merged record when closed-out labeling is requested', async () => {
+    const deps = makeDeps({ record: record({ mergeStatus: 'merged' }) });
+
+    const result = await reconcileMergedIssue('PAN-123', project, { closed: true }, deps);
+
+    expect(deps.setReviewStatus).not.toHaveBeenCalled();
+    expect(deps.cleanupMergedLabels).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'PAN-123',
+      projectPath: '/repo',
+      github: { owner: 'eltmon', repo: 'overdeck', number: 123 },
+    }));
+    expect(deps.commands).toContain("gh issue edit 123 --repo 'eltmon/overdeck' --add-label 'closed-out'");
+    expect(result.skipped).toBe(false);
+    expect(result.actions).toEqual(expect.arrayContaining([
+      'skipped status update: record already has mergeStatus=merged',
+      'applied merged label',
+      'applied closed-out label to PAN-123',
+    ]));
   });
 
   it('dry-runs without writing status, labels, or branch deletes', async () => {
