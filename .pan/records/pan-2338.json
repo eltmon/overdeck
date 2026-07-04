@@ -27,6 +27,11 @@
       "reason": "feedback",
       "note": "[2026-07-04T02:01Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-04T02:01:46.292Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T02:07:03.642Z"
     }
   ],
   "feedback": [
@@ -107,20 +112,20 @@
     "recordedAt": "2026-07-04T01:57:37.929Z"
   },
   "created": "2026-07-04T00:35:12.770Z",
-  "updated": "2026-07-04T02:01:46.293Z",
+  "updated": "2026-07-04T02:07:07.575Z",
   "pipeline": {
     "issueId": "PAN-2338",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T02:01:37.571Z",
-    "reviewNotes": "gc-agents reaps paused/troubled terminal work agents despite the must-not constraint",
+    "updatedAt": "2026-07-04T02:07:07.520Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "workspace-ppk5t matches the bead scope: applyBootReconciliationDecision now returns resumed plus per-agent outcomes, covers resumed/no-resumable-session/deferred-concurrency/deferred-load, wrapper and direct resumed-count callers compile against the new shape, and the focused test covers skipped unresumable candidates. No inspected constraint violations found.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2342",
-    "lastVerifiedCommit": "10451ec160041180325d5032bc314ea618874eff",
+    "lastVerifiedCommit": "fef65ceaf2e88aa8bc22bcf69bbee46dcb065208",
     "reviewRequestedAt": "2026-07-04T01:57:45.558Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -234,7 +239,7 @@
       },
       "costAtCloseOut": {
         "usd": 13.521411,
-        "pricingAsOf": "2026-07-04T02:01:37.598Z"
+        "pricingAsOf": "2026-07-04T02:07:07.575Z"
       }
     },
     "merges": [
