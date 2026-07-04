@@ -446,3 +446,18 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - **FIX (stop-gap):** SIGKILL 1474655 (was D-state, kill landed after it cleared). Churn STOPPED — dashboard stable (pid 1892725, health 200, same pid, zero restarts after 15:35:32), **load crashed 15→2.4**. Watchdog auto-recovery is now OFF (acceptable — it was the problem; re-enable a tolerant one later or moot via PAN-2318).
 - **DURABLE FIX = PAN-2318** ("Dashboard event-loop starvation: extract deacon from server process") — supersedes PAN-1711, and is IN-FLIGHT (review passed, test running, PR #2327). Extracting the deacon off the server event loop keeps the dashboard responsive under load so the watchdog never trips. **Prioritize landing PAN-2318** — it's the meta-fix for this whole class of meltdown.
 - **Downstream recovery (verify next tick):** with churn stopped + load down + DB uncontended, the Linear poll should succeed and repopulate MIN/AUR issues (still 0 at 15:38, server only stable ~3min); the orphaned merges (2325 id12 stuck, 2338/1917 dropped) need clean re-driving now the substrate is stable — but PAN-2325's rebase reset its own review-readiness (needs re-review), so re-drive = re-review the rebased head then merge.
+
+## RUN-55 tick 4 (2026-07-04 ~16:00Z) — OPERATOR AWAY: land entire pipeline for major-release tag
+
+- **Mandate:** operator stepped away (July 4th events); wants EVERYTHING in pipeline landed+merged+green, ready to test then tag a MAJOR release. Drive autonomously across ticks. Keep main GREEN (stability release — a red main blocks the tag + wastes their return).
+- **PAN-2318 (meta-fix) MERGED** ✅ (squash, main=5f718b963d) — auto-merge was BROKEN (sandbox rejects `git rebase` as history-rewriting for behind-main PRs → wedges `merging`; agent-pan-2318 idle 94m on the block). **So the working merge path is DIRECT `gh pr merge <pr> --squash`** (PRs are MERGEABLE/CLEAN = behind-but-no-conflict; GitHub squashes without local rebase). Use a conventional-commit `--subject` (commitlint scope enum: cloister/dashboard/workspace/cli/review/beads/db/specialists/terminal/infra/deps).
+- **GATE each merge on prior merge's main CI = green** (serialize; don't pile onto unconfirmed main). PAN-2318 CI still in_progress at 16:00 → HELD further merges this tick.
+- **LANDING CHECKLIST:**
+  - ✅ PAN-2318 (#2327)
+  - ⏳ PAN-2086 (#2313), PAN-2311 (#2317) — ready (review+test passed); merge after 2318 CI green
+  - ⏳ PAN-2325 (#2328), PAN-2338 (#2342), PAN-1917 (#2279) — were ready; re-verify mergeability (may have gone behind/conflicting as main advances), then merge
+  - 🔄 PAN-2294 (review passed after my re-dispatch), PAN-2145 (review passed), PAN-2257 (test passed) — drive to ready-for-merge then merge
+  - 🔄 swarm slots PAN-1739/2194/2284 — stranded by reboot (swarm coord state lost); recover to issue-level review→merge, or land their branch work directly
+  - ⏸️ MIN-831 (MYN) — held by project auto-merge-default=hold; operator handling MYN separately
+- **Zombie cleanup:** stuck auto-merge entries id 11 (PAN-2174, since Jun30), id 12 (PAN-2325), id 15 (PAN-2318, should self-clear now PR merged) — clear as encountered.
+- **Substrate:** watchdog killed (no auto-recovery now); dashboard stable 22m, load 0.66. If dashboard crashes while away, restart manually (don't re-add aggressive watchdog). PAN-2318 fix is MERGED but NOT deployed — do NOT hot-patch the boot-path change onto live server while operator away; deploy+test is for their return + the release.
