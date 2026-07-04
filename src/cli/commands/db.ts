@@ -6,7 +6,13 @@ import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { extractTeamPrefix, loadProjectsConfigSync, PROJECTS_CONFIG_FILE, getIssuePrefix } from '../../lib/projects.js';
-import { backfillAgentsSync } from '../../lib/overdeck/agents.js';
+import {
+  backfillAgentsSync,
+  getIssueStageSync,
+  isTerminalIssueStage,
+  listAllAgentsSync,
+  removeAgentSync,
+} from '../../lib/overdeck/agents.js';
 import {
   DatabaseProvisionerError,
   getDatabaseProvisioner,
@@ -105,6 +111,11 @@ export function registerDbCommands(program: Command): void {
     .option('--verbose', 'Log each processed agent')
     .action(rebuildAgentsCommand);
 
+  db.command('gc-agents')
+    .description('Remove stopped work-agent rows for terminal issues')
+    .option('--dry-run', 'Show what would be removed without writing')
+    .action(gcAgentsCommand);
+
   db.command('rebuild')
     .description('Reconstruct the dashboard cache from git + GitHub sources (PAN-1920)')
     .option('--verbose', 'Log each enumerated issue and agent')
@@ -123,6 +134,37 @@ export function registerDbCommands(program: Command): void {
     .option('--dry-run', 'Show what would be restored without writing')
     .option('--verbose', 'Log each processed issue')
     .action(restoreVerdictsCommand);
+
+  db.command('reconcile-merges')
+    .description('Backfill fulfilled merge state from tracked PR and branch ancestry evidence (PAN-2311)')
+    .option('--issue-id <id>', 'Reconcile only this issue')
+    .option('--dry-run', 'Show what would be reconciled without writing')
+    .option('--verbose', 'Log each processed issue')
+    .action(reconcileMergesCommand);
+}
+
+async function gcAgentsCommand(options: { dryRun?: boolean }): Promise<void> {
+  const candidates = listAllAgentsSync()
+    .filter((agent) =>
+      agent.role === 'work'
+      && agent.status === 'stopped'
+      && agent.paused !== true
+      && agent.troubled !== true
+      && isTerminalIssueStage(getIssueStageSync(agent.issueId)),
+    );
+  const ids = candidates.map((agent) => agent.id);
+
+  if (options.dryRun) {
+    console.log(`Would reap ${ids.length} agent(s).`);
+    for (const id of ids) console.log(`  ${id}`);
+    return;
+  }
+
+  for (const id of ids) {
+    removeAgentSync(id);
+  }
+  console.log(`Reaped ${ids.length} agent(s).`);
+  for (const id of ids) console.log(`  ${id}`);
 }
 
 async function snapshotCommand(options: {
@@ -534,6 +576,45 @@ async function restoreVerdictsCommand(options: {
     }
   } catch (error: any) {
     spinner.fail(`Verdict restore failed: ${error.message}`);
+    process.exitCode = 1;
+  }
+}
+
+async function reconcileMergesCommand(options: {
+  issueId?: string;
+  dryRun?: boolean;
+  verbose?: boolean;
+}): Promise<void> {
+  const spinner = ora('Reconciling fulfilled merges from durable records...').start();
+
+  try {
+    const { reconcileMergeFulfillment } = await import('../../lib/pan-dir/merge-fulfillment.js');
+    const result = await reconcileMergeFulfillment({
+      issueId: options.issueId,
+      dryRun: options.dryRun,
+      verbose: options.verbose,
+    });
+
+    const verb = options.dryRun ? 'would reconcile' : 'reconciled';
+    spinner.succeed(
+      `Merge reconciliation complete: ${result.reconciled} ${verb}, ${result.flagged} flagged, ${result.skipped} skipped, ${result.failed} failed`
+    );
+
+    for (const detail of result.details) {
+      if (detail.action === 'flagged') {
+        console.log(chalk.yellow(`  ${detail.issueId}: ${detail.reason ?? detail.evidence ?? 'merge fulfillment is not confirmed'}`));
+      } else if (detail.action === 'failed') {
+        console.log(chalk.red(`  ${detail.issueId}: ${detail.reason ?? 'failed'}`));
+      } else if (options.verbose) {
+        console.log(chalk.dim(`  ${detail.issueId}: ${detail.action}${detail.evidence ? ` (${detail.evidence})` : ''}`));
+      }
+    }
+
+    if (result.failed > 0) {
+      process.exitCode = 1;
+    }
+  } catch (error: any) {
+    spinner.fail(`Merge reconciliation failed: ${error.message}`);
     process.exitCode = 1;
   }
 }

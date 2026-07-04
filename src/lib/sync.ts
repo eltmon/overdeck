@@ -27,7 +27,7 @@ import {
   codexGlobalContextFile,
 } from './context-layers/index.js';
 import { backupFileSync, createBackupTimestamp } from './backup.js';
-
+export { isStartupSyncNeededSync, writeSyncManifestSync } from './sync-startup-gate.js';
 export interface SyncItem {
   name: string;
   sourcePath: string;

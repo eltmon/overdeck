@@ -32,6 +32,7 @@ import {
   buildUatPromoteGitDeps,
   type PromoteResult,
 } from '../../../lib/cloister/uat-promote.js';
+import { notifyFlywheelOfUatPromote } from '../../../lib/cloister/uat-promote-notify.js';
 import {
   getUatGenerationSync,
   isMergeTrainEnabled,
@@ -330,7 +331,7 @@ export async function postUatGenerationPromotePayload(
 ): Promise<PromoteResult> {
   const root = projectRoot();
   const { reviewRecordEligibility } = await import('../../../lib/flywheel-merge-order.js');
-  return promoteUatGeneration(name, root, {
+  const result = await promoteUatGeneration(name, root, {
     git: buildUatPromoteGitDeps(root),
     store: { ...buildUatGenerationStore(), get: (n) => getUatGenerationSync(n) },
     teardownStack: (gen) => teardownUatStack(gen),
@@ -338,4 +339,6 @@ export async function postUatGenerationPromotePayload(
     memberEligibility: reviewRecordEligibility,
     log: (msg) => console.log(msg),
   });
+  await notifyFlywheelOfUatPromote(result).catch(() => {});
+  return result;
 }

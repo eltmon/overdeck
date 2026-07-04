@@ -11,6 +11,8 @@ import {
 import { getConversationByName } from '../../../lib/overdeck/conversations.js';
 import { getSetting, setSetting } from '../../../lib/overdeck/control-settings.js';
 import type { ConversationFilter } from '../../../lib/overdeck/discovered-sessions.js';
+import { getSessionsFeedFacets, listSessionsFeed } from '../../../lib/overdeck/sessions-feed.js';
+import type { SessionsFeedFilter } from '../../../lib/overdeck/sessions-feed.js';
 import { searchSessions } from '../../../lib/conversations/search.js';
 import type { SearchQuery } from '../../../lib/conversations/search.js';
 import { scan } from '../../../lib/conversations/scanner.js';
@@ -23,6 +25,8 @@ import type { EmbedSessionsOptions } from '../../../lib/conversations/embeddings
 export type DashboardDbOperation =
   | 'getDiscoveredStats'
   | 'listDiscoveredSessions'
+  | 'listSessionsFeed'
+  | 'getSessionsFeedFacets'
   | 'getDiscoveredSessionById'
   | 'aggregateDiscoveredSessionCost'
   | 'aggregateDiscoveredSessionCostBy'
@@ -210,6 +214,10 @@ async function runInline(
         total: countDiscoveredSessions({ ...filter, limit: undefined, offset: undefined }),
       };
     }
+    case 'listSessionsFeed':
+      return listSessionsFeed(payload as SessionsFeedFilter);
+    case 'getSessionsFeedFacets':
+      return getSessionsFeedFacets(payload as SessionsFeedFilter);
     case 'getDiscoveredSessionById':
       return getDiscoveredSessionById(payload as number);
     case 'aggregateDiscoveredSessionCost':

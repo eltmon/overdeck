@@ -11,7 +11,6 @@ import { promisify } from 'util';
 import { Effect } from 'effect';
 import { capturePane, killSession, listSessionNames, sendKeys, sessionExists } from '../tmux.js';
 import { emitActivityEntrySync, emitActivityTtsSync, emitDashboardLifecycleSync } from '../activity-logger.js';
-import { verifyMergedBeforeLifecycle } from './merged-pr-verification.js';
 
 const execAsync = promisify(exec);
 
@@ -140,6 +139,7 @@ import { gitPush, gitForcePush, MainDivergedError } from '../git/operations.js';
 import { markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
 import { appendGitOperationSync, type GitOperationType } from '../git-activity.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
+import { verifyMergedBeforeLifecycle, type PostMergeLifecycleOptions } from './merge-verification.js';
 
 const SPECIALISTS_DIR = join(OVERDECK_HOME, 'specialists');
 const MERGE_HISTORY_DIR = join(SPECIALISTS_DIR, 'merge-agent');
@@ -279,7 +279,7 @@ export async function postMergeLifecycle(
   issueId: string,
   projectPath: string,
   sourceBranch?: string,
-  options?: { skipDeploy?: boolean; allowVerifiedNoPrMerge?: boolean },
+  options?: PostMergeLifecycleOptions,
 ): Promise<void> {
   // PAN-1517: the per-slot swarm runtime is gone. Slot branches no longer exist
   // — parallelism is an in-context concern owned by the work agent (see
@@ -326,7 +326,11 @@ export async function postMergeLifecycle(
 
     // Set mergeStatus='merged' after verifying the branch or PR actually landed.
     try {
-      setReviewStatusSync(issueId, { mergeStatus: 'merged', readyForMerge: false });
+      setReviewStatusSync(issueId, {
+        mergeStatus: 'merged',
+        readyForMerge: false,
+        ...(options?.markReviewPassed ? { reviewStatus: 'passed' as const } : {}),
+      });
       console.log(`[merge-agent] ✓ mergeStatus set to 'merged' for ${issueId}`);
     } catch (err: any) {
       console.warn(`[merge-agent] Could not set mergeStatus: ${err.message}`);

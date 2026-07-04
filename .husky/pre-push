@@ -27,10 +27,10 @@ while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
       # PAN-2227: audited ratchet bumps — every pushed commit that raises a
       # baseline entry or adds an eslint-any-allowlist entry must reference
       # an issue in its message.
-      if [ "$remote_sha" = "$zero" ]; then
-        base=$(git merge-base origin/main "$local_sha" 2>/dev/null || true)
-      else
+      if [ "$remote_ref" = "refs/heads/main" ] && [ "$remote_sha" != "$zero" ]; then
         base="$remote_sha"
+      else
+        base=$(git merge-base origin/main "$local_sha" 2>/dev/null || true)
       fi
       if [ -n "$base" ]; then
         if [ "$remote_ref" = "refs/heads/main" ]; then

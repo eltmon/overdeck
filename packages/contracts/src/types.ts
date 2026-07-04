@@ -652,8 +652,10 @@ export const DiscoveredSessionSnapshot = Schema.Struct({
   tags: Schema.Array(Schema.String),
   summary: Schema.optional(Schema.String),
   summaryDetailed: Schema.optional(Schema.String),
-  // Human title of the tracked conversation this session belongs to, when the
-  // session id matches a conversation in the DB (joined via conversation_files).
+  // Tracked conversation this session belongs to, when the session id matches a
+  // conversation in the DB (joined via conversation_files).
+  conversationId: Schema.optional(Schema.String),
+  conversationName: Schema.optional(Schema.String),
   conversationTitle: Schema.optional(Schema.String),
   enrichmentLevel: Schema.Number,
   enrichmentModel: Schema.optional(Schema.String),
@@ -665,6 +667,70 @@ export const DiscoveredSessionSnapshot = Schema.Struct({
   scannedAt: Schema.String,
 })
 export type DiscoveredSessionSnapshot = typeof DiscoveredSessionSnapshot.Type
+
+// ─── Unified Sessions Feed (PAN-1917) ────────────────────────────────────────
+
+export const SessionsFeedSource = Schema.Literals(['discovered', 'managed-archived'])
+export type SessionsFeedSource = typeof SessionsFeedSource.Type
+
+export const SessionsFeedRowSnapshot = Schema.Struct({
+  id: Schema.Number,
+  source: SessionsFeedSource,
+  discoveredId: Schema.optional(Schema.Number),
+  jsonlPath: Schema.optional(Schema.String),
+  sessionId: Schema.optional(Schema.String),
+  workspacePath: Schema.optional(Schema.String),
+  messageCount: Schema.Number,
+  firstTs: Schema.optional(Schema.String),
+  lastTs: Schema.optional(Schema.String),
+  primaryModel: Schema.optional(Schema.String),
+  tokenInput: Schema.Number,
+  tokenOutput: Schema.Number,
+  estimatedCost: Schema.Number,
+  tags: Schema.Array(Schema.String),
+  summary: Schema.optional(Schema.String),
+  enrichmentLevel: Schema.Number,
+  enrichmentFailed: Schema.Boolean,
+  overdeckManaged: Schema.Boolean,
+  panIssueId: Schema.optional(Schema.String),
+  archivedAt: Schema.optional(Schema.String),
+  conversationId: Schema.optional(Schema.String),
+  conversationName: Schema.optional(Schema.String),
+  conversationTitle: Schema.optional(Schema.String),
+  harness: Schema.optional(Schema.String),
+})
+export type SessionsFeedRowSnapshot = typeof SessionsFeedRowSnapshot.Type
+
+const SessionsFeedFacetBucketString = Schema.Struct({
+  value: Schema.String,
+  count: Schema.Number,
+})
+
+const SessionsFeedFacetBucketNumber = Schema.Struct({
+  value: Schema.Number,
+  count: Schema.Number,
+})
+
+export const SessionsFeedFacetsSnapshot = Schema.Struct({
+  primaryModels: Schema.Array(SessionsFeedFacetBucketString),
+  tags: Schema.Array(SessionsFeedFacetBucketString),
+  tools: Schema.Array(SessionsFeedFacetBucketString),
+  files: Schema.Array(SessionsFeedFacetBucketString),
+  enrichmentLevels: Schema.Array(SessionsFeedFacetBucketNumber),
+  timeBuckets: Schema.Array(Schema.Struct({
+    value: Schema.Literals(['24h', '7d', '30d', 'older']),
+    count: Schema.Number,
+  })),
+  costBuckets: Schema.Array(Schema.Struct({
+    value: Schema.Literals(['<$0.10', '$0.10-1', '$1-10', '>$10']),
+    count: Schema.Number,
+  })),
+  sources: Schema.Array(Schema.Struct({
+    value: SessionsFeedSource,
+    count: Schema.Number,
+  })),
+})
+export type SessionsFeedFacetsSnapshot = typeof SessionsFeedFacetsSnapshot.Type
 
 /** Filter parameters for conversation search */
 export const ConversationFilter = Schema.Struct({

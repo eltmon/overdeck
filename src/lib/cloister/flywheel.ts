@@ -6,6 +6,7 @@ import { Effect, Schema } from 'effect';
 import type { FlywheelRunId } from '@overdeck/contracts';
 import type { AgentState } from '../agents.js';
 import type { FlywheelScope, RoleEffort } from '../config-yaml.js';
+import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
 import { getAgentDir, spawnRun, stopAgent } from '../agents.js';
 import { parseSequenceMd } from '../backlog/sequence-io.js';
 import { computePredictedConflictSignals, declaredIssueFootprint, pickFromSequence, type IssueFileFootprint } from '../flywheel-merge-order.js';
@@ -61,7 +62,42 @@ function defaultFlywheelRunId(): FlywheelRunId {
   return parseRunId(`RUN-${Date.now()}`);
 }
 
-function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions): string {
+function internalDashboardOrigin(): string {
+  const port = Number.parseInt(process.env['API_PORT'] ?? process.env['PORT'] ?? '3011', 10);
+  return process.env['OVERDECK_INTERNAL_DASHBOARD_URL'] ?? `http://127.0.0.1:${port}`;
+}
+
+async function fetchIssueRowsFromDashboard(): Promise<Array<{ ref?: string; identifier?: string; labels?: string[]; author?: string; assignee?: { name?: string } | string }>> {
+  const dashboardOrigin = internalDashboardOrigin();
+  const token = getInternalTokenSync();
+  if (!token) {
+    console.error('[flywheel] Cannot load issue metadata: internal dashboard token is unavailable');
+    return [];
+  }
+  try {
+    const response = await fetch(new URL('/api/issues?cycle=all&includeCompleted=true', dashboardOrigin), {
+      headers: {
+        [INTERNAL_TOKEN_HEADER]: token,
+        origin: dashboardOrigin,
+      },
+    });
+    if (!response.ok) {
+      console.error(`[flywheel] Cannot load issue metadata from dashboard: HTTP ${response.status}`);
+      return [];
+    }
+    const body = await response.json();
+    if (!Array.isArray(body)) {
+      console.error('[flywheel] Cannot load issue metadata from dashboard: response was not an array');
+      return [];
+    }
+    return body as Array<{ ref?: string; identifier?: string; labels?: string[]; author?: string; assignee?: { name?: string } | string }>;
+  } catch (error) {
+    console.error('[flywheel] Cannot load issue metadata from dashboard:', error);
+    return [];
+  }
+}
+
+async function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions): Promise<string> {
   const configLines = [
     options.harness ? `Harness: ${options.harness}` : undefined,
     options.effort ? `Effort: ${options.effort}` : undefined,
@@ -84,19 +120,12 @@ function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions): str
         const md = readFileSync(seqPath, 'utf-8');
         const parsed = parseSequenceMd(md);
         if (parsed.ok) {
-          // Build issue lookups from the shared issue service (lazy-require avoids
-          // circular module load during CLI startup).
+          // Build issue lookups through the dashboard read path. A deacon child
+          // cannot safely import the dashboard's per-process issue singleton.
           type IssueRow = { ref?: string; identifier?: string; labels?: string[]; author?: string; assignee?: { name?: string } | string };
-          const getIssueRows = (): IssueRow[] => {
-            try {
-              // eslint-disable-next-line @typescript-eslint/no-require-imports
-              const { getSharedIssueService } = require('../../dashboard/server/services/issue-service-singleton.js') as
-                typeof import('../../dashboard/server/services/issue-service-singleton.js');
-              return getSharedIssueService().getIssues() as IssueRow[];
-            } catch { return []; }
-          };
+          const getIssueRows = async (): Promise<IssueRow[]> => fetchIssueRowsFromDashboard();
           const issueRowMap = new Map<string, IssueRow>(
-            getIssueRows().map((i) => [i.ref ?? i.identifier ?? '', i]),
+            (await getIssueRows()).map((i) => [i.ref ?? i.identifier ?? '', i]),
           );
 
           const issueLabelsLookup = (issueId: string): string[] =>
@@ -177,8 +206,8 @@ function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions): str
   return (configLines ? `\n\nRun configuration:\n${configLines}` : '') + sequenceSection;
 }
 
-function defaultFlywheelPrompt(runId: string, options: FlywheelLifecycleOptions, briefContent?: string): string {
-  const configSection = flywheelRunConfigurationSection(options);
+async function defaultFlywheelPrompt(runId: string, options: FlywheelLifecycleOptions, briefContent?: string): Promise<string> {
+  const configSection = await flywheelRunConfigurationSection(options);
   const briefSection = options.briefPath
     ? `\n\nBrief path: ${options.briefPath}\n\n${briefContent ?? ''}`
     : '';
@@ -243,8 +272,8 @@ export async function spawnFlywheelAgent(runId: string, options: FlywheelLifecyc
   const briefPath = options.briefPath ?? join(workspace, 'docs', 'flywheel-brief.md');
   const briefContent = await readFile(briefPath, 'utf8').catch(() => undefined);
   const prompt = options.resumeSessionId
-    ? buildFlywheelResumePrompt(flywheelRunConfigurationSection(options), briefContent)
-    : (options.prompt ?? defaultFlywheelPrompt(runId, options, briefContent));
+    ? buildFlywheelResumePrompt(await flywheelRunConfigurationSection(options), briefContent)
+    : (options.prompt ?? (await defaultFlywheelPrompt(runId, options, briefContent)));
   return spawnRun(runId, 'flywheel', {
     agentId: FLYWHEEL_ORCHESTRATOR_AGENT_ID,
     workspace,

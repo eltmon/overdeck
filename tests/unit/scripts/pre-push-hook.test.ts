@@ -68,6 +68,35 @@ describe('.husky/pre-push', () => {
     expect(existsSync(join(root, 'guard-args.txt'))).toBe(false);
   });
 
+  it('audits feature branch ratchets from origin/main merge-base, not the remote feature sha', () => {
+    const { root, hook } = makeHookFixture();
+    execFileSync('git', ['init'], { cwd: root });
+    execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: root });
+    execFileSync('git', ['config', 'user.name', 'Test User'], { cwd: root });
+    writeFileSync(join(root, 'tracked.txt'), 'base\n');
+    execFileSync('git', ['add', 'tracked.txt'], { cwd: root });
+    execFileSync('git', ['commit', '-m', 'chore: base'], { cwd: root });
+    const mainSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf-8' }).trim();
+    execFileSync('git', ['update-ref', 'refs/remotes/origin/main', mainSha], { cwd: root });
+
+    writeFileSync(join(root, 'tracked.txt'), 'feature\n');
+    execFileSync('git', ['commit', '-am', 'fix: feature change'], { cwd: root });
+    const localSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf-8' }).trim();
+    const staleFeatureSha = '2222222222222222222222222222222222222222';
+    writeFileSync(
+      join(root, 'scripts', 'lint-ratchet-audit.sh'),
+      '#!/usr/bin/env bash\necho "$*" > ratchet-args.txt\nexit 0\n',
+      { mode: 0o755 },
+    );
+
+    const result = runHook(root, hook, `HEAD ${localSha} refs/heads/feature ${staleFeatureSha}\n`);
+
+    expect(result.ok).toBe(true);
+    expect(readFileSync(join(root, 'ratchet-args.txt'), 'utf-8').trim()).toBe(
+      `--range ${mainSha}..${localSha}`,
+    );
+  });
+
   it('skips the release guard for deleted release tags', () => {
     const { root, hook } = makeHookFixture();
     const zeroSha = '0000000000000000000000000000000000000000';

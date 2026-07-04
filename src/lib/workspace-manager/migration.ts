@@ -203,7 +203,7 @@ export function copyOverdeckSettingsToWorkspaceSync(workspacePath: string): { co
  */
 export function ensurePanGitignoreSync(projectPath: string): void {
   const gitignorePath = join(projectPath, '.gitignore');
-  const requiredEntries = ['.pan/events/', '.pan/review/', '.pan/prompts/', '.claude/skills/'];
+  const requiredEntries = ['.pan/events/', '.pan/review/', '.pan/prompts/', '.pan/test/', '.claude/skills/'];
 
   let content = existsSync(gitignorePath) ? readFileSync(gitignorePath, 'utf-8') : '';
   const lines = content.split('\n');

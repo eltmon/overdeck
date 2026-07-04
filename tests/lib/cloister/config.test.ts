@@ -138,8 +138,10 @@ describe('Cloister Configuration', () => {
 
       expect(startup).toHaveProperty('auto_start');
       expect(startup).toHaveProperty('reconciliation_grace_secs');
+      expect(startup).toHaveProperty('reconciliation_max_candidate_age_secs');
       expect(typeof startup.auto_start).toBe('boolean');
       expect(startup.reconciliation_grace_secs).toBe(120);
+      expect(startup.reconciliation_max_candidate_age_secs).toBe(240);
     });
 
     it('should have required threshold fields', () => {

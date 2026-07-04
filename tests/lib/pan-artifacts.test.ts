@@ -22,6 +22,7 @@ describe('ensurePanGitignore', () => {
     expect(content).toContain('.pan/events/');
     expect(content).toContain('.pan/review/');
     expect(content).toContain('.pan/prompts/');
+    expect(content).toContain('.pan/test/');
     expect(content).toContain('.claude/skills/');
   });
 
@@ -33,16 +34,19 @@ describe('ensurePanGitignore', () => {
     expect(content).toContain('.pan/events/');
     expect(content).toContain('.pan/review/');
     expect(content).toContain('.pan/prompts/');
+    expect(content).toContain('.pan/test/');
     expect(content).toContain('.claude/skills/');
   });
 
   it('does not duplicate entries if already present', () => {
-    writeFileSync(join(dir, '.gitignore'), '.pan/events/\n.pan/review/\n.pan/prompts/\n.claude/skills/\n', 'utf-8');
+    writeFileSync(join(dir, '.gitignore'), '.pan/events/\n.pan/review/\n.pan/prompts/\n.pan/test/\n.claude/skills/\n', 'utf-8');
     ensurePanGitignoreSync(dir);
     const content = readFileSync(join(dir, '.gitignore'), 'utf-8');
     const panMatches = (content.match(/\.pan\/events\//g) || []).length;
+    const testMatches = (content.match(/\.pan\/test\//g) || []).length;
     const skillsMatches = (content.match(/\.claude\/skills\//g) || []).length;
     expect(panMatches).toBe(1);
+    expect(testMatches).toBe(1);
     expect(skillsMatches).toBe(1);
   });
 
@@ -65,8 +69,10 @@ describe('ensurePanGitignore', () => {
     ensurePanGitignoreSync(dir);
     const content = readFileSync(join(dir, '.gitignore'), 'utf-8');
     const panMatches = (content.match(/\.pan\/events\//g) || []).length;
+    const testMatches = (content.match(/\.pan\/test\//g) || []).length;
     const skillsMatches = (content.match(/\.claude\/skills\//g) || []).length;
     expect(panMatches).toBe(1);
+    expect(testMatches).toBe(1);
     expect(skillsMatches).toBe(1);
   });
 });
