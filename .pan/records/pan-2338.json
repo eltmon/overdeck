@@ -112,16 +112,16 @@
     "recordedAt": "2026-07-04T01:57:37.929Z"
   },
   "created": "2026-07-04T00:35:12.770Z",
-  "updated": "2026-07-04T14:49:24.777Z",
+  "updated": "2026-07-04T14:50:01.055Z",
   "pipeline": {
     "issueId": "PAN-2338",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "merging",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-04T14:49:01.966Z",
+    "mergeStatus": "pending",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-04T14:49:59.496Z",
     "reviewNotes": "Review passed; prior gc-agents and modal outcome blockers are fixed",
     "testNotes": "TypeScript typecheck passed (tsc --noEmit + hooks + evals). ESLint passed (eslint + effect/permissions/state-writes/overdeck-boundaries/skills/prompts/file-size/ratchet-audit). Full npm test passed: 823/827 files (4 skipped), 8233/8292 tests (52 skipped); frontend tests 3/3 files, 32/32 tests. Focused PAN-2338 suites passed: src/lib/cloister/__tests__/boot-reconciliation.test.ts, src/lib/cloister/__tests__/pan-871-auto-resume.test.ts, src/cli/commands/__tests__/db-gc-agents.test.ts, src/dashboard/server/routes/__tests__/boot-reconciliation.test.ts, src/lib/overdeck/__tests__/agents-issue-stage.test.ts, src/dashboard/frontend/src/components/__tests__/BootReconciliationModal.test.tsx. Browser UAT not required: acceptance criteria are backend/CLI focused (candidate gating, per-agent outcomes, gc-agents CLI) and modal rendering is covered by component unit tests.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -256,7 +256,7 @@
       },
       "costAtCloseOut": {
         "usd": 14.302599,
-        "pricingAsOf": "2026-07-04T14:49:01.991Z"
+        "pricingAsOf": "2026-07-04T14:50:00.368Z"
       }
     },
     "merges": [
