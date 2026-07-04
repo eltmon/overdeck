@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-2338",
   "schemaVersion": 2,
-  "created": "2026-07-04T00:35:12.770Z",
-  "updated": "2026-07-04T00:35:13.106Z",
-  "pipeline": {
-    "issueId": "PAN-2338",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-04T00:35:12.770Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -26,6 +9,76 @@
       "timestamp": "2026-07-04T00:35:12.770Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-04T00:35:12.770Z",
+  "updated": "2026-07-04T01:24:22.550Z",
+  "pipeline": {
+    "issueId": "PAN-2338",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-04T01:24:22.494Z",
+    "inspectNotes": "workspace-ppk5t matches the bead scope: applyBootReconciliationDecision now returns resumed plus per-agent outcomes, covers resumed/no-resumable-session/deferred-concurrency/deferred-load, wrapper and direct resumed-count callers compile against the new shape, and the focused test covers skipped unresumable candidates. No inspected constraint violations found."
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "inspect": {
+          "openai/gpt-5.5": {
+            "input": 813223,
+            "output": 33085,
+            "cacheRead": 6029824,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 26744,
+            "output": 1070,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 20345,
+            "output": 47471,
+            "cacheRead": 5984093,
+            "cacheWrite": 169402
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.5": {
+          "input": 813223,
+          "output": 33085,
+          "cacheRead": 6029824,
+          "cacheWrite": 0
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 26744,
+          "output": 1070,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 20345,
+          "output": 47471,
+          "cacheRead": 5984093,
+          "cacheWrite": 169402
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 13.412889,
+        "pricingAsOf": "2026-07-04T01:24:22.549Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "model": "gpt-5.5"
 }
