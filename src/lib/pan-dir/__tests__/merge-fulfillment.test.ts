@@ -326,13 +326,31 @@ describe('reconcileMergedIssue', () => {
     const result = await reconcileMergedIssue('PAN-123', project, {}, deps);
 
     expect(deps.commands).toContain("git branch -D 'feature/pan-123'");
-    expect(deps.commands).toContain("git push origin --delete 'feature/pan-123'");
+    expect(deps.commands).not.toContain("git push origin --delete 'feature/pan-123'");
     expect(deps.commands).not.toContain("git branch -D 'strike/pan-123'");
     expect(deps.commands).not.toContain("git push origin --delete 'strike/pan-123'");
     expect(result.branchActions).toEqual([
       { branch: 'feature/pan-123', status: 'deleted', reason: 'branch is an ancestor of origin/main' },
       { branch: 'strike/pan-123', status: 'kept', reason: 'branch is not an ancestor of origin/main' },
       { branch: 'origin/feature/pan-123', status: 'missing', reason: 'branch was not found' },
+      { branch: 'origin/strike/pan-123', status: 'missing', reason: 'branch was not found' },
+    ]);
+  });
+
+  it('does not delete a remote branch when only the local branch is merged', async () => {
+    const deps = makeDeps({
+      existingBranches: ['feature/pan-123', 'origin/feature/pan-123'],
+      mergedBranches: ['feature/pan-123'],
+    });
+
+    const result = await reconcileMergedIssue('PAN-123', project, {}, deps);
+
+    expect(deps.commands).toContain("git branch -D 'feature/pan-123'");
+    expect(deps.commands).not.toContain("git push origin --delete 'feature/pan-123'");
+    expect(result.branchActions).toEqual([
+      { branch: 'feature/pan-123', status: 'deleted', reason: 'branch is an ancestor of origin/main' },
+      { branch: 'strike/pan-123', status: 'missing', reason: 'branch was not found' },
+      { branch: 'origin/feature/pan-123', status: 'kept', reason: 'branch is not an ancestor of origin/main' },
       { branch: 'origin/strike/pan-123', status: 'missing', reason: 'branch was not found' },
     ]);
   });

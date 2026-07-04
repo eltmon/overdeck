@@ -354,10 +354,11 @@ async function reconcileBranch(
     return { branch, status: 'planned-delete', reason: 'branch is an ancestor of origin/main' };
   }
 
-  if (!branch.startsWith('origin/')) {
+  if (branch.startsWith('origin/')) {
+    await deps.exec(`git push origin --delete ${shellQuote(remoteBranchName(branch))}`, { cwd: project.path }).catch(() => ({ stdout: '', stderr: '' }));
+  } else {
     await deps.exec(`git branch -D ${shellQuote(branch)}`, { cwd: project.path });
   }
-  await deps.exec(`git push origin --delete ${shellQuote(remoteBranchName(branch))}`, { cwd: project.path }).catch(() => ({ stdout: '', stderr: '' }));
   return { branch, status: 'deleted', reason: 'branch is an ancestor of origin/main' };
 }
 
