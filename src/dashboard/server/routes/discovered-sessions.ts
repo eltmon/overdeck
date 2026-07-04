@@ -6,6 +6,7 @@
  *   POST /api/discovered-sessions/scan       — trigger a scan
  *   GET  /api/discovered-sessions            — list with filters
  *   GET  /api/discovered-sessions/:id        — get single session
+ *   GET  /api/discovered-sessions/:id/messages — get unmanaged session messages
  *   GET  /api/discovered-sessions/search     — FTS + filter search
  *   GET  /api/discovered-sessions/cost       — cost summary
  *   POST /api/discovered-sessions/:id/enrich — enrich single session
@@ -15,6 +16,8 @@
  *
  * Zero sync FS calls — lib functions use fs/promises; SQLite work stays in the existing sync DB layer.
  */
+
+import { stat } from 'node:fs/promises';
 
 import { Effect, Layer, Schema } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
@@ -39,6 +42,7 @@ import { embed } from '../../../lib/conversations/embeddings/providers.js';
 import { validateOrigin } from './origin-validation.js';
 import { rejectUnauthorizedDashboardRequest } from './dashboard-auth.js';
 import { runDashboardDbJob } from '../services/dashboard-db-task.js';
+import { parseConversationMessages } from '../services/conversation-service.js';
 
 function getRequestHeader(
   request: HttpServerRequest.HttpServerRequest,
@@ -177,6 +181,16 @@ const ConfigResponseSchema = Schema.Struct({
 const OkResponseSchema = Schema.Struct({ ok: Schema.Boolean });
 const TestConnectionResponseSchema = Schema.Struct({ ok: Schema.Boolean, latencyMs: Schema.optional(Schema.Number), error: Schema.optional(Schema.String) });
 
+const DISCOVERED_MESSAGES_CACHE_MAX = 20;
+const discoveredMessagesCache = new Map<
+  string,
+  {
+    mtimeMs: number;
+    size: number;
+    result: Awaited<ReturnType<typeof parseConversationMessages>>;
+  }
+>();
+
 function validatedJsonResponse<A>(schema: Schema.Codec<A>, data: unknown): ReturnType<typeof jsonResponse> {
   Schema.decodeUnknownSync(schema)(data);
   return jsonResponse(data);
@@ -191,6 +205,30 @@ function parseRequestBody<A>(schema: Schema.Codec<A>, raw: unknown): { ok: true;
       response: jsonResponse({ error: 'Invalid request body', details: err instanceof Error ? err.message : String(err) }, { status: 400 }),
     };
   }
+}
+
+async function getCachedDiscoveredMessages(
+  sessionFile: string,
+): Promise<Awaited<ReturnType<typeof parseConversationMessages>>> {
+  const fileStats = await stat(sessionFile);
+  const cached = discoveredMessagesCache.get(sessionFile);
+  if (cached && cached.mtimeMs === fileStats.mtimeMs && cached.size === fileStats.size) {
+    discoveredMessagesCache.delete(sessionFile);
+    discoveredMessagesCache.set(sessionFile, cached);
+    return cached.result;
+  }
+
+  const result = await parseConversationMessages(sessionFile, 0);
+  discoveredMessagesCache.set(sessionFile, {
+    mtimeMs: fileStats.mtimeMs,
+    size: fileStats.size,
+    result,
+  });
+  if (discoveredMessagesCache.size > DISCOVERED_MESSAGES_CACHE_MAX) {
+    const firstKey = discoveredMessagesCache.keys().next().value;
+    if (firstKey !== undefined) discoveredMessagesCache.delete(firstKey);
+  }
+  return result;
 }
 
 // ─── GET /api/discovered-sessions/stats ───────────────────────────────────────
@@ -394,6 +432,55 @@ const getByIdRoute = HttpRouter.add(
     }
 
     return validatedJsonResponse(DiscoveredSessionResponseSchema, session);
+  })),
+);
+
+// ─── GET /api/discovered-sessions/:id/messages ───────────────────────────────
+
+const getMessagesRoute = HttpRouter.add(
+  'GET',
+  '/api/discovered-sessions/:id/messages',
+  httpHandler(Effect.gen(function* () {
+    const req = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(req);
+    if (authError) return authError;
+    const params = yield* HttpRouter.params;
+    const id = parseInt(params['id'] ?? '', 10);
+    if (!Number.isFinite(id) || id <= 0) {
+      return jsonResponse({ error: 'Invalid session id' }, { status: 400 });
+    }
+
+    const session = yield* Effect.promise(() => runDashboardDbJob<DiscoveredSession | null>('getDiscoveredSessionById', id));
+    if (!session) {
+      return jsonResponse({ error: 'Discovered session not found' }, { status: 404 });
+    }
+    if (session.conversationName) {
+      return jsonResponse({
+        error: 'Managed conversation messages must be loaded through the conversations endpoint',
+        redirectTo: `/api/conversations/${encodeURIComponent(session.conversationName)}/messages`,
+      }, { status: 409 });
+    }
+
+    return yield* Effect.promise(async () => {
+      try {
+        const result = await getCachedDiscoveredMessages(session.jsonlPath);
+        return jsonResponse({
+          messages: result.messages,
+          workLog: result.workLog,
+          streaming: result.streaming,
+          totalCost: result.totalCost,
+          totalTokens: result.totalTokens,
+          proposedPlan: result.proposedPlan,
+          compactBoundaries: (result.compactBoundaries?.length ?? 0) > 0 ? result.compactBoundaries : undefined,
+        });
+      } catch (err: unknown) {
+        const code = (err as { code?: string })?.code;
+        if (code === 'ENOENT') {
+          return jsonResponse({ error: 'Transcript file no longer exists on disk' }, { status: 410 });
+        }
+        throw err;
+      }
+    });
   })),
 );
 
@@ -795,6 +882,7 @@ export const discoveredSessionsRouteLayer = Layer.mergeAll(
   listRoute,
   searchRoute,
   getCostRoute,
+  getMessagesRoute,
   getByIdRoute,
   postEnrichByIdRoute,
   postScanRoute,

@@ -228,6 +228,12 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
               <div className="text-muted-foreground">Containers</div>
               <div className="mt-1 font-semibold text-foreground">{data.summary.containerCount}</div>
             </div>
+            <div className="rounded-lg border border-border p-2">
+              <div className="text-muted-foreground">Webhook relay</div>
+              <div className={`mt-1 font-semibold ${data.smeeRelay.running || !data.smeeRelay.configured ? 'text-foreground' : 'text-warning-foreground'}`}>
+                {data.smeeRelay.message}
+              </div>
+            </div>
           </div>
 
           {data.reasons.length > 0 && (

@@ -1,0 +1,3 @@
+#!/bin/sh
+
+bash scripts/guard-flywheel-orchestrator-commit.sh </dev/null

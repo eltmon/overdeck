@@ -36,6 +36,7 @@ import {
   getCockpitRouteFromPath,
   getCommandDeckProjectRouteFromPath,
   getConversationRouteState,
+  getSessionKeyFromSearch,
   normalizeCurrentRoute,
   TAB_PATHS,
   type ConversationViewModeMap,
@@ -57,6 +58,7 @@ export {
   getConversationRouteState,
   getConversationViewModeFromSearch,
   getConvIdFromPath,
+  getSessionKeyFromSearch,
   normalizeLegacyAwaitingMergeRoute,
   parseConversationViewModes,
   serializeConversationViewModes,
@@ -132,6 +134,7 @@ export default function App() {
   const initialConversationRoute = getConversationRouteState();
   const initialCockpitRoute = getCockpitRouteFromPath();
   const initialProjectRoute = getCommandDeckProjectRouteFromPath();
+  const initialSessionKey = getSessionKeyFromSearch();
   const [selectedConvId, setSelectedConvIdState] = useState<string | null>(() => initialConversationRoute.convId);
   // PAN-1561: the project whose deck is shown in the Command Deck, driven by the
   // sidebar's Projects rail.
@@ -703,6 +706,7 @@ export default function App() {
             selectedProjectKey={selectedProjectKey}
             pendingConversationTarget={pendingConversationTarget}
             cockpitRoute={cockpitRoute}
+            initialSessionKey={initialSessionKey}
             onOpenWorkspaceHome={handleOpenWorkspaceHome}
             onNewProject={handleNewProject}
             onSelectProject={handleSelectProject}

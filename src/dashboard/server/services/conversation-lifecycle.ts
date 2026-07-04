@@ -135,6 +135,9 @@ export async function pollConversations(): Promise<void> {
     const aliveSessions = new Set(await Effect.runPromise(listSessionNames()));
 
     const endedConversations: typeof conversations = [];
+    let sessionGoneCount = 0;
+    let keepAliveCorpseCount = 0;
+    const keepAliveCorpseDiagnostics: string[] = [];
     const now = Date.now();
     for (const conv of conversations) {
       const ageMs = now - new Date(conv.createdAt).getTime();
@@ -180,18 +183,34 @@ export async function pollConversations(): Promise<void> {
         fresh.lastAttachedAt ? new Date(fresh.lastAttachedAt).getTime() || 0 : 0,
       );
       if (Date.now() - lastAliveSignalMs < SPAWN_GRACE_PERIOD_MS) continue;
-      if (sessionGone) {
-        console.log(`[conversation-lifecycle] Session ${conv.tmuxSession} gone — marking ended`);
-      } else {
+      if (process.env.DEBUG?.includes('conversation-lifecycle')) {
+        console.log(
+          sessionGone
+            ? `[conversation-lifecycle] Session ${conv.tmuxSession} gone — marking ended`
+            : `[conversation-lifecycle] Session ${conv.tmuxSession} alive but harness exited (keep-alive corpse) — marking ended`,
+        );
+      }
+      if (!sessionGone) {
         // PAN-2099: a keep-alive corpse means the harness process crashed/exited
         // while tmux kept the (now dead) pane. Capture the death evidence — pane
         // exit status + output.log tail — instead of the old reasonless line, so
         // an ENOSPC/uncaught-exception death is diagnosable from this log alone.
         const diag = await captureCorpseDiagnostics(conv.tmuxSession);
-        console.log(`[conversation-lifecycle] Session ${conv.tmuxSession} alive but harness exited (keep-alive corpse) — marking ended${diag}`);
+        if (diag) keepAliveCorpseDiagnostics.push(`${conv.tmuxSession}${diag}`);
       }
       markConversationEnded(conv.name);
       endedConversations.push(conv);
+      if (sessionGone) sessionGoneCount++;
+      else keepAliveCorpseCount++;
+    }
+
+    if (endedConversations.length > 0) {
+      const diagnosticsSuffix = keepAliveCorpseDiagnostics.length
+        ? `; keep-alive corpse diagnostics: ${keepAliveCorpseDiagnostics.join(' | ')}`
+        : '';
+      console.log(
+        `[conversation-lifecycle] marked ${endedConversations.length} conversation(s) ended (${sessionGoneCount} session(s) gone, ${keepAliveCorpseCount} keep-alive corpses)${diagnosticsSuffix}`,
+      );
     }
     // Batch attachment cleanup to avoid an unbounded fan-out when many
     // conversations end simultaneously (e.g., after server restart).

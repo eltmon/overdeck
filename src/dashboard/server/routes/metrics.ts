@@ -19,6 +19,8 @@ import { getCloisterService } from '../../../lib/cloister/service.js';
 import { listRunningAgents } from '../../../lib/agents.js';
 import { loadReviewStatuses } from '../../../lib/review-status.js';
 import { getTodayCostSync } from '../../../lib/overdeck/cost-sync.js';
+import { getEventLoopDelaySample } from '../services/event-loop-monitor.js';
+import { readDurableCloisterStatus } from '../services/cloister-control-surface.js';
 
 // ─── Cached review statuses ───────────────────────────────────────────────────
 // loadReviewStatuses() hits SQLite with SELECT * FROM review_status on every
@@ -79,6 +81,50 @@ export function computeStuckCount(
   return new Set([...healthSet, ...persistentSet]).size;
 }
 
+export function buildMetricsSummaryPayload(params: {
+  todayCost: number;
+  status: {
+    summary: {
+      total: number;
+      active: number;
+      warning: number;
+    };
+    agentsNeedingAttention: string[];
+  };
+  costSummary: {
+    topAgents: unknown[];
+    topIssues: unknown[];
+  };
+  runningAgents: Array<{ id: string; issueId?: string; tmuxActive: boolean }>;
+  reviewStatuses: Record<string, { stuck?: boolean; issueId: string }>;
+  getAgentHealth: (id: string) => { state: string } | null | undefined;
+  eventLoop: ReturnType<typeof getEventLoopDelaySample>;
+}) {
+  const topAgents = params.costSummary.topAgents.slice(0, 5);
+  const topIssues = params.costSummary.topIssues.slice(0, 5);
+  const stuckCount = computeStuckCount(
+    params.status.agentsNeedingAttention,
+    params.getAgentHealth,
+    buildAgentIssueMap(params.runningAgents),
+    params.reviewStatuses,
+  );
+
+  return {
+    today: {
+      totalCost: Math.round(params.todayCost * 100) / 100,
+      agentCount: params.status.summary.total,
+      activeCount: params.status.summary.active,
+      stuckCount,
+      warningCount: params.status.summary.warning,
+    },
+    topSpenders: {
+      agents: topAgents,
+      issues: topIssues,
+    },
+    eventLoop: params.eventLoop,
+  };
+}
+
 // ─── Route: GET /api/metrics/summary ─────────────────────────────────────────
 
 const getMetricsSummaryRoute = HttpRouter.add(
@@ -86,34 +132,21 @@ const getMetricsSummaryRoute = HttpRouter.add(
   '/api/metrics/summary',
   httpHandler(Effect.gen(function* () {
     const service = getCloisterService();
-    const status = service.getStatus();
+    const status = readDurableCloisterStatus();
 
     const costSummary = service.getCostSummary();
     const todayCost = getTodayCostSync();
-    const topAgents = costSummary.topAgents.slice(0, 5);
-    const topIssues = costSummary.topIssues.slice(0, 5);
 
     const runningAgents = yield* listRunningAgents();
-    const stuckCount = computeStuckCount(
-      status.agentsNeedingAttention,
-      (id) => service.getAgentHealth(id),
-      buildAgentIssueMap(runningAgents),
-      getReviewStatusesCached(),
-    );
-
-    return jsonResponse({
-      today: {
-        totalCost: Math.round(todayCost * 100) / 100,
-        agentCount: status.summary.total,
-        activeCount: status.summary.active,
-        stuckCount,
-        warningCount: status.summary.warning,
-      },
-      topSpenders: {
-        agents: topAgents,
-        issues: topIssues,
-      },
-    });
+    return jsonResponse(buildMetricsSummaryPayload({
+      todayCost,
+      status,
+      costSummary,
+      runningAgents,
+      reviewStatuses: getReviewStatusesCached(),
+      getAgentHealth: (id) => service.getAgentHealth(id),
+      eventLoop: getEventLoopDelaySample(),
+    }));
   })),
 );
 
@@ -142,7 +175,7 @@ const getMetricsStuckRoute = HttpRouter.add(
   '/api/metrics/stuck',
   httpHandler(Effect.gen(function* () {
     const service = getCloisterService();
-    const status = service.getStatus();
+    const status = readDurableCloisterStatus();
     const runningAgents = yield* listRunningAgents();
     const current = computeStuckCount(
       status.agentsNeedingAttention,

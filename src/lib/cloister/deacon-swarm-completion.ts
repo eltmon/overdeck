@@ -77,6 +77,28 @@ export async function classifyDoneWithoutSignal(
   };
 }
 
+export async function classifyDurableReadySlot(
+  slot: ReconciledSlotItem,
+  deps: Partial<Pick<CoordinateSwarmSlotsDeps, 'getSlotBranchAheadCount' | 'isSlotWorktreeClean'>>,
+  options: ClassifyInFlightSlotsOptions,
+): Promise<ClassifiedSwarmSlot | null> {
+  if (!slot.branch || !options.workspacePath || !options.issueId) return null;
+
+  const aheadCount = await (deps.getSlotBranchAheadCount ?? defaultGetSlotBranchAheadCount)(
+    options.workspacePath,
+    options.issueId,
+    slot.branch,
+  ).catch(() => 0);
+  if (aheadCount < 1) return null;
+
+  const clean = await (deps.isSlotWorktreeClean ?? defaultIsSlotWorktreeClean)(
+    `${options.workspacePath}-slot-${slot.slotIndex}`,
+  ).catch(() => false);
+  if (!clean) return null;
+
+  return { ...slot, lifecycle: 'ready-to-merge', exitStatus: 0, signal: 'inferred' };
+}
+
 export function resetSwarmCompletionInferenceForTests(): void {
   slotCompletionObservations.clear();
 }

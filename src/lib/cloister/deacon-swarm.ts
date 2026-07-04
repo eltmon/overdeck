@@ -45,6 +45,7 @@ import { listFeatureWorkspaces, type FeatureWorkspace } from './deacon-workspace
 import { gcOrphanedSlots } from './deacon-swarm-orphan-gc.js';
 import {
   classifyDoneWithoutSignal,
+  classifyDurableReadySlot,
   clearSwarmCompletionObservation,
   defaultGetSlotBranchAheadCount,
   defaultIsSlotWorktreeClean,
@@ -52,7 +53,13 @@ import {
   resetSwarmCompletionInferenceForTests,
   swarmInferCompletionMode,
 } from './deacon-swarm-completion.js';
+import {
+  defaultRequestIssueReview,
+  finalizeSwarmIssueIfComplete,
+  type RequestIssueReviewResult,
+} from './deacon-swarm-finalization.js';
 import { gcMergedSlots } from './deacon-swarm-gc.js';
+import { createMinimalIssueRecord, writeSwarmFinalizedAt } from './deacon-swarm-record.js';
 
 export { gcOrphanedSlots } from './deacon-swarm-orphan-gc.js';
 export { gcMergedSlots } from './deacon-swarm-gc.js';
@@ -67,7 +74,6 @@ const recentSlotMergeFires = new Map<string, number>();
 const issueAdvanceFailures = new Map<string, { count: number; cooldownUntil: number }>();
 const failedMergeBlocks = new Map<string, FailedMergeBlock>();
 const slotProgressObservations = new Map<string, SlotProgressObservation>();
-
 export type SwarmRecoveryAction = 'retry' | 'drop' | 'handoff';
 
 export interface FailedMergeBlock {
@@ -120,6 +126,8 @@ export interface CoordinateSwarmSlotsDeps {
   getIssueHold?: (issueId: string) => Pick<ReviewStatus, 'stuck' | 'deaconIgnored'> | null;
   /** Per-issue record statusOverrides — the durable item done-ness the merged plan view applies. */
   readStatusOverrides?: (workspacePath: string, issueId: string) => Record<string, string> | undefined;
+  getFinalizedAt: (issueId: string, workspacePath: string) => string | undefined;
+  setFinalizedAt: (issueId: string, workspacePath: string, finalizedAt: string) => void;
   /**
    * Re-evaluated immediately before EVERY slot spawn: global freeze + per-issue hold.
    * The cycle-start checks alone let an in-flight wave keep dispatching after a freeze
@@ -134,6 +142,8 @@ export interface CoordinateSwarmSlotsDeps {
   getMaxSlotIndex?: () => number;
   /** Durable slot assignments from the issue record; they survive registry resets (PAN-2214). */
   listSlotAssignments?: (issueId: string, workspacePath: string) => Array<{ slotIndex: number }>;
+  /** Request issue-level review once every swarm item has been assembled into the feature branch. */
+  requestIssueReview: (issueId: string, workspacePath: string) => Promise<RequestIssueReviewResult>;
 }
 
 const defaultDeps: CoordinateSwarmSlotsDeps = {
@@ -177,6 +187,10 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   shouldDispatch: defaultShouldDispatch,
   getMaxSlotIndex: defaultGetMaxSlotIndex,
   listSlotAssignments: listDurableSlotAssignments,
+  readStatusOverrides: defaultReadStatusOverrides,
+  getFinalizedAt: getSwarmFinalizedAt,
+  setFinalizedAt: recordSwarmFinalizedAt,
+  requestIssueReview: defaultRequestIssueReview,
 };
 
 function defaultGetMaxSlotIndex(): number {
@@ -267,14 +281,10 @@ export async function coordinateSwarmSlots(
     try {
       const spec = await Effect.runPromise(findSpecByIssue(workspace.projectPath, issueId));
       if (!spec) continue;
+      const planStatus = spec.document.plan.status;
+      if (planStatus === 'completed' || planStatus === 'cancelled') continue;
 
-      // Coordinate against the MERGED plan view (main spec + per-issue record
-      // statusOverrides), not the raw main spec. Item done-ness only lives in
-      // the overrides: slot merges mirror `done` there, and gc later deletes
-      // the slot branch + assignment — the only other merged-ness evidence.
-      // Reading the raw spec made completed items dispatchable again after gc
-      // (tier-table-config was re-dispatched to a fresh slot after its work
-      // had already been consolidated into the feature branch).
+      // Coordinate against the merged plan view; slot done-ness lives in statusOverrides.
       const overrides = (deps.readStatusOverrides ?? defaultReadStatusOverrides)(workspace.workspacePath, issueId);
       const doc = overrides && Object.keys(overrides).length > 0
         ? applyStatusOverrides(spec.document, overrides)
@@ -282,15 +292,7 @@ export async function coordinateSwarmSlots(
 
       const readiness = analyzeSwarmReadiness(doc);
       const slotEligibleCount = readiness.items.filter(item => item.slotEligible).length;
-      // Eligibility gates DISPATCH only. Reconcile/merge/gc must still run for
-      // an issue with live slot state, or the endgame starves: once fewer than
-      // two dispatchable items remain, the old early-continue skipped the whole
-      // pass and the final slots of every swarm could never merge (observed
-      // live on PAN-1791 with two finished slots waiting).
-      // The >=2 floor exists so single-item plans never START a swarm — but an
-      // in-progress swarm (evidenced by completed item overrides) must be able
-      // to finish its tail, or the LAST item of every swarm strands undispatched
-      // (observed live on PAN-1791 at 19/20 with only the e2e item left).
+      // Eligibility gates dispatch only; active swarms still need merge/gc/endgame passes.
       const swarmInProgress = Object.entries(overrides ?? {})
         .some(([key, value]) => !key.includes('.') && value === 'completed');
       const dispatchEligible = readiness.swarmEligible && (slotEligibleCount >= 2 || swarmInProgress);
@@ -302,7 +304,10 @@ export async function coordinateSwarmSlots(
       if (!dispatchEligible) {
         const hasSlotState = reconciled.merged.length > 0 || reconciled.inFlight.length > 0
           || reconciled.branches.length > 0 || reconciled.agents.length > 0;
-        if (!hasSlotState) continue;
+        if (!hasSlotState) {
+          actions.push(...await finalizeSwarmIssueIfComplete(issueId, workspace.workspacePath, doc, deps));
+          continue;
+        }
         actions.push(`[swarm] considered ${issueId}: endgame (merge/cleanup only)`);
       }
 
@@ -319,6 +324,7 @@ export async function coordinateSwarmSlots(
       actions.push(...await mergeReadySlots(issueId, workspace.workspacePath, doc, classified, deps));
       actions.push(...await gcMergedSlots(issueId, workspace.workspacePath, reconciled.merged, deps));
       actions.push(...await gcOrphanedSlots(issueId, workspace.workspacePath, reconciled, deps));
+      actions.push(...await finalizeSwarmIssueIfComplete(issueId, workspace.workspacePath, spec.document, deps));
       if (dispatchEligible) {
         actions.push(...await dispatchNextWave(issueId, workspace.workspacePath, doc, reconciled, readiness, deps));
       }
@@ -352,7 +358,12 @@ export async function classifyInFlightSlots(
   const stallThresholdMs = options.stallThresholdMs ?? swarmStallThresholdMs();
 
   for (const slot of slots) {
+    const durableReady = await classifyDurableReadySlot(slot, deps, options);
     if (!slot.agentId) {
+      if (durableReady) {
+        classified.push(durableReady);
+        continue;
+      }
       classified.push({ ...slot, lifecycle: 'failed', reason: 'missing-agent' });
       continue;
     }
@@ -364,6 +375,10 @@ export async function classifyInFlightSlots(
     }
 
     if (!sessionNames.has(slot.agentId)) {
+      if (durableReady) {
+        classified.push(durableReady);
+        continue;
+      }
       classified.push({ ...slot, lifecycle: 'failed', reason: 'vanished-session' });
       continue;
     }
@@ -538,6 +553,14 @@ export function getFailedMergeBlock(issueId: string, workspacePath?: string): Fa
   return failedMergeBlocks.get(normalized);
 }
 
+export function getSwarmFinalizedAt(issueId: string, workspacePath?: string): string | undefined {
+  return workspacePath ? readIssueRecordForWorkspaceSync(workspacePath, issueId.toUpperCase())?.swarm?.finalizedAt : undefined;
+}
+
+export function recordSwarmFinalizedAt(issueId: string, workspacePath: string, finalizedAt: string): void {
+  writeSwarmFinalizedAt(workspacePath, issueId.toUpperCase(), finalizedAt);
+}
+
 export function recordFailedMergeBlock(block: FailedMergeBlock, workspacePath?: string): void {
   const normalizedBlock = { ...block, issueId: block.issueId.toUpperCase() };
   failedMergeBlocks.set(normalizedBlock.issueId, normalizedBlock);
@@ -655,33 +678,6 @@ function writeSwarmFailedMergeBlock(
       failedMergeBlock: block,
     },
   });
-}
-
-function createMinimalIssueRecord(issueId: string): PanIssueRecord {
-  const now = new Date().toISOString();
-  return {
-    issueId,
-    schemaVersion: 2,
-    created: now,
-    updated: now,
-    feedback: [],
-    pipeline: {
-      issueId,
-      reviewStatus: 'pending',
-      testStatus: 'pending',
-      mergeStatus: 'pending',
-      readyForMerge: false,
-      updatedAt: now,
-    },
-    closeOut: {
-      usage: {
-        byStage: {},
-        totals: {},
-      },
-      merges: [],
-      ranOn: '',
-    },
-  };
 }
 
 function recordSlotMergeFire(branchKey: string, now = Date.now()): void {

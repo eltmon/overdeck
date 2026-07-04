@@ -3,13 +3,17 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { mkdtemp, rm } from 'fs/promises';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { Effect } from 'effect';
 import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
+import type { CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
 import { applyStatusOverrides } from '../../../../src/lib/vbrief/io.js';
 import { getDispatchableItems } from '../../../../src/lib/vbrief/dag.js';
 
 const mocks = vi.hoisted(() => ({
   listProjectsSync: vi.fn(),
   getReviewStatusSync: vi.fn(),
+  setReviewStatusSync: vi.fn(),
+  spawnReviewRoleForIssue: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
@@ -20,6 +24,11 @@ vi.mock('../../../../src/lib/projects.js', () => ({
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
   getReviewStatusSync: mocks.getReviewStatusSync,
+  setReviewStatusSync: mocks.setReviewStatusSync,
+}));
+
+vi.mock('../../../../src/lib/cloister/review-agent.js', () => ({
+  spawnReviewRoleForIssue: mocks.spawnReviewRoleForIssue,
 }));
 
 let tempRoot: string;
@@ -28,7 +37,10 @@ beforeEach(async () => {
   tempRoot = await mkdtemp(join(tmpdir(), 'overdeck-swarm-doneness-'));
   mocks.listProjectsSync.mockReset();
   mocks.getReviewStatusSync.mockReset();
+  mocks.setReviewStatusSync.mockReset();
+  mocks.spawnReviewRoleForIssue.mockReset();
   mocks.getReviewStatusSync.mockReturnValue(null);
+  mocks.spawnReviewRoleForIssue.mockReturnValue(Effect.succeed({ success: true, message: 'dispatched' }));
 });
 
 afterEach(async () => {
@@ -76,6 +88,67 @@ function writeSpec(projectPath: string, issueId: string, doc: VBriefDocument): v
   }, null, 2));
 }
 
+function makeAllCompletedDoc(issueId: string, planStatus: string): VBriefDocument {
+  const doc = makeDoc(issueId, 2);
+  doc.plan.status = planStatus;
+  doc.plan.items = doc.plan.items.map(item => ({ ...item, status: 'completed' }));
+  return doc;
+}
+
+function makeCoordinateDeps(
+  issueId: string,
+  projectPath: string,
+  workspacePath: string,
+): CoordinateSwarmSlotsDeps {
+  return {
+    listFeatureWorkspaces: () => [{ issueId, projectPath, workspacePath }],
+    reconcileSlotState: vi.fn(async (reconcileIssueId: string) => ({
+      issueId: reconcileIssueId,
+      merged: [],
+      inFlight: [],
+      pending: [],
+      branches: [],
+      agents: [],
+    })),
+    listSessionNames: vi.fn(async () => []),
+    isPaneDead: vi.fn(async () => false),
+    getPaneExitStatus: vi.fn(async () => null),
+    getAgentRuntimeState: vi.fn(async () => null),
+    getPaneOutputDigest: vi.fn(async () => ''),
+    getBranchTipCommitTime: vi.fn(async () => null),
+    getSlotBranchAheadCount: vi.fn(async () => 0),
+    isSlotWorktreeClean: vi.fn(async () => true),
+    sendCompletionNudge: vi.fn(async () => {}),
+    slotWorktreeExists: vi.fn(() => false),
+    verifyAndMergeSlot: vi.fn(async () => ({
+      verified: false,
+      merged: false,
+      conflicts: false,
+      evidence: {
+        verifyCommands: [],
+        expectedOutputs: [],
+        commandOutputs: [],
+      },
+    })),
+    applyTaskOperationToPlanFile: vi.fn(async () => null),
+    recordSlotAssignment: vi.fn(),
+    clearSlotAssignment: vi.fn(),
+    runGitCommand: vi.fn(async () => null),
+    registeredSlotCapacityAvailable: vi.fn(() => false),
+    tryReserveSwarmSlot: vi.fn(() => false),
+    releaseSwarmSlot: vi.fn(),
+    spawnRun: vi.fn(async () => null),
+    getIssueHold: vi.fn(() => null),
+    readStatusOverrides: vi.fn(() => undefined),
+    getFinalizedAt: vi.fn(() => undefined),
+    setFinalizedAt: vi.fn(),
+    shouldDispatch: vi.fn(() => true),
+    getMaxSlotIndex: vi.fn(() => 4),
+    listSlotAssignments: vi.fn(() => []),
+    requestIssueReview: vi.fn(async () => ({ success: true, message: 'dispatched' })),
+  };
+}
+
 describe('swarm item done-ness survives slot gc (statusOverrides overlay)', () => {
   it('pure mechanism: a completed override removes the item from dispatchable set', () => {
     const doc = makeDoc('PAN-900', 3);
@@ -97,17 +170,35 @@ describe('swarm item done-ness survives slot gc (statusOverrides overlay)', () =
     }, null, 2));
   }
 
-  it('coordinator skips an issue whose only remaining items are override-completed', async () => {
+  it('coordinator finalizes an issue whose only remaining items are override-completed', async () => {
+    const { execFileSync } = await import('node:child_process');
     const { coordinateSwarmSlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
     const projectPath = join(tempRoot, 'project');
-    mkdirSync(join(projectPath, 'workspaces', 'feature-pan-900'), { recursive: true });
+    const workspacePath = join(projectPath, 'workspaces', 'feature-pan-900');
+    mkdirSync(workspacePath, { recursive: true });
+    const git = (...args: string[]) => execFileSync('git', args, { cwd: workspacePath, stdio: 'ignore' });
+    git('init', '-b', 'feature/pan-900');
+    git('config', 'user.email', 't@t');
+    git('config', 'user.name', 't');
+    git('commit', '--allow-empty', '-m', 'base');
     writeSpec(projectPath, 'PAN-900', makeDoc('PAN-900', 2));
     writeRecordOverrides(projectPath, 'pan-900', { 'wi-1': 'completed', 'wi-2': 'completed' });
     mocks.listProjectsSync.mockReturnValue([{ config: { path: projectPath } }]);
 
     const actions = await coordinateSwarmSlots();
 
+    expect(actions).toContain('[swarm] finalized PAN-900: issue-level review requested');
     expect(actions).not.toContain('[swarm] considered PAN-900: swarm eligible');
+    expect(mocks.setReviewStatusSync).toHaveBeenCalledWith('PAN-900', expect.objectContaining({
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      reviewRequestedAt: expect.any(String),
+    }));
+    expect(mocks.spawnReviewRoleForIssue).toHaveBeenCalledWith({
+      issueId: 'PAN-900',
+      workspace: workspacePath,
+      branch: 'feature/pan-900',
+    });
   });
 
   it('coordinator still considers an issue with remaining dispatchable items', async () => {
@@ -121,6 +212,54 @@ describe('swarm item done-ness survives slot gc (statusOverrides overlay)', () =
     const actions = await coordinateSwarmSlots();
 
     expect(actions).toContain('[swarm] considered PAN-901: swarm eligible');
+  });
+});
+
+describe('swarm terminal spec guard', () => {
+  it('skips a completed all-done spec before requesting issue review', async () => {
+    const { coordinateSwarmSlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
+    const projectPath = join(tempRoot, 'project');
+    const workspacePath = join(projectPath, 'workspaces', 'feature-pan-906');
+    mkdirSync(workspacePath, { recursive: true });
+    writeSpec(projectPath, 'PAN-906', makeAllCompletedDoc('PAN-906', 'completed'));
+    const deps = makeCoordinateDeps('PAN-906', projectPath, workspacePath);
+
+    const actions = await coordinateSwarmSlots({}, deps);
+
+    expect(actions).toEqual([]);
+    expect(deps.reconcileSlotState).not.toHaveBeenCalled();
+    expect(deps.requestIssueReview).not.toHaveBeenCalled();
+  });
+
+  it('skips a cancelled spec before reconciling slots', async () => {
+    const { coordinateSwarmSlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
+    const projectPath = join(tempRoot, 'project');
+    const workspacePath = join(projectPath, 'workspaces', 'feature-pan-907');
+    mkdirSync(workspacePath, { recursive: true });
+    writeSpec(projectPath, 'PAN-907', makeAllCompletedDoc('PAN-907', 'cancelled'));
+    const deps = makeCoordinateDeps('PAN-907', projectPath, workspacePath);
+
+    const actions = await coordinateSwarmSlots({}, deps);
+
+    expect(actions).toEqual([]);
+    expect(deps.reconcileSlotState).not.toHaveBeenCalled();
+  });
+
+  it('continues coordinating a non-terminal approved spec', async () => {
+    const { coordinateSwarmSlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
+    const projectPath = join(tempRoot, 'project');
+    const workspacePath = join(projectPath, 'workspaces', 'feature-pan-908');
+    mkdirSync(workspacePath, { recursive: true });
+    const doc = makeDoc('PAN-908', 1);
+    doc.plan.status = 'approved';
+    writeSpec(projectPath, 'PAN-908', doc);
+    const deps = makeCoordinateDeps('PAN-908', projectPath, workspacePath);
+
+    await coordinateSwarmSlots({}, deps);
+
+    expect(deps.reconcileSlotState).toHaveBeenCalledWith('PAN-908', workspacePath, expect.objectContaining({
+      plan: expect.objectContaining({ status: 'approved' }),
+    }));
   });
 });
 
@@ -159,6 +298,7 @@ describe('swarm endgame: merge/cleanup still runs when dispatch is no longer eli
 
     expect(actions).toContain('[swarm] considered PAN-902: endgame (merge/cleanup only)');
     expect(actions).toContain('[swarm] gc slot 1 (item wi-1) for PAN-902');
+    expect(actions).toContain('[swarm] finalized PAN-902: issue-level review requested');
     expect(actions).not.toContain('[swarm] considered PAN-902: swarm eligible');
   });
 });

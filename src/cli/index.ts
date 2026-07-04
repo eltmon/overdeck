@@ -212,6 +212,7 @@ program
   .option('--force', 'Overwrite files modified since Overdeck installed them')
   .option('--diff', 'Show diff for modified files')
   .option('--backup-only', 'Only create backup')
+  .option('--if-changed', 'Skip the sync when inputs are unchanged (used by startup)')
   .action(syncCommand);
 
 // pan context — layered context distribution (PAN-1201)
@@ -643,15 +644,19 @@ program
   .option('--no-deacon', 'Skip Cloister/Deacon auto-start (escape hatch when deacon\'s startup scan is starving the event loop)')
   .option('--resume', 'Enable agent auto-resume on boot — auto-resume is OFF by default (PAN-1963)')
   .option('--no-resume', 'Disable agent auto-resume (now the default; flag kept for explicitness)')
+  .option('--no-open', 'Do not open the dashboard app/browser after startup')
   .option('--seed-from-legacy', 'Seed a fresh local database from the legacy database (copy conversations + reconstruct in-flight agents/issues). Default is an empty local database.')
   .action(async (options) => {
     const noResume = isNoResumeCliOptionEnabled(options);
     const bootGates = resolveBootGates(options);
-    const { spawn, execSync } = await import('child_process');
+    const { spawn, execSync, exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
     const { join, dirname } = await import('path');
     const { fileURLToPath } = await import('url');
     const { readFileSync, existsSync } = await import('fs');
     const { parse } = await import('@iarna/toml');
+    const { resolveDashboardReadyUrl } = await import('./up-readiness.js');
 
     // Find dashboard - check bundled first, then source
     const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -816,10 +821,17 @@ program
           }
 
           console.log(chalk.dim('Starting Traefik...'));
-          execSync('docker compose up -d', {
-            cwd: traefikDir,
-            stdio: 'pipe',
-          });
+          const { stdout } = await execAsync(
+            'docker ps --filter "name=overdeck-traefik" --format "{{.Names}}" 2>/dev/null',
+          );
+          if (stdout.trim().includes('overdeck-traefik')) {
+            console.log(chalk.dim('Traefik already running'));
+          } else {
+            execSync('docker compose up -d', {
+              cwd: traefikDir,
+              stdio: 'pipe',
+            });
+          }
           console.log(chalk.green('✓ Traefik started'));
           console.log(chalk.dim(`  Dashboard: https://traefik.${traefikDomain}:8080\n`));
         } catch (error) {
@@ -894,106 +906,25 @@ program
       return candidates.find((p) => existsSync(p)) ?? null;
     })();
 
-    // Shared post-launch sidecars (CLIProxy, smee, TLDR) — must run for
-    // every launch mode so the Electron fast-path does not skip them.
-    async function startPostLaunchSidecars(): Promise<void> {
-      // Start CLIProxyAPI sidecar for ChatGPT subscription → GPT agent routing.
-      // Idempotent + non-fatal: if the user isn't logged into Codex yet, the
-      // sidecar still comes up and will pick up credentials once they log in.
-      try {
-        const { startCliproxySync, CLIPROXY_PORT } = await import('../lib/cliproxy.js');
-        console.log(chalk.dim('Starting CLIProxyAPI sidecar (GPT subscription router)...'));
-        startCliproxySync();
-        console.log(chalk.green(`✓ CLIProxyAPI listening on http://127.0.0.1:${CLIPROXY_PORT}`));
-      } catch (error: any) {
-        console.log(chalk.yellow('⚠ Failed to start CLIProxyAPI sidecar:'), error?.message || String(error));
-        console.log(chalk.dim('  GPT subscription agents will not work until this is resolved.'));
-      }
+    const { startPostLaunchSidecars } = await import('./up-sidecars.js');
+    const startUpSidecars = () => startPostLaunchSidecars({ selfCli: fileURLToPath(import.meta.url), projectRoot: process.cwd() });
 
-      // Start smee-client webhook relay (optional — non-fatal)
-      try {
-        const { startSmeeProcessSync } = await import('../lib/smee.js');
-        console.log(chalk.dim('\nStarting smee-client webhook relay...'));
-        startSmeeProcessSync();
-      } catch (error: any) {
-        console.log(chalk.yellow('⚠ Failed to start smee-client:'), error?.message || String(error));
-        console.log(chalk.dim('  Webhook relay unavailable — GitHub events will use polling fallback'));
-      }
-
-      // Start TLDR daemon on project root (if Python3 and venv available)
-      try {
-        const { getTldrDaemonServiceSync } = await import('../lib/tldr-daemon.js');
-        const projectRoot = process.cwd();
-        const venvPath = join(projectRoot, '.venv');
-        if (existsSync(venvPath)) {
-          console.log(chalk.dim('\nStarting TLDR daemon for project root...'));
-          const tldrService = getTldrDaemonServiceSync(projectRoot, venvPath);
-          await tldrService.start(true);  // background mode
-          console.log(chalk.green('✓ TLDR daemon started'));
-        } else {
-          console.log(chalk.dim('\nSkipping TLDR daemon (no .venv found)'));
-          console.log(chalk.dim('  Run setup to create venv with llm-tldr'));
-        }
-      } catch (error: any) {
-        console.log(chalk.yellow('⚠ Failed to start TLDR daemon:'), error?.message || String(error));
-        console.log(chalk.dim('  TLDR will be unavailable but dashboard will work normally'));
-      }
+    async function openDashboardInBrowser(url: string): Promise<void> {
+      if (options.open === false) return;
 
       try {
-        const { loadConfigSync } = await import('../lib/config-yaml.js');
-        const { startTtsDaemon } = await import('../lib/tts-daemon.js');
-        const ttsConfig = loadConfigSync().config.tts;
-        if (ttsConfig.daemonAutoStart) {
-          console.log(chalk.dim('\nStarting Qwen TTS daemon...'));
-          const result = await Effect.runPromise(startTtsDaemon({ config: ttsConfig, detach: true, timeoutMs: 30_000 }));
-          if (result.ok) {
-            console.log(chalk.green(`✓ Qwen TTS daemon listening on http://${ttsConfig.daemonHost}:${ttsConfig.daemonPort}`));
-          } else {
-            console.log(chalk.yellow('⚠ Failed to start Qwen TTS daemon:'), result.error ?? result.status?.error ?? 'unknown error');
-          }
-        }
-      } catch (error: any) {
-        console.log(chalk.yellow('⚠ Failed to evaluate Qwen TTS daemon auto-start:'), error?.message || String(error));
-      }
-
-      // Start the supervisor sidecar — exposes POST /restart-dashboard on a
-      // separate port so the dashboard's Force Restart button still works
-      // when the dashboard process itself has crashed.
-      try {
-        const { startSupervisorProcessSync, getSupervisorPortSync } = await import('../lib/supervisor.js');
-        const { startSupervisorUnitIfAvailable, SUPERVISOR_UNIT_NAME } = await import('../lib/systemd.js');
-        if (await startSupervisorUnitIfAvailable()) {
-          console.log(chalk.green(`✓ Supervisor managed by ${SUPERVISOR_UNIT_NAME}`));
-        } else {
-          startSupervisorProcessSync();
-          console.log(chalk.green(`✓ Supervisor listening on http://127.0.0.1:${getSupervisorPortSync()}`));
-        }
-      } catch (error: any) {
-        console.log(chalk.yellow('⚠ Failed to start supervisor:'), error?.message || String(error));
-        console.log(chalk.dim('  Force Restart will only work via the Electron bridge or while dashboard is responding.'));
-      }
-
-      // Deferred context sync — moved off the critical path of `overdeck up`.
-      // Spawned detached AFTER the dashboard is up so it neither blocks the
-      // ~22s before the server spawns nor contends with the server's own boot.
-      // A separate process so it completes regardless of how `pan up` exits
-      // (foreground supervision, --detach, or the Electron fast-path). Its
-      // output is discarded; the next Claude Code session picks up the result.
-      try {
-        const selfCli = fileURLToPath(import.meta.url);
-        const syncChild = spawn(process.execPath, [selfCli, 'sync'], {
-          detached: true,
-          stdio: 'ignore',
-        });
-        syncChild.on('error', () => { /* non-fatal: sync is best-effort */ });
-        syncChild.unref();
-        console.log(chalk.dim('Context sync (skills, rules, hooks, MCP, CLAUDE.md) running in background'));
-      } catch (error: any) {
-        console.log(chalk.yellow('⚠ Could not start deferred context sync (non-fatal):'), error?.message || String(error));
+        const [{ openBrowser }, { layer: nodeServicesLayer }] = await Promise.all([
+          import('../lib/browser.js'),
+          import('@effect/platform-node/NodeServices'),
+        ]);
+        await Effect.runPromise(openBrowser(url).pipe(Effect.provide(nodeServicesLayer)));
+        console.log(chalk.green('✓ Dashboard opened in browser'));
+      } catch {
+        console.log(chalk.dim(`  Open your browser to: ${url}`));
       }
     }
 
-    if (electronAppPath) {
+    if (electronAppPath && options.open !== false) {
       console.log(chalk.dim(`\nLaunching Overdeck desktop app...`));
       console.log(chalk.dim(`  ${electronAppPath}`));
       const { spawn } = await import('child_process');
@@ -1024,7 +955,7 @@ program
       if (launchSucceeded) {
         child.unref();
         console.log(chalk.green('✓ Desktop app launched'));
-        await startPostLaunchSidecars();
+        await startUpSidecars();
         return;
       }
     }
@@ -1109,32 +1040,45 @@ program
       // dashboard can't masquerade as healthy. On timeout we log a warning but
       // do NOT tear down CLIProxy/TLDR below — keeping the system in the best
       // recoverable state (dashboard-side failure, sidecars still usable).
+      let readyUrl: string;
+      let apiUrl: string;
+      let shouldOpenDashboard = true;
       try {
-        const { waitForDashboardHealth } = await import('../lib/platform-lifecycle.js');
-        await Effect.runPromise(waitForDashboardHealth(dashboardApiPort, { timeoutMs: 15_000, expectedIdentity: { repoRoot: process.cwd(), mode: 'primary' } }));
+        const resolved = await resolveDashboardReadyUrl({
+          traefikEnabled,
+          traefikDomain,
+          dashboardPort,
+          dashboardApiPort,
+          expectedIdentity: { repoRoot: process.cwd(), mode: 'primary' },
+        });
+        readyUrl = resolved.readyUrl;
+        apiUrl = resolved.apiUrl;
         console.log(chalk.green('✓ Dashboard started in background and passed /api/health'));
+        if (traefikEnabled && !resolved.traefikReady) {
+          console.log(
+            chalk.yellow(
+              `⚠ Traefik routing warming up — use ${readyUrl} meanwhile`,
+            ),
+          );
+        }
       } catch (err: any) {
+        readyUrl = traefikEnabled
+          ? `https://${traefikDomain}`
+          : `http://localhost:${dashboardPort}`;
+        apiUrl = traefikEnabled
+          ? `https://${traefikDomain}/api`
+          : `http://localhost:${dashboardApiPort}`;
+        shouldOpenDashboard = false;
         console.log(chalk.yellow(`⚠ Dashboard health check did not pass: ${err?.message || err}`));
         console.log(chalk.dim('  CLIProxy and Traefik have been left running — recover with `pan restart --dashboard` once the issue is fixed.'));
       }
-      if (traefikEnabled) {
-        console.log(`  Frontend: ${chalk.cyan(`https://${traefikDomain}`)}`);
-        console.log(`  API:      ${chalk.cyan(`https://${traefikDomain}/api`)}`);
-      } else {
-        console.log(`  Frontend: ${chalk.cyan(`http://localhost:${dashboardPort}`)}`);
-        console.log(`  API:      ${chalk.cyan(`http://localhost:${dashboardApiPort}`)}`);
+      console.log(`  Frontend: ${chalk.cyan(readyUrl)}`);
+      console.log(`  API:      ${chalk.cyan(apiUrl)}`);
+      if (shouldOpenDashboard) {
+        await openDashboardInBrowser(readyUrl);
       }
     } else {
       // Run in foreground
-      if (traefikEnabled) {
-        console.log(`  Frontend: ${chalk.cyan(`https://${traefikDomain}`)}`);
-        console.log(`  API:      ${chalk.cyan(`https://${traefikDomain}/api`)}`);
-      } else {
-        console.log(`  Frontend: ${chalk.cyan(`http://localhost:${dashboardPort}`)}`);
-        console.log(`  API:      ${chalk.cyan(`http://localhost:${dashboardApiPort}`)}`);
-      }
-      console.log(chalk.dim('\nPress Ctrl+C to stop\n'));
-
       const child = spawn(node22, [bundledServer], {
             stdio: 'inherit',
             env: {
@@ -1151,9 +1095,45 @@ program
         console.error(chalk.red('Failed to start dashboard:'), err.message);
         process.exit(1);
       });
+
+      let readyUrl: string;
+      let apiUrl: string;
+      let shouldOpenDashboard = true;
+      try {
+        const resolved = await resolveDashboardReadyUrl({
+          traefikEnabled,
+          traefikDomain,
+          dashboardPort,
+          dashboardApiPort,
+        });
+        readyUrl = resolved.readyUrl;
+        apiUrl = resolved.apiUrl;
+        if (traefikEnabled && !resolved.traefikReady) {
+          console.log(
+            chalk.yellow(
+              `⚠ Traefik routing warming up — use ${readyUrl} meanwhile`,
+            ),
+          );
+        }
+      } catch (err: any) {
+        readyUrl = traefikEnabled
+          ? `https://${traefikDomain}`
+          : `http://localhost:${dashboardPort}`;
+        apiUrl = traefikEnabled
+          ? `https://${traefikDomain}/api`
+          : `http://localhost:${dashboardApiPort}`;
+        shouldOpenDashboard = false;
+        console.log(chalk.yellow(`⚠ Dashboard health check did not pass: ${err?.message || err}`));
+      }
+      console.log(`  Frontend: ${chalk.cyan(readyUrl)}`);
+      console.log(`  API:      ${chalk.cyan(apiUrl)}`);
+      console.log(chalk.dim('\nPress Ctrl+C to stop\n'));
+      if (shouldOpenDashboard) {
+        await openDashboardInBrowser(readyUrl);
+      }
     }
 
-    await startPostLaunchSidecars();
+    await startUpSidecars();
   });
 
 program

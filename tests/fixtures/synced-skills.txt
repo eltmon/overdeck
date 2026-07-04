@@ -30,6 +30,7 @@ pan-admin-config
 pan-admin-hooks
 pan-admin-tldr
 pan-admin-tracker
+pan-agent-activity
 pan-approve
 pan-close
 pan-code-review

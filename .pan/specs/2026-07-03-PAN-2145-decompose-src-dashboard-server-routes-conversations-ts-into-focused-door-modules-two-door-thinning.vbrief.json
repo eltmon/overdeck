@@ -3,17 +3,18 @@
     "version": "0.6",
     "created": "2026-07-03T14:12:00Z",
     "author": "overdeck/0.0.0",
-    "description": "Plan for PAN-2145: Thin routes/conversations.ts (5306 lines) behind src/lib/overdeck/ door modules (two-door route-thinning, Approach A)"
+    "description": "Plan for PAN-2145: Thin routes/conversations.ts (5306 lines) behind src/lib/overdeck/ door modules (two-door route-thinning, Approach A)",
+    "updated": "2026-07-04T18:14:06.894Z"
   },
   "plan": {
     "id": "pan-2145",
     "title": "Decompose src/dashboard/server/routes/conversations.ts into focused door modules (two-door thinning)",
-    "status": "proposed",
+    "status": "completed",
     "uid": "f1020cf6-4136-431e-ba06-f05726aaa3d6",
     "author": "agent:claude-opus-4-8",
-    "sequence": 1,
+    "sequence": 4,
     "created": "2026-07-03T14:12:00Z",
-    "updated": "2026-07-03T14:12:00Z",
+    "updated": "2026-07-04T18:14:06.894Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2145",
@@ -759,5 +760,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "completed"
 }

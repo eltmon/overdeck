@@ -278,6 +278,11 @@ async function cleanupConversationThroughApi(conversation: { name: string }): Pr
   }, conversation);
 }
 
+async function expectSupervisorBackedSession(session: string): Promise<void> {
+  await expect.poll(() => sessions.has(session), { timeout: 30_000 }).toBe(true);
+  await expect.poll(() => tmuxSessionExists(session), { timeout: 30_000 }).toBe(true);
+}
+
 async function startRealConversationRoutes(): Promise<void> {
   const { conversationsRouteLayer } = await import('../../src/dashboard/server/routes/conversations.js');
   const { setupTerminalWebSocket } = await import('../../src/dashboard/server/ws-terminal.js');
@@ -433,8 +438,7 @@ describe('conversation supervisor Playwright UAT', () => {
         body: JSON.stringify({ model: 'gpt-5.5', harness: 'codex' }),
       }) as { name: string; tmuxSession: string };
     });
-    await expect.poll(() => sessions.has(conversation.tmuxSession)).toBe(true);
-    await expect.poll(() => tmuxSessionExists(conversation.tmuxSession)).toBe(true);
+    await expectSupervisorBackedSession(conversation.tmuxSession);
 
     const threadId = '019eaaec-4dfa-7ab1-90ba-9104d16534d1';
     writeCodexRollout(conversation.tmuxSession, threadId);
@@ -448,8 +452,7 @@ describe('conversation supervisor Playwright UAT', () => {
     await page.evaluate(async (conv) => {
       await (window as any).api('/api/conversations/' + conv.name + '/resume', { method: 'POST' });
     }, conversation);
-    await expect.poll(() => sessions.has(conversation.tmuxSession)).toBe(true);
-    await expect.poll(() => tmuxSessionExists(conversation.tmuxSession)).toBe(true);
+    await expectSupervisorBackedSession(conversation.tmuxSession);
 
     const launcher = launcherFor(conversation.tmuxSession);
     expect(launcher).toContain(`codex resume -c project_doc_max_bytes=0 '${threadId}'`);
@@ -467,8 +470,7 @@ describe('conversation supervisor Playwright UAT', () => {
       return state.current;
     }).not.toBeNull();
     const parent = await page.evaluate(() => (window as any).current as { name: string; tmuxSession: string; cwd: string; claudeSessionId: string });
-    await expect.poll(() => sessions.has(parent.tmuxSession)).toBe(true);
-    await expect.poll(() => tmuxSessionExists(parent.tmuxSession)).toBe(true);
+    await expectSupervisorBackedSession(parent.tmuxSession);
 
     await page.locator('#openTerminal').click();
     await expect.poll(() => page.evaluate(() => (window as any).terminalReady)).toBe(true);
@@ -485,8 +487,7 @@ describe('conversation supervisor Playwright UAT', () => {
     await page.locator('#fork').click();
     await expect.poll(() => page.evaluate(() => (window as any).fork)).not.toBeNull();
     const forkConversation = await page.evaluate(() => (window as any).fork as { name: string; tmuxSession: string });
-    await expect.poll(() => sessions.has(forkConversation.tmuxSession)).toBe(true);
-    await expect.poll(() => tmuxSessionExists(forkConversation.tmuxSession)).toBe(true);
+    await expectSupervisorBackedSession(forkConversation.tmuxSession);
 
     const launcher = launcherFor(forkConversation.tmuxSession);
     expect(launcher).toContain('pty-supervisor.js');

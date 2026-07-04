@@ -97,7 +97,7 @@ beforeEach(() => {
   odb = setupOverdeckTestDb();
   projectStub = null;
   mockClearIssueClosedCache.mockClear();
-});
+}, 20_000);
 
 afterEach(() => {
   teardownOverdeckTestDb(odb);

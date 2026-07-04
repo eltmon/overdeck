@@ -13,6 +13,8 @@ import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { listSessionNames } from '../tmux.js';
 import { findPlanSync, readPlanSync } from '../vbrief/io.js';
 import type { VBriefDocument } from '../vbrief/types.js';
+import { isGitHubAppConfigured, listPullRequestsForHead } from '../github-app.js';
+import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { loadCloisterConfig } from './config.js';
 import { clearIssueClosedCache, isIssueClosed } from './issue-closed.js';
 
@@ -195,6 +197,11 @@ async function defaultHasOpenPrForBranch(projectPath: string, issueId: string): 
   const branch = `feature/${issueId.toLowerCase()}`;
 
   try {
+    const resolved = resolveGitHubIssueSync(issueId);
+    if (isGitHubAppConfigured() && resolved.isGitHub) {
+      return (await Effect.runPromise(listPullRequestsForHead(resolved.owner, resolved.repo, branch, 'open'))).length > 0;
+    }
+
     const result = await execAsync(`gh pr list --head ${branch} --state open --json number --limit 1`, { cwd: projectPath }) as { stdout?: string } | string;
     const stdout = typeof result === 'string' ? result : result.stdout;
     const prs = JSON.parse(stdout ?? '[]') as unknown;

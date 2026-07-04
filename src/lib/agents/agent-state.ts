@@ -97,6 +97,9 @@ export interface AgentState {
   /** Flywheel run that spawned this agent, if any. Absent for operator-started agents (PAN-1812). */
   flywheelRunId?: string;
 
+  /** True when a planning session was launched with `pan plan --auto`. */
+  auto?: boolean;
+
   /** Review-convoy metadata for server-side reviewer lifecycle monitoring. */
   reviewSubRole?: string;
   reviewRunId?: string;

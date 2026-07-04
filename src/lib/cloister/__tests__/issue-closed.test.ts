@@ -3,6 +3,8 @@ import { Effect } from 'effect';
 
 const mocks = vi.hoisted(() => ({
   execFileAsync: vi.fn(),
+  getIssueState: vi.fn(),
+  isGitHubAppConfigured: vi.fn(),
   getShadowState: vi.fn(),
   resolveGitHubIssueSync: vi.fn(),
 }));
@@ -24,6 +26,11 @@ vi.mock('../../../lib/tracker-utils.js', () => ({
   resolveGitHubIssueSync: mocks.resolveGitHubIssueSync,
 }));
 
+vi.mock('../../../lib/github-app.js', () => ({
+  getIssueState: mocks.getIssueState,
+  isGitHubAppConfigured: mocks.isGitHubAppConfigured,
+}));
+
 import { clearIssueClosedCache, isIssueClosed, isTrackerIssueClosed } from '../issue-closed.js';
 
 describe('issue closed detection', () => {
@@ -37,6 +44,8 @@ describe('issue closed detection', () => {
       repo: 'overdeck',
       number: 1613,
     });
+    mocks.isGitHubAppConfigured.mockReturnValue(false);
+    mocks.getIssueState.mockReturnValue(Effect.succeed({ state: 'open' }));
     mocks.execFileAsync.mockResolvedValue({ stdout: JSON.stringify({ state: 'OPEN' }), stderr: '' });
   });
 
@@ -67,6 +76,16 @@ describe('issue closed detection', () => {
     ], { encoding: 'utf-8', timeout: 10_000 });
   });
 
+  it('returns true through the GitHub App REST tracker fallback when configured', async () => {
+    mocks.isGitHubAppConfigured.mockReturnValue(true);
+    mocks.getIssueState.mockReturnValue(Effect.succeed({ state: 'closed' }));
+
+    await expect(isIssueClosed('PAN-1613')).resolves.toBe(true);
+
+    expect(mocks.getIssueState).toHaveBeenCalledWith('eltmon', 'overdeck', 1613);
+    expect(mocks.execFileAsync).not.toHaveBeenCalled();
+  });
+
   it('returns false for an open issue', async () => {
     await expect(isIssueClosed('PAN-1613')).resolves.toBe(false);
   });
@@ -80,5 +99,16 @@ describe('issue closed detection', () => {
 
     clearIssueClosedCache('PAN-1613');
     await expect(isTrackerIssueClosed('PAN-1613')).resolves.toBe(false);
+  });
+
+  it('uses the 5-minute tracker cache for App REST results', async () => {
+    mocks.isGitHubAppConfigured.mockReturnValue(true);
+    mocks.getIssueState.mockReturnValue(Effect.succeed({ state: 'closed' }));
+
+    await expect(isTrackerIssueClosed('PAN-1613')).resolves.toBe(true);
+    await expect(isTrackerIssueClosed('PAN-1613')).resolves.toBe(true);
+
+    expect(mocks.getIssueState).toHaveBeenCalledTimes(1);
+    expect(mocks.execFileAsync).not.toHaveBeenCalled();
   });
 });

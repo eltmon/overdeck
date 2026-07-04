@@ -286,6 +286,7 @@ export function startPlanningForIssue(options: {
         startedAt: new Date().toISOString(),
         role: 'plan',
         model: '',
+        auto: auto === true,
       });
       return Promise.resolve();
     });

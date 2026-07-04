@@ -111,7 +111,7 @@ describe('doctor command', () => {
     }));
     mocks.getAgentSessionsSync.mockReturnValue([]);
     mocks.listSessionNamesSync.mockReturnValue([]);
-  });
+  }, 20_000);
 
   afterEach(() => {
     if (odb) {

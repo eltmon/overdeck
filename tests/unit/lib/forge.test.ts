@@ -5,12 +5,14 @@ const {
   execMock,
   getPullRequestStateMock,
   isGitHubAppConfiguredMock,
+  listPullRequestsForHeadMock,
   mergePullRequestWithAppMock,
   parsePullRequestRefMock,
 } = vi.hoisted(() => ({
   execMock: vi.fn<[string, any?], Promise<{ stdout: string; stderr: string }>>(),
   getPullRequestStateMock: vi.fn(),
   isGitHubAppConfiguredMock: vi.fn(),
+  listPullRequestsForHeadMock: vi.fn(),
   mergePullRequestWithAppMock: vi.fn(),
   parsePullRequestRefMock: vi.fn(),
 }));
@@ -32,6 +34,7 @@ vi.mock('child_process', () => {
 vi.mock('../../../src/lib/github-app.js', () => ({
   getPullRequestState: getPullRequestStateMock,
   isGitHubAppConfigured: isGitHubAppConfiguredMock,
+  listPullRequestsForHead: listPullRequestsForHeadMock,
   mergePullRequestWithApp: mergePullRequestWithAppMock,
   parsePullRequestRef: parsePullRequestRefMock,
 }));
@@ -81,6 +84,7 @@ describe('forge adapters', () => {
     vi.clearAllMocks();
     vi.useRealTimers();
     isGitHubAppConfiguredMock.mockReturnValue(false);
+    listPullRequestsForHeadMock.mockReturnValue(Effect.succeed([]));
     parsePullRequestRefMock.mockReturnValue({ owner: 'org', repo: 'repo', number: 42 });
   });
 
@@ -133,6 +137,69 @@ describe('forge adapters', () => {
       created: true,
       url: 'https://gitlab.example.com/group/repo/-/merge_requests/7',
       id: '7',
+    });
+  });
+
+  it('uses GitHub App REST to find an existing GitHub artifact when configured', async () => {
+    isGitHubAppConfiguredMock.mockReturnValue(true);
+    listPullRequestsForHeadMock.mockReturnValue(Effect.succeed([
+      {
+        number: 42,
+        state: 'open',
+        merged: false,
+        mergedAt: null,
+        mergeCommit: null,
+        url: 'https://github.com/org/repo/pull/42',
+      },
+    ]));
+
+    const result = await getForgeAdapter('github').createReviewArtifact({
+      title: 'PAN-632',
+      body: 'Body',
+      sourceBranch: 'feature/pan-632',
+      targetBranch: 'main',
+      repository: 'org/repo',
+      cwd: '/tmp/repo',
+    });
+
+    expect(listPullRequestsForHeadMock).toHaveBeenCalledWith('org', 'repo', 'feature/pan-632', 'all');
+    expect(execMock).not.toHaveBeenCalledWith(
+      expect.stringContaining('gh pr view feature/pan-632'),
+      expect.anything(),
+    );
+    expect(result).toMatchObject({
+      forge: 'github',
+      created: false,
+      url: 'https://github.com/org/repo/pull/42',
+      id: '42',
+    });
+  });
+
+  it('falls back to gh for existing GitHub artifact lookup when the App is not configured', async () => {
+    execMock.mockResolvedValueOnce({
+      stdout: '{"url":"https://github.com/org/repo/pull/42","number":42}',
+      stderr: '',
+    });
+
+    const result = await getForgeAdapter('github').createReviewArtifact({
+      title: 'PAN-632',
+      body: 'Body',
+      sourceBranch: 'feature/pan-632',
+      targetBranch: 'main',
+      repository: 'org/repo',
+      cwd: '/tmp/repo',
+    });
+
+    expect(listPullRequestsForHeadMock).not.toHaveBeenCalled();
+    expect(execMock).toHaveBeenCalledWith(
+      'gh pr view feature/pan-632 --repo org/repo --json url,number 2>/dev/null || true',
+      expect.objectContaining({ cwd: '/tmp/repo' }),
+    );
+    expect(result).toMatchObject({
+      forge: 'github',
+      created: false,
+      url: 'https://github.com/org/repo/pull/42',
+      id: '42',
     });
   });
 

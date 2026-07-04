@@ -22,7 +22,7 @@ vi.mock('../../../../src/lib/activity-logger.js', () => ({
 
 beforeEach(() => {
   odb = setupOverdeckTestDb();
-});
+}, 20_000);
 afterEach(() => {
   teardownOverdeckTestDb(odb);
 });

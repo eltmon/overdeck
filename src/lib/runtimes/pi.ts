@@ -257,7 +257,9 @@ export class PiRuntimeSync {
     if (!existsSync(readyPathFor(agentId))) {
       throw new PiNotReady(`Pi agent ${agentId}: ready.json not present yet`)
     }
-    writePiCommandSync(agentId, { id: randomUUID(), type: 'prompt', message })
+    // steer: Pi delivers immediately when idle and queues mid-turn; a bare
+    // prompt is rejected with AgentBusyError while a run is active.
+    writePiCommandSync(agentId, { id: randomUUID(), type: 'prompt', message, streamingBehavior: 'steer' })
   }
 
   /**

@@ -116,7 +116,17 @@ describe('buildPlanningAgentState', () => {
     expect(buildPlanningAgentState(baseState)).toMatchObject({
       id: 'planning-pan-123',
       issueId: 'PAN-123',
+      auto: false,
       autoSpawnOnFinalize: false,
+    });
+  });
+
+  it('persists auto mode when requested', () => {
+    expect(buildPlanningAgentState({
+      ...baseState,
+      auto: true,
+    })).toMatchObject({
+      auto: true,
     });
   });
 
