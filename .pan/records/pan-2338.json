@@ -12,9 +12,39 @@
       "timestamp": "2026-07-04T01:57:45.557Z",
       "reason": "end",
       "note": "Implemented boot reconciliation candidate gating, per-agent outcomes, modal summaries, stale-row display filtering, and gc-agents. Verification: typecheck passed after rebase; lint passed before rebase and file-size passed after rebase; focused PAN-2338 tests passed. Full npm test was attempted but failed/hung across broad unrelated git/script/PTY suites."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T02:00:35.678Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-04T02:01Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-04T02:01:37.614Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-04T02:01Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-04T02:01:46.292Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-04T02:01:37Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2338\n\ngc-agents reaps paused/troubled terminal work agents despite the must-not constraint\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2338 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-04T02:01:46Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2338\n\ngc-agents reaps paused/troubled terminal work agents despite the must-not constraint\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2338 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/drafts/pan-2338.md",
@@ -77,18 +107,20 @@
     "recordedAt": "2026-07-04T01:57:37.929Z"
   },
   "created": "2026-07-04T00:35:12.770Z",
-  "updated": "2026-07-04T01:58:05.398Z",
+  "updated": "2026-07-04T02:01:46.293Z",
   "pipeline": {
     "issueId": "PAN-2338",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T01:58:05.359Z",
+    "updatedAt": "2026-07-04T02:01:37.571Z",
+    "reviewNotes": "gc-agents reaps paused/troubled terminal work agents despite the must-not constraint",
     "inspectNotes": "workspace-ppk5t matches the bead scope: applyBootReconciliationDecision now returns resumed plus per-agent outcomes, covers resumed/no-resumable-session/deferred-concurrency/deferred-load, wrapper and direct resumed-count callers compile against the new shape, and the focused test covers skipped unresumable candidates. No inspected constraint violations found.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2342",
+    "lastVerifiedCommit": "10451ec160041180325d5032bc314ea618874eff",
     "reviewRequestedAt": "2026-07-04T01:57:45.558Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -202,7 +234,7 @@
       },
       "costAtCloseOut": {
         "usd": 13.521411,
-        "pricingAsOf": "2026-07-04T01:58:05.398Z"
+        "pricingAsOf": "2026-07-04T02:01:37.598Z"
       }
     },
     "merges": [
