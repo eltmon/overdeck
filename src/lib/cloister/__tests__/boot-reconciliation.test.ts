@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  candidateListBootStartedAt: null as string | null,
   agents: [] as Array<{
     id: string;
     role: string;
@@ -14,6 +15,7 @@ const mocks = vi.hoisted(() => ({
     stoppedByUser?: boolean | null;
   }>,
   graceSeconds: 30,
+  maxCandidateAgeSeconds: 60 as number | undefined,
   noResumeActive: false,
   logDeaconEventSync: vi.fn(),
   bootState: {
@@ -21,6 +23,7 @@ const mocks = vi.hoisted(() => ({
     perAgent: {} as Record<string, 'resume' | 'hold'>,
     decidedAt: null as string | null,
     bootId: null as string | null,
+    bootStartedAt: null as string | null,
     graceDeadline: null as string | null,
   },
 }));
@@ -30,6 +33,7 @@ vi.mock('../config.js', () => ({
     startup: {
       auto_start: true,
       reconciliation_grace_secs: mocks.graceSeconds,
+      reconciliation_max_candidate_age_secs: mocks.maxCandidateAgeSeconds,
     },
   })),
 }));
@@ -42,7 +46,10 @@ vi.mock('../no-resume-mode.js', () => ({
 }));
 
 vi.mock('../../overdeck/agents.js', () => ({
-  listAllAgentsSync: vi.fn(() => mocks.agents),
+  listAllAgentsSync: vi.fn(() => {
+    mocks.candidateListBootStartedAt = mocks.bootState.bootStartedAt;
+    return mocks.agents;
+  }),
 }));
 
 vi.mock('../../persistent-logger.js', () => ({
@@ -56,8 +63,9 @@ vi.mock('../../overdeck/control-settings.js', () => ({
     mocks.bootState.perAgent = perAgent;
     mocks.bootState.decidedAt = new Date().toISOString();
   }),
-  stampBootReconciliation: vi.fn((bootId, graceDeadline) => {
+  stampBootReconciliation: vi.fn((bootId, graceDeadline, bootStartedAt) => {
     mocks.bootState.bootId = bootId;
+    mocks.bootState.bootStartedAt = bootStartedAt;
     mocks.bootState.graceDeadline = graceDeadline;
   }),
 }));
@@ -66,6 +74,7 @@ import {
   clearBootReconciliationGraceTimer,
   DEFAULT_BOOT_RECONCILIATION_GRACE_SECS,
   getBootReconciliationGraceSeconds,
+  getBootReconciliationMaxCandidateAgeSeconds,
   listBootReconciliationCandidateIds,
   startBootReconciliation,
 } from '../boot-reconciliation.js';
@@ -88,8 +97,10 @@ describe('boot reconciliation', () => {
     process.env.OVERDECK_HOME = testHome;
     delete process.env.OVERDECK_NO_RESUME;
     delete process.env.OVERDECK_BOOT_ID;
+    mocks.candidateListBootStartedAt = null;
     mocks.agents = [];
     mocks.graceSeconds = 30;
+    mocks.maxCandidateAgeSeconds = 60;
     mocks.noResumeActive = false;
     mocks.logDeaconEventSync.mockClear();
     mocks.bootState = {
@@ -97,6 +108,7 @@ describe('boot reconciliation', () => {
       perAgent: {},
       decidedAt: null,
       bootId: null,
+      bootStartedAt: null,
       graceDeadline: null,
     };
     vi.mocked(setBootReconciliationDecision).mockClear();
@@ -123,6 +135,18 @@ describe('boot reconciliation', () => {
     mocks.graceSeconds = 45;
 
     expect(getBootReconciliationGraceSeconds()).toBe(45);
+  });
+
+  it('uses the configured max candidate age and falls back to 2x grace when invalid', () => {
+    mocks.maxCandidateAgeSeconds = 90;
+    expect(getBootReconciliationMaxCandidateAgeSeconds()).toBe(90);
+
+    mocks.maxCandidateAgeSeconds = 0;
+    expect(getBootReconciliationMaxCandidateAgeSeconds()).toBe(60);
+
+    mocks.graceSeconds = 45;
+    mocks.maxCandidateAgeSeconds = undefined;
+    expect(getBootReconciliationMaxCandidateAgeSeconds()).toBe(90);
   });
 
   it('lists only stopped work agents that are resumable boot reconciliation candidates', () => {
@@ -165,8 +189,10 @@ describe('boot reconciliation', () => {
     expect(getBootReconciliationState()).toMatchObject({
       decision: 'pending',
       bootId: 'boot-test',
+      bootStartedAt: '2026-06-29T15:00:00.000Z',
       graceDeadline: '2026-06-29T15:00:30.000Z',
     });
+    expect(mocks.candidateListBootStartedAt).toBe('2026-06-29T15:00:00.000Z');
 
     await vi.advanceTimersByTimeAsync(30_000);
 
@@ -190,6 +216,7 @@ describe('boot reconciliation', () => {
     expect(getBootReconciliationState()).toMatchObject({
       decision: 'hold_all',
       bootId: 'boot-no-resume',
+      bootStartedAt: '2026-06-29T15:00:00.000Z',
       graceDeadline: '2026-06-29T15:00:30.000Z',
     });
   });
@@ -200,6 +227,7 @@ describe('boot reconciliation', () => {
       perAgent: {},
       decidedAt: '2026-06-29T15:00:05.000Z',
       bootId: 'boot-watchdog',
+      bootStartedAt: '2026-06-29T15:00:00.000Z',
       graceDeadline: '2026-06-29T15:00:30.000Z',
     };
     mocks.agents = [
@@ -223,6 +251,7 @@ describe('boot reconciliation', () => {
     expect(getBootReconciliationState()).toMatchObject({
       decision: 'resume_all',
       bootId: 'boot-watchdog',
+      bootStartedAt: '2026-06-29T15:00:00.000Z',
       graceDeadline: '2026-06-29T15:00:30.000Z',
     });
   });
@@ -233,6 +262,7 @@ describe('boot reconciliation', () => {
       perAgent: {},
       decidedAt: '2026-06-29T15:00:05.000Z',
       bootId: 'boot-watchdog',
+      bootStartedAt: '2026-06-29T15:00:00.000Z',
       graceDeadline: '2026-06-29T15:00:30.000Z',
     };
     mocks.agents = [
@@ -251,11 +281,16 @@ describe('boot reconciliation', () => {
       decision: 'pending',
       timerArmed: true,
     });
-    expect(stampBootReconciliation).toHaveBeenCalledWith('boot-fresh', '2026-06-29T15:02:30.000Z');
+    expect(stampBootReconciliation).toHaveBeenCalledWith(
+      'boot-fresh',
+      '2026-06-29T15:02:30.000Z',
+      '2026-06-29T15:02:00.000Z',
+    );
     expect(setBootReconciliationDecision).toHaveBeenCalledWith('pending');
     expect(getBootReconciliationState()).toMatchObject({
       decision: 'pending',
       bootId: 'boot-fresh',
+      bootStartedAt: '2026-06-29T15:02:00.000Z',
       graceDeadline: '2026-06-29T15:02:30.000Z',
     });
   });

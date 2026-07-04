@@ -7,6 +7,7 @@ const appSettingsMocks = vi.hoisted(() => ({
     perAgent: {},
     decidedAt: null,
     bootId: null,
+    bootStartedAt: null,
     graceDeadline: null,
   })),
   setBootReconciliationDecision: vi.fn(),
@@ -355,6 +356,7 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
       perAgent: {},
       decidedAt: null,
       bootId: null,
+      bootStartedAt: null,
       graceDeadline: null,
     });
   });
@@ -435,6 +437,7 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
       perAgent: {},
       decidedAt: '2026-06-29T15:00:00.000Z',
       bootId: 'boot-pan-2076',
+      bootStartedAt: '2026-06-29T15:00:00.000Z',
       graceDeadline: '2026-06-29T15:00:30.000Z',
     });
 
@@ -450,6 +453,7 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
       perAgent: {},
       decidedAt: '2026-06-29T15:00:30.000Z',
       bootId: 'boot-pan-2076-hold-all',
+      bootStartedAt: '2026-06-29T15:00:00.000Z',
       graceDeadline: '2026-06-29T15:00:30.000Z',
     });
 
@@ -465,6 +469,7 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
       perAgent: {},
       decidedAt: '2026-06-29T15:00:30.000Z',
       bootId: 'boot-pan-2076-hold-all-reconcile',
+      bootStartedAt: '2026-06-29T15:00:00.000Z',
       graceDeadline: '2026-06-29T15:00:30.000Z',
     });
 
@@ -504,6 +509,7 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
       perAgent: { 'PAN-871': 'hold', 'PAN-872': 'resume' },
       decidedAt: '2026-06-29T15:00:30.000Z',
       bootId: 'boot-pan-2076-per-agent-reconcile',
+      bootStartedAt: '2026-06-29T15:00:00.000Z',
       graceDeadline: '2026-06-29T15:00:30.000Z',
     });
 
@@ -520,6 +526,7 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
       perAgent: {},
       decidedAt: '2026-06-29T15:00:30.000Z',
       bootId: 'boot-pan-2076-resume-all',
+      bootStartedAt: '2026-06-29T15:00:00.000Z',
       graceDeadline: '2026-06-29T15:00:30.000Z',
     });
 
@@ -552,6 +559,7 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
       perAgent: { 'PAN-871': 'hold', 'PAN-872': 'resume' },
       decidedAt: '2026-06-29T15:00:30.000Z',
       bootId: 'boot-pan-2076-per-agent',
+      bootStartedAt: '2026-06-29T15:00:00.000Z',
       graceDeadline: '2026-06-29T15:00:30.000Z',
     });
 

@@ -158,6 +158,7 @@ describe('agent failure tracking and auto-resume backoff', () => {
         perAgent: {},
         decidedAt: null,
         bootId: null,
+        bootStartedAt: null,
         graceDeadline: null,
       }),
       setBootReconciliationDecision: vi.fn(),

@@ -44,6 +44,14 @@ export function getBootReconciliationGraceSeconds(): number {
     : DEFAULT_BOOT_RECONCILIATION_GRACE_SECS;
 }
 
+export function getBootReconciliationMaxCandidateAgeSeconds(): number {
+  const config = loadCloisterConfigSync().startup;
+  const value = config.reconciliation_max_candidate_age_secs;
+  return Number.isFinite(value) && value > 0
+    ? value
+    : getBootReconciliationGraceSeconds() * 2;
+}
+
 export function isBootReconciliationCandidate(agent: ReconciliationAgent): boolean {
   if (agent.role !== 'work' || agent.status !== 'stopped') return false;
   if (agent.paused === true || agent.troubled === true) return false;
@@ -113,8 +121,19 @@ export function startBootReconciliation(
   const now = options.now ?? new Date();
   const bootId = options.bootId ?? process.env.OVERDECK_BOOT_ID ?? `boot-${now.toISOString()}`;
   const graceDeadline = new Date(now.getTime() + getBootReconciliationGraceSeconds() * 1000).toISOString();
-  const candidateIds = listBootReconciliationCandidateIds();
   const existing = getBootReconciliationState();
+  const bootStartedAt = existing.bootId === bootId && existing.bootStartedAt
+    ? existing.bootStartedAt
+    : now.toISOString();
+  const stampedGraceDeadline = existing.bootId === bootId && existing.graceDeadline
+    ? existing.graceDeadline
+    : graceDeadline;
+
+  if (existing.bootId !== bootId || !existing.bootStartedAt) {
+    stampBootReconciliation(bootId, stampedGraceDeadline, bootStartedAt);
+  }
+
+  const candidateIds = listBootReconciliationCandidateIds();
 
   if (existing.bootId === bootId && existing.decision) {
     const existingGraceDeadline = existing.graceDeadline ?? graceDeadline;
@@ -134,8 +153,6 @@ export function startBootReconciliation(
       timerArmed: false,
     };
   }
-
-  stampBootReconciliation(bootId, graceDeadline);
 
   if (isExplicitNoResumeRequest()) {
     clearBootReconciliationGraceTimer();

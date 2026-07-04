@@ -18,6 +18,7 @@ describe('auto-resume gates', () => {
     perAgent: Record<string, 'resume' | 'hold'>;
     decidedAt: string | null;
     bootId: string | null;
+    bootStartedAt: string | null;
     graceDeadline: string | null;
   };
   // PAN-1665: free work slots the governor reports. High by default so the gating
@@ -45,6 +46,7 @@ describe('auto-resume gates', () => {
       perAgent: {},
       decidedAt: null,
       bootId: null,
+      bootStartedAt: null,
       graceDeadline: null,
     };
   });
@@ -709,6 +711,7 @@ describe('auto-resume gates', () => {
       perAgent: {},
       decidedAt: BASE_TIME.toISOString(),
       bootId: 'boot-test',
+      bootStartedAt: BASE_TIME.toISOString(),
       graceDeadline: new Date(BASE_TIME.getTime() + 30_000).toISOString(),
     };
     const stoppedAgentId = 'agent-pan-1141-boot-held-stopped';
