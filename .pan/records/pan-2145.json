@@ -27,6 +27,16 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-04T01:47:43.908Z"
+    },
+    {
+      "timestamp": "2026-07-04T01:50:55.004Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T01:50:56.005Z"
     }
   ],
   "feedback": [],
@@ -89,23 +99,23 @@
       "tests/unit/dashboard/server/routes/conversations-fork-pipeline.test.ts",
       "tests/unit/dashboard/server/routes/conversations-no-loss.test.ts"
     ],
-    "recordedAt": "2026-07-03T23:08:08.540Z"
+    "recordedAt": "2026-07-04T01:50:22.147Z"
   },
   "created": "2026-07-03T13:52:41.087Z",
-  "updated": "2026-07-04T01:47:45.767Z",
+  "updated": "2026-07-04T01:50:56.005Z",
   "pipeline": {
     "issueId": "PAN-2145",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T01:47:45.620Z",
+    "updatedAt": "2026-07-04T01:50:55.611Z",
     "inspectNotes": "Spec fidelity passed: fork door remains under 1000 lines, uses self import from ./conversation-forks.js, main.ts imports recoverStuckForks/waitForInFlightForkPipelines from lib/overdeck/conversation-forks.js, and routes 5/28 delegate to the fork door. Constraint compliance passed: no routes/conversations.js import, no execSync, no sync tmux sendKeys, no explicit any in the changed fork door.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2332",
     "lastVerifiedCommit": "ff64924a2fb3aea7480068a6d910d2a1e15e2668",
-    "reviewRequestedAt": "2026-07-03T23:08:18.717Z",
+    "reviewRequestedAt": "2026-07-04T01:50:55.007Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/drafts/PAN-2145.md",
@@ -165,7 +175,7 @@
         "tests/unit/dashboard/server/routes/conversations-fork-pipeline.test.ts",
         "tests/unit/dashboard/server/routes/conversations-no-loss.test.ts"
       ],
-      "recordedAt": "2026-07-03T23:08:08.540Z"
+      "recordedAt": "2026-07-04T01:50:22.147Z"
     }
   },
   "closeOut": {
@@ -218,7 +228,7 @@
       },
       "costAtCloseOut": {
         "usd": 23.38494,
-        "pricingAsOf": "2026-07-04T01:47:45.711Z"
+        "pricingAsOf": "2026-07-04T01:50:55.780Z"
       }
     },
     "merges": [
