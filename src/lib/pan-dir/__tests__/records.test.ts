@@ -131,6 +131,7 @@ describe('buildIssueRecord', () => {
       verificationStatus: 'passed',
       inspectStatus: 'passed',
       mergeStatus: 'merged',
+      releaseStatus: 'partial',
       readyForMerge: true,
       reviewNotes: 'lgtm',
       testNotes: 'green',
@@ -154,8 +155,23 @@ describe('buildIssueRecord', () => {
     expect(record.pipeline.readyForMerge).toBe(true);
     expect(record.pipeline.prNumber).toBe(1908);
     expect(record.pipeline.mergeStatus).toBe('merged');
+    expect(record.pipeline.releaseStatus).toBe('partial');
     expect(record.pipeline).not.toHaveProperty('verificationCycleCount');
     expect(record.pipeline).not.toHaveProperty('mergeRetryCount');
+  });
+
+  it("defaults pipeline releaseStatus to 'pending' when review status has none", async () => {
+    const reviewStatus = {
+      issueId: 'PAN-1908',
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      readyForMerge: false,
+      updatedAt: '2026-06-15T00:00:00.000Z',
+    };
+
+    const record = await buildIssueRecord({ name: 'Test', path: projectRoot }, 'PAN-1908', { reviewStatus });
+
+    expect(record.pipeline.releaseStatus).toBe('pending');
   });
 
   it('omits ephemeral review_status fields', async () => {
@@ -252,6 +268,25 @@ describe('writeIssueRecordSync / queueIssueRecordCommit', () => {
 
     expect(path).toBe(join(tmp, '.pan', 'records', 'pan-1908.json'));
     expect(path).toContain('pan-1908.json');
+  });
+
+  it('round-trips releaseStatus through the pipeline record block', () => {
+    const project = makeProject();
+    writeIssueRecordSync(project, 'PAN-1908', {
+      issueId: 'PAN-1908',
+      schemaVersion: 2,
+      pipeline: {
+        issueId: 'PAN-1908',
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        releaseStatus: 'rolled_back',
+        readyForMerge: false,
+        updatedAt: '2026-06-15T00:00:00.000Z',
+      },
+      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
+    });
+
+    expect(readIssueRecordSync(project, 'PAN-1908')?.pipeline.releaseStatus).toBe('rolled_back');
   });
 
   it('queues auto-commit against the project path', () => {
