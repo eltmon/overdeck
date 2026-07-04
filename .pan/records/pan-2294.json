@@ -68,15 +68,15 @@
     "recordedAt": "2026-07-04T14:20:29.286Z"
   },
   "created": "2026-07-03T12:02:49.631Z",
-  "updated": "2026-07-04T14:22:53.088Z",
+  "updated": "2026-07-04T14:25:11.689Z",
   "pipeline": {
     "issueId": "PAN-2294",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T14:22:53.048Z",
+    "updatedAt": "2026-07-04T14:25:11.637Z",
     "reviewNotes": "sync tmux sessionExistsSync is now on the dashboard promote route",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2349",
     "lastVerifiedCommit": "8f5e9db5a459bedef3f3013604ca09a86e4046ce",
@@ -140,7 +140,7 @@
       },
       "costAtCloseOut": {
         "usd": 3.830111,
-        "pricingAsOf": "2026-07-04T14:22:53.067Z"
+        "pricingAsOf": "2026-07-04T14:25:11.670Z"
       }
     },
     "merges": [
