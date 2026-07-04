@@ -1,14 +1,17 @@
+import { Effect } from 'effect';
 import { messageAgent } from '../agents.js';
 import { getFlywheelActiveRunId, isFlywheelGloballyPaused } from '../overdeck/control-settings.js';
-import { sessionExistsSync } from '../tmux.js';
+import { sessionExists } from '../tmux.js';
 import { recordDeaconNudge } from './deacon-nudge-log.js';
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID } from './flywheel.js';
 import type { PromoteResult } from './uat-promote.js';
 
+type SessionExists = (name: string) => boolean | Promise<boolean>;
+
 export interface NotifyDeps {
   getActiveRunId?: typeof getFlywheelActiveRunId;
   isPaused?: typeof isFlywheelGloballyPaused;
-  sessionExists?: typeof sessionExistsSync;
+  sessionExists?: SessionExists;
   message?: typeof messageAgent;
   recordNudge?: typeof recordDeaconNudge;
 }
@@ -30,14 +33,14 @@ export async function notifyFlywheelOfUatPromote(result: PromoteResult, deps: No
 
     const getActiveRunId = deps.getActiveRunId ?? getFlywheelActiveRunId;
     const isPaused = deps.isPaused ?? isFlywheelGloballyPaused;
-    const sessionExists = deps.sessionExists ?? sessionExistsSync;
+    const sessionExistsDep = deps.sessionExists ?? ((name: string) => Effect.runPromise(sessionExists(name)));
     const message = deps.message ?? messageAgent;
     const recordNudge = deps.recordNudge ?? recordDeaconNudge;
 
     if (!getActiveRunId()) return;
     if (isPaused()) return;
 
-    const delivered = sessionExists(FLYWHEEL_ORCHESTRATOR_AGENT_ID);
+    const delivered = await sessionExistsDep(FLYWHEEL_ORCHESTRATOR_AGENT_ID);
     if (delivered) {
       try {
         await message(FLYWHEEL_ORCHESTRATOR_AGENT_ID, buildPromoteNudge(result), 'uat-promote-notify');
