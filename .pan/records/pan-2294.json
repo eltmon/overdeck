@@ -37,6 +37,11 @@
       "timestamp": "2026-07-04T14:51:30.296Z",
       "reason": "end",
       "note": "Anomalies: pan review request updated pipeline record state but twice became stale without completion output; full npm test previously failed across unrelated suites and hung. No plan deviations. Fixed review issue by replacing dashboard-reachable sessionExistsSync with async sessionExists in UAT promote notify; targeted tests, typecheck, and lint passed."
+    },
+    {
+      "timestamp": "2026-07-04T15:15:45.673Z",
+      "reason": "end",
+      "note": "Anomalies: pan review request previously updated pipeline record state but became stale without completion output; full npm test previously failed across unrelated suites and hung. No plan deviations. Review fix remains complete: dashboard-reachable UAT promote notify uses async sessionExists; targeted tests, typecheck, and lint passed."
     }
   ],
   "feedback": [],
@@ -60,23 +65,24 @@
       "src/lib/cloister/__tests__/uat-promote-notify.test.ts",
       "src/lib/cloister/uat-promote-notify.ts"
     ],
-    "recordedAt": "2026-07-04T14:51:00.588Z"
+    "recordedAt": "2026-07-04T15:15:37.719Z"
   },
   "created": "2026-07-03T12:02:49.631Z",
-  "updated": "2026-07-04T14:55:20.170Z",
+  "updated": "2026-07-04T15:18:32.152Z",
   "pipeline": {
     "issueId": "PAN-2294",
     "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T14:55:20.099Z",
+    "updatedAt": "2026-07-04T15:18:32.105Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-2294-review already running. Use 'pan tell' to message it.",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2349",
-    "lastVerifiedCommit": "76e7dfe1b279858c22b8cc35314ce4ebf1b39060",
-    "reviewRequestedAt": "2026-07-04T14:51:30.298Z",
+    "lastVerifiedCommit": "dc9256fd922a1cc047eab05108e019b492c61497",
+    "reviewRequestedAt": "2026-07-04T15:15:45.674Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/drafts/PAN-2294.md",
@@ -97,7 +103,7 @@
         "src/lib/cloister/__tests__/uat-promote-notify.test.ts",
         "src/lib/cloister/uat-promote-notify.ts"
       ],
-      "recordedAt": "2026-07-04T14:51:00.588Z"
+      "recordedAt": "2026-07-04T15:15:37.719Z"
     }
   },
   "closeOut": {
@@ -105,8 +111,8 @@
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 24130,
-            "output": 497,
+            "input": 25711,
+            "output": 687,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -122,8 +128,8 @@
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 24130,
-          "output": 497,
+          "input": 25711,
+          "output": 687,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -136,7 +142,7 @@
       },
       "costAtCloseOut": {
         "usd": 3.830111,
-        "pricingAsOf": "2026-07-04T14:55:20.157Z"
+        "pricingAsOf": "2026-07-04T15:18:32.151Z"
       }
     },
     "merges": [
