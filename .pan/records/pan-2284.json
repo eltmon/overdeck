@@ -66,7 +66,7 @@
   ],
   "feedback": [],
   "created": "2026-07-03T11:01:31.556Z",
-  "updated": "2026-07-04T19:30:27.238Z",
+  "updated": "2026-07-04T20:02:24.283Z",
   "pipeline": {
     "issueId": "PAN-2284",
     "reviewStatus": "pending",
@@ -149,7 +149,23 @@
     "shared-classifier.shared-classifier.ac1": "completed",
     "shared-classifier.shared-classifier.ac2": "completed",
     "shared-classifier.shared-classifier.ac3": "completed",
-    "shared-classifier.shared-classifier.ac4": "completed"
+    "shared-classifier.shared-classifier.ac4": "completed",
+    "modal-breakdown": "completed",
+    "modal-breakdown.ac1": "completed",
+    "modal-breakdown.ac2": "completed",
+    "modal-breakdown.ac3": "completed",
+    "decision-breakdown": "completed",
+    "decision-breakdown.ac1": "completed",
+    "decision-breakdown.ac2": "completed",
+    "decision-breakdown.ac3": "completed",
+    "resume-path-delegate": "completed",
+    "resume-path-delegate.ac1": "completed",
+    "resume-path-delegate.ac2": "completed",
+    "resume-path-delegate.ac3": "completed",
+    "candidate-filter": "completed",
+    "candidate-filter.ac1": "completed",
+    "candidate-filter.ac2": "completed",
+    "candidate-filter.ac3": "completed"
   },
   "swarm": {
     "slotAssignments": []
