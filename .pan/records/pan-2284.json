@@ -67,9 +67,49 @@
       "timestamp": "2026-07-04T20:02:40.398Z",
       "reason": "end",
       "note": "No deviations from recovery mode. Anomalies: work was already implemented on origin/feature/pan-2284-slot-1 and was already merged locally; I recovered by merging origin/main, resolving conflicts to keep both PAN-2284 classifier filtering and main's PAN-2338/PAN-2318 boot reconciliation outcome/age-gating changes. Per operator instruction, did not run full npm test because it hangs; ran npm run typecheck, npm run lint, and scoped boot-reconciliation Vitest files only. Delivered recovered PAN-2284 boot reconciliation candidate filtering with shared skip classifier preserved and pushed feature/pan-2284."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-04T20:04Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-04T20:04:14.342Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-04T20:04Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-04T20:04:21.948Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T20:04:37.280Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-04T20:05Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-04T20:05:23.340Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-04T20:05Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-04T20:05:31.781Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-04T20:05:23Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2284\n\nFR-4 remains unmet: handleAgentStoppedEvent still does not consume the shared classifier\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2284 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-04T20:05:31Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2284\n\nFR-4 remains unmet: handleAgentStoppedEvent still does not consume the shared classifier\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2284 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".beads/issues.jsonl",
@@ -112,18 +152,20 @@
     "recordedAt": "2026-07-04T20:02:30.686Z"
   },
   "created": "2026-07-03T11:01:31.556Z",
-  "updated": "2026-07-04T20:02:46.803Z",
+  "updated": "2026-07-04T20:05:31.781Z",
   "pipeline": {
     "issueId": "PAN-2284",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T20:02:46.761Z",
+    "updatedAt": "2026-07-04T20:05:23.306Z",
+    "reviewNotes": "FR-4 remains unmet: handleAgentStoppedEvent still does not consume the shared classifier",
     "inspectNotes": "workspace-vawme passes: current code returns resumed/skipped/deferred, boot-reconciliation endpoints pass skipped/deferred, and pan-871 tests read result.resumed with candidate-filtered mocks.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2365",
+    "lastVerifiedCommit": "3e2e9434152bb7fa8bcf3fab918b4b7241be9c6d",
     "reviewRequestedAt": "2026-07-04T20:02:40.400Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -225,7 +267,7 @@
       },
       "costAtCloseOut": {
         "usd": 22.67995,
-        "pricingAsOf": "2026-07-04T20:02:46.802Z"
+        "pricingAsOf": "2026-07-04T20:05:23.334Z"
       }
     },
     "merges": [
