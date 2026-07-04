@@ -1,3 +1,6 @@
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { accessMock, execAsyncMock } = vi.hoisted(() => ({
@@ -111,5 +114,66 @@ describe('systemdUserAvailable', () => {
     delete process.env.container;
     setPlatform('darwin');
     await expect(systemdUserAvailable()).resolves.toBe(false);
+  });
+});
+
+describe('supervisor systemd unit helpers', () => {
+  it('renders the supervisor unit with bounded restart policy and no boot install section', async () => {
+    const { renderSupervisorUnit } = await import('../systemd.js');
+
+    const unit = renderSupervisorUnit({
+      nodePath: '/usr/bin/node',
+      supervisorBundle: '/opt/overdeck/dist/supervisor/server.js',
+      supervisorPort: 3012,
+      workingDirectory: '/opt/overdeck',
+      overdeckHome: '/home/dev/.overdeck',
+    });
+
+    expect(unit).toMatchInlineSnapshot(`
+      "[Unit]
+      Description=Overdeck supervisor sidecar
+      StartLimitIntervalSec=300
+      StartLimitBurst=3
+
+      [Service]
+      Type=simple
+      WorkingDirectory="/opt/overdeck"
+      ExecStart="/usr/bin/node" "/opt/overdeck/dist/supervisor/server.js"
+      Environment="OVERDECK_SUPERVISOR_PORT=3012" "OVERDECK_HOME=/home/dev/.overdeck"
+      Restart=on-failure
+      RestartSec=5
+      "
+    `);
+    expect(unit).not.toContain('[Install]');
+    expect(unit).not.toContain('WantedBy=');
+  });
+
+  it('installs the unit idempotently and reloads systemd only when content changes', async () => {
+    const unitDir = mkdtempSync(join(tmpdir(), 'overdeck-systemd-test-'));
+    const unitText = '[Unit]\nDescription=test\n\n[Service]\nType=simple\n';
+    const { installSupervisorUnit, supervisorUnitPath } = await import('../systemd.js');
+
+    try {
+      const first = await installSupervisorUnit({ unitDir, unitText });
+      const second = await installSupervisorUnit({ unitDir, unitText });
+
+      expect(first).toEqual({ path: supervisorUnitPath(unitDir), written: true });
+      expect(second).toEqual({ path: supervisorUnitPath(unitDir), written: false });
+      expect(readFileSync(supervisorUnitPath(unitDir), 'utf-8')).toBe(unitText);
+      expect(execAsyncMock).toHaveBeenCalledTimes(1);
+      expect(execAsyncMock).toHaveBeenCalledWith('systemctl --user daemon-reload', expect.any(Object));
+    } finally {
+      rmSync(unitDir, { recursive: true, force: true });
+    }
+  });
+
+  it('reports failed unit state and returns false when the unit is absent', async () => {
+    const { isSupervisorUnitFailed } = await import('../systemd.js');
+
+    execAsyncMock.mockResolvedValueOnce({ stdout: 'failed\n', stderr: '' });
+    await expect(isSupervisorUnitFailed()).resolves.toBe(true);
+
+    execAsyncMock.mockRejectedValueOnce(new Error('unit not loaded'));
+    await expect(isSupervisorUnitFailed()).resolves.toBe(false);
   });
 });
