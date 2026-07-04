@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-07-03T14:31:02.879Z",
-  "updated": "2026-07-04T20:15:10.199Z",
+  "updated": "2026-07-04T20:17:46.738Z",
   "pipeline": {
     "issueId": "PAN-1739",
     "reviewStatus": "pending",
@@ -89,8 +89,15 @@
   "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
-    "rc1-allowlist-lock": "running",
-    "rc2-presence-authoritative": "running"
+    "rc1-allowlist-lock": "completed",
+    "rc2-presence-authoritative": "completed",
+    "rc2-presence-authoritative.ac1": "completed",
+    "rc2-presence-authoritative.ac2": "completed",
+    "rc2-presence-authoritative.ac3": "completed",
+    "rc2-presence-authoritative.ac4": "completed",
+    "rc1-allowlist-lock.ac1": "completed",
+    "rc1-allowlist-lock.ac2": "completed",
+    "rc1-allowlist-lock.ac3": "completed"
   },
   "swarm": {
     "slotAssignments": [
