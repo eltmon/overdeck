@@ -276,6 +276,8 @@ export async function coordinateSwarmSlots(
     try {
       const spec = await Effect.runPromise(findSpecByIssue(workspace.projectPath, issueId));
       if (!spec) continue;
+      const planStatus = spec.document.plan.status;
+      if (planStatus === 'completed' || planStatus === 'cancelled') continue;
 
       // Coordinate against the merged plan view; slot done-ness lives in statusOverrides.
       const overrides = (deps.readStatusOverrides ?? defaultReadStatusOverrides)(workspace.workspacePath, issueId);
