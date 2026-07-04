@@ -32,6 +32,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-04T14:43:19.208Z"
+    },
+    {
+      "timestamp": "2026-07-04T14:51:30.296Z",
+      "reason": "end",
+      "note": "Anomalies: pan review request updated pipeline record state but twice became stale without completion output; full npm test previously failed across unrelated suites and hung. No plan deviations. Fixed review issue by replacing dashboard-reachable sessionExistsSync with async sessionExists in UAT promote notify; targeted tests, typecheck, and lint passed."
     }
   ],
   "feedback": [],
@@ -55,24 +60,23 @@
       "src/lib/cloister/__tests__/uat-promote-notify.test.ts",
       "src/lib/cloister/uat-promote-notify.ts"
     ],
-    "recordedAt": "2026-07-04T14:20:29.286Z"
+    "recordedAt": "2026-07-04T14:51:00.588Z"
   },
   "created": "2026-07-03T12:02:49.631Z",
-  "updated": "2026-07-04T14:44:21.762Z",
+  "updated": "2026-07-04T14:55:20.170Z",
   "pipeline": {
     "issueId": "PAN-2294",
     "reviewStatus": "reviewing",
-    "testStatus": "passed",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T14:44:21.657Z",
-    "reviewNotes": "sync tmux sessionExistsSync is now on the dashboard promote route",
+    "updatedAt": "2026-07-04T14:55:20.099Z",
+    "reviewNotes": "Review role spawn failed: Role run agent-pan-2294-review already running. Use 'pan tell' to message it.",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
-    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2349",
-    "lastVerifiedCommit": "cbd7f924a04b45c1b396c520a4c3d956c3b6f380",
-    "reviewRequestedAt": "2026-07-04T14:20:40.270Z",
+    "lastVerifiedCommit": "76e7dfe1b279858c22b8cc35314ce4ebf1b39060",
+    "reviewRequestedAt": "2026-07-04T14:51:30.298Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/drafts/PAN-2294.md",
@@ -93,7 +97,7 @@
         "src/lib/cloister/__tests__/uat-promote-notify.test.ts",
         "src/lib/cloister/uat-promote-notify.ts"
       ],
-      "recordedAt": "2026-07-04T14:20:29.286Z"
+      "recordedAt": "2026-07-04T14:51:00.588Z"
     }
   },
   "closeOut": {
@@ -132,7 +136,7 @@
       },
       "costAtCloseOut": {
         "usd": 3.830111,
-        "pricingAsOf": "2026-07-04T14:44:21.759Z"
+        "pricingAsOf": "2026-07-04T14:55:20.157Z"
       }
     },
     "merges": [
