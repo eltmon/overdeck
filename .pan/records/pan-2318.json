@@ -221,18 +221,15 @@
   },
   "pipeline": {
     "issueId": "PAN-2318",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "merging",
+    "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T15:51:37.369Z",
-    "reviewNotes": "Review passed; config updates reload the child Cloister",
-    "testNotes": "Gates: npm run typecheck (pass), npm run lint (pass), npm run test (pass: 8282 unit + 32 frontend tests). UAT: built workspace dashboard, stopped main-checkout dashboard, started workspace dist/dashboard/server.js on :3011. Playwright verified https://overdeck.localhost/ loads and Board renders with 895 issues; Activity Feed confirms 'Deacon child started (pid 1329904)' and 'Deacon health monitor started'. curl /api/metrics/summary returned eventLoop {p50:20.1,p99:89,max:728.76} (FR-11). curl /api/issues returned 200 in 0.24s then 0.08s (memoization, FR-8/NFR-1). WebSocket connected; no 'Reconnecting...' overlay or console errors. One pre-existing WsTransport schema-warning for pipeline.verification-started (non-fatal).",
+    "updatedAt": "2026-07-04T16:10:17.139Z",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2327",
-    "reviewedAtCommit": "76191cea50052f5141ac982b390c8e1610a26aed",
     "lastVerifiedCommit": "a74bebc649d119383c6cd0ef46a845b5cf9eee3c"
   },
   "closeOut": {
@@ -311,7 +308,7 @@
       },
       "costAtCloseOut": {
         "usd": 17.752606,
-        "pricingAsOf": "2026-07-04T15:51:37.402Z"
+        "pricingAsOf": "2026-07-04T16:10:17.416Z"
       }
     },
     "merges": [
@@ -320,5 +317,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-04T14:07:04.245Z",
-  "updated": "2026-07-04T15:51:37.403Z"
+  "updated": "2026-07-04T16:10:17.547Z"
 }
