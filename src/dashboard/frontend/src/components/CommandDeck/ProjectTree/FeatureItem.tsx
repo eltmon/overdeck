@@ -324,7 +324,7 @@ function formatRoleList(roles: readonly string[]): string {
   return `${roles.slice(0, -1).join(', ')}, and ${roles[roles.length - 1]}`;
 }
 
-function isWorkOrSpecialistSession(session: SessionNodeType): boolean {
+export function isWorkOrSpecialistSession(session: SessionNodeType): boolean {
   return session.type === 'work'
     || session.type === 'strike'
     || session.type === 'planning'
