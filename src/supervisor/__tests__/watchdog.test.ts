@@ -318,7 +318,11 @@ describe('SupervisorWatchdog', () => {
 
   it('passes the persisted boot id to watchdog restart spawns', async () => {
     mkdirSync(testHome, { recursive: true });
-    stampBootReconciliation('boot-watchdog', '2026-05-17T15:30:30.000Z');
+    stampBootReconciliation(
+      'boot-watchdog',
+      '2026-05-17T15:30:30.000Z',
+      '2026-05-17T15:30:00.000Z',
+    );
     const spawnOptions: Array<Parameters<SpawnRestart>[0]> = [];
 
     await makeWatchdog({ spawnOptions }).checkOnce();
