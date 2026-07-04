@@ -907,10 +907,7 @@ program
     })();
 
     const { startPostLaunchSidecars } = await import('./up-sidecars.js');
-    const startUpSidecars = () => startPostLaunchSidecars({
-      selfCli: fileURLToPath(import.meta.url),
-      projectRoot: process.cwd(),
-    });
+    const startUpSidecars = () => startPostLaunchSidecars({ selfCli: fileURLToPath(import.meta.url), projectRoot: process.cwd() });
 
     async function openDashboardInBrowser(url: string): Promise<void> {
       if (options.open === false) return;
@@ -920,9 +917,7 @@ program
           import('../lib/browser.js'),
           import('@effect/platform-node/NodeServices'),
         ]);
-        await Effect.runPromise(
-          openBrowser(url).pipe(Effect.provide(nodeServicesLayer)),
-        );
+        await Effect.runPromise(openBrowser(url).pipe(Effect.provide(nodeServicesLayer)));
         console.log(chalk.green('✓ Dashboard opened in browser'));
       } catch {
         console.log(chalk.dim(`  Open your browser to: ${url}`));
@@ -1166,7 +1161,11 @@ program
     // Stop the supervisor sidecar
     try {
       const { stopSupervisorProcessSync, isSupervisorRunningSync } = await import('../lib/supervisor.js');
-      if (isSupervisorRunningSync()) {
+      const { stopSupervisorUnitIfActive } = await import('../lib/systemd.js');
+      if (await stopSupervisorUnitIfActive()) {
+        console.log(chalk.dim('Stopping supervisor sidecar...'));
+        console.log(chalk.green('✓ Supervisor unit stopped'));
+      } else if (isSupervisorRunningSync()) {
         console.log(chalk.dim('Stopping supervisor sidecar...'));
         stopSupervisorProcessSync();
         console.log(chalk.green('✓ Supervisor stopped'));

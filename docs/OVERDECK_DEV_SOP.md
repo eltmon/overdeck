@@ -53,6 +53,26 @@ The supervisor also polls the Qwen TTS daemon every 10 seconds when TTS is enabl
 
 The latest restart outcome is written to `${OVERDECK_HOME}/restart-status.json`. `pan status` renders that state, including failures and watchdog give-up alarms.
 
+## Dashboard recovery guardian
+
+The local recovery model has two tiers. The `overdeck-supervisor.service` systemd user unit keeps the supervisor sidecar alive, and the supervisor keeps the dashboard alive by polling health and running `pan restart --dashboard` when the dashboard is down. Systemd owns only the supervisor, not the dashboard process, so dashboard recovery still flows through the existing watchdog logic and avoids a second owner fighting the restart path.
+
+On Linux hosts with a working per-user systemd manager, `pan up` installs and starts `overdeck-supervisor.service` through `systemctl --user`. A supervisor crash or SIGKILL is treated as a unit failure and systemd restarts it according to the unit's restart policy. `pan down` is the stay-down latch: it stops `overdeck-supervisor.service` cleanly, and systemd does not restart a unit that the operator deliberately stopped.
+
+Useful operator commands:
+
+```bash
+systemctl --user status overdeck-supervisor.service
+systemctl --user stop overdeck-supervisor.service
+systemctl --user start overdeck-supervisor.service
+```
+
+Use `systemctl --user status overdeck-supervisor.service` to see whether the guardian is running, restarting, or failed. Use `systemctl --user stop overdeck-supervisor.service` only for an intentional stay-down state; use `pan up` or `systemctl --user start overdeck-supervisor.service` to re-arm the guardian afterward.
+
+On hosts without a usable `systemctl --user` session, including macOS, CI, non-systemd Linux, and most containers, Overdeck falls back to the detached supervisor process used before the systemd unit. That fallback still protects the dashboard while the supervisor is alive, but it does not give the supervisor an external guardian.
+
+This is not cold-boot recovery. The unit is not a boot-time bring-up mechanism, and it does not enable user lingering or start Traefik, cliproxy, or the dashboard after a machine reboot from nothing. After reboot, use `pan up` to start the normal stack. The restart-under-load path also depends on #2286; until that prerequisite is in place, a watchdog-triggered dashboard restart may still fail under heavy startup latency.
+
 ## Failure triage
 
 Start with `pan status` and, for audio issues, `pan tts status`.
@@ -79,10 +99,6 @@ less ~/.overdeck/logs/dashboard.log
 ```
 
 The dashboard log contains startup failures, runtime exceptions, and health-check failures from the bundled server process.
-
-## Known limitations
-
-The supervisor can still die. This issue adds dashboard watchdog behavior inside the supervisor, but it does not add a separate process manager that restarts the supervisor itself. If both dashboard and supervisor are unreachable, recover from the CLI with `pan up` or `pan restart --full` after checking the logs above.
 
 ## Process and port topology
 

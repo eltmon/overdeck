@@ -67,8 +67,13 @@ export async function startPostLaunchSidecars(config: {
 
   try {
     const { startSupervisorProcessSync, getSupervisorPortSync } = await import('../lib/supervisor.js');
-    startSupervisorProcessSync();
-    console.log(chalk.green(`✓ Supervisor listening on http://127.0.0.1:${getSupervisorPortSync()}`));
+    const { startSupervisorUnitIfAvailable, SUPERVISOR_UNIT_NAME } = await import('../lib/systemd.js');
+    if (await startSupervisorUnitIfAvailable()) {
+      console.log(chalk.green(`✓ Supervisor managed by ${SUPERVISOR_UNIT_NAME}`));
+    } else {
+      startSupervisorProcessSync();
+      console.log(chalk.green(`✓ Supervisor listening on http://127.0.0.1:${getSupervisorPortSync()}`));
+    }
   } catch (error: unknown) {
     console.log(chalk.yellow('⚠ Failed to start supervisor:'), errorMessage(error));
     console.log(chalk.dim('  Force Restart will only work via the Electron bridge or while dashboard is responding.'));
