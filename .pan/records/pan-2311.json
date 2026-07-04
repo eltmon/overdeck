@@ -127,8 +127,8 @@
     ],
     "recordedAt": "2026-07-04T14:36:30.293Z"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "cli-reconcile-merges": "completed",
     "cli-reconcile-merges.ac1": "completed",
@@ -158,61 +158,23 @@
   },
   "pipeline": {
     "issueId": "PAN-2311",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T15:15:11.513Z",
-    "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
-    "inspectNotes": "Inspection passed for bead workspace-qaa0a. Spec fidelity: merge-fulfillment verifier matches the vBRIEF item by reading tracked PR state, checking feature/pan-<id> and strike/pan-<id> ancestry against origin/main, returning merged/stranded/unknown, and never using git log --grep. Constraint compliance: no prohibited workspace/project patterns found in the changed files.",
+    "updatedAt": "2026-07-04T16:06:43.308Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-07-04T16:03:36.487Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2317",
-    "lastVerifiedCommit": "686d5bb4b594cceb7345e4e7e738847116d8f0a9",
-    "reviewRequestedAt": "2026-07-04T14:37:01.135Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        ".pan/drafts/pan-2311.md",
-        ".pan/records/pan-2311.json",
-        "scripts/file-size-baseline.txt",
-        "src/lib/cloister/merge-verification.ts",
-        "tests/unit/lib/cloister/uat-promote.test.ts",
-        "tests/unit/lib/pan-444-post-merge-step0.test.ts"
-      ],
-      "declaredScopeUntouched": [
-        "src/lib/cloister/__tests__/uat-promote.test.ts"
-      ],
-      "declaredScope": [
-        "src/cli/commands/db.ts",
-        "src/cli/commands/done.ts",
-        "src/dashboard/server/routes/specialists/shared.ts",
-        "src/lib/cloister/__tests__/uat-promote.test.ts",
-        "src/lib/cloister/merge-agent.ts",
-        "src/lib/cloister/uat-promote.ts",
-        "src/lib/pan-dir/__tests__/merge-fulfillment.test.ts",
-        "src/lib/pan-dir/merge-fulfillment.ts",
-        "src/lib/webhook-handlers.ts",
-        "tests/unit/lib/webhook-handlers.test.ts"
-      ],
-      "actualChangedFiles": [
-        ".pan/drafts/pan-2311.md",
-        ".pan/records/pan-2311.json",
-        "scripts/file-size-baseline.txt",
-        "src/cli/commands/db.ts",
-        "src/cli/commands/done.ts",
-        "src/dashboard/server/routes/specialists/shared.ts",
-        "src/lib/cloister/merge-agent.ts",
-        "src/lib/cloister/merge-verification.ts",
-        "src/lib/cloister/uat-promote.ts",
-        "src/lib/pan-dir/__tests__/merge-fulfillment.test.ts",
-        "src/lib/pan-dir/merge-fulfillment.ts",
-        "src/lib/webhook-handlers.ts",
-        "tests/unit/lib/cloister/uat-promote.test.ts",
-        "tests/unit/lib/pan-444-post-merge-step0.test.ts",
-        "tests/unit/lib/webhook-handlers.test.ts"
-      ],
-      "recordedAt": "2026-07-04T14:36:30.293Z"
-    }
+    "reviewedAtCommit": "e4cc233d1cfa99195c137a510232edadaef06de7",
+    "lastVerifiedCommit": "686d5bb4b594cceb7345e4e7e738847116d8f0a9"
   },
   "closeOut": {
     "usage": {
@@ -227,8 +189,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 31388,
-            "output": 1019,
+            "input": 34093,
+            "output": 1746,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -240,6 +202,14 @@
             "cacheRead": 7213371,
             "cacheWrite": 227601
           }
+        },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 303749,
+            "output": 12621,
+            "cacheRead": 4587520,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
@@ -250,8 +220,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 31388,
-          "output": 1019,
+          "input": 34093,
+          "output": 1746,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -260,11 +230,17 @@
           "output": 57884,
           "cacheRead": 7213371,
           "cacheWrite": 227601
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 303749,
+          "output": 12621,
+          "cacheRead": 4587520,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 9.708286,
-        "pricingAsOf": "2026-07-04T15:15:11.540Z"
+        "usd": 10.918967,
+        "pricingAsOf": "2026-07-04T16:06:43.343Z"
       }
     },
     "merges": [
@@ -273,5 +249,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T18:03:53.979Z",
-  "updated": "2026-07-04T15:15:11.551Z"
+  "updated": "2026-07-04T16:06:43.344Z"
 }
