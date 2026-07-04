@@ -31,6 +31,11 @@
       "reason": "feedback",
       "note": "[2026-07-04T14:57Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-04T14:57:00.847Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T15:13:49.455Z"
     }
   ],
   "feedback": [
@@ -216,17 +221,17 @@
   },
   "pipeline": {
     "issueId": "PAN-2318",
-    "reviewStatus": "blocked",
-    "testStatus": "passed",
+    "reviewStatus": "reviewing",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T14:57:10.793Z",
+    "updatedAt": "2026-07-04T15:13:53.813Z",
     "reviewNotes": "PUT /api/cloister/config saves the file but no longer reloads the running child Cloister process, so live settings remain stale until restart.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2327",
     "reviewedAtCommit": "1ee1128f5ea549bf395737633866b6a68d01917a",
-    "lastVerifiedCommit": "1ee1128f5ea549bf395737633866b6a68d01917a"
+    "lastVerifiedCommit": "a74bebc649d119383c6cd0ef46a845b5cf9eee3c"
   },
   "closeOut": {
     "usage": {
@@ -257,9 +262,9 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 870440,
-            "output": 47116,
-            "cacheRead": 21697966,
+            "input": 882176,
+            "output": 52510,
+            "cacheRead": 24188846,
             "cacheWrite": 0
           }
         }
@@ -284,15 +289,15 @@
           "cacheWrite": 160275
         },
         "custom/kimi-k2.7-code": {
-          "input": 870440,
-          "output": 47116,
-          "cacheRead": 21697966,
+          "input": 882176,
+          "output": 52510,
+          "cacheRead": 24188846,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 12.601575,
-        "pricingAsOf": "2026-07-04T14:57:10.860Z"
+        "usd": 13.107565,
+        "pricingAsOf": "2026-07-04T15:13:53.837Z"
       }
     },
     "merges": [
@@ -301,5 +306,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-04T14:07:04.245Z",
-  "updated": "2026-07-04T14:57:10.866Z"
+  "updated": "2026-07-04T15:13:53.839Z"
 }
