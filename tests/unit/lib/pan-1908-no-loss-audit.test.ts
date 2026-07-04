@@ -184,10 +184,10 @@ describe('PAN-1908 no-loss audit', () => {
   });
 
   it('keeps GET /api/agents membership on the agents table, not agent-directory scans', () => {
-    const routePath = join(process.cwd(), 'src/dashboard/server/routes/agents.ts');
+    const routePath = join(process.cwd(), 'src/dashboard/server/routes/agents/listing.ts');
     const source = readFileSync(routePath, 'utf-8');
-    const start = source.indexOf("const getAgentsRoute = HttpRouter.add(");
-    const end = source.indexOf("// ─── Route: GET /api/agents/:id/output", start);
+    const start = source.indexOf("export const getAgentsRoute = HttpRouter.add(");
+    const end = source.indexOf("// ─── Route: GET /api/agents/:id/git-info", start);
     expect(start).toBeGreaterThanOrEqual(0);
     expect(end).toBeGreaterThan(start);
 

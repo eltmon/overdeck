@@ -188,6 +188,7 @@ export interface PlanningAgentStateInput {
   model: string;
   harness: RuntimeName;
   workspaceLocation: 'local' | 'remote';
+  auto?: boolean;
   autoSpawnOnFinalize?: boolean;
   startedAt?: string;
 }
@@ -203,6 +204,7 @@ export function buildPlanningAgentState(input: PlanningAgentStateInput): Record<
     role: 'plan',
     harness: input.harness,
     location: input.workspaceLocation,
+    auto: input.auto === true,
     autoSpawnOnFinalize: input.autoSpawnOnFinalize === true,
   };
 }
@@ -355,6 +357,7 @@ The user invoked \`pan plan --auto\`. Complete planning end-to-end without askin
 
 - Do not use AskUserQuestion.
 - When normal planning would ask a question, choose the most defensible default and record it in \`plan.autoDecisions[]\` as \`{ "summary": "...", "rationale": "..." }\`.
+- If the issue body, PRD, or comments list options and name a recommended/default/smallest acceptable option, choose that option and record it in \`plan.autoDecisions[]\`; do not ask the operator to choose among already-documented options.
 - Halt only for a genuine contradiction between authoritative inputs, such as the issue body requiring one behavior while a linked PRD requires the opposite. If that happens, write the contradiction into continue.json hazards and stop with a clear escalation message so the dashboard surfaces it.
 - Still produce the same complete vBRIEF and beads via \`pan plan finalize\` when no contradiction exists.
 ` : '';
@@ -726,6 +729,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         status: 'running',
         role: 'plan',
         harness: effectiveHarness,
+        auto: auto === true,
       });
       if (autoSpawnOnFinalize) {
         await writeFile(

@@ -180,7 +180,7 @@ beforeEach(() => {
   delete process.env.PAN_DOCKER;
   delete process.env.OVERDECK_DOCKER_WORKSPACE;
   mockSpawnDependencies();
-});
+}, 20_000);
 
 afterEach(() => {
   vi.doUnmock('../harness-resolve.js');

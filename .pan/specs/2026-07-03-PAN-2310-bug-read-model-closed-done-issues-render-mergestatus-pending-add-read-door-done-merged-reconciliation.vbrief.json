@@ -1,0 +1,133 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-03T16:28:29.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2310: read-door done→merged reconciliation so closed/done issues never render mergeStatus=pending",
+    "updated": "2026-07-03T20:43:14.991Z"
+  },
+  "plan": {
+    "id": "pan-2310",
+    "title": "bug(read-model): closed/done issues render mergeStatus=pending — add read-door done→merged reconciliation",
+    "status": "completed",
+    "uid": "8d5d5e4f-8aba-4940-861a-7d1911cf6950",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 5,
+    "created": "2026-07-03T16:28:29.000Z",
+    "updated": "2026-07-03T20:43:14.991Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2310",
+        "label": "PAN-2310",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "read-model",
+      "dashboard",
+      "bug",
+      "issue-data-service"
+    ],
+    "narratives": {
+      "Problem": "Closed/done issues render 'Done' in the project issue tree but 'pending' in the issue detail/slide-out. Root cause (verified): IssueDataService.getIssues() at src/dashboard/server/services/issue-data-service.ts:449-469 augments mergeStatus from an in-memory reviewStatusesCache that is currently empty (0 rows). When the cache misses, the issue passes through unchanged carrying its stale mergeStatus=pending (frozen from the per-issue record's planning-time pipeline block). The read door reconciles the forward direction (mergeStatus=merged but not yet done → show Verifying) but has no inverse: a done/closed issue carrying a non-merged mergeStatus is served unchanged. The tree renders canonical state (fresh → Done) while the issue display renders the stale mergeStatus (pending).",
+      "Proposal": "Add inverse reconciliation inside the same .map() at issue-data-service.ts:449, applied regardless of cache state so it also fixes the empty-cache path. Compute canonical status once at the top of the callback via getCanonicalStatus(issue.state ?? issue.canonicalStatus ?? issue.status, issue.stateType) — the same precedence the forward branch already uses. When canonical status === 'done' and the issue carries a present, non-'merged' mergeStatus, coerce it to 'merged' before returning, in both the cache-hit and cache-miss return paths. Gate strictly on 'done' so 'canceled' issues (which getCanonicalStatus maps distinctly) are never shown as merged. Never invent a mergeStatus on an issue that had none, and never rewrite an already-merged value. Defense-in-depth: even with an empty cache or a stale record, a done issue never displays mergeStatus=pending.",
+      "NonGoals": "- Fixing the upstream cause of the stale per-issue record or the empty review_status table (filed separately as the record-reconciliation bug)\n- Backfilling or repairing the review_status SQLite table or the 18 already-affected records at rest\n- Any change to the tree renderer or issue-display frontend components — the fix is entirely in the read-door resolver\n- Changing forward reconciliation (merged-but-not-done → Verifying) behavior\n- Coercing or otherwise altering the display of 'canceled' issues"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Gate the inverse rule strictly on canonical status === 'done', not 'done' || 'canceled'.",
+        "rationale": "The issue explicitly requires that a canceled issue may legitimately be unmerged and must NOT be shown as merged. getCanonicalStatus already maps cancel-family statuses to 'canceled', distinct from 'done', so strict equality is correct and sufficient."
+      },
+      {
+        "summary": "Apply the fix inside the existing .map() at line 449 rather than adding a new pass or helper module.",
+        "rationale": "Keeps the inverse rule co-located with the forward rule it mirrors, avoids a second O(n) traversal of allIssues on a dashboard hot path, and matches the surgical-change convention. Reuses the existing getCanonicalStatus(state ?? canonicalStatus ?? status, stateType) precedence for consistency between the two directions."
+      },
+      {
+        "summary": "Only rewrite a present, non-terminal mergeStatus; never synthesize one and never touch an already-merged value.",
+        "rationale": "Guarding on issue.mergeStatus && issue.mergeStatus !== 'merged' avoids inventing state on issues that never carried a mergeStatus and keeps the transform idempotent."
+      },
+      {
+        "summary": "Deliver the fix and its regression test as a single bead.",
+        "rationale": "This is a ~6-line single-file bug fix whose regression test is its proof (write-the-test-then-make-it-pass). Splitting them would leave a fix bead without a test and a test bead that cannot land before it, violating independent-mergeability. The change is one indivisible vertical slice."
+      }
+    ],
+    "items": [
+      {
+        "id": "inverse-done-merged-reconciliation",
+        "title": "Add done→merged inverse reconciliation to IssueDataService.getIssues() and cover it with a regression test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T16:28:29.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2310",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/issue-data-service.ts",
+            "tests/dashboard/issue-data-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/dashboard/issue-data-service.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/dashboard/issue-data-service.test.ts passes including the new done→merged and canceled-unaffected cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/issue-data-service.ts, edit the .map() callback that starts at line 450 ('Augment with mergeStatus from the asynchronous review-status cache.'). (1) Move the canonical-status computation to the top of the callback so it is available on every path: `const canonical = getCanonicalStatus(issue.state ?? issue.canonicalStatus ?? issue.status, issue.stateType);` and reuse it in the existing forward branch (replace the inner recomputation at the current line 456). (2) In the cache-hit path, before `return issueWithMerge;`, add: if `canonical === 'done' && issueWithMerge.mergeStatus !== 'merged'`, return `{ ...issueWithMerge, mergeStatus: 'merged' }`. (3) In the cache-miss path, before the final `return issue;`, add: if `canonical === 'done' && issue.mergeStatus && issue.mergeStatus !== 'merged'`, return `{ ...issue, mergeStatus: 'merged' }`. Do NOT include 'canceled' in either check. Then add two unit tests to tests/dashboard/issue-data-service.test.ts, next to the existing 'should restore verifying state for reopened issues with merged review status' test (~line 221), using the same injectIssues + service.reviewStatusesCache harness: (a) an issue with state='done'/status='Done' and mergeStatus='pending', empty reviewStatusesCache, asserts result mergeStatus==='merged'; (b) an issue with status='Canceled' and mergeStatus='pending', empty reviewStatusesCache, asserts result mergeStatus==='pending'. Use cycle:'all' so done/canceled issues are not filtered out."
+        },
+        "items": [
+          {
+            "id": "inverse-done-merged-reconciliation.ac1",
+            "title": "getIssues() resolves a done issue's non-merged mergeStatus to 'merged' when the review-status cache is empty (given state=done, empty cache, mergeStatus=pending → returns mergeStatus=merged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inverse-done-merged-reconciliation.ac2",
+            "title": "getIssues() preserves a canceled issue's mergeStatus unchanged (given status=Canceled, empty cache, mergeStatus=pending → returns mergeStatus=pending, never merged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inverse-done-merged-reconciliation.ac3",
+            "title": "getIssues() never synthesizes a mergeStatus: a done issue with no mergeStatus and empty cache returns output with mergeStatus still absent/undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inverse-done-merged-reconciliation.ac4",
+            "title": "tests/dashboard/issue-data-service.test.ts passes and npm run typecheck completes without errors after the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-07-03-PAN-2310-bug-read-model-closed-done-issues-render-mergestatus-pending-add-read-door-done-merged-reconciliation.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

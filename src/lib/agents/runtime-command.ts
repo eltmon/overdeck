@@ -390,7 +390,9 @@ export async function writePiAgentPrompt(agentId: string, prompt: string, timeou
     throw new Error(`Pi agent ${agentId} did not become ready within ${timeoutSec}s`);
   }
   try {
-    writePiCommandSync(agentId, { id: randomUUID(), type: 'prompt', message: augmentedPrompt });
+    // steer: Pi delivers immediately when idle and queues mid-turn; a bare
+    // prompt is rejected with AgentBusyError while a run is active.
+    writePiCommandSync(agentId, { id: randomUUID(), type: 'prompt', message: augmentedPrompt, streamingBehavior: 'steer' });
   } catch (err) {
     if (err instanceof PiNotReady) {
       throw new Error(`Pi agent ${agentId} reader gone before prompt could be delivered: ${err.message}`);
@@ -406,7 +408,9 @@ export async function writeOhmypiAgentPrompt(agentId: string, prompt: string, ti
     throw new Error(`ohmypi agent ${agentId} did not become ready within ${timeoutSec}s${describeOhmypiSpawnFailure(agentId)}`);
   }
   try {
-    writeOhmypiCommandSync(agentId, { id: randomUUID(), type: 'prompt', message: augmentedPrompt });
+    // steer: omp delivers immediately when idle and queues mid-turn; a bare
+    // prompt is rejected with AgentBusyError while a run is active.
+    writeOhmypiCommandSync(agentId, { id: randomUUID(), type: 'prompt', message: augmentedPrompt, streamingBehavior: 'steer' });
   } catch (err) {
     if (err instanceof OhmypiNotReady) {
       throw new Error(`ohmypi agent ${agentId} reader gone before prompt could be delivered: ${err.message}`);

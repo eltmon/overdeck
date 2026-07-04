@@ -35,7 +35,16 @@ vi.mock('child_process', async (importOriginal) => {
   return { ...actual, execFile };
 });
 
-import { getCiCheckRunsState, getMergeBackendStatus } from '../../../src/lib/github-app.js';
+import {
+  getCiCheckRunsState,
+  getIssueState,
+  getIssueStatePromise,
+  getMergeBackendStatus,
+  listOpenIssuesWithLabels,
+  listOpenIssuesWithLabelsPromise,
+  listPullRequestsForHead,
+  listPullRequestsForHeadPromise,
+} from '../../../src/lib/github-app.js';
 
 describe('getMergeBackendStatus', () => {
   beforeEach(() => {
@@ -180,5 +189,125 @@ describe('getCiCheckRunsState', () => {
       'https://api.github.com/repos/eltmon/overdeck/commits/abc123/check-runs?per_page=100',
       'https://api.github.com/repos/eltmon/overdeck/commits/abc123/check-runs?per_page=100&page=2',
     ]);
+  });
+});
+
+describe('App REST shared helpers', () => {
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', fetchMock);
+    fetchMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function tokenResponse() {
+    return new Response(JSON.stringify({ token: 'token', expires_at: '2026-06-10T00:00:00Z' }), { status: 201 });
+  }
+
+  it('lists pull requests for an owner-qualified head ref via REST', async () => {
+    fetchMock
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(new Response(JSON.stringify([
+        {
+          number: 123,
+          html_url: 'https://github.com/eltmon/overdeck/pull/123',
+          state: 'closed',
+          merged: true,
+          merged_at: '2026-07-03T12:00:00Z',
+          merge_commit_sha: 'abc123',
+        },
+      ]), { status: 200 }));
+
+    const result = await listPullRequestsForHeadPromise('eltmon', 'overdeck', 'feature/pan-2265', 'all');
+
+    expect(result).toEqual([{
+      number: 123,
+      state: 'closed',
+      merged: true,
+      mergedAt: '2026-07-03T12:00:00Z',
+      mergeCommit: 'abc123',
+      url: 'https://github.com/eltmon/overdeck/pull/123',
+    }]);
+    const url = new URL(String(fetchMock.mock.calls[1][0]));
+    expect(url.pathname).toBe('/repos/eltmon/overdeck/pulls');
+    expect(url.searchParams.get('head')).toBe('eltmon:feature/pan-2265');
+    expect(url.searchParams.get('state')).toBe('all');
+  });
+
+  it('returns issue state via REST', async () => {
+    fetchMock
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(new Response(JSON.stringify({ state: 'closed' }), { status: 200 }));
+
+    await expect(getIssueStatePromise('eltmon', 'overdeck', 2265)).resolves.toEqual({ state: 'closed' });
+
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+      'https://api.github.com/app/installations/67890/access_tokens',
+      'https://api.github.com/repos/eltmon/overdeck/issues/2265',
+    ]);
+  });
+
+  it('lists open issue labels with REST pagination and excludes pull requests', async () => {
+    fetchMock
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(new Response(JSON.stringify([
+        {
+          number: 1,
+          labels: [{ name: 'pan-2265' }, { name: 'backend' }],
+        },
+        {
+          number: 2,
+          pull_request: { url: 'https://api.github.com/repos/eltmon/overdeck/pulls/2' },
+          labels: [{ name: 'pan-2265' }],
+        },
+      ]), {
+        status: 200,
+        headers: {
+          link: '<https://api.github.com/repos/eltmon/overdeck/issues?state=open&per_page=100&page=2>; rel="next"',
+        },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify([
+        {
+          number: 3,
+          labels: ['infra', { name: null }, { name: 'rate-limit' }],
+        },
+      ]), { status: 200 }));
+
+    const result = await listOpenIssuesWithLabelsPromise('eltmon', 'overdeck');
+
+    expect(result).toEqual([
+      { number: 1, labels: ['pan-2265', 'backend'] },
+      { number: 3, labels: ['infra', 'rate-limit'] },
+    ]);
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+      'https://api.github.com/app/installations/67890/access_tokens',
+      'https://api.github.com/repos/eltmon/overdeck/issues?state=open&per_page=100',
+      'https://api.github.com/repos/eltmon/overdeck/issues?state=open&per_page=100&page=2',
+    ]);
+  });
+
+  it('exports Effect wrappers for all shared helpers', async () => {
+    fetchMock
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(new Response(JSON.stringify([
+        { number: 4, state: 'open', merged: false, merged_at: null, merge_commit_sha: null },
+      ]), { status: 200 }))
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(new Response(JSON.stringify({ state: 'open' }), { status: 200 }))
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(new Response(JSON.stringify([
+        { number: 5, labels: [{ name: 'ready' }] },
+      ]), { status: 200 }));
+
+    await expect(Effect.runPromise(listPullRequestsForHead('eltmon', 'overdeck', 'feature/pan-2265', 'open')))
+      .resolves.toMatchObject([{ number: 4, state: 'open', merged: false }]);
+    await expect(Effect.runPromise(getIssueState('eltmon', 'overdeck', 2265)))
+      .resolves.toEqual({ state: 'open' });
+    await expect(Effect.runPromise(listOpenIssuesWithLabels('eltmon', 'overdeck')))
+      .resolves.toEqual([{ number: 5, labels: ['ready'] }]);
   });
 });

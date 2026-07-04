@@ -1659,7 +1659,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
           `ALL CHECKS PASSED for ${issueId}. Review: passed. Tests: passed. Your work is complete — ready for merge. You may stop working on this issue.`
         )).pipe(
           Effect.tap(() => Effect.sync(() => console.log(`[review-status] Notified ${notifyAgentId} that all checks passed`))),
-          Effect.catchAll((err) => Effect.sync(() => console.log(
+          Effect.catch((err) => Effect.sync(() => console.log(
             `[review-status] Could not notify work agent for ${issueId} (may not be running): ${err instanceof Error ? err.message : String(err)}`
           ))),
         );
