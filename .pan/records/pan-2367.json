@@ -2,7 +2,7 @@
   "issueId": "PAN-2367",
   "schemaVersion": 2,
   "created": "2026-07-04T21:55:57.203Z",
-  "updated": "2026-07-04T21:55:57.393Z",
+  "updated": "2026-07-04T22:32:54.085Z",
   "pipeline": {
     "issueId": "PAN-2367",
     "reviewStatus": "pending",
@@ -27,5 +27,17 @@
     }
   ],
   "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "model": "claude-opus-4-8",
+  "statusOverrides": {
+    "durable-tombstone-guard": "completed",
+    "durable-tombstone-guard.ac1": "completed",
+    "durable-tombstone-guard.ac2": "completed",
+    "durable-tombstone-guard.ac3": "completed",
+    "durable-tombstone-guard.ac4": "completed",
+    "durable-tombstone-guard.ac5": "completed",
+    "terminal-spec-guard": "completed",
+    "terminal-spec-guard.ac1": "completed",
+    "terminal-spec-guard.ac2": "completed",
+    "terminal-spec-guard.ac3": "completed"
+  }
 }
