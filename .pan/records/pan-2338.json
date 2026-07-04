@@ -42,6 +42,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-04T02:13:20.476Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T14:49:24.774Z"
     }
   ],
   "feedback": [],
@@ -107,19 +112,22 @@
     "recordedAt": "2026-07-04T01:57:37.929Z"
   },
   "created": "2026-07-04T00:35:12.770Z",
-  "updated": "2026-07-04T02:13:24.344Z",
+  "updated": "2026-07-04T14:49:24.777Z",
   "pipeline": {
     "issueId": "PAN-2338",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merging",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T02:13:24.319Z",
-    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
+    "updatedAt": "2026-07-04T14:49:01.966Z",
+    "reviewNotes": "Review passed; prior gc-agents and modal outcome blockers are fixed",
+    "testNotes": "TypeScript typecheck passed (tsc --noEmit + hooks + evals). ESLint passed (eslint + effect/permissions/state-writes/overdeck-boundaries/skills/prompts/file-size/ratchet-audit). Full npm test passed: 823/827 files (4 skipped), 8233/8292 tests (52 skipped); frontend tests 3/3 files, 32/32 tests. Focused PAN-2338 suites passed: src/lib/cloister/__tests__/boot-reconciliation.test.ts, src/lib/cloister/__tests__/pan-871-auto-resume.test.ts, src/cli/commands/__tests__/db-gc-agents.test.ts, src/dashboard/server/routes/__tests__/boot-reconciliation.test.ts, src/lib/overdeck/__tests__/agents-issue-stage.test.ts, src/dashboard/frontend/src/components/__tests__/BootReconciliationModal.test.tsx. Browser UAT not required: acceptance criteria are backend/CLI focused (candidate gating, per-agent outcomes, gc-agents CLI) and modal rendering is covered by component unit tests.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "workspace-ppk5t matches the bead scope: applyBootReconciliationDecision now returns resumed plus per-agent outcomes, covers resumed/no-resumable-session/deferred-concurrency/deferred-load, wrapper and direct resumed-count callers compile against the new shape, and the focused test covers skipped unresumable candidates. No inspected constraint violations found.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2342",
+    "reviewedAtCommit": "0517b64f3587ea55dbef395b6c64c87ec4552762",
     "lastVerifiedCommit": "84d895785affbdf65d1d3ccdfa90c2df30e708ee",
     "reviewRequestedAt": "2026-07-04T01:57:45.558Z",
     "scopeDrift": {
@@ -197,8 +205,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 30784,
-            "output": 1865,
+            "input": 37734,
+            "output": 4923,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -210,6 +218,14 @@
             "cacheRead": 5984093,
             "cacheWrite": 169402
           }
+        },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 236276,
+            "output": 7149,
+            "cacheRead": 2779648,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
@@ -220,8 +236,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 30784,
-          "output": 1865,
+          "input": 37734,
+          "output": 4923,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -230,11 +246,17 @@
           "output": 47471,
           "cacheRead": 5984093,
           "cacheWrite": 169402
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 236276,
+          "output": 7149,
+          "cacheRead": 2779648,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 13.521411,
-        "pricingAsOf": "2026-07-04T02:13:24.336Z"
+        "usd": 14.302599,
+        "pricingAsOf": "2026-07-04T14:49:01.991Z"
       }
     },
     "merges": [
