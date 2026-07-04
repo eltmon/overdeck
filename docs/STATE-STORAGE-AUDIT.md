@@ -8,10 +8,11 @@ and what should the storage model actually be.
 
 > **Resolution note:** The authoritative-source questions raised here were settled by
 > [PAN-1908](https://github.com/eltmon/overdeck/issues/1908): agent runtime state now lives in the SQLite `agents` table in
-> `~/.overdeck/panopticon.db`, durable per-issue records live in the git-backed infra repo
+> `~/.overdeck/overdeck.db` (renamed from `panopticon.db` by [PAN-1952](https://github.com/eltmon/overdeck/issues/1952)), durable per-issue records live in the git-backed infra repo
 > under `.pan/` records, and tmux on the `overdeck` socket remains the liveness oracle. See
 > [AGENT-STATE-PLANES.md](./AGENT-STATE-PLANES.md) for the current model. This audit is kept
 > as historical context for the design rationale, but its Pass 2 action items are superseded.
+> References to `panopticon.db` in the body below reflect the name at audit time (2026-06-14).
 
 ## Confidence legend
 

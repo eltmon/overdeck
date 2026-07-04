@@ -89,7 +89,23 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
    readonly try/catch that `review-status.ts:367` has") BEFORE you file or dispatch. A filed issue
    that only restates the error message is a symptom log, not a diagnosis — and a strike aimed at a
    guessed cause wastes a revolution. Read the code; then strike/fix the real defect.
-5. **Never block on the operator.** Do not halt for planning Q&A, "approach A or B", or any
+5. **You are the deployer — ship your own fixes to the live server.** A fix merged to `main`
+   is **inert until the running dashboard is rebuilt onto it**. Server-code bugs (a broken route
+   handler, a readonly-DB write, an `Effect.catchAll` misuse) keep breaking the pipeline until you
+   redeploy — and review/test agents that can't POST their verdict stay alive holding an
+   **advancing-ceiling** slot (PAN-1665), so a handful of them jam the ceiling and freeze *all*
+   advancement. When merged fixes are not yet live, **deploy them yourself**: from the primary
+   `main` worktree run `npm run build`, then `pan restart --dashboard --health-timeout 180000`,
+   then verify the new pid binds `:3011` with `deacon=on` and is `systemd`-parented (not a
+   `containerd-shim` container peer). After a deploy, prune any agents left stranded by the *old*
+   server: dead-in-tmux advancing agents free their slot on the next `reconcileAgentLiveness`
+   patrol (kill their tmux session to trigger it); merged/verdict-recorded zombies can be reaped
+   directly. This is your **standing authority**, not a per-deploy operator decision. The "never
+   restart the dashboard" rule scopes to **non-flywheel agents restarting from workspace cwds**
+   (the stale-build hijack — PAN-2252/PAN-2280); it never restricted the flywheel, the single
+   coordinated deployer. Deploy from a clean build only — never an in-place `dist/` rebuild without
+   an immediate restart, which wounds the live server.
+6. **Never block on the operator.** Do not halt for planning Q&A, "approach A or B", or any
    decision. Surface it in `openQuestions[]`, pick the most defensible default, act, and let
    the question persist as a non-blocking signal across ticks. The single exception is a
    `vetoed` issue. Action-and-correct beats stop-and-wait; if a default proves wrong, file a
