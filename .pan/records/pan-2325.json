@@ -37,17 +37,14 @@
       "reason": "feedback",
       "note": "[2026-07-04T00:59Z] verification-gate → FAILED — seq 1",
       "timestamp": "2026-07-04T00:59:28.617Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-07-04T00:59:28Z",
-      "markdownBody": "VERIFICATION FAILED for PAN-2325 (attempt 1/3):\n\nFailed check: sync-target-branch\n\nSync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - .pan/test/result.json deleted in HEAD and modified in origin/main.  Version origin/main of .pan/test/result.json left in tree.\n\n## REQUIRED: Resolve merge conflicts BEFORE resubmitting\n\n1. Run: `git fetch origin main && git merge origin/main`\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request PAN-2325 -m \"Fixed sync-target-branch\"\n\nDo NOT resubmit until all repos sync cleanly and tests pass."
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T01:06:17.334Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/drafts/pan-2325.md",
@@ -69,18 +66,20 @@
     "recordedAt": "2026-07-03T23:39:17.250Z"
   },
   "created": "2026-07-03T21:17:15.683Z",
-  "updated": "2026-07-04T00:59:28.635Z",
+  "updated": "2026-07-04T01:07:21.899Z",
   "pipeline": {
     "issueId": "PAN-2325",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "verificationStatus": "failed",
+    "reviewStatus": "reviewing",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T00:59:28.609Z",
-    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - .pan/test/result.json deleted in HEAD and modified in origin/main.  Version origin/main of .pan/test/result.json left in tree.",
+    "updatedAt": "2026-07-04T01:07:21.863Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed sync-target-branch",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2328",
-    "lastVerifiedCommit": "63f8311a51b9062573eea7de8d3de42ee0c188be",
+    "lastVerifiedCommit": "166c3eeca0c4d04f1dbb17c91aac8b1ae04bac8d",
     "reviewRequestedAt": "2026-07-03T23:39:24.241Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -139,7 +138,7 @@
       },
       "costAtCloseOut": {
         "usd": 1.6202400000000001,
-        "pricingAsOf": "2026-07-04T00:59:28.634Z"
+        "pricingAsOf": "2026-07-04T01:07:21.898Z"
       }
     },
     "merges": [
