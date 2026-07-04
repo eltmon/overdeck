@@ -27,24 +27,14 @@
       "reason": "feedback",
       "note": "[2026-07-04T14:22Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-04T14:22:40.277Z"
-    }
-  ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-04T14:22:36Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2294\n\nsync tmux sessionExistsSync is now on the dashboard promote route\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2294 -m \"Fixed review issues\"`"
     },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-04T14:22:40Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2294\n\nsync tmux sessionExistsSync is now on the dashboard promote route\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2294 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T14:43:19.208Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/drafts/PAN-2294.md",
@@ -68,18 +58,20 @@
     "recordedAt": "2026-07-04T14:20:29.286Z"
   },
   "created": "2026-07-03T12:02:49.631Z",
-  "updated": "2026-07-04T14:27:49.615Z",
+  "updated": "2026-07-04T14:44:21.762Z",
   "pipeline": {
     "issueId": "PAN-2294",
     "reviewStatus": "reviewing",
-    "testStatus": "pending",
-    "verificationStatus": "running",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T14:27:49.579Z",
+    "updatedAt": "2026-07-04T14:44:21.657Z",
     "reviewNotes": "sync tmux sessionExistsSync is now on the dashboard promote route",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2349",
-    "lastVerifiedCommit": "8741fa9f0839ea4f52c1968486f4366729d6ac59",
+    "lastVerifiedCommit": "cbd7f924a04b45c1b396c520a4c3d956c3b6f380",
     "reviewRequestedAt": "2026-07-04T14:20:40.270Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -140,7 +132,7 @@
       },
       "costAtCloseOut": {
         "usd": 3.830111,
-        "pricingAsOf": "2026-07-04T14:27:49.614Z"
+        "pricingAsOf": "2026-07-04T14:44:21.759Z"
       }
     },
     "merges": [
