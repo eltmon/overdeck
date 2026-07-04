@@ -102,18 +102,22 @@
     "recordedAt": "2026-07-04T01:50:22.147Z"
   },
   "created": "2026-07-03T13:52:41.087Z",
-  "updated": "2026-07-04T01:50:56.005Z",
+  "updated": "2026-07-04T01:52:26.863Z",
   "pipeline": {
     "issueId": "PAN-2145",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
-    "verificationStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "testing",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T01:50:55.611Z",
+    "updatedAt": "2026-07-04T01:52:26.840Z",
+    "reviewNotes": "No blocking findings; extraction preserves route surface and reviewed behavior.",
+    "testNotes": "TypeScript typecheck passed (tsc --noEmit + hooks + evals). ESLint passed (eslint + effect/permissions/state-writes/overdeck-boundaries/skills/prompts/file-size/ratchet-audit). Focused Vitest suites passed: 9 files, 135 tests. Suites: github-app, flywheel-surfaces, cloister/issue-closed, cloister/orphan-proposed-reconciler, cloister/merge-agent, forge, webhook-handlers, github-graphql-cooldown, dashboard issue-pr + issue-discussions routes. Browser UAT not required: PAN-2265 is a backend-only GitHub App REST migration with no dashboard/UI acceptance criteria (frontend explicitly listed as NonGoal).",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Spec fidelity passed: fork door remains under 1000 lines, uses self import from ./conversation-forks.js, main.ts imports recoverStuckForks/waitForInFlightForkPipelines from lib/overdeck/conversation-forks.js, and routes 5/28 delegate to the fork door. Constraint compliance passed: no routes/conversations.js import, no execSync, no sync tmux sendKeys, no explicit any in the changed fork door.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2332",
+    "reviewedAtCommit": "095b02f6cc210c7570879867e375cbebcdfa4baf",
     "lastVerifiedCommit": "ff64924a2fb3aea7480068a6d910d2a1e15e2668",
     "reviewRequestedAt": "2026-07-04T01:50:55.007Z",
     "scopeDrift": {
@@ -191,8 +195,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 26381,
-            "output": 816,
+            "input": 27408,
+            "output": 970,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -214,8 +218,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 26381,
-          "output": 816,
+          "input": 27408,
+          "output": 970,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -228,7 +232,7 @@
       },
       "costAtCloseOut": {
         "usd": 23.38494,
-        "pricingAsOf": "2026-07-04T01:50:55.780Z"
+        "pricingAsOf": "2026-07-04T01:52:26.861Z"
       }
     },
     "merges": [
@@ -236,8 +240,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "item-residue": "completed",
     "item-residue.ac1": "completed",
