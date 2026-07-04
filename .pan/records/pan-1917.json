@@ -36,6 +36,21 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T23:08:01.680Z"
+    },
+    {
+      "timestamp": "2026-07-04T01:23:59.114Z",
+      "reason": "end",
+      "note": "Fixed test failures"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T01:23:59.367Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T14:50:55.246Z"
     }
   ],
   "feedback": [
@@ -61,6 +76,93 @@
       "markdownBody": "# Review CHANGES REQUESTED for PAN-1917\n\nSemantic search ignores managed-archived source filter while UI exposes it\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1917 -m \"Fixed review issues\"`"
     }
   ],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/records/pan-1917.json",
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/frontend/src/App.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/SessionTable.test.tsx",
+      "src/dashboard/server/services/dashboard-db-task.ts",
+      "src/dashboard/server/services/sessions-feed-rpc.ts",
+      "tests/playwright/conversation-supervisor-uat.test.ts",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/dashboard/frontend/src/App/__tests__/routes.test.ts"
+    ],
+    "declaredScope": [
+      ".pan/drafts/pan-1917.md",
+      "packages/contracts/src/rpc.ts",
+      "packages/contracts/src/types.ts",
+      "src/dashboard/frontend/src/App.tsx",
+      "src/dashboard/frontend/src/App/AppRoutes.tsx",
+      "src/dashboard/frontend/src/App/__tests__/routes.test.ts",
+      "src/dashboard/frontend/src/App/routes.ts",
+      "src/dashboard/frontend/src/components/conversations/ConversationsPage.tsx",
+      "src/dashboard/frontend/src/components/conversations/FacetPanel.tsx",
+      "src/dashboard/frontend/src/components/conversations/ScanButton.tsx",
+      "src/dashboard/frontend/src/components/conversations/SessionDetail.tsx",
+      "src/dashboard/frontend/src/components/conversations/SessionTable.tsx",
+      "src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/ConversationsPage.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/SessionDetail.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/SessionTranscript.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/feedPages.test.ts",
+      "src/dashboard/frontend/src/components/conversations/__tests__/sessions-page-no-loss.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/feedPages.ts",
+      "src/dashboard/server/routes/discovered-sessions.ts",
+      "src/dashboard/server/services/dashboard-db-worker.ts",
+      "src/dashboard/server/ws-rpc.ts",
+      "src/lib/overdeck/discovered-sessions.ts",
+      "src/lib/overdeck/sessions-feed.ts",
+      "tests/bench/sessions-feed.bench.ts",
+      "tests/unit/dashboard/server/routes/discovered-sessions-messages.test.ts",
+      "tests/unit/dashboard/server/routes/fixtures/discovered-session-transcript.jsonl",
+      "tests/unit/dashboard/server/ws-rpc-sessions-feed.test.ts",
+      "tests/unit/lib/overdeck/discovered-sessions.test.ts",
+      "tests/unit/lib/overdeck/sessions-feed.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".pan/drafts/pan-1917.md",
+      ".pan/records/pan-1917.json",
+      "packages/contracts/src/rpc.ts",
+      "packages/contracts/src/types.ts",
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/frontend/src/App.test.tsx",
+      "src/dashboard/frontend/src/App.tsx",
+      "src/dashboard/frontend/src/App/AppRoutes.tsx",
+      "src/dashboard/frontend/src/App/routes.ts",
+      "src/dashboard/frontend/src/components/conversations/ConversationsPage.tsx",
+      "src/dashboard/frontend/src/components/conversations/FacetPanel.tsx",
+      "src/dashboard/frontend/src/components/conversations/ScanButton.tsx",
+      "src/dashboard/frontend/src/components/conversations/SessionDetail.tsx",
+      "src/dashboard/frontend/src/components/conversations/SessionTable.tsx",
+      "src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/ConversationsPage.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/SessionDetail.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/SessionTable.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/SessionTranscript.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/feedPages.test.ts",
+      "src/dashboard/frontend/src/components/conversations/__tests__/sessions-page-no-loss.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/feedPages.ts",
+      "src/dashboard/server/routes/discovered-sessions.ts",
+      "src/dashboard/server/services/dashboard-db-task.ts",
+      "src/dashboard/server/services/dashboard-db-worker.ts",
+      "src/dashboard/server/services/sessions-feed-rpc.ts",
+      "src/dashboard/server/ws-rpc.ts",
+      "src/lib/overdeck/discovered-sessions.ts",
+      "src/lib/overdeck/sessions-feed.ts",
+      "tests/bench/sessions-feed.bench.ts",
+      "tests/playwright/conversation-supervisor-uat.test.ts",
+      "tests/unit/dashboard/server/routes/discovered-sessions-messages.test.ts",
+      "tests/unit/dashboard/server/routes/fixtures/discovered-session-transcript.jsonl",
+      "tests/unit/dashboard/server/ws-rpc-sessions-feed.test.ts",
+      "tests/unit/lib/overdeck/discovered-sessions.test.ts",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts",
+      "tests/unit/lib/overdeck/sessions-feed.test.ts"
+    ],
+    "recordedAt": "2026-07-04T01:23:50.563Z"
+  },
   "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
@@ -112,22 +214,17 @@
   },
   "pipeline": {
     "issueId": "PAN-1917",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merging",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T01:23:16.725Z",
-    "blockerReasons": [
-      {
-        "type": "failing_checks",
-        "summary": "Required checks are failing",
-        "detectedAt": "2026-07-04T00:13:19.930Z"
-      }
-    ],
+    "updatedAt": "2026-07-04T14:50:32.057Z",
+    "testNotes": "Reconciled from green GitHub checks on 542c0bb8: build, lint, test, smoke, CodeRabbit, and overdeck/test passed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2279",
-    "lastVerifiedCommit": "d49d4680713a6fa17349def1e27f57247e0be756"
+    "reviewedAtCommit": "542c0bb8bb7c90901c0e8c7d17f15c81925fe59d",
+    "lastVerifiedCommit": "542c0bb8bb7c90901c0e8c7d17f15c81925fe59d"
   },
   "closeOut": {
     "usage": {
@@ -150,8 +247,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 32964,
-            "output": 2206,
+            "input": 35444,
+            "output": 2998,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -166,9 +263,9 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 935529,
-            "output": 50101,
-            "cacheRead": 20045312,
+            "input": 1546903,
+            "output": 80760,
+            "cacheRead": 31124390,
             "cacheWrite": 0
           }
         }
@@ -187,21 +284,21 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 32964,
-          "output": 2206,
+          "input": 35444,
+          "output": 2998,
           "cacheRead": 0,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 935529,
-          "output": 50101,
-          "cacheRead": 20045312,
+          "input": 1546903,
+          "output": 80760,
+          "cacheRead": 31124390,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 29.557539,
-        "pricingAsOf": "2026-07-04T01:23:16.768Z"
+        "usd": 32.366009,
+        "pricingAsOf": "2026-07-04T14:50:32.098Z"
       }
     },
     "merges": [
@@ -235,5 +332,5 @@
     }
   },
   "created": "2026-07-03T20:23:46.887Z",
-  "updated": "2026-07-04T01:23:16.779Z"
+  "updated": "2026-07-04T14:50:55.283Z"
 }
