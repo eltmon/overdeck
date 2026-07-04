@@ -51,24 +51,14 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-04T14:38:01.641Z"
-    }
-  ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-04T14:37:55Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2311\n\nreconcile can skip closed-out label and verifier can false-strand on PR lookup errors\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2311 -m \"Fixed review issues\"`"
     },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-04T14:38:00Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2311\n\nreconcile can skip closed-out label and verifier can false-strand on PR lookup errors\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2311 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T14:55:21.328Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/drafts/pan-2311.md",
@@ -149,11 +139,11 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T14:40:31.477Z",
-    "reviewNotes": "reconcile can skip closed-out label and verifier can false-strand on PR lookup errors",
+    "updatedAt": "2026-07-04T14:55:25.254Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "Inspection passed for bead workspace-qaa0a. Spec fidelity: merge-fulfillment verifier matches the vBRIEF item by reading tracked PR state, checking feature/pan-<id> and strike/pan-<id> ancestry against origin/main, returning merged/stranded/unknown, and never using git log --grep. Constraint compliance: no prohibited workspace/project patterns found in the changed files.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2317",
-    "lastVerifiedCommit": "bbc0ecd77c33a254ed45a579117c959e02e367e4",
+    "lastVerifiedCommit": "31f08051d2475e3f7dc1a64bf46b9c7c83235ae7",
     "reviewRequestedAt": "2026-07-04T14:37:01.135Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -249,7 +239,7 @@
       },
       "costAtCloseOut": {
         "usd": 9.708286,
-        "pricingAsOf": "2026-07-04T14:40:31.528Z"
+        "pricingAsOf": "2026-07-04T14:55:25.289Z"
       }
     },
     "merges": [
@@ -258,5 +248,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T18:03:53.979Z",
-  "updated": "2026-07-04T14:40:31.534Z"
+  "updated": "2026-07-04T14:55:25.290Z"
 }
