@@ -12,27 +12,105 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-04T14:01:42.576Z"
+    },
+    {
+      "timestamp": "2026-07-04T14:20:40.269Z",
+      "reason": "end",
+      "note": "Anomalies: full npm test failed across many unrelated suites and then hung; targeted tests passed, typecheck passed, and lint passed. bd dolt push stalled after local bead closures were verified, but the feature branch pushed cleanly. No plan deviations. Delivered best-effort UAT promote notification helper and wired postUatGenerationPromotePayload to notify the flywheel while preserving the promote response."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-04T14:22Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-04T14:22:36.761Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-04T14:22Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-04T14:22:40.277Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-04T14:22:36Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2294\n\nsync tmux sessionExistsSync is now on the dashboard promote route\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2294 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-04T14:22:40Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2294\n\nsync tmux sessionExistsSync is now on the dashboard promote route\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2294 -m \"Fixed review issues\"`"
+    }
+  ],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/drafts/PAN-2294.md",
+      ".pan/records/pan-2294.json"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "src/dashboard/server/services/__tests__/uat-train.test.ts",
+      "src/dashboard/server/services/uat-train.ts",
+      "src/lib/cloister/__tests__/uat-promote-notify.test.ts",
+      "src/lib/cloister/uat-promote-notify.ts"
+    ],
+    "actualChangedFiles": [
+      ".pan/drafts/PAN-2294.md",
+      ".pan/records/pan-2294.json",
+      "src/dashboard/server/services/__tests__/uat-train.test.ts",
+      "src/dashboard/server/services/uat-train.ts",
+      "src/lib/cloister/__tests__/uat-promote-notify.test.ts",
+      "src/lib/cloister/uat-promote-notify.ts"
+    ],
+    "recordedAt": "2026-07-04T14:20:29.286Z"
+  },
   "created": "2026-07-03T12:02:49.631Z",
-  "updated": "2026-07-04T14:20:23.182Z",
+  "updated": "2026-07-04T14:22:53.088Z",
   "pipeline": {
     "issueId": "PAN-2294",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T13:16:42.183Z"
+    "updatedAt": "2026-07-04T14:22:53.048Z",
+    "reviewNotes": "sync tmux sessionExistsSync is now on the dashboard promote route",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2349",
+    "lastVerifiedCommit": "8f5e9db5a459bedef3f3013604ca09a86e4046ce",
+    "reviewRequestedAt": "2026-07-04T14:20:40.270Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        ".pan/drafts/PAN-2294.md",
+        ".pan/records/pan-2294.json"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "src/dashboard/server/services/__tests__/uat-train.test.ts",
+        "src/dashboard/server/services/uat-train.ts",
+        "src/lib/cloister/__tests__/uat-promote-notify.test.ts",
+        "src/lib/cloister/uat-promote-notify.ts"
+      ],
+      "actualChangedFiles": [
+        ".pan/drafts/PAN-2294.md",
+        ".pan/records/pan-2294.json",
+        "src/dashboard/server/services/__tests__/uat-train.test.ts",
+        "src/dashboard/server/services/uat-train.ts",
+        "src/lib/cloister/__tests__/uat-promote-notify.test.ts",
+        "src/lib/cloister/uat-promote-notify.ts"
+      ],
+      "recordedAt": "2026-07-04T14:20:29.286Z"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 7936,
-            "output": 131,
+            "input": 24130,
+            "output": 497,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -48,8 +126,8 @@
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 7936,
-          "output": 131,
+          "input": 24130,
+          "output": 497,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -62,10 +140,12 @@
       },
       "costAtCloseOut": {
         "usd": 3.830111,
-        "pricingAsOf": "2026-07-03T13:16:42.202Z"
+        "pricingAsOf": "2026-07-04T14:22:53.067Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2349"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
