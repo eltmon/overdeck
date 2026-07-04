@@ -23,6 +23,7 @@ const mockGetCloisterService = vi.fn(() => ({
 
 vi.mock('../../../src/lib/cloister/service.js', () => ({
   getCloisterService: (...args: unknown[]) => mockGetCloisterService(...args),
+  readCloisterStateFile: vi.fn(() => ({ running: false })),
 }));
 
 const mockListRunningAgents = vi.fn();
@@ -56,7 +57,11 @@ vi.mock('../../../src/dashboard/server/services/domain-services.js', () => ({
 
 // Import REAL helpers from the route module so tests exercise actual production
 // code, not copied mirrors.
-import { buildAgentIssueMap, computeStuckCount as realComputeStuckCount } from '../../../src/dashboard/server/routes/metrics.js';
+import {
+  buildAgentIssueMap,
+  buildMetricsSummaryPayload,
+  computeStuckCount as realComputeStuckCount,
+} from '../../../src/dashboard/server/routes/metrics.js';
 
 // ---------------------------------------------------------------------------
 // Tests: buildAgentIssueMap (real route module — exercises guard directly)
@@ -202,5 +207,41 @@ describe('stuckCount union logic', () => {
       agentIdToIssueId: { 'agent-pan-100': 'pan-100' },   // lowercase from agent
       persistentStuckIssueIds: ['PAN-100'],                 // uppercase from DB
     })).toBe(1);
+  });
+});
+
+describe('buildMetricsSummaryPayload', () => {
+  it('returns the latest event-loop p50, p99, and max fields', () => {
+    const payload = buildMetricsSummaryPayload({
+      todayCost: 12.345,
+      status: {
+        summary: { total: 3, active: 2, warning: 1 },
+        agentsNeedingAttention: [],
+      },
+      costSummary: {
+        topAgents: [],
+        topIssues: [],
+      },
+      runningAgents: [],
+      reviewStatuses: {},
+      getAgentHealth: () => null,
+      eventLoop: {
+        p50: 1,
+        p99: 2,
+        max: 3,
+        unit: 'ms',
+        sampledAt: '2026-07-03T12:00:00.000Z',
+        windowMs: 60_000,
+      },
+    });
+
+    expect(payload.eventLoop).toEqual({
+      p50: 1,
+      p99: 2,
+      max: 3,
+      unit: 'ms',
+      sampledAt: '2026-07-03T12:00:00.000Z',
+      windowMs: 60_000,
+    });
   });
 });
