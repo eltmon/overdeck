@@ -70,6 +70,43 @@ if [ "$TOOL_NAME" = "AskUserQuestion" ]; then
   exit 0
 fi
 
+if command -v jq >/dev/null 2>&1; then
+  case "${OVERDECK_AGENT_ID:-}:$TOOL_NAME" in
+    flywheel-*:Write|flywheel-*:Edit|flywheel-*:MultiEdit)
+      FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // ""' 2>/dev/null)
+      REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+
+      if [ -n "$FILE_PATH" ] && [ -n "$REPO_ROOT" ] && command -v realpath >/dev/null 2>&1; then
+        REPO_REAL=$(realpath -m -- "$REPO_ROOT" 2>/dev/null)
+        case "$FILE_PATH" in
+          /*) TARGET_REAL=$(realpath -m -- "$FILE_PATH" 2>/dev/null) ;;
+          *) TARGET_REAL=$(realpath -m -- "$REPO_REAL/$FILE_PATH" 2>/dev/null) ;;
+        esac
+
+        case "$TARGET_REAL" in
+          "$REPO_REAL"|"$REPO_REAL"/*)
+            REL_PATH=${TARGET_REAL#"$REPO_REAL"/}
+            case "$REL_PATH" in
+              docs/FLYWHEEL-STATE.md|.pan/records/*|.pan/continues/*|.pan/backlog/*|.beads/*) : ;;
+              *)
+                DENY_REASON='Flywheel orchestrator may not write repo artifacts directly; dispatch work to pipeline agents instead.'
+                jq -n --arg reason "$DENY_REASON" '{
+                  hookSpecificOutput: {
+                    hookEventName: "PreToolUse",
+                    permissionDecision: "deny",
+                    permissionDecisionReason: $reason
+                  }
+                }'
+                exit 0
+                ;;
+            esac
+            ;;
+        esac
+      fi
+      ;;
+  esac
+fi
+
 REASON='Overdeck autonomous pipeline agent auto-approve: headless agent-* sessions replace --dangerously-skip-permissions with this scoped PreToolUse allow hook.'
 
 if command -v jq >/dev/null 2>&1; then
