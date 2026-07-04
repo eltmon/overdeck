@@ -77,6 +77,7 @@ export class BdTransientFailure extends Data.TaggedError('BdTransientFailure')<{
   readonly message: string;
   readonly attempts: number;
   readonly caller: string;
+  readonly holder?: BdProcessLockHolder;
   readonly cause?: unknown;
 }> {}
 
@@ -504,6 +505,7 @@ export async function runBdWithRetry<T>(
       message: `bd operation failed after ${maxAttempts} attempts due to transient lock contention`,
       attempts: maxAttempts,
       caller,
+      holder: lastError instanceof BdProcessLockError ? lastError.holder : undefined,
       cause: lastError,
     });
   }

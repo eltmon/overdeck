@@ -19,6 +19,7 @@ import type { MemoryIdentity } from '@overdeck/contracts';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { readWorkspacePlanSync } from '../vbrief/io.js';
+import { getDispatchableItems } from '../vbrief/dag.js';
 import { type Role } from './agent-state.js';
 import { assignDispatchTier, type TierAssignment } from './dispatch-tier.js';
 import { resolveTieredExecutionEnabled } from './tier-table.js';
@@ -219,14 +220,10 @@ export function resolveSlotTierSpawnParams(
   // without a tier table to resolve against.
   if (!tiered) return {};
   const doc = readWorkspacePlanSync(baseWorkspace);
+  if (!doc) return {};
   const planMetadata = doc?.plan?.metadata;
   if (!resolveTieredExecutionEnabled(tiered, planMetadata)) return {};
   if (explicitModel) return {};
-  if (!doc) {
-    throw new Error(
-      `Tiered execution is enabled but no vBRIEF plan is readable in ${baseWorkspace}.`,
-    );
-  }
   const item = doc.plan.items.find((candidate) => candidate.id === slotItemId);
   if (!item) {
     throw new Error(
@@ -234,6 +231,35 @@ export function resolveSlotTierSpawnParams(
     );
   }
   if (!item.metadata?.difficulty && !item.metadata?.model) return {};
+  const assignment = assignDispatchTier(item, tiered, planMetadata);
+  return { model: assignment.model, harness: assignment.harness, tierName: assignment.tierName };
+}
+
+/**
+ * Tiered-execution model resolution for the single work-agent path.
+ * Auto-start and non-swarm issues still run one foreground work agent, but
+ * the first dispatchable vBRIEF item is the same scheduling unit the agent is
+ * about to execute. If tiered execution is enabled for the issue, route that
+ * agent through the item's resolved tier; otherwise leave role-default model
+ * resolution untouched.
+ */
+export function resolveSingleWorkTierSpawnParams(
+  workspace: string,
+  explicitModel?: string,
+): SlotTierSpawnParams {
+  const tiered = loadYamlConfig().config.tieredExecution;
+  if (!tiered) return {};
+  if (explicitModel) return {};
+
+  const doc = readWorkspacePlanSync(workspace);
+  if (!doc) return {};
+  const planMetadata = doc?.plan?.metadata;
+  if (!resolveTieredExecutionEnabled(tiered, planMetadata)) return {};
+
+  const item = getDispatchableItems(doc, new Set())[0];
+  if (!item) return {};
+  if (!item.metadata?.difficulty && !item.metadata?.model) return {};
+
   const assignment = assignDispatchTier(item, tiered, planMetadata);
   return { model: assignment.model, harness: assignment.harness, tierName: assignment.tierName };
 }

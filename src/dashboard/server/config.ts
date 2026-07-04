@@ -70,9 +70,9 @@ export const ServerConfigLayer = Layer.effect(
       throw new ServerConfigError('API_PORT', `Invalid port value: "${portStr}"`);
     }
 
-    // A peer dashboard or workspace checkout must never bind the host dashboard
-    // API port. Workspace/devcontainer peer servers are legitimate only when
-    // they use an explicit non-host port.
+    // A host-side peer dashboard or workspace checkout must never bind the host
+    // dashboard API port. Workspace-container peers use an isolated network
+    // namespace, so the identity guard allows their canonical compose port.
     const identity = getDashboardIdentity();
     const hostDashboardApiPort = readHostDashboardApiPort();
     const overrideAllowed = process.env['OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY'] === '1';

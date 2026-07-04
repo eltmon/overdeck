@@ -70,6 +70,13 @@ export function getConversationViewModeFromSearch(search = window.location.searc
   return view === 'terminal' ? 'terminal' : 'conversation';
 }
 
+export function getSessionKeyFromSearch(search = window.location.search): string | null {
+  const raw = new URLSearchParams(search).get('session');
+  if (!raw) return null;
+  const decoded = raw.trim();
+  return /^(discovered|managed-archived):\d+$/.test(decoded) ? decoded : null;
+}
+
 export type ConversationViewModeMap = Record<string, ConversationViewMode>;
 
 export function parseConversationViewModes(search = window.location.search): ConversationViewModeMap {

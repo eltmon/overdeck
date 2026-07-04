@@ -206,6 +206,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/discovered-sessions/search',       kind: 'http', disposition: 'READ',        door: 'TranscriptsResolver.search' },
   { surface: 'GET /api/discovered-sessions/cost',         kind: 'http', disposition: 'RELOCATE',    door: 'Cost' },
   { surface: 'GET /api/discovered-sessions/:id',          kind: 'http', disposition: 'READ',        door: 'TranscriptsResolver.get' },
+  { surface: 'GET /api/discovered-sessions/:id/messages', kind: 'http', disposition: 'READ',        door: 'TranscriptsResolver.messagesForDiscoveredSession' },
   { surface: 'POST /api/discovered-sessions/:id/enrich',  kind: 'http', disposition: 'WRITE',       door: 'TranscriptsWriter.enrich(id)' },
   { surface: 'POST /api/discovered-sessions/scan',        kind: 'http', disposition: 'WRITE',       door: 'TranscriptsWriter.scan (rebuild)' },
   { surface: 'POST /api/discovered-sessions/enrich',      kind: 'http', disposition: 'WRITE',       door: 'TranscriptsWriter.enrich' },
@@ -217,6 +218,11 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   // ── events.ts ─────────────────────────────────────────────────────────────
   { surface: 'GET /events/stream',                        kind: 'http', disposition: 'RELOCATE',    door: 'Observability.subscribeDomainEvents (legacy SSE; replaced by RPC stream)' },
   { surface: 'GET /events/version',                       kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Build-version probe; outside 8 remodel domains' },
+
+  // ── internal-events.ts ────────────────────────────────────────────────────
+  { surface: 'POST /api/internal/events',                 kind: 'http', disposition: 'WRITE',       door: 'DomainEventWriter.append (internal deacon bridge)' },
+  { surface: 'GET /api/internal/events/latest',           kind: 'http', disposition: 'READ',        door: 'DomainEventResolver.latestSequence (internal deacon bridge)' },
+  { surface: 'GET /api/internal/events/stream',           kind: 'http', disposition: 'READ',        door: 'DomainEventResolver.stream (internal deacon bridge)' },
 
   // ── feature-registry.ts ───────────────────────────────────────────────────
   { surface: 'GET /api/registry/features',                kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Feature registry; outside 8 remodel domains' },
@@ -526,6 +532,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   // Conversations / discovered sessions
   { surface: 'pan.scanConversations',           kind: 'rpc', disposition: 'WRITE',       door: 'TranscriptsWriter.scan' },
   { surface: 'pan.searchConversations',         kind: 'rpc', disposition: 'READ',        door: 'TranscriptsResolver.search' },
+  { surface: 'pan.listSessionsFeed',            kind: 'rpc', disposition: 'READ',        door: 'TranscriptsResolver.sessionsFeed' },
+  { surface: 'pan.getSessionsFeedFacets',       kind: 'rpc', disposition: 'READ',        door: 'TranscriptsResolver.sessionsFeedFacets' },
   { surface: 'pan.listDiscoveredSessions',      kind: 'rpc', disposition: 'READ',        door: 'TranscriptsResolver.list' },
   { surface: 'pan.getDiscoveredSession',        kind: 'rpc', disposition: 'READ',        door: 'TranscriptsResolver.get' },
   { surface: 'pan.enrichSessions',             kind: 'rpc', disposition: 'WRITE',       door: 'TranscriptsWriter.enrich' },

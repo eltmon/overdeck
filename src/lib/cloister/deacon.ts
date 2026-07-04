@@ -11,7 +11,7 @@
  * Inspired by gastown's deacon pattern.
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, rmSync } from 'fs';
+import { appendFileSync, readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, rmSync } from 'fs';
 // PAN-1249: readFile / writeFile / unlink are consumed by the additive Effect
 // helpers below (`readFileOp`, `writeFileOp`, `unlinkPath`).
 import { readdir, readFile, writeFile, unlink } from 'fs/promises';
@@ -34,7 +34,7 @@ import { checkOrphanedReviewStatuses, recoverStalledReviewConvoys, checkMissingR
 import { getAutoCloseOutCanonicalState } from './deacon-canonical-state.js';
 import { checkReadyForMergeStuck as checkReadyForMergeStuckWithDeps, reconcileStaleMergeStatus, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
 import { coordinateSwarmSlots } from './deacon-swarm.js';
-import { recoverOrphanedAgents as recoverOrphanedAgentsWithDeps, handleAgentHeartbeatDeadEvent as handleAgentHeartbeatDeadEventWithDeps, handleAgentStoppedEvent as handleAgentStoppedEventWithDeps, autoResumeStoppedWorkAgents as autoResumeStoppedWorkAgentsWithDeps, applyBootReconciliationDecision as applyBootReconciliationDecisionWithDeps, reconcileAgentLiveness as reconcileAgentLivenessWithDeps, nudgeStalledResumeWorkAgents, redeliverUndeliveredKickoffs, nudgeIdleWorkAgentsWithOpenBeads, cleanupOrphanedPlanningSessions as cleanupOrphanedPlanningSessionsWithDeps, type BootReconciliationDecisionResult } from './deacon-auto-resume.js';
+import { recoverOrphanedAgents as recoverOrphanedAgentsWithDeps, handleAgentHeartbeatDeadEvent as handleAgentHeartbeatDeadEventWithDeps, handleAgentStoppedEvent as handleAgentStoppedEventWithDeps, autoResumeStoppedWorkAgents as autoResumeStoppedWorkAgentsWithDeps, applyBootReconciliationDecision as applyBootReconciliationDecisionWithDeps, reconcileAgentLiveness as reconcileAgentLivenessWithDeps, nudgeStalledResumeWorkAgents, redeliverUndeliveredKickoffs, nudgeIdleWorkAgentsWithOpenBeads, cleanupOrphanedPlanningSessions as cleanupOrphanedPlanningSessionsWithDeps, type BootReconciliationApplyResult } from './deacon-auto-resume.js';
 import { listFeatureWorkspaces } from './deacon-workspaces.js';
 import { createInFlightGuard } from './in-flight-guard.js';
 // Review gated-dispatch behavior moved to deacon-review-status.ts:
@@ -249,6 +249,7 @@ export interface ContainerRestartRecord {
 export interface DeaconState {
   specialists: Record<SpecialistAgentName, SpecialistHealthState>;
   lastPatrol?: string;           // ISO 8601
+  lastPatrolResult?: PatrolResult;
   patrolCycle: number;
   recentDeaths: string[];        // ISO timestamps of recent deaths
   lastMassDeathAlert?: string;   // ISO 8601
@@ -287,6 +288,7 @@ export interface HealthCheckResult {
 const DEACON_DIR = join(OVERDECK_HOME, 'deacon');
 const STATE_FILE = join(DEACON_DIR, 'health-state.json');
 const CONFIG_FILE = join(DEACON_DIR, 'config.json');
+const DEACON_LOG_FILE = join(OVERDECK_HOME, 'logs', 'deacon.log');
 
 let deaconInterval: NodeJS.Timeout | null = null;
 const deaconPatrolGuard = createInFlightGuard();
@@ -388,6 +390,18 @@ export function saveState(state: DeaconState): void {
   } catch (error) {
     console.error('[deacon] Failed to save state:', error);
   }
+}
+
+function saveLastPatrolResult(state: DeaconState, result: PatrolResult): void {
+  state.lastPatrolResult = result;
+  saveState(state);
+}
+
+function refreshPatrolHeartbeat(state: DeaconState): void { state.lastPatrol = new Date().toISOString(); saveState(state); }
+
+function startPatrolHeartbeatTicker(state: DeaconState): NodeJS.Timeout {
+  const ticker = setInterval(() => refreshPatrolHeartbeat(state), Math.max(10_000, Math.floor(config.patrolIntervalMs / 2)));
+  ticker.unref?.(); return ticker;
 }
 
 /**
@@ -1656,7 +1670,7 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
   return autoResumeStoppedWorkAgentsWithDeps(autoResumeNotifierDeps());
 }
 
-export async function applyBootReconciliationDecision(): Promise<BootReconciliationDecisionResult> {
+export async function applyBootReconciliationDecision(): Promise<BootReconciliationApplyResult> {
   return applyBootReconciliationDecisionWithDeps(autoResumeNotifierDeps());
 }
 
@@ -2582,18 +2596,10 @@ export async function checkAwaitingTestWorkSessions(): Promise<string[]> {
   return actions;
 }
 
-/**
- * Run a single patrol cycle
- */
 export async function runPatrol(): Promise<PatrolResult> {
   const state = loadState();
   state.patrolCycle++;
-  state.lastPatrol = new Date().toISOString();
-  // PAN-2219: persist the heartbeat at cycle START, not only at cycle end.
-  // getDeaconStatus() reads state from disk, so a multi-minute patrol cycle
-  // was invisible to the supervisor watchdog, which killed healthy servers
-  // mid-patrol ("deacon patrol heartbeat stale" restart churn).
-  saveState(state);
+  refreshPatrolHeartbeat(state);
 
   // PAN-378: Global specialists removed. All work done by per-project ephemeral specialists.
   const results: HealthCheckResult[] = [];
@@ -2603,8 +2609,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   // Persisted in app_settings; survives restarts. Per-cycle check so flipping
   // the toggle at runtime takes effect on the next tick without restarting.
   if (isDeaconGloballyPaused()) {
-    state.lastPatrol = new Date().toISOString();
-    saveState(state);
+    refreshPatrolHeartbeat(state);
     if (!hasLoggedGlobalPauseSkip) {
       console.log(`[deacon] Patrol cycle ${state.patrolCycle} SKIPPED — globally paused`);
       addLog('info', `Patrol cycle ${state.patrolCycle} skipped — deacon globally paused`, state.patrolCycle);
@@ -2612,12 +2617,13 @@ export async function runPatrol(): Promise<PatrolResult> {
     }
     const skipped: PatrolResult = {
       cycle: state.patrolCycle,
-      timestamp: state.lastPatrol,
+      timestamp: state.lastPatrol!,
       specialists: [],
       actionsToken: ['skipped: globally_paused'],
       massDeathDetected: false,
     };
     lastPatrolResult = skipped;
+    saveLastPatrolResult(state, skipped);
     return skipped;
   }
 
@@ -2626,9 +2632,15 @@ export async function runPatrol(): Promise<PatrolResult> {
   // patrol's combined spawns stay under the concurrency ceiling.
   resetPatrolDispatchBudget();
 
+  const patrolHeartbeatTicker = startPatrolHeartbeatTicker(state);
+  try {
   hasLoggedGlobalPauseSkip = false;
   addLog('info', `Patrol cycle ${state.patrolCycle} — checking per-project specialists`, state.patrolCycle);
   console.log(`[deacon] Patrol cycle ${state.patrolCycle} - checking per-project specialists`);
+
+  const stuckRemediationActions = await checkStuckAgentRemediation();
+  actions.push(...stuckRemediationActions);
+  for (const a of stuckRemediationActions) addLog('action', a, state.patrolCycle);
 
   // Process any pending post-merge lifecycle that wasn't consumed on startup (PAN-626).
   // In dev mode, the deploy script may fail to restart cleanly, leaving the pending file.
@@ -3011,10 +3023,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...apiErrorActions);
   for (const a of apiErrorActions) addLog('action', a, state.patrolCycle);
 
-  const stuckRemediationActions = await checkStuckAgentRemediation();
-  actions.push(...stuckRemediationActions);
-  for (const a of stuckRemediationActions) addLog('action', a, state.patrolCycle);
-
   // PAN-1625: reap orphaned dashboard-server processes (failed-restart leftovers
   // that lost the port but keep running — and can run a second Deacon). Low
   // cadence (~10 min). Never touches the live server, the port owner, a
@@ -3177,21 +3185,22 @@ export async function runPatrol(): Promise<PatrolResult> {
     console.error('[deacon] Error during per-project specialist patrol:', msg);
   }
 
-  // Single save for the entire patrol cycle — all mutations from
-  // checkSpecialistHealth, forceKillSpecialist, and checkMassDeath
-  // accumulate in the shared state object and are persisted once here.
-  saveState(state);
+  refreshPatrolHeartbeat(state);
 
   const result: PatrolResult = {
     cycle: state.patrolCycle,
-    timestamp: state.lastPatrol,
+    timestamp: state.lastPatrol!,
     specialists: results,
     actionsToken: actions,
     massDeathDetected: massDeathCheck.isMassDeath,
   };
 
   lastPatrolResult = result;
+  saveLastPatrolResult(state, result);
   return result;
+  } finally {
+    clearInterval(patrolHeartbeatTicker);
+  }
 }
 
 // Store the most recent patrol result for API access
@@ -3233,12 +3242,19 @@ const MAX_LOG_ENTRIES = 200;
 const deaconLogs: DeaconLogEntry[] = [];
 
 function addLog(level: DeaconLogEntry['level'], message: string, cycle?: number): void {
-  deaconLogs.push({
+  const entry = {
     timestamp: new Date().toISOString(),
     level,
     message,
     cycle,
-  });
+  };
+  deaconLogs.push(entry);
+  try {
+    mkdirSync(dirname(DEACON_LOG_FILE), { recursive: true });
+    appendFileSync(DEACON_LOG_FILE, JSON.stringify(entry) + '\n', 'utf-8');
+  } catch {
+    // Non-fatal: the in-memory ring still serves the current process.
+  }
   // Trim to max size
   if (deaconLogs.length > MAX_LOG_ENTRIES) {
     deaconLogs.splice(0, deaconLogs.length - MAX_LOG_ENTRIES);
@@ -3250,6 +3266,18 @@ function addLog(level: DeaconLogEntry['level'], message: string, cycle?: number)
  * Returns the most recent `limit` entries (default 100).
  */
 export function getDeaconLogs(limit = 100): DeaconLogEntry[] {
+  try {
+    if (existsSync(DEACON_LOG_FILE)) {
+      return readFileSync(DEACON_LOG_FILE, 'utf-8')
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .slice(-limit)
+        .map((line) => JSON.parse(line) as DeaconLogEntry);
+    }
+  } catch {
+    // Fall back to the in-memory ring if the durable log is malformed.
+  }
   return deaconLogs.slice(-limit);
 }
 
@@ -3258,7 +3286,9 @@ export function getDeaconLogs(limit = 100): DeaconLogEntry[] {
  * Used by the dashboard API to show recent Deacon actions.
  */
 export function getLastPatrolResult(): PatrolResult | null {
-  return lastPatrolResult;
+  if (lastPatrolResult) return lastPatrolResult;
+  const state = loadState();
+  return state.lastPatrolResult ?? null;
 }
 
 /**

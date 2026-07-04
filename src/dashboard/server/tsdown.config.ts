@@ -29,6 +29,7 @@ function configYamlSingleChunkAssertion() {
 export default defineConfig({
   entry: {
     server: 'main.ts',
+    deacon: 'deacon-main.ts',
     'dashboard-db-worker': 'services/dashboard-db-worker.ts',
     'checkpoint-worker': '../../lib/memory/checkpoint-worker.ts',
     'memory-fts-worker': '../../lib/memory/fts-worker.ts',

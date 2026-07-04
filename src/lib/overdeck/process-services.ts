@@ -5,7 +5,14 @@ import {
   deliverAgentPermissionDecision,
   type DeliveryResult,
 } from '../agents.js';
-import { getCloisterService, type CloisterStatus } from '../cloister/service.js';
+import { type CloisterStatus } from '../cloister/service.js';
+import {
+  areDurableSpawnsPaused,
+  readDurableCloisterStatus,
+  resumeDurableSpawns,
+  startDurableCloister,
+  stopDurableCloister,
+} from '../../dashboard/server/services/cloister-control-surface.js';
 import { EventBus, type StoredOverdeckEvent } from './infra.js';
 
 export const AgentId = Schema.String.pipe(Schema.brand('AgentId'));
@@ -222,23 +229,23 @@ export const CloisterRuntimeLive = Layer.succeed(
   CloisterRuntime,
   CloisterRuntime.of({
     start: Effect.tryPromise({
-      try: () => getCloisterService().start(),
+      try: async () => { await startDurableCloister(); },
       catch: (error) => error instanceof Error ? error : new Error(String(error)),
     }),
-    stop: Effect.try({
-      try: () => getCloisterService().stop(),
+    stop: Effect.tryPromise({
+      try: () => stopDurableCloister(),
       catch: (error) => error instanceof Error ? error : new Error(String(error)),
     }),
     resumeSpawns: Effect.try({
-      try: () => getCloisterService().resumeSpawns(),
+      try: () => resumeDurableSpawns(),
       catch: (error) => error instanceof Error ? error : new Error(String(error)),
     }),
     isSpawnPaused: Effect.try({
-      try: () => getCloisterService().isSpawnPaused(),
+      try: () => areDurableSpawnsPaused(),
       catch: (error) => error instanceof Error ? error : new Error(String(error)),
     }),
     getStatus: Effect.try({
-      try: () => getCloisterService().getStatus(),
+      try: () => readDurableCloisterStatus(),
       catch: (error) => error instanceof Error ? error : new Error(String(error)),
     }),
   }),

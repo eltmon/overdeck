@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { exec } from 'node:child_process';
+import { exec, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { Effect } from 'effect';
 import type { Command } from 'commander';
 import { parseSequenceMd } from '../../lib/backlog/sequence-io.js';
 import { buildClassifyLookups } from '../../lib/backlog/lookups.js';
@@ -14,6 +15,7 @@ import {
 } from '../../lib/backlog/pickup.js';
 import { isFlywheelAutoPickupBacklog } from '../../lib/overdeck/control-settings.js';
 import { getMergeBlockersPayload } from '../../lib/cloister/merge-blockers.js';
+import { isGitHubAppConfigured, listOpenIssuesWithLabels } from '../../lib/github-app.js';
 
 /**
  * Sandbox-safe Flywheel data surfaces. These read state DIRECTLY (sequence.md + SQLite) and
@@ -24,17 +26,57 @@ import { getMergeBlockersPayload } from '../../lib/cloister/merge-blockers.js';
  */
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
-/** Labels for all open issues, keyed by bare number — fetched via gh so it works inside a
- *  sandboxed harness (the in-memory issue service is server-only, unreachable from a CLI). */
-async function fetchOpenIssueLabels(): Promise<Map<string, string[]>> {
+function parseGitHubRemoteUrl(remoteUrl: string): { owner: string; repo: string } | null {
+  const trimmed = remoteUrl.trim();
+  const match = trimmed.match(/github\.com[:/]([^/]+)\/([^/\s]+?)(?:\.git)?$/i);
+  if (!match) return null;
+  return { owner: match[1]!, repo: match[2]! };
+}
+
+async function resolveGitHubOwnerRepo(): Promise<{ owner: string; repo: string } | null> {
+  try {
+    const { stdout } = await execAsync('git remote get-url origin', { encoding: 'utf8' });
+    return parseGitHubRemoteUrl(stdout);
+  } catch {
+    return null;
+  }
+}
+
+/** Labels for all open issues, keyed by bare number — fetched via REST so it works inside a
+ *  sandboxed harness without burning the gh GraphQL budget. */
+export async function fetchOpenIssueLabels(): Promise<Map<string, string[]>> {
   const byNumber = new Map<string, string[]>();
   try {
-    const { stdout } = await execAsync('gh issue list --state open --json number,labels --limit 1000', { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
-    for (const i of JSON.parse(stdout) as Array<{ number: number; labels: Array<{ name: string }> }>) {
-      byNumber.set(String(i.number), i.labels.map((l) => l.name));
+    const repo = await resolveGitHubOwnerRepo();
+    if (!repo) return byNumber;
+
+    if (isGitHubAppConfigured()) {
+      const issues = await Effect.runPromise(listOpenIssuesWithLabels(repo.owner, repo.repo));
+      for (const issue of issues) {
+        byNumber.set(String(issue.number), issue.labels);
+      }
+      return byNumber;
     }
-  } catch { /* gh unavailable — labels stay empty (degraded, never throws) */ }
+
+    const { stdout } = await execFileAsync(
+      'gh',
+      ['api', '--paginate', '--slurp', `repos/${repo.owner}/${repo.repo}/issues?state=open&per_page=100`],
+      { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 },
+    );
+    const pages = JSON.parse(stdout || '[]') as Array<Array<{
+      number: number;
+      pull_request?: unknown;
+      labels?: Array<{ name?: string | null } | string>;
+    }>>;
+    for (const issue of pages.flat()) {
+      if (issue.pull_request) continue;
+      byNumber.set(String(issue.number), (issue.labels ?? [])
+        .map((label) => typeof label === 'string' ? label : label.name)
+        .filter((name): name is string => typeof name === 'string' && name.length > 0));
+    }
+  } catch { /* GitHub unavailable — labels stay empty (degraded, never throws) */ }
   return byNumber;
 }
 

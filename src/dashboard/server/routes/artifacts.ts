@@ -290,7 +290,7 @@ const getArtifactThumbnailRoute = HttpRouter.add(
     }
 
     const response = yield* HttpServerResponse.file(result.path).pipe(
-      Effect.catchAll(() => Effect.succeed(HttpServerResponse.text('', { status: 204 }))),
+      Effect.catch(() => Effect.succeed(HttpServerResponse.text('', { status: 204 }))),
     );
     return HttpServerResponse.setHeader(response, 'Cache-Control', 'public, max-age=31536000, immutable');
   })),

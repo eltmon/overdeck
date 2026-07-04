@@ -6,6 +6,8 @@ export type Provider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'min
 export type ModelId = string;
 export type Harness = 'claude-code' | 'ohmypi' | 'codex';
 export type HarnessOverride = Harness | '';
+export type VBriefDifficulty = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
+export type VBriefItemKind = 'docs' | 'api' | 'backend' | 'frontend' | 'infra' | 'test' | 'refactor' | 'design' | 'spike';
 
 export interface ProvidersConfig {
   anthropic: boolean;
@@ -157,6 +159,38 @@ export interface ConversationSearchConfig {
   dbPath?: string;
 }
 
+export interface TieredExecutionConfig {
+  enabled: boolean;
+  tiers: Record<string, {
+    model: ModelId;
+    harness: Harness;
+    difficulties: VBriefDifficulty[];
+  }>;
+  supervisor?: {
+    model: ModelId;
+    harness: Harness;
+    subscribe: 'all' | 'flagged' | 'sampled';
+    owns_inspection?: boolean;
+  };
+  by_kind?: Partial<Record<VBriefItemKind, string>>;
+  byKind?: Partial<Record<VBriefItemKind, string>>;
+  feed?: {
+    callouts: 'off' | 'notify' | 'corroborate';
+    exclude: string[];
+    exclude_subjects: string[];
+    max_diff_bytes: number | null;
+  };
+  escalation?: {
+    enabled: boolean;
+    retries_at_tier: number;
+    max_promotions: number;
+    flounder_budget_minutes: Partial<Record<VBriefDifficulty, number>>;
+  };
+  compaction_reroute?: 'off' | 'on';
+  replay_threshold: number;
+  difficultyToTier?: Partial<Record<VBriefDifficulty, string>>;
+}
+
 export interface SettingsConfig {
   workhorses?: WorkhorsesConfig;
   roles?: RolesConfig;
@@ -240,4 +274,5 @@ export interface SettingsConfig {
     resiliency_tier?: 'ephemeral' | 'durable';
     max_concurrent_agents?: number;
   };
+  tiered_execution?: TieredExecutionConfig;
 }

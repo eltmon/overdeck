@@ -3,7 +3,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { Effect } from 'effect';
-import * as conversationsModule from '../../../../../src/dashboard/server/routes/conversations.js';
+import * as forksModule from '../../../../../src/lib/overdeck/conversation-forks.js';
 import { sessionFilePath } from '../../../../../src/lib/paths.js';
 
 vi.mock('../../../../../src/lib/conversations/summary-fork.js', async () => {
@@ -34,7 +34,7 @@ const {
   generateSummaryForFork,
 } = await import('../../../../../src/lib/conversations/summary-fork.js');
 
-const { runForkPipeline } = conversationsModule;
+const { runForkPipeline } = forksModule;
 
 describe('runForkPipeline fallback resilience', () => {
   let TEST_HOME: string;
@@ -99,10 +99,10 @@ describe('runForkPipeline fallback resilience', () => {
   function stubSpawnAndInject() {
     return {
       ensureSpy: vi
-        .spyOn(conversationsModule, 'ensureForkSessionReady')
+        .spyOn(forksModule, 'ensureForkSessionReady')
         .mockResolvedValue(undefined),
       injectSpy: vi
-        .spyOn(conversationsModule, 'injectForkSummary')
+        .spyOn(forksModule, 'injectForkSummary')
         .mockResolvedValue(undefined),
     };
   }

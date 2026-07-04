@@ -10,6 +10,7 @@ import App, {
   getConversationRouteState,
   getConversationViewModeFromSearch,
   getConvIdFromPath,
+  getSessionKeyFromSearch,
   parseConversationViewModes,
   serializeConversationViewModes,
 } from './App';
@@ -204,6 +205,13 @@ describe('conversation route helpers', () => {
     expect(getConvIdFromPath('/conv/123')).toBe('123');
     expect(getConvIdFromPath('/conv/20260523-1234')).toBe('20260523-1234');
     expect(getConvIdFromPath('/command-deck')).toBeNull();
+  });
+
+  it('extracts sessions page selection keys from search params', () => {
+    expect(getSessionKeyFromSearch('?session=discovered:4123')).toBe('discovered:4123');
+    expect(getSessionKeyFromSearch('?session=managed-archived:87')).toBe('managed-archived:87');
+    expect(getSessionKeyFromSearch('?session=managed-archived:not-a-number')).toBeNull();
+    expect(getSessionKeyFromSearch('?session=other:87')).toBeNull();
   });
 
   it('extracts command deck project routes without swallowing issue cockpit routes', () => {

@@ -2,6 +2,18 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { SessionTable } from '../SessionTable';
 
+vi.mock('@tanstack/react-virtual', () => ({
+  useVirtualizer: ({ count, estimateSize }: { count: number; estimateSize?: (index: number) => number }) => ({
+    getVirtualItems: () => Array.from({ length: count }, (_, index) => ({
+      index,
+      key: index,
+      start: index * 36,
+      size: estimateSize?.(index) ?? 36,
+    })),
+    getTotalSize: () => count * 36,
+  }),
+}));
+
 const BASE_SESSION = {
   id: 1,
   source: 'discovered' as const,

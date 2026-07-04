@@ -19,8 +19,8 @@ export function DivergedBadge({ issueIdentifier, stuckReason, stuckDetails }: { 
   }
 
   const titleText = stuckReason
-    ? `Push blocked: ${stuckReason}${shaInfo}. Run: git reset --hard origin/main, then click Unstick to retry.`
-    : `Push blocked due to divergence from origin/main${shaInfo}. Run: git reset --hard origin/main, then click Unstick to retry.`;
+    ? `Push blocked: ${stuckReason}${shaInfo}. Repair the project repo main branch by preserving local work, pushing local-only commits, or fast-forwarding from origin/main as needed; then click Unstick to retry.`
+    : `Push blocked due to divergence from origin/main${shaInfo}. Repair the project repo main branch by preserving local work, pushing local-only commits, or fast-forwarding from origin/main as needed; then click Unstick to retry.`;
 
   return (
     <span className="flex flex-col gap-0.5">
@@ -51,7 +51,7 @@ export function DivergedBadge({ issueIdentifier, stuckReason, stuckDetails }: { 
                 if (current) {
                   const key = state.reviewStatusByIssueId[upperKey] ? upperKey : issueIdentifier;
                   // Optimistic update: clear stuck fields and reset lifecycle.
-                  // Recovery requires `git reset --hard origin/main`, making prior results invalid.
+                  // Recovery changes project main state, making prior results invalid.
                   // The WS status_changed event from the server will reconcile the full state.
                   useDashboardStore.setState((s) => ({
                     reviewStatusByIssueId: {

@@ -121,7 +121,7 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
 
   it('wraps Claude Code conversations with the PTY supervisor and waits for its socket', async () => {
     createSupervisorSocket = true;
-    const { spawnConversationSession } = await import('../conversations.js');
+    const { spawnConversationSession } = await import('../../../../lib/overdeck/conversation-runtime.js');
 
     await spawnConversationSession(
       'conv-supervisor-test',
@@ -145,7 +145,7 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
 
   it('wraps Codex TUI conversations with the PTY supervisor and waits for its socket', async () => {
     createSupervisorSocket = true;
-    const { spawnConversationSession } = await import('../conversations.js');
+    const { spawnConversationSession } = await import('../../../../lib/overdeck/conversation-runtime.js');
 
     await spawnConversationSession(
       'conv-codex-supervisor-test',
@@ -177,7 +177,7 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     mkdirSync(dayDir, { recursive: true });
     writeFileSync(join(dayDir, `rollout-2026-06-14T10-00-00-${threadId}.jsonl`), '{"type":"session_meta"}\n');
 
-    const { spawnConversationSession } = await import('../conversations.js');
+    const { spawnConversationSession } = await import('../../../../lib/overdeck/conversation-runtime.js');
 
     await spawnConversationSession(
       session,
@@ -198,7 +198,7 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
   it('keeps plain forks off Channels MCP while routing them through the supervisor', async () => {
     channelsEnabled = true;
     createSupervisorSocket = true;
-    const { spawnConversationSession } = await import('../conversations.js');
+    const { spawnConversationSession } = await import('../../../../lib/overdeck/conversation-runtime.js');
 
     await spawnConversationSession(
       'conv-plain-fork-test',
@@ -222,7 +222,7 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
   it('dismisses the dev-channels dialog only when Channels MCP is wired', async () => {
     channelsEnabled = true;
     createSupervisorSocket = true;
-    const { spawnConversationSession } = await import('../conversations.js');
+    const { spawnConversationSession } = await import('../../../../lib/overdeck/conversation-runtime.js');
 
     await spawnConversationSession(
       'conv-channels-test',
@@ -240,7 +240,7 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
   });
 
   it('does not wrap Pi conversations with the PTY supervisor', async () => {
-    const { spawnConversationSession } = await import('../conversations.js');
+    const { spawnConversationSession } = await import('../../../../lib/overdeck/conversation-runtime.js');
 
     await spawnConversationSession(
       'conv-pi-test',
@@ -260,7 +260,7 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
 
   it('does not wrap Docker conversations with the PTY supervisor', async () => {
     process.env.PAN_DOCKER = '1';
-    const { spawnConversationSession } = await import('../conversations.js');
+    const { spawnConversationSession } = await import('../../../../lib/overdeck/conversation-runtime.js');
 
     await spawnConversationSession(
       'conv-docker-test',

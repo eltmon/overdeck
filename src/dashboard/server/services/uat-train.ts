@@ -10,6 +10,7 @@
  * is single-flight per project, so ticks never pile up.
  */
 import { stat } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { Effect } from 'effect';
 import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 import {
@@ -31,6 +32,7 @@ import {
   buildUatPromoteGitDeps,
   type PromoteResult,
 } from '../../../lib/cloister/uat-promote.js';
+import { notifyFlywheelOfUatPromote } from '../../../lib/cloister/uat-promote-notify.js';
 import {
   getUatGenerationSync,
   isMergeTrainEnabled,
@@ -39,6 +41,8 @@ import {
 } from '../../../lib/overdeck/merge-sync.js';
 import { extractACFromDocument } from '../../../lib/vbrief/acceptance-criteria.js';
 import { findVBriefByIssue, readVBriefDocument } from '../../../lib/vbrief/vbrief-index.js';
+import { findProjectByPathSync } from '../../../lib/projects.js';
+import { getDashboardIdentity } from '../identity.js';
 import { readCurrentFlywheelStatusForDashboard } from './flywheel-actions.js';
 
 const RECONCILE_INTERVAL_MS = 60_000;
@@ -55,8 +59,22 @@ interface AcceptanceCriteriaCacheEntry {
 
 const acceptanceCriteriaByIssue = new Map<string, AcceptanceCriteriaCacheEntry>();
 
+export function resolveUatProjectRoot(cwdPath = process.cwd()): string {
+  const registeredProject = findProjectByPathSync(cwdPath);
+  if (registeredProject) return resolve(registeredProject.path);
+
+  const normalized = resolve(cwdPath);
+  const workspaceMatch = normalized.match(/^(.*)\/workspaces\/feature-[^/]+(?:\/.*)?$/i);
+  return workspaceMatch?.[1] ? resolve(workspaceMatch[1]) : normalized;
+}
+
 function projectRoot(): string {
-  return process.cwd();
+  return resolveUatProjectRoot();
+}
+
+export function canStartUatTrainReconciler(): boolean {
+  const identity = getDashboardIdentity();
+  return identity.mode === 'primary' && resolve(identity.repoRoot) === projectRoot();
 }
 
 /** Ready set in merge order, or null when no flywheel run is active. */
@@ -137,8 +155,9 @@ export async function runUatTrainReconcile(options: { force?: boolean } = {}): P
 
 let reconcilerTimer: ReturnType<typeof setInterval> | null = null;
 
-export function startUatTrainReconciler(): void {
-  if (reconcilerTimer) return;
+export function startUatTrainReconciler(): boolean {
+  if (!canStartUatTrainReconciler()) return false;
+  if (reconcilerTimer) return true;
   reconcilerTimer = setInterval(() => {
     void runUatTrainReconcile().catch((err) => {
       console.warn('[uat-train] reconcile tick failed:', err instanceof Error ? err.message : err);
@@ -148,6 +167,7 @@ export function startUatTrainReconciler(): void {
   void runUatTrainReconcile().catch((err) => {
     console.warn('[uat-train] initial reconcile failed:', err instanceof Error ? err.message : err);
   });
+  return true;
 }
 
 export function stopUatTrainReconciler(): void {
@@ -311,7 +331,7 @@ export async function postUatGenerationPromotePayload(
 ): Promise<PromoteResult> {
   const root = projectRoot();
   const { reviewRecordEligibility } = await import('../../../lib/flywheel-merge-order.js');
-  return promoteUatGeneration(name, root, {
+  const result = await promoteUatGeneration(name, root, {
     git: buildUatPromoteGitDeps(root),
     store: { ...buildUatGenerationStore(), get: (n) => getUatGenerationSync(n) },
     teardownStack: (gen) => teardownUatStack(gen),
@@ -319,4 +339,6 @@ export async function postUatGenerationPromotePayload(
     memberEligibility: reviewRecordEligibility,
     log: (msg) => console.log(msg),
   });
+  await notifyFlywheelOfUatPromote(result).catch(() => {});
+  return result;
 }

@@ -19,7 +19,7 @@ Overdeck splits every piece of agent and pipeline state into exactly one of thre
 
 **Where it is written.** `src/lib/pan-dir/records.ts` builds records, `src/lib/pan-dir/auto-commit.ts` queues commits. Each project declares the repo and subpath below.
 
-### 2. Runtime plane — local SQLite `~/.overdeck/panopticon.db`
+### 2. Runtime plane — local SQLite `~/.overdeck/overdeck.db`
 
 **What lives here:** machine-local, process-local state for agents running *on this host now*.
 

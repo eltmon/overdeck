@@ -51,7 +51,7 @@ async function resetDb() {
 
 async function createForkPair(options: { forkStatus?: string; forkMode?: 'summary' | 'handoff' | 'plain' } = {}) {
   const { createConversation, setForkRequest } = await import('../../../../lib/overdeck/conversations.js');
-  const { buildForkRequest } = await import('../conversations.js');
+  const { buildForkRequest } = await import('../../../../lib/overdeck/conversation-forks.js');
 
   const parent = createConversation({
     name: 'source-conv',
@@ -112,7 +112,7 @@ beforeEach(async () => {
   const {
     __setForkPipelineRuntimeOverridesForTest,
     waitForInFlightForkPipelines,
-  } = await import('../conversations.js');
+  } = await import('../../../../lib/overdeck/conversation-forks.js');
   await waitForInFlightForkPipelines(0);
   __setForkPipelineRuntimeOverridesForTest({
     sessionExists: async (sessionName: string) => sessionAlive.get(sessionName) ?? false,
@@ -133,7 +133,7 @@ afterEach(async () => {
   const {
     __resetForkPipelineRuntimeOverridesForTest,
     waitForInFlightForkPipelines,
-  } = await import('../conversations.js');
+  } = await import('../../../../lib/overdeck/conversation-forks.js');
   __resetForkPipelineRuntimeOverridesForTest();
   await waitForInFlightForkPipelines(0);
   await resetDb();
@@ -145,7 +145,7 @@ afterEach(async () => {
 describe('fork pipeline recovery and re-entry', () => {
   it('re-enters a handoff fork without re-authoring or double-spawning when doc and live session already exist', async () => {
     const { getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
-    const { runForkPipeline } = await import('../conversations.js');
+    const { runForkPipeline } = await import('../../../../lib/overdeck/conversation-forks.js');
     const { parent } = await createForkPair({ forkMode: 'handoff' });
     const docPath = join(TEST_HOME, 'handoff.md');
     const docText = '## Suggested skills\n\nContinue with the fork recovery fix and keep the existing handoff document. '.repeat(4);
@@ -164,7 +164,7 @@ describe('fork pipeline recovery and re-entry', () => {
   });
 
   it('recreates a tmux keep-alive corpse instead of treating session existence as a reusable fork runtime', async () => {
-    const { runForkPipeline } = await import('../conversations.js');
+    const { runForkPipeline } = await import('../../../../lib/overdeck/conversation-forks.js');
     const { parent } = await createForkPair({ forkMode: 'summary' });
     sessionAlive.set('conv-fork-conv', true);
     harnessAlive.set('conv-fork-conv', false);
@@ -183,7 +183,7 @@ describe('fork pipeline recovery and re-entry', () => {
 
   it('marks a tmux-alive runtime-active fork recovered without killing or re-running the pipeline', async () => {
     const { getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
-    const { recoverStuckForks } = await import('../conversations.js');
+    const { recoverStuckForks } = await import('../../../../lib/overdeck/conversation-forks.js');
     await createForkPair({ forkStatus: 'spawning', forkMode: 'handoff' });
     sessionAlive.set('conv-fork-conv', true);
     harnessAlive.set('conv-fork-conv', true);
@@ -200,7 +200,7 @@ describe('fork pipeline recovery and re-entry', () => {
 
   it('salvages a retry-capped fork when its successor harness is already active', async () => {
     const { getConversationByName, incrementForkRetryCount } = await import('../../../../lib/overdeck/conversations.js');
-    const { recoverStuckForks } = await import('../conversations.js');
+    const { recoverStuckForks } = await import('../../../../lib/overdeck/conversation-forks.js');
     await createForkPair({ forkStatus: 'spawning', forkMode: 'handoff' });
     incrementForkRetryCount('fork-conv');
     incrementForkRetryCount('fork-conv');
@@ -219,7 +219,7 @@ describe('fork pipeline recovery and re-entry', () => {
 
   it('re-enters a stale runtime-active tmux corpse instead of clearing fork status', async () => {
     const { getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
-    const { recoverStuckForks } = await import('../conversations.js');
+    const { recoverStuckForks } = await import('../../../../lib/overdeck/conversation-forks.js');
     await createForkPair({ forkStatus: 'handoff', forkMode: 'handoff' });
     sessionAlive.set('conv-fork-conv', true);
     harnessAlive.set('conv-fork-conv', false);
@@ -247,7 +247,7 @@ describe('fork pipeline recovery and re-entry', () => {
     const {
       getInFlightForkPipelineCount,
       recoverStuckForks,
-    } = await import('../conversations.js');
+    } = await import('../../../../lib/overdeck/conversation-forks.js');
     const { parent, fork } = await createForkPair({ forkStatus: 'handoff', forkMode: 'handoff' });
     const docPath = join(TEST_HOME, 'persisted-handoff.md');
     const docText = '## Suggested skills\n\nReuse this existing handoff document during restart recovery. '.repeat(4);
@@ -279,7 +279,7 @@ describe('fork pipeline recovery and re-entry', () => {
 
   it('recovers a pre-doc handoff fork by authoring, spawning, and injecting from scratch', async () => {
     const { getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
-    const { recoverStuckForks } = await import('../conversations.js');
+    const { recoverStuckForks } = await import('../../../../lib/overdeck/conversation-forks.js');
     await createForkPair({ forkStatus: 'handoff', forkMode: 'handoff' });
     const docPath = join(TEST_HOME, 'new-handoff.md');
     const docText = '## Suggested skills\n\nAuthor a fresh handoff document because recovery started before one existed. '.repeat(4);

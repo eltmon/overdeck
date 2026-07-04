@@ -133,6 +133,63 @@ describe('deacon-swarm completion classification', () => {
     ]);
   });
 
+  it('recovers a vanished clean committed slot as ready-to-merge from durable git state', async () => {
+    const agentId = 'agent-pan-2203-slot-1';
+
+    await expect(classifyInFlightSlots([slot(1, agentId)], deps({
+      sessions: [],
+      aheadCount: 2,
+      clean: true,
+    }), {
+      workspacePath: '/workspace',
+      issueId: 'PAN-2203',
+    })).resolves.toEqual([
+      expect.objectContaining({
+        slotIndex: 1,
+        lifecycle: 'ready-to-merge',
+        exitStatus: 0,
+        signal: 'inferred',
+      }),
+    ]);
+  });
+
+  it('recovers a missing-agent clean committed slot as ready-to-merge from durable git state', async () => {
+    await expect(classifyInFlightSlots([{ ...slot(2), agentId: undefined }], deps({
+      sessions: [],
+      aheadCount: 1,
+      clean: true,
+    }), {
+      workspacePath: '/workspace',
+      issueId: 'PAN-2203',
+    })).resolves.toEqual([
+      expect.objectContaining({
+        slotIndex: 2,
+        lifecycle: 'ready-to-merge',
+        exitStatus: 0,
+        signal: 'inferred',
+      }),
+    ]);
+  });
+
+  it('does not recover a vanished slot when the slot branch is not clean committed work', async () => {
+    const agentId = 'agent-pan-2203-slot-1';
+
+    await expect(classifyInFlightSlots([slot(1, agentId)], deps({
+      sessions: [],
+      aheadCount: 1,
+      clean: false,
+    }), {
+      workspacePath: '/workspace',
+      issueId: 'PAN-2203',
+    })).resolves.toEqual([
+      expect.objectContaining({
+        slotIndex: 1,
+        lifecycle: 'failed',
+        reason: 'vanished-session',
+      }),
+    ]);
+  });
+
   it('nudges a clean committed idle slot exactly once in nudge mode', async () => {
     const agentId = 'agent-pan-2203-slot-1';
     const sendCompletionNudge = vi.fn(async () => undefined);

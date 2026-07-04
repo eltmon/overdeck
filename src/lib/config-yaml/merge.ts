@@ -155,6 +155,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       agentWarnCount: DEFAULT_CONFIG.resources.agentWarnCount,
       agentBlockCount: DEFAULT_CONFIG.resources.agentBlockCount,
     },
+    issues: {
+      closedWindowDays: DEFAULT_CONFIG.issues.closedWindowDays,
+    },
     experimental: {
       experimentalFeatures: DEFAULT_CONFIG.experimental.experimentalFeatures,
       claudeCodeChannels: DEFAULT_CONFIG.experimental.claudeCodeChannels,
@@ -582,6 +585,12 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       }
       if (typeof config.resources.agent_block_count === 'number') {
         result.resources.agentBlockCount = config.resources.agent_block_count;
+      }
+    }
+
+    if (config.issues) {
+      if (typeof config.issues.closed_window_days === 'number') {
+        result.issues.closedWindowDays = config.issues.closed_window_days;
       }
     }
 

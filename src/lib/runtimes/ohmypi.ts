@@ -258,7 +258,9 @@ export class OhmypiRuntimeSync implements AgentRuntimeSync {
     if (!existsSync(readyPathFor(agentId))) {
       throw new OhmypiNotReady(`omp agent ${agentId}: ready.json not present yet`)
     }
-    writeOhmypiCommandSync(agentId, { id: randomUUID(), type: 'prompt', message })
+    // steer: omp delivers immediately when idle and queues mid-turn; a bare
+    // prompt is rejected with AgentBusyError while a run is active.
+    writeOhmypiCommandSync(agentId, { id: randomUUID(), type: 'prompt', message, streamingBehavior: 'steer' })
   }
 
   /**

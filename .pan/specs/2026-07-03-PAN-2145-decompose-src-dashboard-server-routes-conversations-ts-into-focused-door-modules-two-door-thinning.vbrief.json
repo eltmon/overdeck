@@ -1,0 +1,764 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-03T14:12:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2145: Thin routes/conversations.ts (5306 lines) behind src/lib/overdeck/ door modules (two-door route-thinning, Approach A)",
+    "updated": "2026-07-04T18:14:06.894Z"
+  },
+  "plan": {
+    "id": "pan-2145",
+    "title": "Decompose src/dashboard/server/routes/conversations.ts into focused door modules (two-door thinning)",
+    "status": "completed",
+    "uid": "f1020cf6-4136-431e-ba06-f05726aaa3d6",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 4,
+    "created": "2026-07-03T14:12:00Z",
+    "updated": "2026-07-04T18:14:06.894Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2145",
+        "label": "PAN-2145",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-2145.md",
+        "label": "PRD draft (Approach A, authoritative)",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/PAN-2148.md",
+        "label": "PAN-2148 exemplar (same approach, merged)",
+        "type": "prd"
+      },
+      {
+        "uri": "docs/codebase-health/REFACTOR-QUEUE.md",
+        "label": "Refactor queue (campaign ruling)",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "refactor",
+      "codebase-health",
+      "dashboard",
+      "two-door",
+      "conversations"
+    ],
+    "narratives": {
+      "Problem": "src/dashboard/server/routes/conversations.ts is 5306 lines (baselined at 5306 in scripts/file-size-baseline.txt; the #1 server god file, +418 since the issue was filed). It holds 2667 lines of domain helpers (session spawning, runtime readiness, delivery/control-channel, message transforms, fork pipeline, archived-list, control acks) BEFORE the first of 34 HttpRouter.add registrations. The server BOOT path even imports from it (src/dashboard/server/main.ts imports recoverStuckForks + waitForInFlightForkPipelines). Every conversation-lifecycle change lands in this one file. It is pipeline hot-path machinery (agent spawn / live-control / forks).",
+      "Proposal": "Approach A (two-door route-thinning), the campaign-level ruling of 2026-07-02 confirmed by the operator; the issue body's barrel-split ask is superseded (a route-file barrel split just relocates the god file — the workspaces barrel split produced merge-ops.ts at 1925 lines). Keep all 34 routes and conversationsRouteLayer in routes/conversations.ts, but move each handler's domain logic into NEW sibling door modules under src/lib/overdeck/ (conversation-diffs, -archive, -reads, -delivery [+ -message if it would exceed 1000], -runtime, -forks), rewriting each handler as a thin adapter (parse -> one door call -> jsonResponse, <=~40 lines). Repoint every importer of a moved symbol in the same commit (no re-export shims); this also fixes the boot-imports-a-route-file inversion by repointing main.ts to conversation-forks. One seam per commit, safest first; after each seam typecheck + lint (incl. file-size guard) + FULL vitest suite must be green (TENET-10). Module-level singletons move atomically with their cluster. A no-loss audit test (added first) locks all 34 method+path registrations against silent loss. The PAN-2156 dependency gate is verified cleared (conversation-service.ts is now a 13-line barrel over services/conversation/*).",
+      "NonGoals": "- Do NOT barrel-split routes/conversations.ts into a sibling routes/conversations/ directory (the issue-body approach is superseded by Approach A).\n- Do NOT rewrite handlers onto the Effect resolver/writer services or delete scattered read endpoints (PAN-1936 / PAN-2008 territory).\n- Do NOT change any endpoint behavior, method, path, request/response shape, add or remove routes.\n- Do NOT touch conversation-service.ts / services/conversation/* (PAN-2156's transcript-parsing domain).\n- Do NOT grow src/lib/overdeck/conversations.ts past its 1526-line baseline; new logic goes to sibling door modules.\n- Do NOT touch /ws/rpc, /ws/terminal, or EventRouter frontend flows.\n- Do NOT add re-export shims in routes/conversations.ts; repoint importers instead.\n- Do NOT introduce new explicit any; do NOT add execSync or sync tmux calls."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Approach A (two-door thinning) chosen over the issue-body barrel split.",
+        "rationale": "Operator confirmed the campaign-level ruling (docs/codebase-health/REFACTOR-QUEUE.md, 2026-07-02): route files are thinned behind src/lib/overdeck/ door modules, never barrel-split, because a route-file barrel split just relocates the god-file problem (workspaces barrel -> merge-ops.ts at 1925 lines). Matches the PAN-2148/PAN-2147 exemplars."
+      },
+      {
+        "summary": "No-loss audit test authored FIRST (item item-noloss) before any extraction.",
+        "rationale": "The additive-refactor-no-loss rule requires an audit gate. Locking all 34 method+path registrations before moving anything means every subsequent seam is guarded against silently dropping a route; the test stays green throughout because routes never leave the file, only their bodies thin."
+      },
+      {
+        "summary": "Seam order: diffs -> archive -> reads -> delivery -> runtime -> forks -> residue.",
+        "rationale": "Draft D5 'safest first': read-only self-contained diffs first, the stateful fork pipeline (touches the boot path) last but one, then a final residue-thinning + baseline-drop seam."
+      },
+      {
+        "summary": "All seams are readiness=sequential, not parallel-dispatchable.",
+        "rationale": "Every seam edits the shared barrel routes/conversations.ts; concurrent seams would conflict on that file. This is a genuine shared-mutation ordering dependency, encoded as a blocks chain."
+      },
+      {
+        "summary": "Two beads carry requiresInspection=true: the first extraction seam (diffs) and the fork seam.",
+        "rationale": "The first seam crystallizes the door-module + thin-adapter + repoint + baseline-update pattern every later seam copies; a wrong pattern cascades. The fork seam modifies the server boot path (main.ts) and carries the self.-spy subtlety. All other seams are mechanically caught by the full suite + file-size guard, so default to false."
+      },
+      {
+        "summary": "Delivery seam may split into conversation-delivery.ts + conversation-message.ts.",
+        "rationale": "Draft D6: the delivery cluster (handleConversationMessage + transforms + control acks + delivery method) is the ceiling risk; if the single module would exceed 1000 lines, split message handling into a sibling. No new baseline entries either way."
+      }
+    ],
+    "items": [
+      {
+        "id": "item-noloss",
+        "title": "Add no-loss audit test locking all 34 conversation route registrations",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T14:12:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-2145",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/dashboard/server/routes/conversations-no-loss.test.ts",
+            "src/dashboard/server/routes/conversations.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/dashboard/server/routes/conversations-no-loss.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversations-no-loss.test.ts reports 0 failed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create tests/unit/dashboard/server/routes/conversations-no-loss.test.ts that imports conversationsRouteLayer from src/dashboard/server/routes/conversations.js and asserts the exact set of 34 registered method+path pairs is present. Enumerate the expected pairs verbatim from the current file (GET /api/conversations; GET /api/conversations/pending-input; GET /api/conversations/archived; GET /api/conversations/:id; GET /api/conversations/:name/handoff-doc; POST /api/conversations; POST /api/conversations/:name/stop; POST /api/conversations/:name/resume; POST /api/conversations/:name/switch-model; POST /api/conversations/:name/thinking-level; POST /api/conversations/:name/compact; POST /api/conversations/:name/abort; GET /api/conversations/:name/messages; GET /api/conversations/:name/message-locator; POST /api/conversations/:name/upload-image; POST /api/conversations/:name/delete-image; POST /api/conversations/:name/message; POST /api/conversations/:id/codex-approval; POST /api/conversations/:name/delivery-method; POST /api/conversations/:name/control-ack; PATCH /api/conversations/:name; DELETE /api/conversations/:name; POST /api/conversations/:name/archive; POST /api/conversations/:name/unarchive; POST /api/conversations/restart-all; POST /api/conversations/:name/favorite; DELETE /api/conversations/:name/favorite; POST /api/conversations/:name/summary-fork; POST /api/conversations/:name/plan-action; GET /api/conversations/:name/diffs; GET /api/conversations/:name/diffs/full; GET /api/conversations/:name/diffs/:turnId; POST /api/conversations/:name/retitle; GET /api/conversations/:name/about). Follow the pattern of tests/unit/lib/overdeck/no-loss-matrix.ts if that helper is usable for introspecting an HttpRouter layer; otherwise introspect the merged layer's route table directly. This test is the seam guard for every later item."
+        },
+        "items": [
+          {
+            "id": "item-noloss.ac1",
+            "title": "The test enumerates all 34 method+path pairs and asserts conversationsRouteLayer contains each registered pair",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-noloss.ac2",
+            "title": "The test rejects (fails) a route table missing any one of the 34 pairs or with any pair's method or path altered",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-noloss.ac3",
+            "title": "The test produces a green result (0 failed) against the current unmodified conversations.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "item-diffs",
+        "title": "Extract diff logic to src/lib/overdeck/conversation-diffs.ts and thin routes 30-32",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T14:12:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-2145",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "item-archive",
+            "item-reads",
+            "item-delivery",
+            "item-runtime",
+            "item-forks",
+            "item-residue"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/conversation-diffs.ts",
+            "src/dashboard/server/routes/conversations.ts",
+            "scripts/file-size-baseline.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes including the file-size guard (no stale baseline)",
+            "full vitest suite reports 0 failed",
+            "src/lib/overdeck/conversation-diffs.ts is under 1000 lines"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "FIRST EXTRACTION SEAM — this establishes the pattern every later seam copies. Create src/lib/overdeck/conversation-diffs.ts and move the domain logic behind getConversationDiffsRoute (GET /api/conversations/:name/diffs), getConversationDiffFullRoute (GET .../diffs/full), and getConversationDiffTurnRoute (GET .../diffs/:turnId) into it (the checkpoint-manager diff calls: findCommitAtTime, diffSinceCommit, diffFilesAgainstHead, diffPatchSinceCommit, diffPatchFilesAgainstHead, plus their session-file resolution). Rewrite the 3 route handlers as thin adapters (parse params -> one door call -> jsonResponse, <=~40 lines each). Keep the route registrations and conversationsRouteLayer in routes/conversations.ts. Repoint any importer of a moved symbol in the same commit (per-symbol sweep: git grep -n '<symbol>' -- ':!src/dashboard/server/routes/conversations.ts'); add NO re-export shim. Remove any import in conversations.ts left orphaned by the move. Because conversations.ts shrinks, run `bash scripts/lint-file-size.sh --update` and commit the lowered scripts/file-size-baseline.txt entry in the same commit (else lint fails on a stale baseline). CRITICAL: the new door module must NOT import from routes/conversations.js (circular ESM). Commit subject e.g. `refactor(dashboard): extract conversation diffs to overdeck door (pan-2145)`."
+        },
+        "items": [
+          {
+            "id": "item-diffs.ac1",
+            "title": "src/lib/overdeck/conversation-diffs.ts exists, is under 1000 lines, and does not import from routes/conversations.js",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-diffs.ac2",
+            "title": "GET /api/conversations/:name/diffs, .../diffs/full, and .../diffs/:turnId each returns byte-identical response behavior and stays registered in conversationsRouteLayer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-diffs.ac3",
+            "title": "Each of the three diff handlers in conversations.ts returns the conversation-diffs door result and contains no inline diff domain logic",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-diffs.ac4",
+            "title": "scripts/file-size-baseline.txt updates the conversations.ts entry to its new smaller line count and contains no raised or added entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-diffs.ac5",
+            "title": "typecheck completes without errors, lint (incl. file-size guard) passes, and the full vitest suite produces 0 failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "item-archive",
+        "title": "Extract archive logic to src/lib/overdeck/conversation-archive.ts and thin routes 3, 23, 24",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T14:12:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-2145",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-archive.ts",
+            "src/dashboard/server/routes/conversations.ts",
+            "scripts/file-size-baseline.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes including the file-size guard",
+            "full vitest suite reports 0 failed",
+            "src/lib/overdeck/conversation-archive.ts is under 1000 lines"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/overdeck/conversation-archive.ts and move handleArchivedConversationsList, parseArchivedConversationListOptions, mapArchivedConversation, parseStringArrayColumn, parseOptionalNumberParam, and the ArchivedConversationResponse type into it (the logic behind GET /api/conversations/archived, POST /api/conversations/:name/archive, POST /api/conversations/:name/unarchive). Rewrite the 3 handlers as thin adapters. Repoint importers per-symbol (no shim), remove orphaned imports. Run `bash scripts/lint-file-size.sh --update` and commit the lowered baseline. New module must not import routes/conversations.js."
+        },
+        "items": [
+          {
+            "id": "item-archive.ac1",
+            "title": "src/lib/overdeck/conversation-archive.ts exists, under 1000 lines, and does not import routes/conversations.js",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-archive.ac2",
+            "title": "GET /api/conversations/archived, POST /api/conversations/:name/archive, and .../unarchive each returns identical response behavior and stays registered",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-archive.ac3",
+            "title": "handleArchivedConversationsList and parseArchivedConversationListOptions resolve from conversation-archive.ts and every importer is repointed (git grep of each moved symbol returns no hit inside routes/conversations.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-archive.ac4",
+            "title": "scripts/file-size-baseline.txt updates the conversations.ts entry to a smaller count; typecheck, lint (incl. file-size guard), and the full vitest suite each produces 0 failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "item-reads",
+        "title": "Extract read logic to src/lib/overdeck/conversation-reads.ts and thin routes 2, 4, 13-14, 21, 33-34",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T14:12:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-2145",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-reads.ts",
+            "src/dashboard/server/routes/conversations.ts",
+            "tests/dashboard/conversations-patch.test.ts",
+            "scripts/file-size-baseline.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes including the file-size guard",
+            "full vitest suite reports 0 failed",
+            "conversations-patch.test.ts (repointed) reports 0 failed",
+            "src/lib/overdeck/conversation-reads.ts is under 1000 lines"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/overdeck/conversation-reads.ts and move the read/enrichment/title helpers behind GET /api/conversations/pending-input (2), GET /api/conversations/:id (4), GET /api/conversations/:name/messages (13), GET .../message-locator (14), PATCH /api/conversations/:name (21), POST .../retitle (33), GET .../about (34). Move patchConversationTitle, the about-summary cluster (ConversationAboutSummary type, aboutSummaryCache + ABOUT_SUMMARY_CACHE_MAX), the retitle cluster (retitleInFlight, EXPLICIT_RETITLE_TIMEOUT_MS, isClaudeInvocationTimeout, generateAiTitle, refinementScheduled, scheduleTitleRefinement, configuredTitleModel, MAX_TITLE_LENGTH), and the messages/enrichment helpers used only by these reads (getCachedMessages + messagesCache, list enrichment if used only here — otherwise leave shared helpers where later seams also need them). Verify thinness of GET /api/conversations (1) and the favorite routes (26, 27): if a handler is already <=~40 lines and door-backed, leave it. Rewrite moved handlers as thin adapters. Repoint tests/dashboard/conversations-patch.test.ts (imports patchConversationTitle) to src/lib/overdeck/conversation-reads.js. Per-symbol importer sweep; no shim; remove orphaned imports; run baseline --update. Move about-summary/retitle module singletons atomically. New module must not import routes/conversations.js."
+        },
+        "items": [
+          {
+            "id": "item-reads.ac1",
+            "title": "src/lib/overdeck/conversation-reads.ts exists, under 1000 lines, and does not import routes/conversations.js",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-reads.ac2",
+            "title": "patchConversationTitle resolves from conversation-reads.ts and tests/dashboard/conversations-patch.test.ts is repointed to it and reports 0 failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-reads.ac3",
+            "title": "Routes 2, 4, 13, 14, 21, 33, 34 preserve identical response behavior and stay registered; the aboutSummaryCache and retitleInFlight singletons move whole (no duplicate module-scope const remains in conversations.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-reads.ac4",
+            "title": "scripts/file-size-baseline.txt updates the conversations.ts entry to a smaller count; typecheck, lint (incl. file-size guard), and the full vitest suite each produces 0 failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "item-delivery",
+        "title": "Extract message/delivery/control-ack cluster to src/lib/overdeck/conversation-delivery.ts (+ conversation-message.ts if needed) and thin routes 10-12, 15-20, 29",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T14:12:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-2145",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-delivery.ts",
+            "src/lib/overdeck/conversation-message.ts",
+            "src/dashboard/server/routes/conversations.ts",
+            "src/dashboard/server/routes/__tests__/conversations.test.ts",
+            "src/dashboard/server/routes/__tests__/conversation-compaction.test.ts",
+            "scripts/file-size-baseline.txt"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes including the file-size guard",
+            "full vitest suite reports 0 failed",
+            "each new delivery module is under 1000 lines"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/overdeck/conversation-delivery.ts and move the message/control cluster: handleConversationMessage, transformMessageForHarness, pickDeliverAs, resolveConversationDeliveryMethod, sendConversationControlCommand, deliverConversationViaControlChannel, handleConversationThinkingLevel, handleConversationCompact, handleConversationAbort, handleConversationImageUpload, safeUploadExtension, the codex-approval helpers (CODEX_APPROVAL_TOOL_PREFIX, codexConversationPendingInput, deliverCodexApprovalChoice), the control-ack cluster (registerConversationControlAck, resolveConversationControlAck, handleConversationControlAck, validateConversationControlAckOrigin, getPendingConversationControlAckCount, clearPendingConversationControlAcksForTests, CONTROL_ACK_TIMEOUT_MS, ConversationControlAck type, PendingConversationControlAck, and the pendingConversationControlAcks module-scope map), plus the thinking-level/plan-action helpers (parseThinkingLevel, THINKING_LEVELS, PLAN_ACTION_KEYSTROKES, isPiControlChannelHarness, isConversationMidTurn) and readJsonBody if used only by these routes. These back routes 10,11,12,15,16,17,18,19,20,29. CEILING GUARD (D6): if conversation-delivery.ts would exceed 1000 lines, split message handling (handleConversationMessage + transformMessageForHarness + upload helpers) into src/lib/overdeck/conversation-message.ts and keep control/acks/delivery-method in conversation-delivery.ts; record the split in the commit body. The pendingConversationControlAcks map MUST move whole with its ack functions (splitting it creates two registries and breaks ack correlation silently). Rewrite all affected handlers as thin adapters. Repoint importers per-symbol (conversations.test.ts imports registerConversationControlAck, validateConversationControlAckOrigin, resolveConversationDeliveryMethod, resolveConversationControlAck; conversation-compaction.test.ts may import compact helpers) to the new module(s); no shim; remove orphaned imports; run baseline --update. Any test that advances CONTROL_ACK_TIMEOUT_MS (10s) or delivery delays must use fake timers (vi.useFakeTimers + advanceTimersByTimeAsync), never real waits. Server-reachable code stays async-only. New modules must not import routes/conversations.js."
+        },
+        "items": [
+          {
+            "id": "item-delivery.ac1",
+            "title": "Each new delivery module (conversation-delivery.ts, and conversation-message.ts if the split is taken) exists under 1000 lines and does not import routes/conversations.js",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-delivery.ac2",
+            "title": "Routes 10, 11, 12, 15, 16, 17, 18, 19, 20, 29 preserve identical response and message-delivery behavior and stay registered",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-delivery.ac3",
+            "title": "The pendingConversationControlAcks map and its ack functions resolve from one module, and POST /api/conversations/:name/control-ack still resolves acks with no duplicate registry const in conversations.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-delivery.ac4",
+            "title": "conversations.test.ts (and any compaction test) resolves every moved symbol from its new module and produces 0 failed, and the change contains no new explicit any",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-delivery.ac5",
+            "title": "scripts/file-size-baseline.txt updates the conversations.ts entry to a smaller count; typecheck, lint (incl. file-size guard), and the full vitest suite each produces 0 failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "item-runtime",
+        "title": "Extract spawn/lifecycle cluster to src/lib/overdeck/conversation-runtime.ts and thin routes 6-9, 22, 25",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T14:12:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-2145",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/dashboard/server/routes/conversations.ts",
+            "src/dashboard/server/routes/__tests__/conversations-resolve-harness.test.ts",
+            "src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts",
+            "src/dashboard/server/routes/__tests__/conversation-teardown.test.ts",
+            "src/dashboard/server/routes/__tests__/conversations-switch-model.test.ts",
+            "scripts/file-size-baseline.txt"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes including the file-size guard",
+            "full vitest suite reports 0 failed",
+            "src/lib/overdeck/conversation-runtime.ts is under 1000 lines"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/overdeck/conversation-runtime.ts and move the spawn/lifecycle cluster: spawnConversationSession, resolveAllowedHarness, transformMessageForHarness (if not already moved with delivery — keep it in exactly one module), handleConversationSwitchModel, isInsideGitWorkTree, piConversationSystemPromptFiles, claudeConversationSystemPromptFiles, ensurePiConversationSourceContractFile (+ PI_CONVERSATION_SOURCE_CONTRACT), waitForClaudeReady, waitForPiTuiReady, isPiTuiInputReady, tmuxSessionExists, waitForTmuxSession, waitForConversationRuntimeReady, shouldUseSupervisorForConversation, the pty-supervisor helpers (resolvePtySupervisorScriptPath, getPtySupervisorSocketPath, waitForPtySupervisorSocket, PTY_SUPERVISOR_SOCKET_WAIT_MS), extractModelFromSessionFile, backfillConversationModels, generateConversationName, sanitizeName, the process-teardown helpers (parseProcessTable, readProcessTable, collectProcessTree, isProcessAlive, terminatePids, conversationRuntimeRootPids, killConversationRuntimeProcesses, stopConversationRuntime, shellQuote, PROCESS_CLEANUP_GRACE_MS), and the restart-repair helpers (conversationSessionAliveFromState, conversationNeedsRunningRepair, shouldReportUnresolvedLiveSession). These back routes 6 (POST /api/conversations), 7 (stop), 8 (resume), 9 (switch-model), 22 (DELETE), 25 (restart-all). Rewrite handlers as thin adapters. Repoint tests: conversations-resolve-harness (resolveAllowedHarness), conversations-supervisor (spawnConversationSession), conversation-teardown (conversationRuntimeRootPids), and any switch-model test symbol; conversationsRouteLayer imports stay. Per-symbol sweep; no shim; remove orphaned imports; run baseline --update. Async-only (waitForTmuxSession etc. already async — keep so). New module must not import routes/conversations.js."
+        },
+        "items": [
+          {
+            "id": "item-runtime.ac1",
+            "title": "src/lib/overdeck/conversation-runtime.ts exists, under 1000 lines, and does not import routes/conversations.js",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-runtime.ac2",
+            "title": "Routes 6, 7, 8, 9, 22, 25 preserve identical spawn/stop/resume/switch-model/delete/restart behavior and stay registered",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-runtime.ac3",
+            "title": "spawnConversationSession, resolveAllowedHarness, and conversationRuntimeRootPids each resolves from conversation-runtime.ts, and the conversations-resolve-harness, conversations-supervisor, and conversation-teardown tests each produces 0 failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-runtime.ac4",
+            "title": "scripts/file-size-baseline.txt updates the conversations.ts entry to a smaller count; typecheck, lint (incl. file-size guard), and the full vitest suite each produces 0 failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "item-forks",
+        "title": "Extract fork pipeline + handoff-doc to src/lib/overdeck/conversation-forks.ts, thin routes 5, 28, and repoint the boot import in main.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T14:12:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-2145",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "item-residue"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/conversation-forks.ts",
+            "src/dashboard/server/routes/conversations.ts",
+            "src/dashboard/server/main.ts",
+            "tests/unit/dashboard/server/routes/conversations-fork-failure.test.ts",
+            "tests/unit/dashboard/server/routes/conversations-fork-pipeline.test.ts",
+            "src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts",
+            "src/dashboard/server/routes/__tests__/conversations-handoff-delivery.test.ts",
+            "scripts/file-size-baseline.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes including the file-size guard",
+            "full vitest suite reports 0 failed",
+            "conversations-fork-pipeline.test.ts and conversations-fork-failure.test.ts (repointed) report 0 failed",
+            "src/lib/overdeck/conversation-forks.ts is under 1000 lines"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "MOST STATEFUL SEAM — touches the server boot path and carries the self.-spy subtlety; run the FULL suite and a throwaway-server boot check after it (TENET-10; never hot-patch the live server). Create src/lib/overdeck/conversation-forks.ts and move the entire fork pipeline: runForkPipeline, ensureForkSessionReady, injectForkSummary, handleForkPipelineFailure, buildForkRequest, parseSummaryForkFocus, confirmForkPromptAccepted, readExistingHandoffDoc, handleConversationHandoffDoc, handoffTitleFromFocus, parsePersistedForkRequest, the fork runtime-override test hooks (ForkPipelineRuntimeOverrides type, __setForkPipelineRuntimeOverridesForTest, __resetForkPipelineRuntimeOverridesForTest) and the fork wrappers (forkSessionExists, forkHarnessProcessAlive, forkRuntimeState, forkSpawnConversationSession, forkWaitForTmuxSession), plus the in-flight tracking (inFlightForkPipelines set, registerInFlightForkPipeline, getInFlightForkPipelineCount, waitForInFlightForkPipelines) and recoverStuckForks. These back route 5 (GET /api/conversations/:name/handoff-doc) and route 28 (POST /api/conversations/:name/summary-fork). CRITICAL self.-spy: inside conversation-forks.ts, replace `import * as self from './conversations.js'` with `import * as self from './conversation-forks.js'` so runForkPipeline's self.ensureForkSessionReady / self.injectForkSummary calls resolve to THIS module's namespace; then repoint tests/unit/dashboard/server/routes/conversations-fork-pipeline.test.ts to `import * as forksModule from '.../src/lib/overdeck/conversation-forks.js'` and spy on forksModule (not the route file). Repoint conversations-fork-failure.test.ts (handleForkPipelineFailure), conversations-fork-recovery.test.ts (buildForkRequest + others), and conversations-handoff-delivery.test.ts (confirmForkPromptAccepted). BOOT INVERSION FIX: repoint src/dashboard/server/main.ts from `import { recoverStuckForks, waitForInFlightForkPipelines } from './routes/conversations.js'` to `from '../../lib/overdeck/conversation-forks.js'` (verify the relative path from main.ts); call this out in the commit body. The inFlightForkPipelines set moves whole with its functions. Rewrite routes 5 and 28 as thin adapters. Per-symbol sweep; no shim; run baseline --update. Any fork test advancing retry/wait delays uses fake timers. New module must not import routes/conversations.js (except its own self-import)."
+        },
+        "items": [
+          {
+            "id": "item-forks.ac1",
+            "title": "src/lib/overdeck/conversation-forks.ts stays under 1000 lines, and runForkPipeline's self.ensureForkSessionReady/self.injectForkSummary resolves to its own namespace via a self import of ./conversation-forks.js",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-forks.ac2",
+            "title": "conversations-fork-pipeline.test.ts spies on the conversation-forks module and produces 0 failed, and conversations-fork-failure.test.ts produces 0 failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-forks.ac3",
+            "title": "src/dashboard/server/main.ts imports recoverStuckForks and waitForInFlightForkPipelines from lib/overdeck/conversation-forks (not from routes/conversations); the throwaway-server boot completes healthy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-forks.ac4",
+            "title": "GET /api/conversations/:name/handoff-doc and POST /api/conversations/:name/summary-fork each returns identical behavior and stays registered, and the inFlightForkPipelines set resolves from one module with no duplicate registry const in conversations.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-forks.ac5",
+            "title": "scripts/file-size-baseline.txt updates the conversations.ts entry to a smaller count; typecheck, lint (incl. file-size guard), and the full vitest suite each produces 0 failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "item-residue",
+        "title": "Thin residual helpers, drop the baseline entry, and verify the file is under 1000 lines",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T14:12:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-2145",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/conversations.ts",
+            "src/lib/overdeck/conversation-reads.ts",
+            "scripts/file-size-baseline.txt"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "src/dashboard/server/routes/conversations.ts is under 1000 lines",
+            "the conversations.ts entry is dropped from scripts/file-size-baseline.txt",
+            "git grep -n 'routes/conversations.js' src/ returns only server.ts's layer import",
+            "typecheck completes without errors, lint passes, full vitest suite reports 0 failed"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Final thinning seam. Sweep routes/conversations.ts for any leftover domain helper, over-40-line handler, or import orphaned by the earlier seams; move remaining read-shaped residue into conversation-reads.ts (or the appropriate existing door) and finish shrinking the file below 1000 lines. What must remain in routes/conversations.ts: the 34 HttpRouter.add registrations (now thin adapters), the conversationsRouteLayer merge, the default export, and the imports those need. Run `bash scripts/lint-file-size.sh --update`; because conversations.ts is now at or under the 1000 ceiling, --update DROPS its baseline entry entirely (verify the entry is gone). Verify FR-2: `git grep -n 'routes/conversations.js' src/` returns only src/dashboard/server/server.ts (the conversationsRouteLayer import) — main.ts was repointed in the fork seam. Do NOT add re-export shims. Rebase onto origin/main before the final gate and run the full suite (TENET-10)."
+        },
+        "items": [
+          {
+            "id": "item-residue.ac1",
+            "title": "wc -l src/dashboard/server/routes/conversations.ts returns a value under 1000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-residue.ac2",
+            "title": "scripts/lint-file-size.sh --update drops the conversations.ts baseline entry, and a subsequent lint-file-size check passes with no stale-baseline error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-residue.ac3",
+            "title": "git grep -n 'routes/conversations.js' src/ returns only the conversationsRouteLayer import in src/dashboard/server/server.ts (no shim, no other production importer)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "item-residue.ac4",
+            "title": "The no-loss audit test still contains all 34 method+path pairs; typecheck, lint, and the full vitest suite each produces 0 failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "item-noloss",
+        "to": "item-diffs",
+        "type": "blocks"
+      },
+      {
+        "from": "item-diffs",
+        "to": "item-archive",
+        "type": "blocks"
+      },
+      {
+        "from": "item-archive",
+        "to": "item-reads",
+        "type": "blocks"
+      },
+      {
+        "from": "item-reads",
+        "to": "item-delivery",
+        "type": "blocks"
+      },
+      {
+        "from": "item-delivery",
+        "to": "item-runtime",
+        "type": "blocks"
+      },
+      {
+        "from": "item-runtime",
+        "to": "item-forks",
+        "type": "blocks"
+      },
+      {
+        "from": "item-forks",
+        "to": "item-residue",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "completed"
+}

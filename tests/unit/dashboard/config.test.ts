@@ -6,7 +6,10 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { Effect } from 'effect';
+import { parse as parseYaml } from 'yaml';
 import { ServerConfig, ServerConfigLayer, ServerConfigError } from '../../../src/dashboard/server/config.js';
 
 // Prevent loadOverdeckEnv from loading ~/.overdeck.env during tests
@@ -19,6 +22,18 @@ vi.mock('../../../src/lib/env-loader.js', () => ({
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 type EnvSnapshot = Record<string, string | undefined>;
+
+interface DevcontainerCompose {
+  services?: {
+    frontend?: {
+      environment?: string[];
+    };
+    server?: {
+      environment?: string[];
+      labels?: string[];
+    };
+  };
+}
 
 function captureEnv(keys: string[]): EnvSnapshot {
   return Object.fromEntries(keys.map((k) => [k, process.env[k]]));
@@ -67,6 +82,23 @@ async function getConfig() {
   );
 }
 
+function readDevcontainerTemplate(): DevcontainerCompose {
+  const template = readFileSync(
+    resolve(process.cwd(), 'infra/.devcontainer-template/docker-compose.devcontainer.yml.template'),
+    'utf-8',
+  );
+  const rendered = template.replace(/{{[A-Z_]+}}/g, (placeholder) => {
+    const key = placeholder.slice(2, -2);
+    return key === 'PROJECTS_DIR' ? '/home/test/Projects' : `test-${key.toLowerCase()}`;
+  });
+  return parseYaml(rendered) as DevcontainerCompose;
+}
+
+function envValue(environment: string[] | undefined, name: string): string | undefined {
+  const prefix = `${name}=`;
+  return environment?.find((entry) => entry.startsWith(prefix))?.slice(prefix.length);
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('ServerConfig', () => {
@@ -98,6 +130,31 @@ describe('ServerConfig', () => {
     it('throws ServerConfigError on invalid port string', async () => {
       process.env['API_PORT'] = 'not-a-number';
       await expect(getConfig()).rejects.toThrow(ServerConfigError);
+    });
+
+    it('accepts the workspace devcontainer server env in peer mode', async () => {
+      const compose = readDevcontainerTemplate();
+      const serverEnv = compose.services?.server?.environment ?? [];
+      const frontendEnv = compose.services?.frontend?.environment ?? [];
+      const serverPort = envValue(serverEnv, 'PORT');
+      const proxyTarget = envValue(frontendEnv, 'VITE_PROXY_TARGET');
+
+      expect(serverPort).toBeDefined();
+      expect(serverPort).not.toBe('3011');
+      expect(proxyTarget).toBe(`http://server:${serverPort}`);
+      expect(compose.services?.server?.labels ?? []).toContain(
+        `traefik.http.services.pan-api-test-feature_folder.loadbalancer.server.port=${serverPort}`,
+      );
+
+      for (const entry of serverEnv) {
+        const separator = entry.indexOf('=');
+        if (separator === -1) continue;
+        process.env[entry.slice(0, separator)] = entry.slice(separator + 1);
+      }
+      delete process.env['OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY'];
+
+      const cfg = await getConfig();
+      expect(cfg.port).toBe(Number(serverPort));
     });
   });
 

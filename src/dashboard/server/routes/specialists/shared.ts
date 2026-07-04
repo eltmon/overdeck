@@ -126,14 +126,24 @@ export const _serverManagedMerges = new Set<string>();
  * lifecycle still runs at most once regardless of which path merged it.
  * Returns false when a run for the issue is already in flight.
  */
-export function firePostMergeLifecycle(issueId: string): boolean {
+export interface FirePostMergeLifecycleOptions {
+  sourceBranch?: string;
+  verifiedMergedRef?: string;
+}
+
+export function firePostMergeLifecycle(issueId: string, options?: FirePostMergeLifecycleOptions): boolean {
   const started = postMergeGuard.run(
     issueId,
     async () => {
       const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
       const projectPath = getProjectPathForIssue(issuePrefix);
       const { postMergeLifecycle } = await import('../../../../lib/cloister/merge-agent.js');
-      await postMergeLifecycle(issueId, projectPath);
+      await postMergeLifecycle(
+        issueId,
+        projectPath,
+        options?.sourceBranch,
+        options?.verifiedMergedRef ? { verifiedMergedRef: options.verifiedMergedRef } : undefined,
+      );
       console.log(`[merge] post-merge lifecycle completed for ${issueId}`);
 
       // PAN-1691: roll the merge train — rebase ready siblings onto the new main,

@@ -28,6 +28,9 @@ const { defaultExecAsync, mockExecAsync } = vi.hoisted(() => {
   };
 });
 const mockCreateResetMarker = vi.hoisted(() => vi.fn(async (input: unknown) => ({ id: 'reset-1', ...(input as Record<string, unknown>) })));
+const mockSetReviewStatusSync = vi.hoisted(() => vi.fn());
+const mockIsGitHubAppConfigured = vi.hoisted(() => vi.fn(() => false));
+const mockListPullRequestsForHead = vi.hoisted(() => vi.fn(() => Effect.succeed([])));
 const mockExec = vi.hoisted(() => vi.fn((cmd: string, optionsOrCb?: any, maybeCb?: any) => {
   const callback = typeof optionsOrCb === 'function' ? optionsOrCb : maybeCb;
   if (typeof callback === 'function') {
@@ -131,7 +134,7 @@ vi.mock('../../../src/lib/activity-log.js', () => ({
 vi.mock('../../../src/lib/review-status.js', () => ({
   getReviewStatusSync: vi.fn().mockReturnValue(null),
   setReviewStatus: vi.fn(),
-  setReviewStatusSync: vi.fn(),
+  setReviewStatusSync: mockSetReviewStatusSync,
 }));
 
 vi.mock('../../../src/lib/memory/cli.js', () => ({
@@ -140,6 +143,11 @@ vi.mock('../../../src/lib/memory/cli.js', () => ({
 
 vi.mock('../../../src/lib/git-utils.js', () => ({
   cleanupStaleLocks: vi.fn().mockResolvedValue({ found: [], removed: [], errors: [] }),
+}));
+
+vi.mock('../../../src/lib/github-app.js', () => ({
+  isGitHubAppConfigured: mockIsGitHubAppConfigured,
+  listPullRequestsForHead: mockListPullRequestsForHead,
 }));
 
 // ── Subject ───────────────────────────────────────────────────────────────────
@@ -154,6 +162,8 @@ describe('postMergeLifecycle — step 0 deploy handoff', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockExecAsync.mockImplementation(defaultExecAsync);
+    mockIsGitHubAppConfigured.mockReturnValue(false);
+    mockListPullRequestsForHead.mockReturnValue(Effect.succeed([]));
     resetPostMergeState(ISSUE_ID);
     mockWriteFile.mockResolvedValue(undefined);
     mockSpawn.mockReturnValue(mockSpawnChild);
@@ -173,6 +183,25 @@ describe('postMergeLifecycle — step 0 deploy handoff', () => {
     expect(parsed.sourceBranch).toBe(SOURCE_BRANCH);
     expect(typeof parsed.timestamp).toBe('number');
     expect(parsed.timestamp).toBeGreaterThan(0);
+  });
+
+  it('uses GitHub App REST to verify the source branch is merged when configured', async () => {
+    mockIsGitHubAppConfigured.mockReturnValue(true);
+    mockListPullRequestsForHead.mockReturnValue(Effect.succeed([
+      {
+        number: 444,
+        state: 'closed',
+        merged: true,
+        mergedAt: '2026-04-27T00:00:00Z',
+        mergeCommit: 'deadbeef',
+      },
+    ]));
+
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+
+    expect(mockListPullRequestsForHead).toHaveBeenCalledWith('test', 'test', SOURCE_BRANCH, 'all');
+    expect(mockExecAsync).not.toHaveBeenCalledWith(expect.stringContaining('gh pr list'));
+    expect(mockWriteFile).toHaveBeenCalledOnce();
   });
 
   it('defaults sourceBranch to empty string when not provided', async () => {
@@ -242,6 +271,63 @@ describe('postMergeLifecycle — step 0 deploy handoff', () => {
 
     expect(mockWriteFile).toHaveBeenCalledOnce();
     expect(mockSpawn).toHaveBeenCalledOnce();
+  });
+
+  it('accepts an open PR when caller verified the member ref is on origin/main', async () => {
+    mockExecAsync.mockImplementation(async (cmd: string) => {
+      if (cmd.includes('gh pr list')) {
+        return { stdout: '[{"number":444,"mergedAt":null,"mergeCommit":null}]', stderr: '' };
+      }
+      if (cmd.includes("git merge-base --is-ancestor 'member-sha' origin/main")) {
+        return { stdout: '', stderr: '' };
+      }
+      return { stdout: '', stderr: '' };
+    });
+
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, {
+      verifiedMergedRef: 'member-sha',
+    });
+
+    expect(mockWriteFile).toHaveBeenCalledOnce();
+    expect(mockSpawn).toHaveBeenCalledOnce();
+  });
+
+  it('refuses an open PR when caller verified ref is not on origin/main', async () => {
+    mockExecAsync.mockImplementation(async (cmd: string) => {
+      if (cmd.includes('gh pr list')) {
+        return { stdout: '[{"number":444,"mergedAt":null,"mergeCommit":null}]', stderr: '' };
+      }
+      if (cmd.includes("git merge-base --is-ancestor 'member-sha' origin/main")) {
+        throw new Error('not ancestor');
+      }
+      return { stdout: '', stderr: '' };
+    });
+
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, {
+      verifiedMergedRef: 'member-sha',
+    });
+
+    expect(mockWriteFile).not.toHaveBeenCalled();
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+
+  it('persists reviewStatus passed in the merge status write when requested', async () => {
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { markReviewPassed: true });
+
+    expect(mockSetReviewStatusSync).toHaveBeenCalledWith(ISSUE_ID, {
+      mergeStatus: 'merged',
+      readyForMerge: false,
+      reviewStatus: 'passed',
+    });
+  });
+
+  it('does not persist reviewStatus passed by default', async () => {
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+
+    expect(mockSetReviewStatusSync).toHaveBeenCalledWith(ISSUE_ID, {
+      mergeStatus: 'merged',
+      readyForMerge: false,
+    });
   });
 
   // The in-process fallback path exercises several real dynamic imports and

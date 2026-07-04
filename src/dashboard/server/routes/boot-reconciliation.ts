@@ -67,7 +67,6 @@ const getBootReconciliationRoute = HttpRouter.add(
         candidateIds.has(agent.id)
         || agent.paused === true
         || agent.troubled === true
-        || agent.status === 'stopped'
         || Boolean(agent.hostOverride)
       ))
       .map((agent) => ({
@@ -120,14 +119,14 @@ const postBootReconciliationDecisionRoute = HttpRouter.add(
       : {};
     setBootReconciliationDecision(body.decision, perAgent);
     const result = yield* Effect.promise(() => applyBootReconciliationDecision());
+    const resumed = result.resumed;
     return jsonResponse({
       ok: true,
       decision: body.decision,
       perAgent,
-      resumed: result.resumed,
-      count: result.resumed.length,
-      skipped: result.skipped,
-      deferred: result.deferred,
+      resumed,
+      outcomes: result.outcomes,
+      count: resumed.length,
     });
   })),
 );

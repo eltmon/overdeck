@@ -1,0 +1,968 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-03T13:20:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2147: Decompose src/dashboard/server/routes/agents.ts (4071 lines) into focused modules",
+    "updated": "2026-07-03T20:43:33.836Z"
+  },
+  "plan": {
+    "id": "pan-2147",
+    "title": "Decompose src/dashboard/server/routes/agents.ts (4071 lines) into focused modules",
+    "status": "completed",
+    "uid": "793ef67c-7a81-4ffd-ac84-d22ed0ccdee3",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 5,
+    "created": "2026-07-03T13:20:00.000Z",
+    "updated": "2026-07-03T20:43:33.836Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2147",
+        "label": "PAN-2147",
+        "type": "issue"
+      },
+      {
+        "uri": "docs/codebase-health/B3-agents-queries-extract.md",
+        "label": "move+re-export pattern precedent",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "refactor",
+      "codebase-health",
+      "dashboard-server",
+      "behavior-preserving"
+    ],
+    "narratives": {
+      "Problem": "src/dashboard/server/routes/agents.ts is a 4071-line god file on the pipeline hot path (start-agent / spawn / live-control). It bundles ~40 Effect HttpRouter route handlers plus ~600 lines of shared helpers in one file, far above the 1000-line file-size ceiling (baselined shrink-only).",
+      "Proposal": "Extract cohesive route clusters into a sibling directory src/dashboard/server/routes/agents/*.ts, each under 1000 lines, leaving routes/agents.ts as a thin barrel that imports each route Layer, composes agentsRouteLayer via Layer.mergeAll, and re-exports every symbol it currently exports. Pure move + re-export (established repo pattern, see B3-agents-queries-extract.md). The spawn handler postAgentsRoute (~1094 lines) is the only file that exceeds the ceiling alone; its self-contained container-orchestration and remote-spawn inner blocks are extracted into agents/spawn-helpers.ts as parameterized, behavior-preserving functions. Seams are serialized (each edits the barrel) and each is independently green.",
+      "NonGoals": "- No logic change, renamed export, or changed HTTP behavior — byte-identical behavior.\n- Do NOT decompose src/lib/agents.ts (a different file) or any other route file.\n- Do NOT refactor the spawn handler's logic — only physically relocate its self-contained inner blocks with identical statement order.\n- Do NOT change the Layer.mergeAll route set — all 41 routes stay composed.\n- Do NOT edit importers or tests (the barrel re-export keeps them resolving) unless a specific move demonstrably breaks a test.\n- Do NOT introduce any new explicit `any`; do NOT use execSync; async tmux only."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Sibling agents/ directory + barrel re-export at routes/agents.ts.",
+        "rationale": "Matches the repo's own established B3/agents-decomp move+re-export pattern; zero call-site churn and all co-located tests import via the barrel."
+      },
+      {
+        "summary": "Spawn handler is split (not byte-moved): container-orchestration + remote-spawn inner blocks extracted into agents/spawn-helpers.ts.",
+        "rationale": "postAgentsRoute (~1094 lines) exceeds the 1000 ceiling alone; relocating only top-level declarations cannot fix it. This is the single sanctioned deviation from pure move, logic preserved, deep-inspected."
+      },
+      {
+        "summary": "Seams serialized (readiness: sequential, linear blocks chain).",
+        "rationale": "Every seam edits the barrel routes/agents.ts; parallel execution would conflict. Consistent with the supervised-handoff objection on this hot-path pipeline machinery."
+      },
+      {
+        "summary": "Zero test repointing.",
+        "rationale": "All co-located __tests__/agents-*.test.ts import via the barrel '../agents.js'; the re-export keeps them green. Repoint only if a move demonstrably breaks a test."
+      },
+      {
+        "summary": "Each shrinking seam runs `bash scripts/lint-file-size.sh --update` and adds any-carrying new modules to eslint-any-allowlist.json.",
+        "rationale": "The file-size guard prints this exact instruction on stale baseline; --update only lowers/drops. The A1 ratchet requires new files carrying moved `any` to be allowlisted."
+      }
+    ],
+    "items": [
+      {
+        "id": "b1-shared",
+        "title": "Extract shared route helpers into agents/shared.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T13:20:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-2147",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "b2-listing",
+            "b3-conversation",
+            "b4-messaging",
+            "b5-permissions",
+            "b6-runtime-events",
+            "b7-lifecycle-stop",
+            "b8-lifecycle-restart",
+            "b9-control",
+            "b10-spawn-helpers",
+            "b11-spawn"
+          ],
+          "files_scope": [
+            "src/dashboard/server/routes/agents/shared.ts",
+            "src/dashboard/server/routes/agents.ts",
+            "scripts/file-size-baseline.txt",
+            "eslint-any-allowlist.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "lint exits 0 incl. file-size guard and 'single write surface intact'",
+            "vitest reports 0 failed"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/routes/agents/shared.ts and move the preamble helper cluster verbatim: execAsync/execFileAsync, buildPanStartArgs, spawnPanCommandDetached, emitStartAgentPhase, INTERNAL_TOKEN_HEADER, constantTimeTokenEqual, readInternalTokenForRequest, validateAgentRuntimeEventAuth, appendAgentLifecycleLog, updateRegistryForAgentStart, getIssueDataService, AGENTS_CACHE_TTL_MS, invalidateAgentsCache, filterClosedIssueAgents, readJsonBody, toAgentStatusPayload, buildAgentControlEventPayload, buildAgentGateFailureSnapshot, buildStoppedAgentLifecycle, readRemoteAgentState, captureAgentOutputBeforeKill, buildHostOverrideConfirmation, getProjectPath, getWorkspaceLocation, getGitStatusAsync, SpawnGuardrailDecision, resolveAgentCountEnv, formatLeakedSpecialistSummary, AgentStartGateDecision, evaluateAgentStartGate, hasActiveAgentGateOrRetry, evaluateSpawnGuardrails, the shared getter aliases (getClaudeProjectDir..getAgentPendingQuestions), and flyExecCmd. Route modules and the barrel import from this leaf (never re-import shared helpers from the barrel — avoids ESM cycles). In routes/agents.ts, import what its remaining handlers still need from ./agents/shared.js and re-export the public ones (buildPanStartArgs, spawnPanCommandDetached, validateAgentRuntimeEventAuth, invalidateAgentsCache, SpawnGuardrailDecision, AgentStartGateDecision, evaluateAgentStartGate, hasActiveAgentGateOrRetry, evaluateSpawnGuardrails). Run bash scripts/lint-file-size.sh --update; add shared.ts to eslint-any-allowlist.json only if it carries moved `any`."
+        },
+        "items": [
+          {
+            "id": "b1-shared.ac1",
+            "title": "src/dashboard/server/routes/agents/shared.ts exists (< 1000 lines) and exports the moved helper symbols; routes/agents.ts imports them from ./agents/shared.js",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-shared.ac2",
+            "title": "routes/agents.ts re-exports buildPanStartArgs, spawnPanCommandDetached, validateAgentRuntimeEventAuth, invalidateAgentsCache and the guardrail evaluators, so `npx vitest run --configLoader runner src/dashboard/server/routes/__tests__/agents-guardrails.test.ts src/dashboard/server/routes/__tests__/agents-start-args.test.ts` reports 0 failed with no test edits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-shared.ac3",
+            "title": "npm run typecheck exits 0 and npm run lint exits 0 (file-size guard green after scripts/lint-file-size.sh --update lowers the routes/agents.ts baseline; state-write guard prints 'single write surface intact')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-shared.ac4",
+            "title": "git diff for this bead preserves behavior: the bodies moved to shared.ts are byte-identical to the removed originals (pure move + re-export, no handler logic changed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b2-listing",
+        "title": "Extract listing + git-info + liveness routes into agents/listing.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T13:20:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-2147",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/listing.ts",
+            "src/dashboard/server/routes/agents.ts",
+            "scripts/file-size-baseline.txt",
+            "eslint-any-allowlist.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "lint exits 0",
+            "vitest reports 0 failed"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create agents/listing.ts and move getAgentsRoute, getAgentTmuxAliveRoute, getAgentHasSessionRoute, agentHasResolvableWorkspace, UNRESOLVABLE_AGENT_GIT_INFO, getAgentGitInfoRoute verbatim; import shared helpers from ./shared.js. In routes/agents.ts, import these route layers and keep them in agentsRouteLayer (Layer.mergeAll) in their existing positions; re-export agentHasResolvableWorkspace and UNRESOLVABLE_AGENT_GIT_INFO. Run scripts/lint-file-size.sh --update; allowlist listing.ts only if it carries moved `any`."
+        },
+        "items": [
+          {
+            "id": "b2-listing.ac1",
+            "title": "agents/listing.ts (< 1000 lines) exports getAgentsRoute, getAgentTmuxAliveRoute, getAgentHasSessionRoute, getAgentGitInfoRoute layers and agentHasResolvableWorkspace/UNRESOLVABLE_AGENT_GIT_INFO; agentsRouteLayer still composes all three list/liveness routes plus the git-info route",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-listing.ac2",
+            "title": "routes/agents.ts re-exports agentHasResolvableWorkspace and UNRESOLVABLE_AGENT_GIT_INFO so `npx vitest run --configLoader runner src/dashboard/server/routes/__tests__/agents-git-info-fallback.test.ts` reports 0 failed with no test edits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-listing.ac3",
+            "title": "npm run typecheck and npm run lint exits 0 (baseline lowered via scripts/lint-file-size.sh --update); full vitest suite reports 0 failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b3-conversation",
+        "title": "Extract conversation/output/activity/files/timeline routes into agents/conversation.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T13:20:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-2147",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/conversation.ts",
+            "src/dashboard/server/routes/agents.ts",
+            "scripts/file-size-baseline.txt",
+            "eslint-any-allowlist.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "lint exits 0",
+            "vitest reports 0 failed"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create agents/conversation.ts and move EMPTY_CONVERSATION, buildConversationResponse, getAgentConversationRoute, getAgentOutputRoute, getAgentActivityRoute, getAgentFilesRoute, getAgentTimelineRoute verbatim; import shared helpers from ./shared.js. In routes/agents.ts, import the layers, keep them in agentsRouteLayer, and re-export buildConversationResponse. Run scripts/lint-file-size.sh --update; allowlist conversation.ts if it carries moved `any`."
+        },
+        "items": [
+          {
+            "id": "b3-conversation.ac1",
+            "title": "agents/conversation.ts (< 1000 lines) exports the five conversation/output/activity/files/timeline route layers plus buildConversationResponse; agentsRouteLayer still composes all five routes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-conversation.ac2",
+            "title": "routes/agents.ts re-exports buildConversationResponse so `npx vitest run --configLoader runner src/dashboard/server/routes/__tests__/agents-conversation.test.ts` reports 0 failed with no test edits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-conversation.ac3",
+            "title": "npm run typecheck and npm run lint exits 0 (baseline lowered); full vitest suite reports 0 failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b4-messaging",
+        "title": "Extract message/tell/poke routes into agents/messaging.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T13:20:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-2147",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/messaging.ts",
+            "src/dashboard/server/routes/agents.ts",
+            "scripts/file-size-baseline.txt",
+            "eslint-any-allowlist.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "lint exits 0",
+            "vitest reports 0 failed"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create agents/messaging.ts and move sendAgentMessage, validateAgentMessageOrigin, postAgentMessageLikeRoute, postAgentMessageRoute, postAgentTellRoute, postAgentPokeRoute verbatim; import shared helpers from ./shared.js. In routes/agents.ts, import the layers, keep them in agentsRouteLayer, and re-export validateAgentMessageOrigin. Run scripts/lint-file-size.sh --update; allowlist messaging.ts if it carries moved `any`."
+        },
+        "items": [
+          {
+            "id": "b4-messaging.ac1",
+            "title": "agents/messaging.ts (< 1000 lines) exports postAgentMessageRoute, postAgentTellRoute, postAgentPokeRoute layers plus validateAgentMessageOrigin; agentsRouteLayer still composes all three routes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b4-messaging.ac2",
+            "title": "routes/agents.ts re-exports validateAgentMessageOrigin; a targeted grep confirms `import { validateAgentMessageOrigin } from '../agents.js'` still resolves and the full vitest suite reports 0 failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b4-messaging.ac3",
+            "title": "npm run typecheck and npm run lint exits 0 (baseline lowered); git diff is a pure move + re-export",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b5-permissions",
+        "title": "Extract pending-questions/answer/permission routes into agents/permissions.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T13:20:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-2147",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/permissions.ts",
+            "src/dashboard/server/routes/agents.ts",
+            "scripts/file-size-baseline.txt",
+            "eslint-any-allowlist.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "lint exits 0",
+            "vitest reports 0 failed"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create agents/permissions.ts and move getAgentPendingQuestionsRoute, postAgentAnswerQuestionRoute, postInternalAgentPermissionRequestRoute, postAgentPermissionResponseRoute verbatim; import shared helpers from ./shared.js and the existing ./agent-permissions.js helpers. In routes/agents.ts import the layers and keep them in agentsRouteLayer. Run scripts/lint-file-size.sh --update; add permissions.ts to eslint-any-allowlist.json if it carries moved `any` (body parsing here uses `as any`)."
+        },
+        "items": [
+          {
+            "id": "b5-permissions.ac1",
+            "title": "agents/permissions.ts (< 1000 lines) exports the four permission/question route layers; agentsRouteLayer still composes all four routes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b5-permissions.ac2",
+            "title": "If permissions.ts carries moved `any`, it is added to eslint-any-allowlist.json; npm run lint no-explicit-any check exits 0 and no NEW `any` is introduced",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b5-permissions.ac3",
+            "title": "npm run typecheck exits 0 (baseline lowered via --update); full vitest suite reports 0 failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b6-runtime-events",
+        "title": "Extract runtime-event ingestion + runtime/health-history reads into agents/runtime-events.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T13:20:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-2147",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/runtime-events.ts",
+            "src/dashboard/server/routes/agents.ts",
+            "scripts/file-size-baseline.txt",
+            "eslint-any-allowlist.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "lint exits 0",
+            "vitest reports 0 failed"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create agents/runtime-events.ts and move emitAgentRuntimeEvent, postAgentHeartbeatRoute, postAgentWorkCompleteRoute, postAgentStuckRoute, hasNegatedCompletionOutput, postAgentClassifyCompletionRoute, getAgentRuntimeRoute, getAgentHealthHistoryRoute verbatim; import shared helpers (incl. validateAgentRuntimeEventAuth) from ./shared.js. In routes/agents.ts import the layers and keep them in agentsRouteLayer. Run scripts/lint-file-size.sh --update; allowlist runtime-events.ts if it carries moved `any`."
+        },
+        "items": [
+          {
+            "id": "b6-runtime-events.ac1",
+            "title": "agents/runtime-events.ts (< 1000 lines) exports the heartbeat/work-complete/stuck/classify-completion/runtime/health-history route layers; agentsRouteLayer still routes all of them (contains the same route entries)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b6-runtime-events.ac2",
+            "title": "The runtime-event auth path is preserved: postAgentHeartbeatRoute still calls validateAgentRuntimeEventAuth (imported from ./shared.js) and rejects unauthenticated bodies; full vitest suite reports 0 failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b6-runtime-events.ac3",
+            "title": "npm run typecheck and npm run lint exits 0 (baseline lowered); git diff is a pure move + re-export",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b7-lifecycle-stop",
+        "title": "Extract stop/delete/suspend/pause/unpause/untroubled routes into agents/lifecycle-stop.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T13:20:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-2147",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/lifecycle-stop.ts",
+            "src/dashboard/server/routes/agents.ts",
+            "scripts/file-size-baseline.txt",
+            "eslint-any-allowlist.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "lint exits 0",
+            "vitest reports 0 failed"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create agents/lifecycle-stop.ts and move createAgentStopHandler, agentStopRoute, deleteAgentRoute, postAgentStopRoute, postAgentSuspendRoute, postAgentPauseRoute, postAgentUnpauseRoute, postAgentUntroubledRoute verbatim; import shared helpers from ./shared.js. In routes/agents.ts import the layers, keep them in agentsRouteLayer, and re-export createAgentStopHandler. Run scripts/lint-file-size.sh --update; allowlist lifecycle-stop.ts if it carries moved `any`."
+        },
+        "items": [
+          {
+            "id": "b7-lifecycle-stop.ac1",
+            "title": "agents/lifecycle-stop.ts (< 1000 lines) exports the delete/stop/suspend/pause/unpause/untroubled route layers plus createAgentStopHandler; agentsRouteLayer still composes all six routes (DELETE and POST /stop share the handler factory)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b7-lifecycle-stop.ac2",
+            "title": "routes/agents.ts re-exports createAgentStopHandler so `npx vitest run --configLoader runner src/dashboard/server/routes/__tests__/agents-lifecycle-event.test.ts` reports 0 failed with no test edits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b7-lifecycle-stop.ac3",
+            "title": "npm run typecheck and npm run lint exits 0 (baseline lowered); full vitest suite reports 0 failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b8-lifecycle-restart",
+        "title": "Extract resume/recover/restart/restart-fresh/restart-all/reset-session routes into agents/lifecycle-restart.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T13:20:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-2147",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/lifecycle-restart.ts",
+            "src/dashboard/server/routes/agents.ts",
+            "scripts/file-size-baseline.txt",
+            "eslint-any-allowlist.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "lint exits 0",
+            "vitest reports 0 failed"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create agents/lifecycle-restart.ts and move postAgentResumeRoute, postAgentRecoverRoute, postAgentRestartRoute, postAgentRestartFreshRoute, postAgentsRestartAllRoute, postAgentResetSessionRoute verbatim; import shared helpers from ./shared.js and resume/restart primitives from ../../../lib/agents.js. In routes/agents.ts import the layers and keep them in agentsRouteLayer. Run scripts/lint-file-size.sh --update; allowlist lifecycle-restart.ts if it carries moved `any`. Run npm run build to confirm no ESM cycle broke (H1)."
+        },
+        "items": [
+          {
+            "id": "b8-lifecycle-restart.ac1",
+            "title": "agents/lifecycle-restart.ts (< 1000 lines) exports the resume/recover/restart/restart-fresh/restart-all/reset-session route layers; agentsRouteLayer still composes all six routes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b8-lifecycle-restart.ac2",
+            "title": "npm run build exits 0 (no runtime ESM-cycle error from the barrel re-export); npm run typecheck and npm run lint exits 0 (baseline lowered)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b8-lifecycle-restart.ac3",
+            "title": "The full vitest suite passes (0 failed); git diff preserves resume/restart logic (pure move) that the JSONL-resume-across-model-change guard depends on",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b9-control",
+        "title": "Extract cloister-health/handoff/cost/delivery-method/switch-model routes into agents/control.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T13:20:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-2147",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/control.ts",
+            "src/dashboard/server/routes/agents.ts",
+            "scripts/file-size-baseline.txt",
+            "eslint-any-allowlist.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "lint exits 0",
+            "vitest reports 0 failed"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create agents/control.ts and move getAgentCloisterHealthRoute, getAgentHandoffSuggestionRoute, postAgentHandoffRoute, getAgentCostRoute, validateAgentDeliveryMethodOrigin, postAgentDeliveryMethodRoute, postAgentSwitchModelRoute verbatim; import shared helpers from ./shared.js. In routes/agents.ts import the layers, keep them in agentsRouteLayer, and re-export validateAgentDeliveryMethodOrigin. Run scripts/lint-file-size.sh --update; allowlist control.ts if it carries moved `any`."
+        },
+        "items": [
+          {
+            "id": "b9-control.ac1",
+            "title": "agents/control.ts (< 1000 lines) exports the cloister-health/handoff-suggestion/handoff/cost/delivery-method/switch-model route layers plus validateAgentDeliveryMethodOrigin; agentsRouteLayer still composes all seven routes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b9-control.ac2",
+            "title": "routes/agents.ts re-exports validateAgentDeliveryMethodOrigin so `npx vitest run --configLoader runner src/dashboard/server/routes/__tests__/agents-delivery-method.test.ts src/dashboard/server/routes/__tests__/agents-switch-model.test.ts` reports 0 failed with no test edits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b9-control.ac3",
+            "title": "npm run typecheck and npm run lint exits 0 (baseline lowered); full vitest suite reports 0 failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b10-spawn-helpers",
+        "title": "Extract container-orchestration + remote-spawn inner blocks into agents/spawn-helpers.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T13:20:00.000Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "refactor",
+          "issueLabel": "pan-2147",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "b11-spawn"
+          ],
+          "files_scope": [
+            "src/dashboard/server/routes/agents/spawn-helpers.ts",
+            "src/dashboard/server/routes/agents.ts",
+            "scripts/file-size-baseline.txt",
+            "eslint-any-allowlist.json"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npm run build",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "lint exits 0",
+            "build exits 0",
+            "vitest reports 0 failed"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "postAgentsRoute (~1094 lines, currently still in routes/agents.ts) exceeds the 1000 ceiling on its own. Extract its self-contained inner blocks into new agents/spawn-helpers.ts as parameterized functions with IDENTICAL statement order, passing every captured local (issueId, workspacePath, agentSessionName, logging closures, eventStore/lifecycle handles) explicitly: (1) the container-orchestration block — getComposeProjectName + its validate helper, container-health line parsing, and the wait-for-containers polling loop; (2) the remote-agent spawn branch (spawnRemoteAgent/checkRemoteSpendCap path). postAgentsRoute stays inline in routes/agents.ts for this bead and calls the extracted helpers. Do NOT reorder effects or change emission order. Run npm run build (real ESM-cycle check). Run scripts/lint-file-size.sh --update; add spawn-helpers.ts to eslint-any-allowlist.json if it carries moved `any` (the spawn path uses `as any` heavily). If a block cannot be extracted without reordering effects, keep it inline and pick a different extractable block (H5)."
+        },
+        "items": [
+          {
+            "id": "b10-spawn-helpers.ac1",
+            "title": "agents/spawn-helpers.ts (< 1000 lines) exports the container-orchestration and remote-spawn helper functions; postAgentsRoute calls them and its remaining inline body contains materially fewer lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b10-spawn-helpers.ac2",
+            "title": "Behavior is preserved: the extracted helpers receive every previously-captured local as an explicit parameter and preserves the same statement order; the full vitest suite (incl. tests/integration/agent-spawning.test.ts) passes with 0 failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b10-spawn-helpers.ac3",
+            "title": "npm run build exits 0 (no ESM-cycle break); npm run typecheck and npm run lint exits 0; if spawn-helpers.ts carries moved `any` it is allowlisted and no NEW `any` is introduced",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b11-spawn",
+        "title": "Move the reduced postAgentsRoute into agents/spawn.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T13:20:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-2147",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/spawn.ts",
+            "src/dashboard/server/routes/agents.ts",
+            "scripts/file-size-baseline.txt",
+            "eslint-any-allowlist.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npm run build",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "lint exits 0",
+            "build exits 0",
+            "vitest reports 0 failed"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create agents/spawn.ts and move the now-reduced postAgentsRoute verbatim, importing shared helpers from ./shared.js and the extracted helpers from ./spawn-helpers.js. In routes/agents.ts import the postAgentsRoute layer and keep it in agentsRouteLayer in its existing position. Run npm run build. Run scripts/lint-file-size.sh --update; add spawn.ts to eslint-any-allowlist.json if it carries moved `any`."
+        },
+        "items": [
+          {
+            "id": "b11-spawn.ac1",
+            "title": "agents/spawn.ts (< 1000 lines) exports postAgentsRoute; agentsRouteLayer still routes POST /api/agents to postAgentsRoute",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b11-spawn.ac2",
+            "title": "npm run build exits 0; the full vitest suite (incl. tests/integration/agent-spawning.test.ts) reports 0 failed; git diff is a pure move (calls ./spawn-helpers.js, no logic change)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b11-spawn.ac3",
+            "title": "npm run typecheck and npm run lint exits 0 (baseline lowered); if spawn.ts carries moved `any` it is allowlisted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b12-barrel-verify",
+        "title": "Finalize barrel + no-loss route audit + drop baseline entry",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T13:20:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-2147",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents.ts",
+            "scripts/file-size-baseline.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npm run build",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "lint exits 0 with routes/agents.ts absent from the file-size baseline",
+            "build exits 0",
+            "vitest reports 0 failed"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Confirm routes/agents.ts is now a thin barrel: it only imports route layers from ./agents/*.js, composes agentsRouteLayer via Layer.mergeAll, and re-exports every symbol it exported before this issue (agentsRouteLayer default+named, buildPanStartArgs, spawnPanCommandDetached, validateAgentRuntimeEventAuth, invalidateAgentsCache, SpawnGuardrailDecision, AgentStartGateDecision, evaluateAgentStartGate, hasActiveAgentGateOrRetry, evaluateSpawnGuardrails, buildConversationResponse, validateAgentMessageOrigin, createAgentStopHandler, agentHasResolvableWorkspace, UNRESOLVABLE_AGENT_GIT_INFO, validateAgentDeliveryMethodOrigin). No-loss audit: assert the Layer.mergeAll call still lists all 41 route layers that agentsRouteLayer composed before the refactor (enumerate before, count after). Run scripts/lint-file-size.sh --update so routes/agents.ts (now < 1000) is dropped from scripts/file-size-baseline.txt. Any external importer (src/dashboard/server/server.ts, src/lib/overdeck/planning-promotion.ts, src/lib/overdeck/planning-sessions.ts) resolves unchanged."
+        },
+        "items": [
+          {
+            "id": "b12-barrel-verify.ac1",
+            "title": "routes/agents.ts is < 1000 lines and contains no route handler bodies — only imports of ./agents/*.js layers, the Layer.mergeAll composition, and re-export statements",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b12-barrel-verify.ac2",
+            "title": "No-loss audit passes: agentsRouteLayer's Layer.mergeAll composes exactly the same 41 route layers as before the refactor (no route added or removed); a grep count of the mergeAll arguments equals the pre-refactor count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b12-barrel-verify.ac3",
+            "title": "scripts/file-size-baseline.txt no longer contains a routes/agents.ts entry (dropped by --update because it is now <= 1000); npm run lint exits 0 with no stale-baseline error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b12-barrel-verify.ac4",
+            "title": "npm run typecheck, npm run build exits 0 and the full vitest suite reports 0 failed; the named external importers (server.ts, planning-promotion.ts, planning-sessions.ts) and all __tests__/agents-*.test.ts resolve their imports from '../agents.js' unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "b1-shared",
+        "to": "b2-listing",
+        "type": "blocks"
+      },
+      {
+        "from": "b2-listing",
+        "to": "b3-conversation",
+        "type": "blocks"
+      },
+      {
+        "from": "b3-conversation",
+        "to": "b4-messaging",
+        "type": "blocks"
+      },
+      {
+        "from": "b4-messaging",
+        "to": "b5-permissions",
+        "type": "blocks"
+      },
+      {
+        "from": "b5-permissions",
+        "to": "b6-runtime-events",
+        "type": "blocks"
+      },
+      {
+        "from": "b6-runtime-events",
+        "to": "b7-lifecycle-stop",
+        "type": "blocks"
+      },
+      {
+        "from": "b7-lifecycle-stop",
+        "to": "b8-lifecycle-restart",
+        "type": "blocks"
+      },
+      {
+        "from": "b8-lifecycle-restart",
+        "to": "b9-control",
+        "type": "blocks"
+      },
+      {
+        "from": "b9-control",
+        "to": "b10-spawn-helpers",
+        "type": "blocks"
+      },
+      {
+        "from": "b10-spawn-helpers",
+        "to": "b11-spawn",
+        "type": "blocks"
+      },
+      {
+        "from": "b11-spawn",
+        "to": "b12-barrel-verify",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-03-PAN-2147-decompose-src-dashboard-server-routes-agents-ts-4071-lines-into-focused-modules.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

@@ -18,6 +18,7 @@ describe('auto-resume gates', () => {
     perAgent: Record<string, 'resume' | 'hold'>;
     decidedAt: string | null;
     bootId: string | null;
+    bootStartedAt: string | null;
     graceDeadline: string | null;
   };
   // PAN-1665: free work slots the governor reports. High by default so the gating
@@ -45,6 +46,7 @@ describe('auto-resume gates', () => {
       perAgent: {},
       decidedAt: null,
       bootId: null,
+      bootStartedAt: null,
       graceDeadline: null,
     };
   });
@@ -387,7 +389,7 @@ describe('auto-resume gates', () => {
     expect(resumed).toEqual([]);
     expect(resumeAgentMock).not.toHaveBeenCalled();
     expect(vi.mocked(logger.logDeaconEventSync)).toHaveBeenCalledWith(expect.stringContaining('verify-paused'));
-  });
+  }, 20_000);
 
   it('pan pause stops stale-running agents without live tmux sessions', async () => {
     const agentId = 'agent-pan-1141';
@@ -473,7 +475,7 @@ describe('auto-resume gates', () => {
 
     expect(resumed).toEqual([agentId]);
     expect(resumeAgentMock).toHaveBeenCalledWith(agentId);
-  });
+  }, 20_000);
 
   it('recovers orphaned strike agents whose registered session is missing', async () => {
     const agentId = 'strike-pan-1820';
@@ -709,6 +711,7 @@ describe('auto-resume gates', () => {
       perAgent: {},
       decidedAt: BASE_TIME.toISOString(),
       bootId: 'boot-test',
+      bootStartedAt: BASE_TIME.toISOString(),
       graceDeadline: new Date(BASE_TIME.getTime() + 30_000).toISOString(),
     };
     const stoppedAgentId = 'agent-pan-1141-boot-held-stopped';

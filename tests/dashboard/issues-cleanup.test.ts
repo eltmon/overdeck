@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { cleanupAgentStateDirs, removeCompletionMarker } from '../../src/dashboard/server/routes/issues.js';
+import { cleanupAgentStateDirs, removeCompletionMarker } from '../../src/lib/overdeck/workspace-hygiene.js';
 
 let testDir: string;
 

@@ -7,11 +7,11 @@ import { and, eq } from 'drizzle-orm';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
-import { Db, EventBus, Records, Tmux } from './infra.js';
+import { Db, EventBus, Records, Tmux, getOverdeckDatabaseSync } from './infra.js';
 import { IssueId } from './issues.js';
-import { getOverdeckDatabaseSync } from './infra.js';
 import { getOverdeckHome } from '../paths.js';
 import type { AgentState } from '../agents.js';
+export { getIssueStageSync, isTerminalIssueStage } from './issue-stage-sync.js';
 
 // ── Local table definitions (mirrors overdeck-schema.ts — no FK/index annotations here) ─
 

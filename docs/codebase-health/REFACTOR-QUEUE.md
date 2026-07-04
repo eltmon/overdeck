@@ -24,6 +24,10 @@ must list those assumptions in a `## Re-verify at execution` section; if the dep
 is so heavy the PRD would be guesswork, it is **deferred** (marked below) and written
 only when its predecessor lands.
 
+**Close-out status (2026-07-03):** PAN-2151, PAN-2153, PAN-2154, PAN-2156, and PAN-2227
+are fully closed out (issues closed, review status cleared) — the PAN-2260 squash-blind
+close gate fix landed via UAT batch and unblocked the ceremony.
+
 ## Phase 0 — COMPLETE (all four merged, 2026-07-02/03)
 
 | # | Issue | Target | Status |
@@ -41,12 +45,12 @@ peripheral, safe for autonomous pipeline flow once planned.
 | # | Issue | What | PRD |
 |---|---|---|---|
 | 5 | PAN-2227 | Ratchets enforced at write point: pre-push guard, auto-lowering baselines, audited bumps | **MERGED — PR #2268** (2026-07-03; delivered PAN-2204's main-push guard too) |
-| 6 | PAN-2231 | Lint ban on source-introspection tests (red-main #2124 class) | PRD on main; queued after Phase 2 kickoff |
+| 6 | PAN-2231 | Lint ban on source-introspection tests (red-main #2124 class) | **PLANNING 2026-07-03 (planning-pan-2231, --auto)** — banked ahead of PAN-2145 finishing |
 | 7 | PAN-2230 | Circular-dependency ratchet (madge baseline in lint) | PRD on main; queued after Phase 2 kickoff |
 | 8 | PAN-2234 | Mechanical PRD-first gate in `pan plan finalize` / complete-planning | **DONE — landed 1e82badc32, issue closed** |
 | 8b | PAN-2204 | Agent direct-push-to-main guard | **DONE — delivered inside PAN-2227 (PR #2268): `scripts/guard-agent-main-push.sh` wired into `.husky/pre-push`; issue closed** |
 
-## Phase 2 — route thinning (the three biggest god files, done right)
+## Phase 2 — route thinning (the three biggest god files, done right) — ✅ COMPLETE (all three merged 2026-07-03/04)
 
 **Approach decision (2026-07-02, orchestrator review):** these are *route-thinning*
 refactors, NOT barrel splits. Move domain logic behind the two doors
@@ -57,11 +61,17 @@ line-count metric while keeping the module shallow — the workspaces split prov
 
 | # | Issue | Target | Notes |
 |---|---|---|---|
-| 9 | PAN-2148 | `routes/issues.ts` (4,065) | **DISPATCHED 2026-07-03 — GPT-5.5 work agent** (spec promoted, 9 items; PRD re-verified against post-Phase-0 main) |
-| 10 | PAN-2147 | `routes/agents.ts` (4,071) | **PRD written — on main** |
-| 11 | PAN-2145 | `routes/conversations.ts` (5,316 — grew +418 while gated) | **PRD written — on main** (verify `## Re-verify at execution` against post-2156 main before dispatch) |
+| 9 | PAN-2148 | `routes/issues.ts` (4,110) | **MERGED 2026-07-03** (UAT batch `uat/pan-cobalt-0703`, PR #2299) — 4,110 → 818 lines, 9 door modules in `src/lib/overdeck/` |
+| 10 | PAN-2147 | `routes/agents.ts` (4,071) | **MERGED 2026-07-03 (PR #2316)** — 4,071 → 136 lines, route submodules under `routes/agents/` (largest `spawn.ts` 825), no new god file. Code-level validated on origin/main. |
+| 11 | PAN-2145 | `routes/conversations.ts` (5,291) | **MERGED 2026-07-04 (PR #2332)** — landed via direct squash-merge during the RUN-55 stability drain; conversations.ts decomposed into focused modules. **Phase 2 COMPLETE.** |
 
 ## Phase 3 — cloister core (pipeline machinery; supervised, sequenced, never batched)
+
+**NEXT UP (2026-07-04):** Phase 2 is complete → Phase 3 is ready to kick off, but it
+requires an explicit **operator handoff** (it is `needs-handoff`, not auto-pickup).
+Start with PAN-2149; PRDs for items 12–15 are on main. PAN-2189 (deacon.ts) stays
+**deferred** until 12–15 land (its seams shift as each predecessor merges). Run one
+GPT-5.5 work agent at a time — do NOT batch (these red main = pipeline stall).
 
 TENET-10 territory: a red main here stalls the pipeline that ships the fix. One at a
 time, full suite before merge, verify against origin HEAD.
