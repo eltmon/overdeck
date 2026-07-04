@@ -32,6 +32,22 @@ function runHook(stdin: string, env: Record<string, string | undefined> = {}): P
   })
 }
 
+function parseDecision(stdout: string): {
+  hookSpecificOutput?: {
+    hookEventName?: string
+    permissionDecision?: string
+    permissionDecisionReason?: string
+  }
+} {
+  return JSON.parse(stdout) as {
+    hookSpecificOutput?: {
+      hookEventName?: string
+      permissionDecision?: string
+      permissionDecisionReason?: string
+    }
+  }
+}
+
 describe('auto-approve-hook', () => {
   let home: string
 
@@ -55,16 +71,55 @@ describe('auto-approve-hook', () => {
     const { stdout, code } = await runHook(stdin, { HOME: home, OVERDECK_AGENT_ID: agentId })
 
     expect(code).toBe(0)
-    const parsed = JSON.parse(stdout) as {
-      hookSpecificOutput?: {
-        hookEventName?: string
-        permissionDecision?: string
-        permissionDecisionReason?: string
-      }
-    }
+    const parsed = parseDecision(stdout)
     expect(parsed.hookSpecificOutput?.hookEventName).toBe('PreToolUse')
     expect(parsed.hookSpecificOutput?.permissionDecision).toBe('allow')
     expect(parsed.hookSpecificOutput?.permissionDecisionReason).toContain('Overdeck autonomous pipeline agent auto-approve')
+  })
+
+  it('denies flywheel orchestrator writes to non-allowlisted repo paths', async () => {
+    const stdin = JSON.stringify({ tool_name: 'Write', tool_input: { file_path: join(process.cwd(), 'src', 'x.ts') } })
+
+    const { stdout, code } = await runHook(stdin, { HOME: home, OVERDECK_AGENT_ID: 'flywheel-orchestrator' })
+
+    expect(code).toBe(0)
+    const parsed = parseDecision(stdout)
+    expect(parsed.hookSpecificOutput?.hookEventName).toBe('PreToolUse')
+    expect(parsed.hookSpecificOutput?.permissionDecision).toBe('deny')
+    expect(parsed.hookSpecificOutput?.permissionDecisionReason).toContain('Flywheel orchestrator may not write repo artifacts directly')
+  })
+
+  it('allows flywheel orchestrator writes to flywheel state', async () => {
+    const stdin = JSON.stringify({ tool_name: 'Write', tool_input: { file_path: 'docs/FLYWHEEL-STATE.md' } })
+
+    const { stdout, code } = await runHook(stdin, { HOME: home, OVERDECK_AGENT_ID: 'flywheel-orchestrator' })
+
+    expect(code).toBe(0)
+    const parsed = parseDecision(stdout)
+    expect(parsed.hookSpecificOutput?.hookEventName).toBe('PreToolUse')
+    expect(parsed.hookSpecificOutput?.permissionDecision).toBe('allow')
+  })
+
+  it('allows non-flywheel agent writes to repo paths', async () => {
+    const stdin = JSON.stringify({ tool_name: 'Write', tool_input: { file_path: join(process.cwd(), 'src', 'x.ts') } })
+
+    const { stdout, code } = await runHook(stdin, { HOME: home, OVERDECK_AGENT_ID: 'agent-pan-1234' })
+
+    expect(code).toBe(0)
+    const parsed = parseDecision(stdout)
+    expect(parsed.hookSpecificOutput?.hookEventName).toBe('PreToolUse')
+    expect(parsed.hookSpecificOutput?.permissionDecision).toBe('allow')
+  })
+
+  it('allows flywheel orchestrator writes outside the repo', async () => {
+    const stdin = JSON.stringify({ tool_name: 'Write', tool_input: { file_path: join(home, 'scratch.txt') } })
+
+    const { stdout, code } = await runHook(stdin, { HOME: home, OVERDECK_AGENT_ID: 'flywheel-orchestrator' })
+
+    expect(code).toBe(0)
+    const parsed = parseDecision(stdout)
+    expect(parsed.hookSpecificOutput?.hookEventName).toBe('PreToolUse')
+    expect(parsed.hookSpecificOutput?.permissionDecision).toBe('allow')
   })
 
   it.each([
