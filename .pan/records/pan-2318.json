@@ -209,140 +209,10 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T14:43:24.485Z",
-    "reviewNotes": "Review passed; only pipeline metadata changed since prior approval",
-    "testNotes": "Skipped: no code changed since pre-review verification gate",
-    "verificationNotes": "Pre-review verification already covered the reviewed commit",
-    "blockerReasons": [
-      {
-        "type": "failing_checks",
-        "summary": "Required checks are failing",
-        "detectedAt": "2026-07-04T01:49:36.163Z"
-      }
-    ],
+    "updatedAt": "2026-07-04T14:48:46.977Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2327",
     "reviewedAtCommit": "1ee1128f5ea549bf395737633866b6a68d01917a",
-    "lastVerifiedCommit": "1ee1128f5ea549bf395737633866b6a68d01917a",
-    "reviewRequestedAt": "2026-07-04T14:37:22.764Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        ".eslintrc.cjs",
-        ".pan/records/pan-2318.json",
-        ".pan/test/result.json",
-        "scripts/file-size-baseline.txt",
-        "src/cli/commands/cloister/api.ts",
-        "src/dashboard/frontend/src/components/EventRouter.test.tsx",
-        "src/dashboard/server/review-status.ts",
-        "src/dashboard/server/routes/__tests__/resources-agents-table.test.ts",
-        "src/dashboard/server/routes/resources.ts",
-        "src/dashboard/server/server.ts",
-        "src/dashboard/server/services/__tests__/event-loop-monitor.test.ts",
-        "src/dashboard/server/services/__tests__/issue-data-service.test.ts",
-        "src/dashboard/server/services/cloister-control-surface.ts",
-        "src/lib/__tests__/review-status-reconcile.test.ts",
-        "src/lib/config-yaml/defaults.ts",
-        "src/lib/config-yaml/merge.ts",
-        "src/lib/config-yaml/schema.ts",
-        "src/lib/overdeck/control-settings.ts",
-        "sync-sources/hooks/record-cost-event.js",
-        "sync-sources/hooks/record-cost-event.js.map",
-        "tests/unit/dashboard/cloister-control-surface.test.ts",
-        "tests/unit/dashboard/deacon-supervisor.test.ts",
-        "tests/unit/dashboard/internal-events-route.test.ts",
-        "tests/unit/dashboard/metrics-stuck-count.test.ts",
-        "tests/unit/dashboard/server/services/resource-discovery.test.ts",
-        "tests/unit/lib/cloister/deacon-event-client.test.ts",
-        "tests/unit/lib/overdeck/no-loss-matrix.ts"
-      ],
-      "declaredScopeUntouched": [
-        "eslint.config.js",
-        "src/dashboard/server/routes/agents.ts",
-        "src/lib/config-yaml.ts"
-      ],
-      "declaredScope": [
-        "eslint.config.js",
-        "src/cli/commands/cloister/brake.ts",
-        "src/cli/commands/cloister/start.ts",
-        "src/cli/commands/cloister/status.ts",
-        "src/cli/commands/cloister/stop.ts",
-        "src/dashboard/frontend/src/components/EventRouter.tsx",
-        "src/dashboard/server/deacon-main.ts",
-        "src/dashboard/server/http-helpers.ts",
-        "src/dashboard/server/main.ts",
-        "src/dashboard/server/routes/agents.ts",
-        "src/dashboard/server/routes/cloister.ts",
-        "src/dashboard/server/routes/internal-events.ts",
-        "src/dashboard/server/routes/issues.ts",
-        "src/dashboard/server/routes/metrics.ts",
-        "src/dashboard/server/routes/misc/deacon.ts",
-        "src/dashboard/server/services/deacon-supervisor.ts",
-        "src/dashboard/server/services/event-loop-monitor.ts",
-        "src/dashboard/server/services/issue-data-service.ts",
-        "src/dashboard/server/services/resource-discovery.ts",
-        "src/dashboard/server/tsdown.config.ts",
-        "src/lib/cloister/deacon-event-client.ts",
-        "src/lib/cloister/deacon.ts",
-        "src/lib/cloister/flywheel.ts",
-        "src/lib/cloister/service.ts",
-        "src/lib/config-yaml.ts",
-        "src/lib/overdeck/process-services.ts",
-        "src/lib/review-status.ts"
-      ],
-      "actualChangedFiles": [
-        ".eslintrc.cjs",
-        ".pan/records/pan-2318.json",
-        ".pan/test/result.json",
-        "scripts/file-size-baseline.txt",
-        "src/cli/commands/cloister/api.ts",
-        "src/cli/commands/cloister/brake.ts",
-        "src/cli/commands/cloister/start.ts",
-        "src/cli/commands/cloister/status.ts",
-        "src/cli/commands/cloister/stop.ts",
-        "src/dashboard/frontend/src/components/EventRouter.test.tsx",
-        "src/dashboard/frontend/src/components/EventRouter.tsx",
-        "src/dashboard/server/deacon-main.ts",
-        "src/dashboard/server/http-helpers.ts",
-        "src/dashboard/server/main.ts",
-        "src/dashboard/server/review-status.ts",
-        "src/dashboard/server/routes/__tests__/resources-agents-table.test.ts",
-        "src/dashboard/server/routes/cloister.ts",
-        "src/dashboard/server/routes/internal-events.ts",
-        "src/dashboard/server/routes/issues.ts",
-        "src/dashboard/server/routes/metrics.ts",
-        "src/dashboard/server/routes/misc/deacon.ts",
-        "src/dashboard/server/routes/resources.ts",
-        "src/dashboard/server/server.ts",
-        "src/dashboard/server/services/__tests__/event-loop-monitor.test.ts",
-        "src/dashboard/server/services/__tests__/issue-data-service.test.ts",
-        "src/dashboard/server/services/cloister-control-surface.ts",
-        "src/dashboard/server/services/deacon-supervisor.ts",
-        "src/dashboard/server/services/event-loop-monitor.ts",
-        "src/dashboard/server/services/issue-data-service.ts",
-        "src/dashboard/server/services/resource-discovery.ts",
-        "src/dashboard/server/tsdown.config.ts",
-        "src/lib/__tests__/review-status-reconcile.test.ts",
-        "src/lib/cloister/deacon-event-client.ts",
-        "src/lib/cloister/deacon.ts",
-        "src/lib/cloister/flywheel.ts",
-        "src/lib/cloister/service.ts",
-        "src/lib/config-yaml/defaults.ts",
-        "src/lib/config-yaml/merge.ts",
-        "src/lib/config-yaml/schema.ts",
-        "src/lib/overdeck/control-settings.ts",
-        "src/lib/overdeck/process-services.ts",
-        "src/lib/review-status.ts",
-        "sync-sources/hooks/record-cost-event.js",
-        "sync-sources/hooks/record-cost-event.js.map",
-        "tests/unit/dashboard/cloister-control-surface.test.ts",
-        "tests/unit/dashboard/deacon-supervisor.test.ts",
-        "tests/unit/dashboard/internal-events-route.test.ts",
-        "tests/unit/dashboard/metrics-stuck-count.test.ts",
-        "tests/unit/dashboard/server/services/resource-discovery.test.ts",
-        "tests/unit/lib/cloister/deacon-event-client.test.ts",
-        "tests/unit/lib/overdeck/no-loss-matrix.ts"
-      ],
-      "recordedAt": "2026-07-04T14:36:37.246Z"
-    }
+    "lastVerifiedCommit": "1ee1128f5ea549bf395737633866b6a68d01917a"
   },
   "closeOut": {
     "usage": {
@@ -373,9 +243,9 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 729853,
-            "output": 21962,
-            "cacheRead": 8859392,
+            "input": 787183,
+            "output": 32684,
+            "cacheRead": 11681536,
             "cacheWrite": 0
           }
         }
@@ -400,15 +270,15 @@
           "cacheWrite": 160275
         },
         "custom/kimi-k2.7-code": {
-          "input": 729853,
-          "output": 21962,
-          "cacheRead": 8859392,
+          "input": 787183,
+          "output": 32684,
+          "cacheRead": 11681536,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 9.928067,
-        "pricingAsOf": "2026-07-04T14:43:24.650Z"
+        "usd": 10.561627,
+        "pricingAsOf": "2026-07-04T14:48:46.993Z"
       }
     },
     "merges": [
@@ -417,5 +287,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-04T14:07:04.245Z",
-  "updated": "2026-07-04T14:43:24.651Z"
+  "updated": "2026-07-04T14:48:47.003Z"
 }
