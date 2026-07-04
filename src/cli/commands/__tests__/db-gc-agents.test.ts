@@ -50,12 +50,29 @@ describe('pan admin db gc-agents', () => {
     `).run(id, stage, Date.now());
   }
 
-  function seedAgent(id: string, issueId: string, role: string, status: string): void {
+  function seedAgent(
+    id: string,
+    issueId: string,
+    role: string,
+    status: string,
+    flags: { paused?: boolean; troubled?: boolean } = {},
+  ): void {
     mkdirSync(join(testHome, 'agents', id), { recursive: true });
     getOverdeckDatabaseSync().prepare(`
-      INSERT INTO agents (id, issue_id, role, status, workspace, harness, model, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, issueId, role, status, `/workspaces/${id}`, 'claude-code', 'claude', Date.now());
+      INSERT INTO agents (id, issue_id, role, status, workspace, harness, model, paused, troubled, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      issueId,
+      role,
+      status,
+      `/workspaces/${id}`,
+      'claude-code',
+      'claude',
+      flags.paused ? 1 : 0,
+      flags.troubled ? 1 : 0,
+      Date.now(),
+    );
   }
 
   function seedFixture(): void {
@@ -64,6 +81,8 @@ describe('pan admin db gc-agents', () => {
     seedIssue('PAN-OPEN', 'working');
     seedAgent('agent-terminal-1', 'PAN-TERM', 'work', 'stopped');
     seedAgent('agent-terminal-2', 'PAN-CANCELLED', 'work', 'stopped');
+    seedAgent('agent-paused-terminal', 'PAN-TERM', 'work', 'stopped', { paused: true });
+    seedAgent('agent-troubled-terminal', 'PAN-TERM', 'work', 'stopped', { troubled: true });
     seedAgent('agent-running-terminal', 'PAN-TERM', 'work', 'running');
     seedAgent('agent-open', 'PAN-OPEN', 'work', 'stopped');
     seedAgent('agent-review-terminal', 'PAN-TERM', 'review', 'stopped');
@@ -79,10 +98,12 @@ describe('pan admin db gc-agents', () => {
     expect(logs.join('\n')).toContain('agent-terminal-2');
     expect(listAllAgentsSync().map((agent) => agent.id).sort()).toEqual([
       'agent-open',
+      'agent-paused-terminal',
       'agent-review-terminal',
       'agent-running-terminal',
       'agent-terminal-1',
       'agent-terminal-2',
+      'agent-troubled-terminal',
     ]);
     expect(existsSync(join(testHome, 'agents', 'agent-terminal-1'))).toBe(true);
     expect(existsSync(join(testHome, 'agents', 'agent-terminal-2'))).toBe(true);
@@ -96,11 +117,15 @@ describe('pan admin db gc-agents', () => {
     expect(logs.join('\n')).toContain('Reaped 2 agent(s).');
     expect(listAllAgentsSync().map((agent) => agent.id).sort()).toEqual([
       'agent-open',
+      'agent-paused-terminal',
       'agent-review-terminal',
       'agent-running-terminal',
+      'agent-troubled-terminal',
     ]);
     expect(existsSync(join(testHome, 'agents', 'agent-terminal-1'))).toBe(false);
     expect(existsSync(join(testHome, 'agents', 'agent-terminal-2'))).toBe(false);
+    expect(existsSync(join(testHome, 'agents', 'agent-paused-terminal'))).toBe(true);
+    expect(existsSync(join(testHome, 'agents', 'agent-troubled-terminal'))).toBe(true);
     expect(existsSync(join(testHome, 'agents', 'agent-running-terminal'))).toBe(true);
     expect(existsSync(join(testHome, 'agents', 'agent-open'))).toBe(true);
     expect(existsSync(join(testHome, 'agents', 'agent-review-terminal'))).toBe(true);

@@ -141,6 +141,8 @@ async function gcAgentsCommand(options: { dryRun?: boolean }): Promise<void> {
     .filter((agent) =>
       agent.role === 'work'
       && agent.status === 'stopped'
+      && agent.paused !== true
+      && agent.troubled !== true
       && isTerminalIssueStage(getIssueStageSync(agent.issueId)),
     );
   const ids = candidates.map((agent) => agent.id);
