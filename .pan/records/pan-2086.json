@@ -164,47 +164,40 @@
       "reason": "feedback",
       "note": "[2026-07-04T14:02Z] verification-gate → FAILED — seq 3",
       "timestamp": "2026-07-04T14:02:39.978Z"
-    }
-  ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-03T17:02:14Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2086\n\nstartup sync gate still misses the top-level skills mirror input\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2086 -m \"Fixed review issues\"`"
     },
     {
-      "seq": 3,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-03T17:08:20Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2086\n\nstartup sync gate still misses the top-level skills mirror input\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2086 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T14:20:04.782Z"
     },
     {
-      "seq": 3,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-07-04T14:02:39Z",
-      "markdownBody": "VERIFICATION FAILED for PAN-2086 (attempt 1/3):\n\nFailed check: sync-target-branch\n\nSync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - .pan/test/result.json\n\n## REQUIRED: Resolve merge conflicts BEFORE resubmitting\n\n1. Run: `git fetch origin main && git merge origin/main`\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request PAN-2086 -m \"Fixed sync-target-branch\"\n\nDo NOT resubmit until all repos sync cleanly and tests pass."
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T15:32:21.408Z"
     }
   ],
+  "feedback": [],
   "created": "2026-06-27T03:24:50.930Z",
-  "updated": "2026-07-04T14:02:39.998Z",
+  "updated": "2026-07-04T16:06:50.033Z",
   "pipeline": {
     "issueId": "PAN-2086",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "verificationStatus": "failed",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T14:02:39.971Z",
-    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - .pan/test/result.json",
-    "inspectNotes": "Bead workspace-h51bn PASS. Implements Task 1 Step 1 (profile via time/timeAsync helpers + [sync-timing] summary) and Step 2 (content-hash gate: isStartupSyncNeededSync + writeSyncManifestSync at ~/.overdeck/.sync-manifest.json). Hash covers SYNC_SOURCES tree + global.md + per-project project.md + devMode + cwd; missing input falls back to needed=true (conservative). 6 unit tests cover all gate branches. Manual pan sync / pan sync --force behavior unchanged. Follow-up bead expected to wire the gate into the deferred startup spawn in src/cli/index.ts and add the --if-changed flag per the Task 1 guardrail.",
+    "updatedAt": "2026-07-04T16:06:49.731Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-07-04T16:03:36.436Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2313",
-    "lastVerifiedCommit": "ea6362b3792ce4cca9b981289534294734593d09",
-    "reviewRequestedAt": "2026-07-03T16:57:20.281Z"
+    "reviewedAtCommit": "41dfb8f8e74d5bccb80f1cbae6e47432943ff579",
+    "lastVerifiedCommit": "41dfb8f8e74d5bccb80f1cbae6e47432943ff579"
   },
   "closeOut": {
     "usage": {
@@ -290,7 +283,7 @@
       },
       "costAtCloseOut": {
         "usd": 32.61695,
-        "pricingAsOf": "2026-07-04T14:02:39.997Z"
+        "pricingAsOf": "2026-07-04T16:06:49.995Z"
       }
     },
     "merges": [
