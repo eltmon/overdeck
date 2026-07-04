@@ -1,25 +1,34 @@
 {
   "issueId": "PAN-2357",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-04T18:57:09.496Z",
+      "reason": "end",
+      "note": "Skipped full npm test: known hung real-timer suite per operator direction; stopped hung run after broad unrelated failures. No deviations from requested scoped verification. Delivered durable git-based slot completion recovery and all-complete swarm issue-level review finalization. Verified scoped swarm/slot tests, typecheck, and lint."
+    }
+  ],
   "feedback": [],
   "created": "2026-07-04T18:19:57.401Z",
-  "updated": "2026-07-04T18:56:54.017Z",
+  "updated": "2026-07-04T18:57:41.566Z",
   "pipeline": {
     "issueId": "PAN-2357",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T18:38:12.022Z"
+    "updatedAt": "2026-07-04T18:57:41.484Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2361",
+    "reviewRequestedAt": "2026-07-04T18:57:09.498Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 676,
-            "output": 126,
+            "input": 10811,
+            "output": 519,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -27,18 +36,20 @@
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 676,
-          "output": 126,
+          "input": 10811,
+          "output": 519,
           "cacheRead": 0,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-04T18:38:12.044Z"
+        "pricingAsOf": "2026-07-04T18:57:41.566Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2361"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
