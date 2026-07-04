@@ -119,7 +119,8 @@ const postBootReconciliationDecisionRoute = HttpRouter.add(
       ? parsePerAgentMap(body.perAgent)
       : {};
     setBootReconciliationDecision(body.decision, perAgent);
-    const resumed = yield* Effect.promise(() => applyBootReconciliationDecision());
+    const result = yield* Effect.promise(() => applyBootReconciliationDecision());
+    const resumed = result.resumed;
     return jsonResponse({ ok: true, decision: body.decision, perAgent, resumed, count: resumed.length });
   })),
 );

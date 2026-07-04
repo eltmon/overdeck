@@ -47,6 +47,24 @@ export interface AutoResumeNotifierDeps {
   notifyAgentStatusChanged: (state: AgentState, previousStatus?: AgentState['status'], hasLiveTmuxSession?: boolean) => void;
 }
 
+export type BootReconciliationOutcomeReason =
+  | 'resumed'
+  | 'no-resumable-session'
+  | 'deferred-concurrency'
+  | 'deferred-load';
+
+export interface BootReconciliationOutcome {
+  id: string;
+  issueId: string;
+  outcome: 'resumed' | 'skipped';
+  reason: BootReconciliationOutcomeReason;
+}
+
+export interface BootReconciliationApplyResult {
+  resumed: string[];
+  outcomes: BootReconciliationOutcome[];
+}
+
 const orphanFailureRecordedForAutoResume = new Set<string>();
 const appliedBootReconciliationDecisions = new Set<string>();
 
@@ -891,19 +909,19 @@ function bootReconciliationDecisionKey(): string | null {
 
 export async function applyBootReconciliationDecision(
   deps: AutoResumeNotifierDeps,
-): Promise<string[]> {
+): Promise<BootReconciliationApplyResult> {
   const decisionKey = bootReconciliationDecisionKey();
-  if (!decisionKey) return [];
+  if (!decisionKey) return { resumed: [], outcomes: [] };
   if (appliedBootReconciliationDecisions.has(decisionKey)) {
     logDeaconEventSync('applyBootReconciliationDecision: decision already applied');
-    return [];
+    return { resumed: [], outcomes: [] };
   }
 
   const state = getBootReconciliationState();
   if (state.decision === 'hold_all') {
     appliedBootReconciliationDecisions.add(decisionKey);
     logDeaconEventSync('applyBootReconciliationDecision: hold_all — no agents resumed');
-    return [];
+    return { resumed: [], outcomes: [] };
   }
 
   let candidates = listBootReconciliationCandidates();
@@ -912,6 +930,7 @@ export async function applyBootReconciliationDecision(
   }
 
   const resumed: string[] = [];
+  const outcomes: BootReconciliationOutcome[] = [];
   let resumeAttempts = 0;
   const concurrencyLimits = getConcurrencyLimits();
   const runningBefore = countRunningAgents();
@@ -919,14 +938,31 @@ export async function applyBootReconciliationDecision(
   const cores = cpus().length || 1;
   const loadCeiling = cores * RESUME_LOAD_FACTOR;
 
-  for (const agent of candidates) {
+  for (let index = 0; index < candidates.length; index++) {
+    const agent = candidates[index];
     if (resumeAttempts >= workSlots) {
       logDeaconEventSync(`applyBootReconciliationDecision: work concurrency cap reached (running=${runningBefore.work}, max=${concurrencyLimits.maxWorkAgents}, slots=${workSlots}); deferring remaining candidates`);
+      for (const remaining of candidates.slice(index)) {
+        outcomes.push({
+          id: remaining.id,
+          issueId: remaining.issueId,
+          outcome: 'skipped',
+          reason: 'deferred-concurrency',
+        });
+      }
       break;
     }
     const load1 = loadavg()[0];
     if (load1 > loadCeiling) {
       logDeaconEventSync(`applyBootReconciliationDecision: load gate tripped (load1=${load1.toFixed(2)} > ${loadCeiling.toFixed(2)} = ${cores} cores * ${RESUME_LOAD_FACTOR}); deferring remaining candidates`);
+      for (const remaining of candidates.slice(index)) {
+        outcomes.push({
+          id: remaining.id,
+          issueId: remaining.issueId,
+          outcome: 'skipped',
+          reason: 'deferred-load',
+        });
+      }
       break;
     }
     if (resumeAttempts > 0) {
@@ -940,13 +976,26 @@ export async function applyBootReconciliationDecision(
     );
     if (result) {
       resumed.push(result);
+      outcomes.push({
+        id: agent.id,
+        issueId: agent.issueId,
+        outcome: 'resumed',
+        reason: 'resumed',
+      });
       resumeAttempts++;
+    } else {
+      outcomes.push({
+        id: agent.id,
+        issueId: agent.issueId,
+        outcome: 'skipped',
+        reason: 'no-resumable-session',
+      });
     }
   }
 
   appliedBootReconciliationDecisions.add(decisionKey);
   logDeaconEventSync(`applyBootReconciliationDecision: decision=${state.decision} resumed ${resumed.length} agent(s)`);
-  return resumed;
+  return { resumed, outcomes };
 }
 
 /**

@@ -533,10 +533,65 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
     const first = await applyBootReconciliationDecision();
     const second = await applyBootReconciliationDecision();
 
-    expect(first).toEqual(['agent-pan-871']);
-    expect(second).toEqual([]);
+    expect(first.resumed).toEqual(['agent-pan-871']);
+    expect(first.outcomes).toEqual([
+      {
+        id: 'agent-pan-871',
+        issueId: 'PAN-871',
+        outcome: 'resumed',
+        reason: 'resumed',
+      },
+    ]);
+    expect(second).toEqual({ resumed: [], outcomes: [] });
     expect(mockResumeAgent).toHaveBeenCalledTimes(1);
     expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-871');
+  });
+
+  it('reports skipped outcomes when boot reconciliation candidates have no resumable session', async () => {
+    vi.mocked(listAllAgentsSync).mockReturnValue([
+      { id: 'agent-pan-871', issueId: 'PAN-871', status: 'stopped', role: 'work' },
+      { id: 'agent-pan-872', issueId: 'PAN-872', status: 'stopped', role: 'work' },
+    ] as any);
+    mockResumeAgent.mockResolvedValue({ success: false } as any);
+    mockGetAgentState.mockImplementation((agentId: string) => ({
+      id: agentId,
+      issueId: agentId === 'agent-pan-872' ? 'PAN-872' : 'PAN-871',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'stopped',
+      startedAt: new Date().toISOString(),
+    }));
+    appSettingsMocks.getBootReconciliationState.mockReturnValue({
+      decision: 'resume_all',
+      perAgent: {},
+      decidedAt: '2026-06-29T15:00:30.000Z',
+      bootId: 'boot-pan-2076-unresumable',
+      bootStartedAt: '2026-06-29T15:00:00.000Z',
+      graceDeadline: '2026-06-29T15:00:30.000Z',
+    });
+
+    const result = await applyBootReconciliationDecision();
+
+    expect(result).toEqual({
+      resumed: [],
+      outcomes: [
+        {
+          id: 'agent-pan-871',
+          issueId: 'PAN-871',
+          outcome: 'skipped',
+          reason: 'no-resumable-session',
+        },
+        {
+          id: 'agent-pan-872',
+          issueId: 'PAN-872',
+          outcome: 'skipped',
+          reason: 'no-resumable-session',
+        },
+      ],
+    });
+    expect(mockResumeAgent).toHaveBeenCalledTimes(2);
   });
 
   it('applies per_agent by resuming only issueIds marked resume', async () => {
@@ -563,9 +618,17 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
       graceDeadline: '2026-06-29T15:00:30.000Z',
     });
 
-    const resumed = await applyBootReconciliationDecision();
+    const result = await applyBootReconciliationDecision();
 
-    expect(resumed).toEqual(['agent-pan-872']);
+    expect(result.resumed).toEqual(['agent-pan-872']);
+    expect(result.outcomes).toEqual([
+      {
+        id: 'agent-pan-872',
+        issueId: 'PAN-872',
+        outcome: 'resumed',
+        reason: 'resumed',
+      },
+    ]);
     expect(mockResumeAgent).toHaveBeenCalledTimes(1);
     expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-872');
   });
