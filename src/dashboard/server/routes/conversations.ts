@@ -17,7 +17,7 @@ import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, BYPASS_P
 
 import { randomUUID } from 'node:crypto';
 import { exec, execFile, spawn } from 'node:child_process';
-import { existsSync, createReadStream, readFileSync } from 'node:fs';
+import { existsSync, createReadStream } from 'node:fs';
 import { mkdir, writeFile, readFile, stat, realpath, rename, rm, readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { extname, join, resolve } from 'node:path';
@@ -1179,7 +1179,7 @@ export async function handleConversationMessage(
   if (isPiControlChannelHarness(harness)) {
     await deliverConversationViaControlChannel(conv, deliveredMessage, {
       source: 'operator',
-      deliverAs: pickDeliverAs(conv, body['deliverAs']),
+      deliverAs: pickDeliverAs(body['deliverAs']),
     });
   } else {
     // PAN-1635/PAN-1769: capture the transcript offset BEFORE delivery so the
@@ -1304,30 +1304,15 @@ function parseThinkingLevel(value: unknown): ThinkingLevel | null {
     : null;
 }
 
-function isConversationMidTurn(conv: Pick<Conversation, 'tmuxSession'>): boolean {
-  const heartbeatPath = join(getOverdeckHome(), 'heartbeats', `${conv.tmuxSession}.json`);
-  if (!existsSync(heartbeatPath)) return false;
-  try {
-    const heartbeat = JSON.parse(readFileSync(heartbeatPath, 'utf8')) as {
-      timestamp?: string
-      last_action?: string
-    };
-    if (!heartbeat.timestamp) return false;
-    const ageMs = Date.now() - new Date(heartbeat.timestamp).getTime();
-    if (!Number.isFinite(ageMs) || ageMs > 60_000) return false;
-    return heartbeat.last_action !== 'turn_end';
-  } catch {
-    return false;
-  }
-}
-
-export function pickDeliverAs(
-  conv: Pick<Conversation, 'tmuxSession'>,
-  bodyDeliverAs: unknown,
-): ConversationControlDeliverAs {
+export function pickDeliverAs(bodyDeliverAs: unknown): ConversationControlDeliverAs {
   if (bodyDeliverAs === 'follow_up') return 'follow_up';
-  if (bodyDeliverAs === 'steer') return 'steer';
-  return isConversationMidTurn(conv) ? 'steer' : 'prompt';
+  // Default to steer, never a bare prompt: Pi delivers steer immediately when
+  // idle and queues it when a run is active, whereas a bare prompt is rejected
+  // mid-turn with AgentBusyError — and Pi's extension-side sendUserMessage
+  // wrapper swallows that rejection, so the message would be silently lost.
+  // Heartbeat-based busy detection is not viable: heartbeats are only written
+  // at tool-end/turn-end, so a thinking model always looks idle.
+  return 'steer';
 }
 
 export async function sendConversationControlCommand(

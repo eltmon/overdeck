@@ -332,7 +332,7 @@ These gates are orthogonal to the global Deacon freeze in SQLite
 Agent and pipeline state is split into three planes. Do not read or write the wrong one.
 
 1. **Permanent plane — git infra repo.** Durable per-issue records under `.pan/<recordsPath>/<issue>.json` containing the continue subset (`decisions`, `hazards`, `feedback`), the `pipeline` verdict block, `closeOut` (usage, merges, ranOn), and the `owner` URI lease. Specs and project-side continues live here too. Portable across machines.
-2. **Runtime plane — local SQLite `~/.overdeck/panopticon.db`.** The `agents` table is the authoritative runtime registry; `review_status` holds ephemeral columns; `events` is the lifecycle event log. Rebuildable from git + tmux.
+2. **Runtime plane — local SQLite `~/.overdeck/overdeck.db`.** The `agents` table is the authoritative runtime registry; `review_status` holds ephemeral columns; `events` is the lifecycle event log. Rebuildable from git + tmux.
 3. **Liveness oracle — tmux on socket `-L overdeck`.** Ground truth for whether an agent process is actually running.
 
 Key rules:

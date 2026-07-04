@@ -138,6 +138,28 @@ describe('hasBeadsTasks', () => {
     expect(childProcessMocks.execFile).toHaveBeenCalledTimes(2);
   });
 
+  it('uses the longer pan-start retry budget by default', async () => {
+    vi.useFakeTimers();
+    let attempts = 0;
+    childProcessMocks.execFile.mockImplementation((_file: string, _args: string[], _options: unknown, callback: Function) => {
+      attempts += 1;
+      if (attempts < 12) {
+        callback(new Error('database is locked'), '', 'database is locked');
+        return;
+      }
+      callback(null, { stdout: JSON.stringify([{ id: 'overdeck-12' }]) }, '');
+    });
+    const { countBeadsTasksDetailedWithRetry } = await import('../../../../src/cli/commands/start.js');
+
+    await expect(countBeadsTasksDetailedWithRetry(tmpDir, 'PAN-1094', {
+      initialDelayMs: 100,
+      maxDelayMs: 100,
+      random: () => 0,
+      sleep: (ms) => vi.advanceTimersByTimeAsync(ms),
+    })).resolves.toMatchObject({ count: 1, source: 'bd' });
+    expect(childProcessMocks.execFile).toHaveBeenCalledTimes(12);
+  });
+
   // SKIPPED — structurally flaky under CI parallel-worker load; red-gated the
   // v0.30.0 release (run 27969902569, the sole failure: 1/7189). Passes
   // reliably in isolation locally but intermittently fails in CI.

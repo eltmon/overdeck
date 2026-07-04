@@ -251,4 +251,19 @@ describe('bd process lock', () => {
     await expect(resultPromise).rejects.toBeInstanceOf(BdTransientFailure);
     expect(operation).toHaveBeenCalledTimes(2);
   });
+
+  it('carries lock holder details through exhausted retry failures', async () => {
+    const path = await lockPath();
+    writeLock(path, { pid: process.pid, ts: Date.now(), caller: 'long bd list' });
+
+    await expect(runBdWithRetry('blocked start gate', async () => 'never', {
+      workspacePath,
+      maxAttempts: 1,
+      acquisitionTimeoutMs: 0,
+    })).rejects.toMatchObject({
+      attempts: 1,
+      holder: expect.objectContaining({ pid: process.pid, caller: 'long bd list' }),
+      cause: expect.any(BdProcessLockError),
+    });
+  });
 });

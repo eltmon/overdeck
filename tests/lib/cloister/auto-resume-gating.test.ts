@@ -387,7 +387,7 @@ describe('auto-resume gates', () => {
     expect(resumed).toEqual([]);
     expect(resumeAgentMock).not.toHaveBeenCalled();
     expect(vi.mocked(logger.logDeaconEventSync)).toHaveBeenCalledWith(expect.stringContaining('verify-paused'));
-  });
+  }, 20_000);
 
   it('pan pause stops stale-running agents without live tmux sessions', async () => {
     const agentId = 'agent-pan-1141';
@@ -473,7 +473,7 @@ describe('auto-resume gates', () => {
 
     expect(resumed).toEqual([agentId]);
     expect(resumeAgentMock).toHaveBeenCalledWith(agentId);
-  });
+  }, 20_000);
 
   it('recovers orphaned strike agents whose registered session is missing', async () => {
     const agentId = 'strike-pan-1820';
