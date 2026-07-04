@@ -85,20 +85,19 @@
     "recordedAt": "2026-07-04T01:45:21.352Z"
   },
   "created": "2026-07-03T21:17:15.683Z",
-  "updated": "2026-07-04T14:35:48.153Z",
+  "updated": "2026-07-04T14:48:44.991Z",
   "pipeline": {
     "issueId": "PAN-2325",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "passed",
-    "mergeStatus": "merging",
+    "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T14:35:27.113Z",
+    "updatedAt": "2026-07-04T14:48:44.561Z",
     "reviewNotes": "Review passed; .pan/test artifact is untracked, ignored, and covered by reusable gitignore writer",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2328",
-    "reviewedAtCommit": "7108f2c3626149916a1266196c0f2d0d7cdfbb74",
-    "lastVerifiedCommit": "7108f2c3626149916a1266196c0f2d0d7cdfbb74",
+    "lastVerifiedCommit": "02ffd35dd813700832e926f25228586e8b5331c8",
     "reviewRequestedAt": "2026-07-04T01:45:27.231Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -175,7 +174,7 @@
       },
       "costAtCloseOut": {
         "usd": 2.688262,
-        "pricingAsOf": "2026-07-04T14:35:27.167Z"
+        "pricingAsOf": "2026-07-04T14:48:44.938Z"
       }
     },
     "merges": [
