@@ -1,6 +1,13 @@
 {
   "issueId": "PAN-2318",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T14:24:30.602Z"
+    }
+  ],
   "feedback": [],
   "harness": "codex",
   "model": "gpt-5.5",
@@ -58,14 +65,14 @@
   "pipeline": {
     "issueId": "PAN-2318",
     "reviewStatus": "passed",
-    "testStatus": "failed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T14:07:12.670Z",
+    "updatedAt": "2026-07-04T14:26:17.605Z",
     "reviewNotes": "Review passed; only pipeline record changed since prior approval",
-    "testNotes": "no-loss matrix test fails for new internal-events routes",
+    "testNotes": "Fixed the no-loss matrix blocker by adding explicit entries for POST /api/internal/events, GET /api/internal/events/latest, and GET /api/internal/events/stream. Verified with npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts and npx vitest run tests/unit/dashboard/internal-events-route.test.ts tests/unit/lib/cloister/deacon-event-client.test.ts.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "blockerReasons": [
       {
@@ -107,9 +114,9 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 492131,
-            "output": 13301,
-            "cacheRead": 5762560,
+            "input": 492793,
+            "output": 13679,
+            "cacheRead": 5991424,
             "cacheWrite": 0
           }
         }
@@ -134,15 +141,15 @@
           "cacheWrite": 160275
         },
         "custom/kimi-k2.7-code": {
-          "input": 492131,
-          "output": 13301,
-          "cacheRead": 5762560,
+          "input": 492793,
+          "output": 13679,
+          "cacheRead": 5991424,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 9.079186,
-        "pricingAsOf": "2026-07-04T14:07:12.717Z"
+        "usd": 9.124812,
+        "pricingAsOf": "2026-07-04T14:26:17.911Z"
       }
     },
     "merges": [
@@ -151,12 +158,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-04T14:07:04.245Z",
-  "updated": "2026-07-04T14:24:30.604Z",
-  "sessionHistory": [
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-04T14:24:30.602Z"
-    }
-  ]
+  "updated": "2026-07-04T14:26:17.922Z"
 }
