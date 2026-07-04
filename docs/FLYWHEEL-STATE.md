@@ -461,3 +461,17 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
   - ⏸️ MIN-831 (MYN) — held by project auto-merge-default=hold; operator handling MYN separately
 - **Zombie cleanup:** stuck auto-merge entries id 11 (PAN-2174, since Jun30), id 12 (PAN-2325), id 15 (PAN-2318, should self-clear now PR merged) — clear as encountered.
 - **Substrate:** watchdog killed (no auto-recovery now); dashboard stable 22m, load 0.66. If dashboard crashes while away, restart manually (don't re-add aggressive watchdog). PAN-2318 fix is MERGED but NOT deployed — do NOT hot-patch the boot-path change onto live server while operator away; deploy+test is for their return + the release.
+
+## RUN-55 tick 5 (2026-07-04 ~16:15Z) — PAN-2318 DEPLOYED + verified; landing plan for the rest
+
+- **PAN-2318 DEPLOYED to live server** ✅ via `OVERDECK_NO_RESUME=1 pan restart --dashboard --health-timeout 180000` (boot gates: deacon=on, resume=off). Boot-tested new build on throwaway :3099 first (booted clean ~13s, no circular-ESM). **THE FIX WORKS:** live server at load 7.90 answered /api/health in 0.0007s — pre-2318 that load starved the loop into watchdog-"unreachable"; now instant. Deacon patrolling (reconcileAgentLiveness). deaconPid=None in status API (separate-process topology unconfirmed but functionally fine). No watchdog running (killed earlier; deploy did NOT re-add an aggressive one).
+- **LANDING STATUS after PAN-2318 merged (main=5f718b963d, CI green):**
+  - PAN-2086 (#2313): CLEAN (GitHub DIRTY was stale); CI (lint+test) re-running → merge when green.
+  - PAN-2311/2325/2338/1917: CONFLICTING but conflicts are TRIVIAL — only generated artifacts: `.pan/test/result.json` (the file PAN-2325 gitignores!) + `scripts/file-size-baseline.txt`. NO code conflicts.
+- **LANDING PLAN (methodical, gate each on prior CI green):**
+  1. Merge PAN-2086 when its CI goes green (clean).
+  2. Land PAN-2325 next — it gitignores `.pan/test/result.json`, removing that conflict source for 2338/1917. Resolve its artifact conflict (take main's file-size-baseline / regenerate).
+  3. Then 2338/1917/2311: only file-size-baseline conflicts left (trivial). Resolve (take main) + merge.
+  - Resolution mechanism: prefer driving each work agent (resume `pan start --force` → merge main → `git checkout origin/main -- <artifact>` → re-verify → pan done); artifacts are generated so no code judgment. Direct git-in-worktree is the faster fallback for pure-artifact conflicts.
+  - Moving-target caveat: each merge re-conflicts the artifact files on the others; re-resolve per merge. Landing PAN-2325 (gitignore) shrinks the problem.
+- **Then:** mid-pipeline (PAN-2294/2145/2257) to ready→merge; recover reboot-stranded swarm slots (1739/2194/2284). Goal: all merged, main green, ready for operator to test + tag major release.
