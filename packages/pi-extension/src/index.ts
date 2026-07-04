@@ -6,7 +6,7 @@
  */
 
 import { watch, type FSWatcher } from 'node:fs'
-import { appendFile, mkdir, open, readdir, readFile, stat, unlink, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, open, readdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { matchSpecialistCompletion, normalizeSpecialistCompletionName } from './specialist-completion-patterns.js'
@@ -785,9 +785,19 @@ export async function processControlCommandFile(
   ctx: unknown,
   file: string,
 ): Promise<void> {
+  // Claim the file by renaming it before reading. The directory watcher fires
+  // for creations, renames, AND deletions, so a second event for a file that
+  // has already been processed (and unlinked) is normal — losing the rename
+  // race means another invocation owns the command, not an error.
+  const claimed = `${file}.claimed`
+  try {
+    await rename(file, claimed)
+  } catch {
+    return
+  }
   let idForAck: string | null = null
   try {
-    const raw = await readFile(file, 'utf8')
+    const raw = await readFile(claimed, 'utf8')
     const parsed = JSON.parse(raw) as unknown
     if (!isControlCommand(parsed)) {
       console.warn(`[overdeck-pi-extension] malformed control command ignored: ${file}`)
@@ -802,7 +812,7 @@ export async function processControlCommandFile(
       await postControlAck(env, { id: idForAck, ok: false, error: err instanceof Error ? err.message : String(err) })
     }
   } finally {
-    await unlink(file).catch(() => {})
+    await unlink(claimed).catch(() => {})
   }
 }
 
@@ -814,6 +824,12 @@ export async function drainConversationControlCommands(
   const paths = overdeckPathsFor(env.agentId, env.home)
   await mkdir(paths.controlDir, { recursive: true, mode: 0o700 })
   const entries = await readdir(paths.controlDir).catch(() => [])
+  for (const entry of entries.filter((name) => name.endsWith('.claimed')).sort()) {
+    // Leftover claim from a session that died mid-processing. The server's
+    // ack timeout already surfaced the failure, and the command may or may
+    // not have been dispatched — never re-deliver, just clean up.
+    await unlink(join(paths.controlDir, entry)).catch(() => {})
+  }
   for (const entry of entries.filter((name) => name.endsWith('.json')).sort()) {
     await processControlCommandFile(env, pi, ctx, join(paths.controlDir, entry))
   }

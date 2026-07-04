@@ -411,15 +411,24 @@ export async function deliverInitialPromptWithRetry(
   // deliver a SHORT pointer instead (robust regardless of transport — the same
   // pattern that makes file-backed handoffs reliable). Only codex needs this;
   // claude-code/pi line-based input handle the full prompt fine.
+  //
+  // PAN-2330: keep the workspace-level .pan/kickoff.md owned by the work/strike
+  // agent. Review, test, planning, flywheel, and other role prompts can share
+  // the same workspace; writing those prompts to .pan/kickoff.md overwrites the
+  // work agent's brief and a later resume can make it read the wrong task.
   let deliveredPrompt = prompt;
   let state = await getState(agentId);
   try {
-    if (state?.harness && getHarnessBehavior(state.harness).usesCodexHome && state.workspace) {
-      const kickoffPath = join(state.workspace, '.pan', 'kickoff.md');
+    if (state?.harness && getHarnessBehavior(state.harness).usesCodexHome) {
+      const ownsWorkspaceKickoff = state.workspace && (state.role === 'work' || state.role === 'strike');
+      const kickoffPath = ownsWorkspaceKickoff
+        ? join(state.workspace, '.pan', 'kickoff.md')
+        : join(getAgentDir(normalizedId), 'kickoff.md');
+      const displayPath = ownsWorkspaceKickoff ? '`.pan/kickoff.md`' : `\`${kickoffPath}\``;
       mkdirSync(dirname(kickoffPath), { recursive: true });
       writeFileSync(kickoffPath, prompt, 'utf-8');
       deliveredPrompt =
-        'Your complete task brief has been written to `.pan/kickoff.md` in this workspace. '
+        `Your complete task brief has been written to ${displayPath}. `
         + 'Read that file in full now and execute it exactly — it is your full set of work '
         + 'instructions. Begin immediately and keep working autonomously until done; do not '
         + 'wait for further input.';

@@ -16,10 +16,10 @@
  */
 
 import { existsSync, readFileSync, writeFileSync, unlinkSync, openSync, closeSync, readdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { spawn } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import SmeeClient from 'smee-client';
 import { Effect } from 'effect';
 import { loadConfigSync } from './config.js';
@@ -31,6 +31,7 @@ const SMEE_LOG_PATH = join(homedir(), '.overdeck', 'logs', 'smee.log');
 const MAX_RESTART_ATTEMPTS = 5;
 const BASE_RESTART_DELAY_MS = 1_000;
 const MAX_RESTART_DELAY_MS = 30_000;
+const require = createRequire(import.meta.url);
 
 let activeClient: SmeeClient | null = null;
 let restartTimeout: NodeJS.Timeout | null = null;
@@ -44,6 +45,10 @@ function getSmeeUrl(): string | null {
   } catch {
     return null;
   }
+}
+
+export function isSmeeConfiguredSync(): boolean {
+  return getSmeeUrl() !== null;
 }
 
 function getWebhookTarget(): string {
@@ -145,8 +150,7 @@ export function isSmeeRunningSync(): boolean {
 // ─── CLI process mode (detached subprocess) ──────────────────────────────────
 
 function getSmeeBinaryPath(): string {
-  const moduleDir = dirname(fileURLToPath(import.meta.url));
-  return join(moduleDir, '..', '..', 'node_modules', 'smee-client', 'bin', 'smee.js');
+  return require.resolve('smee-client/bin/smee.js');
 }
 
 function isProcessAlive(pid: number): boolean {

@@ -62,6 +62,7 @@ import { getOverdeckDatabasePath } from '../../lib/overdeck/paths.js';
 import { ProjectsLive } from '../../lib/overdeck/config.js';
 import { RecordsLive, TmuxLive } from '../../lib/overdeck/infra.js';
 import { getAgentSessionsSync } from '../../lib/tmux.js';
+import { isSmeeConfiguredSync, startSmeeProcessSync } from '../../lib/smee.js';
 
 declare const Bun: unknown;
 
@@ -476,6 +477,20 @@ void (async () => {
 // Start CLIProxy watchdog — auto-restarts the sidecar if it crashes
 startCliproxyWatchdog();
 console.log('[overdeck] CLIProxy watchdog started (30s interval)');
+
+if (isPeerDashboard) {
+  console.log('[overdeck] smee-client webhook relay skipped — peer dashboard (OVERDECK_DISABLE_DEACON=1)');
+} else if (isSmeeConfiguredSync()) {
+  try {
+    startSmeeProcessSync();
+    console.log('[overdeck] smee-client webhook relay ensured');
+  } catch (err) {
+    console.warn('[overdeck] Failed to ensure smee-client webhook relay:', err instanceof Error ? err.message : String(err));
+    emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Failed to ensure smee-client webhook relay: ${err instanceof Error ? err.message : String(err)}` });
+  }
+} else {
+  console.log('[overdeck] smee-client webhook relay not configured');
+}
 
 // Clean up pollers on graceful shutdown
 const emitShutdownActivity = () => {

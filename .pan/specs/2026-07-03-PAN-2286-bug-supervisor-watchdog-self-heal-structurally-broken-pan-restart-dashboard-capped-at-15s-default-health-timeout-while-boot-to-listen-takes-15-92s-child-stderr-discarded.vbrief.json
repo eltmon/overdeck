@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.6",
     "created": "2026-07-03T15:45:01.892Z",
-    "updated": "2026-07-03T15:48:38.732Z",
+    "updated": "2026-07-03T20:43:47.442Z",
     "author": "overdeck/auto-start",
     "description": "Auto-synthesized minimal plan for PAN-2286: bug(supervisor): watchdog self-heal structurally broken — pan restart --dashboard capped at 15s default health timeout while boot-to-listen takes 15-92s; child stderr discarded",
     "inspectionPolicy": "never"
@@ -10,12 +10,12 @@
   "plan": {
     "id": "pan-2286",
     "title": "bug(supervisor): watchdog self-heal structurally broken — pan restart --dashboard capped at 15s default health timeout while boot-to-listen takes 15-92s; child stderr discarded",
-    "status": "running",
+    "status": "completed",
     "uid": "09c078c3-4895-4d26-b278-cd7e17bc3183",
     "author": "overdeck/auto-start",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-07-03T15:45:01.892Z",
-    "updated": "2026-07-03T15:48:38.732Z",
+    "updated": "2026-07-03T20:43:47.442Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2286",
@@ -109,5 +109,5 @@
     ],
     "edges": []
   },
-  "status": "active"
+  "status": "completed"
 }

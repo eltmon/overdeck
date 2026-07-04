@@ -39,7 +39,7 @@ services:
         # on a cold cache, and a transient DNS blip (EAI_AGAIN) must not hard-fail init.
         { bun install || { echo 'bun install failed — retrying once in 5s...'; sleep 5; bun install; }; } &&
         echo 'Rebuilding native Node.js addons...' &&
-        npm rebuild better-sqlite3 2>&1 &&
+        { npm rebuild better-sqlite3 2>&1 || { echo 'WARN: better-sqlite3 rebuild failed (dev-only transitive dep via evalite; runtime uses bundled node:sqlite/bun:sqlite) — continuing init (PAN-2312).'; }; } &&
         echo 'Building contracts...' &&
         cd packages/contracts && bun run build 2>&1 && cd ../.. &&
         echo 'Building dashboard server...' &&

@@ -1,6 +1,8 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
+import { Effect } from 'effect';
 
+import { isGitHubAppConfigured, listPullRequestsForHead } from '../github-app.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 
 const execAsync = promisify(exec);
@@ -34,6 +36,32 @@ export async function verifyMergedBeforeLifecycle(
 
   const { owner, repo } = ghResolved;
   try {
+    if (isGitHubAppConfigured()) {
+      const prs = await Effect.runPromise(listPullRequestsForHead(owner, repo, branchName, 'all'));
+      const mergedPr = prs.find((pr) => pr.merged || pr.mergedAt || pr.mergeCommit);
+      if (mergedPr) {
+        return { merged: true, reason: `GitHub PR #${mergedPr.number} is merged` };
+      }
+
+      const verifiedMergedRef = options?.verifiedMergedRef?.trim();
+      if (verifiedMergedRef) {
+        try {
+          await execAsync(`git merge-base --is-ancestor ${shellQuote(verifiedMergedRef)} origin/main`, { cwd: projectPath });
+          return { merged: true, reason: `${verifiedMergedRef} is an ancestor of origin/main` };
+        } catch {
+          // Fall through to the normal PR/no-PR refusal.
+        }
+      }
+
+      if (prs.length === 0) {
+        if (options?.allowVerifiedNoPrMerge) {
+          return { merged: true, reason: `No PR found for ${branchName}; accepting caller-verified non-PR merge` };
+        }
+        return { merged: false, reason: `No PR found for ${branchName}; refusing to infer merge from branch state alone` };
+      }
+      return { merged: false, reason: `GitHub PR for ${branchName} is open and not merged` };
+    }
+
     const { stdout } = await execAsync(
       `gh pr list --repo ${shellQuote(`${owner}/${repo}`)} --state all --head ${quotedBranch} --json number,mergedAt,mergeCommit --limit 5`,
       { cwd: projectPath },

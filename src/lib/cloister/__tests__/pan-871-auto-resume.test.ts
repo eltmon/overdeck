@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { Effect } from 'effect';
 
 const appSettingsMocks = vi.hoisted(() => ({
   getBootReconciliationState: vi.fn(() => ({
@@ -130,15 +131,29 @@ vi.mock('../../../lib/transcript-landing.js', () => ({
 }));
 
 vi.mock('child_process', () => ({
-  exec: vi.fn((_cmd: string, optsOrCb: unknown, maybeCb?: unknown) => {
-    const cb = (typeof optsOrCb === 'function' ? optsOrCb : maybeCb) as (
-      error: Error | null,
-      result: { stdout: string; stderr: string },
-    ) => void;
-    cb(null, { stdout: '○ workspace-nudge ● P2 pan-871: Continue work\n', stderr: '' });
-  }),
+  exec: vi.fn(),
   execFile: vi.fn(),
 }));
+
+vi.mock('../../../lib/beads-query.js', async () => {
+  const { Effect } = await import('effect');
+  const { basename, dirname } = await import('node:path');
+  return {
+    resolveBeadsQueryRoot: vi.fn((workspacePath: string) => {
+      const workspaceName = basename(workspacePath);
+      const workspacesDir = dirname(workspacePath);
+      return workspaceName.startsWith('feature-') && basename(workspacesDir) === 'workspaces'
+        ? dirname(workspacesDir)
+        : workspacePath;
+    }),
+    queryReadyBeadsByIssueLabels: vi.fn((_workspace: string, issueIds: readonly string[]) => Effect.succeed({
+      byIssue: Object.fromEntries(issueIds.map((issueId) => [
+        issueId.toLowerCase(),
+        [{ id: `workspace-${issueId.toLowerCase()}`, title: `${issueId}: Continue work`, status: 'open', labels: [issueId.toLowerCase()] }],
+      ])),
+    })),
+  };
+});
 
 vi.mock('os', async (importOriginal) => {
   const actual = await importOriginal<typeof import('os')>();
@@ -266,6 +281,7 @@ import { isIssueClosed } from '../issue-closed.js';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { captureTranscriptUserRecordSnapshot } from '../../../lib/transcript-landing.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../../lib/activity-logger.js';
+import { queryReadyBeadsByIssueLabels } from '../../../lib/beads-query.js';
 
 const mockGetAgentState = getAgentStateSync as any;
 const mockGetAgentStateAsync = getAgentState as any;
@@ -278,6 +294,7 @@ const mockRecordAgentFailure = recordAgentFailure as any;
 const mockGetReviewStatus = getReviewStatusSync as any;
 const mockGetShadowState = getShadowState as any;
 const mockSessionExists = sessionExists as any;
+const mockQueryReadyBeadsByIssueLabels = queryReadyBeadsByIssueLabels as any;
 const mockIsAgentIdleForNudge = isAgentIdleForNudge as any;
 const mockIsIssueClosed = isIssueClosed as any;
 const mockExistsSync = existsSync as any;
@@ -595,7 +612,51 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
     const actions = await nudgeIdleWorkAgentsWithOpenBeads();
 
     expect(actions).toEqual(['Nudged idle agent-pan-871 (PAN-871) — 1 open bead(s)']);
-    expect(mockMessageAgent).toHaveBeenCalledWith('agent-pan-871', expect.stringContaining('Next ready bead: workspace-nudge'));
+    expect(mockMessageAgent).toHaveBeenCalledWith('agent-pan-871', expect.stringContaining('Next ready bead: workspace-pan-871 PAN-871: Continue work'));
+  });
+
+  it('nudges two idle work agents in one project fleet from one ready-beads read', async () => {
+    mockListAgentStates.mockReturnValue([
+      {
+        id: 'agent-pan-871',
+        issueId: 'PAN-871',
+        workspace: '/tmp/project/workspaces/feature-pan-871',
+        harness: 'claude-code',
+        role: 'work',
+        model: 'claude-sonnet-4-6',
+        status: 'running',
+        startedAt: new Date().toISOString(),
+      },
+      {
+        id: 'agent-pan-872',
+        issueId: 'PAN-872',
+        workspace: '/tmp/project/workspaces/feature-pan-872',
+        harness: 'claude-code',
+        role: 'work',
+        model: 'claude-sonnet-4-6',
+        status: 'running',
+        startedAt: new Date().toISOString(),
+      },
+    ]);
+    mockSessionExists.mockResolvedValue(true);
+    mockIsAgentIdleForNudge.mockReturnValue(true);
+    mockQueryReadyBeadsByIssueLabels.mockReturnValueOnce(Effect.succeed({
+      byIssue: {
+        'pan-871': [{ id: 'workspace-a', title: 'PAN-871: First', status: 'open', labels: ['pan-871'] }],
+        'pan-872': [{ id: 'workspace-b', title: 'PAN-872: Second', status: 'open', labels: ['pan-872'] }],
+      },
+    }));
+
+    const actions = await nudgeIdleWorkAgentsWithOpenBeads();
+
+    expect(actions).toEqual([
+      'Nudged idle agent-pan-871 (PAN-871) — 1 open bead(s)',
+      'Nudged idle agent-pan-872 (PAN-872) — 1 open bead(s)',
+    ]);
+    expect(mockQueryReadyBeadsByIssueLabels).toHaveBeenCalledTimes(1);
+    expect(mockQueryReadyBeadsByIssueLabels).toHaveBeenCalledWith('/tmp/project', ['PAN-871', 'PAN-872'], { acquisitionTimeoutMs: 500 });
+    expect(mockMessageAgent).toHaveBeenCalledWith('agent-pan-871', expect.stringContaining('Next ready bead: workspace-a PAN-871: First'));
+    expect(mockMessageAgent).toHaveBeenCalledWith('agent-pan-872', expect.stringContaining('Next ready bead: workspace-b PAN-872: Second'));
   });
 
   it('re-sends the resume prompt to an idle resumed work agent with zero user records since resume', async () => {

@@ -406,17 +406,14 @@ describe('conversation control channel delivery', () => {
     await expect(delivery).resolves.toBeUndefined();
   });
 
-  it('defaults busy pi conversations to steer and honors follow_up override', () => {
-    const heartbeatDir = join(process.env.OVERDECK_HOME!, 'heartbeats');
-    mkdirSync(heartbeatDir, { recursive: true });
-    writeFileSync(join(heartbeatDir, 'conv-busy.json'), JSON.stringify({
-      timestamp: new Date().toISOString(),
-      last_action: 'tool_end',
-    }));
-
-    expect(pickDeliverAs({ tmuxSession: 'conv-idle' }, undefined)).toBe('prompt');
-    expect(pickDeliverAs({ tmuxSession: 'conv-busy' }, undefined)).toBe('steer');
-    expect(pickDeliverAs({ tmuxSession: 'conv-busy' }, 'follow_up')).toBe('follow_up');
+  it('defaults to steer regardless of perceived busy state and honors follow_up override', () => {
+    // Never a bare 'prompt': Pi rejects it mid-turn and swallows the failure,
+    // silently dropping the message. Steer delivers immediately when idle and
+    // queues when busy, so it is the only safe default.
+    expect(pickDeliverAs(undefined)).toBe('steer');
+    expect(pickDeliverAs('steer')).toBe('steer');
+    expect(pickDeliverAs('prompt')).toBe('steer');
+    expect(pickDeliverAs('follow_up')).toBe('follow_up');
   });
 });
 

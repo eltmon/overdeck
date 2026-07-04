@@ -35,9 +35,9 @@
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-03T05:17:08.128Z",
+    "mergeStatus": "merged",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-03T18:22:15.062Z",
     "reviewNotes": "Review passed; remote branch verification now covers the prior close-out safety blocker",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2273",
@@ -50,24 +50,38 @@
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 8707,
-            "output": 681,
+            "input": 11228,
+            "output": 1201,
             "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 436625,
+            "output": 14815,
+            "cacheRead": 3653888,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 8707,
-          "output": 681,
+          "input": 11228,
+          "output": 1201,
           "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 436625,
+          "output": 14815,
+          "cacheRead": 3653888,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-07-03T05:17:08.272Z"
+        "usd": 1.168293,
+        "pricingAsOf": "2026-07-03T18:22:15.085Z"
       }
     },
     "merges": [
@@ -76,5 +90,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T04:41:22.632Z",
-  "updated": "2026-07-03T05:17:08.273Z"
+  "updated": "2026-07-03T18:22:15.085Z"
 }

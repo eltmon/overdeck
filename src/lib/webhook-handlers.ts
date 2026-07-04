@@ -10,6 +10,8 @@ import { setReviewStatus, getReviewStatus, loadReviewStatuses, type BlockerReaso
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js';
 import { GitHubApiError } from './errors.js';
 import { relayCiFailureFeedback } from './cloister/ci-failure-feedback.js';
+import { isInGraphQLCooldown, noteGraphQLRateLimit } from './github-graphql-cooldown.js';
+import { bumpIssuePrTabCacheGeneration } from '../dashboard/server/services/pr-tab-cache.js';
 
 export interface WebhookPayload {
   action?: string;
@@ -36,6 +38,10 @@ export interface WebhookPayload {
     pull_requests?: Array<{ number: number; head: { ref: string; sha?: string } }>;
   };
   repository?: { full_name: string };
+  issue?: {
+    number?: number;
+    pull_request?: unknown;
+  };
   review?: { state: string };
   thread?: { id?: number; resolved?: boolean };
   // status event payload
@@ -86,6 +92,11 @@ function parseGitHubPrUrl(prUrl: string): { owner: string; repo: string; number:
   const m = prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/i);
   if (!m) return null;
   return { owner: m[1]!, repo: m[2]!, number: Number.parseInt(m[3]!, 10) };
+}
+
+function repoFromPrUrl(prUrl: string | undefined): string | null {
+  if (!prUrl) return null;
+  return getRepoFromPrUrl(prUrl);
 }
 
 async function loadAndValidateStatus(
@@ -229,6 +240,7 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
       checksFailed = prState.checksFailed;
     } else {
       // gh CLI fallback (GraphQL) — only when the App is not configured.
+      if (isInGraphQLCooldown()) return;
       const { execFile } = await import('child_process');
       const { promisify } = await import('util');
       const execFileAsync = promisify(execFile);
@@ -236,11 +248,17 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
       // (MERGEABLE | CONFLICTING | UNKNOWN), mergeStateStatus is CLEAN | DIRTY |
       // UNSTABLE | BLOCKED | BEHIND | …, isDraft is a bool, and statusCheckRollup
       // carries the required-check results. PAN-1620.
-      const { stdout } = await execFileAsync(
-        'gh',
-        ['pr', 'view', String(prNumber), '--repo', repo, '--json', 'mergeable,mergeStateStatus,isDraft,statusCheckRollup'],
-        { encoding: 'utf-8', timeout: 15000 },
-      );
+      let stdout: string;
+      try {
+        ({ stdout } = await execFileAsync(
+          'gh',
+          ['pr', 'view', String(prNumber), '--repo', repo, '--json', 'mergeable,mergeStateStatus,isDraft,statusCheckRollup'],
+          { encoding: 'utf-8', timeout: 15000 },
+        ));
+      } catch (err) {
+        noteGraphQLRateLimit(err);
+        throw err;
+      }
       if (!stdout.trim()) return;
       const pr = JSON.parse(stdout) as {
         mergeable?: string | null;
@@ -296,6 +314,8 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
     const issueId = issueIdFromBranch(pr.head.ref);
     if (!issueId) continue;
 
+    bumpIssuePrTabCacheGeneration(issueId);
+
     const status = await loadAndValidateStatus(issueId, repo, pr.number, pr.head.sha);
     if (!status) continue;
 
@@ -340,6 +360,8 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
     const issueId = issueIdFromBranch(pr.head.ref);
     if (!issueId) continue;
 
+    bumpIssuePrTabCacheGeneration(issueId);
+
     const status = await loadAndValidateStatus(issueId, repo, pr.number, pr.head.sha);
     if (!status) continue;
 
@@ -376,6 +398,7 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
   if (!pr) return;
   const issueId = issueIdFromBranch(pr.head.ref);
   if (!issueId) return;
+  bumpIssuePrTabCacheGeneration(issueId);
 
   const repo = payload.repository!.full_name;
 
@@ -476,6 +499,7 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
   if (!pr || !review) return;
   const issueId = issueIdFromBranch(pr.head.ref);
   if (!issueId) return;
+  bumpIssuePrTabCacheGeneration(issueId);
 
   const repo = payload.repository!.full_name;
   const status = await loadAndValidateStatus(issueId, repo, pr.number);
@@ -503,7 +527,33 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
   if (Object.keys(update).length > 0) {
     await Effect.runPromise(setReviewStatus(issueId, update, status));
   }
-}async function handlePullRequestReviewThreadPromise(payload: WebhookPayload): Promise<void> {
+}
+
+async function handlePullRequestReviewCommentPromise(payload: WebhookPayload): Promise<void> {
+  if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
+  const pr = payload.pull_request;
+  if (!pr) return;
+  const issueId = issueIdFromBranch(pr.head.ref);
+  if (!issueId) return;
+  bumpIssuePrTabCacheGeneration(issueId);
+}
+
+async function handleIssueCommentPromise(payload: WebhookPayload): Promise<void> {
+  if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
+  const issue = payload.issue;
+  if (!issue?.pull_request || issue.number == null) return;
+
+  const repo = payload.repository!.full_name.toLowerCase();
+  const statuses = loadReviewStatuses();
+  for (const [issueId, status] of Object.entries(statuses)) {
+    if (status.prNumber !== issue.number) continue;
+    const statusRepo = repoFromPrUrl(status.prUrl);
+    if (statusRepo && statusRepo !== repo) continue;
+    bumpIssuePrTabCacheGeneration(issueId);
+  }
+}
+
+async function handlePullRequestReviewThreadPromise(payload: WebhookPayload): Promise<void> {
   if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
   const pr = payload.pull_request;
   const thread = payload.thread;
@@ -580,6 +630,8 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
   for (const branch of branches) {
     const issueId = issueIdFromBranch(branch.name);
     if (issueId) {
+      bumpIssuePrTabCacheGeneration(issueId);
+
       const status = await loadAndValidateStatus(issueId, repo, undefined, payload.sha);
       if (!status) continue;
 
@@ -666,6 +718,24 @@ export const handlePullRequestReview = (
   Effect.tryPromise({
     try: () => handlePullRequestReviewPromise(payload),
     catch: (cause) => toGhError('handlePullRequestReview', cause),
+  });
+
+/** Effect: handle a `pull_request_review_comment` GitHub webhook payload. */
+export const handlePullRequestReviewComment = (
+  payload: WebhookPayload,
+): Effect.Effect<void, GitHubApiError> =>
+  Effect.tryPromise({
+    try: () => handlePullRequestReviewCommentPromise(payload),
+    catch: (cause) => toGhError('handlePullRequestReviewComment', cause),
+  });
+
+/** Effect: handle an `issue_comment` GitHub webhook payload for PR tab cache invalidation. */
+export const handleIssueComment = (
+  payload: WebhookPayload,
+): Effect.Effect<void, GitHubApiError> =>
+  Effect.tryPromise({
+    try: () => handleIssueCommentPromise(payload),
+    catch: (cause) => toGhError('handleIssueComment', cause),
   });
 
 /** Effect: handle a `pull_request_review_thread` GitHub webhook payload. */

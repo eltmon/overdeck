@@ -1,7 +1,13 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
+import { githubPrLookupSource, lookupPullRequestNumberForBranch } from '../github-pr-lookup.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
+import {
+  getCachedIssuePrTabResponse,
+  getIssuePrTabCacheGeneration,
+  setCachedIssuePrTabResponse,
+} from '../../dashboard/server/services/pr-tab-cache.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -104,26 +110,13 @@ async function resolveIssuePullRequestRef(issueId: string): Promise<
   const repoArg = `${githubCheck.owner}/${githubCheck.repo}`;
 
   try {
-    const { stdout } = await execFileAsync(
-      'gh',
-      [
-        'pr', 'list',
-        '--repo', repoArg,
-        '--head', branchName,
-        '--state', 'all',
-        '--json', 'number',
-        '--limit', '1',
-        '--jq', '.[0].number',
-      ],
-      { encoding: 'utf-8', timeout: 15000 },
-    );
-    const prNumber = stdout.trim();
-    if (!prNumber) {
+    const prNumber = await lookupPullRequestNumberForBranch(githubCheck.owner, githubCheck.repo, branchName);
+    if (prNumber == null) {
       return { issueId: upper, repoArg: null, prNumber: null };
     }
-    return { issueId: upper, repoArg, prNumber };
+    return { issueId: upper, repoArg, prNumber: String(prNumber) };
   } catch (err: any) {
-    return { issueId: upper, repoArg: null, prNumber: null, error: `gh pr list failed: ${err.message}` };
+    return { issueId: upper, repoArg: null, prNumber: null, error: `${githubPrLookupSource()} failed: ${err.message}` };
   }
 }
 
@@ -154,8 +147,14 @@ async function fetchIssuePullRequestFromRef(
 }
 
 export async function fetchIssuePullRequest(issueId: string): Promise<IssuePrEndpointResponse> {
+  const generation = getIssuePrTabCacheGeneration(issueId);
+  const cached = getCachedIssuePrTabResponse<IssuePrEndpointResponse>('pr', issueId, generation);
+  if (cached) return cached;
+
   const prRef = await resolveIssuePullRequestRef(issueId);
-  return fetchIssuePullRequestFromRef(prRef);
+  const result = await fetchIssuePullRequestFromRef(prRef);
+  setCachedIssuePrTabResponse('pr', issueId, generation, result);
+  return result;
 }
 
 async function fetchIssuePullRequestDiffFromRef(

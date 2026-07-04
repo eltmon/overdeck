@@ -55,6 +55,14 @@ vi.mock('../../../../../src/lib/tracker-utils.js', () => ({
   resolveTrackerType: vi.fn(() => 'github'),
 }));
 
+vi.mock('../../../../../src/lib/github-app.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../../src/lib/github-app.js')>();
+  return {
+    ...actual,
+    isGitHubAppConfigured: vi.fn(() => false),
+  };
+});
+
 // Stub modules imported at issues.ts module scope that are unused by this test.
 vi.mock('../../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: vi.fn(),
@@ -80,9 +88,11 @@ import {
   fetchIssuePullRequest,
   fetchIssuePullRequestDiff,
 } from '../../../../../src/lib/overdeck/pull-requests.js';
+import { clearIssuePrTabCacheForTests } from '../../../../../src/dashboard/server/services/pr-tab-cache.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  clearIssuePrTabCacheForTests();
 });
 
 describe('fetchIssuePullRequest — GET /api/issues/:id/pr', () => {

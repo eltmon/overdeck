@@ -1,12 +1,17 @@
-import { exec, execFile } from 'node:child_process';
+import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 
 import { extractPrefixSync, parseIssueIdSync } from '../issue-id.js';
+import { githubPrLookupSource, lookupPullRequestNumberForBranch } from '../github-pr-lookup.js';
 import { resolveGitHubIssueSync, resolveTrackerTypeSync } from '../tracker-utils.js';
 import { getGitHubConfig } from '../../dashboard/server/services/tracker-config.js';
+import {
+  getCachedIssuePrTabResponse,
+  getIssuePrTabCacheGeneration,
+  setCachedIssuePrTabResponse,
+} from '../../dashboard/server/services/pr-tab-cache.js';
 
 const execAsync = promisify(exec);
-const execFileAsync = promisify(execFile);
 
 function isGitHubIssue(issueId: string): {
   isGitHub: boolean;
@@ -61,6 +66,10 @@ export async function fetchIssueDiscussions(
   issueId: string,
   deps: FetchDiscussionsDeps = {},
 ): Promise<IssueDiscussionsResponse> {
+  const generation = getIssuePrTabCacheGeneration(issueId);
+  const cached = getCachedIssuePrTabResponse<IssueDiscussionsResponse>('discussions', issueId, generation);
+  if (cached) return cached;
+
   const upper = issueId.toUpperCase();
   const items: DiscussionItem[] = [];
   const errors: string[] = [];
@@ -169,26 +178,9 @@ export async function fetchIssueDiscussions(
       }
       const branchName = `feature/${issueId.toLowerCase()}`;
       try {
-        const { stdout } = await execFileAsync(
-          'gh',
-          [
-            'pr', 'list',
-            '--repo', prRepoArg,
-            '--head', branchName,
-            '--state', 'all',
-            '--json', 'number',
-            '--limit', '1',
-            '--jq', '.[0].number',
-          ],
-          { encoding: 'utf-8', timeout: 15000 },
-        );
-        const trimmed = stdout.trim();
-        if (trimmed) {
-          const parsed = parseInt(trimmed, 10);
-          if (Number.isFinite(parsed)) return parsed;
-        }
+        if (prOwner && prRepo) return lookupPullRequestNumberForBranch(prOwner, prRepo, branchName);
       } catch (err: any) {
-        errors.push(`gh pr list failed: ${err?.message ?? String(err)}`);
+        errors.push(`${githubPrLookupSource()} failed: ${err?.message ?? String(err)}`);
       }
     }
     return null;
@@ -319,10 +311,12 @@ export async function fetchIssueDiscussions(
     return a.createdAt.localeCompare(b.createdAt);
   });
 
-  return {
+  const result = {
     issueId: upper,
     items,
     prNumber,
     ...(errors.length > 0 ? { errors } : {}),
   };
+  setCachedIssuePrTabResponse('discussions', issueId, generation, result);
+  return result;
 }

@@ -45,7 +45,7 @@ vi.mock('../paths.js', async (importOriginal) => {
 
 import { BRIDGE_TOKEN_HEADER, writeBridgeTokenSync } from '../bridge-token.js';
 import { PTY_TOKEN_HEADER, writePtyToken } from '../pty-token.js';
-import { deliverAgentMessage, deliverAgentPermissionDecision, deliverInitialPromptWithRetry, deliverResumeMessageWithTranscriptConfirmation, type AgentState } from '../agents.js';
+import { deliverAgentMessage, deliverAgentPermissionDecision, deliverInitialPromptWithRetry, deliverResumeMessageWithTranscriptConfirmation, getAgentDir, type AgentState } from '../agents.js';
 import { sendKeys } from '../tmux.js';
 
 function writeAgentState(agentId: string, partial: Partial<AgentState>): void {
@@ -296,9 +296,9 @@ describe('initial kickoff transcript confirmation', () => {
     expect(snapshot).not.toHaveBeenCalled();
   });
 
-  it('delivers codex kickoff as a short pointer to .pan/kickoff.md', async () => {
+  it('delivers work-agent codex kickoff as a short pointer to .pan/kickoff.md', async () => {
     const workspace = mkdtempSync(join(tmpdir(), 'pan-codex-kickoff-'));
-    const fullPrompt = 'Full planning instructions for PAN-2275';
+    const fullPrompt = 'Full work instructions for PAN-2275';
     const deliver = vi.fn(async () => ({ ok: true, path: 'tmux' as const }));
     const snapshot = vi.fn(async () => ({ sessionFile: '/tmp/session.jsonl', userRecordCount: 0 }));
 
@@ -310,7 +310,7 @@ describe('initial kickoff transcript confirmation', () => {
         undefined,
         {
           ...baseOptions,
-          getState: vi.fn(async () => ({ ...baseState, harness: 'codex', role: 'plan', workspace })),
+          getState: vi.fn(async () => ({ ...baseState, harness: 'codex', role: 'work', workspace })),
           deliver,
           snapshot,
         },
@@ -325,6 +325,41 @@ describe('initial kickoff transcript confirmation', () => {
       );
       expect(deliver.mock.calls[0]?.[1]).toContain('`.pan/kickoff.md`');
       expect(deliver.mock.calls[0]?.[1]).not.toContain(fullPrompt);
+      expect(snapshot).not.toHaveBeenCalled();
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  it('does not overwrite a work kickoff when delivering a codex role prompt in the same workspace', async () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'pan-codex-role-kickoff-'));
+    const existingWorkPrompt = 'Full work instructions for PAN-2318';
+    const rolePrompt = 'CODE REVIEW for PAN-2318';
+    const agentId = 'agent-pan-2318-review';
+    const deliver = vi.fn(async () => ({ ok: true, path: 'tmux' as const }));
+    const snapshot = vi.fn(async () => ({ sessionFile: '/tmp/session.jsonl', userRecordCount: 0 }));
+
+    try {
+      mkdirSync(join(workspace, '.pan'), { recursive: true });
+      writeFileSync(join(workspace, '.pan', 'kickoff.md'), existingWorkPrompt, 'utf-8');
+
+      await expect(deliverInitialPromptWithRetry(
+        agentId,
+        rolePrompt,
+        'test:codex-review-kickoff',
+        undefined,
+        {
+          ...baseOptions,
+          getState: vi.fn(async () => ({ ...baseState, id: agentId, harness: 'codex', role: 'review', workspace })),
+          deliver,
+          snapshot,
+        },
+      )).resolves.toMatchObject({ ok: true, path: 'tmux' });
+
+      expect(readFileSync(join(workspace, '.pan', 'kickoff.md'), 'utf-8')).toBe(existingWorkPrompt);
+      expect(readFileSync(join(getAgentDir(agentId), 'kickoff.md'), 'utf-8')).toBe(rolePrompt);
+      expect(deliver.mock.calls[0]?.[1]).toContain(join(getAgentDir(agentId), 'kickoff.md'));
+      expect(deliver.mock.calls[0]?.[1]).not.toContain(rolePrompt);
       expect(snapshot).not.toHaveBeenCalled();
     } finally {
       rmSync(workspace, { recursive: true, force: true });

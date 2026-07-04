@@ -6,8 +6,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   handleCheckSuite,
   handleCheckRun,
+  handleIssueComment,
   handlePullRequest,
   handlePullRequestReview,
+  handlePullRequestReviewComment,
   handlePullRequestReviewThread,
   handleStatus,
   issueIdFromBranch,
@@ -19,6 +21,8 @@ import {
 // Mock review-status module
 const mockGetReviewStatus = vi.fn();
 const mockSetReviewStatus = vi.fn();
+const mockLoadReviewStatuses = vi.fn();
+const mockBumpIssuePrTabCacheGeneration = vi.fn();
 const mockIsGitHubAppConfigured = vi.fn();
 const mockGetPullRequestState = vi.fn();
 const mockExecFile = vi.fn();
@@ -35,7 +39,12 @@ vi.mock('../../../src/lib/review-status.js', () => ({
   // Strip the optional third arg (existing status) so test assertions stay clean.
   setReviewStatus: (...args: [string, Record<string, unknown>]) => Effect.sync(() => mockSetReviewStatus(args[0], args[1])),
   setReviewStatusSync: (...args: [string, Record<string, unknown>]) => Effect.sync(() => mockSetReviewStatus(args[0], args[1])),
-  loadReviewStatuses: () => ({}),
+  loadReviewStatuses: () => mockLoadReviewStatuses(),
+}));
+
+vi.mock('../../../src/dashboard/server/services/pr-tab-cache.js', () => ({
+  bumpIssuePrTabCacheGeneration: (...args: Parameters<typeof mockBumpIssuePrTabCacheGeneration>) =>
+    mockBumpIssuePrTabCacheGeneration(...args),
 }));
 
 // Mock tracker-config so isTrackedRepository passes in tests
@@ -71,6 +80,7 @@ vi.mock('child_process', () => ({
 beforeEach(() => {
   mockGetReviewStatus.mockReturnValue(null);
   mockSetReviewStatus.mockReturnValue(undefined);
+  mockLoadReviewStatuses.mockReturnValue({});
 });
 
 afterEach(() => {
@@ -198,6 +208,20 @@ describe('handleCheckSuite', () => {
       ]),
     }));
   });
+
+  it('invalidates PR tab cache for check suite events', async () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+
+    await Effect.runPromise(handleCheckSuite(makePayload({
+      check_suite: {
+        status: 'completed',
+        conclusion: 'success',
+        pull_requests: [{ number: 1, head: { ref: 'feature/pan-123' } }],
+      },
+    })));
+
+    expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledWith('PAN-123');
+  });
 });
 
 describe('handleCheckRun', () => {
@@ -244,6 +268,20 @@ describe('handleCheckRun', () => {
       ]),
     }));
   });
+
+  it('invalidates PR tab cache for check run events', async () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+
+    await Effect.runPromise(handleCheckRun(makePayload({
+      check_run: {
+        status: 'completed',
+        conclusion: 'success',
+        pull_requests: [{ number: 1, head: { ref: 'feature/pan-123' } }],
+      },
+    })));
+
+    expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledWith('PAN-123');
+  });
 });
 
 describe('handlePullRequest', () => {
@@ -262,6 +300,22 @@ describe('handlePullRequest', () => {
     expect(mockPostMergeLifecycle).toHaveBeenCalledWith('PAN-123', '/tmp/test-project', 'strike/pan-123', {
       markReviewPassed: true,
     });
+  });
+
+  it('bumps PR tab cache generation for the affected issue', async () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+
+    await Effect.runPromise(handlePullRequest(makePayload({
+      action: 'synchronize',
+      pull_request: {
+        number: 1,
+        head: { ref: 'feature/pan-456' },
+        mergeable: true,
+        mergeable_state: 'clean',
+      },
+    })));
+
+    expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledWith('PAN-456');
   });
 
   it('adds draft_pr blocker when PR is draft', async () => {
@@ -512,6 +566,21 @@ describe('handlePullRequest', () => {
 });
 
 describe('handlePullRequestReview', () => {
+  it('bumps PR tab cache generation for the reviewed issue', async () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+
+    await Effect.runPromise(handlePullRequestReview(makePayload({
+      action: 'submitted',
+      pull_request: {
+        number: 1,
+        head: { ref: 'feature/pan-111' },
+      },
+      review: { state: 'approved' },
+    })));
+
+    expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledWith('PAN-111');
+  });
+
   it('adds changes_requested blocker', async () => {
     mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
 
@@ -562,6 +631,51 @@ describe('handlePullRequestReview', () => {
       review: { state: 'dismissed' },
     })));
 
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleIssueComment', () => {
+  it('bumps PR tab cache generation for the status matching repo and PR number', async () => {
+    mockLoadReviewStatuses.mockReturnValue({
+      'PAN-222': {
+        prNumber: 22,
+        prUrl: 'https://github.com/test-owner/test-repo/pull/22',
+      },
+      'PAN-333': {
+        prNumber: 22,
+        prUrl: 'https://github.com/test-owner/other-repo/pull/22',
+      },
+      'PAN-444': {
+        prNumber: 44,
+        prUrl: 'https://github.com/test-owner/test-repo/pull/44',
+      },
+    });
+
+    await Effect.runPromise(handleIssueComment(makePayload({
+      action: 'created',
+      issue: {
+        number: 22,
+        pull_request: { url: 'https://api.github.com/repos/test-owner/test-repo/pulls/22' },
+      },
+    })));
+
+    expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledTimes(1);
+    expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledWith('PAN-222');
+  });
+});
+
+describe('handlePullRequestReviewComment', () => {
+  it('bumps PR tab cache generation for inline PR review comments', async () => {
+    await Effect.runPromise(handlePullRequestReviewComment(makePayload({
+      action: 'created',
+      pull_request: {
+        number: 1,
+        head: { ref: 'feature/pan-555' },
+      },
+    })));
+
+    expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledWith('PAN-555');
     expect(mockSetReviewStatus).not.toHaveBeenCalled();
   });
 });
@@ -775,6 +889,17 @@ describe('handleStatus', () => {
     })));
 
     expect(mockSetReviewStatus).not.toHaveBeenCalled();
+  });
+
+  it('invalidates PR tab cache for status events', async () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+
+    await Effect.runPromise(handleStatus(makePayload({
+      state: 'success',
+      branches: [{ name: 'feature/pan-333' }],
+    })));
+
+    expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledWith('PAN-333');
   });
 });
 
