@@ -114,6 +114,7 @@ import { getContainersReferencingWorkspacePath } from '../../../lib/workspace-ma
 import { collectDockerContainerLifecycleSnapshot, getWorkspaceStackHealth } from '../../../lib/workspace/stack-health.js';
 import { emitActivityEntrySync } from '../../../lib/activity-logger.js';
 import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enrichment.js';
+import { getReleaseSetComponentsForIssueSync } from '../../../lib/database/release-set-status-db.js';
 import { createRecoveryBranchFromStash, dropStash, isSalvageableStash, listStashes } from '../../../lib/stashes.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
 import { getWorkspacePathForIssue } from '../workspace-paths.js';
@@ -1450,7 +1451,16 @@ const getWorkspaceReviewStatusRoute = HttpRouter.add(
       }
     }
 
-    return jsonResponse({ ...base, queuePosition, activeSpecialist, reviewCoordinatorSessionName, reviewSessionNames, reviewSubStatuses });
+    let releaseComponents: ReturnType<typeof getReleaseSetComponentsForIssueSync> | undefined;
+    try {
+      const components = getReleaseSetComponentsForIssueSync(issueId);
+      releaseComponents = components.length > 0 ? components : undefined;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[review-status] Release set lookup failed for ${issueId} (non-fatal): ${msg}`);
+    }
+
+    return jsonResponse({ ...base, queuePosition, activeSpecialist, reviewCoordinatorSessionName, reviewSessionNames, reviewSubStatuses, releaseComponents });
   }))
 );
 

@@ -11,6 +11,7 @@ import { statusColor } from './PrDiffTab';
 const DEFAULT_VERIFICATION_MAX_CYCLES = 10;
 const DEFAULT_AUTO_REQUEUE_MAX = 7;
 const DEFAULT_MERGE_RETRY_MAX = 3;
+const RELEASE_FAILURE_STATUSES = new Set(['failed', 'partial', 'rolled_back']);
 
 interface ReviewPipelineSectionProps {
   reviewStatus: ReviewStatus;
@@ -42,6 +43,9 @@ export function ReviewPipelineSection({ reviewStatus, issueId, onViewLog }: Revi
   });
   const verificationMaxCycles = reviewStatus.verificationMaxCycles ?? DEFAULT_VERIFICATION_MAX_CYCLES;
   const autoRequeueCount = reviewStatus.autoRequeueCount ?? 0;
+  const releaseStatus = reviewStatus.releaseStatus;
+  const failingReleaseComponent = findFailingReleaseComponent(reviewStatus.releaseComponents);
+  const shouldShowReleaseStep = !!releaseStatus && releaseStatus !== 'pending' && releaseStatus !== 'skipped';
 
   const steps: PipelineStep[] = [
     {
@@ -85,6 +89,19 @@ export function ReviewPipelineSection({ reviewStatus, issueId, onViewLog }: Revi
       isSkipped: false,
     },
   ];
+
+  if (shouldShowReleaseStep) {
+    steps.push({
+      key: 'release',
+      label: 'Release',
+      status: releaseStatus,
+      notes: releaseFailureNotes(failingReleaseComponent),
+      isRunning: releaseStatus === 'releasing',
+      isFailed: RELEASE_FAILURE_STATUSES.has(releaseStatus),
+      isPassed: releaseStatus === 'passed',
+      isSkipped: false,
+    });
+  }
 
   const hasAnyNotes = steps.some(s => s.notes);
   const hasFailure = steps.some(s => s.isFailed);
@@ -303,6 +320,9 @@ function StatusLabel({ step }: { step: PipelineStep }) {
       case 'merging': return 'Merging...';
       case 'verifying': return 'Verifying...';
       case 'merged': return 'Merged';
+      case 'releasing': return 'Releasing...';
+      case 'partial': return 'Partial';
+      case 'rolled_back': return 'Rolled Back';
       default: return 'Pending';
     }
   })();
@@ -318,4 +338,27 @@ function StatusLabel({ step }: { step: PipelineStep }) {
       {label}
     </span>
   );
+}
+
+type ReleaseComponent = NonNullable<ReviewStatus['releaseComponents']>[number];
+
+function findFailingReleaseComponent(components: ReviewStatus['releaseComponents']): ReleaseComponent | undefined {
+  return components?.find(component =>
+    component.status === 'failed' ||
+    component.status === 'partial' ||
+    component.status === 'rolled_back' ||
+    component.healthStatus === 'failed' ||
+    component.versionStatus === 'failed' ||
+    component.smokeStatus === 'failed' ||
+    component.rollbackStatus === 'failed' ||
+    component.rollbackStatus === 'rolled_back'
+  );
+}
+
+function releaseFailureNotes(component: ReleaseComponent | undefined): string | undefined {
+  if (!component) return undefined;
+  const notes = component.notes?.trim();
+  return notes
+    ? `${component.componentKey}: ${notes}`
+    : `${component.componentKey}: release stopped at ${component.status}`;
 }

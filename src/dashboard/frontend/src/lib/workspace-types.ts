@@ -12,6 +12,8 @@ export interface ReviewStatus {
   reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
   testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
   mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
+  releaseStatus?: 'pending' | 'releasing' | 'passed' | 'failed' | 'partial' | 'rolled_back' | 'skipped';
+  releaseComponents?: ReleaseSetComponentStatus[];
   inspectStatus?: 'pending' | 'inspecting' | 'passed' | 'failed' | 'error';
   inspectNotes?: string;
   inspectStartedAt?: string;
@@ -44,6 +46,20 @@ export interface ReviewStatus {
   activeSpecialist?: 'review' | 'test' | 'merge' | null;
   /** PAN-905: GitHub-native merge blockers preventing merge */
   blockerReasons?: ReadonlyArray<{ type: string; summary: string; details?: string; detectedAt: string }>;
+}
+
+export interface ReleaseSetComponentStatus {
+  componentKey: string;
+  provider: string;
+  trigger: string;
+  releaseOrder: number;
+  required: boolean;
+  status: string;
+  healthStatus: string;
+  versionStatus: string;
+  smokeStatus: string;
+  rollbackStatus: string;
+  notes?: string;
 }
 
 export interface ContainerStatus {

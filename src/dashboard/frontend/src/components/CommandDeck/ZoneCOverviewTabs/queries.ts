@@ -175,6 +175,8 @@ export interface ReviewStatusData {
   reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
   testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
   mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
+  releaseStatus?: 'pending' | 'releasing' | 'passed' | 'failed' | 'partial' | 'rolled_back' | 'skipped';
+  releaseComponents?: ReleaseSetComponentStatus[];
   verificationStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
   verificationNotes?: string;
   verificationCycleCount?: number;
@@ -193,6 +195,20 @@ export interface ReviewStatusData {
   activeSpecialist?: 'review' | 'test' | 'merge' | null;
   /** Chronological review/test/merge/verify status transitions (S3 History tab). */
   history?: StatusHistoryEntry[];
+}
+
+export interface ReleaseSetComponentStatus {
+  componentKey: string;
+  provider: string;
+  trigger: string;
+  releaseOrder: number;
+  required: boolean;
+  status: string;
+  healthStatus: string;
+  versionStatus: string;
+  smokeStatus: string;
+  rollbackStatus: string;
+  notes?: string;
 }
 
 export interface BlockerReason {
