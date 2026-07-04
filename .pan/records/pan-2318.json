@@ -87,17 +87,14 @@
       "reason": "feedback",
       "note": "[2026-07-04T00:54Z] verification-gate → FAILED — seq 1",
       "timestamp": "2026-07-04T00:54:45.981Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-07-04T00:54:45Z",
-      "markdownBody": "VERIFICATION FAILED for PAN-2318 (attempt 1/3):\n\nFailed check: sync-target-branch\n\nSync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - scripts/file-size-baseline.txt\n\n## REQUIRED: Resolve merge conflicts BEFORE resubmitting\n\n1. Run: `git fetch origin main && git merge origin/main`\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request PAN-2318 -m \"Fixed sync-target-branch\"\n\nDo NOT resubmit until all repos sync cleanly and tests pass."
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T01:01:02.996Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".eslintrc.cjs",
@@ -214,21 +211,22 @@
     "recordedAt": "2026-07-03T23:31:19.317Z"
   },
   "created": "2026-07-03T18:47:58.596Z",
-  "updated": "2026-07-04T00:54:45.996Z",
+  "updated": "2026-07-04T01:02:24.528Z",
   "pipeline": {
     "issueId": "PAN-2318",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "verificationStatus": "failed",
+    "reviewStatus": "reviewing",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T00:54:45.973Z",
-    "reviewNotes": "Agent re-review request (5/25): Fixed review issues",
-    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - scripts/file-size-baseline.txt",
+    "updatedAt": "2026-07-04T01:02:24.487Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed sync-target-branch",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "inspectNotes": "Spec fidelity PASS: diff implements WI-1 deacon child entry, supervisor, tsdown entry, main spawn/shutdown wiring, and single-deacon lock. Constraint compliance PASS: no new execSync/sync tmux/Bun child path violations; deacon-supervisor tests use fake timers.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2327",
-    "lastVerifiedCommit": "354a8b99ed893cc8b57966d4cffa2eb63317037b",
+    "lastVerifiedCommit": "9578e35e71f1c0cf418ec2d8fcc855f8af53390e",
     "reviewRequestedAt": "2026-07-03T23:31:25.516Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -396,7 +394,7 @@
       },
       "costAtCloseOut": {
         "usd": 7.4635679999999995,
-        "pricingAsOf": "2026-07-04T00:54:45.995Z"
+        "pricingAsOf": "2026-07-04T01:02:24.527Z"
       }
     },
     "merges": [
