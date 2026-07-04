@@ -6,6 +6,18 @@ import { useAlert } from './DialogProvider';
 export type BootReconciliationDecision = 'pending' | 'resume_all' | 'hold_all' | 'per_agent';
 export type BootReconciliationPerAgentAction = 'resume' | 'hold';
 export type BootReconciliationConcern = 'running_remote' | 'orphaned' | 'stopped_cleanly' | 'paused_troubled';
+export type BootReconciliationOutcomeReason =
+  | 'resumed'
+  | 'no-resumable-session'
+  | 'deferred-concurrency'
+  | 'deferred-load';
+
+export interface BootReconciliationOutcome {
+  id: string;
+  issueId: string;
+  outcome: 'resumed' | 'skipped';
+  reason: BootReconciliationOutcomeReason;
+}
 
 export interface BootReconciliationAgent {
   id: string;
@@ -40,7 +52,7 @@ async function fetchBootReconciliation(): Promise<BootReconciliationState> {
 async function postBootReconciliationDecision(input: {
   decision: Exclude<BootReconciliationDecision, 'pending'>;
   perAgent?: Record<string, BootReconciliationPerAgentAction>;
-}): Promise<{ ok: boolean; count: number; resumed: string[] }> {
+}): Promise<{ ok: boolean; count: number; resumed: string[]; outcomes?: BootReconciliationOutcome[] }> {
   const res = await fetch('/api/boot-reconciliation/decision', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -51,6 +63,43 @@ async function postBootReconciliationDecision(input: {
     throw new Error(body.error || `POST /api/boot-reconciliation/decision -> ${res.status}`);
   }
   return res.json();
+}
+
+function formatOutcomeReason(reason: string): string {
+  switch (reason) {
+    case 'no-resumable-session':
+      return 'no resumable session';
+    case 'deferred-concurrency':
+      return 'deferred by concurrency limit';
+    case 'deferred-load':
+      return 'deferred by load gate';
+    case 'resumed':
+      return 'resumed';
+    default:
+      return reason.replaceAll('-', ' ');
+  }
+}
+
+function bootDecisionSummary(result: { count: number; outcomes?: BootReconciliationOutcome[] }): string {
+  if (result.count > 0) {
+    return `Boot decision saved. Resumed ${result.count} agent${result.count === 1 ? '' : 's'}.`;
+  }
+
+  const skipped = Array.isArray(result.outcomes)
+    ? result.outcomes.filter((outcome) => outcome.outcome === 'skipped')
+    : [];
+  if (skipped.length === 0) {
+    return 'Boot decision saved. Resumed 0 agents.';
+  }
+
+  const byReason = new Map<string, number>();
+  for (const outcome of skipped) {
+    byReason.set(outcome.reason, (byReason.get(outcome.reason) ?? 0) + 1);
+  }
+  const reasonSummary = Array.from(byReason.entries())
+    .map(([reason, count]) => `${count} ${formatOutcomeReason(reason)}`)
+    .join(', ');
+  return `Boot decision saved. Resumed 0 — ${skipped.length} skipped (${reasonSummary}).`;
 }
 
 async function freezeDeacon(): Promise<{ paused: boolean }> {
@@ -162,13 +211,11 @@ export function BootReconciliationModal() {
 
   const decisionMutation = useMutation({
     mutationFn: postBootReconciliationDecision,
-    onSuccess: ({ count }) => {
+    onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: BOOT_RECONCILIATION_QUERY_KEY });
       void queryClient.invalidateQueries({ queryKey: ['agents'] });
       showAlert({
-        message: count > 0
-          ? `Boot decision saved. Resuming ${count} agent${count === 1 ? '' : 's'}.`
-          : 'Boot decision saved. No agents were resumed.',
+        message: bootDecisionSummary(result),
         variant: 'success',
       });
     },

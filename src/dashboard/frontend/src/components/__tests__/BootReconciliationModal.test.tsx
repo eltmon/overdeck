@@ -122,11 +122,31 @@ describe('BootReconciliationModal', () => {
   });
 
   it('sends resume all, hold all, per-agent review, and freeze actions', async () => {
+    let decisionResponses = 0;
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = input.toString();
       if (url === '/api/boot-reconciliation') return jsonResponse(pendingState);
       if (url === '/api/deacon/pause') return jsonResponse({ paused: true });
       if (url === '/api/boot-reconciliation/decision') {
+        decisionResponses += 1;
+        if (decisionResponses === 1) {
+          return jsonResponse({
+            ok: true,
+            count: 0,
+            resumed: [],
+            outcomes: [
+              {
+                id: 'agent-pan-2076',
+                issueId: 'PAN-2076',
+                outcome: 'skipped',
+                reason: 'no-resumable-session',
+              },
+            ],
+          });
+        }
+        if (decisionResponses === 2) {
+          return jsonResponse({ ok: true, count: 2, resumed: ['agent-pan-2076', 'agent-pan-2077'], outcomes: [] });
+        }
         return jsonResponse({ ok: true, count: 0, resumed: [] });
       }
       return jsonResponse({ error: 'not found' }, 404);
@@ -143,6 +163,7 @@ describe('BootReconciliationModal', () => {
         body: JSON.stringify({ decision: 'resume_all' }),
       }),
     ));
+    expect(await screen.findByText('Boot decision saved. Resumed 0 — 1 skipped (1 no resumable session).')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('boot-reconciliation-hold-all'));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
@@ -152,6 +173,7 @@ describe('BootReconciliationModal', () => {
         body: JSON.stringify({ decision: 'hold_all' }),
       }),
     ));
+    expect(await screen.findByText('Boot decision saved. Resumed 2 agents.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('boot-reconciliation-freeze'));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
@@ -179,6 +201,7 @@ describe('BootReconciliationModal', () => {
         }),
       }),
     ));
+    expect(await screen.findByText('Boot decision saved. Resumed 0 agents.')).toBeInTheDocument();
   });
 
   it('shows the held banner for a hold_all decision and resumes all from it (PAN-2278)', async () => {
