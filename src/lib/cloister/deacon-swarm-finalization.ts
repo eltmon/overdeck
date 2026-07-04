@@ -39,6 +39,8 @@ export async function finalizeSwarmIssueIfComplete(
   baseDoc: VBriefDocument,
   deps: {
     readStatusOverrides?: (workspacePath: string, issueId: string) => Record<string, string> | undefined;
+    getFinalizedAt?: (issueId: string, workspacePath: string) => string | undefined;
+    setFinalizedAt?: (issueId: string, workspacePath: string, finalizedAt: string) => void;
     requestIssueReview: (issueId: string, workspacePath: string) => Promise<RequestIssueReviewResult>;
   },
 ): Promise<string[]> {
@@ -48,13 +50,16 @@ export async function finalizeSwarmIssueIfComplete(
     : baseDoc;
 
   if (!doc.plan.items.every(item => item.status === 'completed')) return [];
+  if (deps.getFinalizedAt?.(issueId, workspacePath)) return [];
   const currentStatus = getReviewStatusSync(issueId);
+  if (currentStatus?.mergeStatus === 'merged') return [];
   if (currentStatus?.reviewRequestedAt || currentStatus?.reviewStatus === 'reviewing' || currentStatus?.reviewStatus === 'passed') {
     return [];
   }
 
   const result = await deps.requestIssueReview(issueId, workspacePath);
   if (result.success) {
+    deps.setFinalizedAt?.(issueId, workspacePath, new Date().toISOString());
     return [`[swarm] finalized ${issueId}: issue-level review requested`];
   }
   return [`[swarm] finalization deferred ${issueId}: ${result.error || result.message}`];
