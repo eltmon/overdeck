@@ -4,17 +4,17 @@
     "created": "2026-07-03T12:06:09.324Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2294: notify the flywheel orchestrator when the operator promotes/merges a UAT train",
-    "updated": "2026-07-03T12:09:57.460Z"
+    "updated": "2026-07-04T18:14:15.258Z"
   },
   "plan": {
     "id": "pan-2294",
     "title": "feat(flywheel): notify the flywheel orchestrator when the operator promotes/merges a UAT train",
-    "status": "proposed",
+    "status": "completed",
     "uid": "a2e8bb70-af12-4211-b226-1c97715ef267",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-03T12:06:09.324Z",
-    "updated": "2026-07-03T12:09:57.460Z",
+    "updated": "2026-07-04T18:14:15.258Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2294",
@@ -196,5 +196,5 @@
       "canonicalFilename": "2026-07-03-PAN-2294-feat-flywheel-notify-the-flywheel-orchestrator-when-the-operator-promotes-merges-a-uat-train.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
