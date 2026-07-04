@@ -1,10 +1,9 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync, statSync } from 'fs';
 import { join } from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { cpus, loadavg } from 'os';
 import { Effect } from 'effect';
 import { isStartingWithinGrace } from './agent-grace.js';
+import { resumedBootReconciliationOutcome, skippedBootReconciliationOutcome, skippedBootReconciliationOutcomes, type BootReconciliationApplyResult, type BootReconciliationOutcome } from './boot-reconciliation-outcomes.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { getConcurrencyLimits, countRunningAgents, workResumeSlotsAvailable } from './concurrency.js';
 import {
@@ -12,6 +11,7 @@ import {
   getBootReconciliationPendingHoldSet,
   listBootReconciliationCandidates,
 } from './boot-reconciliation.js';
+import { bootReconciliationSkipReason, type BootReconciliationSkipReason } from './boot-reconciliation-predicates.js';
 import { isIssueClosed } from './issue-closed.js';
 import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
@@ -42,16 +42,18 @@ import {
   sessionExists,
   sessionExistsSync,
 } from '../tmux.js';
-
-const execAsync = promisify(exec);
+import { queryReadyBeadsByIssueLabels, resolveBeadsQueryRoot, type BeadEntry } from '../beads-query.js';
 
 export interface AutoResumeNotifierDeps {
   notifyAgentStopped: (agentId: string) => void;
   notifyAgentStatusChanged: (state: AgentState, previousStatus?: AgentState['status'], hasLiveTmuxSession?: boolean) => void;
 }
 
+export type { BootReconciliationApplyResult, BootReconciliationOutcome, BootReconciliationOutcomeReason } from './boot-reconciliation-outcomes.js';
 const orphanFailureRecordedForAutoResume = new Set<string>();
 const appliedBootReconciliationDecisions = new Set<string>();
+
+const emptyBootReconciliationApplyResult = (): BootReconciliationApplyResult => ({ resumed: [], outcomes: [], skipped: { workspace_missing: 0, merged: 0, completed: 0, other: 0 }, deferred: 0 });
 
 function isVerifyPausedAgentState(state: Pick<AgentState, 'issueId' | 'paused'>): boolean {
   if (state.paused !== true || !state.issueId) return false;
@@ -397,6 +399,10 @@ function buildStalledResumePrompt(state: AgentState): string | null {
   return buildDefaultResumeContinueMessage(state.issueId);
 }
 
+function readyBeadLine(bead: BeadEntry): string {
+  return `${bead.id} ${bead.title}`.trim();
+}
+
 export async function nudgeStalledResumeWorkAgents(): Promise<string[]> {
   const actions: string[] = [];
 
@@ -491,6 +497,7 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
   const actions: string[] = [];
 
   const states = listAgentStates({ status: 'running', role: 'work' });
+  const eligibleByQueryRoot = new Map<string, AgentState[]>();
 
   for (const state of states) {
     const agentId = state.id;
@@ -516,55 +523,51 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
       } catch { /* fall through and nudge */ }
     }
 
-    // Open beads for THIS issue?
-    const issueLabel = state.issueId.toLowerCase();
-    let openBeads: string[] = [];
-    try {
-      const { stdout } = await execAsync(`bd ready -l ${issueLabel}`, {
-        cwd: state.workspace,
-        encoding: 'utf-8',
-        timeout: 10_000,
-      });
-      // bd ready output: lines starting with "○ workspace-XXXX ● ... pan-NNN: title"
-      openBeads = stdout
-        .split('\n')
-        .filter(l => /^[○◐]\s+workspace-/i.test(l.trim()))
-        .map(l => l.trim());
-    } catch (err: unknown) {
-      logDeaconEventSync(`nudgeIdleWorkAgentsWithOpenBeads: ${agentId} bd ready failed: ${err instanceof Error ? err.message : String(err)}`);
-      continue;
-    }
-    if (openBeads.length === 0) continue;
+    const queryRoot = resolveBeadsQueryRoot(state.workspace);
+    const workspaceStates = eligibleByQueryRoot.get(queryRoot) ?? [];
+    workspaceStates.push(state);
+    eligibleByQueryRoot.set(queryRoot, workspaceStates);
+  }
 
-    // Build the nudge: tell the agent what's next, do not just ping.
-    const firstBead = openBeads[0]?.replace(/^[○◐]\s+/, '').slice(0, 200) ?? '';
-    // PAN-2102: startup kickoff delivery can silently fail on large briefs (the
-    // ~50KB initial prompt trips the PTY supervisor's echo-confirm), leaving the
-    // agent running with NO original context — only this nudge. Point it at the
-    // brief on disk so it can self-recover the full plan/role/decisions/hazards
-    // instead of guessing from the bead title alone.
-    const briefPath = join(getAgentDir(agentId), 'initial-prompt.md');
-    const message = [
-      `Deacon idle-nudge: your tmux is alive but Claude is idle and you have ${openBeads.length} open bead(s) remaining for ${state.issueId}.`,
-      ``,
-      `Next ready bead: ${firstBead}`,
-      ``,
-      `If you don't already have your full brief for ${state.issueId} in context (work-agent role instructions, the vBRIEF plan, recorded decisions & hazards), re-read it now — it is on disk at ${briefPath}, plus .pan/continue.json and .pan/spec.vbrief.json in your workspace. Startup kickoff delivery can silently fail on large briefs, so do not assume you received it.`,
-      ``,
-      `Continue the per-bead workflow without asking — claim it (\`bd update <bead-id> --claim\`), implement, commit, close. ` +
-      `Inspection is conditional on metadata.requiresInspection (default false; check the plan item before deciding to call \`pan inspect\`). ` +
-      `Do NOT end your turn with a multi-paragraph summary; just advance to the next bead.`,
-    ].join('\n');
+  for (const [queryRoot, workspaceStates] of eligibleByQueryRoot) {
+    const issues = workspaceStates.map((state) => state.issueId);
+    const ready = await Effect.runPromise(queryReadyBeadsByIssueLabels(queryRoot, issues, { acquisitionTimeoutMs: 500 }));
 
-    try {
-      const { messageAgent } = await import('../agents.js');
-      await messageAgent(agentId, message);
-      writeFileSync(cooldownFile, String(Date.now()), 'utf-8');
-      const action = `Nudged idle ${agentId} (${state.issueId}) — ${openBeads.length} open bead(s)`;
-      actions.push(action);
-      logDeaconEventSync(`nudgeIdleWorkAgentsWithOpenBeads: ${action}`);
-    } catch (err: unknown) {
-      logDeaconEventSync(`nudgeIdleWorkAgentsWithOpenBeads: ${agentId} messageAgent failed: ${err instanceof Error ? err.message : String(err)}`);
+    for (const state of workspaceStates) {
+      const agentId = state.id;
+      const openBeads = ready.byIssue[state.issueId.toLowerCase()] ?? [];
+      if (openBeads.length === 0) continue;
+
+      // Build the nudge: tell the agent what's next, do not just ping.
+      const firstBead = readyBeadLine(openBeads[0]!).slice(0, 200);
+      // PAN-2102: startup kickoff delivery can silently fail on large briefs (the
+      // ~50KB initial prompt trips the PTY supervisor's echo-confirm), leaving the
+      // agent running with NO original context — only this nudge. Point it at the
+      // brief on disk so it can self-recover the full plan/role/decisions/hazards
+      // instead of guessing from the bead title alone.
+      const briefPath = join(getAgentDir(agentId), 'initial-prompt.md');
+      const message = [
+        `Deacon idle-nudge: your tmux is alive but Claude is idle and you have ${openBeads.length} open bead(s) remaining for ${state.issueId}.`,
+        ``,
+        `Next ready bead: ${firstBead}`,
+        ``,
+        `If you don't already have your full brief for ${state.issueId} in context (work-agent role instructions, the vBRIEF plan, recorded decisions & hazards), re-read it now — it is on disk at ${briefPath}, plus .pan/continue.json and .pan/spec.vbrief.json in your workspace. Startup kickoff delivery can silently fail on large briefs, so do not assume you received it.`,
+        ``,
+        `Continue the per-bead workflow without asking — claim it (\`bd update <bead-id> --claim\`), implement, commit, close. ` +
+        `Inspection is conditional on metadata.requiresInspection (default false; check the plan item before deciding to call \`pan inspect\`). ` +
+        `Do NOT end your turn with a multi-paragraph summary; just advance to the next bead.`,
+      ].join('\n');
+
+      try {
+        const { messageAgent } = await import('../agents.js');
+        await messageAgent(agentId, message);
+        writeFileSync(join(getAgentDir(agentId), '.last-bead-nudge'), String(Date.now()), 'utf-8');
+        const action = `Nudged idle ${agentId} (${state.issueId}) — ${openBeads.length} open bead(s)`;
+        actions.push(action);
+        logDeaconEventSync(`nudgeIdleWorkAgentsWithOpenBeads: ${action}`);
+      } catch (err: unknown) {
+        logDeaconEventSync(`nudgeIdleWorkAgentsWithOpenBeads: ${agentId} messageAgent failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
   }
 
@@ -640,12 +643,6 @@ export async function handleAgentStoppedEvent(
     return null;
   }
 
-  // Skip if workspace is missing
-  if (!state.workspace || !existsSync(state.workspace)) {
-    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — workspace missing (${state.workspace || 'undefined'})`);
-    return null;
-  }
-
   if (state.paused === true) {
     const pauseKind = isVerifyPausedAgentState(state) ? 'verify-paused' : 'manually-paused';
     logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — ${pauseKind} (${state.pausedReason ?? 'no reason'})`);
@@ -659,6 +656,12 @@ export async function handleAgentStoppedEvent(
     return null;
   }
 
+  const terminalSkipReason = bootReconciliationSkipReason(state);
+  if (terminalSkipReason === 'workspace_missing') {
+    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — workspace missing (${state.workspace || 'undefined'})`);
+    return null;
+  }
+
   const hasLiveTmuxSession = await Effect.runPromise(sessionExists(agentId));
   if (hasLiveTmuxSession) {
     const previousStatus = state.status;
@@ -667,6 +670,14 @@ export async function handleAgentStoppedEvent(
     deps.notifyAgentStatusChanged(state, previousStatus, true);
     const msg = `Reconciled ${agentId} (${previousStatus}→running; tmux session alive)`;
     logDeaconEventSync(`handleAgentStoppedEvent: ${msg}`);
+    return null;
+  }
+
+  if (terminalSkipReason !== null) {
+    const suffix = terminalSkipReason === 'merged'
+      ? 'already merged or merge-ready'
+      : 'completed marker exists and review/test passed';
+    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — ${suffix}`);
     return null;
   }
 
@@ -689,13 +700,8 @@ export async function handleAgentStoppedEvent(
       review?.reviewStatus === 'blocked' ||
       review?.reviewStatus === 'failed' ||
       review?.testStatus === 'failed';
-    const trulyPassed =
-      review?.reviewStatus === 'passed' && review?.testStatus === 'passed';
     if (needsFix) {
       logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} resuming despite completed marker — review/test needs fixing (review=${review?.reviewStatus}, test=${review?.testStatus})`);
-    } else if (trulyPassed) {
-      logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — completed marker exists and review/test passed`);
-      return null;
     } else {
       logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — pipeline mid-flight (review=${review?.reviewStatus ?? 'none'}, test=${review?.testStatus ?? 'none'})`);
       return null;
@@ -704,21 +710,6 @@ export async function handleAgentStoppedEvent(
 
   // Refresh review status if we haven't loaded it yet.
   review ??= getReviewStatusSync(state.issueId);
-
-  // Skip if already merge-ready (review+test passed) or already merged
-  if (review?.readyForMerge && review.reviewStatus === 'passed' && review.testStatus === 'passed') {
-    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — already merge-ready`);
-    return null;
-  }
-  if (review?.mergeStatus === 'merged') {
-    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — already merged`);
-    return null;
-  }
-
-  if ((state as { merged?: boolean }).merged === true) {
-    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — agent state has merged=true (mergedAt=${(state as { mergedAt?: string }).mergedAt ?? 'unknown'})`);
-    return null;
-  }
 
   if (await isIssueClosed(state.issueId)) {
     logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — issue ${state.issueId} is closed`);
@@ -893,19 +884,19 @@ function bootReconciliationDecisionKey(): string | null {
 
 export async function applyBootReconciliationDecision(
   deps: AutoResumeNotifierDeps,
-): Promise<string[]> {
+): Promise<BootReconciliationApplyResult> {
   const decisionKey = bootReconciliationDecisionKey();
-  if (!decisionKey) return [];
+  if (!decisionKey) return emptyBootReconciliationApplyResult();
   if (appliedBootReconciliationDecisions.has(decisionKey)) {
     logDeaconEventSync('applyBootReconciliationDecision: decision already applied');
-    return [];
+    return emptyBootReconciliationApplyResult();
   }
 
   const state = getBootReconciliationState();
   if (state.decision === 'hold_all') {
     appliedBootReconciliationDecisions.add(decisionKey);
     logDeaconEventSync('applyBootReconciliationDecision: hold_all — no agents resumed');
-    return [];
+    return emptyBootReconciliationApplyResult();
   }
 
   let candidates = listBootReconciliationCandidates();
@@ -914,6 +905,9 @@ export async function applyBootReconciliationDecision(
   }
 
   const resumed: string[] = [];
+  const outcomes: BootReconciliationOutcome[] = [];
+  const skipped: Record<BootReconciliationSkipReason | 'other', number> = { workspace_missing: 0, merged: 0, completed: 0, other: 0 };
+  let deferred = 0;
   let resumeAttempts = 0;
   const concurrencyLimits = getConcurrencyLimits();
   const runningBefore = countRunningAgents();
@@ -921,14 +915,21 @@ export async function applyBootReconciliationDecision(
   const cores = cpus().length || 1;
   const loadCeiling = cores * RESUME_LOAD_FACTOR;
 
-  for (const agent of candidates) {
+  for (let index = 0; index < candidates.length; index++) {
+    const agent = candidates[index];
     if (resumeAttempts >= workSlots) {
       logDeaconEventSync(`applyBootReconciliationDecision: work concurrency cap reached (running=${runningBefore.work}, max=${concurrencyLimits.maxWorkAgents}, slots=${workSlots}); deferring remaining candidates`);
+      const deferredAgents = candidates.slice(index);
+      deferred += deferredAgents.length;
+      outcomes.push(...skippedBootReconciliationOutcomes(deferredAgents, 'deferred-concurrency'));
       break;
     }
     const load1 = loadavg()[0];
     if (load1 > loadCeiling) {
       logDeaconEventSync(`applyBootReconciliationDecision: load gate tripped (load1=${load1.toFixed(2)} > ${loadCeiling.toFixed(2)} = ${cores} cores * ${RESUME_LOAD_FACTOR}); deferring remaining candidates`);
+      const deferredAgents = candidates.slice(index);
+      deferred += deferredAgents.length;
+      outcomes.push(...skippedBootReconciliationOutcomes(deferredAgents, 'deferred-load'));
       break;
     }
     if (resumeAttempts > 0) {
@@ -942,13 +943,18 @@ export async function applyBootReconciliationDecision(
     );
     if (result) {
       resumed.push(result);
+      outcomes.push(resumedBootReconciliationOutcome(agent));
       resumeAttempts++;
+    } else {
+      const skipReason = bootReconciliationSkipReason(agent) ?? 'other';
+      skipped[skipReason]++;
+      outcomes.push(skippedBootReconciliationOutcome(agent, 'no-resumable-session'));
     }
   }
 
   appliedBootReconciliationDecisions.add(decisionKey);
   logDeaconEventSync(`applyBootReconciliationDecision: decision=${state.decision} resumed ${resumed.length} agent(s)`);
-  return resumed;
+  return { resumed, outcomes, skipped, deferred };
 }
 
 /**

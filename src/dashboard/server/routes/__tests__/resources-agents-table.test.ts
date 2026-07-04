@@ -11,7 +11,7 @@ import { Effect } from 'effect';
 // ─── Module mocks ─────────────────────────────────────────────────────────────
 
 const mockListAgentStates = vi.hoisted(() => vi.fn());
-const mockListSessionsSync = vi.hoisted(() => vi.fn());
+const mockListSessions = vi.hoisted(() => vi.fn());
 const mockGetStats = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../../lib/agents.js', () => ({
@@ -19,7 +19,7 @@ vi.mock('../../../../lib/agents.js', () => ({
 }));
 
 vi.mock('../../../../lib/tmux.js', () => ({
-  listSessionsSync: mockListSessionsSync,
+  listSessions: () => Effect.succeed(mockListSessions()),
 }));
 
 vi.mock('../../../../lib/docker-stats.js', () => ({
@@ -51,7 +51,7 @@ async function runResourcesEffect(): Promise<{
 describe('GET /api/resources (agents table)', () => {
   beforeEach(() => {
     mockListAgentStates.mockReturnValue([]);
-    mockListSessionsSync.mockReturnValue([]);
+    mockListSessions.mockReturnValue([]);
     mockGetStats.mockReturnValue([]);
   });
 
@@ -72,7 +72,7 @@ describe('GET /api/resources (agents table)', () => {
         role: 'review',
       },
     ]);
-    mockListSessionsSync.mockReturnValue([{ name: 'agent-pan-1908' }]);
+    mockListSessions.mockReturnValue([{ name: 'agent-pan-1908' }]);
 
     const { status, body } = await runResourcesEffect();
 
@@ -92,7 +92,7 @@ describe('GET /api/resources (agents table)', () => {
       { id: 'agent-2', status: 'stopped' },
       { id: 'agent-3', status: 'error' },
     ]);
-    mockListSessionsSync.mockReturnValue([]);
+    mockListSessions.mockReturnValue([]);
 
     const { body } = await runResourcesEffect();
     const ids = (body.agents as Record<string, unknown>[]).map((a) => a.id);
@@ -106,7 +106,7 @@ describe('GET /api/resources (agents table)', () => {
     mockListAgentStates.mockReturnValue([
       { id: 'agent-orphan', status: 'running' },
     ]);
-    mockListSessionsSync.mockReturnValue([]);
+    mockListSessions.mockReturnValue([]);
 
     const { body } = await runResourcesEffect();
 

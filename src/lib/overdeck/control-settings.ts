@@ -358,6 +358,7 @@ function overdeckDb() {
 }
 
 export const DEACON_GLOBAL_PAUSE_KEY = 'deacon.globally_paused';
+export const CLOISTER_SPAWNS_PAUSED_KEY = 'cloister.spawns_paused';
 export const FLYWHEEL_GLOBAL_PAUSE_KEY = 'flywheel.globally_paused';
 export const FLYWHEEL_ACTIVE_RUN_ID_KEY = 'flywheel.active_run_id';
 export const FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY = 'flywheel.auto_pickup_backlog';
@@ -367,6 +368,7 @@ export const BOOT_RECONCILIATION_DECISION_KEY = 'boot_reconciliation.decision';
 export const BOOT_RECONCILIATION_PER_AGENT_KEY = 'boot_reconciliation.per_agent';
 export const BOOT_RECONCILIATION_DECIDED_AT_KEY = 'boot_reconciliation.decided_at';
 export const BOOT_RECONCILIATION_BOOT_ID_KEY = 'boot_reconciliation.boot_id';
+export const BOOT_RECONCILIATION_BOOT_STARTED_AT_KEY = 'boot_reconciliation.boot_started_at';
 export const BOOT_RECONCILIATION_GRACE_DEADLINE_KEY = 'boot_reconciliation.grace_deadline';
 
 export type BootReconciliationDecision = 'pending' | 'resume_all' | 'hold_all' | 'per_agent';
@@ -378,6 +380,7 @@ export interface BootReconciliationState {
   perAgent: BootReconciliationPerAgentMap;
   decidedAt: string | null;
   bootId: string | null;
+  bootStartedAt: string | null;
   graceDeadline: string | null;
 }
 
@@ -440,6 +443,7 @@ export function getBootReconciliationState(): BootReconciliationState {
     perAgent: parseBootReconciliationPerAgent(getSetting(BOOT_RECONCILIATION_PER_AGENT_KEY)),
     decidedAt: getSetting(BOOT_RECONCILIATION_DECIDED_AT_KEY),
     bootId: getSetting(BOOT_RECONCILIATION_BOOT_ID_KEY),
+    bootStartedAt: getSetting(BOOT_RECONCILIATION_BOOT_STARTED_AT_KEY),
     graceDeadline: getSetting(BOOT_RECONCILIATION_GRACE_DEADLINE_KEY),
   };
 }
@@ -453,8 +457,9 @@ export function setBootReconciliationDecision(
   setSetting(BOOT_RECONCILIATION_DECIDED_AT_KEY, new Date().toISOString());
 }
 
-export function stampBootReconciliation(bootId: string, graceDeadline: string): void {
+export function stampBootReconciliation(bootId: string, graceDeadline: string, bootStartedAt: string): void {
   setSetting(BOOT_RECONCILIATION_BOOT_ID_KEY, bootId);
+  setSetting(BOOT_RECONCILIATION_BOOT_STARTED_AT_KEY, bootStartedAt);
   setSetting(BOOT_RECONCILIATION_GRACE_DEADLINE_KEY, graceDeadline);
 }
 
@@ -481,6 +486,21 @@ export function setDeaconGloballyPausedSync(paused: boolean): void {
 /** Drop-in for setDeaconGloballyPaused() from app-settings.ts. */
 export function setDeaconGloballyPaused(paused: boolean): void {
   setDeaconGloballyPausedSync(paused);
+}
+
+/** Synchronous check of the Cloister spawn pause flag. */
+export function isCloisterSpawnsPausedSync(): boolean {
+  try {
+    return getSetting(CLOISTER_SPAWNS_PAUSED_KEY) === 'true';
+  } catch (err) {
+    console.warn('[control-settings] Failed to read Cloister spawn pause flag:', err);
+    return false;
+  }
+}
+
+/** Synchronous set of the Cloister spawn pause flag. */
+export function setCloisterSpawnsPausedSync(paused: boolean): void {
+  setSetting(CLOISTER_SPAWNS_PAUSED_KEY, paused ? 'true' : 'false');
 }
 
 /** Drop-in for getFlywheelActiveRunId() from app-settings.ts. */

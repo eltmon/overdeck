@@ -140,6 +140,7 @@ temp/
 .pan/convoy/
 .pan/prompts/
 .pan/pid/
+.pan/test/
 .pan/continue.json
 .pan/feedback/
 .pan/followup-issues.txt

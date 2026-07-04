@@ -1,57 +1,58 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-07-03T10:53:55.565Z · model: claude-opus-4-8 · open: 594_
+_Last sequenced: 2026-07-04T14:06:22.621Z · model: claude-opus-4-8 · open: 535_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 1 | PAN-2261 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 2 | PAN-2260 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 3 | PAN-2172 | M | critical | ok |  | PAN-2170 | Prevents inert agents that look healthy but do no work. |
-| 4 | PAN-2157 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 5 | PAN-1456 | L | critical | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 6 | PAN-806 | L | critical | needs-refinement |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 7 | PAN-2194 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 8 | PAN-2158 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 9 | PAN-1861 | M | critical | ok |  |  | Stops resumed conversations from silently losing transcript writes. |
-| 10 | PAN-1783 | M | critical | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
+| 10 | PAN-2341 | M | critical | ok |  |  | Failed verdict POSTs leave advancing agents zombied, filling the ceiling until the whole pipeline freezes. |
 | 11 | PAN-1560 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
+| 11 | PAN-2318 | L | critical | ok |  |  | Dashboard event-loop starvation makes the UI unusable under load; PRD-backed deacon extraction + active-issue scoping. |
 | 12 | PAN-2270 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
+| 12 | PAN-2325 | S | critical | ok |  |  | Tracked .pan/test/result.json at a shared path guarantees a merge conflict on EVERY merge — gitignore it. |
 | 13 | PAN-2186 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
+| 13 | PAN-2311 | M | critical | ok |  |  | Strike-PR/UAT-batch merges never reconcile per-issue record → done issues stuck 'pending'; adds merge verifier. |
 | 14 | PAN-2179 | M | critical | ok |  |  | Prevents inert agents that look healthy but do no work. |
 | 15 | PAN-2169 | M | critical | ok |  |  | Prevents inert agents that look healthy but do no work. |
 | 16 | PAN-2285 | M | critical | ok |  |  | Per-agent codex auth.json rots, wedging agents in a silent 401 token_revoked loop; substrate liveness fix. |
 | 17 | PAN-2108 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 18 | PAN-1698 | M | critical | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
+| 18 | PAN-2336 | M | critical | ok |  |  | create-beads.test CI flake ('table not found: issues') reddens main, blocking the merge gate for every PR. |
 | 19 | PAN-1491 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 20 | PAN-1214 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 21 | PAN-1213 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
+| 20 | PAN-2338 | M | critical | ok |  |  | Boot Reconciliation lists every historical stopped agent; 'Resume all' silently no-ops — gate candidates + report outcomes. |
 | 22 | PAN-1830 | M | critical | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
+| 22 | PAN-2292 | M | critical | ok |  |  | Peer-port guard regression crash-loops every post-guard workspace server, cascading host dashboard restart churn. |
 | 23 | PAN-2228 | M | critical | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 23 | PAN-2168 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 24 | PAN-2148 | XL | critical | ok |  |  | Shrinks oversized substrate files so future changes stay tractable. |
+| 24 | PAN-2323 | M | high | ok |  |  | Flywheel respawn after crash starts a blank session instead of resuming the live rich one — orphans operator direction. |
+| 25 | PAN-2307 | M | high | ok |  |  | Respawned flywheel sits idle with no kickoff; stuck-remediation starved when dashboard lifetime < patrol duration. |
 | 26 | PAN-2259 | M | critical | ok |  |  | GitHub quota failures block close, edit, and orchestration paths. |
-| 26 | PAN-2154 | L | critical | ok |  |  | Shrinks oversized substrate files so future changes stay tractable. |
+| 26 | PAN-2293 | M | high | ok |  |  | Patrol cycles >180s read as stale heartbeat mid-cycle; watchdog kills the dashboard on first observation. |
+| 27 | PAN-2337 | M | high | ok |  |  | In-place build under a live dashboard breaks new PTY-supervisor spawns until restart — pin artifact + atomic reload. |
 | 28 | PAN-2165 | M | critical | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
+| 28 | PAN-2322 | M | high | ok |  |  | Workspace/UAT agent can seize primary :3011 via an override env var — harden the host dashboard-port guard. |
 | 29 | PAN-807 | L | critical | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
-| 29 | PAN-2192 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
+| 29 | PAN-2331 | S | high | ok |  |  | Codex rate-limit 'switch model?' modal stalls autonomous agents with no auto-dismiss — freezes work. |
+| 30 | PAN-2333 | M | high | ok |  |  | Codex weekly-quota exhaustion freezes agents at an unanswerable modal — need resource alert + downshift/pause policy. |
 | 31 | PAN-1520 | L | critical | needs-refinement |  |  | Substrate work; improves the foundation required for reliable shipping. |
+| 31 | PAN-2300 | M | high | ok |  |  | pan done --strike fails after squash-merge (ancestry check) + strike kickoff wrongly instructs 'merge to main'. |
 | 32 | PAN-1497 | M | critical | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 33 | PAN-1650 | L | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 34 | PAN-1557 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 35 | PAN-1452 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 36 | PAN-804 | L | critical | needs-refinement |  |  | Substrate work; improves the foundation required for reliable shipping. |
-| 36 | PAN-2153 | L | high | ok |  |  | Shrinks oversized substrate files so future changes stay tractable. |
 | 38 | PAN-1113 | M | high | ok |  |  | Restores conversation/session visibility across non-Claude harnesses. |
-| 39 | PAN-2178 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 40 | PAN-2170 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
+| 40 | PAN-2324 | M | high | ok |  |  | Close-out label transition fails atomically on missing 'in-planning' label — closed issues keep stale labels. |
 | 41 | PAN-2167 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 42 | PAN-2106 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 43 | PAN-1770 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 44 | PAN-1766 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
-| 45 | PAN-1681 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 46 | PAN-1498 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
+| 45 | PAN-2308 | M | high | ok |  | PAN-2292 | Migrate stale generated compose files off PORT=3011 + deacon quarantine for deterministic boot refusals. |
+| 46 | PAN-2294 | M | high | ok |  |  | Notify the flywheel orchestrator on UAT-train promote so it re-derives a clean ready set instead of a stale batch. |
 | 47 | PAN-1416 | M | high | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
+| 47 | PAN-2297 | S | medium | ok |  |  | Auto-lower file-size baseline on the UAT-batch merge path — shrink-then-merge currently reddens main. |
 | 48 | PAN-955 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 48 | PAN-2257 | M | high | ok |  |  | Prevents inert agents that look healthy but do no work. |
 | 49 | PAN-2283 | M | high | ok |  |  | Wires the merged tiered-execution library so operators can actually enable difficulty-routed dispatch (off by default). |
@@ -62,39 +63,31 @@ _Last sequenced: 2026-07-03T10:53:55.565Z · model: claude-opus-4-8 · open: 594
 | 55 | PAN-2229 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 56 | PAN-2190 | L | high | ok |  |  | Shrinks oversized substrate files so future changes stay tractable. |
 | 57 | PAN-2149 | L | high | ok |  |  | Shrinks oversized substrate files so future changes stay tractable. |
-| 58 | PAN-2147 | XL | high | ok |  |  | Shrinks oversized substrate files so future changes stay tractable. |
 | 59 | PAN-2265 | M | high | ok |  |  | GitHub quota failures block close, edit, and orchestration paths. |
 | 60 | PAN-2006 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 61 | PAN-1499 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 62 | PAN-933 | M | high | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 63 | PAN-334 | M | high | ok |  |  | Prevents inert agents that look healthy but do no work. |
 | 63 | PAN-2254 | M | high | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
-| 64 | PAN-321 | M | high | ok |  |  | Prevents inert agents that look healthy but do no work. |
 | 65 | PAN-2080 | M | high | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
-| 67 | PAN-1705 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 68 | PAN-1207 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 69 | PAN-1198 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 70 | PAN-2145 | XL | high | ok |  |  | Shrinks oversized substrate files so future changes stay tractable. |
 | 71 | PAN-1767 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 72 | PAN-2189 | L | high | ok |  |  | Shrinks oversized substrate files so future changes stay tractable. |
 | 73 | PAN-1828 | M | high | ok |  |  | Prevents inert agents that look healthy but do no work. |
-| 74 | PAN-1434 | M | high | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 75 | PAN-2193 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 76 | PAN-2095 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 76 | PAN-2255 | M | high | ok |  | PAN-2228 | Routine backlog item; rank reflects current shipping leverage. |
 | 77 | PAN-1618 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 78 | PAN-1209 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
-| 80 | PAN-1730 | M | high | ok |  |  | Restores conversation/session visibility across non-Claude harnesses. |
 | 81 | PAN-2188 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 82 | PAN-2187 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 83 | PAN-1588 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 84 | PAN-1246 | M | high | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 85 | PAN-1219 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 85 | PAN-1917 | L | high | ok |  |  | Restores conversation/session visibility across non-Claude harnesses. |
 | 86 | PAN-1217 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 87 | PAN-813 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 89 | PAN-2202 | L | high | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
-| 90 | PAN-1570 | L | high | ok |  |  | Prevents inert agents that look healthy but do no work. |
+| 90 | PAN-2288 | M | medium | ok |  |  | Lossless auto-migration of dirty-founded tmux servers + boot-time ensure call (PAN-1798 follow-up). |
 | 91 | PAN-1444 | M | high | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 92 | PAN-1440 | M | high | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 93 | PAN-1436 | M | high | needs-refinement |  |  | Prevents inert agents that look healthy but do no work. |
@@ -105,7 +98,7 @@ _Last sequenced: 2026-07-03T10:53:55.565Z · model: claude-opus-4-8 · open: 594
 | 98 | PAN-1556 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 99 | PAN-1433 | M | high | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 100 | PAN-1330 | M | high | ok |  |  | Restores conversation/session visibility across non-Claude harnesses. |
-| 100 | PAN-2227 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
+| 100 | PAN-2334 | M | medium | ok |  |  | Write a Definition of Ready + wire it into the pickup gate to catch junk issues before an agent is spawned. |
 | 101 | PAN-675 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 102 | PAN-629 | M | high | ok |  |  | GitHub quota failures block close, edit, and orchestration paths. |
 | 104 | PAN-2231 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
@@ -113,11 +106,9 @@ _Last sequenced: 2026-07-03T10:53:55.565Z · model: claude-opus-4-8 · open: 594
 | 106 | PAN-1454 | L | high | needs-refinement |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 107 | PAN-2059 | XL | high | ok | ✓ |  | Container; ranks by child impact, not directly pickable. |
 | 108 | PAN-1889 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 109 | PAN-1594 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 110 | PAN-1578 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 111 | PAN-1558 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 112 | PAN-1254 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
-| 112 | PAN-2156 | L | high | ok |  |  | Shrinks oversized substrate files so future changes stay tractable. |
 | 113 | PAN-1253 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 114 | PAN-630 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 116 | PAN-2079 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
@@ -126,9 +117,7 @@ _Last sequenced: 2026-07-03T10:53:55.565Z · model: claude-opus-4-8 · open: 594
 | 119 | PAN-1451 | L | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 120 | PAN-1218 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 121 | PAN-1561 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
-| 121 | PAN-2081 | L | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 122 | PAN-1538 | M | high | ok |  |  | Restores conversation/session visibility across non-Claude harnesses. |
-| 122 | PAN-2151 | L | high | ok |  |  | Shrinks oversized substrate files so future changes stay tractable. |
 | 123 | PAN-1357 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 126 | PAN-1915 | M | high | ok |  |  | Closes security exposure in local/operator configuration. |
 | 127 | PAN-2027 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
@@ -153,58 +142,45 @@ _Last sequenced: 2026-07-03T10:53:55.565Z · model: claude-opus-4-8 · open: 594
 | 146 | PAN-1245 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 147 | PAN-1208 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 148 | PAN-1154 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
-| 149 | PAN-780 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 150 | PAN-687 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
+| 150 | PAN-2287 | XS | low | ok |  |  | Every supervisor.log line is written twice (appendFile + stdio redirect) — misled incident triage. |
 | 151 | PAN-1824 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 152 | PAN-2280 | M | medium | ok |  | PAN-2252 | Stops resumed conversations from silently losing transcript writes. |
-| 153 | PAN-2163 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 154 | PAN-1937 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 155 | PAN-1897 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 156 | PAN-1816 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 157 | PAN-1674 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 158 | PAN-1672 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 159 | PAN-1564 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 160 | PAN-1490 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 161 | PAN-1446 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 162 | PAN-1438 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 163 | PAN-1392 | L | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 164 | PAN-1386 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 165 | PAN-1247 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 166 | PAN-1243 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 167 | PAN-1173 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 168 | PAN-1131 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 169 | PAN-1130 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 170 | PAN-1129 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 171 | PAN-1027 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 172 | PAN-929 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 173 | PAN-928 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
-| 174 | PAN-899 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
-| 175 | PAN-890 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 176 | PAN-886 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 177 | PAN-681 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 178 | PAN-658 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
-| 179 | PAN-605 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 180 | PAN-324 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
+| 180 | PAN-2319 | S | low | ok |  |  | 'COST LIMIT REACHED for undefined' spams every cycle — fix undefined subject, throttle, configurable default. |
 | 181 | PAN-1122 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 182 | PAN-1565 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 183 | PAN-1461 | M | medium | ok |  |  | Restores conversation/session visibility across non-Claude harnesses. |
 | 184 | PAN-1128 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
-| 185 | PAN-1038 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 186 | PAN-900 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
-| 186 | PAN-1718 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 187 | PAN-764 | M | medium | ok |  |  | GitHub quota failures block close, edit, and orchestration paths. |
-| 188 | PAN-673 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
-| 189 | PAN-2181 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 190 | PAN-1234 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 190 | PAN-2086 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 191 | PAN-1232 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 194 | PAN-1837 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
-| 195 | PAN-1708 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 196 | PAN-1670 | M | medium | ok |  |  | Stops resumed conversations from silently losing transcript writes. |
 | 197 | PAN-1643 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 198 | PAN-1641 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 199 | PAN-1553 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 200 | PAN-1482 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
+| 200 | PAN-2295 | XL | medium | needs-refinement |  |  | Built-in web-browser surface (openable like terminal/Codex) + native Agentation integration — needs design. |
 | 201 | PAN-771 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 202 | PAN-752 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 203 | PAN-702 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
@@ -226,7 +202,6 @@ _Last sequenced: 2026-07-03T10:53:55.565Z · model: claude-opus-4-8 · open: 594
 | 219 | PAN-1862 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 220 | PAN-1852 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 221 | PAN-1775 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 222 | PAN-1706 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 223 | PAN-1696 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 224 | PAN-1610 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 225 | PAN-1102 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
@@ -241,7 +216,6 @@ _Last sequenced: 2026-07-03T10:53:55.565Z · model: claude-opus-4-8 · open: 594
 | 234 | PAN-1795 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 235 | PAN-1673 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 236 | PAN-1624 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
-| 237 | PAN-1582 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 238 | PAN-1530 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 239 | PAN-1449 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 240 | PAN-1445 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
@@ -255,25 +229,28 @@ _Last sequenced: 2026-07-03T10:53:55.565Z · model: claude-opus-4-8 · open: 594
 | 248 | PAN-1896 | M | medium | ok |  |  | Restores conversation/session visibility across non-Claude harnesses. |
 | 249 | PAN-1577 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 250 | PAN-1533 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 251 | PAN-2251 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
+| 250 | PAN-2347 | M | low | ok |  |  | Refresh AGENT-STATE-PLANES.md into the definitive, source-verified state-storage reference. |
 | 252 | PAN-2212 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 253 | PAN-2211 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 254 | PAN-2210 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 255 | PAN-2209 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
+| 255 | PAN-2344 | M | low | ok |  |  | Rewrite KANBAN-MODEL.md to match the current pipeline phases, gates, and two-door state model. |
 | 256 | PAN-2198 | L | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 257 | PAN-2197 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 258 | PAN-2053 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 259 | PAN-2032 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 260 | PAN-2004 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
+| 260 | PAN-2345 | S | low | ok |  |  | Refresh pan-done.md to document the current done→rebase→push→PR→review chain and verify-on-main pause. |
 | 261 | PAN-1995 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 262 | PAN-1990 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
+| 262 | PAN-2343 | S | low | ok |  |  | Rewrite MISSION-CONTROL.md against current dashboard architecture and state-label computation. |
 | 263 | PAN-1988 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 264 | PAN-1985 | L | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 265 | PAN-1980 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
+| 265 | PAN-2346 | S | low | ok |  |  | Refresh AGENT_TYPES_INDEX.md to cover the current agent-ID patterns and role/ceiling semantics. |
 | 266 | PAN-1967 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 267 | PAN-1966 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 268 | PAN-1965 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 269 | PAN-1963 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
+| 268 | PAN-2348 | S | low | ok |  | PAN-2347 | Migrate still-relevant STATE-STORAGE-AUDIT.md content into living docs, then delete the frozen audit. |
 | 270 | PAN-1914 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 271 | PAN-1895 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 272 | PAN-1874 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
@@ -289,9 +266,7 @@ _Last sequenced: 2026-07-03T10:53:55.565Z · model: claude-opus-4-8 · open: 594
 | 282 | PAN-1740 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 283 | PAN-1739 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 284 | PAN-1735 | L | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 285 | PAN-1734 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 286 | PAN-1728 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 287 | PAN-1726 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 288 | PAN-1720 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 289 | PAN-1676 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 290 | PAN-1668 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
@@ -299,15 +274,11 @@ _Last sequenced: 2026-07-03T10:53:55.565Z · model: claude-opus-4-8 · open: 594
 | 292 | PAN-1666 | XL | medium | ok | ✓ |  | Container; ranks by child impact, not directly pickable. |
 | 293 | PAN-1657 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 294 | PAN-1656 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 295 | PAN-1622 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 296 | PAN-1620 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 297 | PAN-1619 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 298 | PAN-1581 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 299 | PAN-1542 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 300 | PAN-1453 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 301 | PAN-1432 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 302 | PAN-1244 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 303 | PAN-1165 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
+| 303 | PAN-1165 | M | medium | needs-refinement |  |  | Hardens the pipeline paths that ship all other work. |
 | 304 | PAN-1147 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 305 | PAN-1136 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 306 | PAN-1133 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
@@ -320,7 +291,6 @@ _Last sequenced: 2026-07-03T10:53:55.565Z · model: claude-opus-4-8 · open: 594
 | 313 | PAN-943 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 314 | PAN-938 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 315 | PAN-908 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 316 | PAN-835 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 317 | PAN-833 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 318 | PAN-832 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 319 | PAN-778 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
@@ -343,14 +313,10 @@ _Last sequenced: 2026-07-03T10:53:55.565Z · model: claude-opus-4-8 · open: 594
 | 336 | PAN-480 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 337 | PAN-476 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 338 | PAN-471 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 339 | PAN-456 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 340 | PAN-371 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 341 | PAN-306 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 342 | PAN-637 | M | medium | ok |  |  | Prevents inert agents that look healthy but do no work. |
 | 343 | PAN-531 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 344 | PAN-38 | M | medium | stale |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 345 | PAN-37 | M | medium | stale |  |  | Prevents workspace servers from impersonating production dashboard. |
-| 345 | PAN-2224 | L | medium | ok |  |  | Restores conversation/session visibility across non-Claude harnesses. |
 | 346 | PAN-1868 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 347 | PAN-1488 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 349 | PAN-2282 | M | medium | ok |  |  | Restores conversation/session visibility across non-Claude harnesses. |
@@ -363,7 +329,6 @@ _Last sequenced: 2026-07-03T10:53:55.565Z · model: claude-opus-4-8 · open: 594
 | 356 | PAN-1646 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 357 | PAN-1644 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 358 | PAN-1623 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 359 | PAN-1621 | M | medium | ok |  |  | Restores conversation/session visibility across non-Claude harnesses. |
 | 360 | PAN-1571 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 361 | PAN-1552 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 362 | PAN-1545 | M | medium | ok |  |  | Restores conversation/session visibility across non-Claude harnesses. |
@@ -379,13 +344,10 @@ _Last sequenced: 2026-07-03T10:53:55.565Z · model: claude-opus-4-8 · open: 594
 | 372 | PAN-565 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 373 | PAN-1776 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 374 | PAN-1685 | L | medium | needs-refinement |  |  | Prevents workspace servers from impersonating production dashboard. |
-| 375 | PAN-1547 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 376 | PAN-1439 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 377 | PAN-1164 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 378 | PAN-1101 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 379 | PAN-947 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 380 | PAN-608 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 380 | PAN-2208 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 381 | PAN-247 | M | medium | stale |  |  | Hardens the pipeline paths that ship all other work. |
 | 382 | PAN-113 | M | medium | stale |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 384 | PAN-2070 | M | low | ok |  |  | Hardens the pipeline paths that ship all other work. |
@@ -397,7 +359,6 @@ _Last sequenced: 2026-07-03T10:53:55.565Z · model: claude-opus-4-8 · open: 594
 | 390 | PAN-1227 | M | low | needs-refinement |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 391 | PAN-1226 | L | low | needs-refinement |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 392 | PAN-633 | M | low | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 393 | PAN-487 | L | low | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 394 | PAN-1654 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 395 | PAN-853 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 396 | PAN-810 | M | low | ok |  |  | Hardens the pipeline paths that ship all other work. |
@@ -405,6 +366,7 @@ _Last sequenced: 2026-07-03T10:53:55.565Z · model: claude-opus-4-8 · open: 594
 | 398 | PAN-774 | M | low | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 399 | PAN-663 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 400 | PAN-589 | M | low | ok |  |  | Hardens the pipeline paths that ship all other work. |
+| 400 | PAN-2335 | M | low | ok |  |  | Find-only categorized junk-backlog review document; operator-gated, keep on backlog (do NOT action). |
 | 401 | PAN-454 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 402 | PAN-407 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 403 | PAN-2266 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
@@ -428,9 +390,6 @@ _Last sequenced: 2026-07-03T10:53:55.565Z · model: claude-opus-4-8 · open: 594
 | 421 | PAN-1991 | L | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 422 | PAN-1987 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 423 | PAN-1968 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 424 | PAN-1955 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 425 | PAN-1954 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 426 | PAN-1953 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 427 | PAN-1949 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 428 | PAN-1936 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 429 | PAN-1926 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
@@ -441,17 +400,13 @@ _Last sequenced: 2026-07-03T10:53:55.565Z · model: claude-opus-4-8 · open: 594
 | 434 | PAN-1839 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 435 | PAN-1782 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 436 | PAN-1754 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 437 | PAN-1729 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 438 | PAN-1710 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 439 | PAN-1671 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 440 | PAN-1669 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 441 | PAN-1640 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 442 | PAN-1592 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 443 | PAN-1573 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 444 | PAN-1550 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 445 | PAN-1548 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 446 | PAN-1524 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 447 | PAN-1493 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 448 | PAN-1489 | M | low | needs-refinement |  |  | Hardens the pipeline paths that ship all other work. |
 | 449 | PAN-1481 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 450 | PAN-1480 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
@@ -460,7 +415,6 @@ _Last sequenced: 2026-07-03T10:53:55.565Z · model: claude-opus-4-8 · open: 594
 | 453 | PAN-1442 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 454 | PAN-1325 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 455 | PAN-1242 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 456 | PAN-1238 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 457 | PAN-1222 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 458 | PAN-1166 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 459 | PAN-1153 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
@@ -473,14 +427,11 @@ _Last sequenced: 2026-07-03T10:53:55.565Z · model: claude-opus-4-8 · open: 594
 | 466 | PAN-1041 | M | low | needs-refinement |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 467 | PAN-962 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 468 | PAN-958 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 469 | PAN-948 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 470 | PAN-944 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 471 | PAN-927 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 472 | PAN-904 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 473 | PAN-903 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 474 | PAN-902 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 475 | PAN-863 | M | low | needs-refinement |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 476 | PAN-838 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 477 | PAN-790 | L | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 478 | PAN-786 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 479 | PAN-773 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
@@ -490,15 +441,12 @@ _Last sequenced: 2026-07-03T10:53:55.565Z · model: claude-opus-4-8 · open: 594
 | 483 | PAN-750 | L | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 484 | PAN-749 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 485 | PAN-730 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 486 | PAN-683 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 487 | PAN-660 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 488 | PAN-623 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 489 | PAN-607 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 490 | PAN-592 | M | low | needs-refinement |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 491 | PAN-570 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 492 | PAN-564 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 493 | PAN-554 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 494 | PAN-552 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 495 | PAN-548 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 496 | PAN-546 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 497 | PAN-543 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
@@ -511,20 +459,16 @@ _Last sequenced: 2026-07-03T10:53:55.565Z · model: claude-opus-4-8 · open: 594
 | 504 | PAN-438 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 505 | PAN-399 | M | low | needs-refinement |  |  | Hardens the pipeline paths that ship all other work. |
 | 506 | PAN-198 | M | low | needs-refinement |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 507 | PAN-1838 | M | low | needs-refinement |  |  | Prevents workspace servers from impersonating production dashboard. |
-| 508 | PAN-111 | M | low | stale |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 509 | PAN-743 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 510 | PAN-701 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 511 | PAN-175 | M | low | stale |  |  | Restores conversation/session visibility across non-Claude harnesses. |
 | 512 | PAN-2008 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 513 | PAN-1984 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 514 | PAN-49 | M | low | stale |  |  | Hardens the pipeline paths that ship all other work. |
-| 515 | PAN-1103 | M | low | needs-refinement |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 516 | PAN-826 | M | low | needs-refinement |  |  | Shrinks oversized substrate files so future changes stay tractable. |
 | 517 | PAN-802 | M | low | needs-refinement |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 518 | PAN-700 | M | low | needs-refinement |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 519 | PAN-1653 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 520 | PAN-1494 | M | low | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 521 | PAN-244 | M | low | stale |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 522 | PAN-2073 | M | low | ok |  |  | Documentation improvement; useful but lower shipping leverage. |
 | 523 | PAN-2072 | M | low | ok |  |  | Documentation improvement; useful but lower shipping leverage. |
@@ -546,7 +490,6 @@ _Last sequenced: 2026-07-03T10:53:55.565Z · model: claude-opus-4-8 · open: 594
 | 539 | PAN-1040 | M | low | needs-refinement |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 540 | PAN-984 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 541 | PAN-901 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 542 | PAN-834 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 543 | PAN-791 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 544 | PAN-654 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 545 | PAN-591 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
@@ -568,13 +511,11 @@ _Last sequenced: 2026-07-03T10:53:55.565Z · model: claude-opus-4-8 · open: 594
 | 561 | PAN-1223 | M | low | needs-refinement |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 562 | PAN-898 | M | low | needs-refinement |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 563 | PAN-817 | M | low | needs-refinement |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 563 | PAN-1894 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 564 | PAN-797 | M | low | needs-refinement |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 565 | PAN-713 | M | low | needs-refinement |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 567 | PAN-245 | M | low | stale |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 568 | PAN-1684 | M | low | ok |  |  | Documentation improvement; useful but lower shipping leverage. |
 | 569 | PAN-674 | M | low | ok |  |  | Documentation improvement; useful but lower shipping leverage. |
-| 570 | PAN-656 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 571 | PAN-2074 | M | low | needs-refinement |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 572 | PAN-924 | M | low | needs-refinement |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 573 | PAN-646 | M | low | needs-refinement |  |  | Routine backlog item; rank reflects current shipping leverage. |
@@ -602,26 +543,6 @@ _Last sequenced: 2026-07-03T10:53:55.565Z · model: claude-opus-4-8 · open: 594
 
 ## Rationale detail
 
-### PAN-2261 (rank 1)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-2260 (rank 2)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-2172 (rank 3)
-
-The body is merged/verifying, but the host-mode kickoff failure class remains high impact while open.
-
-### PAN-2157 (rank 4)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-1456 (rank 5)
-
-High score reflects direct risk to pipeline progress, operator recovery, or autonomous shipping paths.
-
 ### PAN-806 (rank 6)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
@@ -630,29 +551,33 @@ Substrate or architecture work ranks high because stable orchestration is the pr
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
-### PAN-2158 (rank 8)
+### PAN-2341 (rank 10)
 
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-1861 (rank 9)
-
-High score reflects direct risk to pipeline progress, operator recovery, or autonomous shipping paths.
-
-### PAN-1783 (rank 10)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
+A transient server bug leaves completed review/test agents holding advancing-ceiling slots forever, freezing all advancement. Self-healing journal reconcile + zombie reap on boot/patrol is a critical liveness fix for the shipping pipeline itself.
 
 ### PAN-1560 (rank 11)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
+### PAN-2318 (rank 11)
+
+Under real load the dashboard reconnect-storms and /api/issues takes seconds, a feedback loop that has been patched 3× without fixing the shape. The PRD-backed fix (extract deacon, invert active-issue filter, purge sync reads) is core substrate; pinned in-review.
+
 ### PAN-2270 (rank 12)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
+### PAN-2325 (rank 12)
+
+A workspace-local recovery artifact is committed at a fixed shared path, so every feature branch conflicts on it forever. Trivial gitignore fix that unblocks every merge; pinned in-review.
+
 ### PAN-2186 (rank 13)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
+
+### PAN-2311 (rank 13)
+
+Non-standard merge paths skip record/label/branch reconciliation, leaving 18 genuinely-merged issues stuck pending. Fixing reconciliation + adding a merge-fulfillment verifier restores pipeline truth; labeled critical, pinned in-review.
 
 ### PAN-2179 (rank 14)
 
@@ -670,61 +595,81 @@ A stale seed-once copy of ~/.codex/auth.json forks the OAuth refresh chain, so r
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
-### PAN-1698 (rank 18)
+### PAN-2336 (rank 18)
 
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
+A beads-DB setup race reddens main on unrelated commits; red main empties the merge gate (Mission #1). Deterministic schema provisioning is a substrate reliability fix.
 
 ### PAN-1491 (rank 19)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
-### PAN-1214 (rank 20)
+### PAN-2338 (rank 20)
 
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-1213 (rank 21)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
+Every dashboard restart shows weeks-old terminal agents as resume candidates and resumes zero with an opaque message. Gating to genuinely-interrupted work + per-agent outcomes + stale-row GC is substrate hygiene; overlaps PAN-2284.
 
 ### PAN-1830 (rank 22)
 
 High score reflects direct risk to pipeline progress, operator recovery, or autonomous shipping paths.
 
+### PAN-2292 (rank 22)
+
+A dashboard-identity guard refuses PORT=3011 but the devcontainer template still sets it, so every new workspace server crash-loops by design. Regression fix; merged and verifying on main.
+
 ### PAN-2228 (rank 23)
 
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
+Two-door delivery hardening now has a PRD + needs-handoff; stays critical substrate tied to zombie-kickoff (PAN-2179).
 
 ### PAN-2168 (rank 23)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
-### PAN-2148 (rank 24)
+### PAN-2323 (rank 24)
 
-The body confirms this is behavior-preserving decomposition of a 4k-line server route, so it stays high substrate work.
+A crash-respawned orchestrator reads only resume-session.json (written on graceful pause), so it boots blank and silently abandons the operator's in-flight drain-mode session. Resume-from-live-session fix protects orchestration continuity.
+
+### PAN-2307 (rank 25)
+
+A respawned orchestrator holds the singleton slot but never gets a tick, and remediation lives at the tail of long patrols killed by watchdog churn. Kickoff-on-respawn + early/independent liveness check; merged, verifying on main.
 
 ### PAN-2259 (rank 26)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
-### PAN-2154 (rank 26)
+### PAN-2293 (rank 26)
 
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
+PAN-2219 stamped the heartbeat at cycle start but long remediation cycles still exceed the 180s threshold, and stale = immediate restart. Deferral like the health path stops the churn; merged, verifying on main.
+
+### PAN-2337 (rank 27)
+
+A mid-flight dist rewrite wounds the running server's spawns with no restart. Boot-pinning the supervisor artifact + atomic staging swap in pan reload closes a real deploy footgun.
 
 ### PAN-2165 (rank 28)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
+### PAN-2322 (rank 28)
+
+The peer-port guard has an override that a workspace/UAT agent could set to impersonate the production dashboard. Security hardening of the single-dashboard invariant.
+
 ### PAN-807 (rank 29)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
-### PAN-2192 (rank 29)
+### PAN-2331 (rank 29)
 
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
+When codex quota runs low, an interactive model-switch modal blocks the agent input loop; many agents froze at once. A narrow launcher/config auto-dismiss is a quick, high-value liveness fix.
+
+### PAN-2333 (rank 30)
+
+Quota exhaustion currently produces a wall of frozen agents and dead-end NEEDS-YOU cards. A proactive quota resource alert + deliberate downshift/pause policy prevents silent agent freezes; broader than PAN-2331.
 
 ### PAN-1520 (rank 31)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
+
+### PAN-2300 (rank 31)
+
+Red-main strike fixes can't complete their handoff (branch never an ancestor of a squash-merge) and the kickoff nudges direct-to-main, undermining the no-unreviewed-main invariant. Two focused fixes to the strike completion path.
 
 ### PAN-1497 (rank 32)
 
@@ -746,21 +691,17 @@ Substrate or architecture work ranks high because stable orchestration is the pr
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
-### PAN-2153 (rank 36)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
 ### PAN-1113 (rank 38)
 
 Top-tier item because it has near-term operator value and a clear path to verification.
 
-### PAN-2178 (rank 39)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
 ### PAN-2170 (rank 40)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
+
+### PAN-2324 (rank 40)
+
+A non-idempotent label transition aborts the whole close-out relabel when an expected label is absent, stranding stale in-review/merged labels on closed issues. Make the transition tolerant/atomic.
 
 ### PAN-2167 (rank 41)
 
@@ -778,17 +719,21 @@ Substrate or architecture work ranks high because stable orchestration is the pr
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
-### PAN-1681 (rank 45)
+### PAN-2308 (rank 45)
 
-Top-tier item because it has near-term operator value and a clear path to verification.
+Follow-up hardening to PAN-2292: live workspaces still carry PORT=3011, and the deacon burns restart attempts on deterministic ServerConfig refusals. Migration pass + quarantine stop the churn.
 
-### PAN-1498 (rank 46)
+### PAN-2294 (rank 46)
 
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
+Without an immediate signal the reconciler rebuilds a not-ready, merge-clickable batch from a stale snapshot. Notifying the orchestrator to re-run Observe→Act on promote closes the gap; in-progress.
 
 ### PAN-1416 (rank 47)
 
 Top-tier item because it has near-term operator value and a clear path to verification.
+
+### PAN-2297 (rank 47)
+
+The PAN-2227 baseline auto-lowering doesn't fire on UAT-batch merges, so a shrunk file leaves a stale-high baseline that fails lint:file-size on main. Wire the same lowering into the UAT merge/write path; planned.
 
 ### PAN-955 (rank 48)
 
@@ -830,10 +775,6 @@ Substrate or architecture work ranks high because stable orchestration is the pr
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
-### PAN-2147 (rank 58)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
 ### PAN-2265 (rank 59)
 
 Top-tier item because it has near-term operator value and a clear path to verification.
@@ -841,10 +782,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
 ### PAN-2006 (rank 60)
 
 Top-tier item because it has near-term operator value and a clear path to verification.
-
-### PAN-1499 (rank 61)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
 ### PAN-933 (rank 62)
 
@@ -858,17 +795,9 @@ Top-tier item because it has near-term operator value and a clear path to verifi
 
 Top-tier item because it has near-term operator value and a clear path to verification.
 
-### PAN-321 (rank 64)
-
-Top-tier item because it has near-term operator value and a clear path to verification.
-
 ### PAN-2080 (rank 65)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-1705 (rank 67)
-
-Top-tier item because it has near-term operator value and a clear path to verification.
 
 ### PAN-1207 (rank 68)
 
@@ -894,10 +823,6 @@ Substrate or architecture work ranks high because stable orchestration is the pr
 
 Top-tier item because it has near-term operator value and a clear path to verification.
 
-### PAN-1434 (rank 74)
-
-Top-tier item because it has near-term operator value and a clear path to verification.
-
 ### PAN-2193 (rank 75)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
@@ -918,9 +843,13 @@ Substrate or architecture work ranks high because stable orchestration is the pr
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
-### PAN-1730 (rank 80)
+### PAN-2188 (rank 81)
 
-Top-tier item because it has near-term operator value and a clear path to verification.
+Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
+
+### PAN-1917 (rank 85)
+
+The body is a UX/data-page redesign with a PRD, but it remains behind the underlying multi-harness transcript pipeline.
 
 
 <!-- machine-readable; do not hand-edit below this line -->
@@ -929,78 +858,11 @@ Top-tier item because it has near-term operator value and a clear path to verifi
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-07-03T10:53:55.565Z",
+  "generatedAt": "2026-07-04T14:06:22.621Z",
   "model": "claude-opus-4-8",
   "pass": "incremental",
-  "openCount": 594,
+  "openCount": 535,
   "nodes": [
-    {
-      "issue": "PAN-2261",
-      "rank": 1,
-      "size": "M",
-      "importance": "critical",
-      "score": 99,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
-      "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2260",
-      "rank": 2,
-      "size": "M",
-      "importance": "critical",
-      "score": 99,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
-      "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2172",
-      "rank": 3,
-      "size": "M",
-      "importance": "critical",
-      "score": 99,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-2170"
-      ],
-      "why": "Prevents inert agents that look healthy but do no work.",
-      "rationale": "The body is merged/verifying, but the host-mode kickoff failure class remains high impact while open.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2157",
-      "rank": 4,
-      "size": "M",
-      "importance": "critical",
-      "score": 99,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
-      "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1456",
-      "rank": 5,
-      "size": "L",
-      "importance": "critical",
-      "score": 99,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Bug fix with direct operator or pipeline reliability impact.",
-      "rationale": "High score reflects direct risk to pipeline progress, operator recovery, or autonomous shipping paths.",
-      "gate": "auto",
-      "planning": "auto"
-    },
     {
       "issue": "PAN-806",
       "rank": 6,
@@ -1023,45 +885,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "ok",
       "dependsOn": [],
       "why": "Hardens the pipeline paths that ship all other work.",
-      "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2158",
-      "rank": 8,
-      "size": "M",
-      "importance": "critical",
-      "score": 99,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
-      "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1861",
-      "rank": 9,
-      "size": "M",
-      "importance": "critical",
-      "score": 99,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Stops resumed conversations from silently losing transcript writes.",
-      "rationale": "High score reflects direct risk to pipeline progress, operator recovery, or autonomous shipping paths.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1783",
-      "rank": 10,
-      "size": "M",
-      "importance": "critical",
-      "score": 99,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Substrate work; improves the foundation required for reliable shipping.",
       "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
       "gate": "auto",
       "planning": "auto"
@@ -1158,47 +981,8 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-1698",
-      "rank": 18,
-      "size": "M",
-      "importance": "critical",
-      "score": 95,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Substrate work; improves the foundation required for reliable shipping.",
-      "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1491",
       "rank": 19,
-      "size": "M",
-      "importance": "critical",
-      "score": 95,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
-      "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1214",
-      "rank": 20,
-      "size": "M",
-      "importance": "critical",
-      "score": 95,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
-      "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1213",
-      "rank": 21,
       "size": "M",
       "importance": "critical",
       "score": 95,
@@ -1231,7 +1015,7 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "ok",
       "dependsOn": [],
       "why": "Prevents workspace servers from impersonating production dashboard.",
-      "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
+      "rationale": "Two-door delivery hardening now has a PRD + needs-handoff; stays critical substrate tied to zombie-kickoff (PAN-2179).",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1249,19 +1033,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-2148",
-      "rank": 24,
-      "size": "XL",
-      "importance": "critical",
-      "score": 90,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Shrinks oversized substrate files so future changes stay tractable.",
-      "rationale": "The body confirms this is behavior-preserving decomposition of a 4k-line server route, so it stays high substrate work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2259",
       "rank": 26,
       "size": "M",
@@ -1270,19 +1041,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "ok",
       "dependsOn": [],
       "why": "GitHub quota failures block close, edit, and orchestration paths.",
-      "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2154",
-      "rank": 26,
-      "size": "L",
-      "importance": "critical",
-      "score": 87,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Shrinks oversized substrate files so future changes stay tractable.",
       "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
       "gate": "auto",
       "planning": "auto"
@@ -1309,19 +1067,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "ok",
       "dependsOn": [],
       "why": "Substrate work; improves the foundation required for reliable shipping.",
-      "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2192",
-      "rank": 29,
-      "size": "M",
-      "importance": "critical",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
       "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
       "gate": "auto",
       "planning": "auto"
@@ -1405,19 +1150,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "interactive"
     },
     {
-      "issue": "PAN-2153",
-      "rank": 36,
-      "size": "L",
-      "importance": "high",
-      "score": 81,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Shrinks oversized substrate files so future changes stay tractable.",
-      "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1113",
       "rank": 38,
       "size": "M",
@@ -1427,19 +1159,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "dependsOn": [],
       "why": "Restores conversation/session visibility across non-Claude harnesses.",
       "rationale": "Top-tier item because it has near-term operator value and a clear path to verification.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2178",
-      "rank": 39,
-      "size": "M",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
-      "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1504,32 +1223,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "ok",
       "dependsOn": [],
       "why": "Substrate work; improves the foundation required for reliable shipping.",
-      "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1681",
-      "rank": 45,
-      "size": "M",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
-      "rationale": "Top-tier item because it has near-term operator value and a clear path to verification.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1498",
-      "rank": 46,
-      "size": "M",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
       "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
       "gate": "auto",
       "planning": "auto"
@@ -1679,19 +1372,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-2147",
-      "rank": 58,
-      "size": "XL",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Shrinks oversized substrate files so future changes stay tractable.",
-      "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2265",
       "rank": 59,
       "size": "M",
@@ -1718,19 +1398,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-1499",
-      "rank": 61,
-      "size": "M",
-      "importance": "high",
-      "score": 75,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Substrate work; improves the foundation required for reliable shipping.",
-      "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-933",
       "rank": 62,
       "size": "M",
@@ -1746,19 +1413,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
     {
       "issue": "PAN-334",
       "rank": 63,
-      "size": "M",
-      "importance": "high",
-      "score": 75,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Prevents inert agents that look healthy but do no work.",
-      "rationale": "Top-tier item because it has near-term operator value and a clear path to verification.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-321",
-      "rank": 64,
       "size": "M",
       "importance": "high",
       "score": 75,
@@ -1791,19 +1445,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "ok",
       "dependsOn": [],
       "why": "Bug fix with direct operator or pipeline reliability impact.",
-      "rationale": "Top-tier item because it has near-term operator value and a clear path to verification.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1705",
-      "rank": 67,
-      "size": "M",
-      "importance": "high",
-      "score": 73,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
       "rationale": "Top-tier item because it has near-term operator value and a clear path to verification.",
       "gate": "auto",
       "planning": "auto"
@@ -1887,19 +1528,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-1434",
-      "rank": 74,
-      "size": "M",
-      "importance": "high",
-      "score": 71,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Prevents workspace servers from impersonating production dashboard.",
-      "rationale": "Top-tier item because it has near-term operator value and a clear path to verification.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2193",
       "rank": 75,
       "size": "M",
@@ -1967,19 +1595,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-1730",
-      "rank": 80,
-      "size": "M",
-      "importance": "high",
-      "score": 68,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Restores conversation/session visibility across non-Claude harnesses.",
-      "rationale": "Top-tier item because it has near-term operator value and a clear path to verification.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2188",
       "rank": 81,
       "size": "M",
@@ -1988,32 +1603,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "ok",
       "dependsOn": [],
       "why": "Hardens the pipeline paths that ship all other work.",
-      "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2187",
-      "rank": 82,
-      "size": "M",
-      "importance": "high",
-      "score": 67,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
-      "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1588",
-      "rank": 83,
-      "size": "M",
-      "importance": "high",
-      "score": 67,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Substrate work; improves the foundation required for reliable shipping.",
       "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
       "gate": "auto",
       "planning": "auto"
@@ -2088,18 +1677,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "ok",
       "dependsOn": [],
       "why": "Prevents workspace servers from impersonating production dashboard.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1570",
-      "rank": 90,
-      "size": "L",
-      "importance": "high",
-      "score": 65,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Prevents inert agents that look healthy but do no work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2248,19 +1825,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-2227",
-      "rank": 100,
-      "size": "M",
-      "importance": "high",
-      "score": 62,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Substrate work; improves the foundation required for reliable shipping.",
-      "rationale": "The body is merged/verifying-on-main; it remains in the active set but is below unmerged blockers.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2231",
       "rank": 104,
       "size": "M",
@@ -2322,18 +1886,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-1594",
-      "rank": 109,
-      "size": "M",
-      "importance": "high",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Substrate work; improves the foundation required for reliable shipping.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1578",
       "rank": 110,
       "size": "M",
@@ -2390,18 +1942,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "ok",
       "dependsOn": [],
       "why": "Substrate work; improves the foundation required for reliable shipping.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2156",
-      "rank": 112,
-      "size": "L",
-      "importance": "high",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Shrinks oversized substrate files so future changes stay tractable.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2498,30 +2038,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "ok",
       "dependsOn": [],
       "why": "Substrate work; improves the foundation required for reliable shipping.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2081",
-      "rank": 121,
-      "size": "L",
-      "importance": "high",
-      "score": 55,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Substrate work; improves the foundation required for reliable shipping.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2151",
-      "rank": 122,
-      "size": "L",
-      "importance": "high",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Shrinks oversized substrate files so future changes stay tractable.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2805,18 +2321,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-780",
-      "rank": 149,
-      "size": "M",
-      "importance": "medium",
-      "score": 62,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-687",
       "rank": 150,
       "size": "M",
@@ -2852,18 +2356,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       ],
       "why": "Stops resumed conversations from silently losing transcript writes.",
       "rationale": "The new body ties transcript loss to black-holed dashboard hooks and live wedges, making it a critical durability blocker.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2163",
-      "rank": 153,
-      "size": "M",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2928,18 +2420,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-1564",
-      "rank": 159,
-      "size": "M",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Bug fix with direct operator or pipeline reliability impact.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1490",
       "rank": 160,
       "size": "M",
@@ -2990,30 +2470,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
     {
       "issue": "PAN-1386",
       "rank": 164,
-      "size": "M",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1247",
-      "rank": 165,
-      "size": "M",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1243",
-      "rank": 166,
       "size": "M",
       "importance": "medium",
       "score": 58,
@@ -3084,54 +2540,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-929",
-      "rank": 172,
-      "size": "M",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-928",
-      "rank": 173,
-      "size": "M",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Bug fix with direct operator or pipeline reliability impact.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-899",
-      "rank": 174,
-      "size": "M",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Bug fix with direct operator or pipeline reliability impact.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-890",
-      "rank": 175,
-      "size": "M",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-886",
       "rank": 176,
       "size": "M",
@@ -3164,18 +2572,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "ok",
       "dependsOn": [],
       "why": "Prevents workspace servers from impersonating production dashboard.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-605",
-      "rank": 179,
-      "size": "M",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Bug fix with direct operator or pipeline reliability impact.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3240,18 +2636,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-1038",
-      "rank": 185,
-      "size": "M",
-      "importance": "medium",
-      "score": 54,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Bug fix with direct operator or pipeline reliability impact.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-900",
       "rank": 186,
       "size": "M",
@@ -3272,30 +2656,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "ok",
       "dependsOn": [],
       "why": "GitHub quota failures block close, edit, and orchestration paths.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-673",
-      "rank": 188,
-      "size": "M",
-      "importance": "medium",
-      "score": 54,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Bug fix with direct operator or pipeline reliability impact.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1718",
-      "rank": 186,
-      "size": "M",
-      "importance": "medium",
-      "score": 53,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Bug fix with direct operator or pipeline reliability impact.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3324,18 +2684,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-2181",
-      "rank": 189,
-      "size": "M",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2086",
       "rank": 190,
       "size": "M",
@@ -3356,30 +2704,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "ok",
       "dependsOn": [],
       "why": "Prevents workspace servers from impersonating production dashboard.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1708",
-      "rank": 195,
-      "size": "M",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1670",
-      "rank": 196,
-      "size": "M",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Stops resumed conversations from silently losing transcript writes.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3684,18 +3008,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-1706",
-      "rank": 222,
-      "size": "M",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1696",
       "rank": 223,
       "size": "M",
@@ -3864,18 +3176,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-1582",
-      "rank": 237,
-      "size": "M",
-      "importance": "medium",
-      "score": 48,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Bug fix with direct operator or pipeline reliability impact.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1530",
       "rank": 238,
       "size": "M",
@@ -4032,18 +3332,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-2251",
-      "rank": 251,
-      "size": "M",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2212",
       "rank": 252,
       "size": "M",
@@ -4106,18 +3394,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
     {
       "issue": "PAN-2197",
       "rank": 257,
-      "size": "M",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2053",
-      "rank": 258,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -4244,18 +3520,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "ok",
       "dependsOn": [],
       "why": "Hardens the pipeline paths that ship all other work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1963",
-      "rank": 269,
-      "size": "M",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4440,18 +3704,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-1734",
-      "rank": 285,
-      "size": "M",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1728",
       "rank": 286,
       "size": "M",
@@ -4460,18 +3712,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "ok",
       "dependsOn": [],
       "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1726",
-      "rank": 287,
-      "size": "M",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4561,42 +3801,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-1622",
-      "rank": 295,
-      "size": "M",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1620",
-      "rank": 296,
-      "size": "M",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1619",
-      "rank": 297,
-      "size": "M",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1581",
       "rank": 298,
       "size": "M",
@@ -4617,18 +3821,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "ok",
       "dependsOn": [],
       "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1453",
-      "rank": 300,
-      "size": "M",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4662,9 +3854,10 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "size": "M",
       "importance": "medium",
       "score": 45,
-      "condition": "ok",
+      "condition": "needs-refinement",
       "dependsOn": [],
       "why": "Hardens the pipeline paths that ship all other work.",
+      "rationale": "Lightweight-review-path design refreshed but remains a multi-sketch enhancement needing a chosen approach; medium hold.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4803,18 +3996,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
     {
       "issue": "PAN-908",
       "rank": 315,
-      "size": "M",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-835",
-      "rank": 316,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -5089,42 +4270,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-456",
-      "rank": 339,
-      "size": "M",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-371",
-      "rank": 340,
-      "size": "M",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-306",
-      "rank": 341,
-      "size": "M",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-637",
       "rank": 342,
       "size": "M",
@@ -5193,19 +4338,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "ok",
       "dependsOn": [],
       "why": "Hardens the pipeline paths that ship all other work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2224",
-      "rank": 345,
-      "size": "L",
-      "importance": "medium",
-      "score": 41,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Restores conversation/session visibility across non-Claude harnesses.",
-      "rationale": "The body confirms multi-harness session discovery is the data prerequisite for session UX and transcript fixes.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5327,18 +4459,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "ok",
       "dependsOn": [],
       "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1621",
-      "rank": 359,
-      "size": "M",
-      "importance": "medium",
-      "score": 41,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Restores conversation/session visibility across non-Claude harnesses.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5523,30 +4643,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "interactive"
     },
     {
-      "issue": "PAN-1547",
-      "rank": 375,
-      "size": "M",
-      "importance": "medium",
-      "score": 40,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1439",
-      "rank": 376,
-      "size": "M",
-      "importance": "medium",
-      "score": 40,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Bug fix with direct operator or pipeline reliability impact.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1164",
       "rank": 377,
       "size": "M",
@@ -5619,18 +4715,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-2208",
-      "rank": 380,
-      "size": "M",
-      "importance": "low",
-      "score": 38,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2070",
       "rank": 384,
       "size": "M",
@@ -5675,6 +4759,7 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "needs-refinement",
       "dependsOn": [],
       "why": "Bug fix with direct operator or pipeline reliability impact.",
+      "rationale": "Older event-loop-stall symptom report now superseded by PAN-2318's comprehensive PRD fix; kept low as a duplicate lens.",
       "gate": "auto",
       "planning": "interactive"
     },
@@ -5730,18 +4815,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "issue": "PAN-633",
       "rank": 392,
       "size": "M",
-      "importance": "low",
-      "score": 38,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-487",
-      "rank": 393,
-      "size": "L",
       "importance": "low",
       "score": 38,
       "condition": "ok",
@@ -6111,42 +5184,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-1955",
-      "rank": 424,
-      "size": "M",
-      "importance": "low",
-      "score": 35,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1954",
-      "rank": 425,
-      "size": "M",
-      "importance": "low",
-      "score": 35,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1953",
-      "rank": 426,
-      "size": "M",
-      "importance": "low",
-      "score": 35,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1949",
       "rank": 427,
       "size": "M",
@@ -6267,18 +5304,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-1729",
-      "rank": 437,
-      "size": "M",
-      "importance": "low",
-      "score": 35,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1710",
       "rank": 438,
       "size": "M",
@@ -6339,18 +5364,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-1573",
-      "rank": 443,
-      "size": "M",
-      "importance": "low",
-      "score": 35,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1550",
       "rank": 444,
       "size": "M",
@@ -6363,32 +5376,8 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-1548",
-      "rank": 445,
-      "size": "M",
-      "importance": "low",
-      "score": 35,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1524",
       "rank": 446,
-      "size": "M",
-      "importance": "low",
-      "score": 35,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1493",
-      "rank": 447,
       "size": "M",
       "importance": "low",
       "score": 35,
@@ -6485,18 +5474,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
     {
       "issue": "PAN-1242",
       "rank": 455,
-      "size": "M",
-      "importance": "low",
-      "score": 35,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1238",
-      "rank": 456,
       "size": "M",
       "importance": "low",
       "score": 35,
@@ -6651,18 +5628,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-948",
-      "rank": 469,
-      "size": "M",
-      "importance": "low",
-      "score": 35,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-944",
       "rank": 470,
       "size": "M",
@@ -6677,18 +5642,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
     {
       "issue": "PAN-927",
       "rank": 471,
-      "size": "M",
-      "importance": "low",
-      "score": 35,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-904",
-      "rank": 472,
       "size": "M",
       "importance": "low",
       "score": 35,
@@ -6733,18 +5686,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "why": "Routine backlog item; rank reflects current shipping leverage.",
       "gate": "auto",
       "planning": "interactive"
-    },
-    {
-      "issue": "PAN-838",
-      "rank": 476,
-      "size": "M",
-      "importance": "low",
-      "score": 35,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-790",
@@ -6855,18 +5796,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-683",
-      "rank": 486,
-      "size": "M",
-      "importance": "low",
-      "score": 35,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-660",
       "rank": 487,
       "size": "M",
@@ -6903,18 +5832,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-592",
-      "rank": 490,
-      "size": "M",
-      "importance": "low",
-      "score": 35,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "interactive"
-    },
-    {
       "issue": "PAN-570",
       "rank": 491,
       "size": "M",
@@ -6941,18 +5858,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
     {
       "issue": "PAN-554",
       "rank": 493,
-      "size": "M",
-      "importance": "low",
-      "score": 35,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-552",
-      "rank": 494,
       "size": "M",
       "importance": "low",
       "score": 35,
@@ -7107,30 +6012,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "interactive"
     },
     {
-      "issue": "PAN-1838",
-      "rank": 507,
-      "size": "M",
-      "importance": "low",
-      "score": 34,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Prevents workspace servers from impersonating production dashboard.",
-      "gate": "auto",
-      "planning": "interactive"
-    },
-    {
-      "issue": "PAN-111",
-      "rank": 508,
-      "size": "M",
-      "importance": "low",
-      "score": 34,
-      "condition": "stale",
-      "dependsOn": [],
-      "why": "Prevents workspace servers from impersonating production dashboard.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-743",
       "rank": 509,
       "size": "M",
@@ -7203,18 +6084,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-1103",
-      "rank": 515,
-      "size": "M",
-      "importance": "low",
-      "score": 31,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "interactive"
-    },
-    {
       "issue": "PAN-826",
       "rank": 516,
       "size": "M",
@@ -7259,18 +6128,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "ok",
       "dependsOn": [],
       "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1494",
-      "rank": 520,
-      "size": "M",
-      "importance": "low",
-      "score": 30,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7517,18 +6374,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
     {
       "issue": "PAN-901",
       "rank": 541,
-      "size": "M",
-      "importance": "low",
-      "score": 27,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-834",
-      "rank": 542,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -7815,19 +6660,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "interactive"
     },
     {
-      "issue": "PAN-1894",
-      "rank": 563,
-      "size": "M",
-      "importance": "low",
-      "score": 23,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "rationale": "The body is merged/released verification work, so it stays active but below unresolved substrate risks.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-245",
       "rank": 567,
       "size": "M",
@@ -7860,18 +6692,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "ok",
       "dependsOn": [],
       "why": "Documentation improvement; useful but lower shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-656",
-      "rank": 570,
-      "size": "M",
-      "importance": "low",
-      "score": 20,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8162,6 +6982,413 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "why": "Routine backlog item; rank reflects current shipping leverage.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-2341",
+      "rank": 10,
+      "size": "M",
+      "importance": "critical",
+      "score": 97,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Failed verdict POSTs leave advancing agents zombied, filling the ceiling until the whole pipeline freezes.",
+      "rationale": "A transient server bug leaves completed review/test agents holding advancing-ceiling slots forever, freezing all advancement. Self-healing journal reconcile + zombie reap on boot/patrol is a critical liveness fix for the shipping pipeline itself.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2318",
+      "rank": 11,
+      "size": "L",
+      "importance": "critical",
+      "score": 96,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Dashboard event-loop starvation makes the UI unusable under load; PRD-backed deacon extraction + active-issue scoping.",
+      "rationale": "Under real load the dashboard reconnect-storms and /api/issues takes seconds, a feedback loop that has been patched 3× without fixing the shape. The PRD-backed fix (extract deacon, invert active-issue filter, purge sync reads) is core substrate; pinned in-review.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2325",
+      "rank": 12,
+      "size": "S",
+      "importance": "critical",
+      "score": 96,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Tracked .pan/test/result.json at a shared path guarantees a merge conflict on EVERY merge — gitignore it.",
+      "rationale": "A workspace-local recovery artifact is committed at a fixed shared path, so every feature branch conflicts on it forever. Trivial gitignore fix that unblocks every merge; pinned in-review.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2311",
+      "rank": 13,
+      "size": "M",
+      "importance": "critical",
+      "score": 94,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Strike-PR/UAT-batch merges never reconcile per-issue record → done issues stuck 'pending'; adds merge verifier.",
+      "rationale": "Non-standard merge paths skip record/label/branch reconciliation, leaving 18 genuinely-merged issues stuck pending. Fixing reconciliation + adding a merge-fulfillment verifier restores pipeline truth; labeled critical, pinned in-review.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2336",
+      "rank": 18,
+      "size": "M",
+      "importance": "critical",
+      "score": 90,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "create-beads.test CI flake ('table not found: issues') reddens main, blocking the merge gate for every PR.",
+      "rationale": "A beads-DB setup race reddens main on unrelated commits; red main empties the merge gate (Mission #1). Deterministic schema provisioning is a substrate reliability fix.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2338",
+      "rank": 20,
+      "size": "M",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Boot Reconciliation lists every historical stopped agent; 'Resume all' silently no-ops — gate candidates + report outcomes.",
+      "rationale": "Every dashboard restart shows weeks-old terminal agents as resume candidates and resumes zero with an opaque message. Gating to genuinely-interrupted work + per-agent outcomes + stale-row GC is substrate hygiene; overlaps PAN-2284.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2292",
+      "rank": 22,
+      "size": "M",
+      "importance": "critical",
+      "score": 92,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Peer-port guard regression crash-loops every post-guard workspace server, cascading host dashboard restart churn.",
+      "rationale": "A dashboard-identity guard refuses PORT=3011 but the devcontainer template still sets it, so every new workspace server crash-loops by design. Regression fix; merged and verifying on main.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2323",
+      "rank": 24,
+      "size": "M",
+      "importance": "high",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Flywheel respawn after crash starts a blank session instead of resuming the live rich one — orphans operator direction.",
+      "rationale": "A crash-respawned orchestrator reads only resume-session.json (written on graceful pause), so it boots blank and silently abandons the operator's in-flight drain-mode session. Resume-from-live-session fix protects orchestration continuity.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2307",
+      "rank": 25,
+      "size": "M",
+      "importance": "high",
+      "score": 83,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Respawned flywheel sits idle with no kickoff; stuck-remediation starved when dashboard lifetime < patrol duration.",
+      "rationale": "A respawned orchestrator holds the singleton slot but never gets a tick, and remediation lives at the tail of long patrols killed by watchdog churn. Kickoff-on-respawn + early/independent liveness check; merged, verifying on main.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2293",
+      "rank": 26,
+      "size": "M",
+      "importance": "high",
+      "score": 83,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Patrol cycles >180s read as stale heartbeat mid-cycle; watchdog kills the dashboard on first observation.",
+      "rationale": "PAN-2219 stamped the heartbeat at cycle start but long remediation cycles still exceed the 180s threshold, and stale = immediate restart. Deferral like the health path stops the churn; merged, verifying on main.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2337",
+      "rank": 27,
+      "size": "M",
+      "importance": "high",
+      "score": 81,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-place build under a live dashboard breaks new PTY-supervisor spawns until restart — pin artifact + atomic reload.",
+      "rationale": "A mid-flight dist rewrite wounds the running server's spawns with no restart. Boot-pinning the supervisor artifact + atomic staging swap in pan reload closes a real deploy footgun.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2322",
+      "rank": 28,
+      "size": "M",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Workspace/UAT agent can seize primary :3011 via an override env var — harden the host dashboard-port guard.",
+      "rationale": "The peer-port guard has an override that a workspace/UAT agent could set to impersonate the production dashboard. Security hardening of the single-dashboard invariant.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2331",
+      "rank": 29,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Codex rate-limit 'switch model?' modal stalls autonomous agents with no auto-dismiss — freezes work.",
+      "rationale": "When codex quota runs low, an interactive model-switch modal blocks the agent input loop; many agents froze at once. A narrow launcher/config auto-dismiss is a quick, high-value liveness fix.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2333",
+      "rank": 30,
+      "size": "M",
+      "importance": "high",
+      "score": 79,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Codex weekly-quota exhaustion freezes agents at an unanswerable modal — need resource alert + downshift/pause policy.",
+      "rationale": "Quota exhaustion currently produces a wall of frozen agents and dead-end NEEDS-YOU cards. A proactive quota resource alert + deliberate downshift/pause policy prevents silent agent freezes; broader than PAN-2331.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2300",
+      "rank": 31,
+      "size": "M",
+      "importance": "high",
+      "score": 79,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan done --strike fails after squash-merge (ancestry check) + strike kickoff wrongly instructs 'merge to main'.",
+      "rationale": "Red-main strike fixes can't complete their handoff (branch never an ancestor of a squash-merge) and the kickoff nudges direct-to-main, undermining the no-unreviewed-main invariant. Two focused fixes to the strike completion path.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2324",
+      "rank": 40,
+      "size": "M",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Close-out label transition fails atomically on missing 'in-planning' label — closed issues keep stale labels.",
+      "rationale": "A non-idempotent label transition aborts the whole close-out relabel when an expected label is absent, stranding stale in-review/merged labels on closed issues. Make the transition tolerant/atomic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2308",
+      "rank": 45,
+      "size": "M",
+      "importance": "high",
+      "score": 66,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-2292"
+      ],
+      "why": "Migrate stale generated compose files off PORT=3011 + deacon quarantine for deterministic boot refusals.",
+      "rationale": "Follow-up hardening to PAN-2292: live workspaces still carry PORT=3011, and the deacon burns restart attempts on deterministic ServerConfig refusals. Migration pass + quarantine stop the churn.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2294",
+      "rank": 46,
+      "size": "M",
+      "importance": "high",
+      "score": 66,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Notify the flywheel orchestrator on UAT-train promote so it re-derives a clean ready set instead of a stale batch.",
+      "rationale": "Without an immediate signal the reconciler rebuilds a not-ready, merge-clickable batch from a stale snapshot. Notifying the orchestrator to re-run Observe→Act on promote closes the gap; in-progress.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2297",
+      "rank": 47,
+      "size": "S",
+      "importance": "medium",
+      "score": 63,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Auto-lower file-size baseline on the UAT-batch merge path — shrink-then-merge currently reddens main.",
+      "rationale": "The PAN-2227 baseline auto-lowering doesn't fire on UAT-batch merges, so a shrunk file leaves a stale-high baseline that fails lint:file-size on main. Wire the same lowering into the UAT merge/write path; planned.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2288",
+      "rank": 90,
+      "size": "M",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Lossless auto-migration of dirty-founded tmux servers + boot-time ensure call (PAN-1798 follow-up).",
+      "rationale": "New foundings land under the managed systemd unit but existing dirty-founded idle servers persist until reboot. Zero-session auto-migration at pan up + a boot-time ensure call finish the managed-tmux transition.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2334",
+      "rank": 100,
+      "size": "M",
+      "importance": "medium",
+      "score": 56,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Write a Definition of Ready + wire it into the pickup gate to catch junk issues before an agent is spawned.",
+      "rationale": "Nothing flagged the retired audit-campaign issues as not-ready, so they consumed an agent and slammed the quota wall. A DoR doc + intake scoring is a process substrate improvement that prevents recurrence.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2287",
+      "rank": 150,
+      "size": "XS",
+      "importance": "low",
+      "score": 44,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Every supervisor.log line is written twice (appendFile + stdio redirect) — misled incident triage.",
+      "rationale": "The launcher redirects stdout to the same file log() appends to, doubling every line and once suggesting a dueling-supervisor. Drop one write path; small cleanup with real triage value.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2319",
+      "rank": 180,
+      "size": "S",
+      "importance": "low",
+      "score": 42,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "'COST LIMIT REACHED for undefined' spams every cycle — fix undefined subject, throttle, configurable default.",
+      "rationale": "A cost-monitor log emits an undefined daily_total subject every cycle. Low-risk noise reduction: fix the subject, throttle the log, consolidate the default.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2295",
+      "rank": 200,
+      "size": "XL",
+      "importance": "medium",
+      "score": 50,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Built-in web-browser surface (openable like terminal/Codex) + native Agentation integration — needs design.",
+      "rationale": "A large, ambitious feature: a first-class browser panel plus Agentation annotation→agent context wiring. Real product value but needs an embedding-model and security design decision before it is workable.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2347",
+      "rank": 250,
+      "size": "M",
+      "importance": "low",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Refresh AGENT-STATE-PLANES.md into the definitive, source-verified state-storage reference.",
+      "rationale": "Docs-refresh: make the primary agent-state reference accurate against live source (overdeck.db schema, write paths, rebuild commands). Useful but low shipping impact.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2344",
+      "rank": 255,
+      "size": "M",
+      "importance": "low",
+      "score": 39,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Rewrite KANBAN-MODEL.md to match the current pipeline phases, gates, and two-door state model.",
+      "rationale": "Docs-refresh of the lifecycle model doc against what the dashboard actually renders. Low shipping impact.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2345",
+      "rank": 260,
+      "size": "S",
+      "importance": "low",
+      "score": 38,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Refresh pan-done.md to document the current done→rebase→push→PR→review chain and verify-on-main pause.",
+      "rationale": "Docs-refresh so a work agent reading pan-done.md gets the real flow; fix the weak MISSION-CONTROL MERGE-button link.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2343",
+      "rank": 262,
+      "size": "S",
+      "importance": "low",
+      "score": 38,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Rewrite MISSION-CONTROL.md against current dashboard architecture and state-label computation.",
+      "rationale": "Docs-refresh: the doc is stale/thin and used panopticon.db naming. Low shipping impact but part of the docs sweep.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2346",
+      "rank": 265,
+      "size": "S",
+      "importance": "low",
+      "score": 37,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Refresh AGENT_TYPES_INDEX.md to cover the current agent-ID patterns and role/ceiling semantics.",
+      "rationale": "Docs-refresh of the agent taxonomy index against src/lib/agents.ts. Low shipping impact.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2348",
+      "rank": 268,
+      "size": "S",
+      "importance": "low",
+      "score": 36,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-2347"
+      ],
+      "why": "Migrate still-relevant STATE-STORAGE-AUDIT.md content into living docs, then delete the frozen audit.",
+      "rationale": "Docs-cleanup: capture the ~/.overdeck surface inventory + any uncovered facts into living docs, then remove the noise. Depends on the AGENT-STATE-PLANES refresh.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2335",
+      "rank": 400,
+      "size": "M",
+      "importance": "low",
+      "score": 28,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Find-only categorized junk-backlog review document; operator-gated, keep on backlog (do NOT action).",
+      "rationale": "Operator explicitly scoped this to produce a review document only and to stay on the backlog un-planned until they sign off. Gated and not for pickup.",
+      "gate": "blocked",
+      "planning": "skip"
     }
   ],
   "edges": [
@@ -8194,74 +7421,11 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "confidence": 1
     },
     {
-      "from": "PAN-2169",
-      "to": "PAN-2172",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2170",
-      "to": "PAN-2172",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2170",
-      "to": "PAN-2172",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.63
-    },
-    {
-      "from": "PAN-2172",
-      "to": "PAN-2086",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2179",
-      "to": "PAN-2172",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.69
-    },
-    {
-      "from": "PAN-2224",
-      "to": "PAN-1917",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2224",
-      "to": "PAN-2282",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.71
-    },
-    {
       "from": "PAN-2228",
       "to": "PAN-2255",
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.72
-    },
-    {
-      "from": "PAN-2251",
-      "to": "PAN-2252",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2252",
-      "to": "PAN-2251",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
     },
     {
       "from": "PAN-2252",
@@ -8293,13 +7457,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
     },
     {
       "from": "PAN-2280",
-      "to": "PAN-2251",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2280",
       "to": "PAN-2253",
       "type": "informs",
       "source": "github-ref",
@@ -8321,13 +7478,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
     },
     {
       "from": "PAN-2285",
-      "to": "PAN-2172",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-2285",
       "to": "PAN-2228",
       "type": "informs",
       "source": "ai-inferred",
@@ -8342,17 +7492,80 @@ Top-tier item because it has near-term operator value and a clear path to verifi
     },
     {
       "from": "PAN-2284",
-      "to": "PAN-2181",
+      "to": "PAN-1846",
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
     },
     {
-      "from": "PAN-2284",
-      "to": "PAN-1846",
+      "from": "PAN-2292",
+      "to": "PAN-2308",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2331",
+      "to": "PAN-2333",
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-2347",
+      "to": "PAN-2348",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2338",
+      "to": "PAN-2284",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.85
+    },
+    {
+      "from": "PAN-2318",
+      "to": "PAN-1711",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-2323",
+      "to": "PAN-2307",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.75
+    },
+    {
+      "from": "PAN-2293",
+      "to": "PAN-2307",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-2325",
+      "to": "PAN-2265",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-2322",
+      "to": "PAN-2292",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.55
+    },
+    {
+      "from": "PAN-2228",
+      "to": "PAN-2179",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
     }
   ]
 }

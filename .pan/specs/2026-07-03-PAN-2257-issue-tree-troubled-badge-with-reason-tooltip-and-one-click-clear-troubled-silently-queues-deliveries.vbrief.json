@@ -4,17 +4,17 @@
     "created": "2026-07-03T05:38:59Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2257: Issue tree: troubled badge with reason tooltip and one-click clear (troubled silently queues deliveries)",
-    "updated": "2026-07-03T06:52:56.092Z"
+    "updated": "2026-07-04T18:14:00.898Z"
   },
   "plan": {
     "id": "pan-2257",
     "title": "Issue tree: troubled badge with reason tooltip and one-click clear (troubled silently queues deliveries)",
-    "status": "running",
+    "status": "completed",
     "uid": "014abf61-2067-440e-a81c-f2ea7f43b87a",
     "author": "agent:gpt-5.5",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-03T05:38:59Z",
-    "updated": "2026-07-03T06:52:56.092Z",
+    "updated": "2026-07-04T18:14:00.898Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2257",
@@ -356,5 +356,5 @@
       "canonicalFilename": "2026-07-03-PAN-2257-issue-tree-troubled-badge-with-reason-tooltip-and-one-click-clear-troubled-silently-queues-deliveries.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }

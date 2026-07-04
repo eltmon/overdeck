@@ -3,6 +3,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { mkdtemp, rm } from 'fs/promises';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { Effect } from 'effect';
 import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
 import { applyStatusOverrides } from '../../../../src/lib/vbrief/io.js';
 import { getDispatchableItems } from '../../../../src/lib/vbrief/dag.js';
@@ -10,6 +11,8 @@ import { getDispatchableItems } from '../../../../src/lib/vbrief/dag.js';
 const mocks = vi.hoisted(() => ({
   listProjectsSync: vi.fn(),
   getReviewStatusSync: vi.fn(),
+  setReviewStatusSync: vi.fn(),
+  spawnReviewRoleForIssue: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
@@ -20,6 +23,11 @@ vi.mock('../../../../src/lib/projects.js', () => ({
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
   getReviewStatusSync: mocks.getReviewStatusSync,
+  setReviewStatusSync: mocks.setReviewStatusSync,
+}));
+
+vi.mock('../../../../src/lib/cloister/review-agent.js', () => ({
+  spawnReviewRoleForIssue: mocks.spawnReviewRoleForIssue,
 }));
 
 let tempRoot: string;
@@ -28,7 +36,10 @@ beforeEach(async () => {
   tempRoot = await mkdtemp(join(tmpdir(), 'overdeck-swarm-doneness-'));
   mocks.listProjectsSync.mockReset();
   mocks.getReviewStatusSync.mockReset();
+  mocks.setReviewStatusSync.mockReset();
+  mocks.spawnReviewRoleForIssue.mockReset();
   mocks.getReviewStatusSync.mockReturnValue(null);
+  mocks.spawnReviewRoleForIssue.mockReturnValue(Effect.succeed({ success: true, message: 'dispatched' }));
 });
 
 afterEach(async () => {
@@ -97,17 +108,35 @@ describe('swarm item done-ness survives slot gc (statusOverrides overlay)', () =
     }, null, 2));
   }
 
-  it('coordinator skips an issue whose only remaining items are override-completed', async () => {
+  it('coordinator finalizes an issue whose only remaining items are override-completed', async () => {
+    const { execFileSync } = await import('node:child_process');
     const { coordinateSwarmSlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
     const projectPath = join(tempRoot, 'project');
-    mkdirSync(join(projectPath, 'workspaces', 'feature-pan-900'), { recursive: true });
+    const workspacePath = join(projectPath, 'workspaces', 'feature-pan-900');
+    mkdirSync(workspacePath, { recursive: true });
+    const git = (...args: string[]) => execFileSync('git', args, { cwd: workspacePath, stdio: 'ignore' });
+    git('init', '-b', 'feature/pan-900');
+    git('config', 'user.email', 't@t');
+    git('config', 'user.name', 't');
+    git('commit', '--allow-empty', '-m', 'base');
     writeSpec(projectPath, 'PAN-900', makeDoc('PAN-900', 2));
     writeRecordOverrides(projectPath, 'pan-900', { 'wi-1': 'completed', 'wi-2': 'completed' });
     mocks.listProjectsSync.mockReturnValue([{ config: { path: projectPath } }]);
 
     const actions = await coordinateSwarmSlots();
 
+    expect(actions).toContain('[swarm] finalized PAN-900: issue-level review requested');
     expect(actions).not.toContain('[swarm] considered PAN-900: swarm eligible');
+    expect(mocks.setReviewStatusSync).toHaveBeenCalledWith('PAN-900', expect.objectContaining({
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      reviewRequestedAt: expect.any(String),
+    }));
+    expect(mocks.spawnReviewRoleForIssue).toHaveBeenCalledWith({
+      issueId: 'PAN-900',
+      workspace: workspacePath,
+      branch: 'feature/pan-900',
+    });
   });
 
   it('coordinator still considers an issue with remaining dispatchable items', async () => {
@@ -159,6 +188,7 @@ describe('swarm endgame: merge/cleanup still runs when dispatch is no longer eli
 
     expect(actions).toContain('[swarm] considered PAN-902: endgame (merge/cleanup only)');
     expect(actions).toContain('[swarm] gc slot 1 (item wi-1) for PAN-902');
+    expect(actions).toContain('[swarm] finalized PAN-902: issue-level review requested');
     expect(actions).not.toContain('[swarm] considered PAN-902: swarm eligible');
   });
 });

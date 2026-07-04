@@ -72,6 +72,14 @@ vi.mock('../../../../../src/dashboard/server/services/tracker-config.js', () => 
   getRallyConfig: vi.fn(),
 }));
 
+vi.mock('../../../../../src/lib/github-app.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../../src/lib/github-app.js')>();
+  return {
+    ...actual,
+    isGitHubAppConfigured: vi.fn(() => false),
+  };
+});
+
 // Stub modules imported at issues.ts module scope that are unused by this test.
 vi.mock('../../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: vi.fn(),
@@ -93,9 +101,11 @@ vi.mock('../../../../../src/dashboard/server/services/issue-service-singleton.js
 
 // Import the function under test after mocks.
 import { fetchIssueDiscussions } from '../../../../../src/lib/overdeck/discussions.js';
+import { clearIssuePrTabCacheForTests } from '../../../../../src/dashboard/server/services/pr-tab-cache.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  clearIssuePrTabCacheForTests();
   mockResolveTrackerType.mockReturnValue('github');
   mockResolveGitHubIssue.mockReturnValue({ isGitHub: false });
   mockGetGitHubConfig.mockReturnValue(null);

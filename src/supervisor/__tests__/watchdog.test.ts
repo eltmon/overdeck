@@ -1,7 +1,7 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   SupervisorWatchdog,
   type SpawnRestart,
@@ -318,7 +318,11 @@ describe('SupervisorWatchdog', () => {
 
   it('passes the persisted boot id to watchdog restart spawns', async () => {
     mkdirSync(testHome, { recursive: true });
-    stampBootReconciliation('boot-watchdog', '2026-05-17T15:30:30.000Z');
+    stampBootReconciliation(
+      'boot-watchdog',
+      '2026-05-17T15:30:30.000Z',
+      '2026-05-17T15:30:00.000Z',
+    );
     const spawnOptions: Array<Parameters<SpawnRestart>[0]> = [];
 
     await makeWatchdog({ spawnOptions }).checkOnce();
@@ -327,5 +331,60 @@ describe('SupervisorWatchdog', () => {
       restartLockHeld: true,
       bootId: 'boot-watchdog',
     });
+  });
+
+  it('waits for a restart that completes after a 60s dashboard boot', async () => {
+    mkdirSync(testHome, { recursive: true });
+    let resolveSpawned: () => void = () => {};
+    const spawned = new Promise<void>((resolve) => {
+      resolveSpawned = resolve;
+    });
+    try {
+      const logs: string[] = [];
+      const watchdog = new SupervisorWatchdog({
+        config,
+        now: () => Date.parse('2026-05-17T15:30:00.000Z'),
+        log: (msg) => logs.push(msg),
+        spawnRestart: () => {
+          vi.useFakeTimers();
+          resolveSpawned();
+          return {
+            pid: 1001,
+            error: null,
+            done: new Promise<void>((resolve) => {
+              setTimeout(resolve, 60_000);
+            }),
+          };
+        },
+        fetchFn: async (input) => {
+          if (input.endsWith('/api/deacon/status')) {
+            return {
+              ok: true,
+              status: 200,
+              statusText: 'OK',
+              json: async () => ({
+                isRunning: true,
+                config: { patrolIntervalMs: 60_000 },
+                state: { lastPatrol: '2026-05-17T15:29:00.000Z' },
+              }),
+            };
+          }
+          return { ok: false, status: 503, statusText: 'Service Unavailable' };
+        },
+      });
+
+      const check = watchdog.checkOnce();
+      await spawned;
+      await vi.advanceTimersByTimeAsync(59_000);
+      expect(logs).toContain('watchdog spawned pan restart --dashboard (pid 1001)');
+      expect(logs.some((msg) => msg.includes('watchdog restart failed'))).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      await check;
+
+      expect(logs.some((msg) => msg.includes('watchdog restart failed'))).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

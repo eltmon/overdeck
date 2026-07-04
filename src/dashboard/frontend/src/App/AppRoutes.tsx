@@ -46,6 +46,7 @@ interface AppRoutesProps {
   selectedProjectKey: string | null;
   pendingConversationTarget: PendingConversationTarget | null;
   cockpitRoute: { project: string; issue: string } | null;
+  initialSessionKey: string | null;
   onOpenWorkspaceHome: (issueId: string) => void;
   onNewProject: () => void;
   onSelectProject: SelectProjectHandler;
@@ -71,6 +72,7 @@ export function AppRoutes({
   selectedProjectKey,
   pendingConversationTarget,
   cockpitRoute,
+  initialSessionKey,
   onOpenWorkspaceHome,
   onNewProject,
   onSelectProject,
@@ -220,7 +222,7 @@ export function AppRoutes({
       )}
       {activeTab === 'sessions' && (
         <div className="w-full h-full overflow-hidden">
-          <ConversationsPage />
+          <ConversationsPage initialSessionKey={initialSessionKey} />
         </div>
       )}
       {activeTab === 'god-view' && (

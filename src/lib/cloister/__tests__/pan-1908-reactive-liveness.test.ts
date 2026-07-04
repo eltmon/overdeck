@@ -26,6 +26,7 @@ const mockWorkResumeSlotsAvailable = vi.fn();
 const mockCountRunningAgents = vi.fn();
 const mockGetConcurrencyLimits = vi.fn();
 const mockIsIssueClosed = vi.fn();
+const mockExistingPaths = vi.hoisted(() => new Set<string>());
 
 vi.mock('effect', async (importOriginal) => {
   const actual = await importOriginal<typeof import('effect')>();
@@ -37,6 +38,7 @@ vi.mock('node:fs', async (importOriginal) => {
   return {
     ...actual,
     existsSync: (path: string) => {
+      if (mockExistingPaths.has(path)) return true;
       if (path === '/tmp/workspace') return true;
       if (path.startsWith('/tmp/agents/')) return false;
       return actual.existsSync(path);
@@ -160,6 +162,7 @@ describe('PAN-1908 reactive liveness handlers', () => {
     mockCountRunningAgents.mockReturnValue({ work: 0, advancing: 0, total: 0 });
     mockGetConcurrencyLimits.mockReturnValue({ maxWorkAgents: 6, reservedAdvancingSlots: 3, totalCeiling: 9 });
     mockIsIssueClosed.mockResolvedValue(false);
+    mockExistingPaths.clear();
   });
 
   afterEach(() => {
@@ -214,6 +217,84 @@ describe('PAN-1908 reactive liveness handlers', () => {
 
       expect(result).toBeNull();
       expect(mockResumeAgent).not.toHaveBeenCalled();
+    });
+
+    it('skips a stopped work agent whose workspace is missing', async () => {
+      mockGetAgentStateSync.mockReturnValue(makeState({ workspace: '/tmp/missing-workspace' }));
+
+      const result = await handleAgentStoppedEvent('agent-pan-1908');
+
+      expect(result).toBeNull();
+      expect(mockResumeAgent).not.toHaveBeenCalled();
+    });
+
+    it('skips a stopped work agent whose review status is already merged', async () => {
+      mockGetAgentStateSync.mockReturnValue(makeState());
+      mockGetReviewStatusSync.mockReturnValue({
+        issueId: 'PAN-1908',
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        mergeStatus: 'merged',
+        readyForMerge: false,
+      });
+
+      const result = await handleAgentStoppedEvent('agent-pan-1908');
+
+      expect(result).toBeNull();
+      expect(mockResumeAgent).not.toHaveBeenCalled();
+    });
+
+    it('reconciles a live tmux session before applying merged terminal skips', async () => {
+      const state = makeState();
+      mockGetAgentStateSync.mockReturnValue(state);
+      mockGetReviewStatusSync.mockReturnValue({
+        issueId: 'PAN-1908',
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        mergeStatus: 'merged',
+        readyForMerge: false,
+      });
+      mockSessionExists.mockResolvedValue(true);
+
+      const result = await handleAgentStoppedEvent('agent-pan-1908');
+
+      expect(result).toBeNull();
+      expect(mockMarkAgentRunningState).toHaveBeenCalledWith(state);
+      expect(mockSaveAgentState).toHaveBeenCalledWith(state);
+      expect(mockResumeAgent).not.toHaveBeenCalled();
+    });
+
+    it('skips a completed done-handoff agent when review and test passed', async () => {
+      mockExistingPaths.add('/tmp/agents/agent-pan-1908/completed');
+      mockGetAgentStateSync.mockReturnValue(makeState());
+      mockGetReviewStatusSync.mockReturnValue({
+        issueId: 'PAN-1908',
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        readyForMerge: false,
+      });
+
+      const result = await handleAgentStoppedEvent('agent-pan-1908');
+
+      expect(result).toBeNull();
+      expect(mockResumeAgent).not.toHaveBeenCalled();
+    });
+
+    it('resumes a completed done-handoff agent when review is blocked', async () => {
+      mockExistingPaths.add('/tmp/agents/agent-pan-1908/completed.processed');
+      mockGetAgentStateSync.mockReturnValue(makeState({ stoppedByUser: true }));
+      mockGetReviewStatusSync.mockReturnValue({
+        issueId: 'PAN-1908',
+        reviewStatus: 'blocked',
+        testStatus: 'passed',
+        verificationStatus: 'pending',
+        readyForMerge: false,
+      });
+
+      const result = await handleAgentStoppedEvent('agent-pan-1908');
+
+      expect(result).toBe('agent-pan-1908');
+      expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-1908');
     });
   });
 

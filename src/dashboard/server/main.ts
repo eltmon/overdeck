@@ -28,12 +28,11 @@ import { ensureInternalTokenSync } from '../../lib/internal-token.js';
 import { clearStuckMergeStatuses, fixStuckReadyForMerge, fixStuckCommentedReviews, getReviewStatusSync, loadReviewStatuses, clearReviewStatus } from '../../lib/review-status.js';
 import { reconcileStaleGitHubBlockers } from '../../lib/webhook-handlers.js';
 import { enrichReviewStatus } from '../../lib/review-status-enrichment.js';
-import { recoverStuckForks, waitForInFlightForkPipelines } from './routes/conversations.js';
+import { recoverStuckForks, waitForInFlightForkPipelines } from '../../lib/overdeck/conversation-forks.js';
 import { getEventStore, initEventStore } from './event-store.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
-import { getCloisterService } from '../../lib/cloister/service.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
-import { applyBootReconciliationDecision, resetPatrolHeartbeatForStartup, setAgentStoppedNotifier, setAgentStatusChangedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
+import { applyBootReconciliationDecision, setAgentStoppedNotifier, setAgentStatusChangedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
 import { getAgentState, type AgentState } from '../../lib/agents.js';
 import { saveAgentStateAndEmitEvent } from './services/agent-projection.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
@@ -52,8 +51,10 @@ import { warnIfAutonomousMergeBackendUnavailable } from './services/merge-backen
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
 import { closeConversationSearchService } from './services/conversation-search-service.js';
 import { startCostReconcileService, stopCostReconcileService } from './services/cost-reconcile-service.js';
+import { startEventLoopMonitor, stopEventLoopMonitor } from './services/event-loop-monitor.js';
 import { formatBootGateState, resolveBootGates } from '../../lib/boot-gates.js';
 import { startBootReconciliation } from '../../lib/cloister/boot-reconciliation.js';
+import { startDeaconChild, stopDeaconChild } from './services/deacon-supervisor.js';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { Layer } from 'effect';
@@ -62,6 +63,7 @@ import { getOverdeckDatabasePath } from '../../lib/overdeck/paths.js';
 import { ProjectsLive } from '../../lib/overdeck/config.js';
 import { RecordsLive, TmuxLive } from '../../lib/overdeck/infra.js';
 import { getAgentSessionsSync } from '../../lib/tmux.js';
+import { isSmeeConfiguredSync, startSmeeProcessSync } from '../../lib/smee.js';
 
 declare const Bun: unknown;
 
@@ -77,6 +79,8 @@ initDashboardLogFile();
 // spawn→listen window attributable. See server.ts for the matching listen mark.
 console.log(`[boot-timing] module graph loaded at +${Math.round(performance.now())}ms (since process start)`);
 console.log(`[overdeck] Boot gates: ${formatBootGateState(resolveBootGates())}`);
+startEventLoopMonitor();
+console.log('[overdeck] Event loop delay monitor started');
 
 // Ensure OVERDECK_HOME exists before any service that needs it (e.g. CacheService opening cache.db)
 await mkdir(getOverdeckHome(), { recursive: true });
@@ -477,6 +481,20 @@ void (async () => {
 startCliproxyWatchdog();
 console.log('[overdeck] CLIProxy watchdog started (30s interval)');
 
+if (isPeerDashboard) {
+  console.log('[overdeck] smee-client webhook relay skipped — peer dashboard (OVERDECK_DISABLE_DEACON=1)');
+} else if (isSmeeConfiguredSync()) {
+  try {
+    startSmeeProcessSync();
+    console.log('[overdeck] smee-client webhook relay ensured');
+  } catch (err) {
+    console.warn('[overdeck] Failed to ensure smee-client webhook relay:', err instanceof Error ? err.message : String(err));
+    emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Failed to ensure smee-client webhook relay: ${err instanceof Error ? err.message : String(err)}` });
+  }
+} else {
+  console.log('[overdeck] smee-client webhook relay not configured');
+}
+
 // Clean up pollers on graceful shutdown
 const emitShutdownActivity = () => {
   try {
@@ -516,9 +534,11 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopTtsSummarizer();
   stopTtsPlayback();
   stopAutoMergeExecutor();
+  stopEventLoopMonitor();
   stopTranscriptPoller();
   stopCostReconcileService();
   stopRestartAnnouncer();
+  await stopDeaconChild().catch((err) => console.warn('[deacon-supervisor] child shutdown failed:', err));
   await stopConversationSearchWatcher().catch((err) => console.warn('[conversation-search] watcher shutdown failed:', err));
   closeConversationSearchService();
   closeMemoryFtsDatabases();
@@ -609,8 +629,7 @@ if (process.env.OVERDECK_DISABLE_DEACON === '1') {
   if (reconciliation.decision !== 'pending') {
     void applyBootReconciliationDecision();
   }
-  resetPatrolHeartbeatForStartup();
-  getCloisterService().start().catch((err) => {
+  startDeaconChild().catch((err) => {
     console.error('[overdeck] Cloister auto-start failed:', err);
     emitActivityEntrySync({ source: 'dashboard', level: 'error', message: `Cloister auto-start failed: ${err instanceof Error ? err.message : String(err)}` });
   });

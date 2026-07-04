@@ -1,7 +1,27 @@
 {
   "issueId": "PAN-2231",
   "schemaVersion": 2,
-  "feedback": [],
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T21:25:54.052Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-04T21:26Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-04T21:26:55.286Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-04T21:26:55Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2231\n\nsource-introspection baseline is not covered by ratchet audit\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2231 -m \"Fixed review issues\"`"
+    }
+  ],
   "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
@@ -19,13 +39,13 @@
   },
   "pipeline": {
     "issueId": "PAN-2231",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T21:25:53.968Z",
+    "updatedAt": "2026-07-04T21:26:52.348Z",
     "reviewNotes": "source-introspection baseline is not covered by ratchet audit",
     "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - .beads/export-state.json\n  - .pan/specs/2026-07-03-PAN-2145-decompose-src-dashboard-server-routes-conversations-ts-into-focused-door-modules-two-door-thinning.vbrief.json",
     "inspectNotes": "workspace-6lghr matches the bead scope: it adds scripts/lint-source-introspection.sh, seeds scripts/source-introspection-baseline.txt with count/path entries, and wires lint:source-introspection into package.json. The scanner is multi-line aware, covers tests plus src test files, does not require a literal src/ substring, and no workspace PRD/CLAUDE constraints are violated.",
@@ -81,7 +101,7 @@
       },
       "costAtCloseOut": {
         "usd": 5.770224,
-        "pricingAsOf": "2026-07-04T21:25:53.991Z"
+        "pricingAsOf": "2026-07-04T21:26:52.374Z"
       }
     },
     "merges": [],
@@ -106,12 +126,5 @@
     ]
   },
   "created": "2026-07-04T21:25:49.097Z",
-  "updated": "2026-07-04T21:25:54.052Z",
-  "sessionHistory": [
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-04T21:25:54.052Z"
-    }
-  ]
+  "updated": "2026-07-04T21:26:55.286Z"
 }
