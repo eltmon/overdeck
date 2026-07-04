@@ -7,9 +7,11 @@ import {
   canStartUatTrainReconciler,
   getUatCandidatePayload,
   getUatGenerationsPayload,
+  postUatGenerationPromotePayload,
   resolveUatProjectRoot,
 } from '../uat-train.js';
 import type { UatGeneration } from '../../../../lib/overdeck/merge-types.js';
+import type { PromoteResult } from '../../../../lib/cloister/uat-promote.js';
 
 const mocks = vi.hoisted(() => ({
   findProjectByPathSync: vi.fn(),
@@ -17,8 +19,15 @@ const mocks = vi.hoisted(() => ({
   readCurrentFlywheelStatusForDashboard: vi.fn(),
   listUatGenerationsSync: vi.fn(),
   probeUatStack: vi.fn(),
+  teardownUatStack: vi.fn(),
+  promoteUatGeneration: vi.fn(),
+  buildUatPromoteGitDeps: vi.fn(),
+  buildUatGenerationStore: vi.fn(),
+  getUatGenerationSync: vi.fn(),
+  notifyFlywheelOfUatPromote: vi.fn(),
   findVBriefByIssue: vi.fn(),
   readVBriefDocument: vi.fn(),
+  reviewRecordEligibility: vi.fn(),
 }));
 
 vi.mock('../../../../lib/projects.js', async (importOriginal) => {
@@ -46,7 +55,16 @@ vi.mock('../../../../lib/overdeck/merge-sync.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../../../lib/overdeck/merge-sync.js')>();
   return {
     ...original,
+    getUatGenerationSync: mocks.getUatGenerationSync,
     listUatGenerationsSync: mocks.listUatGenerationsSync,
+  };
+});
+
+vi.mock('../../../../lib/cloister/uat-generation-deps.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../../../lib/cloister/uat-generation-deps.js')>();
+  return {
+    ...original,
+    buildUatGenerationStore: mocks.buildUatGenerationStore,
   };
 });
 
@@ -55,6 +73,28 @@ vi.mock('../../../../lib/cloister/uat-stack.js', async (importOriginal) => {
   return {
     ...original,
     probeUatStack: mocks.probeUatStack,
+    teardownUatStack: mocks.teardownUatStack,
+  };
+});
+
+vi.mock('../../../../lib/cloister/uat-promote.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../../../lib/cloister/uat-promote.js')>();
+  return {
+    ...original,
+    promoteUatGeneration: mocks.promoteUatGeneration,
+    buildUatPromoteGitDeps: mocks.buildUatPromoteGitDeps,
+  };
+});
+
+vi.mock('../../../../lib/cloister/uat-promote-notify.js', () => ({
+  notifyFlywheelOfUatPromote: mocks.notifyFlywheelOfUatPromote,
+}));
+
+vi.mock('../../../../lib/flywheel-merge-order.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../../../lib/flywheel-merge-order.js')>();
+  return {
+    ...original,
+    reviewRecordEligibility: mocks.reviewRecordEligibility,
   };
 });
 
@@ -231,5 +271,67 @@ describe('UAT train project root and startup gate', () => {
 
     mocks.getDashboardIdentity.mockReturnValue({ repoRoot: '/repo', mode: 'peer' });
     expect(canStartUatTrainReconciler()).toBe(false);
+  });
+});
+
+describe('postUatGenerationPromotePayload', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.findProjectByPathSync.mockReturnValue(null);
+    mocks.buildUatPromoteGitDeps.mockReturnValue({ git: 'deps' });
+    mocks.buildUatGenerationStore.mockReturnValue({ listChain: vi.fn(), update: vi.fn() });
+    mocks.notifyFlywheelOfUatPromote.mockResolvedValue(undefined);
+  });
+
+  it('passes the promote result to notifyFlywheelOfUatPromote', async () => {
+    const result: PromoteResult = {
+      success: true,
+      generation: 'uat/pan-cobalt-0703',
+      mergeSha: 'abc123',
+      members: ['PAN-2294'],
+      postMergeStarted: ['PAN-2294'],
+      invalidated: [],
+    };
+    mocks.promoteUatGeneration.mockResolvedValue(result);
+
+    await postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn());
+
+    expect(mocks.notifyFlywheelOfUatPromote).toHaveBeenCalledWith(result);
+  });
+
+  it('returns the exact promote result object unchanged for success and failure results', async () => {
+    const success: PromoteResult = {
+      success: true,
+      generation: 'uat/pan-cobalt-0703',
+      mergeSha: 'abc123',
+      members: ['PAN-2294'],
+      postMergeStarted: ['PAN-2294'],
+      invalidated: [],
+    };
+    const failure: PromoteResult = {
+      success: false,
+      reason: 'member-not-ready',
+      message: 'not ready',
+    };
+
+    mocks.promoteUatGeneration.mockResolvedValueOnce(success).mockResolvedValueOnce(failure);
+
+    await expect(postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn())).resolves.toBe(success);
+    await expect(postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn())).resolves.toBe(failure);
+  });
+
+  it('still resolves with the promote result when notifyFlywheelOfUatPromote rejects', async () => {
+    const result: PromoteResult = {
+      success: true,
+      generation: 'uat/pan-cobalt-0703',
+      mergeSha: 'abc123',
+      members: ['PAN-2294'],
+      postMergeStarted: ['PAN-2294'],
+      invalidated: [],
+    };
+    mocks.promoteUatGeneration.mockResolvedValue(result);
+    mocks.notifyFlywheelOfUatPromote.mockRejectedValue(new Error('delivery failed'));
+
+    await expect(postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn())).resolves.toBe(result);
   });
 });

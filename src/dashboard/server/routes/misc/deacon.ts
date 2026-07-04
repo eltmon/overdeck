@@ -2,13 +2,17 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { applyBootReconciliationDecision } from '../../../../lib/cloister/deacon.js';
-import { getCloisterService } from '../../../../lib/cloister/service.js';
 import {
   getBootReconciliationState,
   isDeaconGloballyPausedSync as isDeaconGloballyPaused,
   setBootReconciliationDecision,
   setDeaconGloballyPausedSync as setDeaconGloballyPaused,
 } from '../../../../lib/overdeck/control-settings.js';
+import {
+  readDurableDeaconLogs,
+  readDurableDeaconStatus,
+  requestDurablePatrol,
+} from '../../services/cloister-control-surface.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
 import { readJsonBody } from './shared.js';
@@ -51,20 +55,7 @@ const getDeaconStatusRoute = HttpRouter.add(
   '/api/deacon/status',
   Effect.try({
     try: () => {
-      const service = getCloisterService();
-      const status = service.getDeaconStatus();
-      const lastPatrol = service.getLastPatrolResult();
-      return jsonResponse({
-        ...status,
-        lastPatrol: lastPatrol
-          ? {
-              cycle: lastPatrol.cycle,
-              timestamp: lastPatrol.timestamp,
-              actions: lastPatrol.actionsToken,
-              massDeathDetected: lastPatrol.massDeathDetected,
-            }
-          : null,
-      });
+      return jsonResponse(readDurableDeaconStatus());
     },
     catch: (error: unknown) => {
       const msg = error instanceof Error ? error.message : String(error);
@@ -90,9 +81,7 @@ const getDeaconLogsRoute = HttpRouter.add(
 
     return yield* Effect.try({
       try: () => {
-        const service = getCloisterService();
-        const logs = service.getDeaconLogs(Math.min(limit, 200));
-        return jsonResponse({ logs });
+        return jsonResponse({ logs: readDurableDeaconLogs(limit) });
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
@@ -113,9 +102,11 @@ const postDeaconPatrolRoute = HttpRouter.add(
   '/api/deacon/patrol',
   Effect.promise(async () => {
     try {
-      const service = getCloisterService();
-      const result = await service.runDeaconPatrol();
-      return jsonResponse(result);
+      const result = requestDurablePatrol();
+      if (!result.accepted) {
+        return jsonResponse({ error: 'Deacon child is not running' }, { status: 504 });
+      }
+      return jsonResponse({ ok: true, accepted: true });
     }    catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error running deacon patrol:', error);

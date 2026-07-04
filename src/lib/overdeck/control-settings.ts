@@ -358,6 +358,7 @@ function overdeckDb() {
 }
 
 export const DEACON_GLOBAL_PAUSE_KEY = 'deacon.globally_paused';
+export const CLOISTER_SPAWNS_PAUSED_KEY = 'cloister.spawns_paused';
 export const FLYWHEEL_GLOBAL_PAUSE_KEY = 'flywheel.globally_paused';
 export const FLYWHEEL_ACTIVE_RUN_ID_KEY = 'flywheel.active_run_id';
 export const FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY = 'flywheel.auto_pickup_backlog';
@@ -485,6 +486,21 @@ export function setDeaconGloballyPausedSync(paused: boolean): void {
 /** Drop-in for setDeaconGloballyPaused() from app-settings.ts. */
 export function setDeaconGloballyPaused(paused: boolean): void {
   setDeaconGloballyPausedSync(paused);
+}
+
+/** Synchronous check of the Cloister spawn pause flag. */
+export function isCloisterSpawnsPausedSync(): boolean {
+  try {
+    return getSetting(CLOISTER_SPAWNS_PAUSED_KEY) === 'true';
+  } catch (err) {
+    console.warn('[control-settings] Failed to read Cloister spawn pause flag:', err);
+    return false;
+  }
+}
+
+/** Synchronous set of the Cloister spawn pause flag. */
+export function setCloisterSpawnsPausedSync(paused: boolean): void {
+  setSetting(CLOISTER_SPAWNS_PAUSED_KEY, paused ? 'true' : 'false');
 }
 
 /** Drop-in for getFlywheelActiveRunId() from app-settings.ts. */

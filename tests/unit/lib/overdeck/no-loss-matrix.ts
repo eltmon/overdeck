@@ -218,6 +218,11 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /events/stream',                        kind: 'http', disposition: 'RELOCATE',    door: 'Observability.subscribeDomainEvents (legacy SSE; replaced by RPC stream)' },
   { surface: 'GET /events/version',                       kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Build-version probe; outside 8 remodel domains' },
 
+  // ── internal-events.ts ────────────────────────────────────────────────────
+  { surface: 'POST /api/internal/events',                 kind: 'http', disposition: 'WRITE',       door: 'DomainEventWriter.append (internal deacon bridge)' },
+  { surface: 'GET /api/internal/events/latest',           kind: 'http', disposition: 'READ',        door: 'DomainEventResolver.latestSequence (internal deacon bridge)' },
+  { surface: 'GET /api/internal/events/stream',           kind: 'http', disposition: 'READ',        door: 'DomainEventResolver.stream (internal deacon bridge)' },
+
   // ── feature-registry.ts ───────────────────────────────────────────────────
   { surface: 'GET /api/registry/features',                kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Feature registry; outside 8 remodel domains' },
 

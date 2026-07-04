@@ -2,7 +2,7 @@
 import type { AgentRuntimeSync, HealthState } from '../runtimes/types.js';
 import type { CloisterConfig } from './config.js';
 import type { AgentHealth, HealthSummary } from './health.js';
-import type { EventStore } from '../../dashboard/server/event-store.js';
+import type { DomainEvent } from '@overdeck/contracts';
 import { loadCloisterConfigSync } from './config.js';
 import {
   getAgentHealth,
@@ -19,7 +19,12 @@ import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
 import { listRunningAgentsSync, getAgentStateSync, getAgentState, getAgentRuntimeStateSync, saveAgentRuntimeState } from '../agents.js';
 import type { Role } from '../agents.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
-import { setDeaconGloballyPaused, setFlywheelGloballyPaused } from '../overdeck/control-settings.js';
+import {
+  isCloisterSpawnsPausedSync,
+  setCloisterSpawnsPausedSync,
+  setDeaconGloballyPaused,
+  setFlywheelGloballyPaused,
+} from '../overdeck/control-settings.js';
 import { checkAllTriggers, type TriggerDetection } from './triggers.js';
 import { performHandoff, type HandoffResult } from './handoff.js';
 import { logHandoffEventSync, createHandoffEvent } from './handoff-logger.js';
@@ -128,6 +133,17 @@ export type ReactiveIssueState =
 export interface CloisterDomainEventLike {
   type: string;
   payload?: unknown;
+}
+
+interface CloisterEventStore {
+  append(event: Omit<DomainEvent, 'sequence'>): number;
+  subscribe?: (fn: (event: CloisterDomainEventLike) => void) => () => void;
+}
+
+let cloisterEventStoreProvider: (() => CloisterEventStore) | null = null;
+
+export function setCloisterEventStoreProvider(provider: (() => CloisterEventStore) | null): void {
+  cloisterEventStoreProvider = provider;
 }
 
 const ROLE_RUN_STATES: Record<ReactiveIssueState, Role | null> = {
@@ -513,7 +529,7 @@ function writeStateFile(running: boolean, pid?: number): void {
 /**
  * Read Cloister running state from file
  */
-function readStateFile(): { running: boolean; pid?: number; startedAt?: string } {
+export function readCloisterStateFile(): { running: boolean; pid?: number; startedAt?: string } {
   try {
     if (existsSync(CLOISTER_STATE_FILE)) {
       const data = JSON.parse(readFileSync(CLOISTER_STATE_FILE, 'utf-8'));
@@ -648,7 +664,7 @@ export class CloisterService {
   private healthCheckCount: number = 0;
   private lastPokeTimestamps: Map<string, number> = new Map(); // agentId → last poke timestamp (ms)
   private domainEventUnsubscribe: (() => void) | null = null;
-  private eventStore: EventStore | null = null;
+  private eventStore: CloisterEventStore | null = null;
 
   // ─── Status cache ────────────────────────────────────────────────────────────
   // getStatus() does sync file I/O + tmux calls for every agent. Cache for 3s
@@ -887,6 +903,25 @@ export class CloisterService {
     if (this.domainEventUnsubscribe) return;
 
     try {
+      const injected = cloisterEventStoreProvider?.();
+      if (injected) {
+        this.eventStore = injected;
+        if (injected.subscribe) {
+          this.domainEventUnsubscribe = injected.subscribe((event) => {
+            void Effect.runPromise(handleCloisterDomainEvent(event)).catch((error) => {
+              console.error('[cloister] Reactive lifecycle event handling failed:', error);
+              emitActivityEntrySync({
+                source: 'cloister',
+                level: 'error',
+                message: `Reactive lifecycle event handling failed: ${error instanceof Error ? error.message : String(error)}`,
+              });
+            });
+          });
+        }
+        console.log('  ✓ Cloister event store provider installed');
+        return;
+      }
+
       const { initEventStore } = await import('../../dashboard/server/event-store.js');
       const store = await initEventStore();
       this.eventStore = store;
@@ -1513,6 +1548,7 @@ export class CloisterService {
    */
   private pauseSpawns(reason: string): void {
     this.spawnsPaused = true;
+    setCloisterSpawnsPausedSync(true);
     this.emit({ type: 'spawn_paused', reason });
     console.log(`🔔 Agent spawns paused: ${reason}`);
   }
@@ -1524,6 +1560,7 @@ export class CloisterService {
    */
   resumeSpawns(): void {
     this.spawnsPaused = false;
+    setCloisterSpawnsPausedSync(false);
     this.deathTimestamps = []; // Clear death window
     this.emit({ type: 'spawn_resumed' });
     console.log(`🔔 Agent spawns resumed`);
@@ -1533,7 +1570,7 @@ export class CloisterService {
    * Check if spawns are currently paused
    */
   isSpawnPaused(): boolean {
-    return this.spawnsPaused;
+    return this.spawnsPaused || isCloisterSpawnsPausedSync();
   }
 
   /**
@@ -1952,7 +1989,7 @@ export class CloisterService {
       return true;
     }
     // Check if another process has Cloister running
-    const stateFile = readStateFile();
+    const stateFile = readCloisterStateFile();
     return stateFile.running;
   }
 }

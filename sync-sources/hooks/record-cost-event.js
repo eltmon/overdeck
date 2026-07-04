@@ -27598,6 +27598,7 @@ const DEFAULT_CONFIG = {
 		agentWarnCount: 8,
 		agentBlockCount: 10
 	},
+	issues: { closedWindowDays: 14 },
 	experimental: {
 		experimentalFeatures: false,
 		claudeCodeChannels: false,
@@ -27868,6 +27869,7 @@ function mergeConfigs(...configs) {
 			agentWarnCount: DEFAULT_CONFIG.resources.agentWarnCount,
 			agentBlockCount: DEFAULT_CONFIG.resources.agentBlockCount
 		},
+		issues: { closedWindowDays: DEFAULT_CONFIG.issues.closedWindowDays },
 		experimental: {
 			experimentalFeatures: DEFAULT_CONFIG.experimental.experimentalFeatures,
 			claudeCodeChannels: DEFAULT_CONFIG.experimental.claudeCodeChannels,
@@ -28080,6 +28082,9 @@ function mergeConfigs(...configs) {
 			if (typeof config.resources.memory_block_gb === "number") result.resources.memoryBlockGb = config.resources.memory_block_gb;
 			if (typeof config.resources.agent_warn_count === "number") result.resources.agentWarnCount = config.resources.agent_warn_count;
 			if (typeof config.resources.agent_block_count === "number") result.resources.agentBlockCount = config.resources.agent_block_count;
+		}
+		if (config.issues) {
+			if (typeof config.issues.closed_window_days === "number") result.issues.closedWindowDays = config.issues.closed_window_days;
 		}
 		if (config.experimental) {
 			if (typeof config.experimental.experimentalFeatures === "boolean") result.experimental.experimentalFeatures = config.experimental.experimentalFeatures;
