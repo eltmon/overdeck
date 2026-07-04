@@ -195,11 +195,11 @@
     "issueId": "PAN-2318",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T14:37:22.878Z",
+    "updatedAt": "2026-07-04T14:37:58.965Z",
     "blockerReasons": [
       {
         "type": "failing_checks",
@@ -394,7 +394,7 @@
       },
       "costAtCloseOut": {
         "usd": 9.124812,
-        "pricingAsOf": "2026-07-04T14:37:22.948Z"
+        "pricingAsOf": "2026-07-04T14:37:59.018Z"
       }
     },
     "merges": [
@@ -403,5 +403,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-04T14:07:04.245Z",
-  "updated": "2026-07-04T14:37:23.040Z"
+  "updated": "2026-07-04T14:37:59.018Z"
 }
