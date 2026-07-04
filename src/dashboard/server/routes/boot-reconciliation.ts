@@ -67,7 +67,6 @@ const getBootReconciliationRoute = HttpRouter.add(
         candidateIds.has(agent.id)
         || agent.paused === true
         || agent.troubled === true
-        || agent.status === 'stopped'
         || Boolean(agent.hostOverride)
       ))
       .map((agent) => ({
