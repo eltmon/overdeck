@@ -113,6 +113,13 @@ export async function installSupervisorUnit(options: InstallSupervisorUnitOption
   return { path, written: true };
 }
 
+export async function startSupervisorUnitIfAvailable(options: InstallSupervisorUnitOptions = {}): Promise<boolean> {
+  if (!(await systemdUserAvailable())) return false;
+  await installSupervisorUnit(options);
+  await startSupervisorUnit();
+  return true;
+}
+
 export async function startSupervisorUnit(): Promise<void> {
   if (await isSupervisorUnitActive()) return;
   await systemctl(`start ${SUPERVISOR_UNIT_NAME}`);

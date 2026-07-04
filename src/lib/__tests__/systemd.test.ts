@@ -176,4 +176,42 @@ describe('supervisor systemd unit helpers', () => {
     execAsyncMock.mockRejectedValueOnce(new Error('unit not loaded'));
     await expect(isSupervisorUnitFailed()).resolves.toBe(false);
   });
+
+  it('installs and starts the unit when systemd is available', async () => {
+    const unitDir = mkdtempSync(join(tmpdir(), 'overdeck-systemd-start-test-'));
+    const unitText = '[Unit]\nDescription=test\n\n[Service]\nType=simple\n';
+    execAsyncMock.mockImplementation(async (command: string) => {
+      if (command.includes('is-active')) throw new Error('inactive');
+      return { stdout: '', stderr: '' };
+    });
+    const { startSupervisorUnitIfAvailable } = await import('../systemd.js');
+
+    try {
+      await expect(startSupervisorUnitIfAvailable({ unitDir, unitText })).resolves.toBe(true);
+
+      expect(readFileSync(join(unitDir, 'overdeck-supervisor.service'), 'utf-8')).toBe(unitText);
+      expect(execAsyncMock).toHaveBeenCalledWith('systemctl --user daemon-reload', expect.any(Object));
+      expect(execAsyncMock).toHaveBeenCalledWith('systemctl --user start overdeck-supervisor.service', expect.any(Object));
+    } finally {
+      rmSync(unitDir, { recursive: true, force: true });
+    }
+  });
+
+  it('does not restart an already-active unit', async () => {
+    const { startSupervisorUnit } = await import('../systemd.js');
+
+    await startSupervisorUnit();
+
+    expect(execAsyncMock).toHaveBeenCalledTimes(1);
+    expect(execAsyncMock).toHaveBeenCalledWith('systemctl --user is-active --quiet overdeck-supervisor.service', expect.any(Object));
+  });
+
+  it('does not install or start the unit when systemd is unavailable', async () => {
+    process.env.CI = 'true';
+    const { startSupervisorUnitIfAvailable } = await import('../systemd.js');
+
+    await expect(startSupervisorUnitIfAvailable({ unitText: 'unused' })).resolves.toBe(false);
+
+    expect(execAsyncMock).not.toHaveBeenCalled();
+  });
 });
