@@ -107,38 +107,14 @@
       "reason": "feedback",
       "note": "[2026-07-04T20:10Z] review-agent → CHANGES-REQUESTED — seq 4",
       "timestamp": "2026-07-04T20:10:01.961Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T20:14:41.892Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-04T20:05:23Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2284\n\nFR-4 remains unmet: handleAgentStoppedEvent still does not consume the shared classifier\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2284 -m \"Fixed review issues\"`"
-    },
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-04T20:05:31Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2284\n\nFR-4 remains unmet: handleAgentStoppedEvent still does not consume the shared classifier\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2284 -m \"Fixed review issues\"`"
-    },
-    {
-      "seq": 3,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-04T20:09:59Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2284\n\nResume-path delegation changes live-tmux reconciliation ordering before completed/merged skips\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2284 -m \"Fixed review issues\"`"
-    },
-    {
-      "seq": 4,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-04T20:10:01Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2284\n\nResume-path delegation changes live-tmux reconciliation ordering before completed/merged skips\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2284 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".beads/issues.jsonl",
@@ -181,20 +157,20 @@
     "recordedAt": "2026-07-04T20:02:30.686Z"
   },
   "created": "2026-07-03T11:01:31.556Z",
-  "updated": "2026-07-04T20:10:01.961Z",
+  "updated": "2026-07-04T20:14:45.747Z",
   "pipeline": {
     "issueId": "PAN-2284",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T20:09:59.901Z",
-    "reviewNotes": "Resume-path delegation changes live-tmux reconciliation ordering before completed/merged skips",
+    "updatedAt": "2026-07-04T20:14:45.706Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "workspace-vawme passes: current code returns resumed/skipped/deferred, boot-reconciliation endpoints pass skipped/deferred, and pan-871 tests read result.resumed with candidate-filtered mocks.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2365",
-    "lastVerifiedCommit": "ee658a35c7478c44d73e032feaee4e0770e3a5b0",
+    "lastVerifiedCommit": "f21c9420b4b89ef01bbcd9c6e51993c12b2854cb",
     "reviewRequestedAt": "2026-07-04T20:02:40.400Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -296,7 +272,7 @@
       },
       "costAtCloseOut": {
         "usd": 22.67995,
-        "pricingAsOf": "2026-07-04T20:09:59.929Z"
+        "pricingAsOf": "2026-07-04T20:14:45.726Z"
       }
     },
     "merges": [
