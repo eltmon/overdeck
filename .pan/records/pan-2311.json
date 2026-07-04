@@ -86,6 +86,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-04T16:22:51.790Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T16:40:39.705Z"
     }
   ],
   "feedback": [],
@@ -132,8 +137,8 @@
     ],
     "recordedAt": "2026-07-04T14:36:30.293Z"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "cli-reconcile-merges": "completed",
     "cli-reconcile-merges.ac1": "completed",
@@ -163,15 +168,16 @@
   },
   "pipeline": {
     "issueId": "PAN-2311",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T16:36:06.113Z",
+    "updatedAt": "2026-07-04T16:40:43.508Z",
+    "reviewNotes": "Agent re-review request (5/25): Resolved latest origin/main conflict and reverified",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2317",
-    "lastVerifiedCommit": "6c152322ed60d9cc1f75d615c0e455108b71d927"
+    "lastVerifiedCommit": "f2637e8e48ee7bc13594c96371e9ffc249c3307e"
   },
   "closeOut": {
     "usage": {
@@ -237,7 +243,7 @@
       },
       "costAtCloseOut": {
         "usd": 11.747829,
-        "pricingAsOf": "2026-07-04T16:36:06.370Z"
+        "pricingAsOf": "2026-07-04T16:40:43.524Z"
       }
     },
     "merges": [
@@ -246,5 +252,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T18:03:53.979Z",
-  "updated": "2026-07-04T16:36:06.396Z"
+  "updated": "2026-07-04T16:40:43.532Z"
 }
