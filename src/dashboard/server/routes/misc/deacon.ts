@@ -32,7 +32,7 @@ const postResumeAllRoute = HttpRouter.add(
       const result = await applyBootReconciliationDecision();
       const resumed = result.resumed;
       console.log(`[resume-all] Boot reconciliation decision set to resume_all; resumed ${resumed.length} work agent(s)${resumed.length ? `: ${resumed.join(', ')}` : ''}`);
-      return jsonResponse({ ok: true, resumed, count: resumed.length });
+      return jsonResponse({ ok: true, resumed, outcomes: result.outcomes, count: resumed.length });
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error resuming all agents:', error);
