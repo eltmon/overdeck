@@ -86,6 +86,103 @@ projects:
 
 *Not required if `issue_prefixes` or `issue_pattern` is specified.
 
+## Release Configuration
+
+Projects can declare a `release:` section in `~/.overdeck/projects.yaml` to
+describe post-merge rollout coordination. This is used by the release specialist
+after a coordinated merge succeeds: it resolves component order, waits for
+automatic deploys, verifies health and version checks, runs smoke tests, and
+records rollout state.
+
+<Note>
+  The rollout CLI is `pan rollout`. It is separate from `pan release`, which is
+  reserved for Overdeck's npm publishing workflow.
+</Note>
+
+```yaml
+projects:
+  example:
+    name: Example
+    path: /home/user/projects/example
+    issue_prefix: EX
+    release:
+      components:
+        api:
+          provider: kubernetes
+          trigger: auto
+          depends_on: []
+          health_url: https://api.example.com/health
+          version_check: curl -sk https://api.example.com/version
+          smoke_test: curl -sk https://api.example.com/health
+          rollback: kubectl rollout undo deployment/example-api
+```
+
+Release components use these fields:
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `components` | Yes | Map of component name to release component configuration |
+| `provider` | No | Informational provider name such as `kubernetes` or `vercel` |
+| `trigger` | Yes | `auto`, `manual`, or `skip` |
+| `depends_on` | No | Component names that must release before this component |
+| `health_url` | No | URL polled to verify the released service is healthy |
+| `version_check` | No | Shell command used to verify the live version |
+| `smoke_test` | No | Shell command used for component-specific post-release validation |
+| `rollback` | No | Shell command run when this component fails and rollback is available |
+
+`trigger: auto` means Overdeck waits for an external auto-deploy and verifies
+it; it does not run provider-specific deploy commands itself. `trigger: manual`
+records that a human deploy is required. `trigger: skip` excludes the component
+from the release plan.
+
+The releaseStatus lifecycle is `pending` -> `releasing` -> terminal status.
+Release status values are:
+
+- `pending` - release is queued but not started
+- `releasing` - release is currently running
+- `passed` - all required release steps passed
+- `failed` - a required release step failed
+- `partial` - some components released, but the full release did not complete
+- `rolled_back` - rollback ran after a release failure
+- `skipped` - no release was required
+
+Projects without a `release:` section are skipped cleanly; they do not fail
+rollout processing.
+
+Example MYN release configuration:
+
+```yaml
+projects:
+  myn:
+    name: "Mind Your Now"
+    path: /home/user/projects/myn
+    issue_prefix: MIN
+    release:
+      components:
+        api:
+          provider: kubernetes
+          trigger: auto
+          depends_on: []
+          health_url: https://api.mindyournow.com/actuator/health
+          version_check: curl -sk https://api.mindyournow.com/version
+          smoke_test: curl -sk https://api.mindyournow.com/actuator/health | jq .status
+          rollback: kubectl rollout undo deployment/myn-api -n myn
+        frontend:
+          provider: vercel
+          trigger: auto
+          depends_on:
+            - api
+          health_url: https://mindyournow.com
+          version_check: curl -sk https://mindyournow.com/version
+          smoke_test: curl -sk https://mindyournow.com/api/health
+        docs:
+          trigger: skip
+        myn-skills:
+          trigger: manual
+        openclaw-plugin:
+          trigger: manual
+```
+
 ## Label-Based Routing
 
 Issues are routed to different subdirectories based on their labels:
