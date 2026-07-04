@@ -140,6 +140,8 @@ function makeCoordinateDeps(
     spawnRun: vi.fn(async () => null),
     getIssueHold: vi.fn(() => null),
     readStatusOverrides: vi.fn(() => undefined),
+    getFinalizedAt: vi.fn(() => undefined),
+    setFinalizedAt: vi.fn(),
     shouldDispatch: vi.fn(() => true),
     getMaxSlotIndex: vi.fn(() => 4),
     listSlotAssignments: vi.fn(() => []),

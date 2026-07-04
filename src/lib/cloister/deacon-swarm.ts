@@ -59,6 +59,7 @@ import {
   type RequestIssueReviewResult,
 } from './deacon-swarm-finalization.js';
 import { gcMergedSlots } from './deacon-swarm-gc.js';
+import { createMinimalIssueRecord, writeSwarmFinalizedAt } from './deacon-swarm-record.js';
 
 export { gcOrphanedSlots } from './deacon-swarm-orphan-gc.js';
 export { gcMergedSlots } from './deacon-swarm-gc.js';
@@ -125,6 +126,8 @@ export interface CoordinateSwarmSlotsDeps {
   getIssueHold?: (issueId: string) => Pick<ReviewStatus, 'stuck' | 'deaconIgnored'> | null;
   /** Per-issue record statusOverrides — the durable item done-ness the merged plan view applies. */
   readStatusOverrides?: (workspacePath: string, issueId: string) => Record<string, string> | undefined;
+  getFinalizedAt: (issueId: string, workspacePath: string) => string | undefined;
+  setFinalizedAt: (issueId: string, workspacePath: string, finalizedAt: string) => void;
   /**
    * Re-evaluated immediately before EVERY slot spawn: global freeze + per-issue hold.
    * The cycle-start checks alone let an in-flight wave keep dispatching after a freeze
@@ -185,6 +188,8 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   getMaxSlotIndex: defaultGetMaxSlotIndex,
   listSlotAssignments: listDurableSlotAssignments,
   readStatusOverrides: defaultReadStatusOverrides,
+  getFinalizedAt: getSwarmFinalizedAt,
+  setFinalizedAt: recordSwarmFinalizedAt,
   requestIssueReview: defaultRequestIssueReview,
 };
 
@@ -548,6 +553,14 @@ export function getFailedMergeBlock(issueId: string, workspacePath?: string): Fa
   return failedMergeBlocks.get(normalized);
 }
 
+export function getSwarmFinalizedAt(issueId: string, workspacePath?: string): string | undefined {
+  return workspacePath ? readIssueRecordForWorkspaceSync(workspacePath, issueId.toUpperCase())?.swarm?.finalizedAt : undefined;
+}
+
+export function recordSwarmFinalizedAt(issueId: string, workspacePath: string, finalizedAt: string): void {
+  writeSwarmFinalizedAt(workspacePath, issueId.toUpperCase(), finalizedAt);
+}
+
 export function recordFailedMergeBlock(block: FailedMergeBlock, workspacePath?: string): void {
   const normalizedBlock = { ...block, issueId: block.issueId.toUpperCase() };
   failedMergeBlocks.set(normalizedBlock.issueId, normalizedBlock);
@@ -665,33 +678,6 @@ function writeSwarmFailedMergeBlock(
       failedMergeBlock: block,
     },
   });
-}
-
-function createMinimalIssueRecord(issueId: string): PanIssueRecord {
-  const now = new Date().toISOString();
-  return {
-    issueId,
-    schemaVersion: 2,
-    created: now,
-    updated: now,
-    feedback: [],
-    pipeline: {
-      issueId,
-      reviewStatus: 'pending',
-      testStatus: 'pending',
-      mergeStatus: 'pending',
-      readyForMerge: false,
-      updatedAt: now,
-    },
-    closeOut: {
-      usage: {
-        byStage: {},
-        totals: {},
-      },
-      merges: [],
-      ranOn: '',
-    },
-  };
 }
 
 function recordSlotMergeFire(branchKey: string, now = Date.now()): void {
