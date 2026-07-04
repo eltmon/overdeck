@@ -96,10 +96,11 @@ function presenceToStatus(presence: SessionNodeType['presence']): StatusDotStatu
 
 function effectiveActivity(runtime: AgentRuntimeSnapshot | undefined, presence: SessionNodeType['presence']): Activity | undefined {
   if (!runtime?.activity) return undefined;
-  if (presence === 'ended') return undefined;
+  const isEnded = presence === 'ended';
+  if (isEnded) return undefined;
   // agent.stopped sets activity="stopped" but tmux session may still be alive (pan done).
   // If presence says alive, treat as idle — the agent finished work but isn't dead.
-  if (runtime.activity === 'stopped' && presence !== 'ended') return 'idle';
+  if (runtime.activity === 'stopped' && !isEnded) return 'idle';
   return runtime.activity;
 }
 
