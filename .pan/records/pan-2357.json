@@ -6,20 +6,26 @@
       "timestamp": "2026-07-04T18:57:09.496Z",
       "reason": "end",
       "note": "Skipped full npm test: known hung real-timer suite per operator direction; stopped hung run after broad unrelated failures. No deviations from requested scoped verification. Delivered durable git-based slot completion recovery and all-complete swarm issue-level review finalization. Verified scoped swarm/slot tests, typecheck, and lint."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T18:59:57.014Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-04T18:19:57.401Z",
-  "updated": "2026-07-04T18:57:41.566Z",
+  "updated": "2026-07-04T18:59:58.818Z",
   "pipeline": {
     "issueId": "PAN-2357",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T18:57:41.484Z",
+    "updatedAt": "2026-07-04T18:59:58.787Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2361",
+    "lastVerifiedCommit": "140ba58013ea783069b1533a6c8c2222c579bd73",
     "reviewRequestedAt": "2026-07-04T18:57:09.498Z"
   },
   "closeOut": {
@@ -44,7 +50,7 @@
       },
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-04T18:57:41.566Z"
+        "pricingAsOf": "2026-07-04T18:59:58.818Z"
       }
     },
     "merges": [
