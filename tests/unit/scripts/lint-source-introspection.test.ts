@@ -1,4 +1,4 @@
-import { execFileSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,12 +9,8 @@ const READ_FILE_SYNC = 'read' + 'FileSync';
 const TS = '.t' + 's';
 const TSX = '.t' + 'sx';
 
-function makeTempRepo(): string {
-  const root = mkdtempSync(join(tmpdir(), 'lint-source-introspection-'));
-  execFileSync('git', ['init', '--quiet'], { cwd: root });
-  execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: root });
-  execFileSync('git', ['config', 'user.name', 'Test'], { cwd: root });
-  return root;
+function makeTempWorkspace(): string {
+  return mkdtempSync(join(tmpdir(), 'lint-source-introspection-'));
 }
 
 function installScript(root: string): string {
@@ -75,7 +71,7 @@ function runLint(root: string, args: string[] = []): { ok: boolean; output: stri
 
 describe('lint-source-introspection.sh', () => {
   it('passes for a clean temp tree with an empty baseline', () => {
-    const root = makeTempRepo();
+    const root = makeTempWorkspace();
     installScript(root);
 
     const { ok, output } = runLint(root);
@@ -85,7 +81,7 @@ describe('lint-source-introspection.sh', () => {
   });
 
   it('fails when a new single-line source read has no baseline entry', () => {
-    const root = makeTempRepo();
+    const root = makeTempWorkspace();
     installScript(root);
     writeTestFile(root, 'tests/new-offender.test.ts', sourceRead(`src/foo${TS}`));
 
@@ -96,7 +92,7 @@ describe('lint-source-introspection.sh', () => {
   });
 
   it('detects a multi-line source read', () => {
-    const root = makeTempRepo();
+    const root = makeTempWorkspace();
     installScript(root);
     writeTestFile(root, 'tests/multiline.test.ts', multilineSourceRead(`../foo${TSX}`));
 
@@ -107,7 +103,7 @@ describe('lint-source-introspection.sh', () => {
   });
 
   it('reports a stale lowered count and ratchets it down with --update', () => {
-    const root = makeTempRepo();
+    const root = makeTempWorkspace();
     installScript(root);
     writeTestFile(root, 'tests/shrunk.test.ts', sourceRead(`src/foo${TS}`));
     writeBaseline(root, [[2, 'tests/shrunk.test.ts']]);
@@ -125,7 +121,7 @@ describe('lint-source-introspection.sh', () => {
   });
 
   it('never raises counts or adds new files during --update', () => {
-    const root = makeTempRepo();
+    const root = makeTempWorkspace();
     installScript(root);
     writeTestFile(
       root,
