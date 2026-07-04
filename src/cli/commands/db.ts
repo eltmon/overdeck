@@ -123,6 +123,13 @@ export function registerDbCommands(program: Command): void {
     .option('--dry-run', 'Show what would be restored without writing')
     .option('--verbose', 'Log each processed issue')
     .action(restoreVerdictsCommand);
+
+  db.command('reconcile-merges')
+    .description('Backfill fulfilled merge state from tracked PR and branch ancestry evidence (PAN-2311)')
+    .option('--issue-id <id>', 'Reconcile only this issue')
+    .option('--dry-run', 'Show what would be reconciled without writing')
+    .option('--verbose', 'Log each processed issue')
+    .action(reconcileMergesCommand);
 }
 
 async function snapshotCommand(options: {
@@ -534,6 +541,45 @@ async function restoreVerdictsCommand(options: {
     }
   } catch (error: any) {
     spinner.fail(`Verdict restore failed: ${error.message}`);
+    process.exitCode = 1;
+  }
+}
+
+async function reconcileMergesCommand(options: {
+  issueId?: string;
+  dryRun?: boolean;
+  verbose?: boolean;
+}): Promise<void> {
+  const spinner = ora('Reconciling fulfilled merges from durable records...').start();
+
+  try {
+    const { reconcileMergeFulfillment } = await import('../../lib/pan-dir/merge-fulfillment.js');
+    const result = await reconcileMergeFulfillment({
+      issueId: options.issueId,
+      dryRun: options.dryRun,
+      verbose: options.verbose,
+    });
+
+    const verb = options.dryRun ? 'would reconcile' : 'reconciled';
+    spinner.succeed(
+      `Merge reconciliation complete: ${result.reconciled} ${verb}, ${result.flagged} flagged, ${result.skipped} skipped, ${result.failed} failed`
+    );
+
+    for (const detail of result.details) {
+      if (detail.action === 'flagged') {
+        console.log(chalk.yellow(`  ${detail.issueId}: ${detail.reason ?? detail.evidence ?? 'merge fulfillment is not confirmed'}`));
+      } else if (detail.action === 'failed') {
+        console.log(chalk.red(`  ${detail.issueId}: ${detail.reason ?? 'failed'}`));
+      } else if (options.verbose) {
+        console.log(chalk.dim(`  ${detail.issueId}: ${detail.action}${detail.evidence ? ` (${detail.evidence})` : ''}`));
+      }
+    }
+
+    if (result.failed > 0) {
+      process.exitCode = 1;
+    }
+  } catch (error: any) {
+    spinner.fail(`Merge reconciliation failed: ${error.message}`);
     process.exitCode = 1;
   }
 }

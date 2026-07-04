@@ -32,12 +32,12 @@ function makeDeps(rows: UatGeneration[], options: { mainSha?: string; failMerge?
   map: Map<string, UatGeneration>;
   merges: Array<{ branch: string; message: string }>;
   teardowns: string[];
-  fired: string[];
+  fired: Array<{ issueId: string; options?: { sourceBranch?: string; verifiedMergedRef?: string } }>;
 } {
   const map = new Map(rows.map((g) => [g.name, g]));
   const merges: Array<{ branch: string; message: string }> = [];
   const teardowns: string[] = [];
-  const fired: string[] = [];
+  const fired: Array<{ issueId: string; options?: { sourceBranch?: string; verifiedMergedRef?: string } }> = [];
   return {
     map, merges, teardowns, fired,
     git: {
@@ -66,7 +66,7 @@ function makeDeps(rows: UatGeneration[], options: { mainSha?: string; failMerge?
           .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     },
     teardownStack: async (g) => { teardowns.push(g.name); },
-    firePostMerge: (issueId) => { fired.push(issueId); return true; },
+    firePostMerge: (issueId, options) => { fired.push({ issueId, options }); return true; },
     memberEligibility: (issueId) => {
       const reason = options.ineligible?.[issueId];
       return reason ? { eligible: false, reason } : { eligible: true };
@@ -92,7 +92,10 @@ describe('promoteUatGeneration — success', () => {
     expect(deps.merges[0]!.message).toMatch(/^Merge UAT batch uat\/pan-otter-0610 \(PAN-1, PAN-2\)/);
     expect(deps.map.get('uat/pan-otter-0610')!.status).toBe('promoted');
     expect(deps.teardowns).toContain('uat/pan-otter-0610');
-    expect(deps.fired).toEqual(['PAN-1', 'PAN-2']);
+    expect(deps.fired).toEqual([
+      { issueId: 'PAN-1', options: { sourceBranch: 'feature/pan-1', verifiedMergedRef: 'h1' } },
+      { issueId: 'PAN-2', options: { sourceBranch: 'feature/pan-2', verifiedMergedRef: 'h2' } },
+    ]);
   });
 
   it('invalidates every other live generation (main moved) and tears their stacks down', async () => {
