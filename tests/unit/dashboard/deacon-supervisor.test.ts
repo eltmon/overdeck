@@ -147,4 +147,19 @@ describe('deacon supervisor', () => {
     child.connected = false;
     expect(supervisor.sendPatrolNow()).toBe(false);
   });
+
+  it('sends a config reload IPC message only while connected', async () => {
+    const child = fakeChild(405);
+    const supervisor = createDeaconSupervisor({
+      fork: vi.fn(() => child as never),
+      readState: () => ({ running: false }),
+    });
+    await supervisor.startDeaconChild();
+
+    expect(supervisor.reloadConfig()).toBe(true);
+    expect(child.send).toHaveBeenCalledWith({ type: 'reload-config' });
+
+    child.connected = false;
+    expect(supervisor.reloadConfig()).toBe(false);
+  });
 });

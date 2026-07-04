@@ -18,6 +18,7 @@ import { OVERDECK_HOME } from '../../../lib/paths.js';
 import { getRuntimeForAgent } from '../../../lib/runtimes/index.js';
 import {
   isChildRunning,
+  reloadDeaconConfig,
   sendPatrolNow,
   startDeaconChild,
   stopDeaconChild,
@@ -28,6 +29,7 @@ export interface CloisterControlDeps {
   startDeaconChild?: typeof startDeaconChild;
   stopDeaconChild?: typeof stopDeaconChild;
   sendPatrolNow?: typeof sendPatrolNow;
+  reloadDeaconConfig?: typeof reloadDeaconConfig;
   isChildRunning?: typeof isChildRunning;
   readDeaconState?: typeof loadDeaconState;
   readDeaconConfig?: typeof loadDeaconConfig;
@@ -110,6 +112,11 @@ export function readDurableDeaconLogs(limit = 100): DeaconLogEntry[] {
 export function requestDurablePatrol(deps: CloisterControlDeps = {}): { accepted: true } | { accepted: false } {
   if ((deps.isChildRunning ?? isChildRunning)() === false) return { accepted: false };
   return (deps.sendPatrolNow ?? sendPatrolNow)() ? { accepted: true } : { accepted: false };
+}
+
+export function reloadDurableCloisterConfig(deps: CloisterControlDeps = {}): { accepted: true } | { accepted: false } {
+  if ((deps.isChildRunning ?? isChildRunning)() === false) return { accepted: false };
+  return (deps.reloadDeaconConfig ?? reloadDeaconConfig)() ? { accepted: true } : { accepted: false };
 }
 
 export function readLastPatrolResultArtifact(): PatrolResult | null {

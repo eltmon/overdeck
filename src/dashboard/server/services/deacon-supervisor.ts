@@ -23,6 +23,7 @@ export interface DeaconSupervisor {
   startDeaconChild(): Promise<boolean>;
   stopDeaconChild(): Promise<void>;
   sendPatrolNow(): boolean;
+  reloadConfig(): boolean;
   isChildRunning(): boolean;
 }
 
@@ -190,6 +191,12 @@ export function createDeaconSupervisor(deps: DeaconSupervisorDeps = {}): DeaconS
       return true;
     },
 
+    reloadConfig(): boolean {
+      if (!child || !child.connected) return false;
+      child.send?.({ type: 'reload-config' });
+      return true;
+    },
+
     isChildRunning(): boolean {
       return child !== null && !child.killed;
     },
@@ -201,4 +208,5 @@ const defaultSupervisor = createDeaconSupervisor();
 export const startDeaconChild = defaultSupervisor.startDeaconChild;
 export const stopDeaconChild = defaultSupervisor.stopDeaconChild;
 export const sendPatrolNow = defaultSupervisor.sendPatrolNow;
+export const reloadDeaconConfig = defaultSupervisor.reloadConfig;
 export const isChildRunning = defaultSupervisor.isChildRunning;

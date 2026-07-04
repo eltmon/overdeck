@@ -26,6 +26,7 @@ import { httpHandler } from './http-handler.js';
 import {
   areDurableSpawnsPaused,
   readDurableCloisterStatus,
+  reloadDurableCloisterConfig,
   resumeDurableSpawns,
   startDurableCloister,
   stopDurableCloister,
@@ -195,7 +196,11 @@ const putCloisterConfigRoute = HttpRouter.add(
       },
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
-    return jsonResponse({ success: true, config: updates });
+    const reload = yield* Effect.try({
+      try: () => reloadDurableCloisterConfig(),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+    return jsonResponse({ success: true, config: updates, reloaded: reload.accepted });
   })),
 );
 

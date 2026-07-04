@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   startDeaconChild: vi.fn(async () => true),
   stopDeaconChild: vi.fn(async () => undefined),
   sendPatrolNow: vi.fn(() => true),
+  reloadDeaconConfig: vi.fn(() => true),
   isChildRunning: vi.fn(() => true),
 }));
 
@@ -64,6 +65,7 @@ vi.mock('../../../src/dashboard/server/services/deacon-supervisor.js', () => ({
   startDeaconChild: mocks.startDeaconChild,
   stopDeaconChild: mocks.stopDeaconChild,
   sendPatrolNow: mocks.sendPatrolNow,
+  reloadDeaconConfig: mocks.reloadDeaconConfig,
   isChildRunning: mocks.isChildRunning,
 }));
 
@@ -74,6 +76,7 @@ describe('cloister control surface no-loss audit', () => {
     mocks.readCloisterStateFile.mockReturnValue({ running: true, pid: 1234, startedAt: '2026-07-03T00:00:00.000Z' });
     mocks.isChildRunning.mockReturnValue(true);
     mocks.sendPatrolNow.mockReturnValue(true);
+    mocks.reloadDeaconConfig.mockReturnValue(true);
     mocks.isCloisterSpawnsPausedSync.mockReturnValue(true);
   });
 
@@ -86,7 +89,7 @@ describe('cloister control surface no-loss audit', () => {
     ['POST /api/cloister/resume-spawns', 'resumeDurableSpawns'],
     ['GET /api/cloister/spawn-status', 'areDurableSpawnsPaused'],
     ['GET /api/cloister/config', 'filesystem config read route remains owner'],
-    ['PUT /api/cloister/config', 'filesystem config write route remains owner'],
+    ['PUT /api/cloister/config', 'filesystem config write plus live child reload'],
     ['GET /api/cloister/agents/health', 'dashboard health route remains owner'],
     ['GET /api/deacon/status', 'readDurableDeaconStatus'],
     ['GET /api/deacon/logs', 'readDurableDeaconLogs'],
@@ -139,6 +142,21 @@ describe('cloister control surface no-loss audit', () => {
 
     expect(requestDurablePatrol()).toEqual({ accepted: false });
     expect(mocks.sendPatrolNow).not.toHaveBeenCalled();
+  });
+
+  it('requests live config reload through the child supervisor', async () => {
+    const { reloadDurableCloisterConfig } = await import('../../../src/dashboard/server/services/cloister-control-surface.js');
+
+    expect(reloadDurableCloisterConfig()).toEqual({ accepted: true });
+    expect(mocks.reloadDeaconConfig).toHaveBeenCalled();
+  });
+
+  it('does not request live config reload when no child is running', async () => {
+    mocks.isChildRunning.mockReturnValue(false);
+    const { reloadDurableCloisterConfig } = await import('../../../src/dashboard/server/services/cloister-control-surface.js');
+
+    expect(reloadDurableCloisterConfig()).toEqual({ accepted: false });
+    expect(mocks.reloadDeaconConfig).not.toHaveBeenCalled();
   });
 
   it('reads deacon status and logs from durable artifacts', async () => {

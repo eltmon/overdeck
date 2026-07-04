@@ -26,9 +26,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-04T14:42:50.481Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-04T14:57Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-04T14:57:00.847Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-04T14:57:00Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2318\n\nPUT /api/cloister/config saves the file but no longer reloads the running child Cloister process, so live settings remain stale until restart.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2318 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".eslintrc.cjs",
@@ -203,13 +216,14 @@
   },
   "pipeline": {
     "issueId": "PAN-2318",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T14:48:46.977Z",
+    "updatedAt": "2026-07-04T14:57:10.793Z",
+    "reviewNotes": "PUT /api/cloister/config saves the file but no longer reloads the running child Cloister process, so live settings remain stale until restart.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2327",
     "reviewedAtCommit": "1ee1128f5ea549bf395737633866b6a68d01917a",
     "lastVerifiedCommit": "1ee1128f5ea549bf395737633866b6a68d01917a"
@@ -243,9 +257,9 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 787183,
-            "output": 32684,
-            "cacheRead": 11681536,
+            "input": 870440,
+            "output": 47116,
+            "cacheRead": 21697966,
             "cacheWrite": 0
           }
         }
@@ -270,15 +284,15 @@
           "cacheWrite": 160275
         },
         "custom/kimi-k2.7-code": {
-          "input": 787183,
-          "output": 32684,
-          "cacheRead": 11681536,
+          "input": 870440,
+          "output": 47116,
+          "cacheRead": 21697966,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 10.561627,
-        "pricingAsOf": "2026-07-04T14:48:46.993Z"
+        "usd": 12.601575,
+        "pricingAsOf": "2026-07-04T14:57:10.860Z"
       }
     },
     "merges": [
@@ -287,5 +301,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-04T14:07:04.245Z",
-  "updated": "2026-07-04T14:48:47.003Z"
+  "updated": "2026-07-04T14:57:10.866Z"
 }

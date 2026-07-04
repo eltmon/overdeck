@@ -110,6 +110,14 @@ process.on('message', (message) => {
     void runPatrol().catch((err) => {
       console.error('[deacon-child] patrol request failed:', err);
     });
+    return;
+  }
+  if ((message as { type?: unknown }).type === 'reload-config') {
+    try {
+      getCloisterService().reloadConfig();
+    } catch (err) {
+      console.error('[deacon-child] config reload request failed:', err);
+    }
   }
 });
 
