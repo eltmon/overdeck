@@ -6,156 +6,19 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-04T14:24:30.602Z"
+    },
+    {
+      "timestamp": "2026-07-04T14:37:22.764Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T14:37:23.040Z"
     }
   ],
   "feedback": [],
-  "harness": "codex",
-  "model": "gpt-5.5",
-  "statusOverrides": {
-    "wi-3-control-surface-audit": "completed",
-    "wi-3-control-surface-audit.ac1": "completed",
-    "wi-3-control-surface-audit.ac2": "completed",
-    "wi-3-control-surface-audit.ac3": "completed",
-    "wi-3-control-surface-audit.ac4": "completed",
-    "wi-3-control-surface-audit.ac5": "completed",
-    "wi-7-memoize-issues-sort": "completed",
-    "wi-7-memoize-issues-sort.ac1": "completed",
-    "wi-7-memoize-issues-sort.ac2": "completed",
-    "wi-7-memoize-issues-sort.ac3": "completed",
-    "wi-7-memoize-issues-sort.ac4": "completed",
-    "wi-1-deacon-child": "completed",
-    "wi-1-deacon-child.ac1": "completed",
-    "wi-1-deacon-child.ac2": "completed",
-    "wi-1-deacon-child.ac3": "completed",
-    "wi-1-deacon-child.ac4": "completed",
-    "wi-1-deacon-child.ac5": "completed",
-    "wi-6-github-closed-window": "completed",
-    "wi-6-github-closed-window.ac1": "completed",
-    "wi-6-github-closed-window.ac2": "completed",
-    "wi-6-github-closed-window.ac3": "completed",
-    "wi-2-event-bridge": "completed",
-    "wi-2-event-bridge.ac1": "completed",
-    "wi-2-event-bridge.ac2": "completed",
-    "wi-2-event-bridge.ac3": "completed",
-    "wi-2-event-bridge.ac4": "completed",
-    "wi-2-event-bridge.ac5": "completed",
-    "wi-9-execsync-lint-guard": "completed",
-    "wi-9-execsync-lint-guard.ac1": "completed",
-    "wi-9-execsync-lint-guard.ac2": "completed",
-    "wi-9-execsync-lint-guard.ac3": "completed",
-    "wi-8-eventrouter-backoff": "completed",
-    "wi-8-eventrouter-backoff.ac1": "completed",
-    "wi-8-eventrouter-backoff.ac2": "completed",
-    "wi-8-eventrouter-backoff.ac3": "completed",
-    "wi-8-eventrouter-backoff.ac4": "completed",
-    "wi-5-planning-refresh-gate": "completed",
-    "wi-5-planning-refresh-gate.ac1": "completed",
-    "wi-5-planning-refresh-gate.ac2": "completed",
-    "wi-5-planning-refresh-gate.ac3": "completed",
-    "wi-4-resource-discovery-filter": "completed",
-    "wi-4-resource-discovery-filter.ac1": "completed",
-    "wi-4-resource-discovery-filter.ac2": "completed",
-    "wi-4-resource-discovery-filter.ac3": "completed",
-    "wi-4-resource-discovery-filter.ac4": "completed",
-    "wi-10-eventloop-gauge": "completed",
-    "wi-10-eventloop-gauge.ac1": "completed",
-    "wi-10-eventloop-gauge.ac2": "completed",
-    "wi-10-eventloop-gauge.ac3": "completed"
-  },
-  "pipeline": {
-    "issueId": "PAN-2318",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "verificationStatus": "passed",
-    "inspectStatus": "passed",
-    "mergeStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-04T14:27:55.711Z",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
-    "blockerReasons": [
-      {
-        "type": "failing_checks",
-        "summary": "Required checks are failing",
-        "detectedAt": "2026-07-04T01:49:36.163Z"
-      }
-    ],
-    "prUrl": "https://github.com/eltmon/overdeck/pull/2327",
-    "lastVerifiedCommit": "9578e35e71f1c0cf418ec2d8fcc855f8af53390e"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {
-        "inspect-deep": {
-          "openai/gpt-5.5": {
-            "input": 409428,
-            "output": 15543,
-            "cacheRead": 2991616,
-            "cacheWrite": 0
-          }
-        },
-        "memory-extraction": {
-          "cliproxy/gpt-5.4-mini": {
-            "input": 26714,
-            "output": 788,
-            "cacheRead": 0,
-            "cacheWrite": 0
-          }
-        },
-        "plan": {
-          "anthropic/claude-opus-4-8": {
-            "input": 17641,
-            "output": 38691,
-            "cacheRead": 2794255,
-            "cacheWrite": 160275
-          }
-        },
-        "test": {
-          "custom/kimi-k2.7-code": {
-            "input": 492793,
-            "output": 13679,
-            "cacheRead": 5991424,
-            "cacheWrite": 0
-          }
-        }
-      },
-      "totals": {
-        "openai/gpt-5.5": {
-          "input": 409428,
-          "output": 15543,
-          "cacheRead": 2991616,
-          "cacheWrite": 0
-        },
-        "cliproxy/gpt-5.4-mini": {
-          "input": 26714,
-          "output": 788,
-          "cacheRead": 0,
-          "cacheWrite": 0
-        },
-        "anthropic/claude-opus-4-8": {
-          "input": 17641,
-          "output": 38691,
-          "cacheRead": 2794255,
-          "cacheWrite": 160275
-        },
-        "custom/kimi-k2.7-code": {
-          "input": 492793,
-          "output": 13679,
-          "cacheRead": 5991424,
-          "cacheWrite": 0
-        }
-      },
-      "costAtCloseOut": {
-        "usd": 9.124812,
-        "pricingAsOf": "2026-07-04T14:27:55.792Z"
-      }
-    },
-    "merges": [
-      "https://github.com/eltmon/overdeck/pull/2327"
-    ],
-    "ranOn": "eltmon-z790"
-  },
-  "created": "2026-07-04T14:07:04.245Z",
-  "updated": "2026-07-04T14:36:37.248Z",
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".eslintrc.cjs",
@@ -274,5 +137,271 @@
       "tests/unit/lib/overdeck/no-loss-matrix.ts"
     ],
     "recordedAt": "2026-07-04T14:36:37.246Z"
-  }
+  },
+  "harness": "codex",
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "wi-3-control-surface-audit": "completed",
+    "wi-3-control-surface-audit.ac1": "completed",
+    "wi-3-control-surface-audit.ac2": "completed",
+    "wi-3-control-surface-audit.ac3": "completed",
+    "wi-3-control-surface-audit.ac4": "completed",
+    "wi-3-control-surface-audit.ac5": "completed",
+    "wi-7-memoize-issues-sort": "completed",
+    "wi-7-memoize-issues-sort.ac1": "completed",
+    "wi-7-memoize-issues-sort.ac2": "completed",
+    "wi-7-memoize-issues-sort.ac3": "completed",
+    "wi-7-memoize-issues-sort.ac4": "completed",
+    "wi-1-deacon-child": "completed",
+    "wi-1-deacon-child.ac1": "completed",
+    "wi-1-deacon-child.ac2": "completed",
+    "wi-1-deacon-child.ac3": "completed",
+    "wi-1-deacon-child.ac4": "completed",
+    "wi-1-deacon-child.ac5": "completed",
+    "wi-6-github-closed-window": "completed",
+    "wi-6-github-closed-window.ac1": "completed",
+    "wi-6-github-closed-window.ac2": "completed",
+    "wi-6-github-closed-window.ac3": "completed",
+    "wi-2-event-bridge": "completed",
+    "wi-2-event-bridge.ac1": "completed",
+    "wi-2-event-bridge.ac2": "completed",
+    "wi-2-event-bridge.ac3": "completed",
+    "wi-2-event-bridge.ac4": "completed",
+    "wi-2-event-bridge.ac5": "completed",
+    "wi-9-execsync-lint-guard": "completed",
+    "wi-9-execsync-lint-guard.ac1": "completed",
+    "wi-9-execsync-lint-guard.ac2": "completed",
+    "wi-9-execsync-lint-guard.ac3": "completed",
+    "wi-8-eventrouter-backoff": "completed",
+    "wi-8-eventrouter-backoff.ac1": "completed",
+    "wi-8-eventrouter-backoff.ac2": "completed",
+    "wi-8-eventrouter-backoff.ac3": "completed",
+    "wi-8-eventrouter-backoff.ac4": "completed",
+    "wi-5-planning-refresh-gate": "completed",
+    "wi-5-planning-refresh-gate.ac1": "completed",
+    "wi-5-planning-refresh-gate.ac2": "completed",
+    "wi-5-planning-refresh-gate.ac3": "completed",
+    "wi-4-resource-discovery-filter": "completed",
+    "wi-4-resource-discovery-filter.ac1": "completed",
+    "wi-4-resource-discovery-filter.ac2": "completed",
+    "wi-4-resource-discovery-filter.ac3": "completed",
+    "wi-4-resource-discovery-filter.ac4": "completed",
+    "wi-10-eventloop-gauge": "completed",
+    "wi-10-eventloop-gauge.ac1": "completed",
+    "wi-10-eventloop-gauge.ac2": "completed",
+    "wi-10-eventloop-gauge.ac3": "completed"
+  },
+  "pipeline": {
+    "issueId": "PAN-2318",
+    "reviewStatus": "reviewing",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-04T14:37:22.878Z",
+    "blockerReasons": [
+      {
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-07-04T01:49:36.163Z"
+      }
+    ],
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2327",
+    "lastVerifiedCommit": "9578e35e71f1c0cf418ec2d8fcc855f8af53390e",
+    "reviewRequestedAt": "2026-07-04T14:37:22.764Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        ".eslintrc.cjs",
+        ".pan/records/pan-2318.json",
+        ".pan/test/result.json",
+        "scripts/file-size-baseline.txt",
+        "src/cli/commands/cloister/api.ts",
+        "src/dashboard/frontend/src/components/EventRouter.test.tsx",
+        "src/dashboard/server/review-status.ts",
+        "src/dashboard/server/routes/__tests__/resources-agents-table.test.ts",
+        "src/dashboard/server/routes/resources.ts",
+        "src/dashboard/server/server.ts",
+        "src/dashboard/server/services/__tests__/event-loop-monitor.test.ts",
+        "src/dashboard/server/services/__tests__/issue-data-service.test.ts",
+        "src/dashboard/server/services/cloister-control-surface.ts",
+        "src/lib/__tests__/review-status-reconcile.test.ts",
+        "src/lib/config-yaml/defaults.ts",
+        "src/lib/config-yaml/merge.ts",
+        "src/lib/config-yaml/schema.ts",
+        "src/lib/overdeck/control-settings.ts",
+        "sync-sources/hooks/record-cost-event.js",
+        "sync-sources/hooks/record-cost-event.js.map",
+        "tests/unit/dashboard/cloister-control-surface.test.ts",
+        "tests/unit/dashboard/deacon-supervisor.test.ts",
+        "tests/unit/dashboard/internal-events-route.test.ts",
+        "tests/unit/dashboard/metrics-stuck-count.test.ts",
+        "tests/unit/dashboard/server/services/resource-discovery.test.ts",
+        "tests/unit/lib/cloister/deacon-event-client.test.ts",
+        "tests/unit/lib/overdeck/no-loss-matrix.ts"
+      ],
+      "declaredScopeUntouched": [
+        "eslint.config.js",
+        "src/dashboard/server/routes/agents.ts",
+        "src/lib/config-yaml.ts"
+      ],
+      "declaredScope": [
+        "eslint.config.js",
+        "src/cli/commands/cloister/brake.ts",
+        "src/cli/commands/cloister/start.ts",
+        "src/cli/commands/cloister/status.ts",
+        "src/cli/commands/cloister/stop.ts",
+        "src/dashboard/frontend/src/components/EventRouter.tsx",
+        "src/dashboard/server/deacon-main.ts",
+        "src/dashboard/server/http-helpers.ts",
+        "src/dashboard/server/main.ts",
+        "src/dashboard/server/routes/agents.ts",
+        "src/dashboard/server/routes/cloister.ts",
+        "src/dashboard/server/routes/internal-events.ts",
+        "src/dashboard/server/routes/issues.ts",
+        "src/dashboard/server/routes/metrics.ts",
+        "src/dashboard/server/routes/misc/deacon.ts",
+        "src/dashboard/server/services/deacon-supervisor.ts",
+        "src/dashboard/server/services/event-loop-monitor.ts",
+        "src/dashboard/server/services/issue-data-service.ts",
+        "src/dashboard/server/services/resource-discovery.ts",
+        "src/dashboard/server/tsdown.config.ts",
+        "src/lib/cloister/deacon-event-client.ts",
+        "src/lib/cloister/deacon.ts",
+        "src/lib/cloister/flywheel.ts",
+        "src/lib/cloister/service.ts",
+        "src/lib/config-yaml.ts",
+        "src/lib/overdeck/process-services.ts",
+        "src/lib/review-status.ts"
+      ],
+      "actualChangedFiles": [
+        ".eslintrc.cjs",
+        ".pan/records/pan-2318.json",
+        ".pan/test/result.json",
+        "scripts/file-size-baseline.txt",
+        "src/cli/commands/cloister/api.ts",
+        "src/cli/commands/cloister/brake.ts",
+        "src/cli/commands/cloister/start.ts",
+        "src/cli/commands/cloister/status.ts",
+        "src/cli/commands/cloister/stop.ts",
+        "src/dashboard/frontend/src/components/EventRouter.test.tsx",
+        "src/dashboard/frontend/src/components/EventRouter.tsx",
+        "src/dashboard/server/deacon-main.ts",
+        "src/dashboard/server/http-helpers.ts",
+        "src/dashboard/server/main.ts",
+        "src/dashboard/server/review-status.ts",
+        "src/dashboard/server/routes/__tests__/resources-agents-table.test.ts",
+        "src/dashboard/server/routes/cloister.ts",
+        "src/dashboard/server/routes/internal-events.ts",
+        "src/dashboard/server/routes/issues.ts",
+        "src/dashboard/server/routes/metrics.ts",
+        "src/dashboard/server/routes/misc/deacon.ts",
+        "src/dashboard/server/routes/resources.ts",
+        "src/dashboard/server/server.ts",
+        "src/dashboard/server/services/__tests__/event-loop-monitor.test.ts",
+        "src/dashboard/server/services/__tests__/issue-data-service.test.ts",
+        "src/dashboard/server/services/cloister-control-surface.ts",
+        "src/dashboard/server/services/deacon-supervisor.ts",
+        "src/dashboard/server/services/event-loop-monitor.ts",
+        "src/dashboard/server/services/issue-data-service.ts",
+        "src/dashboard/server/services/resource-discovery.ts",
+        "src/dashboard/server/tsdown.config.ts",
+        "src/lib/__tests__/review-status-reconcile.test.ts",
+        "src/lib/cloister/deacon-event-client.ts",
+        "src/lib/cloister/deacon.ts",
+        "src/lib/cloister/flywheel.ts",
+        "src/lib/cloister/service.ts",
+        "src/lib/config-yaml/defaults.ts",
+        "src/lib/config-yaml/merge.ts",
+        "src/lib/config-yaml/schema.ts",
+        "src/lib/overdeck/control-settings.ts",
+        "src/lib/overdeck/process-services.ts",
+        "src/lib/review-status.ts",
+        "sync-sources/hooks/record-cost-event.js",
+        "sync-sources/hooks/record-cost-event.js.map",
+        "tests/unit/dashboard/cloister-control-surface.test.ts",
+        "tests/unit/dashboard/deacon-supervisor.test.ts",
+        "tests/unit/dashboard/internal-events-route.test.ts",
+        "tests/unit/dashboard/metrics-stuck-count.test.ts",
+        "tests/unit/dashboard/server/services/resource-discovery.test.ts",
+        "tests/unit/lib/cloister/deacon-event-client.test.ts",
+        "tests/unit/lib/overdeck/no-loss-matrix.ts"
+      ],
+      "recordedAt": "2026-07-04T14:36:37.246Z"
+    }
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "inspect-deep": {
+          "openai/gpt-5.5": {
+            "input": 409428,
+            "output": 15543,
+            "cacheRead": 2991616,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 26714,
+            "output": 788,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 17641,
+            "output": 38691,
+            "cacheRead": 2794255,
+            "cacheWrite": 160275
+          }
+        },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 492793,
+            "output": 13679,
+            "cacheRead": 5991424,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.5": {
+          "input": 409428,
+          "output": 15543,
+          "cacheRead": 2991616,
+          "cacheWrite": 0
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 26714,
+          "output": 788,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 17641,
+          "output": 38691,
+          "cacheRead": 2794255,
+          "cacheWrite": 160275
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 492793,
+          "output": 13679,
+          "cacheRead": 5991424,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 9.124812,
+        "pricingAsOf": "2026-07-04T14:37:22.948Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2327"
+    ],
+    "ranOn": "eltmon-z790"
+  },
+  "created": "2026-07-04T14:07:04.245Z",
+  "updated": "2026-07-04T14:37:23.040Z"
 }
