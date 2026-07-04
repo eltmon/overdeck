@@ -26,7 +26,7 @@ function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', iss
 }
 
 export interface StatusHistoryEntry {
-  type: 'review' | 'test' | 'merge' | 'inspect' | 'uat';
+  type: 'review' | 'test' | 'merge' | 'inspect' | 'uat' | 'release';
   status: string;
   timestamp: string;
   notes?: string;
@@ -44,6 +44,7 @@ export interface ReviewStatus {
   reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
   testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
   mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
+  releaseStatus?: 'pending' | 'releasing' | 'passed' | 'failed' | 'partial' | 'rolled_back' | 'skipped';
   inspectStatus?: 'pending' | 'inspecting' | 'passed' | 'failed' | 'error';
   inspectNotes?: string;
   inspectStartedAt?: string;
@@ -57,6 +58,7 @@ export interface ReviewStatus {
   reviewNotes?: string;
   testNotes?: string;
   mergeNotes?: string;
+  releaseNotes?: string;
   updatedAt: string;
   readyForMerge: boolean;
   /**
@@ -294,6 +296,9 @@ export function setReviewStatusSync(
   }
   if (update.mergeStatus && update.mergeStatus !== status.mergeStatus) {
     history.push({ type: 'merge', status: update.mergeStatus, timestamp: now });
+  }
+  if (update.releaseStatus && update.releaseStatus !== status.releaseStatus) {
+    history.push({ type: 'release', status: update.releaseStatus, timestamp: now, notes: update.releaseNotes });
   }
   while (history.length > 10) history.shift();
 
