@@ -22,19 +22,70 @@
       "timestamp": "2026-07-04T19:57:50.286Z",
       "reason": "start",
       "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-07-04T20:18:02.168Z",
+      "reason": "end",
+      "note": "Anomaly: an initial broad npm test run was interrupted after unrelated root-suite failures; requested verification passed: npm run typecheck and frontend ProjectTree vitest for SessionNode.test.tsx + FeatureItem.test.tsx. No deploy/restart run. Delivered by merging origin/feature/pan-1739-slot-1 and origin/feature/pan-1739-slot-2 into feature/pan-1739, preserving both slot assignments and unioning the SessionNode ended-presence logic/tests."
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/drafts/pan-1739.md",
+      ".pan/records/pan-1739.json"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.tsx"
+    ],
+    "actualChangedFiles": [
+      ".pan/drafts/pan-1739.md",
+      ".pan/records/pan-1739.json",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.tsx"
+    ],
+    "recordedAt": "2026-07-04T20:17:53.311Z"
+  },
   "created": "2026-07-03T14:31:02.879Z",
-  "updated": "2026-07-04T20:17:46.738Z",
+  "updated": "2026-07-04T20:18:13.881Z",
   "pipeline": {
     "issueId": "PAN-1739",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T22:05:36.623Z"
+    "updatedAt": "2026-07-04T20:18:13.824Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2366",
+    "reviewRequestedAt": "2026-07-04T20:18:02.170Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        ".pan/drafts/pan-1739.md",
+        ".pan/records/pan-1739.json"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.test.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.tsx"
+      ],
+      "actualChangedFiles": [
+        ".pan/drafts/pan-1739.md",
+        ".pan/records/pan-1739.json",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.test.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.tsx"
+      ],
+      "recordedAt": "2026-07-04T20:17:53.311Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -49,8 +100,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 7694,
-            "output": 173,
+            "input": 39618,
+            "output": 952,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -72,18 +123,20 @@
           "cacheWrite": 227177
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 7694,
-          "output": 173,
+          "input": 39618,
+          "output": 952,
           "cacheRead": 0,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
         "usd": 5.097999,
-        "pricingAsOf": "2026-07-03T22:05:36.660Z"
+        "pricingAsOf": "2026-07-04T20:18:13.881Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2366"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
