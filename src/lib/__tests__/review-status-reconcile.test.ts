@@ -11,6 +11,7 @@ const db = vi.hoisted(() => ({
   upsert: vi.fn(),
   delete: vi.fn(),
   getFromDb: vi.fn(),
+  getManyFromDb: vi.fn(),
 }));
 const journal = vi.hoisted(() => ({
   readJournalStatusSync: vi.fn(),
@@ -23,7 +24,7 @@ vi.mock('../overdeck/review-status-sync.js', () => ({
   getReviewStatusFromDbSync: db.getFromDb,
   deleteReviewStatus: db.delete,
   getAllReviewStatusesFromDb: vi.fn(() => ({})),
-  getReviewStatusesFromDb: vi.fn(() => ({})),
+  getReviewStatusesFromDb: db.getManyFromDb,
   markWorkspaceStuck: vi.fn(),
   clearWorkspaceStuck: vi.fn(),
   setDeaconIgnored: vi.fn(),
@@ -38,7 +39,7 @@ const notifier = vi.hoisted(() => ({ notify: vi.fn() }));
 vi.mock('../pipeline-notifier.js', () => ({ notifyPipelineSync: notifier.notify }));
 vi.mock('../activity-logger.js', () => ({ emitActivityEntrySync: vi.fn(), emitActivityTtsSync: vi.fn() }));
 
-import { getReviewStatusSync, resetPipelineVerdictsForWorkStartSync, setReviewStatusSync } from '../review-status.js';
+import { getReviewStatusSync, loadReadyForMergeFlags, resetPipelineVerdictsForWorkStartSync, setReviewStatusSync } from '../review-status.js';
 
 const dbRow = (over: Partial<ReviewStatus> = {}): ReviewStatus => ({
   issueId: 'PAN-1866',
@@ -52,6 +53,7 @@ const dbRow = (over: Partial<ReviewStatus> = {}): ReviewStatus => ({
 describe('getReviewStatusSync — journal→DB reconcile (PAN-1988)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    db.getManyFromDb.mockReturnValue({});
     journal.enrichReviewNotesFromRecordSync.mockImplementation((_id: string, s: ReviewStatus) => s);
   });
 
@@ -181,6 +183,46 @@ describe('getReviewStatusSync — journal→DB reconcile (PAN-1988)', () => {
 
     expect(() => getReviewStatusSync('PAN-1866')).not.toThrow();
     expect(getReviewStatusSync('PAN-1866')?.reviewStatus).toBe('blocked');
+  });
+
+  it('loads ready-for-merge flags from one DB batch plus per-candidate journal overlay', () => {
+    db.getManyFromDb.mockReturnValue({
+      'PAN-1866': dbRow({
+        issueId: 'PAN-1866',
+        reviewStatus: 'reviewing',
+        testStatus: 'pending',
+        updatedAt: '2026-06-20T07:00:00.000Z',
+        readyForMerge: false,
+      }),
+      'PAN-1867': dbRow({
+        issueId: 'PAN-1867',
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        mergeStatus: 'pending',
+        updatedAt: '2026-06-20T07:30:00.000Z',
+        readyForMerge: true,
+      }),
+    });
+    journal.readJournalStatusSync.mockImplementation((issueId: string) => {
+      if (issueId === 'PAN-1866') {
+        return {
+          updatedAt: '2026-06-20T07:22:21.788Z',
+          durable: { reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'pending' },
+        };
+      }
+      return null;
+    });
+
+    const flags = loadReadyForMergeFlags(['pan-1866', 'PAN-1867', 'PAN-1867']);
+
+    expect(db.getManyFromDb).toHaveBeenCalledTimes(1);
+    expect(db.getManyFromDb).toHaveBeenCalledWith(['PAN-1866', 'PAN-1867']);
+    expect(journal.readJournalStatusSync).toHaveBeenCalledWith('PAN-1866');
+    expect(journal.readJournalStatusSync).toHaveBeenCalledWith('PAN-1867');
+    expect(flags).toEqual(new Map([
+      ['PAN-1866', true],
+      ['PAN-1867', true],
+    ]));
   });
 });
 

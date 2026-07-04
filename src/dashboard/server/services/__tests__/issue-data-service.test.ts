@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { computeBeadCounts, IssueDataService } from '../issue-data-service.js';
+import { computeBeadCounts, IssueDataService, shouldRefreshPlanningStateForIssue } from '../issue-data-service.js';
 import type { VBriefDocument } from '../../../../lib/vbrief/types.js';
+import { mergeConfigs } from '../../../../lib/config-yaml.js';
 
 describe('computeBeadCounts', () => {
   function makeDoc(items: Array<{ status: string }>): VBriefDocument {
@@ -102,5 +103,228 @@ describe('IssueDataService tracker-polling gate (PAN-1817)', () => {
     expect(polls.linear).toHaveBeenCalledTimes(1);
     expect(polls.rally).toHaveBeenCalledTimes(1);
     svc.stop();
+  });
+});
+
+describe('IssueDataService planning refresh gate', () => {
+  function makeService() {
+    const cache = { getBackoffMs: () => 0 } as any;
+    const svc = new IssueDataService(cache);
+    vi.spyOn(svc as any, 'drainPlanningRefreshQueue').mockImplementation(() => {});
+    return svc;
+  }
+
+  it('queues planning refreshes for active issues only, not terminal done/canceled issues', () => {
+    const svc = makeService();
+    const terminal = Array.from({ length: 1000 }, (_, idx) => ({
+      identifier: `PAN-DONE-${idx}`,
+      status: idx % 2 === 0 ? 'Done' : 'Canceled',
+    }));
+    const active = Array.from({ length: 10 }, (_, idx) => ({
+      identifier: `PAN-ACTIVE-${idx}`,
+      status: idx % 2 === 0 ? 'In Progress' : 'Todo',
+    }));
+
+    (svc as any).schedulePlanningRefreshForIssues([...terminal, ...active]);
+
+    expect((svc as any).planningRefreshQueue).toEqual(active.map((issue) => issue.identifier));
+    expect((svc as any).planningRefreshQueued.size).toBe(10);
+  });
+
+  it('preserves planning refreshes for active non-terminal issues', () => {
+    const svc = makeService();
+    const active = [
+      { identifier: 'PAN-READY', status: 'Ready' },
+      { identifier: 'PAN-REVIEW', status: 'In Review' },
+      { identifier: 'PAN-VERIFYING', status: 'Verifying on main' },
+    ];
+
+    (svc as any).schedulePlanningRefreshForIssues(active);
+
+    expect((svc as any).planningRefreshQueue).toEqual(['PAN-READY', 'PAN-REVIEW', 'PAN-VERIFYING']);
+  });
+
+  it('uses getCanonicalStatus stateType handling rather than a separate status mapping', () => {
+    expect(shouldRefreshPlanningStateForIssue({
+      identifier: 'PAN-CUSTOM-DONE',
+      status: 'Custom Done Name',
+      stateType: 'completed',
+    })).toBe(false);
+    expect(shouldRefreshPlanningStateForIssue({
+      identifier: 'PAN-CUSTOM-ACTIVE',
+      status: 'Custom Active Name',
+      stateType: 'started',
+    })).toBe(true);
+  });
+});
+
+describe('IssueDataService GitHub closed issue window', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-03T12:00:00.000Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  function makeCache() {
+    return {
+      getEtag: vi.fn(() => null),
+      updateRateLimit: vi.fn(),
+      set: vi.fn(),
+      getStale: vi.fn(() => null),
+    };
+  }
+
+  function makeOctokit() {
+    const paginate = vi.fn(async (_method: unknown, params: unknown, mapFn: (response: any) => unknown) => {
+      mapFn({
+        headers: {
+          'x-ratelimit-remaining': '4999',
+          'x-ratelimit-limit': '5000',
+          'x-ratelimit-reset': `${Math.floor(Date.now() / 1000) + 3600}`,
+          etag: 'etag-1',
+        },
+        data: [],
+      });
+      return [];
+    });
+    return {
+      issues: { listForRepo: vi.fn() },
+      paginate,
+    };
+  }
+
+  it('adds since to the closed GitHub issue fetch from the default config window', async () => {
+    const merged = mergeConfigs({}).config;
+    const cache = makeCache();
+    const service = new IssueDataService(cache as any, {
+      loadConfig: () => ({ config: merged }),
+    });
+    const octokit = makeOctokit();
+
+    await (service as any).fetchGitHubRepoIssues(octokit, 'eltmon', 'overdeck', 'closed', 'PAN', 'github:closed:eltmon/overdeck');
+
+    expect(merged.issues.closedWindowDays).toBe(14);
+    expect(octokit.paginate).toHaveBeenCalledWith(
+      octokit.issues.listForRepo,
+      expect.objectContaining({
+        state: 'closed',
+        since: '2026-06-19T12:00:00.000Z',
+      }),
+      expect.any(Function),
+    );
+  });
+
+  it('uses a closed_window_days override to compute the closed issue since lower bound', async () => {
+    const merged = mergeConfigs({ issues: { closed_window_days: 3 } }).config;
+    const cache = makeCache();
+    const service = new IssueDataService(cache as any, {
+      loadConfig: () => ({ config: merged }),
+    });
+    const octokit = makeOctokit();
+
+    await (service as any).fetchGitHubRepoIssues(octokit, 'eltmon', 'overdeck', 'closed', 'PAN', 'github:closed:eltmon/overdeck');
+
+    expect(octokit.paginate).toHaveBeenCalledWith(
+      octokit.issues.listForRepo,
+      expect.objectContaining({
+        state: 'closed',
+        since: '2026-06-30T12:00:00.000Z',
+      }),
+      expect.any(Function),
+    );
+  });
+
+  it('does not add since to the open GitHub issue fetch', async () => {
+    const merged = mergeConfigs({ issues: { closed_window_days: 3 } }).config;
+    const cache = makeCache();
+    const service = new IssueDataService(cache as any, {
+      loadConfig: () => ({ config: merged }),
+    });
+    const octokit = makeOctokit();
+
+    await (service as any).fetchGitHubRepoIssues(octokit, 'eltmon', 'overdeck', 'open', 'PAN', 'github:open:eltmon/overdeck');
+
+    expect(octokit.paginate).toHaveBeenCalledWith(
+      octokit.issues.listForRepo,
+      expect.not.objectContaining({ since: expect.anything() }),
+      expect.any(Function),
+    );
+  });
+});
+
+describe('IssueDataService getIssues memoization', () => {
+  function makeCache() {
+    return {
+      getBackoffMs: () => 0,
+    };
+  }
+
+  function makeServiceWithIssues(issues: any[]) {
+    const service = new IssueDataService(makeCache() as any);
+    (service as any).trackers.github.lastFetchedIssues = issues;
+    (service as any).trackers.linear.lastFetchedIssues = [];
+    (service as any).trackers.rally.lastFetchedIssues = [];
+    return service;
+  }
+
+  it('returns the identical array instance across repeated getIssues calls without a data change', () => {
+    const service = makeServiceWithIssues([
+      { identifier: 'PAN-1', status: 'Todo', updatedAt: '2026-07-01T00:00:00.000Z' },
+    ]);
+
+    const first = service.getIssues();
+    const second = service.getIssues();
+
+    expect(second).toBe(first);
+  });
+
+  it('invalidates the memo when pushUpdated runs', () => {
+    const service = makeServiceWithIssues([
+      { identifier: 'PAN-1', status: 'Todo', updatedAt: '2026-07-01T00:00:00.000Z' },
+    ]);
+    const first = service.getIssues();
+    (service as any).trackers.github.lastFetchedIssues = [
+      { identifier: 'PAN-1', status: 'In Progress', updatedAt: '2026-07-02T00:00:00.000Z' },
+    ];
+
+    (service as any).pushUpdated();
+    const next = service.getIssues();
+
+    expect(next).not.toBe(first);
+    expect(next[0]?.status).toBe('In Progress');
+  });
+
+  it('reuses the cached serialized JSON string for repeated route responses', () => {
+    const service = makeServiceWithIssues([
+      { identifier: 'PAN-1', status: 'Todo', updatedAt: '2026-07-01T00:00:00.000Z' },
+    ]);
+    const stringifySpy = vi.spyOn(JSON, 'stringify');
+
+    const first = service.getIssuesJson();
+    const second = service.getIssuesJson();
+
+    expect(second).toBe(first);
+    expect(stringifySpy).toHaveBeenCalledTimes(1);
+    stringifySpy.mockRestore();
+  });
+
+  it('sorts with parse-once timestamps in the same order as the old Date comparator', () => {
+    const source = [
+      { identifier: 'PAN-3', status: 'Todo', updatedAt: '2026-06-30T00:00:00.000Z' },
+      { identifier: 'PAN-1', status: 'Todo', updatedAt: '2026-07-01T00:00:00.000Z' },
+      { identifier: 'PAN-2', status: 'Todo', updatedAt: '2026-07-02T00:00:00.000Z' },
+    ];
+    const service = makeServiceWithIssues(source);
+
+    const actual = service.getIssues().map((issue) => issue.identifier);
+    const expected = source
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .map((issue) => issue.identifier);
+
+    expect(actual).toEqual(expected);
   });
 });

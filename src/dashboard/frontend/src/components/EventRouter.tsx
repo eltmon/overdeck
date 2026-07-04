@@ -24,11 +24,24 @@ const SNAPSHOT_FALLBACK_INTERVAL_MS = 2_000
 const SNAPSHOT_FALLBACK_WINDOW_MS = 3 * 60_000
 const STREAM_STALENESS_TIMEOUT_MS = 35_000
 const UNREACHABLE_OVERLAY_RETRY_ATTEMPTS = 6
+export const EVENT_ROUTER_RECONNECT_BASE_DELAY_MS = 2_000
+export const EVENT_ROUTER_RECONNECT_MAX_DELAY_MS = 30_000
+export const EVENT_ROUTER_RECONNECT_JITTER_RATIO = 0.2
 
 type SequencedDomainEvent = Exclude<DomainEvent, { type: 'system.heartbeat' }>
 
 function isSequencedDomainEvent(event: DomainEvent): event is SequencedDomainEvent {
   return 'sequence' in event
+}
+
+export function eventRouterReconnectDelayMs(attempt: number, random: () => number = Math.random): number {
+  const safeAttempt = Math.max(1, Math.floor(attempt))
+  const baseDelay = Math.min(
+    EVENT_ROUTER_RECONNECT_BASE_DELAY_MS * 2 ** (safeAttempt - 1),
+    EVENT_ROUTER_RECONNECT_MAX_DELAY_MS,
+  )
+  const jitter = 1 + ((random() * 2 - 1) * EVENT_ROUTER_RECONNECT_JITTER_RATIO)
+  return Math.min(EVENT_ROUTER_RECONNECT_MAX_DELAY_MS, Math.round(baseDelay * jitter))
 }
 
 // ─── EventRouter component ────────────────────────────────────────────────────
@@ -50,6 +63,8 @@ export function EventRouter() {
     let fallbackInterval: ReturnType<typeof setInterval> | null = null
     let fallbackTimeout: ReturnType<typeof setTimeout> | null = null
     let stalenessTimeout: ReturnType<typeof setTimeout> | null = null
+    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null
+    let reconnectAttempt = 0
     let unsubscribe: (() => void) | null = null
 
     function stopFallbackPoller() {
@@ -81,7 +96,14 @@ export function EventRouter() {
       stalenessTimeout = null
     }
 
+    function stopScheduledReconnect() {
+      if (reconnectTimeout) clearTimeout(reconnectTimeout)
+      reconnectTimeout = null
+    }
+
     function reconnectDomainStream() {
+      if (bootstrapInFlight) return
+      stopScheduledReconnect()
       unsubscribe?.()
       unsubscribe = null
       resetTransport()
@@ -90,12 +112,22 @@ export function EventRouter() {
       bootstrap().catch(console.error)
     }
 
+    function scheduleReconnectDomainStream() {
+      if (reconnectTimeout || bootstrapInFlight) return
+      reconnectAttempt += 1
+      const delayMs = eventRouterReconnectDelayMs(reconnectAttempt)
+      reconnectTimeout = setTimeout(() => {
+        reconnectTimeout = null
+        reconnectDomainStream()
+      }, delayMs)
+    }
+
     function resetStalenessWatchdog() {
       stopStalenessWatchdog()
       stalenessTimeout = setTimeout(() => {
-        console.warn('[EventRouter] domain event stream stale — reconnecting')
+        console.warn('[EventRouter] domain event stream stale — scheduling reconnect')
         showOverlay('Reconnecting to the dashboard…')
-        reconnectDomainStream()
+        scheduleReconnectDomainStream()
       }, STREAM_STALENESS_TIMEOUT_MS)
     }
 
@@ -204,6 +236,8 @@ export function EventRouter() {
 
     // ── Event handler ─────────────────────────────────────────────────────────
     function handleEvent(event: DomainEvent) {
+      reconnectAttempt = 0
+      stopScheduledReconnect()
       resetStalenessWatchdog()
       hideOverlay()
       if (!isSequencedDomainEvent(event)) return
@@ -264,6 +298,7 @@ export function EventRouter() {
     return () => {
       stopFallbackPoller()
       stopStalenessWatchdog()
+      stopScheduledReconnect()
       unsubscribe?.()
     }
   }, [syncSnapshot, applyEvents, seedRecentActivity])
