@@ -1,4 +1,4 @@
-import { jsonResponse } from "../http-helpers.js";
+import { jsonResponse, jsonStringResponse } from "../http-helpers.js";
 import { httpHandler } from './http-handler.js';
 /**
  * Issues route module — Effect HttpRouter.Layer (PAN-428 B6)
@@ -219,8 +219,7 @@ const getIssuesRoute = HttpRouter.add(
     const includeCompleted = searchParams.get('includeCompleted') === 'true';
 
     const issueDataService = getIssueDataService();
-    const issues = issueDataService.getIssues({ cycle, includeCompleted });
-    return jsonResponse(issues);
+    return jsonStringResponse(issueDataService.getIssuesJson({ cycle, includeCompleted }));
   })),
 );
 

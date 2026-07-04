@@ -4,6 +4,7 @@
  */
 export {
   loadReviewStatuses,
+  loadReadyForMergeFlags,
   saveReviewStatuses,
   setReviewStatusSync,
   getReviewStatusSync,

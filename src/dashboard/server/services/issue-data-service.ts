@@ -24,6 +24,7 @@ import { loadReviewStatusesForIssues, type ReviewStatus } from '../../../lib/rev
 import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { findPlan, readWorkspacePlan } from '../../../lib/vbrief/io.js';
 import type { VBriefDocument } from '../../../lib/vbrief/types.js';
+import { loadConfigSync } from '../../../lib/config-yaml.js';
 
 /**
  * Compute bead progress counts from a cached plan document.
@@ -80,6 +81,11 @@ export function getCanonicalStatus(status: string | undefined, stateType?: strin
   return 'backlog'; // Default fallback
 }
 
+export function shouldRefreshPlanningStateForIssue(issue: any): boolean {
+  const canonical = getCanonicalStatus(issue?.status, issue?.stateType);
+  return canonical !== 'done' && canonical !== 'canceled';
+}
+
 // Poll intervals (ms)
 const POLL_INTERVALS = {
   github:  { default: 30_000, min: 15_000, max: 300_000 },
@@ -96,6 +102,11 @@ interface TrackerState {
   lastFetchedIssues: any[];
   lastError: string | null;
   lastFetchedAt: string | null;
+}
+
+interface GetIssuesCacheEntry {
+  issues: any[];
+  json: string | null;
 }
 
 /**
@@ -159,6 +170,7 @@ const planningStateCache = new Map<string, PlanningStateCacheEntry>();
 const planningStateRefreshInFlight = new Set<string>();
 const PLANNING_REFRESH_CONCURRENCY = 4;
 const PLANNING_FINISHED_STATUSES = new Set(['proposed', 'approved', 'pending', 'running', 'completed', 'blocked']);
+const DAY_MS = 86_400_000;
 
 function getCachedPlanningState(identifier: string): {
   hasPlan: boolean;
@@ -258,6 +270,7 @@ function updatePlanningStateCache(identifier: string, entry: PlanningStateCacheE
 
 export class IssueDataService {
   private cache: CacheService;
+  private loadConfig: typeof loadConfigSync;
   private trackers: Record<string, TrackerState> = {};
   private linearLastFullRefresh = 0;
   private started = false;
@@ -273,14 +286,16 @@ export class IssueDataService {
   private planningRefreshActive = 0;
   private reviewStatusRefreshQueued = false;
   private reviewStatusRefreshIssueIds = new Set<string>();
+  private getIssuesCache = new Map<string, GetIssuesCacheEntry>();
 
   /** Register a callback invoked whenever issue data changes (PAN-433). */
   onIssuesChanged(fn: (issues: unknown[]) => void): void {
     this._onIssuesChanged = fn;
   }
 
-  constructor(cache: CacheService) {
+  constructor(cache: CacheService, options?: { loadConfig?: typeof loadConfigSync }) {
     this.cache = cache;
+    this.loadConfig = options?.loadConfig ?? loadConfigSync;
 
     for (const tracker of ['github', 'linear', 'rally'] as const) {
       this.trackers[tracker] = {
@@ -394,6 +409,40 @@ export class IssueDataService {
    * This is the hot path — must be fast.
    */
   getIssues(options?: { cycle?: string; includeCompleted?: boolean }): any[] {
+    return this.getIssuesCacheEntry(options).issues;
+  }
+
+  getIssuesJson(options?: { cycle?: string; includeCompleted?: boolean }): string {
+    const entry = this.getIssuesCacheEntry(options);
+    if (entry.json === null) {
+      entry.json = JSON.stringify(entry.issues);
+    }
+    return entry.json;
+  }
+
+  private getIssuesCacheEntry(options?: { cycle?: string; includeCompleted?: boolean }): GetIssuesCacheEntry {
+    const key = this.getIssuesCacheKey(options);
+    const cached = this.getIssuesCache.get(key);
+    if (cached) return cached;
+
+    const issues = this.computeIssues(options);
+    if (process.env.NODE_ENV !== 'production') {
+      Object.freeze(issues);
+    }
+    const entry: GetIssuesCacheEntry = { issues, json: null };
+    this.getIssuesCache.set(key, entry);
+    return entry;
+  }
+
+  private getIssuesCacheKey(options?: { cycle?: string; includeCompleted?: boolean }): string {
+    return `${options?.cycle ?? 'current'}|${options?.includeCompleted === true}`;
+  }
+
+  private invalidateGetIssuesCache(): void {
+    this.getIssuesCache.clear();
+  }
+
+  private computeIssues(options?: { cycle?: string; includeCompleted?: boolean }): any[] {
     let allIssues = [
       ...this.trackers.github.lastFetchedIssues,
       ...this.trackers.linear.lastFetchedIssues,
@@ -480,10 +529,11 @@ export class IssueDataService {
       };
     });
 
-    // Sort by updatedAt
-    allIssues.sort((a, b) =>
-      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    );
+    const updatedAtMs = new Map<any, number>();
+    for (const issue of allIssues) {
+      updatedAtMs.set(issue, Date.parse(issue.updatedAt) || 0);
+    }
+    allIssues.sort((a, b) => (updatedAtMs.get(b) ?? 0) - (updatedAtMs.get(a) ?? 0));
 
     return allIssues;
   }
@@ -707,10 +757,12 @@ export class IssueDataService {
   }
 
   private pushSnapshot(): void {
+    this.invalidateGetIssuesCache();
     this._onIssuesChanged?.(this.getIssues());
   }
 
   private pushUpdated(): void {
+    this.invalidateGetIssuesCache();
     const cachedIssues = this.getCachedTrackerIssues();
     this.schedulePlanningRefreshForIssues(cachedIssues);
     this.scheduleReviewStatusRefreshForIssues(cachedIssues);
@@ -728,6 +780,7 @@ export class IssueDataService {
   private schedulePlanningRefreshForIssues(issues: any[]): void {
     for (const issue of issues) {
       const identifier = typeof issue?.identifier === 'string' ? issue.identifier : '';
+      if (!shouldRefreshPlanningStateForIssue(issue)) continue;
       if (!identifier || this.planningRefreshQueued.has(identifier) || planningStateRefreshInFlight.has(identifier)) continue;
       this.planningRefreshQueued.add(identifier);
       this.planningRefreshQueue.push(identifier);
@@ -863,9 +916,12 @@ export class IssueDataService {
       requestParams.headers = { 'If-None-Match': cachedEtag };
     }
 
-    // Fetch ALL closed issues (no date filter) so Done column is complete after restarts
+    // Fetch recently updated closed issues; SQLite L2 cache keeps older closed
+    // issues visible within TTL across restarts while the windowed fetch runs.
     if (state === 'closed') {
       requestParams.per_page = 100;
+      const windowDays = this.loadConfig().config.issues.closedWindowDays;
+      requestParams.since = new Date(Date.now() - windowDays * DAY_MS).toISOString();
     }
 
     try {
