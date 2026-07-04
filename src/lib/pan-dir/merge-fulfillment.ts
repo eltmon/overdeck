@@ -94,6 +94,20 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
+function mergeBranchRefs(issueId: string): string[] {
+  const suffix = issueId.toLowerCase();
+  return [
+    `feature/${suffix}`,
+    `strike/${suffix}`,
+    `origin/feature/${suffix}`,
+    `origin/strike/${suffix}`,
+  ];
+}
+
+function remoteBranchName(ref: string): string {
+  return ref.startsWith('origin/') ? ref.slice('origin/'.length) : ref;
+}
+
 function resolveDeps(deps: Partial<MergeFulfillmentDeps>): ResolvedMergeFulfillmentDeps {
   return { ...defaultDeps, ...deps } as ResolvedMergeFulfillmentDeps;
 }
@@ -340,8 +354,10 @@ async function reconcileBranch(
     return { branch, status: 'planned-delete', reason: 'branch is an ancestor of origin/main' };
   }
 
-  await deps.exec(`git branch -D ${shellQuote(branch)}`, { cwd: project.path });
-  await deps.exec(`git push origin --delete ${shellQuote(branch)}`, { cwd: project.path }).catch(() => ({ stdout: '', stderr: '' }));
+  if (!branch.startsWith('origin/')) {
+    await deps.exec(`git branch -D ${shellQuote(branch)}`, { cwd: project.path });
+  }
+  await deps.exec(`git push origin --delete ${shellQuote(remoteBranchName(branch))}`, { cwd: project.path }).catch(() => ({ stdout: '', stderr: '' }));
   return { branch, status: 'deleted', reason: 'branch is an ancestor of origin/main' };
 }
 
@@ -357,9 +373,8 @@ export async function verifyIssueMergeFulfillment(
   const prResult = await prMerged(normalized, project, record, mergedDeps);
   if (prResult.result) return prResult.result;
 
-  const branches = [`feature/${normalized.toLowerCase()}`, `strike/${normalized.toLowerCase()}`];
   let sawExistingBranch = false;
-  for (const branch of branches) {
+  for (const branch of mergeBranchRefs(normalized)) {
     const exists = await branchExists(branch, project, mergedDeps);
     if (exists === 'unknown') {
       return { verdict: 'unknown', evidence: `${normalized} branch ${branch} existence could not be resolved` };
@@ -441,7 +456,7 @@ export async function reconcileMergedIssue(
   }
 
   const branchActions: ReconcileMergedIssueResult['branchActions'] = [];
-  for (const branch of [`feature/${normalized.toLowerCase()}`, `strike/${normalized.toLowerCase()}`]) {
+  for (const branch of mergeBranchRefs(normalized)) {
     branchActions.push(await reconcileBranch(branch, project, dryRun, mergedDeps));
   }
 

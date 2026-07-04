@@ -124,6 +124,18 @@ describe('verifyIssueMergeFulfillment', () => {
     });
   });
 
+  it.each(['origin/feature/pan-123', 'origin/strike/pan-123'])('returns merged when only %s is an ancestor of origin/main', async (branch) => {
+    const deps = makeDeps({
+      existingBranches: [branch],
+      mergedBranches: [branch],
+    });
+
+    await expect(verifyIssueMergeFulfillment('PAN-123', project, deps)).resolves.toEqual({
+      verdict: 'merged',
+      evidence: `${branch} is an ancestor of origin/main`,
+    });
+  });
+
   it('returns merged with PR evidence when the tracked PR reports merged', async () => {
     const deps = makeDeps({
       record: record({ prUrl: 'https://github.com/eltmon/overdeck/pull/123', prNumber: 123 }),
@@ -320,6 +332,26 @@ describe('reconcileMergedIssue', () => {
     expect(result.branchActions).toEqual([
       { branch: 'feature/pan-123', status: 'deleted', reason: 'branch is an ancestor of origin/main' },
       { branch: 'strike/pan-123', status: 'kept', reason: 'branch is not an ancestor of origin/main' },
+      { branch: 'origin/feature/pan-123', status: 'missing', reason: 'branch was not found' },
+      { branch: 'origin/strike/pan-123', status: 'missing', reason: 'branch was not found' },
+    ]);
+  });
+
+  it('deletes a merged remote-only feature branch without deleting a local branch', async () => {
+    const deps = makeDeps({
+      existingBranches: ['origin/feature/pan-123'],
+      mergedBranches: ['origin/feature/pan-123'],
+    });
+
+    const result = await reconcileMergedIssue('PAN-123', project, {}, deps);
+
+    expect(deps.commands).not.toContain("git branch -D 'origin/feature/pan-123'");
+    expect(deps.commands).toContain("git push origin --delete 'feature/pan-123'");
+    expect(result.branchActions).toEqual([
+      { branch: 'feature/pan-123', status: 'missing', reason: 'branch was not found' },
+      { branch: 'strike/pan-123', status: 'missing', reason: 'branch was not found' },
+      { branch: 'origin/feature/pan-123', status: 'deleted', reason: 'branch is an ancestor of origin/main' },
+      { branch: 'origin/strike/pan-123', status: 'missing', reason: 'branch was not found' },
     ]);
   });
 
@@ -380,6 +412,8 @@ describe('reconcileMergedIssue', () => {
     expect(result.branchActions).toEqual([
       { branch: 'feature/pan-123', status: 'planned-delete', reason: 'branch is an ancestor of origin/main' },
       { branch: 'strike/pan-123', status: 'planned-keep', reason: 'branch is not an ancestor of origin/main' },
+      { branch: 'origin/feature/pan-123', status: 'missing', reason: 'branch was not found' },
+      { branch: 'origin/strike/pan-123', status: 'missing', reason: 'branch was not found' },
     ]);
   });
 });
