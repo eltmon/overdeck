@@ -341,7 +341,7 @@ export const saveAgentState = (state: AgentState): Effect.Effect<void, FsError> 
       try: () => writeFileAsync(stateFile, JSON.stringify(cleanAgentState(state), null, 2)),
       catch: (cause) => toAgentFsError('write', stateFile, cause),
     });
-    recordFeatureRegistryAgentState(state);
+    yield* Effect.promise(() => recordFeatureRegistryAgentState(state));
 
     // PAN-1919: mirror harness/model into the per-issue git-tracked record.
     if (state.harness && state.model) {
@@ -357,9 +357,9 @@ export const saveAgentState = (state: AgentState): Effect.Effect<void, FsError> 
   });
 };
 
-function recordFeatureRegistryAgentState(state: AgentState): void {
+function recordFeatureRegistryAgentState(state: AgentState): Promise<unknown> {
   const status = state.status === 'starting' || state.status === 'running' ? 'active' : 'deferred';
-  void recordFeatureRegistryLifecycle({
+  return recordFeatureRegistryLifecycle({
     issueId: state.issueId,
     workspacePath: state.workspace,
     agentId: state.id,
