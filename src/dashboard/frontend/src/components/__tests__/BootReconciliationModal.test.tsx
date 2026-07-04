@@ -145,7 +145,19 @@ describe('BootReconciliationModal', () => {
           });
         }
         if (decisionResponses === 2) {
-          return jsonResponse({ ok: true, count: 2, resumed: ['agent-pan-2076', 'agent-pan-2077'], outcomes: [] });
+          return jsonResponse({
+            ok: true,
+            count: 2,
+            resumed: ['agent-pan-2076', 'agent-pan-2077'],
+            outcomes: [
+              {
+                id: 'agent-pan-2079',
+                issueId: 'PAN-2079',
+                outcome: 'skipped',
+                reason: 'deferred-concurrency',
+              },
+            ],
+          });
         }
         return jsonResponse({ ok: true, count: 0, resumed: [] });
       }
@@ -173,7 +185,9 @@ describe('BootReconciliationModal', () => {
         body: JSON.stringify({ decision: 'hold_all' }),
       }),
     ));
-    expect(await screen.findByText('Boot decision saved. Resumed 2 agents.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Boot decision saved. Resumed 2 — 1 skipped (1 deferred by concurrency limit).'),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('boot-reconciliation-freeze'));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(

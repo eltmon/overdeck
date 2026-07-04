@@ -81,15 +81,11 @@ function formatOutcomeReason(reason: string): string {
 }
 
 function bootDecisionSummary(result: { count: number; outcomes?: BootReconciliationOutcome[] }): string {
-  if (result.count > 0) {
-    return `Boot decision saved. Resumed ${result.count} agent${result.count === 1 ? '' : 's'}.`;
-  }
-
   const skipped = Array.isArray(result.outcomes)
     ? result.outcomes.filter((outcome) => outcome.outcome === 'skipped')
     : [];
   if (skipped.length === 0) {
-    return 'Boot decision saved. Resumed 0 agents.';
+    return `Boot decision saved. Resumed ${result.count} agent${result.count === 1 ? '' : 's'}.`;
   }
 
   const byReason = new Map<string, number>();
@@ -99,7 +95,7 @@ function bootDecisionSummary(result: { count: number; outcomes?: BootReconciliat
   const reasonSummary = Array.from(byReason.entries())
     .map(([reason, count]) => `${count} ${formatOutcomeReason(reason)}`)
     .join(', ');
-  return `Boot decision saved. Resumed 0 — ${skipped.length} skipped (${reasonSummary}).`;
+  return `Boot decision saved. Resumed ${result.count} — ${skipped.length} skipped (${reasonSummary}).`;
 }
 
 async function freezeDeacon(): Promise<{ paused: boolean }> {
