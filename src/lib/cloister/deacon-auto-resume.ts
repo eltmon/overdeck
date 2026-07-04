@@ -11,6 +11,7 @@ import {
   getBootReconciliationPendingHoldSet,
   listBootReconciliationCandidates,
 } from './boot-reconciliation.js';
+import { bootReconciliationSkipReason, type BootReconciliationSkipReason } from './boot-reconciliation-predicates.js';
 import { isIssueClosed } from './issue-closed.js';
 import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
@@ -51,6 +52,8 @@ export interface AutoResumeNotifierDeps {
 export type { BootReconciliationApplyResult, BootReconciliationOutcome, BootReconciliationOutcomeReason } from './boot-reconciliation-outcomes.js';
 const orphanFailureRecordedForAutoResume = new Set<string>();
 const appliedBootReconciliationDecisions = new Set<string>();
+
+const emptyBootReconciliationApplyResult = (): BootReconciliationApplyResult => ({ resumed: [], outcomes: [], skipped: { workspace_missing: 0, merged: 0, completed: 0, other: 0 }, deferred: 0 });
 
 function isVerifyPausedAgentState(state: Pick<AgentState, 'issueId' | 'paused'>): boolean {
   if (state.paused !== true || !state.issueId) return false;
@@ -640,12 +643,6 @@ export async function handleAgentStoppedEvent(
     return null;
   }
 
-  // Skip if workspace is missing
-  if (!state.workspace || !existsSync(state.workspace)) {
-    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — workspace missing (${state.workspace || 'undefined'})`);
-    return null;
-  }
-
   if (state.paused === true) {
     const pauseKind = isVerifyPausedAgentState(state) ? 'verify-paused' : 'manually-paused';
     logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — ${pauseKind} (${state.pausedReason ?? 'no reason'})`);
@@ -659,6 +656,12 @@ export async function handleAgentStoppedEvent(
     return null;
   }
 
+  const terminalSkipReason = bootReconciliationSkipReason(state);
+  if (terminalSkipReason === 'workspace_missing') {
+    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — workspace missing (${state.workspace || 'undefined'})`);
+    return null;
+  }
+
   const hasLiveTmuxSession = await Effect.runPromise(sessionExists(agentId));
   if (hasLiveTmuxSession) {
     const previousStatus = state.status;
@@ -667,6 +670,14 @@ export async function handleAgentStoppedEvent(
     deps.notifyAgentStatusChanged(state, previousStatus, true);
     const msg = `Reconciled ${agentId} (${previousStatus}→running; tmux session alive)`;
     logDeaconEventSync(`handleAgentStoppedEvent: ${msg}`);
+    return null;
+  }
+
+  if (terminalSkipReason !== null) {
+    const suffix = terminalSkipReason === 'merged'
+      ? 'already merged or merge-ready'
+      : 'completed marker exists and review/test passed';
+    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — ${suffix}`);
     return null;
   }
 
@@ -689,13 +700,8 @@ export async function handleAgentStoppedEvent(
       review?.reviewStatus === 'blocked' ||
       review?.reviewStatus === 'failed' ||
       review?.testStatus === 'failed';
-    const trulyPassed =
-      review?.reviewStatus === 'passed' && review?.testStatus === 'passed';
     if (needsFix) {
       logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} resuming despite completed marker — review/test needs fixing (review=${review?.reviewStatus}, test=${review?.testStatus})`);
-    } else if (trulyPassed) {
-      logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — completed marker exists and review/test passed`);
-      return null;
     } else {
       logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — pipeline mid-flight (review=${review?.reviewStatus ?? 'none'}, test=${review?.testStatus ?? 'none'})`);
       return null;
@@ -704,21 +710,6 @@ export async function handleAgentStoppedEvent(
 
   // Refresh review status if we haven't loaded it yet.
   review ??= getReviewStatusSync(state.issueId);
-
-  // Skip if already merge-ready (review+test passed) or already merged
-  if (review?.readyForMerge && review.reviewStatus === 'passed' && review.testStatus === 'passed') {
-    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — already merge-ready`);
-    return null;
-  }
-  if (review?.mergeStatus === 'merged') {
-    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — already merged`);
-    return null;
-  }
-
-  if ((state as { merged?: boolean }).merged === true) {
-    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — agent state has merged=true (mergedAt=${(state as { mergedAt?: string }).mergedAt ?? 'unknown'})`);
-    return null;
-  }
 
   if (await isIssueClosed(state.issueId)) {
     logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — issue ${state.issueId} is closed`);
@@ -895,17 +886,17 @@ export async function applyBootReconciliationDecision(
   deps: AutoResumeNotifierDeps,
 ): Promise<BootReconciliationApplyResult> {
   const decisionKey = bootReconciliationDecisionKey();
-  if (!decisionKey) return { resumed: [], outcomes: [] };
+  if (!decisionKey) return emptyBootReconciliationApplyResult();
   if (appliedBootReconciliationDecisions.has(decisionKey)) {
     logDeaconEventSync('applyBootReconciliationDecision: decision already applied');
-    return { resumed: [], outcomes: [] };
+    return emptyBootReconciliationApplyResult();
   }
 
   const state = getBootReconciliationState();
   if (state.decision === 'hold_all') {
     appliedBootReconciliationDecisions.add(decisionKey);
     logDeaconEventSync('applyBootReconciliationDecision: hold_all — no agents resumed');
-    return { resumed: [], outcomes: [] };
+    return emptyBootReconciliationApplyResult();
   }
 
   let candidates = listBootReconciliationCandidates();
@@ -915,6 +906,8 @@ export async function applyBootReconciliationDecision(
 
   const resumed: string[] = [];
   const outcomes: BootReconciliationOutcome[] = [];
+  const skipped: Record<BootReconciliationSkipReason | 'other', number> = { workspace_missing: 0, merged: 0, completed: 0, other: 0 };
+  let deferred = 0;
   let resumeAttempts = 0;
   const concurrencyLimits = getConcurrencyLimits();
   const runningBefore = countRunningAgents();
@@ -926,13 +919,17 @@ export async function applyBootReconciliationDecision(
     const agent = candidates[index];
     if (resumeAttempts >= workSlots) {
       logDeaconEventSync(`applyBootReconciliationDecision: work concurrency cap reached (running=${runningBefore.work}, max=${concurrencyLimits.maxWorkAgents}, slots=${workSlots}); deferring remaining candidates`);
-      outcomes.push(...skippedBootReconciliationOutcomes(candidates.slice(index), 'deferred-concurrency'));
+      const deferredAgents = candidates.slice(index);
+      deferred += deferredAgents.length;
+      outcomes.push(...skippedBootReconciliationOutcomes(deferredAgents, 'deferred-concurrency'));
       break;
     }
     const load1 = loadavg()[0];
     if (load1 > loadCeiling) {
       logDeaconEventSync(`applyBootReconciliationDecision: load gate tripped (load1=${load1.toFixed(2)} > ${loadCeiling.toFixed(2)} = ${cores} cores * ${RESUME_LOAD_FACTOR}); deferring remaining candidates`);
-      outcomes.push(...skippedBootReconciliationOutcomes(candidates.slice(index), 'deferred-load'));
+      const deferredAgents = candidates.slice(index);
+      deferred += deferredAgents.length;
+      outcomes.push(...skippedBootReconciliationOutcomes(deferredAgents, 'deferred-load'));
       break;
     }
     if (resumeAttempts > 0) {
@@ -949,13 +946,15 @@ export async function applyBootReconciliationDecision(
       outcomes.push(resumedBootReconciliationOutcome(agent));
       resumeAttempts++;
     } else {
+      const skipReason = bootReconciliationSkipReason(agent) ?? 'other';
+      skipped[skipReason]++;
       outcomes.push(skippedBootReconciliationOutcome(agent, 'no-resumable-session'));
     }
   }
 
   appliedBootReconciliationDecisions.add(decisionKey);
   logDeaconEventSync(`applyBootReconciliationDecision: decision=${state.decision} resumed ${resumed.length} agent(s)`);
-  return { resumed, outcomes };
+  return { resumed, outcomes, skipped, deferred };
 }
 
 /**

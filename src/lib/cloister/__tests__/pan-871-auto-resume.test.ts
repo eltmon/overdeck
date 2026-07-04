@@ -580,7 +580,17 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
         reason: 'resumed',
       },
     ]);
-    expect(second).toEqual({ resumed: [], outcomes: [] });
+    expect(second).toEqual({
+      resumed: [],
+      outcomes: [],
+      skipped: {
+        workspace_missing: 0,
+        merged: 0,
+        completed: 0,
+        other: 0,
+      },
+      deferred: 0,
+    });
     expect(mockResumeAgent).toHaveBeenCalledTimes(1);
     expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-871');
   });
@@ -628,6 +638,13 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
           reason: 'no-resumable-session',
         },
       ],
+      skipped: {
+        workspace_missing: 0,
+        merged: 0,
+        completed: 0,
+        other: 2,
+      },
+      deferred: 0,
     });
     expect(mockResumeAgent).toHaveBeenCalledTimes(2);
   });

@@ -14,6 +14,7 @@ import {
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { loadCloisterConfigSync } from './config.js';
 import { isExplicitNoResumeRequest } from './no-resume-mode.js';
+import { bootReconciliationSkipReason } from './boot-reconciliation-predicates.js';
 
 export const DEFAULT_BOOT_RECONCILIATION_GRACE_SECS = 120;
 
@@ -77,6 +78,7 @@ export function isBootReconciliationCandidate(agent: ReconciliationAgent): boole
   if (agent.paused === true || agent.troubled === true) return false;
   if (agent.stoppedByUser === true && !hasCompletionMarker(agent.workspace)) return false;
   if (!isRecentBootCandidate(agent)) return false;
+  if (bootReconciliationSkipReason(agent) !== null) return false;
   if (!agent.workspace || !existsSync(agent.workspace)) return false;
   if (isTerminalIssueStage(getIssueStageSync(agent.issueId))) return false;
   return true;

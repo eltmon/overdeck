@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -17,8 +17,15 @@ const mocks = vi.hoisted(() => ({
     paused?: boolean | null;
     troubled?: boolean | null;
     stoppedByUser?: boolean | null;
+    merged?: boolean | null;
   }>,
   issueStages: {} as Record<string, string | null>,
+  reviewStatuses: new Map<string, {
+    reviewStatus?: string;
+    testStatus?: string;
+    readyForMerge?: boolean;
+    mergeStatus?: string;
+  }>(),
   graceSeconds: 30,
   maxCandidateAgeSeconds: 60 as number | undefined,
   noResumeActive: false,
@@ -63,6 +70,10 @@ vi.mock('../../overdeck/agents.js', () => ({
 
 vi.mock('../../persistent-logger.js', () => ({
   logDeaconEventSync: mocks.logDeaconEventSync,
+}));
+
+vi.mock('../../review-status.js', () => ({
+  getReviewStatusSync: vi.fn((issueId: string) => mocks.reviewStatuses.get(issueId) ?? null),
 }));
 
 vi.mock('../../overdeck/control-settings.js', () => ({
@@ -133,6 +144,7 @@ describe('boot reconciliation', () => {
     mocks.candidateListBootStartedAt = null;
     mocks.agents = [];
     mocks.issueStages = {};
+    mocks.reviewStatuses.clear();
     mocks.graceSeconds = 30;
     mocks.maxCandidateAgeSeconds = 60;
     mocks.noResumeActive = false;
@@ -244,6 +256,56 @@ describe('boot reconciliation', () => {
     ];
 
     expect(listBootReconciliationCandidateIds()).toEqual([]);
+  });
+
+  it('rejects already-merged and completed-passed agents while preserving a genuinely stopped candidate', () => {
+    mocks.bootState.bootStartedAt = BASE_TIME.toISOString();
+    const completedAgentDir = join(testHome, 'agents', 'agent-completed');
+    mkdirSync(completedAgentDir, { recursive: true });
+    writeFileSync(join(completedAgentDir, 'completed.processed'), '');
+    mocks.reviewStatuses.set('PAN-MERGED', { mergeStatus: 'merged' });
+    mocks.reviewStatuses.set('PAN-COMPLETED', { reviewStatus: 'passed', testStatus: 'passed' });
+    mocks.agents = [
+      stoppedWorkAgent(testHome, 'agent-live', { issueId: 'PAN-LIVE' }),
+      stoppedWorkAgent(testHome, 'agent-merged', { issueId: 'PAN-MERGED' }),
+      stoppedWorkAgent(testHome, 'agent-completed', { issueId: 'PAN-COMPLETED' }),
+    ];
+
+    expect(listBootReconciliationCandidateIds()).toEqual(['agent-live']);
+  });
+
+  it('marks a boot with only phantom stopped work agents as resume_all without holding a modal', () => {
+    const completedAgentDir = join(testHome, 'agents', 'agent-completed');
+    mkdirSync(completedAgentDir, { recursive: true });
+    writeFileSync(join(completedAgentDir, 'completed.processed'), '');
+    mocks.issueStages['PAN-TERMINAL'] = 'verifying_on_main';
+    mocks.reviewStatuses.set('PAN-MERGED', { mergeStatus: 'merged' });
+    mocks.reviewStatuses.set('PAN-COMPLETED', { reviewStatus: 'passed', testStatus: 'passed' });
+    mocks.agents = [
+      stoppedWorkAgent(testHome, 'agent-missing', { workspace: join(testHome, 'missing') }),
+      stoppedWorkAgent(testHome, 'agent-merged', { issueId: 'PAN-MERGED' }),
+      stoppedWorkAgent(testHome, 'agent-completed', { issueId: 'PAN-COMPLETED' }),
+      stoppedWorkAgent(testHome, 'agent-terminal', { issueId: 'PAN-TERMINAL' }),
+    ];
+
+    const result = startBootReconciliation({
+      bootId: 'boot-phantoms',
+      now: BASE_TIME,
+    });
+
+    expect(result).toEqual({
+      bootId: 'boot-phantoms',
+      graceDeadline: '2026-06-29T15:00:30.000Z',
+      candidateIds: [],
+      decision: 'resume_all',
+      timerArmed: false,
+    });
+    expect(getBootReconciliationState()).toMatchObject({
+      decision: 'resume_all',
+      bootId: 'boot-phantoms',
+      bootStartedAt: '2026-06-29T15:00:00.000Z',
+      graceDeadline: '2026-06-29T15:00:30.000Z',
+    });
   });
 
   it('stamps pending state and flips to resume_all when the grace timer expires', async () => {

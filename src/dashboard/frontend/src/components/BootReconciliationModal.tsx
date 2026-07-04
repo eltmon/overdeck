@@ -19,6 +19,13 @@ export interface BootReconciliationOutcome {
   reason: BootReconciliationOutcomeReason;
 }
 
+export interface BootReconciliationSkipBreakdown {
+  workspace_missing?: number;
+  merged?: number;
+  completed?: number;
+  other?: number;
+}
+
 export interface BootReconciliationAgent {
   id: string;
   issueId: string;
@@ -52,7 +59,14 @@ async function fetchBootReconciliation(): Promise<BootReconciliationState> {
 async function postBootReconciliationDecision(input: {
   decision: Exclude<BootReconciliationDecision, 'pending'>;
   perAgent?: Record<string, BootReconciliationPerAgentAction>;
-}): Promise<{ ok: boolean; count: number; resumed: string[]; outcomes?: BootReconciliationOutcome[] }> {
+}): Promise<{
+  ok: boolean;
+  count: number;
+  resumed: string[];
+  outcomes?: BootReconciliationOutcome[];
+  skipped?: BootReconciliationSkipBreakdown;
+  deferred?: number;
+}> {
   const res = await fetch('/api/boot-reconciliation/decision', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -63,6 +77,21 @@ async function postBootReconciliationDecision(input: {
     throw new Error(body.error || `POST /api/boot-reconciliation/decision -> ${res.status}`);
   }
   return res.json();
+}
+
+function formatDecisionSkipSummary(skipped: BootReconciliationSkipBreakdown = {}, deferred = 0): string {
+  const labels: Array<[keyof BootReconciliationSkipBreakdown, string]> = [
+    ['workspace_missing', 'workspace missing'],
+    ['merged', 'already merged'],
+    ['completed', 'completed'],
+    ['other', 'not resumable'],
+  ];
+  const parts = labels
+    .map(([key, label]) => ({ count: skipped[key] ?? 0, label }))
+    .filter((item) => item.count > 0)
+    .map((item) => `${item.count} ${item.label}`);
+  if (deferred > 0) parts.push(`${deferred} deferred`);
+  return parts.join(', ');
 }
 
 function formatOutcomeReason(reason: string): string {
@@ -80,7 +109,20 @@ function formatOutcomeReason(reason: string): string {
   }
 }
 
-function bootDecisionSummary(result: { count: number; outcomes?: BootReconciliationOutcome[] }): string {
+function bootDecisionSummary(result: {
+  count: number;
+  outcomes?: BootReconciliationOutcome[];
+  skipped?: BootReconciliationSkipBreakdown;
+  deferred?: number;
+}): string {
+  if (result.skipped || result.deferred) {
+    const skipSummary = formatDecisionSkipSummary(result.skipped, result.deferred ?? 0);
+    if (result.count > 0) {
+      return `Boot decision saved. Resuming ${result.count} agent${result.count === 1 ? '' : 's'}.${skipSummary ? ` Also skipped ${skipSummary}.` : ''}`;
+    }
+    return `Boot decision saved. No agents resumed${skipSummary ? ` — ${skipSummary}` : ''}.`;
+  }
+
   const skipped = Array.isArray(result.outcomes)
     ? result.outcomes.filter((outcome) => outcome.outcome === 'skipped')
     : [];

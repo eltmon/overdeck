@@ -94,7 +94,17 @@ vi.mock('../../../../lib/cloister/boot-reconciliation.js', () => ({
 }));
 
 vi.mock('../../../../lib/cloister/deacon.js', () => ({
-  applyBootReconciliationDecision: vi.fn(async () => ({ resumed: [], outcomes: [] })),
+  applyBootReconciliationDecision: vi.fn(async () => ({
+    resumed: ['agent-candidate'],
+    outcomes: [],
+    skipped: {
+      workspace_missing: 1,
+      merged: 2,
+      completed: 3,
+      other: 4,
+    },
+    deferred: 5,
+  })),
 }));
 
 vi.mock('../../../../lib/tmux.js', () => ({
@@ -119,8 +129,8 @@ vi.mock('../../../../lib/overdeck/control-settings.js', () => ({
 
 import { bootReconciliationRouteLayer } from '../boot-reconciliation.js';
 
-async function requestRoute(path: string): Promise<{ status: number; body: any }> {
-  const request = HttpServerRequest.fromWeb(new Request(`http://localhost${path}`));
+async function requestRoute(path: string, init?: RequestInit): Promise<{ status: number; body: any }> {
+  const request = HttpServerRequest.fromWeb(new Request(`http://localhost${path}`, init));
   const response = await Effect.runPromise(
     Effect.scoped(
       Effect.flatMap(HttpRouter.toHttpEffect(bootReconciliationRouteLayer), (app) =>
@@ -145,5 +155,26 @@ describe('boot reconciliation route', () => {
     for (const id of ['agent-paused', 'agent-troubled', 'agent-remote']) {
       expect(response.body.set.find((agent: { id: string }) => agent.id === id).readOnly).toBe(true);
     }
+  });
+
+  it('returns skipped and deferred boot decision breakdowns', async () => {
+    const response = await requestRoute('/api/boot-reconciliation/decision', {
+      method: 'POST',
+      body: JSON.stringify({ decision: 'resume_all' }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      ok: true,
+      count: 1,
+      resumed: ['agent-candidate'],
+      skipped: {
+        workspace_missing: 1,
+        merged: 2,
+        completed: 3,
+        other: 4,
+      },
+      deferred: 5,
+    });
   });
 });
