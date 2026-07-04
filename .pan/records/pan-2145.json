@@ -17,6 +17,16 @@
       "timestamp": "2026-07-03T23:08:18.715Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T23:11:15.228Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T01:47:43.908Z"
     }
   ],
   "feedback": [],
@@ -82,18 +92,19 @@
     "recordedAt": "2026-07-03T23:08:08.540Z"
   },
   "created": "2026-07-03T13:52:41.087Z",
-  "updated": "2026-07-03T23:08:51.232Z",
+  "updated": "2026-07-04T01:47:45.767Z",
   "pipeline": {
     "issueId": "PAN-2145",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T23:08:51.173Z",
+    "updatedAt": "2026-07-04T01:47:45.620Z",
     "inspectNotes": "Spec fidelity passed: fork door remains under 1000 lines, uses self import from ./conversation-forks.js, main.ts imports recoverStuckForks/waitForInFlightForkPipelines from lib/overdeck/conversation-forks.js, and routes 5/28 delegate to the fork door. Constraint compliance passed: no routes/conversations.js import, no execSync, no sync tmux sendKeys, no explicit any in the changed fork door.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2332",
+    "lastVerifiedCommit": "ff64924a2fb3aea7480068a6d910d2a1e15e2668",
     "reviewRequestedAt": "2026-07-03T23:08:18.717Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -207,7 +218,7 @@
       },
       "costAtCloseOut": {
         "usd": 23.38494,
-        "pricingAsOf": "2026-07-03T23:08:51.231Z"
+        "pricingAsOf": "2026-07-04T01:47:45.711Z"
       }
     },
     "merges": [
