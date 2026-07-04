@@ -504,3 +504,15 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - **ONLY REMAINING — swarm slots need operator decision:** PAN-1739/2194/2284 have branch work pushed but **NO PRs** (reboot lost swarm coordination that creates issue-level PRs). Landing them = create PRs + put through review (they're swarm slots, never issue-reviewed). Held back from rushing UNREVIEWED work into the stability release. Operator's call: land (I create PRs + shepherd review) vs defer post-release.
 - **Minor residue:** stale review_status entries (PAN-2311/2145 show ready-but-merged) — will reconcile via postMergeLifecycle. Linear/MYN read-model (MIN-831 operator-handled).
 - **RELEASE READINESS:** core + mid-pipeline landed, main green, fix deployed → ready for operator to test + tag major release once they decide on the swarm slots.
+
+## RUN-55 tick 14-16 (2026-07-04 ~20:15Z) — RELEASE-SCOPE DRAIN: 4 of 6 landed, last 2 in flight
+
+Operator relayed the release-scope contract: land PAN-1739, PAN-2194, PAN-2248, PAN-2258, PAN-2284, PAN-2357, then operator tags a major npm stability release via `pan release stable` (I do NOT tag). Stay in drain mode, no new pickup.
+
+- **PAN-2357 (swarm-finalization substrate fix):** root-caused the swarm stranding — (1) no issue-level finalization step created PRs from ready slots; (2) ephemeral slot `resolution` field lost on reboot → vanished-session misclassified `failed`. Fix (`deacon-swarm-finalization.ts` `finalizeSwarmIssueIfComplete` + `deacon-swarm-completion.ts` `classifyDurableReadySlot`) reviewed PASS → **MERGED PR #2361 + deployed.**
+- **PAN-2194 (flywheel-orch commit guard):** reviewed guard script → **MERGED PR #2362.**
+- **PAN-2248 / PAN-2258:** stale duplicate PRs #2256/#2269 — **closed both, deleted branches, cleared in-review labels.** (PAN-2258 already delivered via PR #2271 earlier; PAN-2248 superseded.)
+- **PAN-2284 (boot-reconciliation):** recovered via dispatched work agent — assembled stranded slots → **PR #2365 OPEN, CI running** (build/lint/test/smoke). Shepherd to green + self-review + merge.
+- **PAN-1739 (strike/session in issue tree):** first `pan start` dispatch died on boot; **re-dispatched, agent-pan-1739 ALIVE (gpt-5.5).** Two stranded slot branches exist (`feature/pan-1739-slot-1`, `-slot-2`, both ~2-3 commits ahead, overlap on SessionNode.tsx/.test.tsx). Sent recovery `pan tell`: fetch + merge both slots, resolve SessionNode overlap by unioning both slots' logic/assertions, typecheck + scoped ProjectTree vitest, `pan done`.
+- **Substrate bugs filed** (strike self-abort forensics): PAN-2359 (`reapMergedStrikeWorkspaces` false-positives on FRESH 0-commit strikes), PAN-2360 (strike worktree unregistered mid-run, agent falls back to main).
+- **NEXT:** shepherd PR #2365 to merge + agent-pan-1739 to `pan done`+PR+merge. When both land → all 6 release-scope items done + main green + pipeline empty → **report release-readiness to operator (do NOT tag).**
