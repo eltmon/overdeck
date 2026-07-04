@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-03T12:02:49.631Z",
-  "updated": "2026-07-04T14:01:42.577Z",
+  "updated": "2026-07-04T14:20:23.182Z",
   "pipeline": {
     "issueId": "PAN-2294",
     "reviewStatus": "pending",
@@ -69,5 +69,16 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.5"
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "wire-promote": "completed",
+    "wire-promote.ac1": "completed",
+    "wire-promote.ac2": "completed",
+    "wire-promote.ac3": "completed",
+    "notify-helper": "completed",
+    "notify-helper.ac1": "completed",
+    "notify-helper.ac2": "completed",
+    "notify-helper.ac3": "completed",
+    "notify-helper.ac4": "completed"
+  }
 }
