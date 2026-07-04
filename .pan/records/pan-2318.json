@@ -166,8 +166,8 @@
     ],
     "recordedAt": "2026-07-04T14:36:37.246Z"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "wi-3-control-surface-audit": "completed",
     "wi-3-control-surface-audit.ac1": "completed",
@@ -221,16 +221,18 @@
   },
   "pipeline": {
     "issueId": "PAN-2318",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merging",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T15:13:53.813Z",
-    "reviewNotes": "PUT /api/cloister/config saves the file but no longer reloads the running child Cloister process, so live settings remain stale until restart.",
+    "updatedAt": "2026-07-04T15:51:37.369Z",
+    "reviewNotes": "Review passed; config updates reload the child Cloister",
+    "testNotes": "Gates: npm run typecheck (pass), npm run lint (pass), npm run test (pass: 8282 unit + 32 frontend tests). UAT: built workspace dashboard, stopped main-checkout dashboard, started workspace dist/dashboard/server.js on :3011. Playwright verified https://overdeck.localhost/ loads and Board renders with 895 issues; Activity Feed confirms 'Deacon child started (pid 1329904)' and 'Deacon health monitor started'. curl /api/metrics/summary returned eventLoop {p50:20.1,p99:89,max:728.76} (FR-11). curl /api/issues returned 200 in 0.24s then 0.08s (memoization, FR-8/NFR-1). WebSocket connected; no 'Reconnecting...' overlay or console errors. One pre-existing WsTransport schema-warning for pipeline.verification-started (non-fatal).",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2327",
-    "reviewedAtCommit": "1ee1128f5ea549bf395737633866b6a68d01917a",
+    "reviewedAtCommit": "76191cea50052f5141ac982b390c8e1610a26aed",
     "lastVerifiedCommit": "a74bebc649d119383c6cd0ef46a845b5cf9eee3c"
   },
   "closeOut": {
@@ -246,8 +248,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 27741,
-            "output": 921,
+            "input": 28768,
+            "output": 1045,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -261,10 +263,16 @@
           }
         },
         "test": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 59,
+            "output": 2713,
+            "cacheRead": 333766,
+            "cacheWrite": 226169
+          },
           "custom/kimi-k2.7-code": {
-            "input": 882176,
-            "output": 52510,
-            "cacheRead": 24188846,
+            "input": 1396832,
+            "output": 90240,
+            "cacheRead": 43533486,
             "cacheWrite": 0
           }
         }
@@ -277,8 +285,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 27741,
-          "output": 921,
+          "input": 28768,
+          "output": 1045,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -288,16 +296,22 @@
           "cacheRead": 2794255,
           "cacheWrite": 160275
         },
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 59,
+          "output": 2713,
+          "cacheRead": 333766,
+          "cacheWrite": 226169
+        },
         "custom/kimi-k2.7-code": {
-          "input": 882176,
-          "output": 52510,
-          "cacheRead": 24188846,
+          "input": 1396832,
+          "output": 90240,
+          "cacheRead": 43533486,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 13.107565,
-        "pricingAsOf": "2026-07-04T15:13:53.837Z"
+        "usd": 17.752606,
+        "pricingAsOf": "2026-07-04T15:51:37.402Z"
       }
     },
     "merges": [
@@ -306,5 +320,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-04T14:07:04.245Z",
-  "updated": "2026-07-04T15:13:53.839Z"
+  "updated": "2026-07-04T15:51:37.403Z"
 }
