@@ -42,13 +42,30 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-04T01:06:17.334Z"
+    },
+    {
+      "timestamp": "2026-07-04T01:45:27.229Z",
+      "reason": "end",
+      "note": "No skipped work. Re-running completion signal on operator nudge after fixing review finding and sync-target-branch. Delivered .pan/test/ in repo .gitignore and ensurePanGitignoreSync, with regression coverage. Gates passed after merge: targeted vitest, npm run typecheck, npm run build, npm test."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T01:45:27.465Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T14:35:48.153Z"
     }
   ],
   "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/drafts/pan-2325.md",
-      ".pan/records/pan-2325.json"
+      ".pan/records/pan-2325.json",
+      "src/lib/workspace-manager/migration.ts",
+      "tests/lib/pan-artifacts.test.ts"
     ],
     "declaredScopeUntouched": [],
     "declaredScope": [
@@ -61,30 +78,34 @@
       ".pan/drafts/pan-2325.md",
       ".pan/records/pan-2325.json",
       ".pan/test/result.json",
-      "src/lib/cloister/__tests__/test-verdict.test.ts"
+      "src/lib/cloister/__tests__/test-verdict.test.ts",
+      "src/lib/workspace-manager/migration.ts",
+      "tests/lib/pan-artifacts.test.ts"
     ],
-    "recordedAt": "2026-07-03T23:39:17.250Z"
+    "recordedAt": "2026-07-04T01:45:21.352Z"
   },
   "created": "2026-07-03T21:17:15.683Z",
-  "updated": "2026-07-04T01:07:21.899Z",
+  "updated": "2026-07-04T14:35:48.153Z",
   "pipeline": {
     "issueId": "PAN-2325",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merging",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T01:07:21.863Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed sync-target-branch",
+    "updatedAt": "2026-07-04T14:35:27.113Z",
+    "reviewNotes": "Review passed; .pan/test artifact is untracked, ignored, and covered by reusable gitignore writer",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
-    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2328",
-    "lastVerifiedCommit": "166c3eeca0c4d04f1dbb17c91aac8b1ae04bac8d",
-    "reviewRequestedAt": "2026-07-03T23:39:24.241Z",
+    "reviewedAtCommit": "7108f2c3626149916a1266196c0f2d0d7cdfbb74",
+    "lastVerifiedCommit": "7108f2c3626149916a1266196c0f2d0d7cdfbb74",
+    "reviewRequestedAt": "2026-07-04T01:45:27.231Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/drafts/pan-2325.md",
-        ".pan/records/pan-2325.json"
+        ".pan/records/pan-2325.json",
+        "src/lib/workspace-manager/migration.ts",
+        "tests/lib/pan-artifacts.test.ts"
       ],
       "declaredScopeUntouched": [],
       "declaredScope": [
@@ -97,9 +118,11 @@
         ".pan/drafts/pan-2325.md",
         ".pan/records/pan-2325.json",
         ".pan/test/result.json",
-        "src/lib/cloister/__tests__/test-verdict.test.ts"
+        "src/lib/cloister/__tests__/test-verdict.test.ts",
+        "src/lib/workspace-manager/migration.ts",
+        "tests/lib/pan-artifacts.test.ts"
       ],
-      "recordedAt": "2026-07-03T23:39:17.250Z"
+      "recordedAt": "2026-07-04T01:45:21.352Z"
     }
   },
   "closeOut": {
@@ -107,8 +130,8 @@
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 23370,
-            "output": 516,
+            "input": 26211,
+            "output": 1174,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -120,12 +143,20 @@
             "cacheRead": 886291,
             "cacheWrite": 112114
           }
+        },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 403694,
+            "output": 10372,
+            "cacheRead": 3384320,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 23370,
-          "output": 516,
+          "input": 26211,
+          "output": 1174,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -134,11 +165,17 @@
           "output": 16179,
           "cacheRead": 886291,
           "cacheWrite": 112114
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 403694,
+          "output": 10372,
+          "cacheRead": 3384320,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 1.6202400000000001,
-        "pricingAsOf": "2026-07-04T01:07:21.898Z"
+        "usd": 2.688262,
+        "pricingAsOf": "2026-07-04T14:35:27.167Z"
       }
     },
     "merges": [
