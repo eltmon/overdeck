@@ -30,6 +30,14 @@ function writeBaseline(root: string, entries: Array<[number, string]>): void {
   );
 }
 
+function writeSourceIntrospectionBaseline(root: string, entries: Array<[number, string]>): void {
+  mkdirSync(join(root, 'scripts'), { recursive: true });
+  writeFileSync(
+    join(root, 'scripts', 'source-introspection-baseline.txt'),
+    entries.map(([count, path]) => `${count} ${path}`).join('\n') + '\n',
+  );
+}
+
 function writeAllowlist(root: string, paths: string[]): void {
   writeFileSync(join(root, 'eslint-any-allowlist.json'), `${JSON.stringify(paths, null, 2)}\n`);
 }
@@ -44,6 +52,7 @@ function setupRepo(): string {
   const root = makeTempRepo();
   installScript(root);
   writeBaseline(root, [[1200, 'src/base.ts']]);
+  writeSourceIntrospectionBaseline(root, [[1, 'tests/legacy.test.ts']]);
   writeAllowlist(root, ['src/legacy.ts']);
   commitAll(root, 'initial PAN-0000');
   return root;
@@ -72,7 +81,7 @@ describe('lint-ratchet-audit.sh', () => {
 
     expect(result.ok).toBe(false);
     expect(result.output).toContain(commit.slice(0, 12));
-    expect(result.output).toContain('baseline raised: src/base.ts 1200 -> 1300');
+    expect(result.output).toContain('file-size baseline raised: src/base.ts 1200 -> 1300');
     expect(result.output).toContain('must reference an issue');
   });
 
@@ -80,6 +89,33 @@ describe('lint-ratchet-audit.sh', () => {
     const root = setupRepo();
     writeBaseline(root, [[1300, 'src/base.ts']]);
     commitAll(root, 'raise baseline PAN-123');
+
+    const result = runAudit(root, ['--range', 'HEAD~1..HEAD']);
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('ratchet audit passed');
+  });
+
+  it('fails range mode when a source-introspection baseline entry rises without an issue ref', () => {
+    const root = setupRepo();
+    writeSourceIntrospectionBaseline(root, [[2, 'tests/legacy.test.ts']]);
+    const commit = commitAll(root, 'raise source baseline');
+
+    const result = runAudit(root, ['--range', 'HEAD~1..HEAD']);
+
+    expect(result.ok).toBe(false);
+    expect(result.output).toContain(commit.slice(0, 12));
+    expect(result.output).toContain('source-introspection baseline raised: tests/legacy.test.ts 1 -> 2');
+    expect(result.output).toContain('must reference an issue');
+  });
+
+  it('passes range mode when a source-introspection baseline increase carries an issue ref', () => {
+    const root = setupRepo();
+    writeSourceIntrospectionBaseline(root, [
+      [1, 'tests/legacy.test.ts'],
+      [1, 'tests/new.test.ts'],
+    ]);
+    commitAll(root, 'raise source baseline PAN-2231');
 
     const result = runAudit(root, ['--range', 'HEAD~1..HEAD']);
 
@@ -131,13 +167,14 @@ describe('lint-ratchet-audit.sh', () => {
 
     expect(result.ok).toBe(false);
     expect(result.output).toContain(ratchetCommit.slice(0, 12));
-    expect(result.output).toContain('baseline raised: src/base.ts 1200 -> 1300');
+    expect(result.output).toContain('file-size baseline raised: src/base.ts 1200 -> 1300');
   });
 
   it('warns and passes when a root commit touches a ratchet file', () => {
     const root = makeTempRepo();
     installScript(root);
     writeBaseline(root, [[1200, 'src/base.ts']]);
+    writeSourceIntrospectionBaseline(root, [[1, 'tests/legacy.test.ts']]);
     writeAllowlist(root, ['src/legacy.ts']);
     const rootCommit = commitAll(root, 'root ratchet');
 

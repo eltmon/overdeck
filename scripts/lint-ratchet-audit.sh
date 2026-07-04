@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
 # lint-ratchet-audit.sh — require issue references for ratchet increases.
-# Lowering file-size baselines and removing allowlist entries is always free.
-# Raising/adding either ratchet must happen in a commit whose message includes
-# an issue reference matching ([A-Z]+-[0-9]+|#[0-9]+).
+# Lowering numeric baselines and removing allowlist entries is always free.
+# Raising/adding any ratchet must happen in a commit whose message includes an
+# issue reference matching ([A-Z]+-[0-9]+|#[0-9]+).
 #
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -18,7 +18,10 @@ elif [[ $# -ne 0 ]]; then
   exit 2
 fi
 
-BASELINE="scripts/file-size-baseline.txt"
+BASELINES=(
+  "file-size baseline:scripts/file-size-baseline.txt"
+  "source-introspection baseline:scripts/source-introspection-baseline.txt"
+)
 ALLOWLIST="eslint-any-allowlist.json"
 ISSUE_REF_RE='([A-Z]+-[0-9]+|#[0-9]+)'
 
@@ -26,7 +29,8 @@ declare -A seen_commits
 
 baseline_at() {
   local rev="$1"
-  { git show "$rev:$BASELINE" 2>/dev/null || true; } | awk 'NF >= 2 { print $1, $2 }' | sort -k2
+  local file="$2"
+  { git show "$rev:$file" 2>/dev/null || true; } | awk 'NF >= 2 { print $1, $2 }' | sort -k2
 }
 
 allowlist_at() {
@@ -37,8 +41,10 @@ allowlist_at() {
 }
 
 parent_baseline_at() {
+  local file="$1"
+  shift
   for parent in "$@"; do
-    baseline_at "$parent"
+    baseline_at "$parent" "$file"
   done | awk '
     !($2 in max) || $1 > max[$2] { max[$2] = $1 }
     END { for (path in max) print max[path], path }
@@ -53,16 +59,18 @@ parent_allowlist_at() {
 
 baseline_increases_for_commit() {
   local commit="$1"
-  shift
+  local label="$2"
+  local file="$3"
+  shift 3
   local old_file new_file
   old_file=$(mktemp)
   new_file=$(mktemp)
-  parent_baseline_at "$@" > "$old_file"
-  baseline_at "$commit" > "$new_file"
-  awk '
+  parent_baseline_at "$file" "$@" > "$old_file"
+  baseline_at "$commit" "$file" > "$new_file"
+  awk -v label="$label" '
     FILENAME == ARGV[1] { old[$2] = $1; next }
-    !($2 in old) { print "baseline added: " $2 " (" $1 " lines)"; next }
-    $1 > old[$2] { print "baseline raised: " $2 " " old[$2] " -> " $1 }
+    !($2 in old) { print label " added: " $2 " (" $1 ")"; next }
+    $1 > old[$2] { print label " raised: " $2 " " old[$2] " -> " $1 }
   ' "$old_file" "$new_file"
   rm -f "$old_file" "$new_file"
 }
@@ -102,7 +110,11 @@ audit_commit() {
 
   local increases
   increases=$(
-    baseline_increases_for_commit "$commit" "${parents[@]}"
+    for baseline in "${BASELINES[@]}"; do
+      label="${baseline%%:*}"
+      file="${baseline#*:}"
+      baseline_increases_for_commit "$commit" "$label" "$file" "${parents[@]}"
+    done
     allowlist_increases_for_commit "$commit" "${parents[@]}"
   )
 
@@ -131,7 +143,15 @@ commits_for_file() {
   fi
 }
 
-for file in "$BASELINE" "$ALLOWLIST"; do
+for baseline in "${BASELINES[@]}"; do
+  file="${baseline#*:}"
+  while IFS= read -r commit; do
+    [[ -z "$commit" ]] && continue
+    audit_commit "$commit"
+  done < <(commits_for_file "$file")
+done
+
+for file in "$ALLOWLIST"; do
   while IFS= read -r commit; do
     [[ -z "$commit" ]] && continue
     audit_commit "$commit"
