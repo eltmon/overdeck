@@ -13,30 +13,34 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import {
   buildForkRequest,
-  clearPendingConversationControlAcksForTests,
+  getInFlightForkPipelineCount,
+  parseSummaryForkFocus,
+  readExistingHandoffDoc,
+  recoverStuckForks,
+  registerInFlightForkPipeline,
+  waitForInFlightForkPipelines,
+} from '../../../../lib/overdeck/conversation-forks.js';
+import {
   conversationNeedsRunningRepair,
   conversationSessionAliveFromState,
-  getPendingConversationControlAckCount,
-  getInFlightForkPipelineCount,
+  handleConversationSwitchModel,
+  piConversationSystemPromptFiles,
+  shouldReportUnresolvedLiveSession,
+} from '../../../../lib/overdeck/conversation-runtime.js';
+import {
+  clearPendingConversationControlAcksForTests,
   deliverConversationViaControlChannel,
+  getPendingConversationControlAckCount,
   handleConversationAbort,
   handleConversationCompact,
   handleConversationControlAck,
-  handleConversationSwitchModel,
   handleConversationThinkingLevel,
-  parseSummaryForkFocus,
   pickDeliverAs,
-  readExistingHandoffDoc,
-  recoverStuckForks,
   registerConversationControlAck,
-  registerInFlightForkPipeline,
-  validateConversationControlAckOrigin,
-  resolveConversationDeliveryMethod,
   resolveConversationControlAck,
-  piConversationSystemPromptFiles,
-  shouldReportUnresolvedLiveSession,
-  waitForInFlightForkPipelines,
-} from '../conversations.js';
+  resolveConversationDeliveryMethod,
+  validateConversationControlAckOrigin,
+} from '../../../../lib/overdeck/conversation-delivery.js';
 import { deliverAgentMessage } from '../../../../lib/agents.js';
 import { sendKeysAsync } from '../../../../lib/tmux.js';
 import { _resetTrustedOriginsForTests } from '../origin-validation.js';
@@ -185,6 +189,14 @@ function decodeJsonResponse(response: { status: number; body: unknown }) {
   const payload = response.body as { body: Uint8Array } | null;
   const text = payload?.body ? new TextDecoder().decode(payload.body) : '{}';
   return JSON.parse(text) as Record<string, unknown>;
+}
+
+function decodeArchiveResult(response: { status?: number; body: unknown }) {
+  return response.body;
+}
+
+function archiveResultStatus(response: { status?: number }) {
+  return response.status ?? 200;
 }
 
 function decodeTextResponse(response: { body: unknown }) {
@@ -681,7 +693,7 @@ describe('conversations route — DB integration', () => {
 
   it('keeps claude-code composer delivery on deliverAgentMessage', async () => {
     const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleConversationMessage } = await import('../conversations.js');
+    const { handleConversationMessage } = await import('../../../../lib/overdeck/conversation-message.js');
     vi.mocked(deliverAgentMessage).mockClear();
 
     createConversation({
@@ -695,7 +707,7 @@ describe('conversations route — DB integration', () => {
     const response = await handleConversationMessage('claude-conv', { message: 'hello claude' });
     const body = decodeJsonResponse(response);
 
-    expect(response.status).toBe(200);
+    expect(archiveResultStatus(response)).toBe(200);
     expect(body.ok).toBe(true);
     expect(deliverAgentMessage).toHaveBeenCalledWith(
       'conv-claude',
@@ -707,7 +719,7 @@ describe('conversations route — DB integration', () => {
 
   it('returns a persisted handoff document as markdown', async () => {
     const { createConversation, getConversationByName, recordConversationHandoff } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleConversationHandoffDoc } = await import('../conversations.js');
+    const { handleConversationHandoffDoc } = await import('../../../../lib/overdeck/conversation-forks.js');
 
     const docPath = join(TEST_HOME, 'handoffs', 'source-2026-05-23T04-35-00.000Z.md');
     mkdirSync(join(TEST_HOME, 'handoffs'), { recursive: true });
@@ -718,14 +730,14 @@ describe('conversations route — DB integration', () => {
 
     const response = await handleConversationHandoffDoc('target-conv');
 
-    expect(response.status).toBe(200);
+    expect(archiveResultStatus(response)).toBe(200);
     expect(decodeTextResponse(response)).toContain('## Suggested skills');
     expect(getConversationByName('source-conv')?.handoffTargetConvId).toBe(target.id);
   });
 
   it('returns 404 when a conversation has no handoff document path', async () => {
     const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleConversationHandoffDoc } = await import('../conversations.js');
+    const { handleConversationHandoffDoc } = await import('../../../../lib/overdeck/conversation-forks.js');
 
     createConversation({ name: 'plain-conv', tmuxSession: 'conv-plain', cwd: '/cwd' });
 
@@ -737,7 +749,7 @@ describe('conversations route — DB integration', () => {
 
   it('returns 410 when the recorded handoff document is missing on disk', async () => {
     const { createConversation, recordConversationHandoff } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleConversationHandoffDoc } = await import('../conversations.js');
+    const { handleConversationHandoffDoc } = await import('../../../../lib/overdeck/conversation-forks.js');
 
     const docPath = join(TEST_HOME, 'handoffs', 'missing.md');
     createConversation({ name: 'source-conv', tmuxSession: 'conv-source', cwd: '/cwd' });
@@ -752,7 +764,7 @@ describe('conversations route — DB integration', () => {
 
   it('stores uploaded images under the owning conversation attachment directory', async () => {
     const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleConversationImageUpload } = await import('../conversations.js');
+    const { handleConversationImageUpload } = await import('../../../../lib/overdeck/conversation-message.js');
     const { getConversationAttachmentDir } = await import('../../services/conversation-attachments.js');
 
     createConversation({ name: 'upload-test', tmuxSession: 'conv-upload-test', cwd: '/cwd' });
@@ -761,14 +773,14 @@ describe('conversations route — DB integration', () => {
     const response = await handleConversationImageUpload('upload-test', 'evidence.txt', bytes, 'image/png');
 
     const body = decodeJsonResponse(response);
-    expect(response.status).toBe(200);
+    expect(archiveResultStatus(response)).toBe(200);
     expect(body.path).toEqual(expect.stringMatching(new RegExp(`${getConversationAttachmentDir('upload-test').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.+\\.png$`)));
     expect(readFileSync(body.path as string)).toEqual(Buffer.from([137, 80, 78, 71]));
   });
 
   it('rejects unsupported mimeType before writing files', async () => {
     const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleConversationImageUpload } = await import('../conversations.js');
+    const { handleConversationImageUpload } = await import('../../../../lib/overdeck/conversation-message.js');
 
     createConversation({ name: 'upload-test', tmuxSession: 'conv-upload-test', cwd: '/cwd' });
 
@@ -780,7 +792,7 @@ describe('conversations route — DB integration', () => {
 
   it('rejects magic-byte mismatch for valid mimeType', async () => {
     const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleConversationImageUpload } = await import('../conversations.js');
+    const { handleConversationImageUpload } = await import('../../../../lib/overdeck/conversation-message.js');
 
     createConversation({ name: 'upload-test', tmuxSession: 'conv-upload-test', cwd: '/cwd' });
 
@@ -800,7 +812,7 @@ describe('conversations route — DB integration', () => {
 
   it('rejects oversized upload payloads before writing files', async () => {
     const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleConversationImageUpload } = await import('../conversations.js');
+    const { handleConversationImageUpload } = await import('../../../../lib/overdeck/conversation-message.js');
 
     createConversation({ name: 'upload-test', tmuxSession: 'conv-upload-test', cwd: '/cwd' });
 
@@ -813,7 +825,7 @@ describe('conversations route — DB integration', () => {
 
   it('rejects empty upload payloads', async () => {
     const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleConversationImageUpload } = await import('../conversations.js');
+    const { handleConversationImageUpload } = await import('../../../../lib/overdeck/conversation-message.js');
 
     createConversation({ name: 'upload-test', tmuxSession: 'conv-upload-test', cwd: '/cwd' });
 
@@ -829,7 +841,7 @@ describe('conversations route — DB integration', () => {
     deliverMock.mockClear();
 
     const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleConversationImageUpload, handleConversationMessage } = await import('../conversations.js');
+    const { handleConversationImageUpload, handleConversationMessage } = await import('../../../../lib/overdeck/conversation-message.js');
 
     createConversation({ name: 'owner-conv', tmuxSession: 'conv-owner-conv', cwd: '/cwd' });
     createConversation({ name: 'other-conv', tmuxSession: 'conv-other-conv', cwd: '/cwd' });
@@ -862,7 +874,7 @@ describe('conversations route — DB integration', () => {
 
   it('delete-image removes only conversation-owned uploads', async () => {
     const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleConversationImageUpload } = await import('../conversations.js');
+    const { handleConversationImageUpload } = await import('../../../../lib/overdeck/conversation-message.js');
     const { removeConversationAttachment } = await import('../../services/conversation-attachments.js');
 
     createConversation({ name: 'owner-conv', tmuxSession: 'conv-owner-conv', cwd: '/cwd' });
@@ -881,7 +893,7 @@ describe('conversations route — DB integration', () => {
 
   it('ended and archived cleanup preserve unsent uploads newer than session history', async () => {
     const { createConversation, markConversationEnded, archiveConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleConversationImageUpload } = await import('../conversations.js');
+    const { handleConversationImageUpload } = await import('../../../../lib/overdeck/conversation-message.js');
     const { cleanupUnreferencedConversationAttachments } = await import('../../services/conversation-attachments.js');
 
     createConversation({ name: 'unsent-conv', tmuxSession: 'conv-unsent-conv', cwd: '/cwd' });
@@ -906,7 +918,7 @@ describe('conversations route — DB integration', () => {
 
   it('archive prunes unreferenced uploads while preserving prose-first referenced ones', async () => {
     const { createConversation, markConversationEnded, archiveConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleConversationImageUpload } = await import('../conversations.js');
+    const { handleConversationImageUpload } = await import('../../../../lib/overdeck/conversation-message.js');
     const { cleanupUnreferencedConversationAttachments } = await import('../../services/conversation-attachments.js');
 
     createConversation({ name: 'archived-conv', tmuxSession: 'conv-archived-conv', cwd: '/cwd' });
@@ -948,7 +960,7 @@ describe('conversations route — DB integration', () => {
   it('returns archived conversations ordered by archivedAt descending', async () => {
     const { createConversation, archiveConversation } = await import('../../../../lib/overdeck/conversations.js');
     const { getOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
-    const { handleArchivedConversationsList } = await import('../conversations.js');
+    const { handleArchivedConversationsList } = await import('../../../../lib/overdeck/conversation-archive.js');
     const db = getOverdeckDatabaseSync();
 
     createConversation({ name: 'older-archived', tmuxSession: 'conv-older', cwd: '/cwd/older', title: 'Older archived' });
@@ -960,9 +972,9 @@ describe('conversations route — DB integration', () => {
     db.prepare(`UPDATE conversations SET archived_at = ? WHERE name = ?`).run('2026-05-23T00:00:00.000Z', 'newer-archived');
 
     const response = await handleArchivedConversationsList();
-    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+    const rows = decodeArchiveResult(response) as Array<Record<string, unknown>>;
 
-    expect(response.status).toBe(200);
+    expect(archiveResultStatus(response)).toBe(200);
     expect(rows.map((row) => row.conversationName)).toEqual(['newer-archived', 'older-archived']);
     expect(rows.map((row) => row.conversationName)).not.toContain('active-conv');
     expect(rows[0]).toMatchObject({
@@ -973,7 +985,7 @@ describe('conversations route — DB integration', () => {
     });
 
     const limitedResponse = await handleArchivedConversationsList({ limit: 1 });
-    const limitedRows = decodeJsonResponse(limitedResponse) as unknown as Array<Record<string, unknown>>;
+    const limitedRows = decodeArchiveResult(limitedResponse) as Array<Record<string, unknown>>;
     expect(limitedRows.map((row) => row.conversationName)).toEqual(['newer-archived']);
   });
 
@@ -981,7 +993,7 @@ describe('conversations route — DB integration', () => {
     const { createConversation, archiveConversation } = await import('../../../../lib/overdeck/conversations.js');
     const { upsertDiscoveredSession } = await import('../../../../lib/overdeck/discovered-sessions.js');
     const { getOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
-    const { handleArchivedConversationsList } = await import('../conversations.js');
+    const { handleArchivedConversationsList } = await import('../../../../lib/overdeck/conversation-archive.js');
     const db = getOverdeckDatabaseSync();
 
     createConversation({
@@ -1026,15 +1038,15 @@ describe('conversations route — DB integration', () => {
       enrichmentLevel: 2,
       limit: 50,
     });
-    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+    const rows = decodeArchiveResult(response) as Array<Record<string, unknown>>;
 
-    expect(response.status).toBe(200);
+    expect(archiveResultStatus(response)).toBe(200);
     expect(rows.map((row) => row.conversationName)).toEqual(['matching-archived']);
   });
 
   it('preserves and filters archived conversations by harness', async () => {
     const { createConversation, archiveConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleArchivedConversationsList } = await import('../conversations.js');
+    const { handleArchivedConversationsList } = await import('../../../../lib/overdeck/conversation-archive.js');
 
     createConversation({ name: 'codex-archived', tmuxSession: 'conv-codex', cwd: '/cwd/codex', harness: 'codex' });
     createConversation({ name: 'pi-archived', tmuxSession: 'conv-pi', cwd: '/cwd/pi', harness: 'ohmypi' });
@@ -1042,9 +1054,9 @@ describe('conversations route — DB integration', () => {
     archiveConversation('pi-archived');
 
     const response = await handleArchivedConversationsList({ harness: 'codex' });
-    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+    const rows = decodeArchiveResult(response) as Array<Record<string, unknown>>;
 
-    expect(response.status).toBe(200);
+    expect(archiveResultStatus(response)).toBe(200);
     expect(rows.map((row) => row.conversationName)).toEqual(['codex-archived']);
     expect(rows[0]).toMatchObject({ harness: 'codex' });
   });
@@ -1052,7 +1064,7 @@ describe('conversations route — DB integration', () => {
   it('includes legacy null-harness archived conversations when filtering for claude-code', async () => {
     const { createConversation, archiveConversation } = await import('../../../../lib/overdeck/conversations.js');
     const { getOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
-    const { handleArchivedConversationsList } = await import('../conversations.js');
+    const { handleArchivedConversationsList } = await import('../../../../lib/overdeck/conversation-archive.js');
     const db = getOverdeckDatabaseSync();
 
     createConversation({ name: 'legacy-claude-archived', tmuxSession: 'conv-legacy-claude', cwd: '/cwd/legacy' });
@@ -1062,9 +1074,9 @@ describe('conversations route — DB integration', () => {
     db.prepare(`UPDATE conversations SET harness = NULL WHERE name = ?`).run('legacy-claude-archived');
 
     const response = await handleArchivedConversationsList({ harness: 'claude-code' });
-    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+    const rows = decodeArchiveResult(response) as Array<Record<string, unknown>>;
 
-    expect(response.status).toBe(200);
+    expect(archiveResultStatus(response)).toBe(200);
     expect(rows.map((row) => row.conversationName)).toEqual(['legacy-claude-archived']);
     expect(rows[0]).toMatchObject({ harness: null });
   });
@@ -1074,7 +1086,7 @@ describe('conversations route — DB integration', () => {
     vi.setSystemTime(new Date('2026-05-23T12:00:00.000Z'));
 
     try {
-      const { parseArchivedConversationListOptions } = await import('../conversations.js');
+      const { parseArchivedConversationListOptions } = await import('../../../../lib/overdeck/conversation-archive.js');
 
       const options = parseArchivedConversationListOptions(new URLSearchParams('since=7d&limit=50&harness=codex'));
 
@@ -1088,7 +1100,7 @@ describe('conversations route — DB integration', () => {
   it('returns archived conversations without discovered_sessions enrichment', async () => {
     const { createConversation, archiveConversation } = await import('../../../../lib/overdeck/conversations.js');
     const { getOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
-    const { handleArchivedConversationsList } = await import('../conversations.js');
+    const { handleArchivedConversationsList } = await import('../../../../lib/overdeck/conversation-archive.js');
     const db = getOverdeckDatabaseSync();
 
     createConversation({
@@ -1104,9 +1116,9 @@ describe('conversations route — DB integration', () => {
     db.prepare(`UPDATE conversations SET archived_at = ?, total_cost = ? WHERE name = ?`).run('2026-05-23T01:00:00.000Z', 1.23, 'sparse-archived');
 
     const response = await handleArchivedConversationsList();
-    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+    const rows = decodeArchiveResult(response) as Array<Record<string, unknown>>;
 
-    expect(response.status).toBe(200);
+    expect(archiveResultStatus(response)).toBe(200);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       conversationName: 'sparse-archived',
@@ -1128,7 +1140,7 @@ describe('conversations route — DB integration', () => {
 
   it('returns null jsonlPath for archived non-Claude conversations without discovered_sessions enrichment', async () => {
     const { createConversation, archiveConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleArchivedConversationsList } = await import('../conversations.js');
+    const { handleArchivedConversationsList } = await import('../../../../lib/overdeck/conversation-archive.js');
 
     createConversation({
       name: 'ohmypi-archived',
@@ -1141,9 +1153,9 @@ describe('conversations route — DB integration', () => {
     archiveConversation('ohmypi-archived');
 
     const response = await handleArchivedConversationsList();
-    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+    const rows = decodeArchiveResult(response) as Array<Record<string, unknown>>;
 
-    expect(response.status).toBe(200);
+    expect(archiveResultStatus(response)).toBe(200);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       conversationName: 'ohmypi-archived',
@@ -1155,7 +1167,7 @@ describe('conversations route — DB integration', () => {
     const { createConversation, archiveConversation } = await import('../../../../lib/overdeck/conversations.js');
     const { upsertDiscoveredSession } = await import('../../../../lib/overdeck/discovered-sessions.js');
     const { getOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
-    const { handleArchivedConversationsList } = await import('../conversations.js');
+    const { handleArchivedConversationsList } = await import('../../../../lib/overdeck/conversation-archive.js');
     const db = getOverdeckDatabaseSync();
 
     createConversation({
@@ -1188,9 +1200,9 @@ describe('conversations route — DB integration', () => {
     db.prepare(`UPDATE conversations SET archived_at = ? WHERE name = ?`).run('2026-05-23T02:00:00.000Z', 'enriched-archived');
 
     const response = await handleArchivedConversationsList();
-    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+    const rows = decodeArchiveResult(response) as Array<Record<string, unknown>>;
 
-    expect(response.status).toBe(200);
+    expect(archiveResultStatus(response)).toBe(200);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       conversationName: 'enriched-archived',
@@ -1215,7 +1227,7 @@ describe('conversations route — DB integration', () => {
   it('returns the discovered jsonlPath for archived non-Claude conversations after discovery', async () => {
     const { createConversation, archiveConversation } = await import('../../../../lib/overdeck/conversations.js');
     const { upsertDiscoveredSession } = await import('../../../../lib/overdeck/discovered-sessions.js');
-    const { handleArchivedConversationsList } = await import('../conversations.js');
+    const { handleArchivedConversationsList } = await import('../../../../lib/overdeck/conversation-archive.js');
 
     createConversation({
       name: 'codex-archived',
@@ -1235,9 +1247,9 @@ describe('conversations route — DB integration', () => {
     archiveConversation('codex-archived');
 
     const response = await handleArchivedConversationsList();
-    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+    const rows = decodeArchiveResult(response) as Array<Record<string, unknown>>;
 
-    expect(response.status).toBe(200);
+    expect(archiveResultStatus(response)).toBe(200);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       conversationName: 'codex-archived',
@@ -1308,14 +1320,14 @@ describe('conversations route — DB integration', () => {
 
   it('excludes non-archived conversations from the archived list', async () => {
     const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleArchivedConversationsList } = await import('../conversations.js');
+    const { handleArchivedConversationsList } = await import('../../../../lib/overdeck/conversation-archive.js');
 
     createConversation({ name: 'not-archived', tmuxSession: 'conv-not-archived', cwd: '/cwd' });
 
     const response = await handleArchivedConversationsList();
-    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+    const rows = decodeArchiveResult(response) as Array<Record<string, unknown>>;
 
-    expect(response.status).toBe(200);
+    expect(archiveResultStatus(response)).toBe(200);
     expect(rows).toEqual([]);
   });
 
@@ -1580,18 +1592,18 @@ describe('validateOrigin', () => {
 
 describe('transformMessageForHarness (PAN-1535)', () => {
   it('passes claude-code messages through unchanged', async () => {
-    const { transformMessageForHarness } = await import('../conversations.js');
+    const { transformMessageForHarness } = await import('../../../../lib/overdeck/conversation-message.js');
     const message = '@/home/u/.overdeck/conversation-attachments/c1/abc.png\nhello';
     expect(transformMessageForHarness(message, 'claude-code', ['/home/u/.overdeck/conversation-attachments/c1/abc.png'])).toBe(message);
   });
 
   it('passes through unchanged when there are no managed paths', async () => {
-    const { transformMessageForHarness } = await import('../conversations.js');
+    const { transformMessageForHarness } = await import('../../../../lib/overdeck/conversation-message.js');
     expect(transformMessageForHarness('hello', 'pi', [])).toBe('hello');
   });
 
   it('rewrites pi messages to an explicit Read-tool instruction', async () => {
-    const { transformMessageForHarness } = await import('../conversations.js');
+    const { transformMessageForHarness } = await import('../../../../lib/overdeck/conversation-message.js');
     const path = '/home/u/.overdeck/conversation-attachments/c1/abc.png';
     const out = transformMessageForHarness(`@${path}\nwhat is this?`, 'pi', [path]);
     expect(out).toContain('Read tool');
@@ -1601,7 +1613,7 @@ describe('transformMessageForHarness (PAN-1535)', () => {
   });
 
   it('handles empty user text by switching to a describe-what-you-see prompt', async () => {
-    const { transformMessageForHarness } = await import('../conversations.js');
+    const { transformMessageForHarness } = await import('../../../../lib/overdeck/conversation-message.js');
     const path = '/home/u/.overdeck/conversation-attachments/c1/abc.png';
     const out = transformMessageForHarness(`@${path}`, 'pi', [path]);
     expect(out).toContain('describe what you see');
@@ -1610,7 +1622,7 @@ describe('transformMessageForHarness (PAN-1535)', () => {
   });
 
   it('handles multiple managed attachments', async () => {
-    const { transformMessageForHarness } = await import('../conversations.js');
+    const { transformMessageForHarness } = await import('../../../../lib/overdeck/conversation-message.js');
     const p1 = '/home/u/.overdeck/conversation-attachments/c1/a.png';
     const p2 = '/home/u/.overdeck/conversation-attachments/c1/b.png';
     const out = transformMessageForHarness(`@${p1}\n@${p2}\ncompare`, 'pi', [p1, p2]);
@@ -1622,7 +1634,7 @@ describe('transformMessageForHarness (PAN-1535)', () => {
   });
 
   it('leaves unmanaged @mentions in user prose alone', async () => {
-    const { transformMessageForHarness } = await import('../conversations.js');
+    const { transformMessageForHarness } = await import('../../../../lib/overdeck/conversation-message.js');
     const managed = '/home/u/.overdeck/conversation-attachments/c1/a.png';
     const unmanaged = '/etc/passwd';
     const out = transformMessageForHarness(`@${managed}\nalso look at @${unmanaged} please`, 'pi', [managed]);
@@ -1631,7 +1643,7 @@ describe('transformMessageForHarness (PAN-1535)', () => {
   });
 
   it('escapes regex metacharacters in attachment paths', async () => {
-    const { transformMessageForHarness } = await import('../conversations.js');
+    const { transformMessageForHarness } = await import('../../../../lib/overdeck/conversation-message.js');
     // Paths can legitimately contain `.` and other regex metacharacters
     const path = '/home/u/.overdeck/conversation-attachments/c1/file.with.dots.png';
     const out = transformMessageForHarness(`@${path}\nhi`, 'pi', [path]);

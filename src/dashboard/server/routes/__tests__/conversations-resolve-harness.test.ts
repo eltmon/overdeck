@@ -6,7 +6,7 @@ vi.mock('../../../../lib/harness-resolve.js', () => ({
   resolveHarness: resolveHarnessMock,
 }));
 
-import { resolveAllowedHarness } from '../conversations.js';
+import { resolveAllowedHarness } from '../../../../lib/overdeck/conversation-runtime.js';
 
 describe('resolveAllowedHarness (PAN-1842)', () => {
   it('returns claude-code when no model is provided', async () => {

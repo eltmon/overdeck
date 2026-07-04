@@ -37,7 +37,7 @@ vi.mock('../../../../../src/lib/overdeck/conversations.js', async () => {
 });
 
 const { handleForkPipelineFailure } = await import(
-  '../../../../../src/dashboard/server/routes/conversations.js'
+  '../../../../../src/lib/overdeck/conversation-forks.js'
 );
 const {
   updateForkStatus,
