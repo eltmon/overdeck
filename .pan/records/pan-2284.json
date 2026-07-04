@@ -92,6 +92,11 @@
       "reason": "feedback",
       "note": "[2026-07-04T20:05Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-04T20:05:31.781Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T20:09:07.097Z"
     }
   ],
   "feedback": [
@@ -152,20 +157,20 @@
     "recordedAt": "2026-07-04T20:02:30.686Z"
   },
   "created": "2026-07-03T11:01:31.556Z",
-  "updated": "2026-07-04T20:05:31.781Z",
+  "updated": "2026-07-04T20:09:11.001Z",
   "pipeline": {
     "issueId": "PAN-2284",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T20:05:23.306Z",
-    "reviewNotes": "FR-4 remains unmet: handleAgentStoppedEvent still does not consume the shared classifier",
+    "updatedAt": "2026-07-04T20:09:10.950Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "workspace-vawme passes: current code returns resumed/skipped/deferred, boot-reconciliation endpoints pass skipped/deferred, and pan-871 tests read result.resumed with candidate-filtered mocks.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2365",
-    "lastVerifiedCommit": "3e2e9434152bb7fa8bcf3fab918b4b7241be9c6d",
+    "lastVerifiedCommit": "ee658a35c7478c44d73e032feaee4e0770e3a5b0",
     "reviewRequestedAt": "2026-07-04T20:02:40.400Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -267,7 +272,7 @@
       },
       "costAtCloseOut": {
         "usd": 22.67995,
-        "pricingAsOf": "2026-07-04T20:05:23.334Z"
+        "pricingAsOf": "2026-07-04T20:09:10.998Z"
       }
     },
     "merges": [
