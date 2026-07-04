@@ -12,7 +12,7 @@ import {
 import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
 import { listProjectsSync, resolveProjectFromIssueSync, type ResolvedProject } from '../../../lib/projects.js';
 import { listSessionNames } from '../../../lib/tmux.js';
-import { getReviewStatusSync } from '../review-status.js';
+import { loadReadyForMergeFlags } from '../review-status.js';
 import { getGitHubConfig } from './tracker-config.js';
 import { resolveAgentGitInfo } from './git-info.js';
 import { parseIssueIdFromTextSync } from '../../../lib/resource-utils.js';
@@ -241,11 +241,28 @@ function hasRecentActivity(lastActivity: number | null): boolean {
 }
 
 function isLiveResource(issue: MutableResourceIssue): boolean {
-  return issue.resourceDetails.tmuxSessions.length > 0
+  return issue.resourceDetails.remoteAgent !== null
+    || issue.resourceDetails.tmuxSessions.length > 0
     || issue.resourceDetails.dockerContainers.length > 0
-    || issue.resourceDetails.prs.length > 0
-    || issue.agentStatus === 'active'
-    || hasRecentActivity(issue.lastActivity);
+    || hasOpenPr(issue);
+}
+
+function isActiveTrackerState(state: string | null): boolean {
+  return state === 'in_progress' || state === 'in_review' || state === 'started';
+}
+
+function isTerminalTrackerState(state: string | null): boolean {
+  return state === 'closed' || state === 'done' || state === 'canceled' || state === 'completed';
+}
+
+function hasOpenPr(issue: MutableResourceIssue): boolean {
+  return issue.resourceDetails.prs.some((pr) => pr.state === 'OPEN' || pr.state === 'open');
+}
+
+function shouldLoadReviewStatus(issue: MutableResourceIssue): boolean {
+  return issue.resourceSources.size > 0
+    && (!isTerminalTrackerState(issue.trackerState) || hasOpenPr(issue))
+    && (isLiveResource(issue) || (isActiveTrackerState(issue.trackerState) && issue.branch != null));
 }
 
 /**
@@ -454,7 +471,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
       hasState: false,
       isShadow: false,
       agentStatus: null,
-      readyForMerge: getReviewStatusSync(upper)?.readyForMerge ?? false,
+      readyForMerge: false,
       lastActivity: null,
       resourceSources: new Set<ResourceSource>(),
       resourceDetails: {
@@ -620,6 +637,16 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
     issue.lastActivity = Number.isFinite(lastActivity) ? lastActivity : null;
   }));
 
+  const reviewStatusIssueIds = [...issueMap.values()]
+    .filter(shouldLoadReviewStatus)
+    .map((issue) => issue.issueId);
+  if (reviewStatusIssueIds.length > 0) {
+    const readyForMergeFlags = loadReadyForMergeFlags(reviewStatusIssueIds);
+    for (const issue of issueMap.values()) {
+      issue.readyForMerge = readyForMergeFlags.get(issue.issueId) ?? false;
+    }
+  }
+
   // PRD acceptance (PAN-862): the tree shows ONLY issues with real in-flight work.
   // PAN-1966 (durable-signal membership): an active tracker LABEL is NOT sufficient
   // on its own — labels drift (an issue can stay `in-progress`/`in-review` after its
@@ -629,26 +656,9 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
   // live runtime resource (tmux / docker / open PR / remote agent). A branch or
   // workspace dir alone (no active label, no live resource) is merged-issue debris
   // and stays excluded.
-  const isActiveTrackerState = (state: string | null): boolean =>
-    state === 'in_progress' || state === 'in_review' || state === 'started';
-
   // PAN-2054: a CLOSED/done/canceled issue is terminal — the operator (or close-out)
   // has declared it finished. Any workspace, feature branch, or *paused* work-agent
   // tmux session left behind is stale close-out residue, not active pipeline work.
-  const isTerminalTrackerState = (state: string | null): boolean =>
-    state === 'closed' || state === 'done' || state === 'canceled' || state === 'completed';
-
-  const hasOpenPr = (issue: MutableResourceIssue): boolean =>
-    issue.resourceDetails.prs.some((pr) => pr.state === 'OPEN' || pr.state === 'open');
-
-  const isLiveResource = (issue: MutableResourceIssue): boolean => {
-    if (issue.resourceDetails.remoteAgent) return true;
-    if (issue.resourceDetails.tmuxSessions.length > 0) return true;
-    if (issue.resourceDetails.dockerContainers.length > 0) return true;
-    if (issue.resourceDetails.prs.some((pr) => pr.state === 'OPEN' || pr.state === 'open')) return true;
-    return false;
-  };
-
   const discoveredIssues = [...issueMap.values()]
     .filter((issue) => issue.resourceSources.size > 0)
     // PAN-2054: drop terminal (closed/done/canceled) issues from the active resource

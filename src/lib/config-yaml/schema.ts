@@ -374,6 +374,11 @@ export interface ResourcesConfig {
   agent_block_count?: number;
 }
 
+export interface IssuesConfig {
+  /** Days of recently updated closed GitHub issues to fetch. */
+  closed_window_days?: number;
+}
+
 /**
  * Complete configuration structure (YAML schema)
  */
@@ -495,6 +500,9 @@ export interface YamlConfig {
 
   /** Resource thresholds for dashboard health + spawn guardrails */
   resources?: ResourcesConfig;
+
+  /** Dashboard issue-fetch behavior */
+  issues?: IssuesConfig;
 
   /** Experimental, opt-in features. Each flag is research-preview and may be removed. */
   experimental?: ExperimentalConfig;
@@ -781,6 +789,11 @@ export interface NormalizedConfig {
     memoryBlockGb: number;
     agentWarnCount: number;
     agentBlockCount: number;
+  };
+
+  /** Dashboard issue-fetch behavior, normalised (always defined). */
+  issues: {
+    closedWindowDays: number;
   };
 
   /** Experimental flag values, normalised (always defined, never undefined). */

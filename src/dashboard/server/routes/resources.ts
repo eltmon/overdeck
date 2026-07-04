@@ -24,7 +24,7 @@ import { DockerStatsCollector } from '../../../lib/docker-stats.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { httpHandler } from './http-handler.js';
 import { listAgentStates, type AgentState } from '../../../lib/agents.js';
-import { listSessionsSync } from '../../../lib/tmux.js';
+import { listSessions } from '../../../lib/tmux.js';
 
 const execAsync = promisify(exec);
 
@@ -64,7 +64,10 @@ export function getResourcesEffect(): Effect.Effect<ReturnType<typeof jsonRespon
 
     // PAN-1908: authoritative agent registry is the SQLite agents table.
     // Read active agent states from the table and cross-check tmux liveness.
-    const tmuxSessionNames = new Set(listSessionsSync().map(s => s.name));
+    const sessions = yield* listSessions().pipe(
+      Effect.catch(() => Effect.succeed([])),
+    );
+    const tmuxSessionNames = new Set(sessions.map(s => s.name));
     const agents: Record<string, unknown>[] = listAgentStates()
       .filter((state: AgentState) => state.status !== 'stopped')
       .map((state: AgentState) => ({

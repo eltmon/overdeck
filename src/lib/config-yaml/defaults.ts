@@ -178,6 +178,9 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     agentWarnCount: 8,
     agentBlockCount: 10,
   },
+  issues: {
+    closedWindowDays: 14,
+  },
   experimental: {
     experimentalFeatures: false,
     claudeCodeChannels: false,
