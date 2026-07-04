@@ -82,9 +82,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T23:31:29.101Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-04T00:54Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-07-04T00:54:45.981Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-07-04T00:54:45Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-2318 (attempt 1/3):\n\nFailed check: sync-target-branch\n\nSync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - scripts/file-size-baseline.txt\n\n## REQUIRED: Resolve merge conflicts BEFORE resubmitting\n\n1. Run: `git fetch origin main && git merge origin/main`\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request PAN-2318 -m \"Fixed sync-target-branch\"\n\nDo NOT resubmit until all repos sync cleanly and tests pass."
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".eslintrc.cjs",
@@ -201,18 +214,18 @@
     "recordedAt": "2026-07-03T23:31:19.317Z"
   },
   "created": "2026-07-03T18:47:58.596Z",
-  "updated": "2026-07-03T23:31:29.101Z",
+  "updated": "2026-07-04T00:54:45.996Z",
   "pipeline": {
     "issueId": "PAN-2318",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T23:31:28.975Z",
+    "updatedAt": "2026-07-04T00:54:45.973Z",
     "reviewNotes": "Agent re-review request (5/25): Fixed review issues",
-    "verificationNotes": "Verification FAILED at test (50837ms):\n\ngit\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nerror: option '--test-waived <reason>' argument missing\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| tests/unit/dashboard/metrics-stuck-count.test.ts [ tests/unit/dashboard/metrics-stuck-count.test.ts ]\nError: [vitest] No \"readCloisterStateFile\" export is defined on the \"../../../src/lib/cloister/service.js\" mock. Did you forget to return it from \"vi.mock\"?\nIf you need to partially mock a module, you can use \"importOriginal\" helper inside:\n\nvi.mock(import(\"../../../src/lib/cloister/service.js\"), async (importOriginal) => {\n  const actual = await importOriginal()\n  return {\n    ...actual,\n    // your mocked methods\n  }\n})\n\n ❯ createDeaconSupervisor src/dashboard/server/services/deacon-supervisor.ts:60:39\n     58| export function createDeaconSupervisor(deps: DeaconSupervisorDeps = {}…\n     59|   const forkImpl = deps.fork ?? fork;\n     60|   const readState = deps.readState ?? readCloisterStateFile;\n       |                                       ^\n     61|   const emitActivity = deps.emitActivity ?? emitActivityEntrySync;\n     62|   const now = deps.now ?? Date.now;\n ❯ src/dashboard/server/services/deacon-supervisor.ts:199:27\n ❯ src/dashboard/server/services/cloister-control-surface.ts:19:1\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n",
+    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - scripts/file-size-baseline.txt",
     "inspectNotes": "Spec fidelity PASS: diff implements WI-1 deacon child entry, supervisor, tsdown entry, main spawn/shutdown wiring, and single-deacon lock. Constraint compliance PASS: no new execSync/sync tmux/Bun child path violations; deacon-supervisor tests use fake timers.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2327",
     "lastVerifiedCommit": "354a8b99ed893cc8b57966d4cffa2eb63317037b",
@@ -383,7 +396,7 @@
       },
       "costAtCloseOut": {
         "usd": 7.4635679999999995,
-        "pricingAsOf": "2026-07-03T23:31:29.016Z"
+        "pricingAsOf": "2026-07-04T00:54:45.995Z"
       }
     },
     "merges": [
