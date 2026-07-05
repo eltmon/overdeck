@@ -1,6 +1,7 @@
 import { Route } from 'lucide-react';
-import { type SettingsConfig, type TieredExecutionConfig } from '../types';
+import { type Harness, type SettingsConfig, type TieredExecutionConfig } from '../types';
 import type { SaveStatus } from '../hooks/useAutosavePipeline';
+import { MODELS_BY_PROVIDER } from '../modelCatalog';
 
 interface TieredExecutionSectionProps {
   formData: SettingsConfig;
@@ -10,6 +11,16 @@ interface TieredExecutionSectionProps {
 }
 
 const DIFFICULTIES = ['trivial', 'simple', 'medium', 'complex', 'expert'] as const;
+const HARNESSES: Harness[] = ['claude-code', 'ohmypi', 'codex'];
+const MODEL_OPTIONS = Object.entries(MODELS_BY_PROVIDER).flatMap(([providerId, provider]) =>
+  provider.models.map((model) => ({
+    providerId,
+    providerName: provider.name,
+    id: model.id,
+    name: model.name,
+  })),
+);
+const DEFAULT_MODEL = MODEL_OPTIONS[0]?.id ?? 'claude-haiku-4-5';
 
 function defaultTieredExecution(enabled: boolean): TieredExecutionConfig {
   return {
@@ -48,6 +59,23 @@ function validationReason(config: TieredExecutionConfig | undefined): string | n
   return null;
 }
 
+function inputDifficultyMap(config: TieredExecutionConfig | undefined): Partial<Record<typeof DIFFICULTIES[number], string>> {
+  const result: Partial<Record<typeof DIFFICULTIES[number], string>> = {};
+  for (const [tierName, tier] of Object.entries(config?.tiers ?? {})) {
+    for (const difficulty of tier.difficulties ?? []) {
+      if (DIFFICULTIES.includes(difficulty)) result[difficulty] = result[difficulty] ? 'multiple' : tierName;
+    }
+  }
+  return result;
+}
+
+function nextTierName(config: TieredExecutionConfig | undefined): string {
+  const existing = new Set(Object.keys(config?.tiers ?? {}));
+  let index = existing.size + 1;
+  while (existing.has(`tier-${index}`)) index += 1;
+  return `tier-${index}`;
+}
+
 export function TieredExecutionSection({
   formData,
   saveErrorMessage,
@@ -56,22 +84,100 @@ export function TieredExecutionSection({
 }: TieredExecutionSectionProps) {
   const config = formData.tiered_execution;
   const tiers = Object.entries(config?.tiers ?? {});
-  const difficultyMap = config?.difficultyToTier ?? {};
+  const difficultyMap = inputDifficultyMap(config);
   const byKind = config?.byKind ?? config?.by_kind ?? {};
   const byKindEntries = Object.entries(byKind).filter(([, tierName]) => Boolean(tierName));
   const reason = validationReason(config);
   const enabled = config?.enabled ?? false;
   const resolvedState = enabled && !reason ? 'Enabled' : reason ? 'Invalid' : 'Disabled';
   const serverTieredError = saveErrorMessage?.includes('tiered_execution') ? saveErrorMessage : null;
+  const difficultyError = serverTieredError?.includes('tiered_execution difficulty') ? serverTieredError : null;
 
-  const handleEnabledChange = () => {
+  const updateTieredExecution = (nextConfig: TieredExecutionConfig) => {
     onSettingsChange({
       ...formData,
-      tiered_execution: {
-        ...defaultTieredExecution(!enabled),
-        ...config,
-        enabled: !enabled,
+      tiered_execution: nextConfig,
+    });
+  };
+
+  const currentConfig = (): TieredExecutionConfig => ({
+    ...defaultTieredExecution(enabled),
+    ...config,
+    tiers: { ...(config?.tiers ?? {}) },
+  });
+
+  const handleEnabledChange = () => {
+    updateTieredExecution({
+      ...defaultTieredExecution(!enabled),
+      ...config,
+      enabled: !enabled,
+    });
+  };
+
+  const handleAddTier = () => {
+    const next = currentConfig();
+    const name = nextTierName(next);
+    updateTieredExecution({
+      ...next,
+      tiers: {
+        ...next.tiers,
+        [name]: {
+          model: DEFAULT_MODEL,
+          harness: 'claude-code',
+          difficulties: [],
+        },
       },
+    });
+  };
+
+  const handleRenameTier = (oldName: string, newName: string) => {
+    if (!newName || newName === oldName) return;
+    const next = currentConfig();
+    const { [oldName]: tier, ...rest } = next.tiers;
+    if (!tier) return;
+    updateTieredExecution({
+      ...next,
+      tiers: {
+        ...rest,
+        [newName]: tier,
+      },
+    });
+  };
+
+  const handleTierPatch = (
+    name: string,
+    patch: Partial<TieredExecutionConfig['tiers'][string]>,
+  ) => {
+    const next = currentConfig();
+    const tier = next.tiers[name];
+    if (!tier) return;
+    updateTieredExecution({
+      ...next,
+      tiers: {
+        ...next.tiers,
+        [name]: {
+          ...tier,
+          ...patch,
+        },
+      },
+    });
+  };
+
+  const handleDifficultyToggle = (name: string, difficulty: typeof DIFFICULTIES[number]) => {
+    const tier = config?.tiers?.[name];
+    if (!tier) return;
+    const difficulties = tier.difficulties.includes(difficulty)
+      ? tier.difficulties.filter((entry) => entry !== difficulty)
+      : [...tier.difficulties, difficulty];
+    handleTierPatch(name, { difficulties });
+  };
+
+  const handleRemoveTier = (name: string) => {
+    const next = currentConfig();
+    const { [name]: _removed, ...tiersWithoutRemoved } = next.tiers;
+    updateTieredExecution({
+      ...next,
+      tiers: tiersWithoutRemoved,
     });
   };
 
@@ -148,22 +254,98 @@ export function TieredExecutionSection({
               </div>
             ))}
           </div>
+          {difficultyError && (
+            <p className="mt-3 text-xs text-destructive">{difficultyError}</p>
+          )}
         </div>
 
         <div className="space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm font-medium text-foreground">Tier table</span>
+            <button
+              type="button"
+              onClick={handleAddTier}
+              className="rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted/30"
+            >
+              Add tier
+            </button>
+          </div>
           {tiers.length > 0 ? tiers.map(([name, tier]) => (
             <div key={name} className="px-4 py-3 rounded-lg border border-border/70">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <span className="text-sm font-medium text-foreground">{name}</span>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {tier.difficulties.join(', ') || 'No difficulties'}
-                  </p>
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-foreground">Tier name</span>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(event) => handleRenameTier(name, event.target.value.trim())}
+                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs font-mono text-foreground focus:ring-1 focus:ring-primary"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-foreground">Model</span>
+                  <select
+                    value={tier.model}
+                    onChange={(event) => handleTierPatch(name, { model: event.target.value })}
+                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
+                  >
+                    {!MODEL_OPTIONS.some((model) => model.id === tier.model) && (
+                      <option value={tier.model}>{tier.model}</option>
+                    )}
+                    {Object.entries(MODELS_BY_PROVIDER).map(([providerId, provider]) => (
+                      <optgroup key={providerId} label={provider.name}>
+                        {provider.models.map((model) => (
+                          <option key={model.id} value={model.id}>
+                            {model.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-foreground">Harness</span>
+                  <select
+                    value={tier.harness}
+                    onChange={(event) => handleTierPatch(name, { harness: event.target.value as Harness })}
+                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
+                  >
+                    {HARNESSES.map((harness) => (
+                      <option key={harness} value={harness}>{harness}</option>
+                    ))}
+                  </select>
+                </label>
+                <div className="space-y-1.5">
+                  <span className="text-xs font-medium text-foreground">Difficulties</span>
+                  <div className="flex flex-wrap gap-2">
+                    {DIFFICULTIES.map((difficulty) => (
+                      <label
+                        key={difficulty}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={tier.difficulties.includes(difficulty)}
+                          onChange={() => handleDifficultyToggle(name, difficulty)}
+                          className="h-3.5 w-3.5 accent-primary"
+                        />
+                        {difficulty}
+                      </label>
+                    ))}
+                  </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-xs font-mono text-foreground">{tier.model}</div>
-                  <div className="text-xs text-muted-foreground">{tier.harness}</div>
-                </div>
+              </div>
+              {serverTieredError?.includes(`tiers.${name}`) && (
+                <p className="mt-3 text-xs text-destructive">{serverTieredError}</p>
+              )}
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => handleRemoveTier(name)}
+                  className="rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/30"
+                >
+                  Remove tier
+                </button>
               </div>
             </div>
           )) : (
