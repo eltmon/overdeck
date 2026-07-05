@@ -4,17 +4,17 @@
     "created": "2026-07-05T06:31:07Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2318 (RUN-56 B0 re-plan): supervisor watchdog boot-grace period — the sole un-landed remainder after WI-1…WI-10 verified merged on origin/main",
-    "updated": "2026-07-05T06:35:57.104Z"
+    "updated": "2026-07-05T06:44:53.348Z"
   },
   "plan": {
     "id": "pan-2318",
     "title": "Supervisor watchdog boot-grace period (remainder of PAN-2318 event-loop starvation work)",
-    "status": "proposed",
+    "status": "running",
     "uid": "6eb32c62-87ed-4af0-a43a-05ea6d130494",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-07-05T06:31:07Z",
-    "updated": "2026-07-05T06:35:57.104Z",
+    "updated": "2026-07-05T06:44:53.348Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2318",
@@ -141,5 +141,5 @@
       "canonicalFilename": "2026-07-05-PAN-2318-supervisor-watchdog-boot-grace-period-remainder-of-pan-2318-event-loop-starvation-work.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
