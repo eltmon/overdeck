@@ -105,7 +105,7 @@ export function TieredExecutionSection({
               }`} />
             </button>
             <div className="text-right">
-              <span className={`text-xs font-semibold ${reason ? 'text-destructive' : enabled ? 'text-success' : 'text-muted-foreground'}`}>
+              <span className={`text-xs font-semibold ${reason ? 'text-destructive' : enabled ? 'text-foreground' : 'text-muted-foreground'}`}>
                 {resolvedState}
               </span>
               <p className="text-xs text-muted-foreground mt-0.5">
