@@ -1,91 +1,113 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-07-04T14:06:22.621Z · model: claude-opus-4-8 · open: 535_
+_Last sequenced: 2026-07-05T23:06:31.414459Z · model: zai/glm-5.2 · open: 558_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 6 | PAN-806 | L | critical | needs-refinement |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 7 | PAN-2194 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
+| 9 | PAN-2395 | M | critical | ok |  |  | One invalid tiered_execution enum poisons every config read — live conversations falsely marked ended, resume/new-conversation blocked. |
 | 10 | PAN-2341 | M | critical | ok |  |  | Failed verdict POSTs leave advancing agents zombied, filling the ceiling until the whole pipeline freezes. |
 | 11 | PAN-1560 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 11 | PAN-2318 | L | critical | ok |  |  | Dashboard event-loop starvation makes the UI unusable under load; PRD-backed deacon extraction + active-issue scoping. |
+| 11 | PAN-2367 | M | critical | ok |  |  | Swarm finalizer loops with the closed-issue reaper — spawns review agents for ~20 closed issues every patrol (model-spend leak). |
 | 12 | PAN-2270 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 12 | PAN-2325 | S | critical | ok |  |  | Tracked .pan/test/result.json at a shared path guarantees a merge conflict on EVERY merge — gitignore it. |
+| 12 | PAN-2372 | M | critical | ok |  |  | Swarm slot finishes its beads but never runs pan done — deacon can't converge it; permanent stall in the default nudge mode. |
 | 13 | PAN-2186 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 13 | PAN-2311 | M | critical | ok |  |  | Strike-PR/UAT-batch merges never reconcile per-issue record → done issues stuck 'pending'; adds merge verifier. |
 | 14 | PAN-2179 | M | critical | ok |  |  | Prevents inert agents that look healthy but do no work. |
+| 14 | PAN-2359 | M | critical | ok |  |  | reapMergedStrikeWorkspaces reaps FRESH strike workspaces — a 0-commit branch looks 'merged', dumping the agent onto main mid-spawn. |
 | 15 | PAN-2169 | M | critical | ok |  |  | Prevents inert agents that look healthy but do no work. |
+| 15 | PAN-2363 | M | critical | ok |  |  | gcMergedSlots reaps a just-spawned swarm slot — fresh 0-commit branch classifies as 'merged' before the agent boots. |
+| 16 | PAN-2381 | M | critical | ok |  |  | Three event types missing from the DomainEvent schema union poison the RPC stream — permanent 'Reconnecting…' loop for every tab. |
 | 16 | PAN-2285 | M | critical | ok |  |  | Per-agent codex auth.json rots, wedging agents in a silent 401 token_revoked loop; substrate liveness fix. |
 | 17 | PAN-2108 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
+| 17 | PAN-2360 | M | critical | ok |  |  | Strike kickoff instructs the agent to merge/push main, contradicting roles/strike.md — the PAN-2204 unreviewed-direct-to-main hazard. |
 | 18 | PAN-2336 | M | critical | ok |  |  | create-beads.test CI flake ('table not found: issues') reddens main, blocking the merge gate for every PR. |
 | 19 | PAN-1491 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 20 | PAN-2338 | M | critical | ok |  |  | Boot Reconciliation lists every historical stopped agent; 'Resume all' silently no-ops — gate candidates + report outcomes. |
+| 20 | PAN-2364 | M | high | ok |  |  | Per-slot failure isolation — one failed-merge slot freezes the ENTIRE issue's swarm behind a manual pan swarm recover. |
+| 21 | PAN-2379 | M | high | ok |  |  | Verify gate installs deps warn-only + 60s timeout → false verify failures against empty node_modules, blocking swarm convergence. |
 | 22 | PAN-1830 | M | critical | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 22 | PAN-2292 | M | critical | ok |  |  | Peer-port guard regression crash-loops every post-guard workspace server, cascading host dashboard restart churn. |
 | 23 | PAN-2228 | M | critical | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 23 | PAN-2168 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
+| 23 | PAN-2371 | M | high | ok |  |  | conversation-supervisor-uat.test.ts flake (#create click timeout) blocks the verification gate for unrelated PRs through 3/3 cycles. |
 | 24 | PAN-2323 | M | high | ok |  |  | Flywheel respawn after crash starts a blank session instead of resuming the live rich one — orphans operator direction. |
+| 24 | PAN-1166 | M | high | ok |  |  | Hard prerequisite of the Overdeck Anywhere epic — re-gate /ws/terminal + bind auth before any remote exposure. |
 | 25 | PAN-2307 | M | high | ok |  |  | Respawned flywheel sits idle with no kickoff; stuck-remediation starved when dashboard lifetime < patrol duration. |
 | 26 | PAN-2259 | M | critical | ok |  |  | GitHub quota failures block close, edit, and orchestration paths. |
 | 26 | PAN-2293 | M | high | ok |  |  | Patrol cycles >180s read as stale heartbeat mid-cycle; watchdog kills the dashboard on first observation. |
+| 26 | PAN-2396 | M | high | ok |  |  | --no-resume must be a full quiescence escape hatch — gate sequencer auto-trigger + all autonomous role runs, not just deacon resume. |
 | 27 | PAN-2337 | M | high | ok |  |  | In-place build under a live dashboard breaks new PTY-supervisor spawns until restart — pin artifact + atomic reload. |
+| 27 | PAN-2351 | M | high | ok |  | PAN-1166 | Overdeck Anywhere P0: scoped access tokens + WS/SSE heartbeats — the security prerequisite that blocks ALL remote exposure. |
 | 28 | PAN-2165 | M | critical | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 28 | PAN-2322 | M | high | ok |  |  | Workspace/UAT agent can seize primary :3011 via an override env var — harden the host dashboard-port guard. |
+| 28 | PAN-2375 | M | high | ok |  |  | Tame beads/records auto-commit churn on main — debounce, batch, and auto-push so pan reload never deploys stale, diverged code. |
 | 29 | PAN-807 | L | critical | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 29 | PAN-2331 | S | high | ok |  |  | Codex rate-limit 'switch model?' modal stalls autonomous agents with no auto-dismiss — freezes work. |
+| 29 | PAN-2385 | M | high | ok |  |  | Commit-feed broadcast + subscribe-policy supervisor have no production caller — the Standing Crew's review silently does nothing. |
 | 30 | PAN-2333 | M | high | ok |  |  | Codex weekly-quota exhaustion freezes agents at an unanswerable modal — need resource alert + downshift/pause policy. |
+| 30 | PAN-2373 | M | high | ok |  |  | Flake policy — CI retry semantics, quarantine mechanism, and a non-blocking flake lane so an intermittent test never gates a release. |
 | 31 | PAN-1520 | L | critical | needs-refinement |  |  | Substrate work; improves the foundation required for reliable shipping. |
-| 31 | PAN-2300 | M | high | ok |  |  | pan done --strike fails after squash-merge (ancestry check) + strike kickoff wrongly instructs 'merge to main'. |
+| 31 | PAN-2300 | M | high | ok |  |  | pan done --strike verifies squash-merge via branch ancestry (always fails) — red-main strikes can't complete their handoff. |
+| 31 | PAN-2378 | M | high | ok |  |  | Tiered-execution configuration UI — edit the tier table, global/project enable, per-issue override visibility (operator-priority). |
 | 32 | PAN-1497 | M | critical | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
+| 32 | PAN-2383 | M | high | ok |  |  | Editable per-issue Standing Crew toggle on the issue view — upgrade PAN-2378's read-only chip; first tiered-execution dogfood issue. |
 | 33 | PAN-1650 | L | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
+| 33 | PAN-2387 | M | high | ok |  |  | Costs by Issue topped by a $12.7k UNKNOWN bucket; per-issue total shows $0.00 while model rows sum higher; codex cost misattributed. |
 | 34 | PAN-1557 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
+| 34 | PAN-2388 | M | high | ok |  |  | Deliberate token/cost capture for non-claude-code harnesses — ohmypi and codex as first-class metering citizens. |
 | 35 | PAN-1452 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
+| 35 | PAN-2390 | M | high | ok |  |  | systemd-oomd killed overdeck-tmux-server (all 55 agent processes) under host memory pressure — set ManagedOOMPreference=avoid. |
 | 36 | PAN-804 | L | critical | needs-refinement |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 38 | PAN-1113 | M | high | ok |  |  | Restores conversation/session visibility across non-Claude harnesses. |
 | 40 | PAN-2170 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
+| 40 | PAN-2376 | XL | high | ok | ✓ |  | Epic: CI/CD reliability — flake policy, verify-to-merge convergence, strike/swarm merge hardening, deploy hygiene, review automation. |
 | 40 | PAN-2324 | M | high | ok |  |  | Close-out label transition fails atomically on missing 'in-planning' label — closed issues keep stale labels. |
 | 41 | PAN-2167 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 42 | PAN-2106 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 43 | PAN-1770 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 44 | PAN-1766 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 45 | PAN-2308 | M | high | ok |  | PAN-2292 | Migrate stale generated compose files off PORT=3011 + deacon quarantine for deterministic boot refusals. |
-| 46 | PAN-2294 | M | high | ok |  |  | Notify the flywheel orchestrator on UAT-train promote so it re-derives a clean ready set instead of a stale batch. |
 | 47 | PAN-1416 | M | high | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 47 | PAN-2297 | S | medium | ok |  |  | Auto-lower file-size baseline on the UAT-batch merge path — shrink-then-merge currently reddens main. |
 | 48 | PAN-955 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
-| 48 | PAN-2257 | M | high | ok |  |  | Prevents inert agents that look healthy but do no work. |
-| 49 | PAN-2283 | M | high | ok |  |  | Wires the merged tiered-execution library so operators can actually enable difficulty-routed dispatch (off by default). |
+| 48 | PAN-2377 | M | high | ok |  |  | First-class 'special orders' runs — operator-supplied order book executed with lane semantics (proven manually on RUN-56). |
 | 51 | PAN-2075 | XL | high | ok | ✓ |  | Container; ranks by child impact, not directly pickable. |
-| 52 | PAN-2284 | S | high | ok |  |  | Boot Resume-All shows phantom candidates and reports 0 resumed; filter to truly resumable agents + skip breakdown. |
 | 53 | PAN-2233 | L | high | ok |  |  | Shrinks oversized substrate files so future changes stay tractable. |
 | 54 | PAN-2232 | L | high | ok |  |  | Shrinks oversized substrate files so future changes stay tractable. |
 | 55 | PAN-2229 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
+| 55 | PAN-2391 | M | medium | ok |  |  | Tiered-execution: weighted model distributions per tier — consume multiple subscription plans (gpt-5.5, glm-5.2, kimi-k2.7-code). |
 | 56 | PAN-2190 | L | high | ok |  |  | Shrinks oversized substrate files so future changes stay tractable. |
 | 57 | PAN-2149 | L | high | ok |  |  | Shrinks oversized substrate files so future changes stay tractable. |
-| 59 | PAN-2265 | M | high | ok |  |  | GitHub quota failures block close, edit, and orchestration paths. |
+| 58 | PAN-2386 | M | medium | ok |  |  | pan plan --auto-start always refused on multi-repo workspaces — complete-planning leaves its own dirt behind; refusal is silent. |
 | 60 | PAN-2006 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
+| 60 | PAN-2350 | XL | medium | ok | ✓ |  | Epic: Overdeck Anywhere — remote access, Hermes bridge, mobile, and the shared relay backbone (PRD-backed, phased). |
 | 62 | PAN-933 | M | high | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 63 | PAN-334 | M | high | ok |  |  | Prevents inert agents that look healthy but do no work. |
 | 63 | PAN-2254 | M | high | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 65 | PAN-2080 | M | high | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
+| 65 | PAN-2352 | M | medium | ok |  | PAN-2351 | Overdeck Anywhere P1a: remote dashboard access via Cloudflare Tunnel + Access — the coffee-shop story (operator-only). |
 | 68 | PAN-1207 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 69 | PAN-1198 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
-| 70 | PAN-2145 | XL | high | ok |  |  | Shrinks oversized substrate files so future changes stay tractable. |
+| 70 | PAN-2384 | M | medium | ok |  |  | Agents page crashes to the error boundary — TypeError reading 'replace' in agent-card useMemo during the agent spawn window. |
 | 71 | PAN-1767 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 72 | PAN-2189 | L | high | ok |  |  | Shrinks oversized substrate files so future changes stay tractable. |
 | 73 | PAN-1828 | M | high | ok |  |  | Prevents inert agents that look healthy but do no work. |
 | 75 | PAN-2193 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
+| 75 | PAN-2374 | M | medium | ok |  |  | CodeRabbit integration — opportunistic ingestion of reviews, never gating (structurally non-gating invariants). |
 | 76 | PAN-2095 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 76 | PAN-2255 | M | high | ok |  | PAN-2228 | Routine backlog item; rank reflects current shipping leverage. |
 | 77 | PAN-1618 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 78 | PAN-1209 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
+| 80 | PAN-2353 | M | medium | ok |  | PAN-2351 | Overdeck Anywhere P1b: Hermes external-agent bridge — scoped API over Fly 6PN (first external-service integration). |
 | 81 | PAN-2188 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 84 | PAN-1246 | M | high | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 85 | PAN-1219 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 85 | PAN-1917 | L | high | ok |  |  | Restores conversation/session visibility across non-Claude harnesses. |
+| 85 | PAN-2354 | M | medium | ok |  | PAN-2351 | Overdeck Anywhere P1c: needs-you push notification bridge (ntfy first, Web Push later). |
 | 86 | PAN-1217 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 87 | PAN-813 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
+| 88 | PAN-2358 | M | medium | ok |  |  | Restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition) — affects non-claude harnesses. |
 | 89 | PAN-2202 | L | high | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 90 | PAN-2288 | M | medium | ok |  |  | Lossless auto-migration of dirty-founded tmux servers + boot-time ensure call (PAN-1798 follow-up). |
 | 91 | PAN-1444 | M | high | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
@@ -93,24 +115,28 @@ _Last sequenced: 2026-07-04T14:06:22.621Z · model: claude-opus-4-8 · open: 535
 | 93 | PAN-1436 | M | high | needs-refinement |  |  | Prevents inert agents that look healthy but do no work. |
 | 94 | PAN-262 | M | high | ok |  |  | Shrinks oversized substrate files so future changes stay tractable. |
 | 95 | PAN-2240 | M | high | ok |  |  | Restores conversation/session visibility across non-Claude harnesses. |
+| 95 | PAN-2355 | M | medium | ok |  | PAN-2351, PAN-2352 | Overdeck Anywhere P2: mobile PWA — Needs-You feed, conversation view, pipeline board, Web Push. |
 | 96 | PAN-2207 | M | high | ok |  |  | GitHub quota failures block close, edit, and orchestration paths. |
 | 97 | PAN-1912 | M | high | ok |  |  | Restores conversation/session visibility across non-Claude harnesses. |
 | 98 | PAN-1556 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 99 | PAN-1433 | M | high | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 100 | PAN-1330 | M | high | ok |  |  | Restores conversation/session visibility across non-Claude harnesses. |
 | 100 | PAN-2334 | M | medium | ok |  |  | Write a Definition of Ready + wire it into the pickup gate to catch junk issues before an agent is spawned. |
+| 100 | PAN-2393 | M | medium | ok |  | PAN-2387 | Per-line-item cost + tokens on issue-view tree rows; every Standing Crew member (incl. supervisor) gets its own row. |
 | 101 | PAN-675 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 102 | PAN-629 | M | high | ok |  |  | GitHub quota failures block close, edit, and orchestration paths. |
-| 104 | PAN-2231 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 105 | PAN-2230 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
+| 105 | PAN-2392 | M | medium | ok |  | PAN-2387, PAN-2388, PAN-2385 | Standing Crew cost panel — per-member roster with cost, tokens, verdicts, escalations (mockup included). |
 | 106 | PAN-1454 | L | high | needs-refinement |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 107 | PAN-2059 | XL | high | ok | ✓ |  | Container; ranks by child impact, not directly pickable. |
 | 108 | PAN-1889 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 110 | PAN-1578 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
+| 110 | PAN-2389 | M | medium | ok |  |  | Regenerate the token spend report post-rebrand — backfill cost events from stored JSONL conversations, no legacy DB import. |
 | 111 | PAN-1558 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 112 | PAN-1254 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 113 | PAN-1253 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 114 | PAN-630 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
+| 115 | PAN-2394 | M | medium | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts — 'no saved history'. |
 | 116 | PAN-2079 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 117 | PAN-2078 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 118 | PAN-2077 | L | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
@@ -124,6 +150,7 @@ _Last sequenced: 2026-07-04T14:06:22.621Z · model: claude-opus-4-8 · open: 535
 | 128 | PAN-1913 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 129 | PAN-1544 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 130 | PAN-1525 | L | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
+| 130 | PAN-2356 | M | medium | needs-refinement |  | PAN-2351 | Overdeck Anywhere P3: relay service — outbound-only daemon, GitHub OAuth, push origin, multi-tenant front door (product phase). |
 | 131 | PAN-1504 | M | high | needs-refinement |  |  | Hardens the pipeline paths that ship all other work. |
 | 132 | PAN-1196 | M | high | needs-refinement |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 133 | PAN-1142 | M | high | needs-refinement |  |  | Substrate work; improves the foundation required for reliable shipping. |
@@ -132,7 +159,6 @@ _Last sequenced: 2026-07-04T14:06:22.621Z · model: claude-opus-4-8 · open: 535
 | 136 | PAN-1424 | M | high | needs-refinement |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 137 | PAN-1313 | L | high | needs-refinement |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 138 | PAN-1311 | M | high | needs-refinement |  |  | Substrate work; improves the foundation required for reliable shipping. |
-| 139 | PAN-2253 | M | medium | ok |  | PAN-2252 | Prevents inert agents that look healthy but do no work. |
 | 140 | PAN-2252 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 141 | PAN-1755 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 142 | PAN-1691 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
@@ -163,7 +189,7 @@ _Last sequenced: 2026-07-04T14:06:22.621Z · model: claude-opus-4-8 · open: 535
 | 171 | PAN-1027 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 176 | PAN-886 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 177 | PAN-681 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
-| 178 | PAN-658 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
+| 178 | PAN-658 | M | medium | ok |  | PAN-2356 | Shared Sessions v0 — Phase 4 of Overdeck Anywhere, sequenced after the #2356 relay (plain WSS rooms, WebRTC deferred). |
 | 180 | PAN-324 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 180 | PAN-2319 | S | low | ok |  |  | 'COST LIMIT REACHED for undefined' spams every cycle — fix undefined subject, throttle, configurable default. |
 | 181 | PAN-1122 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
@@ -173,7 +199,6 @@ _Last sequenced: 2026-07-04T14:06:22.621Z · model: claude-opus-4-8 · open: 535
 | 186 | PAN-900 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 187 | PAN-764 | M | medium | ok |  |  | GitHub quota failures block close, edit, and orchestration paths. |
 | 190 | PAN-1234 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
-| 190 | PAN-2086 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 191 | PAN-1232 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 194 | PAN-1837 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 197 | PAN-1643 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
@@ -235,7 +260,6 @@ _Last sequenced: 2026-07-04T14:06:22.621Z · model: claude-opus-4-8 · open: 535
 | 254 | PAN-2210 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 255 | PAN-2209 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 255 | PAN-2344 | M | low | ok |  |  | Rewrite KANBAN-MODEL.md to match the current pipeline phases, gates, and two-door state model. |
-| 256 | PAN-2198 | L | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 257 | PAN-2197 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 259 | PAN-2032 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 260 | PAN-2004 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
@@ -416,7 +440,6 @@ _Last sequenced: 2026-07-04T14:06:22.621Z · model: claude-opus-4-8 · open: 535
 | 454 | PAN-1325 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 455 | PAN-1242 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 457 | PAN-1222 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 458 | PAN-1166 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 459 | PAN-1153 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 460 | PAN-1116 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 461 | PAN-1065 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
@@ -551,6 +574,10 @@ Substrate or architecture work ranks high because stable orchestration is the pr
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
+### PAN-2395 (rank 9)
+
+Live incident (2026-07-05): a YAML boolean-coerced enum threw on every config load, falsely ending a live conversation and blocking resume/creation. Data-corrupting + liveness-killing; critical substrate.
+
 ### PAN-2341 (rank 10)
 
 A transient server bug leaves completed review/test agents holding advancing-ceiling slots forever, freezing all advancement. Self-healing journal reconcile + zombie reap on boot/patrol is a critical liveness fix for the shipping pipeline itself.
@@ -559,33 +586,41 @@ A transient server bug leaves completed review/test agents holding advancing-cei
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
-### PAN-2318 (rank 11)
+### PAN-2367 (rank 11)
 
-Under real load the dashboard reconnect-storms and /api/issues takes seconds, a feedback loop that has been patched 3× without fixing the shape. The PRD-backed fix (extract deacon, invert active-issue filter, purge sync reads) is core substrate; pinned in-review.
+Pinned in-pipeline (merged/verifying on main). Runaway review-agent spawn loop on the production deacon; self-limiting in damage but burns model spend every ~2.4 min until deployed.
 
 ### PAN-2270 (rank 12)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
-### PAN-2325 (rank 12)
+### PAN-2372 (rank 12)
 
-A workspace-local recovery artifact is committed at a fixed shared path, so every feature branch conflicts on it forever. Trivial gitignore fix that unblocks every merge; pinned in-review.
+Root-caused live (RUN-56): classifyDurableReadySlot is unreachable while a slot session is alive, so a clean+ahead slot that forgets pan done strands forever. Blocks the whole multi-agent convergence value prop.
 
 ### PAN-2186 (rank 13)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
-### PAN-2311 (rank 13)
-
-Non-standard merge paths skip record/label/branch reconciliation, leaving 18 genuinely-merged issues stuck pending. Fixing reconciliation + adding a merge-fulfillment verifier restores pipeline truth; labeled critical, pinned in-review.
-
 ### PAN-2179 (rank 14)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
+### PAN-2359 (rank 14)
+
+Destructive silent loss of fresh strike work (observed 2026-07-04): ahead==0 ambiguity eats a just-spawned strike before it commits. Same provably-merged-guard family as PAN-2363.
+
 ### PAN-2169 (rank 15)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
+
+### PAN-2363 (rank 15)
+
+Swarm variant of PAN-2359: every swarm dispatch rolls the dice on a silent destructive reap. Destructive-patrols-need-durable-proof rule; critical.
+
+### PAN-2381 (rank 16)
+
+Operator-facing outage: an unknown event type kills the whole subscription stream incl. heartbeats; every client reconnect-storms. Stream-boundary validation guard + union fix; critical liveness.
 
 ### PAN-2285 (rank 16)
 
@@ -595,6 +630,10 @@ A stale seed-once copy of ~/.codex/auth.json forks the OAuth refresh chain, so r
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
+### PAN-2360 (rank 17)
+
+Observed: a codex strike pushed its fix straight to origin/main. Contract contradiction between kickoff template and strike role; direct-to-main hazard, critical.
+
 ### PAN-2336 (rank 18)
 
 A beads-DB setup race reddens main on unrelated commits; red main empties the merge gate (Mission #1). Deterministic schema provisioning is a substrate reliability fix.
@@ -603,9 +642,13 @@ A beads-DB setup race reddens main on unrelated commits; red main empties the me
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
-### PAN-2338 (rank 20)
+### PAN-2364 (rank 20)
 
-Every dashboard restart shows weeks-old terminal agents as resume candidates and resumes zero with an opaque message. Gating to genuinely-interrupted work + per-agent outcomes + stale-row GC is substrate hygiene; overlaps PAN-2284.
+failedMergeBlock is per-issue not per-slot, so swarm parallelism serializes on the first problem. Hardening follow-up to the landed PAN-2357; high.
+
+### PAN-2379 (rank 21)
+
+Verified live (RUN-56): concurrent bun installs time out, gates run against empty node_modules, deacon re-fails every patrol. False-fail-that-blocks-convergence; high.
 
 ### PAN-1830 (rank 22)
 
@@ -623,9 +666,17 @@ Two-door delivery hardening now has a PRD + needs-handoff; stays critical substr
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
+### PAN-2371 (rank 23)
+
+A timing flake in a blocking UAT exhausted verification cycles for an orthogonal lint change. CI-green-vs-gate-red; high, unblocks the gate.
+
 ### PAN-2323 (rank 24)
 
 A crash-respawned orchestrator reads only resume-session.json (written on graceful pause), so it boots blank and silently abandons the operator's in-flight drain-mode session. Resume-from-live-session fix protects orchestration continuity.
+
+### PAN-1166 (rank 24)
+
+Delta: 2026-07-04 comment makes this the blocking prerequisite of epic PAN-2350 (Phase 0 / PAN-2351 scoped tokens depend on it); bootstrap path already merged, remaining work is the lockdown. Elevated from low to high.
 
 ### PAN-2307 (rank 25)
 
@@ -639,9 +690,17 @@ Substrate or architecture work ranks high because stable orchestration is the pr
 
 PAN-2219 stamped the heartbeat at cycle start but long remediation cycles still exceed the 180s threshold, and stale = immediate restart. Deferral like the health path stops the churn; merged, verifying on main.
 
+### PAN-2396 (rank 26)
+
+During the PAN-2395 incident the sequencer auto-trigger respawned under --no-resume; the operator's emergency hatch is incomplete. High liveness/control fix.
+
 ### PAN-2337 (rank 27)
 
 A mid-flight dist rewrite wounds the running server's spawns with no restart. Boot-pinning the supervisor artifact + atomic staging swap in pan reload closes a real deploy footgun.
+
+### PAN-2351 (rank 27)
+
+Phase 0 of the Overdeck Anywhere epic; blocks every remote-access phase. Scoped tokens + instant revocation + proxy-surviving heartbeats; high security substrate.
 
 ### PAN-2165 (rank 28)
 
@@ -651,6 +710,10 @@ Substrate or architecture work ranks high because stable orchestration is the pr
 
 The peer-port guard has an override that a workspace/UAT agent could set to impersonate the production dashboard. Security hardening of the single-dashboard invariant.
 
+### PAN-2375 (rank 28)
+
+64 state commits/day leaves local main perpetually ahead of origin, so pan reload can ship stale code and mislead audits. High substrate hygiene.
+
 ### PAN-807 (rank 29)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
@@ -659,9 +722,17 @@ Substrate or architecture work ranks high because stable orchestration is the pr
 
 When codex quota runs low, an interactive model-switch modal blocks the agent input loop; many agents froze at once. A narrow launcher/config auto-dismiss is a quick, high-value liveness fix.
 
+### PAN-2385 (rank 29)
+
+Second ignition gap (cf. PAN-2283): broadcastCommit has zero non-test callers; supervisor.subscribe is unreachable with owns_inspection=false. A shipped subsystem's core behavior is inert; high.
+
 ### PAN-2333 (rank 30)
 
 Quota exhaustion currently produces a wall of frozen agents and dead-end NEEDS-YOU cards. A proactive quota resource alert + deliberate downshift/pause policy prevents silent agent freezes; broader than PAN-2331.
+
+### PAN-2373 (rank 30)
+
+Pinned in-pipeline (planned). Foundational CI/CD-epic phase-0 work: retry+quarantine+flake-lane with audited tracking. Unblocks the verification gate class of failures.
 
 ### PAN-1520 (rank 31)
 
@@ -669,23 +740,43 @@ Substrate or architecture work ranks high because stable orchestration is the pr
 
 ### PAN-2300 (rank 31)
 
-Red-main strike fixes can't complete their handoff (branch never an ancestor of a squash-merge) and the kickoff nudges direct-to-main, undermining the no-unreviewed-main invariant. Two focused fixes to the strike completion path.
+Re-scoped under epic PAN-2376 to defect 1 only (squash-merge ancestry check always fails); defect 2 moved to PAN-2360. Strike-completion impact unchanged, rank held.
+
+### PAN-2378 (rank 31)
+
+Pinned in-pipeline (merged/verifying). Operator-designated must-land-before-RUN-56; the editable Settings surface over PAN-2283's wiring.
 
 ### PAN-1497 (rank 32)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
+### PAN-2383 (rank 32)
+
+Pinned in-pipeline (in-progress). First Standing-Crew test-drive; the write-door design (plan.metadata immutability) is the hard bead. High.
+
 ### PAN-1650 (rank 33)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
+
+### PAN-2387 (rank 33)
+
+Pinned in-pipeline (planned). The cost-transparency page undermines its own story; three aggregation/parser defects. Tiered-execution makes per-issue cost the pitch, so $0 tiers are product-level failure; high.
 
 ### PAN-1557 (rank 34)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
+### PAN-2388 (rank 34)
+
+Pinned in-pipeline (planned). Cost capture was Claude-Code-only; the other two shipped harnesses were never designed into metering. Multi-harness is now the normal case; high.
+
 ### PAN-1452 (rank 35)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
+
+### PAN-2390 (rank 35)
+
+A host-wide memory spike mass-killed every agent session; narrow infra fix (one systemd-run property) with a clear evidence trail. High resilience.
 
 ### PAN-804 (rank 36)
 
@@ -698,6 +789,10 @@ Top-tier item because it has near-term operator value and a clear path to verifi
 ### PAN-2170 (rank 40)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
+
+### PAN-2376 (rank 40)
+
+Substrate epic (labeled substrate-improvement). The RUN-55/56 drains proved delivery machinery is the bottleneck; its children are the critical strike/swarm/flake/verify work ranked high above. Container — not directly pickable.
 
 ### PAN-2324 (rank 40)
 
@@ -723,10 +818,6 @@ Substrate or architecture work ranks high because stable orchestration is the pr
 
 Follow-up hardening to PAN-2292: live workspaces still carry PORT=3011, and the deacon burns restart attempts on deterministic ServerConfig refusals. Migration pass + quarantine stop the churn.
 
-### PAN-2294 (rank 46)
-
-Without an immediate signal the reconciler rebuilds a not-ready, merge-clickable batch from a stale snapshot. Notifying the orchestrator to re-run Observe→Act on promote closes the gap; in-progress.
-
 ### PAN-1416 (rank 47)
 
 Top-tier item because it has near-term operator value and a clear path to verification.
@@ -739,21 +830,13 @@ The PAN-2227 baseline auto-lowering doesn't fire on UAT-batch merges, so a shrun
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
-### PAN-2257 (rank 48)
+### PAN-2377 (rank 48)
 
-The changed body clarifies troubled agents silently queue operator messages, raising its impact as a delivery-loss UI fix.
-
-### PAN-2283 (rank 49)
-
-PAN-1791/PAN-2222 merged the full tiered-execution library but never landed the config-load, dispatch-threading, or settings wiring, so no operator can turn it on. This ignition work makes an entire shipped subsystem reachable behind two explicit opt-in doors. In-pipeline (planning), so pinned at gate=auto.
+Pattern proven manually; makes campaign orchestration mechanical (lane enforcement, pickup-gate release) instead of prose the model must honor. Strategic substrate; high.
 
 ### PAN-2075 (rank 51)
 
 Epic container score is derived from open child issues; it is not directly pickable.
-
-### PAN-2284 (rank 52)
-
-Boot reconciliation lists 39 candidates but resumes 0 because it does not apply the resumability predicates the resume path enforces, so the modal reads as a broken button and buries the 1-2 genuinely resumable agents. Sharing the skip checks and returning a skip breakdown restores a trustworthy boot-recovery UX, adjacent to the PAN-2075 reconciliation epic.
 
 ### PAN-2233 (rank 53)
 
@@ -767,6 +850,10 @@ Substrate or architecture work ranks high because stable orchestration is the pr
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
+### PAN-2391 (rank 55)
+
+Operator requirement to use up several plans rather than pinning one model per tier; deterministic selection (replay-safe). Medium, extends the shipped tier table.
+
 ### PAN-2190 (rank 56)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
@@ -775,13 +862,17 @@ Substrate or architecture work ranks high because stable orchestration is the pr
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
-### PAN-2265 (rank 59)
+### PAN-2386 (rank 58)
 
-Top-tier item because it has near-term operator value and a clear path to verification.
+Structural impossibility for multi-repo projects: post-commit record modification + untracked sub-repo dirs trip the dirty guard, and the refusal is buried in lifecycle.log. Medium; unblocks the auto-start flow.
 
 ### PAN-2006 (rank 60)
 
 Top-tier item because it has near-term operator value and a clear path to verification.
+
+### PAN-2350 (rank 60)
+
+Strategic feature epic unifying four remote-access dreams behind three primitives (reachability, identity, remote-safe API). Children are phased; P0 (security) ranks high on its own merit. Container — not directly pickable.
 
 ### PAN-933 (rank 62)
 
@@ -795,62 +886,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
 
 Top-tier item because it has near-term operator value and a clear path to verification.
 
-### PAN-2080 (rank 65)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-1207 (rank 68)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-1198 (rank 69)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-2145 (rank 70)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-1767 (rank 71)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-2189 (rank 72)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-1828 (rank 73)
-
-Top-tier item because it has near-term operator value and a clear path to verification.
-
-### PAN-2193 (rank 75)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-2095 (rank 76)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-2255 (rank 76)
-
-Top-tier item because it has near-term operator value and a clear path to verification.
-
-### PAN-1618 (rank 77)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-1209 (rank 78)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-2188 (rank 81)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-1917 (rank 85)
-
-The body is a UX/data-page redesign with a PRD, but it remains behind the underlying multi-harness transcript pipeline.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -858,10 +893,10 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-07-04T14:06:22.621Z",
-  "model": "claude-opus-4-8",
+  "generatedAt": "2026-07-05T23:06:31.414459Z",
+  "model": "zai/glm-5.2",
   "pass": "incremental",
-  "openCount": 535,
+  "openCount": 558,
   "nodes": [
     {
       "issue": "PAN-806",
@@ -890,6 +925,32 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
+      "issue": "PAN-2395",
+      "rank": 9,
+      "size": "M",
+      "importance": "critical",
+      "score": 96,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "One invalid tiered_execution enum poisons every config read — live conversations falsely marked ended, resume/new-conversation blocked.",
+      "rationale": "Live incident (2026-07-05): a YAML boolean-coerced enum threw on every config load, falsely ending a live conversation and blocking resume/creation. Data-corrupting + liveness-killing; critical substrate.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2341",
+      "rank": 10,
+      "size": "M",
+      "importance": "critical",
+      "score": 97,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Failed verdict POSTs leave advancing agents zombied, filling the ceiling until the whole pipeline freezes.",
+      "rationale": "A transient server bug leaves completed review/test agents holding advancing-ceiling slots forever, freezing all advancement. Self-healing journal reconcile + zombie reap on boot/patrol is a critical liveness fix for the shipping pipeline itself.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1560",
       "rank": 11,
       "size": "M",
@@ -903,6 +964,19 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
+      "issue": "PAN-2367",
+      "rank": 11,
+      "size": "M",
+      "importance": "critical",
+      "score": 95,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Swarm finalizer loops with the closed-issue reaper — spawns review agents for ~20 closed issues every patrol (model-spend leak).",
+      "rationale": "Pinned in-pipeline (merged/verifying on main). Runaway review-agent spawn loop on the production deacon; self-limiting in damage but burns model spend every ~2.4 min until deployed.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2270",
       "rank": 12,
       "size": "M",
@@ -912,6 +986,19 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "dependsOn": [],
       "why": "Hardens the pipeline paths that ship all other work.",
       "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2372",
+      "rank": 12,
+      "size": "M",
+      "importance": "critical",
+      "score": 94,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Swarm slot finishes its beads but never runs pan done — deacon can't converge it; permanent stall in the default nudge mode.",
+      "rationale": "Root-caused live (RUN-56): classifyDurableReadySlot is unreachable while a slot session is alive, so a clean+ahead slot that forgets pan done strands forever. Blocks the whole multi-agent convergence value prop.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -942,6 +1029,19 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
+      "issue": "PAN-2359",
+      "rank": 14,
+      "size": "M",
+      "importance": "critical",
+      "score": 92,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "reapMergedStrikeWorkspaces reaps FRESH strike workspaces — a 0-commit branch looks 'merged', dumping the agent onto main mid-spawn.",
+      "rationale": "Destructive silent loss of fresh strike work (observed 2026-07-04): ahead==0 ambiguity eats a just-spawned strike before it commits. Same provably-merged-guard family as PAN-2363.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2169",
       "rank": 15,
       "size": "M",
@@ -951,6 +1051,32 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "dependsOn": [],
       "why": "Prevents inert agents that look healthy but do no work.",
       "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2363",
+      "rank": 15,
+      "size": "M",
+      "importance": "critical",
+      "score": 91,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "gcMergedSlots reaps a just-spawned swarm slot — fresh 0-commit branch classifies as 'merged' before the agent boots.",
+      "rationale": "Swarm variant of PAN-2359: every swarm dispatch rolls the dice on a silent destructive reap. Destructive-patrols-need-durable-proof rule; critical.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2381",
+      "rank": 16,
+      "size": "M",
+      "importance": "critical",
+      "score": 90,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Three event types missing from the DomainEvent schema union poison the RPC stream — permanent 'Reconnecting…' loop for every tab.",
+      "rationale": "Operator-facing outage: an unknown event type kills the whole subscription stream incl. heartbeats; every client reconnect-storms. Stream-boundary validation guard + union fix; critical liveness.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -981,6 +1107,32 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
+      "issue": "PAN-2360",
+      "rank": 17,
+      "size": "M",
+      "importance": "critical",
+      "score": 89,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Strike kickoff instructs the agent to merge/push main, contradicting roles/strike.md — the PAN-2204 unreviewed-direct-to-main hazard.",
+      "rationale": "Observed: a codex strike pushed its fix straight to origin/main. Contract contradiction between kickoff template and strike role; direct-to-main hazard, critical.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2336",
+      "rank": 18,
+      "size": "M",
+      "importance": "critical",
+      "score": 90,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "create-beads.test CI flake ('table not found: issues') reddens main, blocking the merge gate for every PR.",
+      "rationale": "A beads-DB setup race reddens main on unrelated commits; red main empties the merge gate (Mission #1). Deterministic schema provisioning is a substrate reliability fix.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1491",
       "rank": 19,
       "size": "M",
@@ -994,6 +1146,32 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
+      "issue": "PAN-2364",
+      "rank": 20,
+      "size": "M",
+      "importance": "high",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Per-slot failure isolation — one failed-merge slot freezes the ENTIRE issue's swarm behind a manual pan swarm recover.",
+      "rationale": "failedMergeBlock is per-issue not per-slot, so swarm parallelism serializes on the first problem. Hardening follow-up to the landed PAN-2357; high.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2379",
+      "rank": 21,
+      "size": "M",
+      "importance": "high",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Verify gate installs deps warn-only + 60s timeout → false verify failures against empty node_modules, blocking swarm convergence.",
+      "rationale": "Verified live (RUN-56): concurrent bun installs time out, gates run against empty node_modules, deacon re-fails every patrol. False-fail-that-blocks-convergence; high.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1830",
       "rank": 22,
       "size": "M",
@@ -1003,6 +1181,19 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "dependsOn": [],
       "why": "Prevents workspace servers from impersonating production dashboard.",
       "rationale": "High score reflects direct risk to pipeline progress, operator recovery, or autonomous shipping paths.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2292",
+      "rank": 22,
+      "size": "M",
+      "importance": "critical",
+      "score": 92,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Peer-port guard regression crash-loops every post-guard workspace server, cascading host dashboard restart churn.",
+      "rationale": "A dashboard-identity guard refuses PORT=3011 but the devcontainer template still sets it, so every new workspace server crash-loops by design. Regression fix; merged and verifying on main.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1033,6 +1224,58 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
+      "issue": "PAN-2371",
+      "rank": 23,
+      "size": "M",
+      "importance": "high",
+      "score": 83,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "conversation-supervisor-uat.test.ts flake (#create click timeout) blocks the verification gate for unrelated PRs through 3/3 cycles.",
+      "rationale": "A timing flake in a blocking UAT exhausted verification cycles for an orthogonal lint change. CI-green-vs-gate-red; high, unblocks the gate.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2323",
+      "rank": 24,
+      "size": "M",
+      "importance": "high",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Flywheel respawn after crash starts a blank session instead of resuming the live rich one — orphans operator direction.",
+      "rationale": "A crash-respawned orchestrator reads only resume-session.json (written on graceful pause), so it boots blank and silently abandons the operator's in-flight drain-mode session. Resume-from-live-session fix protects orchestration continuity.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-1166",
+      "rank": 24,
+      "size": "M",
+      "importance": "high",
+      "score": 82,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Hard prerequisite of the Overdeck Anywhere epic — re-gate /ws/terminal + bind auth before any remote exposure.",
+      "rationale": "Delta: 2026-07-04 comment makes this the blocking prerequisite of epic PAN-2350 (Phase 0 / PAN-2351 scoped tokens depend on it); bootstrap path already merged, remaining work is the lockdown. Elevated from low to high.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2307",
+      "rank": 25,
+      "size": "M",
+      "importance": "high",
+      "score": 83,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Respawned flywheel sits idle with no kickoff; stuck-remediation starved when dashboard lifetime < patrol duration.",
+      "rationale": "A respawned orchestrator holds the singleton slot but never gets a tick, and remediation lives at the tail of long patrols killed by watchdog churn. Kickoff-on-respawn + early/independent liveness check; merged, verifying on main.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2259",
       "rank": 26,
       "size": "M",
@@ -1042,6 +1285,60 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "dependsOn": [],
       "why": "GitHub quota failures block close, edit, and orchestration paths.",
       "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2293",
+      "rank": 26,
+      "size": "M",
+      "importance": "high",
+      "score": 83,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Patrol cycles >180s read as stale heartbeat mid-cycle; watchdog kills the dashboard on first observation.",
+      "rationale": "PAN-2219 stamped the heartbeat at cycle start but long remediation cycles still exceed the 180s threshold, and stale = immediate restart. Deferral like the health path stops the churn; merged, verifying on main.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2396",
+      "rank": 26,
+      "size": "M",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "--no-resume must be a full quiescence escape hatch — gate sequencer auto-trigger + all autonomous role runs, not just deacon resume.",
+      "rationale": "During the PAN-2395 incident the sequencer auto-trigger respawned under --no-resume; the operator's emergency hatch is incomplete. High liveness/control fix.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2337",
+      "rank": 27,
+      "size": "M",
+      "importance": "high",
+      "score": 81,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-place build under a live dashboard breaks new PTY-supervisor spawns until restart — pin artifact + atomic reload.",
+      "rationale": "A mid-flight dist rewrite wounds the running server's spawns with no restart. Boot-pinning the supervisor artifact + atomic staging swap in pan reload closes a real deploy footgun.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2351",
+      "rank": 27,
+      "size": "M",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-1166"
+      ],
+      "why": "Overdeck Anywhere P0: scoped access tokens + WS/SSE heartbeats — the security prerequisite that blocks ALL remote exposure.",
+      "rationale": "Phase 0 of the Overdeck Anywhere epic; blocks every remote-access phase. Scoped tokens + instant revocation + proxy-surviving heartbeats; high security substrate.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1059,6 +1356,32 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
+      "issue": "PAN-2322",
+      "rank": 28,
+      "size": "M",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Workspace/UAT agent can seize primary :3011 via an override env var — harden the host dashboard-port guard.",
+      "rationale": "The peer-port guard has an override that a workspace/UAT agent could set to impersonate the production dashboard. Security hardening of the single-dashboard invariant.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2375",
+      "rank": 28,
+      "size": "M",
+      "importance": "high",
+      "score": 79,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Tame beads/records auto-commit churn on main — debounce, batch, and auto-push so pan reload never deploys stale, diverged code.",
+      "rationale": "64 state commits/day leaves local main perpetually ahead of origin, so pan reload can ship stale code and mislead audits. High substrate hygiene.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-807",
       "rank": 29,
       "size": "L",
@@ -1068,6 +1391,58 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "dependsOn": [],
       "why": "Substrate work; improves the foundation required for reliable shipping.",
       "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2331",
+      "rank": 29,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Codex rate-limit 'switch model?' modal stalls autonomous agents with no auto-dismiss — freezes work.",
+      "rationale": "When codex quota runs low, an interactive model-switch modal blocks the agent input loop; many agents froze at once. A narrow launcher/config auto-dismiss is a quick, high-value liveness fix.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2385",
+      "rank": 29,
+      "size": "M",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Commit-feed broadcast + subscribe-policy supervisor have no production caller — the Standing Crew's review silently does nothing.",
+      "rationale": "Second ignition gap (cf. PAN-2283): broadcastCommit has zero non-test callers; supervisor.subscribe is unreachable with owns_inspection=false. A shipped subsystem's core behavior is inert; high.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2333",
+      "rank": 30,
+      "size": "M",
+      "importance": "high",
+      "score": 79,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Codex weekly-quota exhaustion freezes agents at an unanswerable modal — need resource alert + downshift/pause policy.",
+      "rationale": "Quota exhaustion currently produces a wall of frozen agents and dead-end NEEDS-YOU cards. A proactive quota resource alert + deliberate downshift/pause policy prevents silent agent freezes; broader than PAN-2331.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2373",
+      "rank": 30,
+      "size": "M",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Flake policy — CI retry semantics, quarantine mechanism, and a non-blocking flake lane so an intermittent test never gates a release.",
+      "rationale": "Pinned in-pipeline (planned). Foundational CI/CD-epic phase-0 work: retry+quarantine+flake-lane with audited tracking. Unblocks the verification gate class of failures.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1085,6 +1460,32 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "interactive"
     },
     {
+      "issue": "PAN-2300",
+      "rank": 31,
+      "size": "M",
+      "importance": "high",
+      "score": 79,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan done --strike verifies squash-merge via branch ancestry (always fails) — red-main strikes can't complete their handoff.",
+      "rationale": "Re-scoped under epic PAN-2376 to defect 1 only (squash-merge ancestry check always fails); defect 2 moved to PAN-2360. Strike-completion impact unchanged, rank held.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2378",
+      "rank": 31,
+      "size": "M",
+      "importance": "high",
+      "score": 77,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Tiered-execution configuration UI — edit the tier table, global/project enable, per-issue override visibility (operator-priority).",
+      "rationale": "Pinned in-pipeline (merged/verifying). Operator-designated must-land-before-RUN-56; the editable Settings surface over PAN-2283's wiring.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1497",
       "rank": 32,
       "size": "M",
@@ -1094,6 +1495,19 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "dependsOn": [],
       "why": "Prevents workspace servers from impersonating production dashboard.",
       "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2383",
+      "rank": 32,
+      "size": "M",
+      "importance": "high",
+      "score": 77,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Editable per-issue Standing Crew toggle on the issue view — upgrade PAN-2378's read-only chip; first tiered-execution dogfood issue.",
+      "rationale": "Pinned in-pipeline (in-progress). First Standing-Crew test-drive; the write-door design (plan.metadata immutability) is the hard bead. High.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1111,6 +1525,19 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
+      "issue": "PAN-2387",
+      "rank": 33,
+      "size": "M",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Costs by Issue topped by a $12.7k UNKNOWN bucket; per-issue total shows $0.00 while model rows sum higher; codex cost misattributed.",
+      "rationale": "Pinned in-pipeline (planned). The cost-transparency page undermines its own story; three aggregation/parser defects. Tiered-execution makes per-issue cost the pitch, so $0 tiers are product-level failure; high.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1557",
       "rank": 34,
       "size": "M",
@@ -1124,6 +1551,19 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
+      "issue": "PAN-2388",
+      "rank": 34,
+      "size": "M",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Deliberate token/cost capture for non-claude-code harnesses — ohmypi and codex as first-class metering citizens.",
+      "rationale": "Pinned in-pipeline (planned). Cost capture was Claude-Code-only; the other two shipped harnesses were never designed into metering. Multi-harness is now the normal case; high.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1452",
       "rank": 35,
       "size": "M",
@@ -1133,6 +1573,19 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "dependsOn": [],
       "why": "Hardens the pipeline paths that ship all other work.",
       "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2390",
+      "rank": 35,
+      "size": "M",
+      "importance": "high",
+      "score": 75,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "systemd-oomd killed overdeck-tmux-server (all 55 agent processes) under host memory pressure — set ManagedOOMPreference=avoid.",
+      "rationale": "A host-wide memory spike mass-killed every agent session; narrow infra fix (one systemd-run property) with a clear evidence trail. High resilience.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1172,6 +1625,33 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "dependsOn": [],
       "why": "Substrate work; improves the foundation required for reliable shipping.",
       "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2376",
+      "rank": 40,
+      "size": "XL",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Epic: CI/CD reliability — flake policy, verify-to-merge convergence, strike/swarm merge hardening, deploy hygiene, review automation.",
+      "rationale": "Substrate epic (labeled substrate-improvement). The RUN-55/56 drains proved delivery machinery is the bottleneck; its children are the critical strike/swarm/flake/verify work ranked high above. Container — not directly pickable.",
+      "gate": "auto",
+      "planning": "skip",
+      "isEpic": true
+    },
+    {
+      "issue": "PAN-2324",
+      "rank": 40,
+      "size": "M",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Close-out label transition fails atomically on missing 'in-planning' label — closed issues keep stale labels.",
+      "rationale": "A non-idempotent label transition aborts the whole close-out relabel when an expected label is absent, stranding stale in-review/merged labels on closed issues. Make the transition tolerant/atomic.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1228,6 +1708,21 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
+      "issue": "PAN-2308",
+      "rank": 45,
+      "size": "M",
+      "importance": "high",
+      "score": 66,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-2292"
+      ],
+      "why": "Migrate stale generated compose files off PORT=3011 + deacon quarantine for deterministic boot refusals.",
+      "rationale": "Follow-up hardening to PAN-2292: live workspaces still carry PORT=3011, and the deacon burns restart attempts on deterministic ServerConfig refusals. Migration pass + quarantine stop the churn.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1416",
       "rank": 47,
       "size": "M",
@@ -1237,6 +1732,19 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "dependsOn": [],
       "why": "Prevents workspace servers from impersonating production dashboard.",
       "rationale": "Top-tier item because it has near-term operator value and a clear path to verification.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2297",
+      "rank": 47,
+      "size": "S",
+      "importance": "medium",
+      "score": 63,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Auto-lower file-size baseline on the UAT-batch merge path — shrink-then-merge currently reddens main.",
+      "rationale": "The PAN-2227 baseline auto-lowering doesn't fire on UAT-batch merges, so a shrunk file leaves a stale-high baseline that fails lint:file-size on main. Wire the same lowering into the UAT merge/write path; planned.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1254,28 +1762,15 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
-      "issue": "PAN-2283",
-      "rank": 49,
-      "size": "M",
-      "importance": "high",
-      "score": 79,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Wires the merged tiered-execution library so operators can actually enable difficulty-routed dispatch (off by default).",
-      "rationale": "PAN-1791/PAN-2222 merged the full tiered-execution library but never landed the config-load, dispatch-threading, or settings wiring, so no operator can turn it on. This ignition work makes an entire shipped subsystem reachable behind two explicit opt-in doors. In-pipeline (planning), so pinned at gate=auto.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2257",
+      "issue": "PAN-2377",
       "rank": 48,
       "size": "M",
       "importance": "high",
-      "score": 77,
+      "score": 70,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Prevents inert agents that look healthy but do no work.",
-      "rationale": "The changed body clarifies troubled agents silently queue operator messages, raising its impact as a delivery-loss UI fix.",
+      "why": "First-class 'special orders' runs — operator-supplied order book executed with lane semantics (proven manually on RUN-56).",
+      "rationale": "Pattern proven manually; makes campaign orchestration mechanical (lane enforcement, pickup-gate release) instead of prose the model must honor. Strategic substrate; high.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1292,19 +1787,6 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "gate": "auto",
       "planning": "skip",
       "isEpic": true
-    },
-    {
-      "issue": "PAN-2284",
-      "rank": 52,
-      "size": "S",
-      "importance": "high",
-      "score": 75,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Boot Resume-All shows phantom candidates and reports 0 resumed; filter to truly resumable agents + skip breakdown.",
-      "rationale": "Boot reconciliation lists 39 candidates but resumes 0 because it does not apply the resumability predicates the resume path enforces, so the modal reads as a broken button and buries the 1-2 genuinely resumable agents. Sharing the skip checks and returning a skip breakdown restores a trustworthy boot-recovery UX, adjacent to the PAN-2075 reconciliation epic.",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-2233",
@@ -1346,6 +1828,19 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
+      "issue": "PAN-2391",
+      "rank": 55,
+      "size": "M",
+      "importance": "medium",
+      "score": 66,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Tiered-execution: weighted model distributions per tier — consume multiple subscription plans (gpt-5.5, glm-5.2, kimi-k2.7-code).",
+      "rationale": "Operator requirement to use up several plans rather than pinning one model per tier; deterministic selection (replay-safe). Medium, extends the shipped tier table.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2190",
       "rank": 56,
       "size": "L",
@@ -1372,15 +1867,15 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
-      "issue": "PAN-2265",
-      "rank": 59,
+      "issue": "PAN-2386",
+      "rank": 58,
       "size": "M",
-      "importance": "high",
-      "score": 75,
+      "importance": "medium",
+      "score": 64,
       "condition": "ok",
       "dependsOn": [],
-      "why": "GitHub quota failures block close, edit, and orchestration paths.",
-      "rationale": "Top-tier item because it has near-term operator value and a clear path to verification.",
+      "why": "pan plan --auto-start always refused on multi-repo workspaces — complete-planning leaves its own dirt behind; refusal is silent.",
+      "rationale": "Structural impossibility for multi-repo projects: post-commit record modification + untracked sub-repo dirs trip the dirty guard, and the refusal is buried in lifecycle.log. Medium; unblocks the auto-start flow.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1396,6 +1891,20 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "rationale": "Top-tier item because it has near-term operator value and a clear path to verification.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-2350",
+      "rank": 60,
+      "size": "XL",
+      "importance": "medium",
+      "score": 65,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Epic: Overdeck Anywhere — remote access, Hermes bridge, mobile, and the shared relay backbone (PRD-backed, phased).",
+      "rationale": "Strategic feature epic unifying four remote-access dreams behind three primitives (reachability, identity, remote-safe API). Children are phased; P0 (security) ranks high on its own merit. Container — not directly pickable.",
+      "gate": "auto",
+      "planning": "skip",
+      "isEpic": true
     },
     {
       "issue": "PAN-933",
@@ -1424,6 +1933,19 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
+      "issue": "PAN-2254",
+      "rank": 63,
+      "size": "M",
+      "importance": "high",
+      "score": 73,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Bug fix with direct operator or pipeline reliability impact.",
+      "rationale": "Top-tier item because it has near-term operator value and a clear path to verification.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2080",
       "rank": 65,
       "size": "M",
@@ -1437,15 +1959,17 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
-      "issue": "PAN-2254",
-      "rank": 63,
+      "issue": "PAN-2352",
+      "rank": 65,
       "size": "M",
-      "importance": "high",
-      "score": 73,
+      "importance": "medium",
+      "score": 62,
       "condition": "ok",
-      "dependsOn": [],
-      "why": "Bug fix with direct operator or pipeline reliability impact.",
-      "rationale": "Top-tier item because it has near-term operator value and a clear path to verification.",
+      "dependsOn": [
+        "PAN-2351"
+      ],
+      "why": "Overdeck Anywhere P1a: remote dashboard access via Cloudflare Tunnel + Access — the coffee-shop story (operator-only).",
+      "rationale": "Phase 1a, mostly ops/config/docs over the P0 scope model. Medium; delivers the headline remote-access UX.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1476,15 +2000,15 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
-      "issue": "PAN-2145",
+      "issue": "PAN-2384",
       "rank": 70,
-      "size": "XL",
-      "importance": "high",
-      "score": 72,
+      "size": "M",
+      "importance": "medium",
+      "score": 61,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Shrinks oversized substrate files so future changes stay tractable.",
-      "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
+      "why": "Agents page crashes to the error boundary — TypeError reading 'replace' in agent-card useMemo during the agent spawn window.",
+      "rationale": "One partial agent row kills the whole fleet view exactly when the operator looks; nullish-guard + card-level boundary. Medium, narrow fix.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1541,6 +2065,19 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
+      "issue": "PAN-2374",
+      "rank": 75,
+      "size": "M",
+      "importance": "medium",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CodeRabbit integration — opportunistic ingestion of reviews, never gating (structurally non-gating invariants).",
+      "rationale": "Opportunistic external review leveraged when available, structurally impossible to become load-bearing. Medium; no deps, pairs with review automation.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2095",
       "rank": 76,
       "size": "M",
@@ -1550,6 +2087,21 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "dependsOn": [],
       "why": "Substrate work; improves the foundation required for reliable shipping.",
       "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2255",
+      "rank": 76,
+      "size": "M",
+      "importance": "high",
+      "score": 68,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-2228"
+      ],
+      "why": "Routine backlog item; rank reflects current shipping leverage.",
+      "rationale": "Top-tier item because it has near-term operator value and a clear path to verification.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1580,17 +2132,17 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
-      "issue": "PAN-2255",
-      "rank": 76,
+      "issue": "PAN-2353",
+      "rank": 80,
       "size": "M",
-      "importance": "high",
-      "score": 68,
+      "importance": "medium",
+      "score": 58,
       "condition": "ok",
       "dependsOn": [
-        "PAN-2228"
+        "PAN-2351"
       ],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "rationale": "Top-tier item because it has near-term operator value and a clear path to verification.",
+      "why": "Overdeck Anywhere P1b: Hermes external-agent bridge — scoped API over Fly 6PN (first external-service integration).",
+      "rationale": "Phase 1b, greenfield; thin routes over existing doors, no new write paths. Medium.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1632,6 +2184,34 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
+      "issue": "PAN-1917",
+      "rank": 85,
+      "size": "L",
+      "importance": "high",
+      "score": 66,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Restores conversation/session visibility across non-Claude harnesses.",
+      "rationale": "The body is a UX/data-page redesign with a PRD, but it remains behind the underlying multi-harness transcript pipeline.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2354",
+      "rank": 85,
+      "size": "M",
+      "importance": "medium",
+      "score": 57,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-2351"
+      ],
+      "why": "Overdeck Anywhere P1c: needs-you push notification bridge (ntfy first, Web Push later).",
+      "rationale": "Phase 1c; event-store subscriber → ntfy, needs-you only and batched. Medium.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1217",
       "rank": 86,
       "size": "M",
@@ -1656,15 +2236,15 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
-      "issue": "PAN-1917",
-      "rank": 85,
-      "size": "L",
-      "importance": "high",
-      "score": 66,
+      "issue": "PAN-2358",
+      "rank": 88,
+      "size": "M",
+      "importance": "medium",
+      "score": 56,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Restores conversation/session visibility across non-Claude harnesses.",
-      "rationale": "The body is a UX/data-page redesign with a PRD, but it remains behind the underlying multi-harness transcript pipeline.",
+      "why": "Restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition) — affects non-claude harnesses.",
+      "rationale": "A behavior-preserving move silently rewrote the attachment-stripping logic (no escaping/lookbehind); CI green didn't prove preservation. Medium correctness regression for pi/kimi/codex.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1677,6 +2257,19 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "condition": "ok",
       "dependsOn": [],
       "why": "Prevents workspace servers from impersonating production dashboard.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2288",
+      "rank": 90,
+      "size": "M",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Lossless auto-migration of dirty-founded tmux servers + boot-time ensure call (PAN-1798 follow-up).",
+      "rationale": "New foundings land under the managed systemd unit but existing dirty-founded idle servers persist until reboot. Zero-session auto-migration at pan up + a boot-time ensure call finish the managed-tmux transition.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1741,6 +2334,22 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
+      "issue": "PAN-2355",
+      "rank": 95,
+      "size": "M",
+      "importance": "medium",
+      "score": 54,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-2351",
+        "PAN-2352"
+      ],
+      "why": "Overdeck Anywhere P2: mobile PWA — Needs-You feed, conversation view, pipeline board, Web Push.",
+      "rationale": "Phase 2 mobile surface in the existing React codebase; PWA-before-native decision. Medium; large feature.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2207",
       "rank": 96,
       "size": "M",
@@ -1801,6 +2410,34 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
+      "issue": "PAN-2334",
+      "rank": 100,
+      "size": "M",
+      "importance": "medium",
+      "score": 56,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Write a Definition of Ready + wire it into the pickup gate to catch junk issues before an agent is spawned.",
+      "rationale": "Nothing flagged the retired audit-campaign issues as not-ready, so they consumed an agent and slammed the quota wall. A DoR doc + intake scoring is a process substrate improvement that prevents recurrence.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2393",
+      "rank": 100,
+      "size": "M",
+      "importance": "medium",
+      "score": 53,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-2387"
+      ],
+      "why": "Per-line-item cost + tokens on issue-view tree rows; every Standing Crew member (incl. supervisor) gets its own row.",
+      "rationale": "Operator requirement for per-member cost legibility; invariant: sum of line items == issue rollup == Costs page. Medium, depends on PAN-2387 attribution.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-675",
       "rank": 101,
       "size": "M",
@@ -1825,8 +2462,8 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
-      "issue": "PAN-2231",
-      "rank": 104,
+      "issue": "PAN-2230",
+      "rank": 105,
       "size": "M",
       "importance": "high",
       "score": 62,
@@ -1837,14 +2474,19 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
-      "issue": "PAN-2230",
+      "issue": "PAN-2392",
       "rank": 105,
       "size": "M",
-      "importance": "high",
-      "score": 62,
+      "importance": "medium",
+      "score": 52,
       "condition": "ok",
-      "dependsOn": [],
-      "why": "Substrate work; improves the foundation required for reliable shipping.",
+      "dependsOn": [
+        "PAN-2387",
+        "PAN-2388",
+        "PAN-2385"
+      ],
+      "why": "Standing Crew cost panel — per-member roster with cost, tokens, verdicts, escalations (mockup included).",
+      "rationale": "Beautiful UI for tuning tier configs from evidence; mockup is operator-reviewed. Medium; depends on the cost/parser fixes landing first.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1898,6 +2540,19 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
+      "issue": "PAN-2389",
+      "rank": 110,
+      "size": "M",
+      "importance": "medium",
+      "score": 51,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Regenerate the token spend report post-rebrand — backfill cost events from stored JSONL conversations, no legacy DB import.",
+      "rationale": "Pinned in-pipeline (planned). Proves the cache-derivability bet for cost history; read-only backfill + fixes the Pages 404. Medium.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1558",
       "rank": 111,
       "size": "M",
@@ -1942,6 +2597,19 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "condition": "ok",
       "dependsOn": [],
       "why": "Substrate work; improves the foundation required for reliable shipping.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2394",
+      "rank": 115,
+      "size": "M",
+      "importance": "medium",
+      "score": 51,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts — 'no saved history'.",
+      "rationale": "Data-loss incident; the stop-fix + missing-transcript indicator landed on main, but the deacon stale-agent purge is flagged as the next-dangerous auto-deletion path to audit. Medium follow-up.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2102,6 +2770,21 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
+      "issue": "PAN-2356",
+      "rank": 130,
+      "size": "M",
+      "importance": "medium",
+      "score": 48,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-2351"
+      ],
+      "why": "Overdeck Anywhere P3: relay service — outbound-only daemon, GitHub OAuth, push origin, multi-tenant front door (product phase).",
+      "rationale": "Phase 3 product phase (~$2-5/mo) — build when multi-machine/multi-user demand is real, not before; also the substrate for PAN-658. Medium, needs-refinement (cost/infra decisions deferred).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1504",
       "rank": 131,
       "size": "M",
@@ -2196,20 +2879,6 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "why": "Substrate work; improves the foundation required for reliable shipping.",
       "gate": "auto",
       "planning": "interactive"
-    },
-    {
-      "issue": "PAN-2253",
-      "rank": 139,
-      "size": "M",
-      "importance": "medium",
-      "score": 62,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-2252"
-      ],
-      "why": "Prevents inert agents that look healthy but do no work.",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-2252",
@@ -2329,6 +2998,19 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "condition": "ok",
       "dependsOn": [],
       "why": "Prevents workspace servers from impersonating production dashboard.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2287",
+      "rank": 150,
+      "size": "XS",
+      "importance": "low",
+      "score": 44,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Every supervisor.log line is written twice (appendFile + stdio redirect) — misled incident triage.",
+      "rationale": "The launcher redirects stdout to the same file log() appends to, doubling every line and once suggesting a dueling-supervisor. Drop one write path; small cleanup with real triage value.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2570,8 +3252,11 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "importance": "medium",
       "score": 58,
       "condition": "ok",
-      "dependsOn": [],
-      "why": "Prevents workspace servers from impersonating production dashboard.",
+      "dependsOn": [
+        "PAN-2356"
+      ],
+      "why": "Shared Sessions v0 — Phase 4 of Overdeck Anywhere, sequenced after the #2356 relay (plain WSS rooms, WebRTC deferred).",
+      "rationale": "Delta: linked as Phase 4 of epic PAN-2350; transport decision narrowed to plain WSS over the #2356 relay. Large later-phase feature, rank held.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2584,6 +3269,19 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "condition": "ok",
       "dependsOn": [],
       "why": "Hardens the pipeline paths that ship all other work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2319",
+      "rank": 180,
+      "size": "S",
+      "importance": "low",
+      "score": 42,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "'COST LIMIT REACHED for undefined' spams every cycle — fix undefined subject, throttle, configurable default.",
+      "rationale": "A cost-monitor log emits an undefined daily_total subject every cycle. Low-risk noise reduction: fix the subject, throttle the log, consolidate the default.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2684,18 +3382,6 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
-      "issue": "PAN-2086",
-      "rank": 190,
-      "size": "M",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1837",
       "rank": 194,
       "size": "M",
@@ -2752,6 +3438,19 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "condition": "ok",
       "dependsOn": [],
       "why": "Prevents workspace servers from impersonating production dashboard.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2295",
+      "rank": 200,
+      "size": "XL",
+      "importance": "medium",
+      "score": 50,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Built-in web-browser surface (openable like terminal/Codex) + native Agentation integration — needs design.",
+      "rationale": "A large, ambitious feature: a first-class browser panel plus Agentation annotation→agent context wiring. Real product value but needs an embedding-model and security design decision before it is workable.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3332,6 +4031,19 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
+      "issue": "PAN-2347",
+      "rank": 250,
+      "size": "M",
+      "importance": "low",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Refresh AGENT-STATE-PLANES.md into the definitive, source-verified state-storage reference.",
+      "rationale": "Docs-refresh: make the primary agent-state reference accurate against live source (overdeck.db schema, write paths, rebuild commands). Useful but low shipping impact.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2212",
       "rank": 252,
       "size": "M",
@@ -3380,14 +4092,15 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
-      "issue": "PAN-2198",
-      "rank": 256,
-      "size": "L",
-      "importance": "medium",
-      "score": 45,
+      "issue": "PAN-2344",
+      "rank": 255,
+      "size": "M",
+      "importance": "low",
+      "score": 39,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
+      "why": "Rewrite KANBAN-MODEL.md to match the current pipeline phases, gates, and two-door state model.",
+      "rationale": "Docs-refresh of the lifecycle model doc against what the dashboard actually renders. Low shipping impact.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3428,6 +4141,19 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
+      "issue": "PAN-2345",
+      "rank": 260,
+      "size": "S",
+      "importance": "low",
+      "score": 38,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Refresh pan-done.md to document the current done→rebase→push→PR→review chain and verify-on-main pause.",
+      "rationale": "Docs-refresh so a work agent reading pan-done.md gets the real flow; fix the weak MISSION-CONTROL MERGE-button link.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1995",
       "rank": 261,
       "size": "M",
@@ -3448,6 +4174,19 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "condition": "ok",
       "dependsOn": [],
       "why": "Routine backlog item; rank reflects current shipping leverage.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2343",
+      "rank": 262,
+      "size": "S",
+      "importance": "low",
+      "score": 38,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Rewrite MISSION-CONTROL.md against current dashboard architecture and state-label computation.",
+      "rationale": "Docs-refresh: the doc is stale/thin and used panopticon.db naming. Low shipping impact but part of the docs sweep.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3488,6 +4227,19 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
+      "issue": "PAN-2346",
+      "rank": 265,
+      "size": "S",
+      "importance": "low",
+      "score": 37,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Refresh AGENT_TYPES_INDEX.md to cover the current agent-ID patterns and role/ceiling semantics.",
+      "rationale": "Docs-refresh of the agent taxonomy index against src/lib/agents.ts. Low shipping impact.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1967",
       "rank": 266,
       "size": "M",
@@ -3520,6 +4272,21 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "condition": "ok",
       "dependsOn": [],
       "why": "Hardens the pipeline paths that ship all other work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2348",
+      "rank": 268,
+      "size": "S",
+      "importance": "low",
+      "score": 36,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-2347"
+      ],
+      "why": "Migrate still-relevant STATE-STORAGE-AUDIT.md content into living docs, then delete the frozen audit.",
+      "rationale": "Docs-cleanup: capture the ~/.overdeck surface inventory + any uncovered facts into living docs, then remove the noise. Depends on the AGENT-STATE-PLANES refresh.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4908,6 +5675,19 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "planning": "auto"
     },
     {
+      "issue": "PAN-2335",
+      "rank": 400,
+      "size": "M",
+      "importance": "low",
+      "score": 28,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Find-only categorized junk-backlog review document; operator-gated, keep on backlog (do NOT action).",
+      "rationale": "Operator explicitly scoped this to produce a review document only and to stay on the backlog un-planned until they sign off. Gated and not for pickup.",
+      "gate": "blocked",
+      "planning": "skip"
+    },
+    {
       "issue": "PAN-454",
       "rank": 401,
       "size": "M",
@@ -5486,18 +6266,6 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
     {
       "issue": "PAN-1222",
       "rank": 457,
-      "size": "M",
-      "importance": "low",
-      "score": 35,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1166",
-      "rank": 458,
       "size": "M",
       "importance": "low",
       "score": 35,
@@ -6982,413 +7750,6 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "why": "Routine backlog item; rank reflects current shipping leverage.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-2341",
-      "rank": 10,
-      "size": "M",
-      "importance": "critical",
-      "score": 97,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Failed verdict POSTs leave advancing agents zombied, filling the ceiling until the whole pipeline freezes.",
-      "rationale": "A transient server bug leaves completed review/test agents holding advancing-ceiling slots forever, freezing all advancement. Self-healing journal reconcile + zombie reap on boot/patrol is a critical liveness fix for the shipping pipeline itself.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2318",
-      "rank": 11,
-      "size": "L",
-      "importance": "critical",
-      "score": 96,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Dashboard event-loop starvation makes the UI unusable under load; PRD-backed deacon extraction + active-issue scoping.",
-      "rationale": "Under real load the dashboard reconnect-storms and /api/issues takes seconds, a feedback loop that has been patched 3× without fixing the shape. The PRD-backed fix (extract deacon, invert active-issue filter, purge sync reads) is core substrate; pinned in-review.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2325",
-      "rank": 12,
-      "size": "S",
-      "importance": "critical",
-      "score": 96,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Tracked .pan/test/result.json at a shared path guarantees a merge conflict on EVERY merge — gitignore it.",
-      "rationale": "A workspace-local recovery artifact is committed at a fixed shared path, so every feature branch conflicts on it forever. Trivial gitignore fix that unblocks every merge; pinned in-review.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2311",
-      "rank": 13,
-      "size": "M",
-      "importance": "critical",
-      "score": 94,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Strike-PR/UAT-batch merges never reconcile per-issue record → done issues stuck 'pending'; adds merge verifier.",
-      "rationale": "Non-standard merge paths skip record/label/branch reconciliation, leaving 18 genuinely-merged issues stuck pending. Fixing reconciliation + adding a merge-fulfillment verifier restores pipeline truth; labeled critical, pinned in-review.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2336",
-      "rank": 18,
-      "size": "M",
-      "importance": "critical",
-      "score": 90,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "create-beads.test CI flake ('table not found: issues') reddens main, blocking the merge gate for every PR.",
-      "rationale": "A beads-DB setup race reddens main on unrelated commits; red main empties the merge gate (Mission #1). Deterministic schema provisioning is a substrate reliability fix.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2338",
-      "rank": 20,
-      "size": "M",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Boot Reconciliation lists every historical stopped agent; 'Resume all' silently no-ops — gate candidates + report outcomes.",
-      "rationale": "Every dashboard restart shows weeks-old terminal agents as resume candidates and resumes zero with an opaque message. Gating to genuinely-interrupted work + per-agent outcomes + stale-row GC is substrate hygiene; overlaps PAN-2284.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2292",
-      "rank": 22,
-      "size": "M",
-      "importance": "critical",
-      "score": 92,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Peer-port guard regression crash-loops every post-guard workspace server, cascading host dashboard restart churn.",
-      "rationale": "A dashboard-identity guard refuses PORT=3011 but the devcontainer template still sets it, so every new workspace server crash-loops by design. Regression fix; merged and verifying on main.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2323",
-      "rank": 24,
-      "size": "M",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Flywheel respawn after crash starts a blank session instead of resuming the live rich one — orphans operator direction.",
-      "rationale": "A crash-respawned orchestrator reads only resume-session.json (written on graceful pause), so it boots blank and silently abandons the operator's in-flight drain-mode session. Resume-from-live-session fix protects orchestration continuity.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2307",
-      "rank": 25,
-      "size": "M",
-      "importance": "high",
-      "score": 83,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Respawned flywheel sits idle with no kickoff; stuck-remediation starved when dashboard lifetime < patrol duration.",
-      "rationale": "A respawned orchestrator holds the singleton slot but never gets a tick, and remediation lives at the tail of long patrols killed by watchdog churn. Kickoff-on-respawn + early/independent liveness check; merged, verifying on main.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2293",
-      "rank": 26,
-      "size": "M",
-      "importance": "high",
-      "score": 83,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Patrol cycles >180s read as stale heartbeat mid-cycle; watchdog kills the dashboard on first observation.",
-      "rationale": "PAN-2219 stamped the heartbeat at cycle start but long remediation cycles still exceed the 180s threshold, and stale = immediate restart. Deferral like the health path stops the churn; merged, verifying on main.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2337",
-      "rank": 27,
-      "size": "M",
-      "importance": "high",
-      "score": 81,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-place build under a live dashboard breaks new PTY-supervisor spawns until restart — pin artifact + atomic reload.",
-      "rationale": "A mid-flight dist rewrite wounds the running server's spawns with no restart. Boot-pinning the supervisor artifact + atomic staging swap in pan reload closes a real deploy footgun.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2322",
-      "rank": 28,
-      "size": "M",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Workspace/UAT agent can seize primary :3011 via an override env var — harden the host dashboard-port guard.",
-      "rationale": "The peer-port guard has an override that a workspace/UAT agent could set to impersonate the production dashboard. Security hardening of the single-dashboard invariant.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2331",
-      "rank": 29,
-      "size": "S",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Codex rate-limit 'switch model?' modal stalls autonomous agents with no auto-dismiss — freezes work.",
-      "rationale": "When codex quota runs low, an interactive model-switch modal blocks the agent input loop; many agents froze at once. A narrow launcher/config auto-dismiss is a quick, high-value liveness fix.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2333",
-      "rank": 30,
-      "size": "M",
-      "importance": "high",
-      "score": 79,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Codex weekly-quota exhaustion freezes agents at an unanswerable modal — need resource alert + downshift/pause policy.",
-      "rationale": "Quota exhaustion currently produces a wall of frozen agents and dead-end NEEDS-YOU cards. A proactive quota resource alert + deliberate downshift/pause policy prevents silent agent freezes; broader than PAN-2331.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2300",
-      "rank": 31,
-      "size": "M",
-      "importance": "high",
-      "score": 79,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan done --strike fails after squash-merge (ancestry check) + strike kickoff wrongly instructs 'merge to main'.",
-      "rationale": "Red-main strike fixes can't complete their handoff (branch never an ancestor of a squash-merge) and the kickoff nudges direct-to-main, undermining the no-unreviewed-main invariant. Two focused fixes to the strike completion path.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2324",
-      "rank": 40,
-      "size": "M",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Close-out label transition fails atomically on missing 'in-planning' label — closed issues keep stale labels.",
-      "rationale": "A non-idempotent label transition aborts the whole close-out relabel when an expected label is absent, stranding stale in-review/merged labels on closed issues. Make the transition tolerant/atomic.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2308",
-      "rank": 45,
-      "size": "M",
-      "importance": "high",
-      "score": 66,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-2292"
-      ],
-      "why": "Migrate stale generated compose files off PORT=3011 + deacon quarantine for deterministic boot refusals.",
-      "rationale": "Follow-up hardening to PAN-2292: live workspaces still carry PORT=3011, and the deacon burns restart attempts on deterministic ServerConfig refusals. Migration pass + quarantine stop the churn.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2294",
-      "rank": 46,
-      "size": "M",
-      "importance": "high",
-      "score": 66,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Notify the flywheel orchestrator on UAT-train promote so it re-derives a clean ready set instead of a stale batch.",
-      "rationale": "Without an immediate signal the reconciler rebuilds a not-ready, merge-clickable batch from a stale snapshot. Notifying the orchestrator to re-run Observe→Act on promote closes the gap; in-progress.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2297",
-      "rank": 47,
-      "size": "S",
-      "importance": "medium",
-      "score": 63,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Auto-lower file-size baseline on the UAT-batch merge path — shrink-then-merge currently reddens main.",
-      "rationale": "The PAN-2227 baseline auto-lowering doesn't fire on UAT-batch merges, so a shrunk file leaves a stale-high baseline that fails lint:file-size on main. Wire the same lowering into the UAT merge/write path; planned.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2288",
-      "rank": 90,
-      "size": "M",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Lossless auto-migration of dirty-founded tmux servers + boot-time ensure call (PAN-1798 follow-up).",
-      "rationale": "New foundings land under the managed systemd unit but existing dirty-founded idle servers persist until reboot. Zero-session auto-migration at pan up + a boot-time ensure call finish the managed-tmux transition.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2334",
-      "rank": 100,
-      "size": "M",
-      "importance": "medium",
-      "score": 56,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Write a Definition of Ready + wire it into the pickup gate to catch junk issues before an agent is spawned.",
-      "rationale": "Nothing flagged the retired audit-campaign issues as not-ready, so they consumed an agent and slammed the quota wall. A DoR doc + intake scoring is a process substrate improvement that prevents recurrence.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2287",
-      "rank": 150,
-      "size": "XS",
-      "importance": "low",
-      "score": 44,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Every supervisor.log line is written twice (appendFile + stdio redirect) — misled incident triage.",
-      "rationale": "The launcher redirects stdout to the same file log() appends to, doubling every line and once suggesting a dueling-supervisor. Drop one write path; small cleanup with real triage value.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2319",
-      "rank": 180,
-      "size": "S",
-      "importance": "low",
-      "score": 42,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "'COST LIMIT REACHED for undefined' spams every cycle — fix undefined subject, throttle, configurable default.",
-      "rationale": "A cost-monitor log emits an undefined daily_total subject every cycle. Low-risk noise reduction: fix the subject, throttle the log, consolidate the default.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2295",
-      "rank": 200,
-      "size": "XL",
-      "importance": "medium",
-      "score": 50,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Built-in web-browser surface (openable like terminal/Codex) + native Agentation integration — needs design.",
-      "rationale": "A large, ambitious feature: a first-class browser panel plus Agentation annotation→agent context wiring. Real product value but needs an embedding-model and security design decision before it is workable.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2347",
-      "rank": 250,
-      "size": "M",
-      "importance": "low",
-      "score": 40,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Refresh AGENT-STATE-PLANES.md into the definitive, source-verified state-storage reference.",
-      "rationale": "Docs-refresh: make the primary agent-state reference accurate against live source (overdeck.db schema, write paths, rebuild commands). Useful but low shipping impact.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2344",
-      "rank": 255,
-      "size": "M",
-      "importance": "low",
-      "score": 39,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Rewrite KANBAN-MODEL.md to match the current pipeline phases, gates, and two-door state model.",
-      "rationale": "Docs-refresh of the lifecycle model doc against what the dashboard actually renders. Low shipping impact.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2345",
-      "rank": 260,
-      "size": "S",
-      "importance": "low",
-      "score": 38,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Refresh pan-done.md to document the current done→rebase→push→PR→review chain and verify-on-main pause.",
-      "rationale": "Docs-refresh so a work agent reading pan-done.md gets the real flow; fix the weak MISSION-CONTROL MERGE-button link.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2343",
-      "rank": 262,
-      "size": "S",
-      "importance": "low",
-      "score": 38,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Rewrite MISSION-CONTROL.md against current dashboard architecture and state-label computation.",
-      "rationale": "Docs-refresh: the doc is stale/thin and used panopticon.db naming. Low shipping impact but part of the docs sweep.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2346",
-      "rank": 265,
-      "size": "S",
-      "importance": "low",
-      "score": 37,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Refresh AGENT_TYPES_INDEX.md to cover the current agent-ID patterns and role/ceiling semantics.",
-      "rationale": "Docs-refresh of the agent taxonomy index against src/lib/agents.ts. Low shipping impact.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2348",
-      "rank": 268,
-      "size": "S",
-      "importance": "low",
-      "score": 36,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-2347"
-      ],
-      "why": "Migrate still-relevant STATE-STORAGE-AUDIT.md content into living docs, then delete the frozen audit.",
-      "rationale": "Docs-cleanup: capture the ~/.overdeck surface inventory + any uncovered facts into living docs, then remove the noise. Depends on the AGENT-STATE-PLANES refresh.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2335",
-      "rank": 400,
-      "size": "M",
-      "importance": "low",
-      "score": 28,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Find-only categorized junk-backlog review document; operator-gated, keep on backlog (do NOT action).",
-      "rationale": "Operator explicitly scoped this to produce a review document only and to stay on the backlog un-planned until they sign off. Gated and not for pickup.",
-      "gate": "blocked",
-      "planning": "skip"
     }
   ],
   "edges": [
@@ -7429,36 +7790,8 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
     },
     {
       "from": "PAN-2252",
-      "to": "PAN-2253",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.77
-    },
-    {
-      "from": "PAN-2252",
       "to": "PAN-2280",
       "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2257",
-      "to": "PAN-2255",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2259",
-      "to": "PAN-2265",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.84
-    },
-    {
-      "from": "PAN-2280",
-      "to": "PAN-2253",
-      "type": "informs",
       "source": "github-ref",
       "confidence": 1
     },
@@ -7484,20 +7817,6 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "confidence": 0.6
     },
     {
-      "from": "PAN-2284",
-      "to": "PAN-2075",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2284",
-      "to": "PAN-1846",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-2292",
       "to": "PAN-2308",
       "type": "unblocks",
@@ -7519,20 +7838,6 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "confidence": 1
     },
     {
-      "from": "PAN-2338",
-      "to": "PAN-2284",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.85
-    },
-    {
-      "from": "PAN-2318",
-      "to": "PAN-1711",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
-    },
-    {
       "from": "PAN-2323",
       "to": "PAN-2307",
       "type": "informs",
@@ -7547,13 +7852,6 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "confidence": 0.7
     },
     {
-      "from": "PAN-2325",
-      "to": "PAN-2265",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
       "from": "PAN-2322",
       "to": "PAN-2292",
       "type": "informs",
@@ -7566,6 +7864,321 @@ The body is a UX/data-page redesign with a PRD, but it remains behind the underl
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.7
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-2351",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-2352",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-2353",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-2354",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-2355",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-2356",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-658",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2376",
+      "to": "PAN-2373",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2376",
+      "to": "PAN-2371",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2376",
+      "to": "PAN-2207",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2376",
+      "to": "PAN-2341",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2376",
+      "to": "PAN-2167",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2376",
+      "to": "PAN-2359",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2376",
+      "to": "PAN-2363",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2376",
+      "to": "PAN-2360",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2376",
+      "to": "PAN-2300",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2376",
+      "to": "PAN-2270",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2376",
+      "to": "PAN-2372",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2376",
+      "to": "PAN-2364",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2376",
+      "to": "PAN-2095",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2376",
+      "to": "PAN-2375",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2376",
+      "to": "PAN-2374",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2376",
+      "to": "PAN-2229",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2376",
+      "to": "PAN-2230",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2376",
+      "to": "PAN-2297",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-1166",
+      "to": "PAN-2351",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2351",
+      "to": "PAN-2352",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2351",
+      "to": "PAN-2353",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2351",
+      "to": "PAN-2354",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2351",
+      "to": "PAN-2355",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2352",
+      "to": "PAN-2355",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2351",
+      "to": "PAN-2356",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2356",
+      "to": "PAN-658",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2387",
+      "to": "PAN-2393",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2387",
+      "to": "PAN-2392",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2388",
+      "to": "PAN-2392",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2385",
+      "to": "PAN-2392",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2387",
+      "to": "PAN-2389",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2388",
+      "to": "PAN-2389",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2367",
+      "to": "PAN-2372",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.72
+    },
+    {
+      "from": "PAN-2379",
+      "to": "PAN-2372",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-2391",
+      "to": "PAN-2388",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.72
+    },
+    {
+      "from": "PAN-2396",
+      "to": "PAN-2395",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-2359",
+      "to": "PAN-2363",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-2300",
+      "to": "PAN-2360",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.85
     }
   ]
 }
