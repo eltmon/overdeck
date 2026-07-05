@@ -24,6 +24,7 @@ import {
 } from '../projects.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { ReviewMode } from '../config-yaml.js';
+import type { TieredExecutionIssueOverride } from '../agents/tier-table.js';
 import type {
   ContinueBeadsMapping,
   ContinueDecision,
@@ -137,6 +138,11 @@ export interface PanIssueRecord {
   model?: string;
   /** Per-issue review mode override; beats project/global config. */
   reviewMode?: ReviewMode;
+  /**
+   * Per-issue tiered-execution (Standing Crew) override; beats plan-metadata
+   * and global config. Unset means inherit (PAN-2383).
+   */
+  tieredExecutionOverride?: TieredExecutionIssueOverride;
 
   decisions?: ContinueDecision[];
   hazards?: ContinueHazard[];
@@ -611,6 +617,41 @@ export function writeRecordScopeDriftSync(
 ): void {
   const record = ensureIssueRecordSync(project, issueId);
   record.scopeDrift = scopeDrift;
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
+/**
+ * Set (or clear) the per-issue tiered-execution override in the record (sync).
+ * Passing `null`/`undefined` clears the field back to inherit (PAN-2383).
+ */
+export function writeRecordTieredExecutionOverrideSync(
+  project: ProjectConfig,
+  issueId: string,
+  override: TieredExecutionIssueOverride | null | undefined,
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  if (override === null || override === undefined) {
+    delete record.tieredExecutionOverride;
+  } else {
+    record.tieredExecutionOverride = override;
+  }
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
+/** Async variant of writeRecordTieredExecutionOverrideSync (PAN-2383). */
+export async function writeRecordTieredExecutionOverride(
+  project: ProjectConfig,
+  issueId: string,
+  override: TieredExecutionIssueOverride | null | undefined,
+): Promise<void> {
+  const record = await ensureIssueRecord(project, issueId);
+  if (override === null || override === undefined) {
+    delete record.tieredExecutionOverride;
+  } else {
+    record.tieredExecutionOverride = override;
+  }
   const recordPath = writeIssueRecordSync(project, issueId, record);
   queueIssueRecordCommit(project, issueId, recordPath);
 }
