@@ -33,14 +33,25 @@ mechanics are binding. Where this brief and the master plan disagree, the master
 
 ## This run
 
-- **START GATE (operator-directed 2026-07-04, do not dispatch past it):** no order-book
-  dispatch (`pan plan` / `pan start` for any Lane A or B item) until BOTH hold: (1) the
-  v0.42.0 release is verifiably published (Release workflow green, GitHub Release exists,
-  npm packages at 0.42.0) — if the workflow goes red, escalate to the operator, never
-  fix-forward into a release; and (2) the pipeline is fully clear — inherited swarms
-  dispositioned, their sessions gone, no other agents in flight. The inherited-cleanup
-  work below proceeds immediately; it is what clears the table. Report when the gate
-  opens and you begin A1/B1.
+- **START GATE 1 — clean table (operator-directed 2026-07-04):** nothing dispatches until
+  BOTH hold: (1) the v0.42.0 release is verifiably published (Release workflow green,
+  GitHub Release exists, npm packages at 0.42.0) — if the workflow goes red, escalate to
+  the operator, never fix-forward into a release; and (2) the pipeline is fully clear —
+  inherited swarms dispositioned, their sessions gone, no other agents in flight. The
+  inherited-cleanup work below proceeds immediately; it is what clears the table.
+- **PRELUDE — tiered execution ships first (operator-directed 2026-07-04):** once Gate 1
+  opens, dispatch the prelude BEFORE any order-book item:
+  [PAN-2283](https://github.com/eltmon/overdeck/issues/2283) (tiered-execution ignition:
+  config load + dispatch wiring + read-only panel) then
+  [PAN-2378](https://github.com/eltmon/overdeck/issues/2378) (tiered-execution
+  configuration UI). Normal pipeline flow, PRD-first planning (no pre-written PRDs exist
+  for these — planning writes them). The operator expected this in v0.42 — it targets a
+  **v0.43.x** release instead (v0.42 stands, no unpublish). When both land + deploy,
+  report readiness and SUGGEST cutting v0.43.0; the operator cuts releases.
+- **START GATE 2 — operator test-drive (explicit go required):** after the prelude lands,
+  HOLD again. The operator may run a few test issues with tiered execution enabled. Do
+  NOT begin the order book (A1/B1) until the operator explicitly says to start the
+  special orders. Report "prelude complete, holding for operator go" and wait.
 - **Scope:** ONLY the order book (18 issues across the two campaigns) + shepherding
   [PAN-2265](https://github.com/eltmon/overdeck/issues/2265) (already in review) to close.
 - **Saturation:** the order book replaces backlog saturation. Keep Lane B always occupied
