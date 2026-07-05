@@ -92,10 +92,12 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     let slotHarness = options.harness;
     if (slot) {
       assertRegisteredSlotCap(issueId, options.maxRegisteredSlots);
-      const tierParams = resolveSlotTierSpawnParams(workspace, slot.slotItemId, options.model);
+      const tierParams = resolveSlotTierSpawnParams(workspace, slot.slotItemId, options.model, modelSpawnKey);
       if (tierParams.model) {
         slotModel = determineModel({ model: tierParams.model, role, spawnKey: modelSpawnKey });
-        slotHarness = tierParams.harness;
+        // Implicit staffing (PAN-2397) omits harness — keep the parent's
+        // historical harness handling in that case.
+        slotHarness = tierParams.harness ?? options.harness;
       }
       await ensureRegisteredSlotWorktree(workspace, slot);
     }
@@ -454,7 +456,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Determine model based on role configuration
   const modelSpawnKey = `${role}:${options.issueId}`;
   const singleTierParams = role === 'work' && options.slotItemId === undefined && options.slotIndex === undefined
-    ? resolveSingleWorkTierSpawnParams(options.workspace, options.model)
+    ? resolveSingleWorkTierSpawnParams(options.workspace, options.model, modelSpawnKey)
     : {};
   const selectedModel = determineModel({ model: singleTierParams.model ?? options.model, role, spawnKey: modelSpawnKey });
   console.log(`[DEBUG] Selected model: ${selectedModel}`);

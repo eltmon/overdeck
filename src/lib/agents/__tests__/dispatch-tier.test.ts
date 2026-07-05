@@ -147,9 +147,16 @@ describe('resolveSlotTierSpawnParams', () => {
 
   function mockConfig(tieredExecution: TierAssignmentConfig): void {
     vi.mocked(loadConfigSync).mockReturnValue({
-      config: { tieredExecution },
+      config: { tieredExecution, roles: { work: { model: 'claude-sonnet-4-6' } } },
     } as unknown as ReturnType<typeof loadConfigSync>);
   }
+
+  const IMPLICIT_PARAMS = {
+    model: 'claude-sonnet-4-6',
+    harness: undefined,
+    tierName: 'default',
+    implicit: true,
+  };
 
   beforeEach(() => {
     vi.mocked(loadConfigSync).mockReset();
@@ -164,14 +171,15 @@ describe('resolveSlotTierSpawnParams', () => {
       model: 'claude-opus-4-8',
       harness: 'claude-code',
       tierName: 'frontier',
+      implicit: false,
     });
   });
 
-  it('returns no override when tiering is disabled', () => {
+  it('staffs from the implicit roles.work tier when tiering is disabled (PAN-2397)', () => {
     mockConfig({ ...TIER_CONFIG, enabled: false });
     vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([planItem('bead-x', { difficulty: 'expert' })]));
 
-    expect(resolveSlotTierSpawnParams('/ws', 'bead-x')).toEqual({});
+    expect(resolveSlotTierSpawnParams('/ws', 'bead-x')).toEqual(IMPLICIT_PARAMS);
   });
 
   it('lets an explicit per-spawn model override outrank tier routing', () => {
@@ -181,11 +189,11 @@ describe('resolveSlotTierSpawnParams', () => {
     expect(resolveSlotTierSpawnParams('/ws', 'bead-x', 'claude-sonnet-5')).toEqual({});
   });
 
-  it('falls through to the existing role-default resolution for an unlabeled item', () => {
+  it('falls through to the implicit roles.work tier for an unlabeled item (PAN-2397)', () => {
     mockConfig(TIER_CONFIG);
     vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([planItem('bead-x', {})]));
 
-    expect(resolveSlotTierSpawnParams('/ws', 'bead-x')).toEqual({});
+    expect(resolveSlotTierSpawnParams('/ws', 'bead-x')).toEqual(IMPLICIT_PARAMS);
   });
 
   it('throws when tiering is enabled but the slot item is missing from the plan', () => {
@@ -224,9 +232,16 @@ describe('resolveSingleWorkTierSpawnParams', () => {
 
   function mockConfig(tieredExecution: TierAssignmentConfig): void {
     vi.mocked(loadConfigSync).mockReturnValue({
-      config: { tieredExecution },
+      config: { tieredExecution, roles: { work: { model: 'claude-sonnet-4-6' } } },
     } as unknown as ReturnType<typeof loadConfigSync>);
   }
+
+  const IMPLICIT_PARAMS = {
+    model: 'claude-sonnet-4-6',
+    harness: undefined,
+    tierName: 'default',
+    implicit: true,
+  };
 
   beforeEach(() => {
     vi.mocked(loadConfigSync).mockReset();
@@ -244,16 +259,17 @@ describe('resolveSingleWorkTierSpawnParams', () => {
       model: 'claude-haiku-4-5',
       harness: 'claude-code',
       tierName: 'cheap',
+      implicit: false,
     });
   });
 
-  it('leaves single work-agent routing untouched when global config is on but plan metadata opts out', () => {
+  it('staffs from the implicit tier when global config is on but plan metadata opts out (PAN-2397)', () => {
     mockConfig(TIER_CONFIG);
     vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
       planItem('frontier', { difficulty: 'expert' }),
     ], { tiered_execution: 'off' }));
 
-    expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({});
+    expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual(IMPLICIT_PARAMS);
   });
 
   it('leaves ordinary single work-agent starts untouched when no vBRIEF plan is readable', () => {
@@ -274,6 +290,7 @@ describe('resolveSingleWorkTierSpawnParams', () => {
       model: 'claude-opus-4-8',
       harness: 'claude-code',
       tierName: 'frontier',
+      implicit: false,
     });
   });
 

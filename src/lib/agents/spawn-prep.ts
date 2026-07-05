@@ -21,7 +21,8 @@ import type { RuntimeName } from '../runtimes/types.js';
 import { readWorkspacePlanSync } from '../vbrief/io.js';
 import { getDispatchableItems } from '../vbrief/dag.js';
 import { type Role } from './agent-state.js';
-import { assignDispatchTier, type TierAssignment } from './dispatch-tier.js';
+import type { TierAssignment } from './dispatch-tier.js';
+import { resolveStaffing } from './staffing.js';
 import { resolveTieredExecutionEnabled } from './tier-table.js';
 import {
   buildCavemanExports,
@@ -191,6 +192,10 @@ export interface SlotTierSpawnParams {
   model?: string;
   harness?: RuntimeName;
   tierName?: string;
+  /** PAN-2397: true when staffing came from the implicit roles.work tier.
+   * Implicit staffing intentionally omits `harness` so the spawn keeps its
+   * historical harness handling (provider-default derived from the model). */
+  implicit?: boolean;
 }
 
 /**
@@ -212,27 +217,41 @@ export function resolveSlotTierSpawnParams(
   baseWorkspace: string,
   slotItemId: string,
   explicitModel?: string,
+  spawnKey?: string,
 ): SlotTierSpawnParams {
-  const tiered = loadYamlConfig().config.tieredExecution;
-  // No tiered-execution config at all means the feature is off — the
-  // enablement-gate contract (zero behavior change when unconfigured).
-  // A plan-level `tiered_execution: on` override cannot enable tiering
-  // without a tier table to resolve against.
-  if (!tiered) return {};
+  // An explicit per-spawn model override outranks all staffing (same
+  // precedence as determineModel).
+  if (explicitModel) return {};
   const doc = readWorkspacePlanSync(baseWorkspace);
   if (!doc) return {};
   const planMetadata = doc?.plan?.metadata;
-  if (!resolveTieredExecutionEnabled(tiered, planMetadata)) return {};
-  if (explicitModel) return {};
+
+  const config = loadYamlConfig().config;
+  const tiered = config.tieredExecution;
+  const explicitTableActive = Boolean(tiered && resolveTieredExecutionEnabled(tiered, planMetadata));
+
   const item = doc.plan.items.find((candidate) => candidate.id === slotItemId);
   if (!item) {
-    throw new Error(
-      `Tiered execution is enabled but item '${slotItemId}' was not found in the plan for ${baseWorkspace}.`,
-    );
+    // With an explicit table active a missing item is a data-integrity signal;
+    // otherwise fall back to the historical role-default spawn path.
+    if (explicitTableActive) {
+      throw new Error(
+        `Tiered execution is enabled but item '${slotItemId}' was not found in the plan for ${baseWorkspace}.`,
+      );
+    }
+    return {};
   }
-  if (!item.metadata?.difficulty && !item.metadata?.model) return {};
-  const assignment = assignDispatchTier(item, tiered, planMetadata);
-  return { model: assignment.model, harness: assignment.harness, tierName: assignment.tierName };
+
+  // PAN-2397 (Always Tiered): staffing ALWAYS resolves — explicit tier table
+  // when enabled, else the implicit roles.work tier (same resolveModel +
+  // spawnKey as determineModel, so distributions stay deterministic).
+  const staffing = resolveStaffing(item, { planMetadata, spawnKey, config });
+  return {
+    model: staffing.model,
+    harness: staffing.implicit ? undefined : staffing.harness,
+    tierName: staffing.tierName,
+    implicit: staffing.implicit,
+  };
 }
 
 /**
@@ -246,22 +265,27 @@ export function resolveSlotTierSpawnParams(
 export function resolveSingleWorkTierSpawnParams(
   workspace: string,
   explicitModel?: string,
+  spawnKey?: string,
 ): SlotTierSpawnParams {
-  const tiered = loadYamlConfig().config.tieredExecution;
-  if (!tiered) return {};
   if (explicitModel) return {};
 
   const doc = readWorkspacePlanSync(workspace);
   if (!doc) return {};
   const planMetadata = doc?.plan?.metadata;
-  if (!resolveTieredExecutionEnabled(tiered, planMetadata)) return {};
 
   const item = getDispatchableItems(doc, new Set())[0];
   if (!item) return {};
-  if (!item.metadata?.difficulty && !item.metadata?.model) return {};
 
-  const assignment = assignDispatchTier(item, tiered, planMetadata);
-  return { model: assignment.model, harness: assignment.harness, tierName: assignment.tierName };
+  // PAN-2397 (Always Tiered): the single-work path staffs through the same
+  // resolver as slots — explicit table when enabled, implicit roles.work
+  // tier otherwise.
+  const staffing = resolveStaffing(item, { planMetadata, spawnKey, config: loadYamlConfig().config });
+  return {
+    model: staffing.model,
+    harness: staffing.implicit ? undefined : staffing.harness,
+    tierName: staffing.tierName,
+    implicit: staffing.implicit,
+  };
 }
 
 /**
