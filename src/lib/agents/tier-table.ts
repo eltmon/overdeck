@@ -6,8 +6,6 @@ import type { ModelProvider } from '../model-fallback.js';
 import { resolveModelIdSync } from '../model-capabilities.js';
 import { getProviderForModelSync, PROVIDERS } from '../providers.js';
 import { canUseHarnessSync } from '../harness-policy.js';
-import { loadConfigSync } from '../config-yaml/load.js';
-import { readIssueRecordSync, resolveProjectForIssue } from '../pan-dir/record.js';
 
 export const TIERED_EXECUTION_DIFFICULTIES: readonly VBriefDifficulty[] = ['trivial', 'simple', 'medium', 'complex', 'expert'] as const;
 export const TIERED_EXECUTION_SUBSCRIPTIONS = ['all', 'flagged', 'sampled'] as const;
@@ -117,63 +115,42 @@ export const TIERED_EXECUTION_ISSUE_OVERRIDES = ['on', 'off'] as const;
 export type TieredExecutionIssueOverride = typeof TIERED_EXECUTION_ISSUE_OVERRIDES[number];
 
 /**
- * Per-issue tiered_execution opt-in/out. A mutable record override wins over
- * immutable plan.metadata, and plan.metadata wins over the global
- * `tiered_execution.enabled` flag. Any other value is a config error
- * (fail-loud, no silent inherit on typos like 'yes' or true).
+ * Coerce a tiered-execution override value to a boolean, or `undefined` when
+ * unset (null/undefined = inherit). Any other value is a config error
+ * (fail-loud, no silent inherit on typos like 'yes' or true). `label` names
+ * the source (plan-metadata key or record field) in the error message.
+ */
+function coerceTieredExecutionOverride(value: unknown, label: string): boolean | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (value === 'on') return true;
+  if (value === 'off') return false;
+  throw new TieredExecutionConfigError(
+    `${label} must be one of ${TIERED_EXECUTION_ISSUE_OVERRIDES.join(', ')}; got ${JSON.stringify(value)}`,
+  );
+}
+
+/**
+ * Per-issue tiered_execution opt-in/out (PAN-1791 FR-9, extended PAN-2383).
+ * Precedence, highest first:
+ *   1. `recordOverride` — the mutable per-issue record override (PAN-2383),
+ *      editable after planning via the issue view.
+ *   2. `plan.metadata.tiered_execution` — the immutable planning-time override.
+ *   3. the global `tiered_execution.enabled` flag.
+ * An explicit `'on'`/`'off'` at a level wins; an unset (null/undefined) value
+ * falls through to the next level — an unset record override preserves the
+ * pre-PAN-2383 plan-metadata > global behavior byte-for-byte. Any other value
+ * at any level is a config error (fail-loud, no silent inherit).
  */
 export function resolveTieredExecutionEnabled(
   config: Pick<TieredExecutionConfig, 'enabled'>,
   planMetadata?: { [key: string]: unknown },
-): boolean {
-  return resolveTieredExecutionEnabledWithOverride(config, undefined, planMetadata);
-}
-
-export function validateTieredExecutionIssueOverride(
-  override: unknown,
-  path = 'tieredExecutionOverride',
-): TieredExecutionIssueOverride | undefined {
-  if (override === undefined || override === null) return undefined;
-  if (override === 'on') return override;
-  if (override === 'off') return override;
-  throw new TieredExecutionConfigError(
-    `${path} must be one of ${TIERED_EXECUTION_ISSUE_OVERRIDES.join(', ')}; got ${JSON.stringify(override)}`,
-  );
-}
-
-export function resolveTieredExecutionEnabledWithOverride(
-  config: Pick<TieredExecutionConfig, 'enabled'>,
   recordOverride?: unknown,
-  planMetadata?: { [key: string]: unknown },
 ): boolean {
-  const storedOverride = validateTieredExecutionIssueOverride(recordOverride, 'record.tieredExecutionOverride');
-  if (storedOverride === 'on') return true;
-  if (storedOverride === 'off') return false;
-
-  const planOverride = validateTieredExecutionIssueOverride(
-    planMetadata?.tiered_execution,
-    'plan.metadata.tiered_execution',
-  );
-  if (planOverride === 'on') return true;
-  if (planOverride === 'off') return false;
+  const fromRecord = coerceTieredExecutionOverride(recordOverride, 'record tieredExecutionOverride');
+  if (fromRecord !== undefined) return fromRecord;
+  const fromPlan = coerceTieredExecutionOverride(planMetadata?.tiered_execution, 'plan.metadata.tiered_execution');
+  if (fromPlan !== undefined) return fromPlan;
   return config.enabled;
-}
-
-export function readTieredExecutionOverrideForIssue(
-  issueId: string,
-): TieredExecutionIssueOverride | null {
-  const project = resolveProjectForIssue(issueId);
-  const override = project ? readIssueRecordSync(project, issueId)?.tieredExecutionOverride : undefined;
-  return validateTieredExecutionIssueOverride(override, 'record.tieredExecutionOverride') ?? null;
-}
-
-export function resolveTieredExecutionEnabledForIssue(
-  issueId: string,
-  planMetadata?: { [key: string]: unknown },
-): boolean {
-  const config = loadConfigSync().config.tieredExecution;
-  const override = readTieredExecutionOverrideForIssue(issueId);
-  return resolveTieredExecutionEnabledWithOverride(config, override, planMetadata);
 }
 
 function isRuntimeName(value: string): value is RuntimeName {

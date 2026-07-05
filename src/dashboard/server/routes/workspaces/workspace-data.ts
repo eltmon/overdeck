@@ -52,8 +52,8 @@ import type { VBriefDocument, VBriefInspectionPolicy } from '../../../../lib/vbr
 import {
   readTieredExecutionOverrideForIssue,
   resolveTieredExecutionEnabledForIssue,
-  type TieredExecutionIssueOverride,
-} from '../../../../lib/agents/tier-table.js';
+} from '../../../../lib/agents/tiered-execution-issue.js';
+import type { TieredExecutionIssueOverride } from '../../../../lib/agents/tier-table.js';
 import { getChangedFiles, getDiffBase, getDiffStat } from '../../../../lib/cloister/review-context.js';
 import type { ChangedFile } from '../../../../lib/cloister/review-context.js';
 import { getTldrDaemonServiceSync } from '../../../../lib/tldr-daemon.js';
