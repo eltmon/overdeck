@@ -61,24 +61,19 @@
       "reason": "feedback",
       "note": "[2026-07-05T05:57Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-05T05:57:08.009Z"
-    }
-  ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-05T05:56:59Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2378\n\nKind override edits are masked by stale derived byKind\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2378 -m \"Fixed review issues\"`"
     },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-05T05:57:08Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2378\n\nKind override edits are masked by stale derived byKind\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2378 -m \"Fixed review issues\"`"
+      "timestamp": "2026-07-05T05:59:34.735Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-05T05:59:35.251Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/drafts/PAN-2378.md",
@@ -128,7 +123,7 @@
       "src/lib/settings-api.ts",
       "tests/lib/settings-api.test.ts"
     ],
-    "recordedAt": "2026-07-05T05:53:24.889Z"
+    "recordedAt": "2026-07-05T05:59:28.066Z"
   },
   "harness": "codex",
   "model": "gpt-5.5",
@@ -164,17 +159,17 @@
   },
   "pipeline": {
     "issueId": "PAN-2378",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-05T05:56:59.333Z",
+    "updatedAt": "2026-07-05T05:59:42.389Z",
     "reviewNotes": "Kind override edits are masked by stale derived byKind",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2380",
     "lastVerifiedCommit": "2230fb3f558797eb5b40d44c8fcf501073c7c410",
-    "reviewRequestedAt": "2026-07-05T05:53:30.996Z",
+    "reviewRequestedAt": "2026-07-05T05:59:34.736Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/drafts/PAN-2378.md",
@@ -224,7 +219,7 @@
         "src/lib/settings-api.ts",
         "tests/lib/settings-api.test.ts"
       ],
-      "recordedAt": "2026-07-05T05:53:24.889Z"
+      "recordedAt": "2026-07-05T05:59:28.066Z"
     },
     "deaconIgnored": true,
     "deaconIgnoredAt": "2026-07-05T04:59:38.468Z",
@@ -280,7 +275,7 @@
       },
       "costAtCloseOut": {
         "usd": 10.57664,
-        "pricingAsOf": "2026-07-05T05:56:59.369Z"
+        "pricingAsOf": "2026-07-05T05:59:42.443Z"
       }
     },
     "merges": [
@@ -299,5 +294,5 @@
     ]
   },
   "created": "2026-07-05T05:48:58.706Z",
-  "updated": "2026-07-05T05:57:08.009Z"
+  "updated": "2026-07-05T05:59:42.444Z"
 }
