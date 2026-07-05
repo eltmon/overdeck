@@ -4,7 +4,7 @@ import {
   getAllReleaseSetsFromDb,
   getReleaseSetFromDb,
   upsertReleaseSet as dbUpsert,
-} from './database/release-set-db.js';
+} from './overdeck/release-sync.js';
 import type { ReleaseComponentConfig } from './projects.js';
 
 export type ReleaseSetStatus = 'pending' | 'releasing' | 'passed' | 'failed' | 'partial' | 'rolled_back' | 'skipped';

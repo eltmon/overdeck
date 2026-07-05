@@ -1,10 +1,42 @@
-import { getDatabase, DatabaseError } from './index.js';
+import { getOverdeckDatabaseSync } from './infra.js';
 import type { ReleaseComponentState, ReleaseSet } from '../release-set.js';
-export { DatabaseError };
+
+function isoFromMillisRequired(value: number): string {
+  return new Date(value).toISOString();
+}
+
+function millisFromIso(value: string | null | undefined): number {
+  if (!value) return Date.now();
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? ms : Date.now();
+}
+
+interface OverdeckReleaseSetRow {
+  issue_id: string;
+  project_key: string;
+  project_path: string;
+  workspace_type: string;
+  status: string;
+  created_at: number;
+  updated_at: number;
+}
+
+interface OverdeckReleaseComponentRow {
+  component_key: string;
+  provider: string | null;
+  trigger: string;
+  release_order: number;
+  required: number;
+  status: string;
+  health_status: string | null;
+  version_status: string | null;
+  smoke_status: string | null;
+  rollback_status: string | null;
+  notes: string | null;
+}
 
 export function upsertReleaseSet(releaseSet: ReleaseSet): void {
-  const db = getDatabase();
-
+  const db = getOverdeckDatabaseSync();
   const tx = db.transaction((set: ReleaseSet) => {
     db.prepare(`
       INSERT INTO release_sets (
@@ -23,11 +55,11 @@ export function upsertReleaseSet(releaseSet: ReleaseSet): void {
       set.projectPath,
       set.workspaceType,
       set.status,
-      set.createdAt,
-      set.updatedAt,
+      millisFromIso(set.createdAt),
+      millisFromIso(set.updatedAt),
     );
 
-    db.prepare(`DELETE FROM release_set_components WHERE issue_id = ?`).run(set.issueId);
+    db.prepare('DELETE FROM release_set_components WHERE issue_id = ?').run(set.issueId);
 
     const insertComponent = db.prepare(`
       INSERT INTO release_set_components (
@@ -58,20 +90,18 @@ export function upsertReleaseSet(releaseSet: ReleaseSet): void {
 }
 
 export function getReleaseSetFromDb(issueId: string): ReleaseSet | null {
-  const db = getDatabase();
+  const db = getOverdeckDatabaseSync();
   const row = db.prepare(`
     SELECT issue_id, project_key, project_path, workspace_type, status, created_at, updated_at
     FROM release_sets
     WHERE issue_id = ?
-  `).get(issueId) as DbReleaseSetRow | undefined;
-
+  `).get(issueId) as OverdeckReleaseSetRow | undefined;
   if (!row) return null;
-
-  return rowToReleaseSet(row, getComponentsFromDb(issueId));
+  return rowToReleaseSet(row, loadComponentsForReleaseSet(issueId));
 }
 
 export function getAllReleaseSetsFromDb(projectKey?: string): ReleaseSet[] {
-  const db = getDatabase();
+  const db = getOverdeckDatabaseSync();
   const rows = (
     projectKey
       ? db.prepare(`
@@ -85,51 +115,28 @@ export function getAllReleaseSetsFromDb(projectKey?: string): ReleaseSet[] {
           FROM release_sets
           ORDER BY updated_at DESC
         `).all()
-  ) as DbReleaseSetRow[];
+  ) as OverdeckReleaseSetRow[];
 
-  return rows.map(row => rowToReleaseSet(row, getComponentsFromDb(row.issue_id)));
+  return rows.map((row) => rowToReleaseSet(row, loadComponentsForReleaseSet(row.issue_id)));
 }
 
 export function deleteReleaseSet(issueId: string): void {
-  const db = getDatabase();
-  db.prepare(`DELETE FROM release_sets WHERE issue_id = ?`).run(issueId);
+  const db = getOverdeckDatabaseSync();
+  db.prepare('DELETE FROM release_set_components WHERE issue_id = ?').run(issueId);
+  db.prepare('DELETE FROM release_sets WHERE issue_id = ?').run(issueId);
 }
 
-interface DbReleaseSetRow {
-  issue_id: string;
-  project_key: string;
-  project_path: string;
-  workspace_type: string;
-  status: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface DbReleaseComponentRow {
-  component_key: string;
-  provider: string | null;
-  trigger: string;
-  release_order: number;
-  required: number;
-  status: string;
-  health_status: string | null;
-  version_status: string | null;
-  smoke_status: string | null;
-  rollback_status: string | null;
-  notes: string | null;
-}
-
-function getComponentsFromDb(issueId: string): ReleaseComponentState[] {
-  const db = getDatabase();
+function loadComponentsForReleaseSet(issueId: string): ReleaseComponentState[] {
+  const db = getOverdeckDatabaseSync();
   const rows = db.prepare(`
     SELECT component_key, provider, trigger, release_order, required, status,
            health_status, version_status, smoke_status, rollback_status, notes
     FROM release_set_components
     WHERE issue_id = ?
     ORDER BY release_order ASC, component_key ASC
-  `).all(issueId) as DbReleaseComponentRow[];
+  `).all(issueId) as OverdeckReleaseComponentRow[];
 
-  return rows.map(row => ({
+  return rows.map((row) => ({
     componentKey: row.component_key,
     provider: row.provider ?? undefined,
     trigger: row.trigger as ReleaseComponentState['trigger'],
@@ -144,15 +151,15 @@ function getComponentsFromDb(issueId: string): ReleaseComponentState[] {
   }));
 }
 
-function rowToReleaseSet(row: DbReleaseSetRow, components: ReleaseComponentState[]): ReleaseSet {
+function rowToReleaseSet(row: OverdeckReleaseSetRow, components: ReleaseComponentState[]): ReleaseSet {
   return {
     issueId: row.issue_id,
     projectKey: row.project_key,
     projectPath: row.project_path,
     workspaceType: row.workspace_type as ReleaseSet['workspaceType'],
     status: row.status as ReleaseSet['status'],
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    createdAt: isoFromMillisRequired(row.created_at),
+    updatedAt: isoFromMillisRequired(row.updated_at),
     components,
   };
 }

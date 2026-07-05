@@ -70,6 +70,38 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   try { db.exec("UPDATE `discovered_sessions` SET `harness` = 'claude-code' WHERE `harness` IS NULL"); } catch { /* table absent */ }
   try { db.exec('ALTER TABLE `review_status` ADD COLUMN `release_status` text'); } catch { /* already exists or table absent */ }
   try { db.exec('ALTER TABLE `review_status` ADD COLUMN `release_notes` text'); } catch { /* already exists or table absent */ }
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS release_sets (
+      issue_id       TEXT PRIMARY KEY,
+      project_key    TEXT NOT NULL,
+      project_path   TEXT NOT NULL,
+      workspace_type TEXT NOT NULL,
+      status         TEXT NOT NULL DEFAULT 'pending',
+      created_at     INTEGER NOT NULL,
+      updated_at     INTEGER NOT NULL
+    )
+  `);
+  db.exec('CREATE INDEX IF NOT EXISTS release_sets_project_idx ON release_sets(project_key, updated_at)');
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS release_set_components (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      issue_id        TEXT NOT NULL,
+      component_key   TEXT NOT NULL,
+      provider        TEXT,
+      trigger         TEXT NOT NULL,
+      release_order   INTEGER NOT NULL DEFAULT 0,
+      required        INTEGER NOT NULL DEFAULT 1,
+      status          TEXT NOT NULL DEFAULT 'pending',
+      health_status   TEXT,
+      version_status  TEXT,
+      smoke_status    TEXT,
+      rollback_status TEXT,
+      notes           TEXT,
+      FOREIGN KEY (issue_id) REFERENCES release_sets(issue_id) ON DELETE CASCADE
+    )
+  `);
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS release_set_components_issue_component_idx ON release_set_components(issue_id, component_key)');
+  db.exec('CREATE INDEX IF NOT EXISTS release_set_components_issue_order_idx ON release_set_components(issue_id, release_order, component_key)');
   db.exec('CREATE INDEX IF NOT EXISTS `cost_session_id_idx` ON `cost_events` (`session_id`)');
 }
 

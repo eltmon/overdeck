@@ -117,6 +117,7 @@ import { registerFlywheelCommands } from './commands/flywheel.js';
 import { registerMergeCommands } from './commands/merge.js';
 import { registerArtifactCommands } from './commands/artifacts.js';
 import { registerSwarmCommands } from './commands/swarm.js';
+import { registerRolloutCommands } from './commands/rollout.js';
 
 // Pre-parse --yolo from argv so it works regardless of position relative to the
 // subcommand. Commander's enablePositionalOptions() routes post-subcommand options
@@ -614,6 +615,7 @@ registerCavemanCommands(program);
 registerScopeCommands(program);
 registerFlywheelCommands(program);
 registerMergeCommands(program);
+registerRolloutCommands(program);
 registerArtifactCommands(program);
 
 // Shorthand: pan status = pan status
