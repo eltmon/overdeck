@@ -26,7 +26,7 @@
 1050 src/lib/overdeck/memory.ts
 1001 src/lib/overdeck/merge.ts
 1110 src/lib/review-status.ts
-1488 src/lib/settings-api.ts
+1475 src/lib/settings-api.ts
 1205 src/lib/sync.ts
 1261 src/lib/tmux.ts
 1095 src/lib/vbrief/dag.ts

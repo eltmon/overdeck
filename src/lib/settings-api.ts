@@ -31,7 +31,7 @@ import {
 } from './config-yaml.js';
 import { ModelId } from './settings.js';
 import type { Role } from './agents.js';
-import type { ValidatedTieredExecutionConfig } from './agents/tier-table.js';
+import { tieredExecutionConfigForSave, validateTieredExecutionSettings, type ApiTieredExecutionConfig } from './settings-api-tiered-execution.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { getBuiltInDefaultHarness } from './providers.js';
 import { defaultBackgroundAiFeatures, type BackgroundAiFeature } from './background-ai/registry.js';
@@ -265,7 +265,7 @@ export interface ApiSettingsConfig {
     resiliency_tier?: 'ephemeral' | 'durable';
     max_concurrent_agents?: number;
   };
-  tiered_execution?: ValidatedTieredExecutionConfig;
+  tiered_execution?: ApiTieredExecutionConfig;
   deprecation_warnings?: ApiDeprecationWarning[];
 }
 
@@ -283,6 +283,8 @@ export function getDefaultConversationModelApi(): ModelId {
 }
 
 const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer'];
+type AvailableModel = { id: ModelId; name: string; costPer1MTokens: number };
+type AvailableModelsApi = Record<'anthropic' | 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter' | 'nous' | 'dashscope', AvailableModel[]>;
 const WORKHORSE_SLOTS: readonly WorkhorseSlot[] = ['expensive', 'mid', 'cheap'];
 const MODEL_PROVIDERS = ['anthropic', 'openai', 'google', 'minimax', 'zai', 'kimi', 'mimo', 'openrouter', 'nous', 'dashscope'] as const;
 type ApiModelProvider = typeof MODEL_PROVIDERS[number];
@@ -794,6 +796,7 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     ['experimental', config.experimental],
     ['claude', config.claude],
     ['codex', config.codex],
+    ['tiered_execution', config.tiered_execution],
   ];
 
   for (const [key, value] of topLevelSections) {
@@ -934,6 +937,7 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
       ? { permissionMode: settings.codex.permissionMode }
       : undefined,
     remote: settings.remote,
+    tiered_execution: tieredExecutionConfigForSave(settings.tiered_execution, currentConfig.providerAuth),
   };
 
   await writeYamlConfigPreservingComments(yamlConfig);
@@ -1225,6 +1229,11 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
     }
   }
 
+  if (settings.tiered_execution !== undefined) {
+    const tieredExecutionError = validateTieredExecutionSettings(settings.tiered_execution, loadConfigSync().config.providerAuth);
+    if (tieredExecutionError) errors.push(tieredExecutionError);
+  }
+
   return {
     valid: errors.length === 0,
     errors,
@@ -1235,30 +1244,8 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
 /**
  * Get available models by provider (for model selection UI)
  */
-export function getAvailableModelsApi(): {
-  anthropic: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  openai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  google: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  minimax: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  zai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  kimi: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  mimo: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  openrouter: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  nous: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  dashscope: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-} {
-  const result: {
-    anthropic: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    openai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    google: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    minimax: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    zai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    kimi: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    mimo: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    openrouter: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    nous: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    dashscope: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  } = {
+export function getAvailableModelsApi(): AvailableModelsApi {
+  const result: AvailableModelsApi = {
     anthropic: [],
     openai: [],
     google: [],

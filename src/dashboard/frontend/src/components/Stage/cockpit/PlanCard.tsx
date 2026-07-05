@@ -1,6 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { CheckCircle2, Circle } from 'lucide-react'
-import { usePlanningSummaryQuery } from '../../CommandDeck/ZoneCOverviewTabs/queries'
+import {
+  usePlanningSummaryQuery,
+  useSettingsQuery,
+  useWorkspacePlanQuery,
+} from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import { CockpitCard } from './CockpitCard'
 
 interface BeadTask {
@@ -14,6 +18,12 @@ interface BeadsResponse {
   tasks: BeadTask[]
 }
 
+function tieredChipLabel(override: unknown, globalEnabled: boolean | undefined): string {
+  if (override === 'on') return 'tiered: on (issue override)'
+  if (override === 'off') return 'tiered: off (issue override)'
+  return `tiered: ${globalEnabled ? 'on' : 'off'} (global)`
+}
+
 /**
  * PlanCard — the plan at a glance: acceptance-criteria progress + the beads
  * list (sourced from the authoritative /api/issues/:id/beads endpoint, shared
@@ -22,7 +32,11 @@ interface BeadsResponse {
  */
 export function PlanCard({ issueId }: { issueId: string }) {
   const planning = usePlanningSummaryQuery(issueId)
+  const workspacePlan = useWorkspacePlanQuery(issueId)
+  const settings = useSettingsQuery()
   const ac = planning.data?.acceptanceProgress
+  const tieredOverride = workspacePlan.data?.plan?.metadata?.tiered_execution
+  const tieredLabel = tieredChipLabel(tieredOverride, settings.data?.tiered_execution?.enabled)
 
   const beadsQuery = useQuery<BeadsResponse>({
     queryKey: ['beads', issueId],
@@ -49,6 +63,17 @@ export function PlanCard({ issueId }: { issueId: string }) {
         </span>
       }
     >
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <a
+          href="https://github.com/eltmon/overdeck/blob/main/docs/TIERED-EXECUTION.md"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex h-6 items-center rounded-md border border-border bg-muted/20 px-2 font-mono text-[11px] text-muted-foreground hover:bg-muted/40"
+        >
+          {tieredLabel}
+        </a>
+      </div>
+
       {ac && ac.total > 0 && (
         <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-muted">
           <div
