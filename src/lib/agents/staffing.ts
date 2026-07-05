@@ -24,8 +24,9 @@ import type { NormalizedConfig } from '../config-yaml/schema.js';
 import { resolveModel } from '../config-yaml/roles.js';
 import { requireModelOverrideSync } from '../model-validation.js';
 import { getBuiltInDefaultHarness, getProviderForModelSync } from '../providers.js';
+import { fmix32, fnv1a32 } from '../config-yaml/percent.js';
 import { resolveTier } from './resolve-tier.js';
-import { resolveTieredExecutionEnabled } from './tier-table.js';
+import { resolveTieredExecutionEnabled, type TierDistributionEntry } from './tier-table.js';
 
 export const IMPLICIT_TIER_NAME = 'default';
 
@@ -90,6 +91,16 @@ export function resolveStaffing(
   if (tiered && resolveTieredExecutionEnabled(tiered, options.planMetadata)) {
     try {
       const tier = resolveTier(item, tiered);
+      // PAN-2391: a distribution tier spreads beads across weighted
+      // model+harness entries. Selection is deterministic per bead so
+      // replay/re-resolution always lands on the same entry. A per-bead
+      // metadata.model override never reaches here with the tier's name
+      // (resolveTier returns the override pseudo-tier), so overrides win.
+      const distribution = tiered.tiers?.[tier.tierName]?.distribution;
+      if (distribution && distribution.length > 0) {
+        const entry = pickDistributionEntry(distribution, `${options.spawnKey ?? ''}:${item.id}`);
+        return { tierName: tier.tierName, model: entry.model, harness: entry.harness, implicit: false };
+      }
       return { tierName: tier.tierName, model: tier.model, harness: tier.harness, implicit: false };
     } catch {
       // Explicit table cannot place this bead — fall through to the implicit
@@ -98,4 +109,20 @@ export function resolveStaffing(
   }
 
   return resolveImplicitStaffing(config, options.spawnKey);
+}
+
+/** Deterministic weighted pick (D6): FNV-1a of the selection key → bucket in
+ * [0, 100). Same key always selects the same entry. */
+export function pickDistributionEntry(
+  entries: readonly TierDistributionEntry[],
+  selectionKey: string,
+): TierDistributionEntry {
+  const total = entries.reduce((sum, entry) => sum + entry.weight, 0);
+  const bucket = fmix32(fnv1a32(selectionKey)) % total;
+  let cursor = 0;
+  for (const entry of entries) {
+    cursor += entry.weight;
+    if (bucket < cursor) return entry;
+  }
+  return entries[entries.length - 1]!;
 }

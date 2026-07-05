@@ -253,3 +253,54 @@ describe('tiered execution tier table', () => {
     }))).toThrow('tiered_execution.compaction_reroute');
   });
 });
+
+// PAN-2391: distribution tiers — weighted model+harness entries per tier.
+describe('validateTieredExecutionConfig distribution tiers (PAN-2391)', () => {
+  const base = {
+    enabled: true,
+    supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged' },
+    tiers: {
+      cheap: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple'] },
+      standard: {
+        difficulties: ['medium', 'complex', 'expert'],
+        distribution: [
+          { model: 'gpt-5.5', harness: 'codex', weight: 40 },
+          { model: 'kimi-k2.7-code', harness: 'claude-code', weight: 60 },
+        ],
+      },
+    },
+  };
+
+  it('accepts a distribution tier and normalizes a max-weight representative', () => {
+    const validated = validateTieredExecutionConfig(base as never);
+    const standard = validated.tiers.standard!;
+    expect(standard.distribution).toHaveLength(2);
+    expect(standard.model).toBe('kimi-k2.7-code');
+    expect(standard.harness).toBe('claude-code');
+  });
+
+  it('rejects declaring both model/harness and distribution', () => {
+    const config = structuredClone(base) as never as typeof base;
+    (config.tiers.standard as Record<string, unknown>).model = 'gpt-5.5';
+    (config.tiers.standard as Record<string, unknown>).harness = 'codex';
+    expect(() => validateTieredExecutionConfig(config as never)).toThrow(/not both/);
+  });
+
+  it('rejects weights that do not total 100', () => {
+    const config = structuredClone(base) as never as { tiers: { standard: { distribution: Array<{ weight: number }> } } };
+    config.tiers.standard.distribution[0]!.weight = 50;
+    expect(() => validateTieredExecutionConfig(config as never)).toThrow(/total exactly 100/);
+  });
+
+  it('rejects non-positive-integer weights', () => {
+    const config = structuredClone(base) as never as { tiers: { standard: { distribution: Array<{ weight: number }> } } };
+    config.tiers.standard.distribution[0]!.weight = 0;
+    expect(() => validateTieredExecutionConfig(config as never)).toThrow(/positive integer/);
+  });
+
+  it('validates each entry model/harness', () => {
+    const config = structuredClone(base) as never as { tiers: { standard: { distribution: Array<{ harness: string }> } } };
+    config.tiers.standard.distribution[0]!.harness = 'not-a-harness';
+    expect(() => validateTieredExecutionConfig(config as never)).toThrow(/harness/);
+  });
+});
