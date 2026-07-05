@@ -25,6 +25,7 @@ export interface SupervisorWatchdogConfig {
   maxRestarts: number;
   windowMs: number;
   requestTimeoutMs: number;
+  bootGraceMs: number;
 }
 
 export interface SupervisorWatchdogStatus {
@@ -68,6 +69,8 @@ interface InternalState {
   consecutiveFailures: number;
   consecutiveHardFailures: number;
   patrolUnhealthySince: number | null;
+  hasBecomeHealthy: boolean;
+  bootGraceStartedAt: number;
   restartAttempts: number[];
   gaveUp: boolean;
   lastError: string | null;
@@ -125,6 +128,7 @@ export function readWatchdogConfig(env: NodeJS.ProcessEnv, dashboardApiPort: num
     maxRestarts: parsePositiveIntEnv(env.OVERDECK_SUPERVISOR_MAX_RESTARTS, 3),
     windowMs: parsePositiveIntEnv(env.OVERDECK_SUPERVISOR_WINDOW_MS, 5 * 60_000),
     requestTimeoutMs: parsePositiveIntEnv(env.OVERDECK_SUPERVISOR_TIMEOUT_MS, 10_000),
+    bootGraceMs: parsePositiveIntEnv(env.OVERDECK_SUPERVISOR_BOOT_GRACE_MS, 5 * 60_000),
   };
 }
 
@@ -170,6 +174,8 @@ export class SupervisorWatchdog {
       consecutiveFailures: 0,
       consecutiveHardFailures: 0,
       patrolUnhealthySince: null,
+      hasBecomeHealthy: false,
+      bootGraceStartedAt: this.now(),
       restartAttempts: persistedState.restartAttempts,
       gaveUp: persistedState.gaveUp,
       lastError: null,
@@ -216,6 +222,7 @@ export class SupervisorWatchdog {
     const url = `${dashboardBaseUrl}/api/health`;
     let restartReason: string | null = null;
     let restartLogReason: string | null = null;
+    let restartEligibleForBootGrace = false;
     try {
       const response = await this.fetchFn(url, {
         signal: AbortSignal.timeout(this.config.requestTimeoutMs),
@@ -224,6 +231,7 @@ export class SupervisorWatchdog {
         throw new Error(`health check returned ${response.status}${response.statusText ? ` ${response.statusText}` : ''}`);
       }
       await this.assertDashboardIdentity(response);
+      this.state.hasBecomeHealthy = true;
 
       const patrolFailure = await this.assessDeaconPatrol(dashboardBaseUrl, startedAt);
       if (patrolFailure) {
@@ -288,6 +296,20 @@ export class SupervisorWatchdog {
         ? `dashboard unreachable: ${this.state.lastError ?? 'health check failed'}`
         : `sustained health-probe timeouts: ${this.state.lastError ?? 'health check timed out'}`;
       restartLogReason = hardDown ? 'dashboard unreachable' : 'sustained timeouts — dashboard starved';
+      restartEligibleForBootGrace = hardDown;
+    }
+
+    if (
+      restartEligibleForBootGrace
+      && !this.state.hasBecomeHealthy
+      && startedAt - this.state.bootGraceStartedAt < this.config.bootGraceMs
+    ) {
+      await this.log(
+        `watchdog: deferring restart during boot grace (${restartLogReason ?? 'dashboard health check failed'}); `
+        + `${Math.max(0, this.config.bootGraceMs - (startedAt - this.state.bootGraceStartedAt))}ms remaining`,
+      );
+      await this.persistState();
+      return;
     }
 
     this.pruneRestartAttempts(startedAt);
@@ -351,6 +373,8 @@ export class SupervisorWatchdog {
     // boot was killed before boot reconciliation + its first patrol could
     // complete — restart churn until maxRestarts/gaveUp.
     this.state.patrolUnhealthySince = null;
+    this.state.hasBecomeHealthy = false;
+    this.state.bootGraceStartedAt = this.now();
 
     await Effect.runPromise(writeRestartStatus({
       ts: new Date(startedAt).toISOString(),
