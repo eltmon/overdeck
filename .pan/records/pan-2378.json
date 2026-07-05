@@ -5,9 +5,34 @@
   "harness": "claude-code",
   "model": "gpt-5.5",
   "statusOverrides": {
-    "be-write-door": "pending",
-    "fe-issue-chip": "pending",
-    "docs-note": "pending"
+    "be-write-door": "completed",
+    "fe-issue-chip": "completed",
+    "docs-note": "completed",
+    "fe-knobs": "completed",
+    "fe-knobs.ac1": "completed",
+    "fe-knobs.ac2": "completed",
+    "fe-knobs.ac3": "completed",
+    "fe-knobs.ac4": "completed",
+    "fe-knobs.ac5": "completed",
+    "fe-tier-table": "completed",
+    "fe-tier-table.ac1": "completed",
+    "fe-tier-table.ac2": "completed",
+    "fe-tier-table.ac3": "completed",
+    "fe-tier-table.ac4": "completed",
+    "fe-toggle-preview": "completed",
+    "fe-toggle-preview.ac1": "completed",
+    "fe-toggle-preview.ac2": "completed",
+    "fe-toggle-preview.ac3": "completed",
+    "docs-note.ac1": "completed",
+    "docs-note.ac2": "completed",
+    "fe-issue-chip.ac1": "completed",
+    "fe-issue-chip.ac2": "completed",
+    "fe-issue-chip.ac3": "completed",
+    "fe-issue-chip.ac4": "completed",
+    "be-write-door.ac1": "completed",
+    "be-write-door.ac2": "completed",
+    "be-write-door.ac3": "completed",
+    "be-write-door.ac4": "completed"
   },
   "pipeline": {
     "issueId": "PAN-2378",
@@ -91,5 +116,5 @@
     ]
   },
   "created": "2026-07-05T05:42:05.762Z",
-  "updated": "2026-07-05T05:42:05.762Z"
+  "updated": "2026-07-05T05:44:15.990Z"
 }
