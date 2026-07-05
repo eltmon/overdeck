@@ -1,8 +1,69 @@
 {
   "issueId": "PAN-2378",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-05T05:44:27.812Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-05T05:44:28.142Z"
+    }
+  ],
   "feedback": [],
-  "harness": "claude-code",
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/drafts/PAN-2378.md",
+      ".pan/records/pan-2283.json",
+      ".pan/records/pan-2378.json",
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/frontend/src/components/Settings/hooks/useAutosavePipeline.ts",
+      "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.test.tsx",
+      "src/dashboard/frontend/src/components/vbrief/types.ts",
+      "src/lib/settings-api-tiered-execution.ts",
+      "tests/lib/settings-api.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMetricStrip.tsx",
+      "src/dashboard/server/routes/settings.ts",
+      "tests/unit/lib/settings-api.test.ts"
+    ],
+    "declaredScope": [
+      "docs/TIERED-EXECUTION.md",
+      "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
+      "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMetricStrip.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.tsx",
+      "src/dashboard/server/routes/settings.ts",
+      "src/lib/settings-api.ts",
+      "tests/unit/lib/settings-api.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".pan/drafts/PAN-2378.md",
+      ".pan/records/pan-2283.json",
+      ".pan/records/pan-2378.json",
+      "docs/TIERED-EXECUTION.md",
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
+      "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+      "src/dashboard/frontend/src/components/Settings/hooks/useAutosavePipeline.ts",
+      "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.tsx",
+      "src/dashboard/frontend/src/components/vbrief/types.ts",
+      "src/lib/settings-api-tiered-execution.ts",
+      "src/lib/settings-api.ts",
+      "tests/lib/settings-api.test.ts"
+    ],
+    "recordedAt": "2026-07-05T05:44:21.258Z"
+  },
+  "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
     "be-write-door": "completed",
@@ -36,15 +97,65 @@
   },
   "pipeline": {
     "issueId": "PAN-2378",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-05T05:42:05.688Z",
+    "updatedAt": "2026-07-05T05:44:34.657Z",
     "reviewNotes": "Tier rename can overwrite an existing tier and drop its configuration",
-    "verificationNotes": "Verification FAILED at frontend-typecheck (13180ms):\n\npe '{ exclude_subjects: string[]; }' is missing the following properties from type '{ callouts: \"off\" | \"notify\" | \"corroborate\"; exclude: string[]; exclude_subjects: string[]; max_diff_bytes: number | null; }': callouts, exclude, max_diff_bytes\nsrc/components/Settings/sections/TieredExecutionSection.tsx(604,56): error TS2345: Argument of type '{ enabled: boolean; }' is not assignable to parameter of type '{ enabled: boolean; retries_at_tier: number; max_promotions: number; flounder_budget_minutes: Partial<Record<VBriefDifficulty, number>>; }'.\n  Type '{ enabled: boolean; }' is missing the following properties from type '{ enabled: boolean; retries_at_tier: number; max_promotions: number; flounder_budget_minutes: Partial<Record<VBriefDifficulty, number>>; }': retries_at_tier, max_promotions, flounder_budget_minutes\nsrc/components/Settings/sections/TieredExecutionSection.tsx(621,64): error TS2345: Argument of type '{ retries_at_tier: number; }' is not assignable to parameter of type '{ enabled: boolean; retries_at_tier: number; max_promotions: number; flounder_budget_minutes: Partial<Record<VBriefDifficulty, number>>; }'.\n  Type '{ retries_at_tier: number; }' is missing the following properties from type '{ enabled: boolean; retries_at_tier: number; max_promotions: number; flounder_budget_minutes: Partial<Record<VBriefDifficulty, number>>; }': enabled, max_promotions, flounder_budget_minutes\nsrc/components/Settings/sections/TieredExecutionSection.tsx(631,64): error TS2345: Argument of type '{ max_promotions: number; }' is not assignable to parameter of type '{ enabled: boolean; retries_at_tier: number; max_promotions: number; flounder_budget_minutes: Partial<Record<VBriefDifficulty, number>>; }'.\n  Type '{ max_promotions: number; }' is missing the following properties from type '{ enabled: boolean; retries_at_tier: number; max_promotions: number; flounder_budget_minutes: Partial<Record<VBriefDifficulty, number>>; }': enabled, retries_at_tier, flounder_budget_minutes\n",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2380",
+    "reviewRequestedAt": "2026-07-05T05:44:27.813Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        ".pan/drafts/PAN-2378.md",
+        ".pan/records/pan-2283.json",
+        ".pan/records/pan-2378.json",
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/frontend/src/components/Settings/hooks/useAutosavePipeline.ts",
+        "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.test.tsx",
+        "src/dashboard/frontend/src/components/vbrief/types.ts",
+        "src/lib/settings-api-tiered-execution.ts",
+        "tests/lib/settings-api.test.ts"
+      ],
+      "declaredScopeUntouched": [
+        "src/dashboard/frontend/src/components/Stage/cockpit/IssueMetricStrip.tsx",
+        "src/dashboard/server/routes/settings.ts",
+        "tests/unit/lib/settings-api.test.ts"
+      ],
+      "declaredScope": [
+        "docs/TIERED-EXECUTION.md",
+        "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
+        "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+        "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
+        "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/cockpit/IssueMetricStrip.tsx",
+        "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.tsx",
+        "src/dashboard/server/routes/settings.ts",
+        "src/lib/settings-api.ts",
+        "tests/unit/lib/settings-api.test.ts"
+      ],
+      "actualChangedFiles": [
+        ".pan/drafts/PAN-2378.md",
+        ".pan/records/pan-2283.json",
+        ".pan/records/pan-2378.json",
+        "docs/TIERED-EXECUTION.md",
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
+        "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+        "src/dashboard/frontend/src/components/Settings/hooks/useAutosavePipeline.ts",
+        "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
+        "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.tsx",
+        "src/dashboard/frontend/src/components/vbrief/types.ts",
+        "src/lib/settings-api-tiered-execution.ts",
+        "src/lib/settings-api.ts",
+        "tests/lib/settings-api.test.ts"
+      ],
+      "recordedAt": "2026-07-05T05:44:21.258Z"
+    },
     "deaconIgnored": true,
     "deaconIgnoredAt": "2026-07-05T04:59:38.468Z",
     "deaconIgnoredReason": "swarm freeze via pan swarm freeze"
@@ -99,10 +210,12 @@
       },
       "costAtCloseOut": {
         "usd": 10.57664,
-        "pricingAsOf": "2026-07-05T05:42:05.749Z"
+        "pricingAsOf": "2026-07-05T05:44:34.713Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2380"
+    ],
     "ranOn": "eltmon-z790"
   },
   "swarm": {
@@ -116,5 +229,5 @@
     ]
   },
   "created": "2026-07-05T05:42:05.762Z",
-  "updated": "2026-07-05T05:44:15.990Z"
+  "updated": "2026-07-05T05:44:34.721Z"
 }
