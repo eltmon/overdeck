@@ -239,7 +239,7 @@ export function TieredExecutionSection({
     });
   };
 
-  const handleFeedPatch = (patch: NonNullable<TieredExecutionConfig['feed']>, opts: { debounce?: boolean } = {}) => {
+  const handleFeedPatch = (patch: Partial<NonNullable<TieredExecutionConfig['feed']>>, opts: { debounce?: boolean } = {}) => {
     const next = currentConfig();
     onSettingsChange({
       ...formData,
@@ -256,7 +256,7 @@ export function TieredExecutionSection({
     }, opts);
   };
 
-  const handleEscalationPatch = (patch: NonNullable<TieredExecutionConfig['escalation']>, opts: { debounce?: boolean } = {}) => {
+  const handleEscalationPatch = (patch: Partial<NonNullable<TieredExecutionConfig['escalation']>>, opts: { debounce?: boolean } = {}) => {
     const next = currentConfig();
     onSettingsChange({
       ...formData,
