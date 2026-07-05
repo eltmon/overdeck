@@ -48,7 +48,9 @@ import { getWorkspacePathForIssue } from '../../workspace-paths.js';
 import { criticalPath, actionableDoc } from '../../../../lib/vbrief/dag.js';
 import { findVBriefByIssue, readVBriefDocument } from '../../../../lib/vbrief/vbrief-index.js';
 import { VBRIEF_INSPECTION_POLICIES } from '../../../../lib/vbrief/types.js';
-import type { VBriefDocument, VBriefInspectionPolicy } from '../../../../lib/vbrief/types.js';
+import type { VBriefDocument, VBriefInspectionPolicy, TieredExecutionResolved } from '../../../../lib/vbrief/types.js';
+import { resolveTieredExecutionEnabled } from '../../../../lib/agents/tier-table.js';
+import { loadConfigSync } from '../../../../lib/config.js';
 import { getChangedFiles, getDiffBase, getDiffStat } from '../../../../lib/cloister/review-context.js';
 import type { ChangedFile } from '../../../../lib/cloister/review-context.js';
 import { getTldrDaemonServiceSync } from '../../../../lib/tldr-daemon.js';
@@ -199,6 +201,21 @@ function resolvePlanLocation(projectPath: string, issueId: string): Effect.Effec
       doc: yield* readPlan(planPath),
     };
   });
+}
+
+function computeTieredExecutionResolved(doc: VBriefDocument): TieredExecutionResolved {
+  const config = loadConfigSync().config;
+  const override = doc.plan.metadata?.tiered_execution;
+
+  if (override === 'on') {
+    return { effective: true, source: 'issue override' };
+  }
+  if (override === 'off') {
+    return { effective: false, source: 'issue override' };
+  }
+
+  const isEnabled = config.tieredExecution?.enabled ?? false;
+  return { effective: isEnabled, source: 'global' };
 }
 
 export interface UatContextAcceptanceCriterion {
@@ -781,7 +798,8 @@ const getWorkspacePlanRoute = HttpRouter.add(
     }
 
     const cp = criticalPath(actionableDoc(location.doc));
-    return jsonResponse({ ...location.doc, criticalPath: cp, lifecycleDir: location.lifecycleDir });
+    const tieredExecution = computeTieredExecutionResolved(location.doc);
+    return jsonResponse({ ...location.doc, criticalPath: cp, lifecycleDir: location.lifecycleDir, tieredExecution });
   }))
 );
 const getWorkspaceUatContextRoute = HttpRouter.add(

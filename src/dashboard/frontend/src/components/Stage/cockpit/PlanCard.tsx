@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query'
 import { CheckCircle2, Circle } from 'lucide-react'
 import {
   usePlanningSummaryQuery,
-  useSettingsQuery,
   useWorkspacePlanQuery,
 } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import { CockpitCard } from './CockpitCard'
@@ -18,10 +17,8 @@ interface BeadsResponse {
   tasks: BeadTask[]
 }
 
-function tieredChipLabel(override: unknown, globalEnabled: boolean | undefined): string {
-  if (override === 'on') return 'tiered: on (issue override)'
-  if (override === 'off') return 'tiered: off (issue override)'
-  return `tiered: ${globalEnabled ? 'on' : 'off'} (global)`
+function tieredChipLabel(effective: boolean, source: string): string {
+  return `tiered: ${effective ? 'on' : 'off'} (${source})`
 }
 
 /**
@@ -33,10 +30,9 @@ function tieredChipLabel(override: unknown, globalEnabled: boolean | undefined):
 export function PlanCard({ issueId }: { issueId: string }) {
   const planning = usePlanningSummaryQuery(issueId)
   const workspacePlan = useWorkspacePlanQuery(issueId)
-  const settings = useSettingsQuery()
   const ac = planning.data?.acceptanceProgress
-  const tieredOverride = workspacePlan.data?.plan?.metadata?.tiered_execution
-  const tieredLabel = tieredChipLabel(tieredOverride, settings.data?.tiered_execution?.enabled)
+  const tieredExecution = workspacePlan.data?.tieredExecution
+  const tieredLabel = tieredExecution ? tieredChipLabel(tieredExecution.effective, tieredExecution.source) : 'loading…'
 
   const beadsQuery = useQuery<BeadsResponse>({
     queryKey: ['beads', issueId],

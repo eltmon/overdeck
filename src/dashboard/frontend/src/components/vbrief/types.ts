@@ -66,6 +66,11 @@ export interface VBriefPlan {
   edges: VBriefEdge[];
 }
 
+export interface TieredExecutionResolved {
+  effective: boolean;
+  source: 'issue override' | 'plan metadata' | 'global';
+}
+
 export interface VBriefDocument {
   vBRIEFInfo: {
     version: string;
@@ -77,4 +82,5 @@ export interface VBriefDocument {
   };
   plan: VBriefPlan;
   criticalPath?: string[];
+  tieredExecution?: TieredExecutionResolved;
 }
