@@ -17,10 +17,26 @@ export type TieredExecutionSubscription = typeof TIERED_EXECUTION_SUBSCRIPTIONS[
 export type TieredExecutionCalloutPolicy = typeof TIERED_EXECUTION_CALLOUT_POLICIES[number];
 export type TieredExecutionCompactionReroutePolicy = typeof TIERED_EXECUTION_COMPACTION_REROUTE_POLICIES[number];
 
+export interface TierDistributionEntry {
+  model: ModelId | string;
+  harness: RuntimeName;
+  /** Integer percentage; a tier's entries must total exactly 100. */
+  weight: number;
+}
+
 export interface TierDefinition {
   model: ModelId | string;
   harness: RuntimeName;
   difficulties: VBriefDifficulty[];
+  /**
+   * PAN-2391: weighted model+harness entries this tier spreads its beads
+   * across (to consume multiple subscription plans). When present, the raw
+   * config declared `distribution` INSTEAD of model/harness; the normalized
+   * model/harness above are the max-weight representative so distribution-
+   * unaware readers degrade safely. Selection is deterministic per bead
+   * (see pickDistributionEntry).
+   */
+  distribution?: TierDistributionEntry[];
 }
 
 export interface TieredExecutionSupervisorConfig {
@@ -293,9 +309,42 @@ export function validateTieredExecutionConfig(
 
   for (const [tierName, tier] of Object.entries(config.tiers)) {
     const path = `tiered_execution.tiers.${tierName}`;
-    validateHarness(tier.harness, path);
-    const model = validateModel(tier.model, path);
-    validateModelHarnessPolicy(model, tier.harness, path, context);
+
+    const rawDistribution = (tier as { distribution?: unknown }).distribution;
+    let normalizedDistribution: TierDistributionEntry[] | undefined;
+    let model: string;
+    let harness: RuntimeName;
+    if (rawDistribution !== undefined) {
+      if (tier.model !== undefined || tier.harness !== undefined) {
+        throw new TieredExecutionConfigError(`${path} must declare either model/harness or distribution, not both`);
+      }
+      if (!Array.isArray(rawDistribution) || rawDistribution.length === 0) {
+        throw new TieredExecutionConfigError(`${path}.distribution must be a non-empty array of {model, harness, weight}`);
+      }
+      normalizedDistribution = rawDistribution.map((entry, index) => {
+        const entryPath = `${path}.distribution[${index}]`;
+        const candidate = entry as Partial<TierDistributionEntry>;
+        validateHarness(candidate.harness as RuntimeName, entryPath);
+        const entryModel = validateModel(candidate.model as string, entryPath);
+        validateModelHarnessPolicy(entryModel, candidate.harness as RuntimeName, entryPath, context);
+        if (!Number.isInteger(candidate.weight) || (candidate.weight as number) <= 0) {
+          throw new TieredExecutionConfigError(`${entryPath}.weight must be a positive integer`);
+        }
+        return { model: entryModel, harness: candidate.harness as RuntimeName, weight: candidate.weight as number };
+      });
+      const total = normalizedDistribution.reduce((sum, entry) => sum + entry.weight, 0);
+      if (total !== 100) {
+        throw new TieredExecutionConfigError(`${path}.distribution weights must total exactly 100 (got ${total})`);
+      }
+      const representative = normalizedDistribution.reduce((best, entry) => (entry.weight > best.weight ? entry : best));
+      model = representative.model;
+      harness = representative.harness;
+    } else {
+      validateHarness(tier.harness, path);
+      model = validateModel(tier.model, path);
+      validateModelHarnessPolicy(model, tier.harness, path, context);
+      harness = tier.harness;
+    }
 
     if (!Array.isArray(tier.difficulties) || tier.difficulties.length === 0) {
       throw new TieredExecutionConfigError(`${path}.difficulties must contain at least one difficulty`);
@@ -310,7 +359,7 @@ export function validateTieredExecutionConfig(
       difficultyOwners[difficulty] = [...(difficultyOwners[difficulty] ?? []), tierName];
     }
 
-    normalizedTiers[tierName] = { model, harness: tier.harness, difficulties };
+    normalizedTiers[tierName] = { model, harness, difficulties, ...(normalizedDistribution ? { distribution: normalizedDistribution } : {}) };
   }
 
   const difficultyToTier: Partial<Record<VBriefDifficulty, string>> = {};

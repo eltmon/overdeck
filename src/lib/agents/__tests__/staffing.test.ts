@@ -87,3 +87,65 @@ describe('resolveStaffing (PAN-2397 W1 — Always Tiered)', () => {
     expect(() => resolveImplicitStaffing({} as never)).toThrow();
   });
 });
+
+describe('distribution tiers (PAN-2391 / PAN-2397 W2)', () => {
+  function distributionConfig() {
+    return {
+      roles: WORK_ROLES,
+      tieredExecution: {
+        enabled: true,
+        tiers: {
+          standard: {
+            model: 'gpt-5.5',
+            harness: 'codex',
+            difficulties: ['medium'],
+            distribution: [
+              { model: 'gpt-5.5', harness: 'codex', weight: 40 },
+              { model: 'glm-5.2', harness: 'ohmypi', weight: 30 },
+              { model: 'kimi-k2.7-code', harness: 'ohmypi', weight: 30 },
+            ],
+          },
+        },
+        difficultyToTier: { medium: 'standard' },
+        byKind: {},
+      },
+    } as never;
+  }
+
+  it('same bead always resolves to the same distribution entry', () => {
+    const config = distributionConfig();
+    const first = resolveStaffing(item('bead-7', { difficulty: 'medium' }), { config, spawnKey: 'work:PAN-1' });
+    for (let i = 0; i < 5; i += 1) {
+      const again = resolveStaffing(item('bead-7', { difficulty: 'medium' }), { config, spawnKey: 'work:PAN-1' });
+      expect(again).toEqual(first);
+    }
+    expect(first.tierName).toBe('standard');
+    expect(first.implicit).toBe(false);
+  });
+
+  it('spreads beads across entries roughly by weight', async () => {
+    const { pickDistributionEntry } = await import('../staffing.js');
+    const entries = [
+      { model: 'gpt-5.5', harness: 'codex', weight: 40 },
+      { model: 'glm-5.2', harness: 'ohmypi', weight: 30 },
+      { model: 'kimi-k2.7-code', harness: 'ohmypi', weight: 30 },
+    ] as never;
+    const counts: Record<string, number> = {};
+    for (let i = 0; i < 1000; i += 1) {
+      const picked = pickDistributionEntry(entries, `work:PAN-1:bead-${i}`);
+      counts[picked.model] = (counts[picked.model] ?? 0) + 1;
+    }
+    expect(counts['gpt-5.5']).toBeGreaterThan(320);
+    expect(counts['gpt-5.5']).toBeLessThan(480);
+    expect(counts['glm-5.2']).toBeGreaterThan(220);
+    expect(counts['kimi-k2.7-code']).toBeGreaterThan(220);
+  });
+
+  it('per-bead metadata.model override outranks the distribution', () => {
+    const staffing = resolveStaffing(item('bead-7', { difficulty: 'medium', model: 'claude-haiku-4-5' }), {
+      config: distributionConfig(),
+      spawnKey: 'work:PAN-1',
+    });
+    expect(staffing.model).toBe('claude-haiku-4-5');
+  });
+});
