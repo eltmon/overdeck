@@ -9,7 +9,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import {
   isValidAgentDirectoryName,
-  isLegacyConversationDirectory,
+  isConversationDirectory,
   getPlanningIssueId,
   getAgentDirectoryIssueId,
   findOrphanedAgentDirs,
@@ -115,19 +115,19 @@ describe('isValidAgentDirectoryName', () => {
 });
 
 // ------------------------------------------------------------------
-// isLegacyConversationDirectory
+// isConversationDirectory
 // ------------------------------------------------------------------
 
-describe('isLegacyConversationDirectory', () => {
-  it('identifies conv-* directories as legacy', () => {
-    expect(isLegacyConversationDirectory('conv-20260411-1125')).toBe(true);
-    expect(isLegacyConversationDirectory('conv-20260425-025517-630')).toBe(true);
+describe('isConversationDirectory', () => {
+  it('identifies conv-* directories', () => {
+    expect(isConversationDirectory('conv-20260411-1125')).toBe(true);
+    expect(isConversationDirectory('conv-20260425-025517-630')).toBe(true);
   });
 
   it('rejects non-conv directories', () => {
-    expect(isLegacyConversationDirectory('agent-pan-801')).toBe(false);
-    expect(isLegacyConversationDirectory('planning-pan-801')).toBe(false);
-    expect(isLegacyConversationDirectory('random-dir')).toBe(false);
+    expect(isConversationDirectory('agent-pan-801')).toBe(false);
+    expect(isConversationDirectory('planning-pan-801')).toBe(false);
+    expect(isConversationDirectory('random-dir')).toBe(false);
   });
 });
 
@@ -185,7 +185,7 @@ describe('findOrphanedAgentDirs', () => {
     expect(result).toEqual([]);
   });
 
-  it('identifies legacy directories as orphaned', async () => {
+  it('identifies legacy directories as orphaned but never conv-* directories', async () => {
     vi.mocked(listSessionNames).mockReturnValue(Effect.succeed([]));
 
     mkdirSync(join(TEST_DIR, 'agent-pan-801'), { recursive: true });
@@ -197,7 +197,9 @@ describe('findOrphanedAgentDirs', () => {
     const result = await Effect.runPromise(findOrphanedAgentDirs(TEST_DIR));
     const names = result.map((d) => d.name).sort();
 
-    expect(names).toEqual(['agent-108', 'conv-20260411-1125', 'specialist-test-agent', 'work-pan-208']);
+    // conv-* dirs hold ohmypi/codex transcripts and must never be orphaned,
+    // even with no running tmux session (2026-07-05 transcript-loss incident).
+    expect(names).toEqual(['agent-108', 'specialist-test-agent', 'work-pan-208']);
     expect(result.every((d) => !d.hasRunningSession)).toBe(true);
   });
 
@@ -228,14 +230,24 @@ describe('findOrphanedAgentDirs', () => {
   });
 
   it('marks running legacy sessions as protected', async () => {
-    vi.mocked(listSessionNames).mockReturnValue(Effect.succeed(['conv-20260411-1125']));
+    vi.mocked(listSessionNames).mockReturnValue(Effect.succeed(['specialist-test-agent']));
 
-    mkdirSync(join(TEST_DIR, 'conv-20260411-1125'), { recursive: true });
+    mkdirSync(join(TEST_DIR, 'specialist-test-agent'), { recursive: true });
 
     const result = await Effect.runPromise(findOrphanedAgentDirs(TEST_DIR));
     expect(result).toHaveLength(1);
-    expect(result[0].name).toBe('conv-20260411-1125');
+    expect(result[0].name).toBe('specialist-test-agent');
     expect(result[0].hasRunningSession).toBe(true);
+  });
+
+  it('never reports conv-* directories as orphaned, session running or not', async () => {
+    vi.mocked(listSessionNames).mockReturnValue(Effect.succeed(['conv-20260425-025517-630']));
+
+    mkdirSync(join(TEST_DIR, 'conv-20260411-1125'), { recursive: true }); // ended, no session
+    mkdirSync(join(TEST_DIR, 'conv-20260425-025517-630'), { recursive: true }); // live
+
+    const result = await Effect.runPromise(findOrphanedAgentDirs(TEST_DIR));
+    expect(result).toEqual([]);
   });
 });
 
@@ -257,10 +269,10 @@ describe('cleanupAgentDirectories', () => {
       agentsDir: TEST_DIR,
     }));
 
-    expect(result.totalOrphaned).toBe(3);
+    expect(result.totalOrphaned).toBe(2);
     expect(result.wouldRemove).toContain('agent-108');
     expect(result.wouldRemove).toContain('planning-pan-569');
-    expect(result.wouldRemove).toContain('conv-20260411-1125');
+    expect(result.wouldRemove).not.toContain('conv-20260411-1125');
     expect(result.removed).toEqual([]);
     expect(result.protected).toEqual([]);
 
@@ -285,17 +297,17 @@ describe('cleanupAgentDirectories', () => {
       agentsDir: TEST_DIR,
     }));
 
-    expect(result.totalOrphaned).toBe(3);
+    expect(result.totalOrphaned).toBe(2);
     expect(result.removed).toContain('agent-108');
     expect(result.removed).toContain('planning-pan-569');
-    expect(result.removed).toContain('conv-20260411-1125');
+    expect(result.removed).not.toContain('conv-20260411-1125');
     expect(result.wouldRemove).toEqual([]);
     expect(result.protected).toEqual([]);
 
-    // Verify deletion
+    // Verify deletion — conv-* dirs survive (transcript storage, never removed)
     expect(existsSync(join(TEST_DIR, 'agent-108'))).toBe(false);
     expect(existsSync(join(TEST_DIR, 'planning-pan-569'))).toBe(false);
-    expect(existsSync(join(TEST_DIR, 'conv-20260411-1125'))).toBe(false);
+    expect(existsSync(join(TEST_DIR, 'conv-20260411-1125'))).toBe(true);
     expect(existsSync(join(TEST_DIR, 'agent-pan-801'))).toBe(true);
   });
 
@@ -317,7 +329,7 @@ describe('cleanupAgentDirectories', () => {
     expect(existsSync(join(TEST_DIR, 'agent-min-215'))).toBe(true);
   });
 
-  it('protects running planning and conv sessions', async () => {
+  it('protects running planning sessions and never counts conv dirs as orphaned', async () => {
     vi.mocked(listSessionNames).mockReturnValue(Effect.succeed([
       'planning-pan-817',
       'conv-20260425-025517-630',
@@ -333,8 +345,8 @@ describe('cleanupAgentDirectories', () => {
       agentsDir: TEST_DIR,
     }));
 
-    expect(result.totalOrphaned).toBe(2);
-    expect(result.protected).toContain('conv-20260425-025517-630');
+    expect(result.totalOrphaned).toBe(1);
+    expect(result.protected).not.toContain('conv-20260425-025517-630');
     expect(result.removed).toContain('planning-pan-569');
 
     expect(existsSync(join(TEST_DIR, 'planning-pan-817'))).toBe(true);
