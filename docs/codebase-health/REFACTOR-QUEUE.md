@@ -67,11 +67,20 @@ line-count metric while keeping the module shallow — the workspaces split prov
 
 ## Phase 3 — cloister core (pipeline machinery; supervised, sequenced, never batched)
 
-**NEXT UP (2026-07-04):** Phase 2 is complete → Phase 3 is ready to kick off, but it
-requires an explicit **operator handoff** (it is `needs-handoff`, not auto-pickup).
-Start with PAN-2149; PRDs for items 12–15 are on main. PAN-2189 (deacon.ts) stays
-**deferred** until 12–15 land (its seams shift as each predecessor merges). Run one
-GPT-5.5 work agent at a time — do NOT batch (these red main = pipeline stall).
+**INTERLEAVING (2026-07-04, operator-directed):** Phase 3 is now sequenced BEHIND the
+CI/CD reliability epic's cloister-adjacent fixes (PAN-2376 Phases 1–2) — see
+`docs/master-plan-cicd-and-refactoring.md` (Lane B, items B1–B8 before B9–B12). Reason:
+eight small surgical fixes rebase cheaply under a later decomposition; a decomposition
+landing first rewrites every anchor in eight CI/CD PRDs at once. The items and order
+WITHIN Phase 3 are unchanged. **Every Phase 3 PRD (written 2026-07-02) requires its
+`## Re-verify at execution` pass before dispatch** — the CI/CD fixes touch these files.
+PAN-2297 must land before PAN-2233 starts.
+
+**Handoff status:** the `needs-handoff` gate is satisfied — the operator directed the
+master-plan drip on 2026-07-04. Start with PAN-2149 when Lane B reaches B9. PAN-2189
+(deacon.ts) stays **deferred** until 12–15 land (its seams shift as each predecessor
+merges). Run one work agent at a time in this lane — do NOT batch (red main here =
+pipeline stall).
 
 TENET-10 territory: a red main here stalls the pipeline that ships the fix. One at a
 time, full suite before merge, verify against origin HEAD.

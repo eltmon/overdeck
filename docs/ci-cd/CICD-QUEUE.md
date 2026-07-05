@@ -27,6 +27,13 @@ normal pipeline flow; Phase 1/2 touch pipeline machinery (TENET-10: red main sta
 pipeline that ships the fix) — one at a time, full suite before merge, verify against
 origin HEAD.
 
+**Interleaving with the refactor campaign (2026-07-04):** cross-campaign ordering is
+owned by `docs/master-plan-cicd-and-refactoring.md`. Summary: Phases 0/3 and the
+non-cloister Phase 4 items are **Lane A** (parallel-safe, dispatch any time); Phases
+1/2 are **Lane B** (strictly serial, one in flight) and land BEFORE refactor Phase 3's
+cloister decompositions — small fixes rebase cheaply under a later decomposition, the
+reverse rewrites every PRD anchor at once. PAN-2297 must land before refactor PAN-2233.
+
 **PRD chaining rule** applies verbatim from REFACTOR-QUEUE.md: every PRD carries
 `Verified-Against: main @ <sha>`; grep anchors, never bare line numbers; if a PRD's
 target is modified by an earlier queue item, list assumptions in
