@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  readWatchdogConfig,
   SupervisorWatchdog,
   type SpawnRestart,
   type SupervisorWatchdogConfig,
@@ -21,6 +22,7 @@ const config: SupervisorWatchdogConfig = {
   maxRestarts: 3,
   windowMs: 5 * 60_000,
   requestTimeoutMs: 2_000,
+  bootGraceMs: 0,
 };
 
 function makeWatchdog(overrides: Partial<{
@@ -156,6 +158,111 @@ describe('SupervisorWatchdog', () => {
     expect(spawns.count).toBe(1);
     expect(watchdog.status().consecutiveHardFailures).toBe(3);
     expect(logs.some((msg) => msg.includes('dashboard unreachable'))).toBe(true);
+  });
+
+  it('defers hard-failure restart during boot grace before first healthy check', async () => {
+    let now = Date.parse('2026-05-17T15:30:00.000Z');
+    const spawns = { count: 0 };
+    const logs: string[] = [];
+    const watchdog = makeWatchdog({
+      spawns,
+      logs,
+      now: () => now,
+      config: { ...config, failThreshold: 3, bootGraceMs: 300_000 },
+    });
+
+    await watchdog.checkOnce();
+    now += 1_000;
+    await watchdog.checkOnce();
+    now += 1_000;
+    await watchdog.checkOnce();
+
+    expect(spawns.count).toBe(0);
+    expect(watchdog.status()).toMatchObject({
+      healthy: false,
+      consecutiveFailures: 3,
+      consecutiveHardFailures: 3,
+    });
+    expect(logs.some((msg) => msg.includes('deferring restart during boot grace'))).toBe(true);
+  });
+
+  it('restarts after hard failures once the dashboard has been healthy', async () => {
+    let fetchOk = true;
+    const spawns = { count: 0 };
+    const watchdog = new SupervisorWatchdog({
+      config: { ...config, failThreshold: 3, bootGraceMs: 300_000 },
+      now: () => Date.parse('2026-05-17T15:30:00.000Z'),
+      log: () => undefined,
+      spawnRestart: () => {
+        spawns.count += 1;
+        return { pid: 1000 + spawns.count, error: null };
+      },
+      fetchFn: async (input) => {
+        if (input.endsWith('/api/deacon/status')) {
+          return {
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            json: async () => ({
+              isRunning: true,
+              config: { patrolIntervalMs: 60_000 },
+              state: { lastPatrol: '2026-05-17T15:29:00.000Z' },
+            }),
+          };
+        }
+        return fetchOk
+          ? { ok: true, status: 200, statusText: 'OK' }
+          : { ok: false, status: 503, statusText: 'Service Unavailable' };
+      },
+    });
+
+    await watchdog.checkOnce();
+    fetchOk = false;
+    await watchdog.checkOnce();
+    await watchdog.checkOnce();
+    await watchdog.checkOnce();
+
+    expect(spawns.count).toBe(1);
+  });
+
+  it('restarts a never-healthy dashboard after boot grace expires', async () => {
+    let now = Date.parse('2026-05-17T15:30:00.000Z');
+    const spawns = { count: 0 };
+    const watchdog = makeWatchdog({
+      spawns,
+      now: () => now,
+      config: { ...config, failThreshold: 3, bootGraceMs: 10_000 },
+    });
+
+    await watchdog.checkOnce();
+    now += 1_000;
+    await watchdog.checkOnce();
+    now += 10_000;
+    await watchdog.checkOnce();
+
+    expect(spawns.count).toBe(1);
+  });
+
+  it('starts a fresh boot-grace window after a watchdog restart', async () => {
+    let now = Date.parse('2026-05-17T15:30:00.000Z');
+    const spawns = { count: 0 };
+    const watchdog = makeWatchdog({
+      spawns,
+      now: () => now,
+      config: { ...config, failThreshold: 1, bootGraceMs: 10_000 },
+    });
+
+    now += 10_001;
+    await watchdog.checkOnce();
+    expect(spawns.count).toBe(1);
+
+    now += 1_000;
+    await watchdog.checkOnce();
+    expect(spawns.count).toBe(1);
+
+    now += 10_000;
+    await watchdog.checkOnce();
+    expect(spawns.count).toBe(2);
   });
 
   it('clears consecutive failures and restart attempts on health success', async () => {
@@ -406,6 +513,11 @@ describe('SupervisorWatchdog', () => {
       restartLockHeld: true,
       bootId: 'boot-watchdog',
     });
+  });
+
+  it('parses supervisor boot-grace environment configuration', () => {
+    expect(readWatchdogConfig({}, 3011).bootGraceMs).toBe(300_000);
+    expect(readWatchdogConfig({ OVERDECK_SUPERVISOR_BOOT_GRACE_MS: '45000' }, 3011).bootGraceMs).toBe(45_000);
   });
 
   it('waits for a restart that completes after a 60s dashboard boot', async () => {
