@@ -214,7 +214,7 @@ export function TieredExecutionSection({
     });
   };
 
-  const handleSupervisorPatch = (patch: NonNullable<TieredExecutionConfig['supervisor']>) => {
+  const handleSupervisorPatch = (patch: Partial<NonNullable<TieredExecutionConfig['supervisor']>>) => {
     const next = currentConfig();
     updateTieredExecution({
       ...next,

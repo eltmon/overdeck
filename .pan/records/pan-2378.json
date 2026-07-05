@@ -1,69 +1,16 @@
 {
   "issueId": "PAN-2378",
   "schemaVersion": 2,
-  "sessionHistory": [
+  "feedback": [
     {
-      "timestamp": "2026-07-05T05:44:27.812Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-05T05:44:28.142Z"
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-05T05:45:43Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2378\n\nTier-name editing remounts the controlled input on every keystroke\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2378 -m \"Fixed review issues\"`"
     }
   ],
-  "feedback": [],
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      ".pan/drafts/PAN-2378.md",
-      ".pan/records/pan-2283.json",
-      ".pan/records/pan-2378.json",
-      "scripts/file-size-baseline.txt",
-      "src/dashboard/frontend/src/components/Settings/hooks/useAutosavePipeline.ts",
-      "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.test.tsx",
-      "src/dashboard/frontend/src/components/vbrief/types.ts",
-      "src/lib/settings-api-tiered-execution.ts",
-      "tests/lib/settings-api.test.ts"
-    ],
-    "declaredScopeUntouched": [
-      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMetricStrip.tsx",
-      "src/dashboard/server/routes/settings.ts",
-      "tests/unit/lib/settings-api.test.ts"
-    ],
-    "declaredScope": [
-      "docs/TIERED-EXECUTION.md",
-      "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
-      "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
-      "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
-      "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
-      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMetricStrip.tsx",
-      "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.tsx",
-      "src/dashboard/server/routes/settings.ts",
-      "src/lib/settings-api.ts",
-      "tests/unit/lib/settings-api.test.ts"
-    ],
-    "actualChangedFiles": [
-      ".pan/drafts/PAN-2378.md",
-      ".pan/records/pan-2283.json",
-      ".pan/records/pan-2378.json",
-      "docs/TIERED-EXECUTION.md",
-      "scripts/file-size-baseline.txt",
-      "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
-      "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
-      "src/dashboard/frontend/src/components/Settings/hooks/useAutosavePipeline.ts",
-      "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
-      "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
-      "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.test.tsx",
-      "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.tsx",
-      "src/dashboard/frontend/src/components/vbrief/types.ts",
-      "src/lib/settings-api-tiered-execution.ts",
-      "src/lib/settings-api.ts",
-      "tests/lib/settings-api.test.ts"
-    ],
-    "recordedAt": "2026-07-05T05:44:21.258Z"
-  },
-  "harness": "codex",
+  "harness": "claude-code",
   "model": "gpt-5.5",
   "statusOverrides": {
     "be-write-door": "completed",
@@ -97,14 +44,15 @@
   },
   "pipeline": {
     "issueId": "PAN-2378",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-05T05:44:34.657Z",
-    "reviewNotes": "Tier rename can overwrite an existing tier and drop its configuration",
+    "updatedAt": "2026-07-05T05:45:43.418Z",
+    "reviewNotes": "Tier-name editing remounts the controlled input on every keystroke",
+    "verificationNotes": "Verification FAILED at frontend-typecheck (13153ms):\n\nsrc/components/Settings/sections/TieredExecutionSection.tsx(222,9): error TS2783: 'model' is specified more than once, so this usage will be overwritten.\nsrc/components/Settings/sections/TieredExecutionSection.tsx(223,9): error TS2783: 'harness' is specified more than once, so this usage will be overwritten.\nsrc/components/Settings/sections/TieredExecutionSection.tsx(224,9): error TS2783: 'subscribe' is specified more than once, so this usage will be overwritten.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2380",
     "reviewRequestedAt": "2026-07-05T05:44:27.813Z",
     "scopeDrift": {
@@ -210,7 +158,7 @@
       },
       "costAtCloseOut": {
         "usd": 10.57664,
-        "pricingAsOf": "2026-07-05T05:44:34.713Z"
+        "pricingAsOf": "2026-07-05T05:45:43.445Z"
       }
     },
     "merges": [
@@ -228,6 +176,13 @@
       }
     ]
   },
-  "created": "2026-07-05T05:42:05.762Z",
-  "updated": "2026-07-05T05:44:34.721Z"
+  "created": "2026-07-05T05:45:10.526Z",
+  "updated": "2026-07-05T05:45:43.452Z",
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-07-05T05:45Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-05T05:45:43.452Z"
+    }
+  ]
 }
