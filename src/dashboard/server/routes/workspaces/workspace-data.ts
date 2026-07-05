@@ -205,17 +205,17 @@ function resolvePlanLocation(projectPath: string, issueId: string): Effect.Effec
 
 function computeTieredExecutionResolved(doc: VBriefDocument): TieredExecutionResolved {
   const config = loadConfigSync().config;
-  const override = doc.plan.metadata?.tiered_execution;
+  const planMetadataOverride = doc.plan.metadata?.tiered_execution;
+  const globalEnabled = config.tieredExecution?.enabled ?? false;
 
-  if (override === 'on') {
-    return { effective: true, source: 'issue override' };
+  if (planMetadataOverride === 'on') {
+    return { effective: true, source: 'plan-metadata', override: 'on' };
   }
-  if (override === 'off') {
-    return { effective: false, source: 'issue override' };
+  if (planMetadataOverride === 'off') {
+    return { effective: false, source: 'plan-metadata', override: 'off' };
   }
 
-  const isEnabled = config.tieredExecution?.enabled ?? false;
-  return { effective: isEnabled, source: 'global' };
+  return { effective: globalEnabled, source: 'global', override: null };
 }
 
 export interface UatContextAcceptanceCriterion {

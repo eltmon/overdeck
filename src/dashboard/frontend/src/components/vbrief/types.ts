@@ -68,7 +68,8 @@ export interface VBriefPlan {
 
 export interface TieredExecutionResolved {
   effective: boolean;
-  source: 'issue override' | 'plan metadata' | 'global';
+  source: 'issue-override' | 'plan-metadata' | 'global';
+  override: 'on' | 'off' | null;
 }
 
 export interface VBriefDocument {

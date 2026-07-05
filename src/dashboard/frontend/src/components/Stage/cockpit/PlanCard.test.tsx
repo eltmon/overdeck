@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 const queryMocks = vi.hoisted(() => ({
   planningSummaryQuery: { data: { acceptanceProgress: { completed: 0, total: 0, percent: 0 } } },
-  workspacePlanQuery: { data: { plan: { metadata: {} }, tieredExecution: { effective: false, source: 'global' as const } } },
+  workspacePlanQuery: { data: { plan: { metadata: {} }, tieredExecution: { effective: false, source: 'global' as const, override: null } } },
 }))
 
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/queries', () => ({
@@ -29,7 +29,7 @@ function renderPlanCard() {
 
 describe('PlanCard tiered execution chip', () => {
   beforeEach(() => {
-    queryMocks.workspacePlanQuery.data = { plan: { metadata: {} }, tieredExecution: { effective: false, source: 'global' as const } }
+    queryMocks.workspacePlanQuery.data = { plan: { metadata: {} }, tieredExecution: { effective: false, source: 'global' as const, override: null } }
     global.fetch = vi.fn(async (url) => {
       if (String(url) === '/api/issues/PAN-2378/beads') {
         return Response.json({ issueId: 'PAN-2378', tasks: [] })
@@ -43,25 +43,25 @@ describe('PlanCard tiered execution chip', () => {
   })
 
   it('renders the on override chip as read-only with the docs link', () => {
-    queryMocks.workspacePlanQuery.data = { plan: { metadata: { tiered_execution: 'on' } }, tieredExecution: { effective: true, source: 'issue override' as const } }
+    queryMocks.workspacePlanQuery.data = { plan: { metadata: { tiered_execution: 'on' } }, tieredExecution: { effective: true, source: 'plan-metadata' as const, override: 'on' } }
 
     renderPlanCard()
 
-    const chip = screen.getByRole('link', { name: 'tiered: on (issue override)' })
+    const chip = screen.getByRole('link', { name: 'tiered: on (plan-metadata)' })
     expect(chip.getAttribute('href')).toContain('docs/TIERED-EXECUTION.md')
     expect(screen.queryByRole('button', { name: /tiered:/ })).toBeNull()
   })
 
   it('renders the off override chip', () => {
-    queryMocks.workspacePlanQuery.data = { plan: { metadata: { tiered_execution: 'off' } }, tieredExecution: { effective: false, source: 'issue override' as const } }
+    queryMocks.workspacePlanQuery.data = { plan: { metadata: { tiered_execution: 'off' } }, tieredExecution: { effective: false, source: 'plan-metadata' as const, override: 'off' } }
 
     renderPlanCard()
 
-    expect(screen.getByRole('link', { name: 'tiered: off (issue override)' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'tiered: off (plan-metadata)' })).toBeTruthy()
   })
 
-  it('renders the inherited global chip when no issue override exists', () => {
-    queryMocks.workspacePlanQuery.data = { plan: { metadata: {} }, tieredExecution: { effective: true, source: 'global' as const } }
+  it('renders the inherited global chip when no override exists', () => {
+    queryMocks.workspacePlanQuery.data = { plan: { metadata: {} }, tieredExecution: { effective: true, source: 'global' as const, override: null } }
 
     renderPlanCard()
 
