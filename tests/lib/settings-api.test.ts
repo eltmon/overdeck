@@ -93,9 +93,28 @@ vi.mock('fs/promises', async () => {
   const actual = await vi.importActual<typeof import('fs/promises')>('fs/promises');
   return {
     ...actual,
+    readFile: vi.fn(async () => {
+      const error = new Error('ENOENT') as Error & { code: string };
+      error.code = 'ENOENT';
+      throw error;
+    }),
     writeFile: vi.fn(),
   };
 });
+
+const validTieredExecution = {
+  enabled: true,
+  tiers: {
+    cheap: { model: 'claude-haiku-4-5', harness: 'claude-code' as const, difficulties: ['trivial', 'simple'] },
+    frontier: { model: 'claude-opus-4-8', harness: 'claude-code' as const, difficulties: ['medium', 'complex', 'expert'] },
+  },
+  supervisor: { model: 'claude-opus-4-8', harness: 'claude-code' as const, subscribe: 'flagged' as const },
+  by_kind: {},
+  feed: { callouts: 'off' as const, exclude: [], exclude_subjects: [], max_diff_bytes: null },
+  escalation: { enabled: false, retries_at_tier: 0, max_promotions: 0, flounder_budget_minutes: {} },
+  compaction_reroute: 'off' as const,
+  replay_threshold: 0.5,
+};
 
 
 describe('settings-api', () => {
@@ -292,6 +311,29 @@ describe('settings-api', () => {
       };
       const result = validateSettingsApi(settings);
       expect(result.valid).toBe(true);
+    });
+
+    it('accepts a valid tiered_execution table', () => {
+      const result = validateSettingsApi({
+        ...validSettings,
+        tiered_execution: validTieredExecution,
+      });
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('rejects invalid tiered_execution tables with the validator message', () => {
+      const result = validateSettingsApi({
+        ...validSettings,
+        tiered_execution: {
+          ...validTieredExecution,
+          tiers: {
+            cheap: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple'] },
+          },
+        },
+      });
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain("tiered_execution difficulty 'medium' is not mapped to any tier");
     });
 
     it('should return valid for valid settings', () => {
@@ -709,6 +751,80 @@ describe('settings-api', () => {
       const yamlContent = callArgs[1] as string;
       expect(yamlContent).toContain('background_ai:');
       expect(yamlContent).toContain('cheap_mode: false');
+    });
+
+    it('persists tiered_execution while preserving unrelated comments and keys', async () => {
+      const { readFile, writeFile } = await import('fs/promises');
+      vi.mocked(readFile).mockResolvedValueOnce(`# keep this comment
+custom_key: still-here
+models:
+  # keep provider comment
+  providers:
+    anthropic: true
+`);
+      const settings: ApiSettingsConfig = {
+        models: {
+          providers: {
+            anthropic: true,
+            openai: false,
+            google: false,
+            minimax: false,
+            zai: false,
+            kimi: false,
+            openrouter: false,
+            nous: false,
+            dashscope: false,
+          },
+          overrides: {},
+        },
+        api_keys: {},
+        tiered_execution: validTieredExecution,
+      };
+
+      await Effect.runPromise(saveSettingsApi(settings));
+
+      const callArgs = vi.mocked(writeFile).mock.calls.at(-1)!;
+      const yamlContent = String(callArgs[1]);
+      expect(yamlContent).toContain('# keep this comment');
+      expect(yamlContent).toContain('custom_key: still-here');
+      expect(yamlContent).toContain('# keep provider comment');
+      expect(yamlContent).toContain('tiered_execution:');
+      expect(yamlContent).toContain('cheap:');
+      expect(yamlContent).toContain('supervisor:');
+      expect(yamlContent).toContain('replay_threshold: 0.5');
+      expect(yamlContent).not.toContain('difficultyToTier');
+    });
+
+    it('rejects enabled tiered_execution with an incomplete table before writing', async () => {
+      const { writeFile } = await import('fs/promises');
+      vi.mocked(writeFile).mockClear();
+      const settings: ApiSettingsConfig = {
+        models: {
+          providers: {
+            anthropic: true,
+            openai: false,
+            google: false,
+            minimax: false,
+            zai: false,
+            kimi: false,
+            openrouter: false,
+            nous: false,
+            dashscope: false,
+          },
+          overrides: {},
+        },
+        api_keys: {},
+        tiered_execution: {
+          enabled: true,
+          tiers: {},
+          replay_threshold: 0.5,
+        },
+      };
+
+      await expect(Effect.runPromise(saveSettingsApi(settings))).rejects.toMatchObject({
+        message: "tiered_execution difficulty 'trivial' is not mapped to any tier",
+      });
+      expect(writeFile).not.toHaveBeenCalled();
     });
   });
 
