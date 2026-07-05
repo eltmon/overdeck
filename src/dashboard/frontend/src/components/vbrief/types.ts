@@ -61,6 +61,7 @@ export interface VBriefPlan {
     Alternative?: string;
     [key: string]: string | undefined;
   };
+  metadata?: { tiered_execution?: 'on' | 'off'; [key: string]: unknown };
   items: VBriefItem[];
   edges: VBriefEdge[];
 }

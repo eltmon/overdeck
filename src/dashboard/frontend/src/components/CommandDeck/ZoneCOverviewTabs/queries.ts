@@ -13,6 +13,8 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 import type { StatusHistoryEntry } from '../../../lib/workspace-types';
+import type { SettingsConfig } from '../../Settings/types';
+import type { VBriefDocument } from '../../vbrief/types';
 
 export type { StatusHistoryEntry };
 
@@ -149,6 +151,34 @@ export function usePlanningQuery(
     queryKey: ['command-deck-planning', issueId, 'full'],
     queryFn: () => fetchJson<PlanningResponse>(`/api/command-deck/planning/${issueId}`),
     refetchInterval: false,
+    ...options,
+  });
+}
+
+export function useWorkspacePlanQuery(
+  issueId: string,
+  options?: Omit<UseQueryOptions<VBriefDocument | null>, 'queryKey' | 'queryFn'>,
+): UseQueryResult<VBriefDocument | null> {
+  return useQuery({
+    queryKey: ['workspace-plan', issueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}/plan`);
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} — /api/workspaces/${issueId}/plan`);
+      return res.json() as Promise<VBriefDocument>;
+    },
+    refetchInterval: 30_000,
+    ...options,
+  });
+}
+
+export function useSettingsQuery(
+  options?: Omit<UseQueryOptions<SettingsConfig>, 'queryKey' | 'queryFn'>,
+): UseQueryResult<SettingsConfig> {
+  return useQuery({
+    queryKey: ['settings'],
+    queryFn: () => fetchJson<SettingsConfig>('/api/settings'),
+    staleTime: 30_000,
     ...options,
   });
 }

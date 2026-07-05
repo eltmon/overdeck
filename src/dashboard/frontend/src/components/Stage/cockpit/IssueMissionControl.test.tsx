@@ -23,6 +23,9 @@ const queryMocks = vi.hoisted(() => {
     },
   }
   const planningQuery = { data: { prd: '# PRD', state: '# STATE' }, isLoading: false }
+  const planningSummaryQuery = { data: { acceptanceProgress: { completed: 1, total: 2, percent: 50 } }, isLoading: false }
+  const workspacePlanQuery = { data: { plan: { metadata: {} } }, isLoading: false }
+  const settingsQuery = { data: { tiered_execution: { enabled: false } }, isLoading: false }
   const prQuery = { data: { pr: { number: 1661, additions: 4, deletions: 1, changedFiles: 2, isDraft: false, state: 'OPEN' } } }
   const reviewStatusQuery = {
     data: {
@@ -38,13 +41,16 @@ const queryMocks = vi.hoisted(() => {
   }
   const issueCostsQuery = { data: { totalCost: 1.23, totalTokens: 1000, byModel: {}, sessions: [] } }
   const workspaceQuery = { data: null, isLoading: false }
-  return { activityQuery, issueCheckRunsQuery, planningQuery, prQuery, reviewStatusQuery, issueCostsQuery, workspaceQuery }
+  return { activityQuery, issueCheckRunsQuery, planningQuery, planningSummaryQuery, workspacePlanQuery, settingsQuery, prQuery, reviewStatusQuery, issueCostsQuery, workspaceQuery }
 })
 
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/queries', () => ({
   useActivityQuery: () => queryMocks.activityQuery,
   useIssueCheckRunsQuery: () => queryMocks.issueCheckRunsQuery,
   usePlanningQuery: () => queryMocks.planningQuery,
+  usePlanningSummaryQuery: () => queryMocks.planningSummaryQuery,
+  useWorkspacePlanQuery: () => queryMocks.workspacePlanQuery,
+  useSettingsQuery: () => queryMocks.settingsQuery,
   usePrQuery: () => queryMocks.prQuery,
   useReviewStatusQuery: () => queryMocks.reviewStatusQuery,
   useIssueCostsQuery: () => queryMocks.issueCostsQuery,
