@@ -372,3 +372,14 @@ describe('TieredExecutionSection', () => {
     expect(screen.getAllByText('tiered_execution.replay_threshold must be a number > 0 and <= 1').length).toBeGreaterThan(0);
   });
 });
+
+// 2026-07-05 incident guard: new-tier and supervisor DEFAULTS silently
+// pre-populated with the most premium catalog entry (Fable 5) and burned the
+// operator's Anthropic plan. Frontier models must never be an unchosen default.
+describe('frontier models are never the default', () => {
+  it('DEFAULT_MODEL and DEFAULT_SUPERVISOR_MODEL are not fable/opus', async () => {
+    const mod = await import('../TieredExecutionSection');
+    expect(mod.DEFAULT_MODEL).not.toMatch(/fable|opus/i);
+    expect(mod.DEFAULT_SUPERVISOR_MODEL).not.toMatch(/fable|opus/i);
+  });
+});
