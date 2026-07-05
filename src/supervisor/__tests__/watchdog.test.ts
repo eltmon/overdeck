@@ -415,6 +415,51 @@ describe('SupervisorWatchdog', () => {
     expect(logs.some((msg) => msg.includes('deacon patrol heartbeat stale'))).toBe(true);
   });
 
+  it('ends boot grace after the first successful health response even when deacon patrol is stale', async () => {
+    let fetchOk = true;
+    let now = Date.parse('2026-05-17T15:35:00.000Z');
+    const spawns = { count: 0 };
+    const watchdog = new SupervisorWatchdog({
+      config: { ...config, failThreshold: 3, busyFailThreshold: 12, bootGraceMs: 300_000 },
+      now: () => now,
+      log: () => undefined,
+      spawnRestart: () => {
+        spawns.count += 1;
+        return { pid: 1000 + spawns.count, error: null };
+      },
+      fetchFn: async (input) => {
+        if (input.endsWith('/api/deacon/status')) {
+          return {
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            json: async () => ({
+              isRunning: true,
+              config: { patrolIntervalMs: 60_000 },
+              state: { lastPatrol: '2026-05-17T15:30:00.000Z' },
+            }),
+          };
+        }
+        return fetchOk
+          ? { ok: true, status: 200, statusText: 'OK' }
+          : { ok: false, status: 503, statusText: 'Service Unavailable' };
+      },
+    });
+
+    await watchdog.checkOnce();
+    expect(spawns.count).toBe(0);
+
+    fetchOk = false;
+    now += 1_000;
+    await watchdog.checkOnce();
+    now += 1_000;
+    await watchdog.checkOnce();
+    now += 1_000;
+    await watchdog.checkOnce();
+
+    expect(spawns.count).toBe(1);
+  });
+
   it('waits three patrol intervals before restarting a missing initial patrol heartbeat', async () => {
     let now = Date.parse('2026-05-17T15:30:00.000Z');
     const spawns = { count: 0 };

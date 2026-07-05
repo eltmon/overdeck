@@ -231,6 +231,7 @@ export class SupervisorWatchdog {
         throw new Error(`health check returned ${response.status}${response.statusText ? ` ${response.statusText}` : ''}`);
       }
       await this.assertDashboardIdentity(response);
+      this.state.hasBecomeHealthy = true;
 
       const patrolFailure = await this.assessDeaconPatrol(dashboardBaseUrl, startedAt);
       if (patrolFailure) {
@@ -258,7 +259,6 @@ export class SupervisorWatchdog {
       if (!restartReason) {
         const shouldPersistClear = this.state.restartAttempts.length > 0 || this.state.gaveUp;
         this.state.healthy = true;
-        this.state.hasBecomeHealthy = true;
         this.state.lastCheck = checkedAt;
         this.state.consecutiveFailures = 0;
         this.state.consecutiveHardFailures = 0;
