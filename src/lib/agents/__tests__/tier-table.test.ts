@@ -112,8 +112,8 @@ describe('tiered execution tier table', () => {
     })).toThrow('ohmypi cannot run Anthropic models');
   });
 
-  it('rejects Anthropic subscription auth on ohmypi when loaded from config yaml', () => {
-    expect(() => mergeConfigs({
+  it('degrades Anthropic-subscription-on-ohmypi at load: staffing disabled, reason surfaced (PAN-2395)', () => {
+    const merged = mergeConfigs({
       models: {
         providers: {
           anthropic: { enabled: true, auth: 'subscription' },
@@ -128,7 +128,9 @@ describe('tiered execution tier table', () => {
           },
         },
       }),
-    })).toThrow('ohmypi cannot run Anthropic models');
+    });
+    expect(merged.config.tieredExecution.enabled).toBe(false);
+    expect(merged.config.tieredExecutionInvalid?.reason).toContain('ohmypi cannot run Anthropic models');
   });
 
   it('defaults to disabled with replay threshold 0.5 when no tiered_execution block exists', () => {
@@ -166,7 +168,7 @@ describe('tiered execution tier table', () => {
       model: 'claude-opus-4-8',
       harness: 'claude-code',
       subscribe: 'flagged',
-      owns_inspection: false,
+      owns_inspection: true,
     });
     expect(result.byKind).toEqual({});
   });

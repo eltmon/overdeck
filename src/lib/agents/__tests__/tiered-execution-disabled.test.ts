@@ -132,7 +132,8 @@ describe('tiered execution enabled with v2 knobs at defaults', () => {
       flounder_budget_minutes: {},
     });
     expect(config.compaction_reroute).toBe('off');
-    expect(config.supervisor?.owns_inspection).toBe(false);
+    // PAN-2397 W4: a configured supervisor owns inspection by default.
+    expect(config.supervisor?.owns_inspection).toBe(true);
     expect(config.byKind).toEqual({});
   });
 

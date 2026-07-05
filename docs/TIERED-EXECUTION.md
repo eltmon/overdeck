@@ -26,7 +26,7 @@ tiered_execution:
     model: claude-opus-4-8
     harness: claude-code
     subscribe: flagged
-    owns_inspection: false
+    owns_inspection: true   # default when a supervisor is configured (PAN-2397 W4)
   by_kind:
     design: frontier
     spike: frontier
@@ -58,7 +58,7 @@ tiered_execution:
 - `escalation.retries_at_tier` and `escalation.max_promotions` are non-negative integers; both default to `0`.
 - `escalation.flounder_budget_minutes` maps difficulties to positive minute budgets; default `{}` leaves the floundering trigger inactive.
 - `compaction_reroute` must be `off` or `on`; default `off` keeps replay respawning the same registered slot with the same captured behavior.
-- `supervisor.owns_inspection` defaults to `false`, so `pan inspect` still spawns the ephemeral inspect specialist unless the operator opts in.
+- `supervisor.owns_inspection` defaults to `true` when a supervisor is configured (PAN-2397 W4): a standing supervisor IS the inspection surface. Set it to `false` explicitly to keep routing `pan inspect` to the ephemeral inspect/inspect-deep subrole agents.
 - `by_kind` is optional and defaults to `{}`; kind routing is never hardcoded.
 
 ## Settings UI
@@ -121,7 +121,7 @@ There is no `off` policy — the supervisor block is required whenever tiers are
 
 Supervisor findings block the foreman before downstream beads proceed. A clean supervisor ack does not replace the normal review and test pipeline.
 
-When `supervisor.owns_inspection: true` and tiered execution is enabled for the issue, `pan inspect` routes to the standing supervisor instead of spawning an ephemeral inspect specialist. If the supervisor session is absent, Overdeck starts it first; if that fails, inspection fails loudly rather than silently falling back. With the flag at its default `false`, the existing ephemeral inspect path is unchanged.
+When `supervisor.owns_inspection: true` and tiered execution is enabled for the issue, `pan inspect` routes to the standing supervisor instead of spawning an ephemeral inspect specialist. If the supervisor session is absent, Overdeck starts it first; if that fails, inspection fails loudly rather than silently falling back. With the flag explicitly set to `false`, the existing ephemeral inspect path is unchanged (and it remains the path when no supervisor is configured at all).
 
 ## Escalation
 
