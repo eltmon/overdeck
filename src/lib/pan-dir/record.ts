@@ -24,6 +24,7 @@ import {
 } from '../projects.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { ReviewMode } from '../config-yaml.js';
+import type { TieredExecutionIssueOverride } from '../agents/tier-table.js';
 import type {
   ContinueBeadsMapping,
   ContinueDecision,
@@ -137,6 +138,8 @@ export interface PanIssueRecord {
   model?: string;
   /** Per-issue review mode override; beats project/global config. */
   reviewMode?: ReviewMode;
+  /** Per-issue tiered execution override; beats plan metadata and global config. */
+  tieredExecutionOverride?: TieredExecutionIssueOverride;
 
   decisions?: ContinueDecision[];
   hazards?: ContinueHazard[];
