@@ -61,6 +61,14 @@ tiered_execution:
 - `supervisor.owns_inspection` defaults to `false`, so `pan inspect` still spawns the ephemeral inspect specialist unless the operator opts in.
 - `by_kind` is optional and defaults to `{}`; kind routing is never hardcoded.
 
+## Settings UI
+
+The dashboard Settings -> Tiered Execution panel is the operator-facing edit surface for project tier configuration. It includes the project enable toggle, an editable tier table for tier names, models, harnesses, and difficulty coverage, plus controls for supervisor policy, `by_kind` routing, feed filtering and call-outs, escalation limits, compaction reroute, and replay threshold. The form validates inline before save, including full difficulty coverage, known model and harness values, required supervisor settings, and valid numeric thresholds.
+
+The panel also shows a resolved-state preview so operators can see the effective tiered-execution state that will be used by routing after global config, project config, and issue context are applied.
+
+On the issue view, any per-issue `plan.metadata.tiered_execution` override is visible as a read-only chip in the issue header/resolution area. Editing that override from the UI is intentionally not supported: there is no plan metadata write door, and the PAN-1124 spec immutability contract keeps vBRIEF plan metadata immutable from dashboard controls. To set or change a per-issue override, update `plan.metadata.tiered_execution` in the vBRIEF plan instead.
+
 ## Resolution Chain
 
 The router chooses a tier deterministically for each ready bead. Models do not race to decide whether to intervene.
