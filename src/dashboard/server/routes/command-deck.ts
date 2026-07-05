@@ -715,6 +715,7 @@ async function fetchPlanningData(
     acceptanceProgress?: { completed: number; total: number; percent: number };
     stashCount?: number;
     pipelineMirror?: unknown;
+    planMetadata?: Record<string, unknown>;
   } = { hasPrd: false, hasState: false, transcripts: [], discussions: [], notes: [] };
 
   // Helper: read PRD content from a location, handling both flat and subdir formats.
@@ -754,6 +755,7 @@ async function fetchPlanningData(
         };
       }
       result.pipelineMirror = doc.plan.metadata?.pipeline;
+      result.planMetadata = doc.plan.metadata;
     }
   } catch { /* no vBRIEF plan */ }
 

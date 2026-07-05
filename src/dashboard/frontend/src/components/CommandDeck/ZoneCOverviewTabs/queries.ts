@@ -13,6 +13,7 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 import type { StatusHistoryEntry } from '../../../lib/workspace-types';
+import type { SettingsConfig } from '../../Settings/types';
 
 export type { StatusHistoryEntry };
 
@@ -40,6 +41,7 @@ export interface PlanningResponse extends PlanningSummaryResponse {
   state?: string;
   inference?: string;
   statusReview?: string;
+  planMetadata?: Record<string, unknown>;
   transcripts?: PlanningArtifact[];
   discussions?: PlanningArtifact[];
   notes?: PlanningArtifact[];
@@ -149,6 +151,17 @@ export function usePlanningQuery(
     queryKey: ['command-deck-planning', issueId, 'full'],
     queryFn: () => fetchJson<PlanningResponse>(`/api/command-deck/planning/${issueId}`),
     refetchInterval: false,
+    ...options,
+  });
+}
+
+export function useSettingsQuery(
+  options?: Omit<UseQueryOptions<SettingsConfig>, 'queryKey' | 'queryFn'>,
+): UseQueryResult<SettingsConfig> {
+  return useQuery({
+    queryKey: ['settings'],
+    queryFn: () => fetchJson<SettingsConfig>('/api/settings'),
+    retry: false,
     ...options,
   });
 }
