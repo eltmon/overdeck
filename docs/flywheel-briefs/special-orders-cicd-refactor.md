@@ -48,11 +48,26 @@ mechanics are binding. Where this brief and the master plan disagree, the master
   for these — planning writes them). The operator expected this in v0.42 — it targets a
   **v0.43.x** release instead (v0.42 stands, no unpublish). When both land + deploy,
   report readiness and SUGGEST cutting v0.43.0; the operator cuts releases.
+- **B0 — PAN-2318, operator-priority (added 2026-07-05, EXEMPT from Gate 2):**
+  [PAN-2318](https://github.com/eltmon/overdeck/issues/2318) (dashboard event-loop
+  starvation) is released NOW as order-book item B0 — the operator explicitly wants it
+  before everything else in the book because the watchdog "unreachable" false-positive
+  restarts the dashboard unrequested (2026-07-05 incident), removing the operator's
+  ability to quickly stop agents. Start `pan plan PAN-2318` immediately (planning is
+  code-free, runs alongside the prelude). PRD exists: `.pan/drafts/pan-2318.md` — direct
+  planning to (1) re-verify which work streams already landed (stream 1, deacon
+  extraction, landed as 5f718b963d; streams 2–4 remain) and scope beads to the remainder
+  only, and (2) add one scope item: a supervisor-watchdog boot grace period so a
+  freshly-booted, busy-but-alive server is not declared unreachable (PAN-1714
+  recurrence). Work runs in its isolated workspace in parallel, but the MERGE waits
+  until PAN-2378 lands (one cloister-adjacent change in flight at a time). B1 and the
+  rest of the order book remain behind Gate 2.
 - **START GATE 2 — operator test-drive (explicit go required):** after the prelude lands,
   HOLD again. The operator may run a few test issues with tiered execution enabled. Do
-  NOT begin the order book (A1/B1) until the operator explicitly says to start the
-  special orders. Report "prelude complete, holding for operator go" and wait.
-- **Scope:** ONLY the order book (18 issues across the two campaigns) + shepherding
+  NOT begin the order book (A1/B1 onward — B0 is exempt, see above) until the operator
+  explicitly says to start the special orders. Report "prelude complete, holding for
+  operator go" and wait.
+- **Scope:** ONLY the order book (now 19 issues: B0 + the two campaigns) + shepherding
   [PAN-2265](https://github.com/eltmon/overdeck/issues/2265) (already in review) to close.
 - **Saturation:** the order book replaces backlog saturation. Keep Lane B always occupied
   (that's the critical path) and run 1–3 Lane A items alongside; respect

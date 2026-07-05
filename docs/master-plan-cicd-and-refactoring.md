@@ -47,6 +47,7 @@ draft) → `pan start <id>`. They do not consume the Lane B slot.
 
 | Order | Issue | Campaign | Why this position |
 |---|---|---|---|
+| B0 | [PAN-2318](https://github.com/eltmon/overdeck/issues/2318) | Operator-priority (2026-07-05) | Dashboard event-loop starvation, remaining streams 2–4 (active-issue scoping, sync-read purge, tactical). Stream 1 (deacon extraction) landed as 5f718b963d — planning must re-verify what remains. **Runs before B1**: the watchdog "unreachable" false-positive it fixes restarts the dashboard unrequested, which endangers every later Lane B merge. Scope addition: supervisor-watchdog boot grace period (PAN-1714 recurrence, 2026-07-05 incident). PRD: `.pan/drafts/pan-2318.md`. |
 | B1 | [PAN-2207](https://github.com/eltmon/overdeck/issues/2207) | CI/CD P1 | done.ts + deacon patrol; smallest convergence fix |
 | B2 | [PAN-2341](https://github.com/eltmon/overdeck/issues/2341) | CI/CD P1 | deacon boot reconcile + zombie reap |
 | B3 | [PAN-2167](https://github.com/eltmon/overdeck/issues/2167) | CI/CD P1 | clean-tree gate (review-pipeline.ts) |
