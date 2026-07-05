@@ -41,6 +41,18 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
 - Multi-provider — drives Anthropic, OpenAI, Google, OpenRouter, Minimax,
   DashScope through omp's own provider routing.
 
+### OpenAI Codex CLI (alternative)
+
+- First-party OpenAI agent loop for the GPT model family (GPT-5.5, GPT-5.4,
+  GPT-5.3-Codex, …) with ChatGPT-subscription or API-key auth.
+- Work agents run as live, attachable TUI sessions (`codexMode: work-tui`)
+  under the PTY supervisor — never one-shot `codex exec`.
+- Runtime adapter at `src/lib/runtimes/codex.ts`; per-agent thread-id pinning
+  enables session introspection and cost parsing
+  (`src/lib/cost-parsers/codex-parser.ts`).
+- Native AGENTS.md and Claude-Code-compatible skills; `pan sync` distributes
+  context layers and skills to it like any other harness.
+
 ## Installing oh-my-pi
 
 oh-my-pi is **not** auto-installed. Install it once, then run `pan doctor` to confirm.

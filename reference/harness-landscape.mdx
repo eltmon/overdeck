@@ -147,7 +147,7 @@ and should be re-checked before any decision.
 - **Implementation files:** `src/lib/runtimes/ohmypi.ts`, `src/lib/runtimes/ohmypi-fifo.ts`,
   `src/lib/cost-parsers/ohmypi-parser.ts`, `packages/ohmypi-extension/`.
 
-### OpenAI Codex CLI — Not supported (strong candidate)
+### OpenAI Codex CLI — Supported
 
 - **Vendor / model:** OpenAI. OpenAI-centric (GPT-5.4, GPT-5.3-Codex); `--oss`
   flag runs open-weight models on local Ollama/LM Studio/MLX. Non-OpenAI cloud
@@ -166,10 +166,15 @@ and should be re-checked before any decision.
 - **Headless / RPC:** `codex exec` non-interactive; `--json` newline-delimited
   event stream; `--output-schema` for validated output; `codex mcp-server` for
   stdio orchestration. Among the strongest headless interfaces in the field.
-- **Why a candidate:** Apache-2.0, native AGENTS.md + skills, excellent headless
-  story, and Overdeck's ChatGPT-subscription auth already exists. The Codex
-  *harness* would let GPT-subscription users run a first-party OpenAI agent loop
-  instead of CLIProxy-routing GPT into Claude Code.
+- **Why it's supported:** Apache-2.0, native AGENTS.md + skills, excellent
+  headless story, and Overdeck's ChatGPT-subscription auth already exists. The
+  Codex harness gives GPT-subscription users a first-party OpenAI agent loop
+  (GPT-5.5 and the rest of the GPT model family) instead of CLIProxy-routing GPT
+  into Claude Code. Work agents run as live, attachable TUI sessions
+  (`codexMode: work-tui`) under the PTY supervisor — never one-shot `codex exec`.
+- **Implementation files:** `src/lib/runtimes/codex.ts`,
+  `src/lib/cost-parsers/codex-parser.ts` (per-agent thread-id pinning at
+  `~/.overdeck/agents/<id>/codex-thread-id` for session introspection).
 
 ### Google Gemini CLI — Not supported (candidate)
 
