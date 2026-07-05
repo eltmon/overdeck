@@ -3,7 +3,7 @@ import { useDashboardStore } from '../../lib/store';
 import { useTheme } from '../../hooks/useTheme';
 import { useConversationUiState } from '../../hooks/useConversationUiState';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, Folder, GitBranchPlus, GitFork, CheckCircle2, AlertCircle, Archive, Sparkles, Info, RefreshCw, FileText, ExternalLink, RotateCcw, ArrowRight, MoreVertical, Star, Share2, Download, Square } from 'lucide-react';
+import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, Folder, GitBranchPlus, GitFork, CheckCircle2, AlertCircle, Archive, Sparkles, Info, RefreshCw, FileText, FileX, ExternalLink, RotateCcw, ArrowRight, MoreVertical, Star, Share2, Download, Square } from 'lucide-react';
 import { toast } from 'sonner';
 import { XTerminal } from '../XTerminal';
 import type { Conversation } from '../CommandDeck/ConversationList';
@@ -667,6 +667,15 @@ export function ConversationPanel({
                   <span className={`${styles.conversationTerminalTitleText} ${retitleMutation.isPending ? styles.titleRegenerating : ''}`}>
                     {conversation.title ?? conversation.name}
                   </span>
+                  {conversation.transcriptMissing && (
+                    <span
+                      title="Transcript missing — this conversation had activity, but its history file no longer exists on disk. The history cannot be recovered."
+                      aria-label="Transcript missing"
+                      style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--warning)', flexShrink: 0 }}
+                    >
+                      <FileX size={13} />
+                    </span>
+                  )}
                   <button
                     className={styles.conversationTitleEditBtn}
                     onClick={startEditingTitle}
@@ -1328,7 +1337,15 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   const isSpawning = !conversation.sessionAlive && !conversation.endedAt && !isSpawnFailed && !isForking;
   const isDiscovering = streamMessagesEnabled && data?.discovering === true && messages.length === 0;
   const isFirstMessage = !isLoading && !isDiscovering && messages.length === 0 && conversation.sessionAlive;
-  const isOrphaned = !isLoading && !isDiscovering && messages.length === 0 && !conversation.sessionAlive && !isSpawnFailed && !isSpawning;
+  // A failed /messages fetch leaves `data` undefined — that is NOT the same as a
+  // successful empty response. Rendering it as "no saved history" (the old
+  // behavior) falsely tells the user their history is gone, e.g. during a
+  // server-restart window (2026-07-05 incident). Ended conversations have no
+  // refetchInterval, so without a retry surface the error state would persist.
+  const messagesFetchFailed =
+    !isLoading && !isDiscovering && !streamMessagesEnabled && data == null &&
+    !isSpawning && !isSpawnFailed && !isForking;
+  const isOrphaned = !isLoading && !isDiscovering && data != null && messages.length === 0 && !conversation.sessionAlive && !isSpawnFailed && !isSpawning;
 
   // Spin unless truly idle: idle = last message is a completed assistant turn (completedAt set).
   // Note: `completedAt` is reliably set server-side for all terminal stop reasons via
@@ -1367,6 +1384,23 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
           </p>
           <p className={styles.conversationEmptyStateSubtitle}>{data.error}</p>
         </div>
+      ) : messagesFetchFailed ? (
+        <div className={styles.conversationEmptyState}>
+          <p className={styles.conversationEmptyStateTitle} style={{ color: 'var(--warning)' }}>
+            ⚠ Couldn&apos;t load history
+          </p>
+          <p className={styles.conversationEmptyStateSubtitle}>
+            The request for this conversation&apos;s messages failed — the saved history may still be intact.
+          </p>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
+            <button
+              className={styles.conversationArchiveBtnLarge}
+              onClick={() => queryClient.invalidateQueries({ queryKey: conversationMessagesQueryKey(conversation.name) })}
+            >
+              Retry
+            </button>
+          </div>
+        </div>
       ) : isSpawning ? (
         <div className={styles.conversationEmptyState}>
           <p className={styles.conversationEmptyStateTitle}>
@@ -1393,9 +1427,20 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
         />
       ) : isOrphaned ? (
         <div className={styles.conversationEmptyState}>
-          <p className={styles.conversationEmptyStateSubtitle}>
-            This conversation has no saved history. The session may have ended before any messages were exchanged.
-          </p>
+          {conversation.transcriptMissing ? (
+            <>
+              <p className={styles.conversationEmptyStateTitle} style={{ color: 'var(--warning)' }}>
+                ⚠ Transcript missing
+              </p>
+              <p className={styles.conversationEmptyStateSubtitle}>
+                This conversation had activity, but its transcript file no longer exists on disk. The history cannot be recovered.
+              </p>
+            </>
+          ) : (
+            <p className={styles.conversationEmptyStateSubtitle}>
+              This conversation has no saved history. The session may have ended before any messages were exchanged.
+            </p>
+          )}
           <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
             {onResume && (
               <>

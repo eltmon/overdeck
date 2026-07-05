@@ -82,6 +82,9 @@ export interface Conversation {
       options: ReadonlyArray<{ label: string; description?: string }>;
     }>;
   };
+  /** True when this conversation had activity but its transcript file no longer
+   *  exists on disk — its history was lost (e.g. 2026-07-05 conv-* dir cleanup). */
+  transcriptMissing?: boolean;
 }
 
 // ─── Sort types ───────────────────────────────────────────────────────────────
