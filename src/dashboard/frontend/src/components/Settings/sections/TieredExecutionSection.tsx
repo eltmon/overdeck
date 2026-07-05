@@ -63,6 +63,11 @@ function validationReason(config: TieredExecutionConfig | undefined): string | n
 
   const owners = new Map<string, string[]>();
   for (const [tierName, tier] of tiers) {
+    if (tier.distribution) {
+      if (tier.distribution.length === 0) return `tiered_execution.tiers.${tierName}.distribution must be a non-empty array`;
+      const total = tier.distribution.reduce((sum, entry) => sum + (entry.weight || 0), 0);
+      if (total !== 100) return `tiered_execution.tiers.${tierName}.distribution weights must total exactly 100 (got ${total})`;
+    }
     if (!tier.model) return `tiered_execution.tiers.${tierName}.model is required`;
     if (!tier.harness) return `tiered_execution.tiers.${tierName}.harness is required`;
     if (!Array.isArray(tier.difficulties) || tier.difficulties.length === 0) {
@@ -270,6 +275,51 @@ export function TieredExecutionSection({
     handleTierPatch(name, { difficulties });
   };
 
+  type DistributionEntry = { model: string; harness: Harness; weight: number };
+
+  const representativeOf = (entries: DistributionEntry[]): { model: string; harness: Harness } => {
+    const top = entries.reduce((best, entry) => (entry.weight > best.weight ? entry : best));
+    return { model: top.model, harness: top.harness };
+  };
+
+  const handleToggleDistribution = (name: string) => {
+    const tier = config?.tiers?.[name];
+    if (!tier) return;
+    if (tier.distribution) {
+      const { model, harness } = representativeOf(tier.distribution as DistributionEntry[]);
+      handleTierPatch(name, { model, harness, distribution: undefined } as never);
+    } else {
+      handleTierPatch(name, {
+        distribution: [{ model: tier.model, harness: tier.harness, weight: 100 }],
+      } as never);
+    }
+  };
+
+  const handleDistributionPatch = (name: string, index: number, patch: Partial<DistributionEntry>) => {
+    const tier = config?.tiers?.[name];
+    const entries = (tier?.distribution ?? []) as DistributionEntry[];
+    const next = entries.map((entry, i) => (i === index ? { ...entry, ...patch } : entry));
+    // Keep model/harness = the max-weight representative so save/load
+    // round-trips stay idempotent with the server validator.
+    handleTierPatch(name, { distribution: next, ...representativeOf(next) } as never);
+  };
+
+  const handleDistributionAdd = (name: string) => {
+    const tier = config?.tiers?.[name];
+    if (!tier) return;
+    const entries = (tier.distribution ?? []) as DistributionEntry[];
+    const next = [...entries, { model: tier.model, harness: tier.harness, weight: 0 } as DistributionEntry];
+    handleTierPatch(name, { distribution: next, ...representativeOf(next) } as never);
+  };
+
+  const handleDistributionRemove = (name: string, index: number) => {
+    const tier = config?.tiers?.[name];
+    const entries = (tier?.distribution ?? []) as DistributionEntry[];
+    if (entries.length <= 1) return handleToggleDistribution(name);
+    const next = entries.filter((_, i) => i !== index);
+    handleTierPatch(name, { distribution: next, ...representativeOf(next) } as never);
+  };
+
   const handleRemoveTier = (name: string) => {
     const next = currentConfig();
     const { [name]: _removed, ...tiersWithoutRemoved } = next.tiers;
@@ -449,6 +499,7 @@ export function TieredExecutionSection({
             <div key={name} className="px-4 py-3 rounded-lg border border-border/70">
               <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
                 <TierNameInput name={name} tierNames={tierNames} onRename={handleRenameTier} />
+                {!tier.distribution && (<>
                 <label className="space-y-1.5">
                   <span className="text-xs font-medium text-foreground">Model</span>
                   <select
@@ -482,6 +533,7 @@ export function TieredExecutionSection({
                     ))}
                   </select>
                 </label>
+                </>)}
                 <div className="space-y-1.5">
                   <span className="text-xs font-medium text-foreground">Difficulties</span>
                   <div className="flex flex-wrap gap-2">
@@ -502,10 +554,79 @@ export function TieredExecutionSection({
                   </div>
                 </div>
               </div>
+              {tier.distribution && (
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-foreground">Distribution</span>
+                    <span className={`text-xs ${tier.distribution.reduce((sum, entry) => sum + (entry.weight || 0), 0) === 100 ? 'text-muted-foreground' : 'text-destructive'}`}>
+                      Total: {tier.distribution.reduce((sum, entry) => sum + (entry.weight || 0), 0)}% (must total 100)
+                    </span>
+                  </div>
+                  {tier.distribution.map((entry, index) => (
+                    <div key={index} className="grid gap-2 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_90px_70px] items-center">
+                      <select
+                        value={entry.model}
+                        onChange={(event) => handleDistributionPatch(name, index, { model: event.target.value })}
+                        className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
+                      >
+                        {!MODEL_OPTIONS.some((model) => model.id === entry.model) && (
+                          <option value={entry.model}>{entry.model}</option>
+                        )}
+                        {Object.entries(MODELS_BY_PROVIDER).map(([providerId, provider]) => (
+                          <optgroup key={providerId} label={provider.name}>
+                            {provider.models.map((model) => (
+                              <option key={model.id} value={model.id}>{model.name}</option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                      <select
+                        value={entry.harness}
+                        onChange={(event) => handleDistributionPatch(name, index, { harness: event.target.value as Harness })}
+                        className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
+                      >
+                        {HARNESSES.map((harness) => (
+                          <option key={harness} value={harness}>{harness}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={entry.weight}
+                        onChange={(event) => handleDistributionPatch(name, index, { weight: Number(event.target.value) })}
+                        className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
+                        aria-label={`weight for entry ${index + 1}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleDistributionRemove(name, index)}
+                        className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted/30"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => handleDistributionAdd(name)}
+                    className="rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted/30"
+                  >
+                    Add model
+                  </button>
+                </div>
+              )}
               {serverTieredError?.includes(`tiers.${name}`) && (
                 <p className="mt-3 text-xs text-destructive">{serverTieredError}</p>
               )}
-              <div className="mt-3 flex justify-end">
+              <div className="mt-3 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleToggleDistribution(name)}
+                  className="rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted/30"
+                >
+                  {tier.distribution ? 'Use single model' : 'Use distribution'}
+                </button>
                 <button
                   type="button"
                   onClick={() => handleRemoveTier(name)}

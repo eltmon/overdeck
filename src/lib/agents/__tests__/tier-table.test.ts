@@ -306,3 +306,44 @@ describe('validateTieredExecutionConfig distribution tiers (PAN-2391)', () => {
     expect(() => validateTieredExecutionConfig(config as never)).toThrow(/harness/);
   });
 });
+
+// Round-trip: save writes the validated (normalized) tiers — representative
+// model/harness alongside distribution — and the next load re-validates that
+// exact shape. Validation must be idempotent or tiered staffing silently
+// degrades on the second load.
+describe('distribution validation is idempotent across save/load round-trips (PAN-2391)', () => {
+  it('re-validating a validated distribution config succeeds', () => {
+    const first = validateTieredExecutionConfig({
+      enabled: true,
+      supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged' },
+      tiers: {
+        standard: {
+          difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'],
+          distribution: [
+            { model: 'gpt-5.5', harness: 'codex', weight: 60 },
+            { model: 'kimi-k2.7-code', harness: 'claude-code', weight: 40 },
+          ],
+        },
+      },
+    } as never);
+    const second = validateTieredExecutionConfig(first as never);
+    expect(second.tiers.standard!.model).toBe('gpt-5.5');
+    expect(second.tiers.standard!.distribution).toHaveLength(2);
+  });
+
+  it('still rejects a genuinely conflicting model alongside a distribution', () => {
+    expect(() => validateTieredExecutionConfig({
+      enabled: true,
+      supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged' },
+      tiers: {
+        standard: {
+          model: 'claude-haiku-4-5',
+          difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'],
+          distribution: [
+            { model: 'gpt-5.5', harness: 'codex', weight: 100 },
+          ],
+        },
+      },
+    } as never)).toThrow(/not both/);
+  });
+});
