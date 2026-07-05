@@ -46,6 +46,7 @@ export interface VBriefPlan {
   id: string;
   title: string;
   status: string;
+  metadata?: { tiered_execution?: 'on' | 'off'; [key: string]: unknown };
   author?: string;
   uid?: string;
   sequence?: number;
