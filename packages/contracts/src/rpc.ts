@@ -12,6 +12,8 @@ import {
   ScanResult,
   SequenceNumber,
   SessionNodePresence,
+  SessionsFeedFacetsSnapshot,
+  SessionsFeedRowSnapshot,
   WorkspaceDetail,
 } from "./types"
 import { EditorIdSchema, OpenInEditorInput } from "./editor"
@@ -24,6 +26,8 @@ export const WS_METHODS = {
   scanConversations: "pan.scanConversations",
   searchConversations: "pan.searchConversations",
   listDiscoveredSessions: "pan.listDiscoveredSessions",
+  listSessionsFeed: "pan.listSessionsFeed",
+  getSessionsFeedFacets: "pan.getSessionsFeedFacets",
   getDiscoveredSession: "pan.getDiscoveredSession",
   enrichSessions: "pan.enrichSessions",
   embedSessions: "pan.embedSessions",
@@ -432,6 +436,39 @@ const DiscoveredSessionListResult = Schema.Struct({
   total: Schema.Number,
 })
 
+const SessionsFeedPayload = Schema.Struct({
+  harness: Schema.optional(Schema.String),
+  workspacePath: Schema.optional(Schema.String),
+  primaryModel: Schema.optional(Schema.String),
+  managed: Schema.optional(Schema.Boolean),
+  unmanaged: Schema.optional(Schema.Boolean),
+  since: Schema.optional(Schema.String),
+  before: Schema.optional(Schema.String),
+  after: Schema.optional(Schema.String),
+  minCost: Schema.optional(Schema.Number),
+  maxCost: Schema.optional(Schema.Number),
+  minMessages: Schema.optional(Schema.Number),
+  tags: Schema.optional(Schema.Array(Schema.String)),
+  tools: Schema.optional(Schema.Array(Schema.String)),
+  files: Schema.optional(Schema.Array(Schema.String)),
+  issueId: Schema.optional(Schema.String),
+  enrichmentLevel: Schema.optional(Schema.Number),
+  enriched: Schema.optional(Schema.Boolean),
+  notEnriched: Schema.optional(Schema.Boolean),
+  query: Schema.optional(Schema.String),
+  semantic: Schema.optional(Schema.Boolean),
+  similarTo: Schema.optional(Schema.Number),
+  limit: Schema.optional(Schema.Number),
+  offset: Schema.optional(Schema.Number),
+  cursor: Schema.optional(Schema.String),
+  source: Schema.optional(Schema.Literals(['discovered', 'managed-archived'])),
+})
+
+const SessionsFeedListResult = Schema.Struct({
+  rows: Schema.Array(SessionsFeedRowSnapshot),
+  nextCursor: Schema.NullOr(Schema.String),
+})
+
 const DiscoveredSessionSearchResult = Schema.Struct({
   sessions: Schema.Array(DiscoveredSessionSnapshot),
   total: Schema.Number,
@@ -480,6 +517,20 @@ export const SearchConversationsRpc = Rpc.make(WS_METHODS.searchConversations, {
 export const ListDiscoveredSessionsRpc = Rpc.make(WS_METHODS.listDiscoveredSessions, {
   payload: ConversationFilter,
   success: DiscoveredSessionListResult,
+  error: PanRpcError,
+})
+
+/** List the unified discovered + managed archived sessions feed */
+export const ListSessionsFeedRpc = Rpc.make(WS_METHODS.listSessionsFeed, {
+  payload: SessionsFeedPayload,
+  success: SessionsFeedListResult,
+  error: PanRpcError,
+})
+
+/** Get facet buckets for the unified sessions feed */
+export const GetSessionsFeedFacetsRpc = Rpc.make(WS_METHODS.getSessionsFeedFacets, {
+  payload: SessionsFeedPayload,
+  success: SessionsFeedFacetsSnapshot,
   error: PanRpcError,
 })
 
@@ -577,6 +628,8 @@ export const PanRpcGroup = RpcGroup.make(
   ScanConversationsRpc,
   SearchConversationsRpc,
   ListDiscoveredSessionsRpc,
+  ListSessionsFeedRpc,
+  GetSessionsFeedFacetsRpc,
   GetDiscoveredSessionRpc,
   EnrichSessionsRpc,
   EmbedSessionsRpc,

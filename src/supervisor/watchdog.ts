@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { readFileSync } from 'node:fs';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { acquireRestartLock } from '../lib/restart-lock.js';
 import { writeRestartStatus } from '../lib/restart-status.js';
 import { getOverdeckHome } from '../lib/paths.js';
@@ -10,6 +10,10 @@ import { getBootReconciliationState } from '../lib/overdeck/control-settings.js'
 export interface SupervisorWatchdogConfig {
   enabled: boolean;
   dashboardApiPort: number;
+  expectedIdentity?: {
+    repoRoot: string;
+    mode: 'primary' | 'peer';
+  };
   pollMs: number;
   failThreshold: number;
   /** Restart threshold for timeout-only failure streaks. A timeout means the
@@ -111,6 +115,10 @@ export function readWatchdogConfig(env: NodeJS.ProcessEnv, dashboardApiPort: num
   return {
     enabled: env.OVERDECK_SUPERVISOR_WATCHDOG !== '0',
     dashboardApiPort,
+    expectedIdentity: {
+      repoRoot: resolve(process.cwd()),
+      mode: 'primary',
+    },
     pollMs: parsePositiveIntEnv(env.OVERDECK_SUPERVISOR_POLL_MS, 10_000),
     failThreshold: parsePositiveIntEnv(env.OVERDECK_SUPERVISOR_FAIL_THRESHOLD, 3),
     busyFailThreshold: parsePositiveIntEnv(env.OVERDECK_SUPERVISOR_BUSY_FAIL_THRESHOLD, 12),
@@ -215,6 +223,7 @@ export class SupervisorWatchdog {
       if (!response.ok) {
         throw new Error(`health check returned ${response.status}${response.statusText ? ` ${response.statusText}` : ''}`);
       }
+      await this.assertDashboardIdentity(response);
 
       const patrolFailure = await this.assessDeaconPatrol(dashboardBaseUrl, startedAt);
       if (patrolFailure) {
@@ -361,6 +370,22 @@ export class SupervisorWatchdog {
   private pruneRestartAttempts(now: number): void {
     const cutoff = now - this.config.windowMs;
     this.state.restartAttempts = this.state.restartAttempts.filter((ts) => ts >= cutoff);
+  }
+
+  private async assertDashboardIdentity(response: FetchResponse): Promise<void> {
+    const expectedIdentity = this.config.expectedIdentity;
+    if (!expectedIdentity) return;
+    if (!response.json) {
+      throw new Error('health check returned no JSON body');
+    }
+
+    const body = await response.json().catch(() => null) as unknown;
+    const payload = body && typeof body === 'object' ? body as Record<string, unknown> : {};
+    const repoRoot = typeof payload.repoRoot === 'string' ? payload.repoRoot : '(missing)';
+    const mode = typeof payload.mode === 'string' ? payload.mode : '(missing)';
+    if (repoRoot === expectedIdentity.repoRoot && mode === expectedIdentity.mode) return;
+
+    throw new Error(`port held by non-${expectedIdentity.mode} server (cwd=${repoRoot}, mode=${mode})`);
   }
 
   private async assessDeaconPatrol(

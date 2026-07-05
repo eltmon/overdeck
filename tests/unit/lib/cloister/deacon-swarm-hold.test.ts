@@ -9,6 +9,7 @@ import type { CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deac
 const mocks = vi.hoisted(() => ({
   listProjectsSync: vi.fn(),
   getReviewStatusSync: vi.fn(),
+  setReviewStatusSync: vi.fn(),
   isDeaconGloballyPausedSync: vi.fn(() => false),
 }));
 
@@ -18,6 +19,7 @@ vi.mock('../../../../src/lib/projects.js', () => ({
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
   getReviewStatusSync: mocks.getReviewStatusSync,
+  setReviewStatusSync: mocks.setReviewStatusSync,
 }));
 
 vi.mock('../../../../src/lib/overdeck/control-settings.js', async (importOriginal) => ({
@@ -31,6 +33,7 @@ beforeEach(async () => {
   tempRoot = await mkdtemp(join(tmpdir(), 'overdeck-swarm-hold-'));
   mocks.listProjectsSync.mockReset();
   mocks.getReviewStatusSync.mockReset();
+  mocks.setReviewStatusSync.mockReset();
   mocks.isDeaconGloballyPausedSync.mockReset();
   mocks.isDeaconGloballyPausedSync.mockReturnValue(false);
 });

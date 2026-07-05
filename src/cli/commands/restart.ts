@@ -171,6 +171,17 @@ async function reportHeldRestartLock(startedAt: number): Promise<void> {
   process.exitCode = 2;
 }
 
+export async function shouldRunManualSupervisorCycle(env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+  if (env.OVERDECK_SKIP_SUPERVISOR_CYCLE === '1') return false;
+
+  try {
+    const { systemdUserAvailable, isSupervisorUnitActive } = await import('../../lib/systemd.js');
+    return !(await systemdUserAvailable() && await isSupervisorUnitActive());
+  } catch {
+    return true;
+  }
+}
+
 export async function restartCommand(options: RestartOptions): Promise<void> {
   const startedAt = Date.now();
   const scope = resolveScope(options);
@@ -211,7 +222,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
   try {
     switch (scope) {
       case 'dashboard': {
-        if (process.env.OVERDECK_SKIP_SUPERVISOR_CYCLE !== '1') {
+        if (await shouldRunManualSupervisorCycle()) {
           try {
             const { stopSupervisorProcessSync, startSupervisorProcessSync } = await import('../../lib/supervisor.js');
             stopSupervisorProcessSync();

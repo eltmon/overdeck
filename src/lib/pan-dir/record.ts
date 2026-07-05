@@ -76,6 +76,7 @@ export interface PanIssueSwarmSlotAssignment {
 }
 
 export interface PanIssueSwarmRecord {
+  finalizedAt?: string;
   failedMergeBlock?: PanIssueSwarmFailedMergeBlock;
   slotAssignments?: PanIssueSwarmSlotAssignment[];
 }

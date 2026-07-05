@@ -29,6 +29,7 @@ function makeWatchdog(overrides: Partial<{
   logs: string[];
   fetchOk: boolean;
   fetchTimeout: boolean;
+  healthBody: unknown;
   deaconStatus: unknown;
   spawnOptions: Array<Parameters<SpawnRestart>[0]>;
   config: SupervisorWatchdogConfig;
@@ -37,6 +38,7 @@ function makeWatchdog(overrides: Partial<{
   const logs = overrides.logs ?? [];
   const fetchOk = overrides.fetchOk ?? false;
   const fetchTimeout = overrides.fetchTimeout ?? false;
+  const healthBody = overrides.healthBody;
   const deaconStatus = overrides.deaconStatus ?? {
     isRunning: true,
     config: { patrolIntervalMs: 60_000 },
@@ -62,7 +64,12 @@ function makeWatchdog(overrides: Partial<{
       }
       if (fetchTimeout) throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
       return fetchOk
-        ? { ok: true, status: 200, statusText: 'OK' }
+        ? {
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            ...(healthBody === undefined ? {} : { json: async () => healthBody }),
+          }
         : { ok: false, status: 503, statusText: 'Service Unavailable' };
     },
   });
@@ -165,6 +172,74 @@ describe('SupervisorWatchdog', () => {
       gaveUp: false,
     });
     expect(recovered.status().restartAttempts).toEqual([]);
+  });
+
+  it('treats a peer dashboard health response as a hard failure', async () => {
+    const spawns = { count: 0 };
+    const watchdog = makeWatchdog({
+      spawns,
+      fetchOk: true,
+      config: {
+        ...config,
+        expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
+      },
+      healthBody: { status: 'ok', repoRoot: '/repo', mode: 'peer' },
+    });
+
+    await watchdog.checkOnce();
+
+    expect(spawns.count).toBe(1);
+    expect(watchdog.status()).toMatchObject({
+      healthy: false,
+      consecutiveFailures: 1,
+      consecutiveHardFailures: 1,
+    });
+    expect(watchdog.status().lastError).toContain('mode=peer');
+  });
+
+  it('treats a foreign repoRoot health response as unhealthy', async () => {
+    const spawns = { count: 0 };
+    const watchdog = makeWatchdog({
+      spawns,
+      fetchOk: true,
+      config: {
+        ...config,
+        expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
+      },
+      healthBody: { status: 'ok', repoRoot: '/other-repo', mode: 'primary' },
+    });
+
+    await watchdog.checkOnce();
+
+    expect(spawns.count).toBe(1);
+    expect(watchdog.status()).toMatchObject({
+      healthy: false,
+      consecutiveFailures: 1,
+      consecutiveHardFailures: 1,
+    });
+    expect(watchdog.status().lastError).toContain('/other-repo');
+  });
+
+  it('marks a matching primary dashboard health response healthy', async () => {
+    const spawns = { count: 0 };
+    const watchdog = makeWatchdog({
+      spawns,
+      fetchOk: true,
+      config: {
+        ...config,
+        expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
+      },
+      healthBody: { status: 'ok', repoRoot: '/repo', mode: 'primary' },
+    });
+
+    await watchdog.checkOnce();
+
+    expect(spawns.count).toBe(0);
+    expect(watchdog.status()).toMatchObject({
+      healthy: true,
+      consecutiveFailures: 0,
+      consecutiveHardFailures: 0,
+    });
   });
 
   it('defers restart when dashboard health is OK but deacon patrol heartbeat is stale', async () => {
@@ -318,7 +393,11 @@ describe('SupervisorWatchdog', () => {
 
   it('passes the persisted boot id to watchdog restart spawns', async () => {
     mkdirSync(testHome, { recursive: true });
-    stampBootReconciliation('boot-watchdog', '2026-05-17T15:30:30.000Z');
+    stampBootReconciliation(
+      'boot-watchdog',
+      '2026-05-17T15:30:30.000Z',
+      '2026-05-17T15:30:00.000Z',
+    );
     const spawnOptions: Array<Parameters<SpawnRestart>[0]> = [];
 
     await makeWatchdog({ spawnOptions }).checkOnce();

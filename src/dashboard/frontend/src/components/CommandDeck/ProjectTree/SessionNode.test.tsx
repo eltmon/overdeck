@@ -276,6 +276,51 @@ describe('SessionNode', () => {
     expect(screen.getByText('Work').closest('button')?.querySelector('.sessionIconRunning')).toBeTruthy();
   });
 
+  it('renders ended sessions with stale working activity as dead, not live (PAN-1739)', () => {
+    runtimeById['planning-dead'] = {
+      activity: 'working',
+      lastActivity: '2026-05-06T11:55:00.000Z',
+    };
+
+    render(
+      <SessionNode
+        session={makeSession({
+          sessionId: 'planning-dead',
+          type: 'planning',
+          presence: 'ended',
+          status: 'stopped',
+          duration: 22 * 60,
+        })}
+      />,
+    );
+
+    const row = screen.getByText('Planning').closest('button');
+    expect(row?.querySelector('.sessionIconRunning')).toBeNull();
+    expect(row?.querySelector('[data-status="active"]')).toBeNull();
+    expect(screen.queryByText('22m')).toBeNull();
+  });
+
+  it('derives ended status dots from presence instead of stale working activity (PAN-1739)', () => {
+    runtimeById['reviewer-dead'] = {
+      activity: 'working',
+      lastActivity: '2026-05-06T11:55:00.000Z',
+    };
+
+    render(
+      <SessionNode
+        session={makeSession({
+          sessionId: 'reviewer-dead',
+          type: 'reviewer',
+          role: 'security',
+          presence: 'ended',
+          status: 'stopped',
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId('status-dot')).toHaveAttribute('data-status', 'ended');
+  });
+
   it('renders registered swarm slots as distinct openable terminal rows', () => {
     render(
       <div>

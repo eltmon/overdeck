@@ -529,6 +529,39 @@ export const PipelineTestCompletedEvent = Schema.Struct({
 })
 export type PipelineTestCompletedEvent = typeof PipelineTestCompletedEvent.Type
 
+/** New — verification gate dispatched (review-pipeline verify step) */
+export const PipelineVerificationStartedEvent = Schema.Struct({
+  type: Schema.Literal("pipeline.verification-started"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ issueId: IssueId }),
+})
+export type PipelineVerificationStartedEvent = typeof PipelineVerificationStartedEvent.Type
+
+/** New — verification gate failed (carries failedCheck for gate failures, message for infra errors) */
+export const PipelineVerificationFailedEvent = Schema.Struct({
+  type: Schema.Literal("pipeline.verification-failed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: IssueId,
+    failedCheck: Schema.optional(Schema.String),
+    message: Schema.optional(Schema.String),
+  }),
+})
+export type PipelineVerificationFailedEvent = typeof PipelineVerificationFailedEvent.Type
+
+/** New — issue lifecycle transition (single source: IssueLifecycle.transitionTo).
+ * `state` stays an open string so new server-side lifecycle states can never
+ * poison the domain-event stream (the failure mode behind this event's addition). */
+export const IssueTransitionedEvent = Schema.Struct({
+  type: Schema.Literal("issue.transitioned"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ issueId: IssueId, state: Schema.String }),
+})
+export type IssueTransitionedEvent = typeof IssueTransitionedEvent.Type
+
 export const OperatorInterventionEvent = Schema.Struct({
   type: Schema.Literal("operator.intervention"),
   sequence: SequenceNumber,
@@ -1146,6 +1179,9 @@ export const DomainEvent = Schema.Union([
   PipelineReviewCompletedEvent,
   PipelineTestStartedEvent,
   PipelineTestCompletedEvent,
+  PipelineVerificationStartedEvent,
+  PipelineVerificationFailedEvent,
+  IssueTransitionedEvent,
   OperatorInterventionEvent,
   SubstrateBugFiledEvent,
   ReviewReviewerStartedEvent,

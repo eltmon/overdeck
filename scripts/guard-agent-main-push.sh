@@ -48,6 +48,25 @@ if [[ -z "$changed_paths" ]]; then
   exit 0
 fi
 
+if [[ "${OVERDECK_AGENT_ID:-}" == "flywheel-orchestrator" ]]; then
+  offending_paths=$(printf '%s\n' "$changed_paths" | grep -Ev '^(docs/FLYWHEEL-STATE\.md$|\.pan/records/|\.pan/continues/|\.pan/backlog/|\.beads/)' || true)
+  if [[ -z "$offending_paths" ]]; then
+    exit 0
+  fi
+
+  echo "✖ agent main-push guard: flywheel-orchestrator may only push flywheel state/checkpoint paths" >&2
+  echo "Refusing flywheel-orchestrator push to refs/heads/main because this range touches disallowed paths:" >&2
+  printf '%s\n' "$offending_paths" >&2
+  echo "" >&2
+  echo "Allowed flywheel-orchestrator paths are:" >&2
+  echo "  docs/FLYWHEEL-STATE.md" >&2
+  echo "  .pan/records/" >&2
+  echo "  .pan/continues/" >&2
+  echo "  .pan/backlog/" >&2
+  echo "  .beads/" >&2
+  exit 1
+fi
+
 offending_paths=$(printf '%s\n' "$changed_paths" | grep -E '^(src|packages|roles|skills|scripts)/' || true)
 if [[ -z "$offending_paths" ]]; then
   exit 0

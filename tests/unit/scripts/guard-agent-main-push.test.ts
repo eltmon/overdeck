@@ -96,6 +96,34 @@ describe('guard-agent-main-push.sh', () => {
     expect(result.ok).toBe(true);
   });
 
+  it('blocks flywheel-orchestrator ranges touching artifact paths and names them', () => {
+    const { root, base } = setupRepo();
+    mkdirSync(join(root, '.pan', 'specs'), { recursive: true });
+    writeFileSync(join(root, '.pan', 'specs', 'x.vbrief.json'), '{}\n');
+    const head = commitAll(root, 'vbrief artifact');
+
+    const result = runGuard(root, ['--range', `${base}..${head}`], {
+      OVERDECK_AGENT_ID: 'flywheel-orchestrator',
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.output).toContain('flywheel-orchestrator');
+    expect(result.output).toContain('.pan/specs/x.vbrief.json');
+  });
+
+  it('allows flywheel-orchestrator ranges touching only flywheel state', () => {
+    const { root, base } = setupRepo();
+    mkdirSync(join(root, 'docs'), { recursive: true });
+    writeFileSync(join(root, 'docs', 'FLYWHEEL-STATE.md'), 'tick\n');
+    const head = commitAll(root, 'flywheel state');
+
+    const result = runGuard(root, ['--range', `${base}..${head}`], {
+      OVERDECK_AGENT_ID: 'flywheel-orchestrator',
+    });
+
+    expect(result.ok).toBe(true);
+  });
+
   it('allows operator escape-hatch ranges even when code paths changed', () => {
     const { root, base } = setupRepo();
     mkdirSync(join(root, 'scripts'), { recursive: true });

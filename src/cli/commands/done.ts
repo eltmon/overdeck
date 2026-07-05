@@ -493,6 +493,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       await postMergeLifecycle(issueId, resolved.projectPath, branchName, {
         skipDeploy: true,
         allowVerifiedNoPrMerge: true,
+        markReviewPassed: true,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

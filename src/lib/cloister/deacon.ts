@@ -34,7 +34,7 @@ import { checkOrphanedReviewStatuses, recoverStalledReviewConvoys, checkMissingR
 import { getAutoCloseOutCanonicalState } from './deacon-canonical-state.js';
 import { checkReadyForMergeStuck as checkReadyForMergeStuckWithDeps, reconcileStaleMergeStatus, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
 import { coordinateSwarmSlots } from './deacon-swarm.js';
-import { recoverOrphanedAgents as recoverOrphanedAgentsWithDeps, handleAgentHeartbeatDeadEvent as handleAgentHeartbeatDeadEventWithDeps, handleAgentStoppedEvent as handleAgentStoppedEventWithDeps, autoResumeStoppedWorkAgents as autoResumeStoppedWorkAgentsWithDeps, applyBootReconciliationDecision as applyBootReconciliationDecisionWithDeps, reconcileAgentLiveness as reconcileAgentLivenessWithDeps, nudgeStalledResumeWorkAgents, redeliverUndeliveredKickoffs, nudgeIdleWorkAgentsWithOpenBeads, cleanupOrphanedPlanningSessions as cleanupOrphanedPlanningSessionsWithDeps } from './deacon-auto-resume.js';
+import { recoverOrphanedAgents as recoverOrphanedAgentsWithDeps, handleAgentHeartbeatDeadEvent as handleAgentHeartbeatDeadEventWithDeps, handleAgentStoppedEvent as handleAgentStoppedEventWithDeps, autoResumeStoppedWorkAgents as autoResumeStoppedWorkAgentsWithDeps, applyBootReconciliationDecision as applyBootReconciliationDecisionWithDeps, reconcileAgentLiveness as reconcileAgentLivenessWithDeps, nudgeStalledResumeWorkAgents, redeliverUndeliveredKickoffs, nudgeIdleWorkAgentsWithOpenBeads, cleanupOrphanedPlanningSessions as cleanupOrphanedPlanningSessionsWithDeps, type BootReconciliationApplyResult } from './deacon-auto-resume.js';
 import { listFeatureWorkspaces } from './deacon-workspaces.js';
 import { createInFlightGuard } from './in-flight-guard.js';
 // Review gated-dispatch behavior moved to deacon-review-status.ts:
@@ -1670,7 +1670,7 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
   return autoResumeStoppedWorkAgentsWithDeps(autoResumeNotifierDeps());
 }
 
-export async function applyBootReconciliationDecision(): Promise<string[]> {
+export async function applyBootReconciliationDecision(): Promise<BootReconciliationApplyResult> {
   return applyBootReconciliationDecisionWithDeps(autoResumeNotifierDeps());
 }
 

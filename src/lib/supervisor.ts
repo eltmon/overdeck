@@ -66,7 +66,7 @@ export function isSupervisorRunningSync(): boolean {
   return pid !== null && isProcessAlive(pid);
 }
 
-function resolveSupervisorBundle(): string {
+export function resolveSupervisorBundle(): string {
   // Always the built bundle (dist/supervisor/server.js) so import resolution
   // works under Node 22. Resolve from packageRoot — robust across every
   // invocation context (CLI bundle in dist/, dashboard server in
