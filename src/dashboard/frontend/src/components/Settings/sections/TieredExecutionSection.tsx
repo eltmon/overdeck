@@ -24,7 +24,13 @@ const MODEL_OPTIONS = Object.entries(MODELS_BY_PROVIDER).flatMap(([providerId, p
     name: model.name,
   })),
 );
-const DEFAULT_MODEL = MODEL_OPTIONS[0]?.id ?? 'claude-haiku-4-5';
+// Defaults must NEVER be a frontier model (fable/opus). MODEL_OPTIONS[0] is
+// the most premium catalog entry, and defaulting new tiers/the supervisor to
+// it silently burned the operator's Anthropic plan (2026-07-05 incident).
+// Frontier models stay fully selectable — they are just never the unchosen
+// default. Enforced by __tests__/TieredExecutionSection.test.tsx.
+export const DEFAULT_MODEL = 'claude-haiku-4-5';
+export const DEFAULT_SUPERVISOR_MODEL = 'claude-sonnet-5';
 
 function defaultTieredExecution(enabled: boolean): TieredExecutionConfig {
   return {
@@ -278,7 +284,7 @@ export function TieredExecutionSection({
     updateTieredExecution({
       ...next,
       supervisor: {
-        model: next.supervisor?.model ?? DEFAULT_MODEL,
+        model: next.supervisor?.model ?? DEFAULT_SUPERVISOR_MODEL,
         harness: next.supervisor?.harness ?? 'claude-code',
         subscribe: next.supervisor?.subscribe ?? 'flagged',
         owns_inspection: next.supervisor?.owns_inspection ?? false,
@@ -522,7 +528,7 @@ export function TieredExecutionSection({
             <label className="space-y-1.5">
               <span className="text-xs font-medium text-foreground">Model</span>
               <select
-                value={config?.supervisor?.model ?? DEFAULT_MODEL}
+                value={config?.supervisor?.model ?? DEFAULT_SUPERVISOR_MODEL}
                 onChange={(event) => handleSupervisorPatch({ model: event.target.value, harness: config?.supervisor?.harness ?? 'claude-code', subscribe: config?.supervisor?.subscribe ?? 'flagged' })}
                 className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
               >
@@ -539,7 +545,7 @@ export function TieredExecutionSection({
               <span className="text-xs font-medium text-foreground">Harness</span>
               <select
                 value={config?.supervisor?.harness ?? 'claude-code'}
-                onChange={(event) => handleSupervisorPatch({ model: config?.supervisor?.model ?? DEFAULT_MODEL, harness: event.target.value as Harness, subscribe: config?.supervisor?.subscribe ?? 'flagged' })}
+                onChange={(event) => handleSupervisorPatch({ model: config?.supervisor?.model ?? DEFAULT_SUPERVISOR_MODEL, harness: event.target.value as Harness, subscribe: config?.supervisor?.subscribe ?? 'flagged' })}
                 className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
               >
                 {HARNESSES.map((harness) => <option key={harness} value={harness}>{harness}</option>)}
@@ -549,7 +555,7 @@ export function TieredExecutionSection({
               <span className="text-xs font-medium text-foreground">Subscribe</span>
               <select
                 value={config?.supervisor?.subscribe ?? 'flagged'}
-                onChange={(event) => handleSupervisorPatch({ model: config?.supervisor?.model ?? DEFAULT_MODEL, harness: config?.supervisor?.harness ?? 'claude-code', subscribe: event.target.value as NonNullable<TieredExecutionConfig['supervisor']>['subscribe'] })}
+                onChange={(event) => handleSupervisorPatch({ model: config?.supervisor?.model ?? DEFAULT_SUPERVISOR_MODEL, harness: config?.supervisor?.harness ?? 'claude-code', subscribe: event.target.value as NonNullable<TieredExecutionConfig['supervisor']>['subscribe'] })}
                 className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
               >
                 {SUBSCRIPTIONS.map((subscription) => <option key={subscription} value={subscription}>{subscription}</option>)}
@@ -562,7 +568,7 @@ export function TieredExecutionSection({
                 role="switch"
                 aria-checked={config?.supervisor?.owns_inspection ?? false}
                 aria-label="Supervisor owns inspection"
-                onClick={() => handleSupervisorPatch({ model: config?.supervisor?.model ?? DEFAULT_MODEL, harness: config?.supervisor?.harness ?? 'claude-code', subscribe: config?.supervisor?.subscribe ?? 'flagged', owns_inspection: !(config?.supervisor?.owns_inspection ?? false) })}
+                onClick={() => handleSupervisorPatch({ model: config?.supervisor?.model ?? DEFAULT_SUPERVISOR_MODEL, harness: config?.supervisor?.harness ?? 'claude-code', subscribe: config?.supervisor?.subscribe ?? 'flagged', owns_inspection: !(config?.supervisor?.owns_inspection ?? false) })}
                 className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                   config?.supervisor?.owns_inspection ? 'bg-primary' : 'bg-muted'
                 }`}
