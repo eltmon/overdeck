@@ -50,7 +50,7 @@ function readySlot(overrides: Partial<ClassifiedSwarmSlot> = {}): ClassifiedSwar
   };
 }
 
-function deps(result: { merged: boolean; conflicts: boolean }): Pick<CoordinateSwarmSlotsDeps, 'verifyAndMergeSlot' | 'applyTaskOperationToPlanFile'> {
+function deps(result: { merged: boolean; conflicts: boolean }): Pick<CoordinateSwarmSlotsDeps, 'verifyAndMergeSlot' | 'applyTaskOperationToPlanFile' | 'fireTieredCommitHooks'> {
   return {
     verifyAndMergeSlot: vi.fn(async () => ({
       verified: true,
@@ -63,6 +63,7 @@ function deps(result: { merged: boolean; conflicts: boolean }): Pick<CoordinateS
       },
     })),
     applyTaskOperationToPlanFile: vi.fn(async () => undefined),
+    fireTieredCommitHooks: vi.fn(async () => []),
   };
 }
 

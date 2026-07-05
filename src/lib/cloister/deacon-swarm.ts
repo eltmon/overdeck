@@ -60,6 +60,7 @@ import {
 } from './deacon-swarm-finalization.js';
 import { gcMergedSlots } from './deacon-swarm-gc.js';
 import { createMinimalIssueRecord, writeSwarmFinalizedAt } from './deacon-swarm-record.js';
+import { fireTieredCommitHooks } from './swarm-tiered-hooks.js';
 
 export { gcOrphanedSlots } from './deacon-swarm-orphan-gc.js';
 export { gcMergedSlots } from './deacon-swarm-gc.js';
@@ -115,6 +116,10 @@ export interface CoordinateSwarmSlotsDeps {
     operation: PersistedTaskOperation,
     workspacePath?: string,
   ) => Promise<unknown>;
+  /** PAN-2385: fire the tiered commit feed + supervisor review after a slot merges. */
+  fireTieredCommitHooks: (
+    options: { issueId: string; workspacePath: string; item: VBriefItem; doc: VBriefDocument },
+  ) => Promise<string[]>;
   recordSlotAssignment: (workspacePath: string, issueId: string, assignment: SlotAssignment) => void;
   clearSlotAssignment: (workspacePath: string, issueId: string, slotIndex: number, itemId?: string) => void;
   runGitCommand: (command: string, cwd: string) => Promise<unknown>;
@@ -176,6 +181,7 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   verifyAndMergeSlot,
   applyTaskOperationToPlanFile: (planPath, operation, workspacePath) =>
     Effect.runPromise(applyTaskOperationToPlanFile(planPath, operation, workspacePath)),
+  fireTieredCommitHooks,
   recordSlotAssignment,
   clearSlotAssignment,
   runGitCommand: (command, cwd) => execAsync(command, { cwd }),
@@ -463,7 +469,7 @@ export async function mergeReadySlots(
   workspacePath: string,
   doc: VBriefDocument,
   slots: ClassifiedSwarmSlot[],
-  deps: Pick<CoordinateSwarmSlotsDeps, 'verifyAndMergeSlot' | 'applyTaskOperationToPlanFile'> = defaultDeps,
+  deps: Pick<CoordinateSwarmSlotsDeps, 'verifyAndMergeSlot' | 'applyTaskOperationToPlanFile' | 'fireTieredCommitHooks'> = defaultDeps,
 ): Promise<string[]> {
   const actions: string[] = [];
   const itemsById = new Map(doc.plan.items.map(item => [item.id, item]));
@@ -490,6 +496,12 @@ export async function mergeReadySlots(
         writerId: 'deacon-swarm',
       }, workspacePath);
       actions.push(`[swarm] merged slot ${slot.slotIndex} (item ${item.id}) for ${issueId}`);
+      // PAN-2385: commits just landed — fire the tiered feed + supervisor review (best-effort).
+      try {
+        actions.push(...await deps.fireTieredCommitHooks({ issueId, workspacePath, item, doc }));
+      } catch (err) {
+        actions.push(`[tiered] commit hooks threw for ${issueId} item ${item.id}: ${err instanceof Error ? err.message : String(err)}`);
+      }
       continue;
     }
 
