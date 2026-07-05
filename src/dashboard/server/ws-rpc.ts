@@ -6,10 +6,10 @@
  * are implemented via TerminalService (dual-runtime PTY, B20).
  */
 
-import { Effect, Layer, Queue, Schedule, Stream } from 'effect';
+import { Effect, Layer, Queue, Schedule, Schema, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { RpcSerialization, RpcServer } from 'effect/unstable/rpc';
-import { PanRpcGroup, PanRpcError, WS_METHODS } from '@overdeck/contracts';
+import { DomainEvent as DomainEventSchema, PanRpcGroup, PanRpcError, WS_METHODS } from '@overdeck/contracts';
 import { PanOpen } from './services/open.js';
 import { EventStoreService } from './services/domain-services.js';
 import { ReadModelService, type ReadModelServiceShape } from './read-model.js';
@@ -51,6 +51,20 @@ function storedToDomainEvent(stored: StoredEvent): DomainEvent {
     timestamp: stored.timestamp,
     payload: stored.payload,
   } as DomainEvent;
+}
+
+// An event whose type/shape is missing from the contracts DomainEvent union
+// must never reach RPC stream encoding — one bad event fails the encode and
+// kills the subscription stream (merged heartbeats included) for every client,
+// wedging the dashboard in a permanent "Reconnecting…" loop (same failure
+// class as PAN-2225). Validate at the boundary: drop loudly instead.
+const isKnownDomainEvent = Schema.is(DomainEventSchema);
+function passesDomainEventSchema(event: DomainEvent): boolean {
+  if (isKnownDomainEvent(event)) return true;
+  console.error(
+    `[ws-rpc] dropping domain event that fails DomainEvent schema validation — add it to the contracts union: type=${event.type} seq=${event.sequence}`,
+  );
+  return false;
 }
 
 function createSystemHeartbeatEvent(): SystemHeartbeatEvent {
@@ -755,6 +769,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
         );
         return eventStore.streamEvents.pipe(
           Stream.map(storedToDomainEvent),
+          Stream.filter(passesDomainEventSchema),
           Stream.merge(heartbeats),
         );
       },
@@ -779,6 +794,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
         console.log(`[ws-rpc] subscribeIssueEvents invoked issueId=${input.issueId}`);
         return eventStore.streamEvents.pipe(
           Stream.map(storedToDomainEvent),
+          Stream.filter(passesDomainEventSchema),
           Stream.mapEffect((event) =>
             getCachedAgentIssueLookup(readModel).pipe(
               Effect.map((lookup) => filterDomainEventForIssue(event, input.issueId, lookup)),
@@ -831,7 +847,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
       // ── replayEvents ─────────────────────────────────────────────────────────
       [WS_METHODS.replayEvents]: (input) =>
         eventStore.readFrom(input.fromSequence).pipe(
-          Effect.map((stored) => stored.map(storedToDomainEvent)),
+          Effect.map((stored) => stored.map(storedToDomainEvent).filter(passesDomainEventSchema)),
           Effect.mapError(
             (cause) =>
               new PanRpcError({
