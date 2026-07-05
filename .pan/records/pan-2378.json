@@ -5,128 +5,12 @@
     {
       "reason": "resume",
       "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-05T05:49:44.646Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-05T05:50Z] review-agent → CHANGES-REQUESTED — seq 1",
-      "timestamp": "2026-07-05T05:50:34.261Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-05T05:50Z] review-agent → CHANGES-REQUESTED — seq 2",
-      "timestamp": "2026-07-05T05:50:37.680Z"
-    },
-    {
-      "timestamp": "2026-07-05T05:53:30.995Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-05T05:53:31.417Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-05T05:54Z] review-agent → CHANGES-REQUESTED — seq 1",
-      "timestamp": "2026-07-05T05:54:52.964Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-05T05:54Z] review-agent → CHANGES-REQUESTED — seq 2",
-      "timestamp": "2026-07-05T05:54:57.758Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-05T05:55:39.208Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-05T05:56:10.067Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-05T05:56:25.561Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-05T05:56Z] review-agent → CHANGES-REQUESTED — seq 1",
-      "timestamp": "2026-07-05T05:56:59.375Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-05T05:57Z] review-agent → CHANGES-REQUESTED — seq 2",
-      "timestamp": "2026-07-05T05:57:08.009Z"
-    },
-    {
-      "timestamp": "2026-07-05T05:59:34.735Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-05T05:59:35.251Z"
+      "timestamp": "2026-07-05T06:02:14.429Z"
     }
   ],
   "feedback": [],
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      ".pan/drafts/PAN-2378.md",
-      ".pan/records/pan-2283.json",
-      ".pan/records/pan-2378.json",
-      "scripts/build-cli.mjs",
-      "scripts/file-size-baseline.txt",
-      "src/dashboard/frontend/src/components/Settings/hooks/useAutosavePipeline.ts",
-      "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.test.tsx",
-      "src/dashboard/frontend/src/components/vbrief/types.ts",
-      "src/lib/settings-api-tiered-execution.ts",
-      "tests/lib/settings-api.test.ts"
-    ],
-    "declaredScopeUntouched": [
-      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMetricStrip.tsx",
-      "src/dashboard/server/routes/settings.ts",
-      "tests/unit/lib/settings-api.test.ts"
-    ],
-    "declaredScope": [
-      "docs/TIERED-EXECUTION.md",
-      "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
-      "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
-      "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
-      "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
-      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMetricStrip.tsx",
-      "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.tsx",
-      "src/dashboard/server/routes/settings.ts",
-      "src/lib/settings-api.ts",
-      "tests/unit/lib/settings-api.test.ts"
-    ],
-    "actualChangedFiles": [
-      ".pan/drafts/PAN-2378.md",
-      ".pan/records/pan-2283.json",
-      ".pan/records/pan-2378.json",
-      "docs/TIERED-EXECUTION.md",
-      "scripts/build-cli.mjs",
-      "scripts/file-size-baseline.txt",
-      "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
-      "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
-      "src/dashboard/frontend/src/components/Settings/hooks/useAutosavePipeline.ts",
-      "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
-      "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
-      "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.test.tsx",
-      "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.tsx",
-      "src/dashboard/frontend/src/components/vbrief/types.ts",
-      "src/lib/settings-api-tiered-execution.ts",
-      "src/lib/settings-api.ts",
-      "tests/lib/settings-api.test.ts"
-    ],
-    "recordedAt": "2026-07-05T05:59:28.066Z"
-  },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "be-write-door": "completed",
     "fe-issue-chip": "completed",
@@ -159,16 +43,19 @@
   },
   "pipeline": {
     "issueId": "PAN-2378",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
-    "verificationStatus": "running",
+    "reviewStatus": "passed",
+    "testStatus": "testing",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-05T05:59:42.389Z",
-    "reviewNotes": "Kind override edits are masked by stale derived byKind",
+    "updatedAt": "2026-07-05T06:03:02.678Z",
+    "reviewNotes": "No blocking findings; no code changes since prior passed review",
+    "testNotes": "Dispatch failed before tests started: duplicate tmux session agent-pan-2378-test.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2380",
-    "lastVerifiedCommit": "2230fb3f558797eb5b40d44c8fcf501073c7c410",
+    "reviewedAtCommit": "f12de2f64a6b4668fd949e5bdb54d5094bf9b2ad",
+    "lastVerifiedCommit": "f12de2f64a6b4668fd949e5bdb54d5094bf9b2ad",
     "reviewRequestedAt": "2026-07-05T05:59:34.736Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -238,8 +125,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 13024,
-            "output": 993,
+            "input": 14051,
+            "output": 1105,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -261,8 +148,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 13024,
-          "output": 993,
+          "input": 14051,
+          "output": 1105,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -275,7 +162,7 @@
       },
       "costAtCloseOut": {
         "usd": 10.57664,
-        "pricingAsOf": "2026-07-05T05:59:42.443Z"
+        "pricingAsOf": "2026-07-05T06:03:02.725Z"
       }
     },
     "merges": [
@@ -293,6 +180,6 @@
       }
     ]
   },
-  "created": "2026-07-05T05:48:58.706Z",
-  "updated": "2026-07-05T05:59:42.444Z"
+  "created": "2026-07-05T06:00:58.665Z",
+  "updated": "2026-07-05T06:03:02.737Z"
 }
