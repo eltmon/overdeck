@@ -39,6 +39,14 @@ dashboard server, a React frontend, and a fleet of tmux-hosted coding agents.
 - `session-format-converter.ts` — conversation transcript conversion between
   harness JSONL formats (tier-4 harness switch; experimental).
 - `conversations/switch-strategy.ts` — model/harness switch tiers 1–4.
+- Cost metering — `cost-parsers/` (per-harness session parsers: `jsonl-parser.ts`
+  claude-code, `ohmypi-parser.ts`, `codex-parser.ts`, legacy `pi-parser.ts`),
+  `cost.ts` (pricing table, `getPricingSync`), `overdeck/cost.ts` (the two-door
+  CostWriter: `record()` dedupes by requestId/sourceFile → append-only archive →
+  `cost_events` SQLite; `reconcile({source})` sweeps per-agent session dirs).
+  Live triggers: claude via WAL/transcript sync, ohmypi via
+  `cloister/pi-cost-reconciler.ts` (gated on a running ohmypi agent), plus
+  `POST /api/costs/reconcile` (`dashboard/server/routes/costs.ts`).
 
 ## Agent pipeline
 
@@ -68,4 +76,4 @@ Work agents can run on Fly.io VMs (`src/lib/remote/remote-agents.ts`,
 `routes/projects.ts` `collectSessionTreeNodes()` (PAN-1775). Remote agents have
 no local tmux session — never assume tmux discovery covers them.
 
-<!-- last-verified: 2026-06-12 -->
+<!-- last-verified: 2026-07-05 -->
