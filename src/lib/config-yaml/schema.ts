@@ -689,6 +689,12 @@ export interface NormalizedConfig {
   /** Tiered bead execution configuration, normalized and validated. */
   tieredExecution: ValidatedTieredExecutionConfig;
 
+  /** PAN-2395: set when the configured tiered_execution block failed
+   * validation at load time. Tiered staffing is disabled (tieredExecution is
+   * the disabled default) and surfaces read this to warn the operator;
+   * nothing else may throw over it. */
+  tieredExecutionInvalid?: { reason: string };
+
   /** Per-work-type overrides */
   overrides: Partial<Record<string, ModelId>>;
 

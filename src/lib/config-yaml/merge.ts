@@ -4,7 +4,7 @@ import type { ModelProvider } from '../model-fallback.js';
 import { resolveModelIdSync } from '../model-capabilities.js';
 import type { ModelId } from '../settings.js';
 import { BACKGROUND_AI_FEATURES } from '../background-ai/registry.js';
-import { DEFAULT_TIERED_EXECUTION_CONFIG, validateTieredExecutionConfig } from '../agents/tier-table.js';
+import { DEFAULT_TIERED_EXECUTION_CONFIG, TieredExecutionConfigError, validateTieredExecutionConfig } from '../agents/tier-table.js';
 import { DEFAULT_CONFIG } from './defaults.js';
 import { cloneRoles, DEFAULT_MODEL_REFS, DEFAULT_ROLES, DEFAULT_WORKHORSES, mergeRoleConfig, validateRoleModelRefs } from './roles.js';
 import {
@@ -82,6 +82,29 @@ function resolveEnvVar(value: string | undefined): string | undefined {
 /**
  * Merge multiple configs with precedence: project > global > defaults
  */
+
+// PAN-2395: an invalid tiered_execution block must never blast-radius config
+// loading — the 2026-07-05 incident had a YAML-coerced enum throwing out of
+// EVERY loadConfig call, which falsely ended a live conversation and blocked
+// conversation creation. Load-path validation now DEGRADES: tiered staffing is
+// disabled (dispatch falls back to the implicit roles.work tier), the reason
+// is surfaced on config.tieredExecutionInvalid, and we warn once per distinct
+// reason per process. Save-time validation at the settings write door remains
+// the fail-loud enforcement point.
+let lastTieredInvalidReasonWarned: string | undefined;
+function degradeInvalidTieredExecution(
+  result: { tieredExecution: typeof DEFAULT_TIERED_EXECUTION_CONFIG; tieredExecutionInvalid?: { reason: string } },
+  err: unknown,
+): void {
+  if (!(err instanceof TieredExecutionConfigError)) throw err;
+  if (lastTieredInvalidReasonWarned !== err.message) {
+    lastTieredInvalidReasonWarned = err.message;
+    console.error(`[config] tiered_execution is INVALID — tiered staffing disabled until fixed: ${err.message}`);
+  }
+  result.tieredExecutionInvalid = { reason: err.message };
+  result.tieredExecution = { ...DEFAULT_TIERED_EXECUTION_CONFIG, enabled: false };
+}
+
 export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedConfig; explicitlyDisabled: Set<ModelProvider> } {
   const result: NormalizedConfig = {
     ...DEFAULT_CONFIG,
@@ -425,9 +448,14 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     mergeRoleConfig(result, config);
 
     if (config.tiered_execution) {
-      result.tieredExecution = validateTieredExecutionConfig(config.tiered_execution, {
-        providerAuth: result.providerAuth,
-      });
+      try {
+        result.tieredExecution = validateTieredExecutionConfig(config.tiered_execution, {
+          providerAuth: result.providerAuth,
+        });
+        result.tieredExecutionInvalid = undefined;
+      } catch (err) {
+        degradeInvalidTieredExecution(result, err);
+      }
     }
 
     // Merge legacy API keys (for backward compatibility)
@@ -645,9 +673,15 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
   }
 
   validateRoleModelRefs(result);
-  result.tieredExecution = validateTieredExecutionConfig(result.tieredExecution, {
-    providerAuth: result.providerAuth,
-  });
+  if (!result.tieredExecutionInvalid) {
+    try {
+      result.tieredExecution = validateTieredExecutionConfig(result.tieredExecution, {
+        providerAuth: result.providerAuth,
+      });
+    } catch (err) {
+      degradeInvalidTieredExecution(result, err);
+    }
+  }
 
   return { config: result, explicitlyDisabled };
 }
