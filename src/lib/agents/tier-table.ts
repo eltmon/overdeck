@@ -315,9 +315,6 @@ export function validateTieredExecutionConfig(
     let model: string;
     let harness: RuntimeName;
     if (rawDistribution !== undefined) {
-      if (tier.model !== undefined || tier.harness !== undefined) {
-        throw new TieredExecutionConfigError(`${path} must declare either model/harness or distribution, not both`);
-      }
       if (!Array.isArray(rawDistribution) || rawDistribution.length === 0) {
         throw new TieredExecutionConfigError(`${path}.distribution must be a non-empty array of {model, harness, weight}`);
       }
@@ -337,6 +334,16 @@ export function validateTieredExecutionConfig(
         throw new TieredExecutionConfigError(`${path}.distribution weights must total exactly 100 (got ${total})`);
       }
       const representative = normalizedDistribution.reduce((best, entry) => (entry.weight > best.weight ? entry : best));
+      // Idempotent re-validation: a normalized config carries the max-weight
+      // representative as model/harness alongside the distribution. Accept
+      // model/harness that MATCH the representative; reject a genuine
+      // conflicting declaration of both.
+      if (
+        (tier.model !== undefined && tier.model !== representative.model)
+        || (tier.harness !== undefined && tier.harness !== representative.harness)
+      ) {
+        throw new TieredExecutionConfigError(`${path} must declare either model/harness or distribution, not both`);
+      }
       model = representative.model;
       harness = representative.harness;
     } else {
