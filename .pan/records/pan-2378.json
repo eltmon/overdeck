@@ -6,11 +6,72 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-05T06:02:14.429Z"
+    },
+    {
+      "timestamp": "2026-07-05T06:05:06.374Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-05T06:05:29.428Z"
     }
   ],
   "feedback": [],
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/drafts/PAN-2378.md",
+      ".pan/records/pan-2283.json",
+      ".pan/records/pan-2378.json",
+      "scripts/build-cli.mjs",
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/frontend/src/components/Settings/hooks/useAutosavePipeline.ts",
+      "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.test.tsx",
+      "src/dashboard/frontend/src/components/vbrief/types.ts",
+      "src/lib/settings-api-tiered-execution.ts",
+      "tests/lib/settings-api.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMetricStrip.tsx",
+      "src/dashboard/server/routes/settings.ts",
+      "tests/unit/lib/settings-api.test.ts"
+    ],
+    "declaredScope": [
+      "docs/TIERED-EXECUTION.md",
+      "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
+      "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMetricStrip.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.tsx",
+      "src/dashboard/server/routes/settings.ts",
+      "src/lib/settings-api.ts",
+      "tests/unit/lib/settings-api.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".pan/drafts/PAN-2378.md",
+      ".pan/records/pan-2283.json",
+      ".pan/records/pan-2378.json",
+      "docs/TIERED-EXECUTION.md",
+      "scripts/build-cli.mjs",
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
+      "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+      "src/dashboard/frontend/src/components/Settings/hooks/useAutosavePipeline.ts",
+      "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.tsx",
+      "src/dashboard/frontend/src/components/vbrief/types.ts",
+      "src/lib/settings-api-tiered-execution.ts",
+      "src/lib/settings-api.ts",
+      "tests/lib/settings-api.test.ts"
+    ],
+    "recordedAt": "2026-07-05T06:04:58.055Z"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "be-write-door": "completed",
     "fe-issue-chip": "completed",
@@ -43,20 +104,19 @@
   },
   "pipeline": {
     "issueId": "PAN-2378",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
-    "verificationStatus": "passed",
+    "reviewStatus": "reviewing",
+    "testStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-05T06:03:02.678Z",
+    "updatedAt": "2026-07-05T06:05:15.673Z",
     "reviewNotes": "No blocking findings; no code changes since prior passed review",
     "testNotes": "Dispatch failed before tests started: duplicate tmux session agent-pan-2378-test.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2380",
     "reviewedAtCommit": "f12de2f64a6b4668fd949e5bdb54d5094bf9b2ad",
     "lastVerifiedCommit": "f12de2f64a6b4668fd949e5bdb54d5094bf9b2ad",
-    "reviewRequestedAt": "2026-07-05T05:59:34.736Z",
+    "reviewRequestedAt": "2026-07-05T06:05:06.387Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/drafts/PAN-2378.md",
@@ -106,7 +166,7 @@
         "src/lib/settings-api.ts",
         "tests/lib/settings-api.test.ts"
       ],
-      "recordedAt": "2026-07-05T05:59:28.066Z"
+      "recordedAt": "2026-07-05T06:04:58.055Z"
     },
     "deaconIgnored": true,
     "deaconIgnoredAt": "2026-07-05T04:59:38.468Z",
@@ -138,6 +198,14 @@
             "cacheRead": 5771207,
             "cacheWrite": 193528
           }
+        },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 485476,
+            "output": 5945,
+            "cacheRead": 1356800,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
@@ -158,11 +226,17 @@
           "output": 50418,
           "cacheRead": 5771207,
           "cacheWrite": 193528
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 485476,
+          "output": 5945,
+          "cacheRead": 1356800,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 10.57664,
-        "pricingAsOf": "2026-07-05T06:03:02.725Z"
+        "usd": 11.319409,
+        "pricingAsOf": "2026-07-05T06:05:15.748Z"
       }
     },
     "merges": [
@@ -181,5 +255,5 @@
     ]
   },
   "created": "2026-07-05T06:00:58.665Z",
-  "updated": "2026-07-05T06:03:02.737Z"
+  "updated": "2026-07-05T06:05:29.431Z"
 }
