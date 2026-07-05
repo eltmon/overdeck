@@ -160,6 +160,40 @@ describe('TieredExecutionSection', () => {
     expect(screen.getAllByText('unmapped').length).toBeGreaterThan(0);
   });
 
+  it('rejects renaming a tier onto an existing tier name', () => {
+    const onSettingsChange = vi.fn();
+
+    render(
+      <TieredExecutionSection
+        formData={baseSettings({
+          tiered_execution: {
+            enabled: false,
+            tiers: {
+              cheap: {
+                model: 'claude-haiku-4-5',
+                harness: 'claude-code',
+                difficulties: ['trivial'],
+              },
+              expensive: {
+                model: 'claude-opus-4-8',
+                harness: 'claude-code',
+                difficulties: ['simple', 'medium', 'complex', 'expert'],
+              },
+            },
+            by_kind: {},
+            supervisor: { model: 'claude-opus-4-8', harness: 'claude-code', subscribe: 'flagged' },
+            replay_threshold: 0.5,
+          },
+        })}
+        onSettingsChange={onSettingsChange}
+      />,
+    );
+
+    fireEvent.change(screen.getAllByLabelText('Tier name')[0], { target: { value: 'expensive' } });
+
+    expect(onSettingsChange).not.toHaveBeenCalled();
+  });
+
   it('edits supervisor fields through onSettingsChange', () => {
     const onSettingsChange = vi.fn();
     render(

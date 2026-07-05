@@ -165,6 +165,7 @@ export function TieredExecutionSection({
   const handleRenameTier = (oldName: string, newName: string) => {
     if (!newName || newName === oldName) return;
     const next = currentConfig();
+    if (next.tiers[newName]) return;
     const { [oldName]: tier, ...rest } = next.tiers;
     if (!tier) return;
     updateTieredExecution({
