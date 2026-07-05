@@ -9,6 +9,13 @@ const promptsDir = join(distDir, 'prompts');
 const cliPromptsDir = join(distDir, 'cli', 'prompts');
 const preservedRoot = join(projectRoot, '.tmp', `overdeck-dashboard-${process.pid}-${Date.now()}`);
 const preservedDashboardDir = join(preservedRoot, 'dashboard');
+const cliBuildHeapFlag = '--max-old-space-size=8192';
+
+const nodeOptionsForCliBuild = (nodeOptions = '') => (
+  nodeOptions.includes('--max-old-space-size=')
+    ? nodeOptions
+    : `${nodeOptions} ${cliBuildHeapFlag}`.trim()
+);
 
 const moveDirSync = (src, dst) => {
   try {
@@ -106,7 +113,12 @@ try {
     moveDirSync(dashboardDir, preservedDashboardDir);
   }
 
-  const build = spawnSync('tsdown', { cwd: projectRoot, stdio: 'inherit', shell: true });
+  const build = spawnSync('tsdown', {
+    cwd: projectRoot,
+    env: { ...process.env, NODE_OPTIONS: nodeOptionsForCliBuild(process.env.NODE_OPTIONS) },
+    stdio: 'inherit',
+    shell: true,
+  });
   if (build.status !== 0) {
     restoreDashboard();
     process.exit(build.status ?? 1);

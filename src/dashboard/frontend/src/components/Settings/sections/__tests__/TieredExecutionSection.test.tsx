@@ -108,6 +108,8 @@ describe('TieredExecutionSection', () => {
     );
 
     fireEvent.change(screen.getByLabelText('Tier name'), { target: { value: 'cheap' } });
+    expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.tiers['tier-1']).toBeDefined();
+    fireEvent.blur(screen.getByLabelText('Tier name'));
     expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.tiers.cheap).toBeDefined();
 
     const renamed = onSettingsChange.mock.calls.at(-1)![0] as SettingsConfig;
@@ -190,8 +192,10 @@ describe('TieredExecutionSection', () => {
     );
 
     fireEvent.change(screen.getAllByLabelText('Tier name')[0], { target: { value: 'expensive' } });
+    fireEvent.blur(screen.getAllByLabelText('Tier name')[0]);
 
     expect(onSettingsChange).not.toHaveBeenCalled();
+    expect(screen.getByText('Tier name already exists')).toBeTruthy();
   });
 
   it('edits supervisor fields through onSettingsChange', () => {

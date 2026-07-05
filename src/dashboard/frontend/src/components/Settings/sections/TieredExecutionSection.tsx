@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Route } from 'lucide-react';
 import { type Harness, type SettingsConfig, type TieredExecutionConfig } from '../types';
 import type { SaveStatus } from '../hooks/useAutosavePipeline';
@@ -95,6 +96,64 @@ function nextTierName(config: TieredExecutionConfig | undefined): string {
   let index = existing.size + 1;
   while (existing.has(`tier-${index}`)) index += 1;
   return `tier-${index}`;
+}
+
+function TierNameInput({
+  name,
+  tierNames,
+  onRename,
+}: {
+  name: string;
+  tierNames: string[];
+  onRename: (oldName: string, newName: string) => void;
+}) {
+  const [draft, setDraft] = useState(name);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDraft(name);
+    setError(null);
+  }, [name]);
+
+  const commit = () => {
+    const nextName = draft.trim();
+    if (!nextName || nextName === name) {
+      setDraft(name);
+      setError(null);
+      return;
+    }
+    if (tierNames.includes(nextName)) {
+      setError('Tier name already exists');
+      return;
+    }
+    setError(null);
+    onRename(name, nextName);
+  };
+
+  return (
+    <label className="space-y-1.5">
+      <span className="text-xs font-medium text-foreground">Tier name</span>
+      <input
+        type="text"
+        value={draft}
+        onBlur={commit}
+        onChange={(event) => {
+          setDraft(event.target.value);
+          setError(null);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') event.currentTarget.blur();
+          if (event.key === 'Escape') {
+            setDraft(name);
+            setError(null);
+            event.currentTarget.blur();
+          }
+        }}
+        className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs font-mono text-foreground focus:ring-1 focus:ring-primary"
+      />
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </label>
+  );
 }
 
 export function TieredExecutionSection({
@@ -383,15 +442,7 @@ export function TieredExecutionSection({
           {tiers.length > 0 ? tiers.map(([name, tier]) => (
             <div key={name} className="px-4 py-3 rounded-lg border border-border/70">
               <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-                <label className="space-y-1.5">
-                  <span className="text-xs font-medium text-foreground">Tier name</span>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(event) => handleRenameTier(name, event.target.value.trim())}
-                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs font-mono text-foreground focus:ring-1 focus:ring-primary"
-                  />
-                </label>
+                <TierNameInput name={name} tierNames={tierNames} onRename={handleRenameTier} />
                 <label className="space-y-1.5">
                   <span className="text-xs font-medium text-foreground">Model</span>
                   <select
