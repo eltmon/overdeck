@@ -97,7 +97,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     models: ['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.2'],
     tierModels: { opus: 'gpt-5.5', sonnet: 'gpt-5.4', haiku: 'gpt-5.4-mini' },
     tested: true,
-    description: 'Route through the local CLIProxyAPI Anthropic-compatible sidecar using Codex/ChatGPT subscription auth.',
+    description: 'First-party Codex CLI harness (default) using ChatGPT-subscription or API-key auth. The local CLIProxyAPI sidecar remains a legacy alternate for routing GPT models into claude-code.',
   },
 
   google: {
