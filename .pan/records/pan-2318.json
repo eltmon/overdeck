@@ -107,6 +107,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-05T07:10:39.930Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-05T07:14:06.479Z"
     }
   ],
   "feedback": [],
@@ -296,12 +301,11 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-05T07:12:48.772Z",
-    "reviewNotes": "Review passed; watchdog boot grace scoped correctly",
-    "testNotes": "Project gates passed: npm run typecheck (clean, including hooks/evals), npm run lint (ESLint + effect + permissions + state-writes + boundaries + skills + prompts + file-size + source-introspection + ratchet-audit all passed), npx vitest run src/supervisor/__tests__/watchdog.test.ts (19/19 passed). Browser UAT not required: acceptance criteria for PAN-2318 remainder (watchdog boot-grace window) are infra/backend behavior covered by unit tests; no UI/dashboard observable criteria in vBRIEF or PRD.",
+    "updatedAt": "2026-07-05T07:15:07.665Z",
+    "reviewNotes": "Review passed; current cycle only changed pipeline metadata",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2327",
-    "reviewedAtCommit": "fc359eccb310ee68f15741df101c7c52367892fd",
+    "reviewedAtCommit": "acd711decf36f0167b77825353794e4e41fbdf5e",
     "lastVerifiedCommit": "16a6cc0ca90b0b056d239a4595698d370ba59b46",
     "reviewRequestedAt": "2026-07-05T07:04:42.664Z"
   },
@@ -340,9 +344,9 @@
             "cacheWrite": 226169
           },
           "custom/kimi-k2.7-code": {
-            "input": 1709172,
-            "output": 98865,
-            "cacheRead": 46430382,
+            "input": 2088604,
+            "output": 106382,
+            "cacheRead": 47163310,
             "cacheWrite": 0
           }
         }
@@ -373,15 +377,15 @@
           "cacheWrite": 226169
         },
         "custom/kimi-k2.7-code": {
-          "input": 1709172,
-          "output": 98865,
-          "cacheRead": 46430382,
+          "input": 2088604,
+          "output": 106382,
+          "cacheRead": 47163310,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 23.139906,
-        "pricingAsOf": "2026-07-05T07:12:48.786Z"
+        "usd": 23.66969,
+        "pricingAsOf": "2026-07-05T07:15:07.682Z"
       }
     },
     "merges": [
@@ -390,7 +394,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-04T14:07:04.245Z",
-  "updated": "2026-07-05T07:12:48.787Z",
+  "updated": "2026-07-05T07:15:07.684Z",
   "swarm": {
     "finalizedAt": "2026-07-05T07:04:42.866Z"
   }
