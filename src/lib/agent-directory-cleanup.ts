@@ -4,10 +4,16 @@
  * Valid directories (preserved):
  *   - agent-<issueId>    — work agents (always preserved)
  *   - planning-<issueId> — planning agents (only preserved while tmux session is running)
+ *   - conv-*             — conversation directories (ALWAYS preserved: ohmypi
+ *                          conversations write their only transcript to
+ *                          conv-<name>/sessions/*.jsonl via --session-dir, and
+ *                          codex conversations keep rollout JSONLs under
+ *                          conv-<name>/codex-home/sessions/. Deleting these
+ *                          destroys conversation history permanently — 2026-07-05
+ *                          incident: a boot-time `pan sync` wiped every ended
+ *                          pi/codex conversation transcript.)
  *
  * Legacy directories (eligible for cleanup when no tmux session is running):
- *   - conv-*             — old conversation directories (conversations now live in
- *                          ~/.overdeck/conversations/)
  *   - work-<issueId>, review-<issueId>, test-<issueId>, merge-<issueId>
  *   - agent-<number>, agent-agent-*, agent-* with uppercase prefix
  *   - specialist-*
@@ -76,12 +82,16 @@ export function isValidAgentDirectoryName(name: string): boolean {
 }
 
 /**
- * Check whether a directory name is a legacy conv-* directory.
+ * Check whether a directory name is a conversation (conv-*) directory.
  *
- * Conversations now store state in ~/.overdeck/conversations/, so any
- * conv-* directory under ~/.overdeck/agents/ is legacy.
+ * Conversation launcher/state files live in ~/.overdeck/conversations/, but the
+ * conv-* directory under ~/.overdeck/agents/ is the canonical transcript home
+ * for non-claude harnesses: ohmypi writes sessions/*.jsonl there (--session-dir)
+ * and codex keeps rollout JSONLs under codex-home/sessions/. These directories
+ * must NEVER be auto-removed — doing so permanently destroys conversation
+ * history.
  */
-export function isLegacyConversationDirectory(name: string): boolean {
+export function isConversationDirectory(name: string): boolean {
   return name.startsWith('conv-');
 }
 
@@ -143,6 +153,10 @@ async function findOrphanedAgentDirsPromise(
   for (const name of dirs) {
     // Work-agent directories are always valid
     if (isValidAgentDirectoryName(name)) continue;
+
+    // Conversation directories hold the only transcript for ohmypi/codex
+    // conversations (sessions/*.jsonl, codex-home/sessions/). Never touch them.
+    if (isConversationDirectory(name)) continue;
 
     // Planning directories are valid only while their tmux session is running
     const planningIssueId = getPlanningIssueId(name);
