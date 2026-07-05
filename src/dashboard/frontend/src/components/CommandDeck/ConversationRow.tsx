@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useDashboardStore } from '../../lib/store';
-import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Scissors, TriangleAlert, FileText, ExternalLink, Share2, MoreVertical } from 'lucide-react';
+import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Scissors, TriangleAlert, FileText, FileX, ExternalLink, Share2, MoreVertical } from 'lucide-react';
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
 import { useConfirm } from '../DialogProvider';
 import { useNow } from '../../hooks/useNow';
@@ -228,6 +228,15 @@ export function ConversationRow({
         >
           <TriangleAlert size={10} />
           <span>Fallback: {conv.forkFallbackReason}</span>
+        </span>
+      )}
+      {conv.transcriptMissing && (
+        <span
+          className={styles.conversationForkFailed}
+          title="Transcript missing — this conversation had activity, but its history file no longer exists on disk. The history cannot be recovered."
+        >
+          <FileX size={10} />
+          <span>No transcript</span>
         </span>
       )}
     </>

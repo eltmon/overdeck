@@ -182,6 +182,26 @@ export async function resolveSessionFile(conv: Conversation): Promise<string | n
   return null;
 }
 
+/**
+ * True when a conversation that demonstrably had activity (tokens recorded, or
+ * a title derived from its messages) no longer has a transcript file on disk.
+ * This is the operator-facing "history was lost" signal — e.g. the 2026-07-05
+ * incident where a boot-time cleanup deleted conv-* dirs holding ohmypi/codex
+ * transcripts. Live sessions are excluded: a claude-code session writes its
+ * JSONL only on the first message, so a missing file is normal while alive.
+ */
+export function conversationTranscriptMissing(
+  conv: Conversation,
+  sessionAlive: boolean,
+  sessionFile: string | null,
+): boolean {
+  if (sessionAlive) return false;
+  const hadActivity =
+    (conv.totalTokens ?? 0) > 0 || conv.titleSource === 'ai' || conv.titleSource === 'auto';
+  if (!hadActivity) return false;
+  return !sessionFile || !existsSync(sessionFile);
+}
+
 // ─── Messages cache ───────────────────────────────────────────────────────────
 
 const MESSAGES_CACHE_MAX = 100;
@@ -418,6 +438,7 @@ export async function getConversationRead(
       pendingInputCount,
       pendingInputKinds,
       pendingAskUserQuestion,
+      transcriptMissing: conversationTranscriptMissing(conv, sessionAlive, convSf),
     });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
