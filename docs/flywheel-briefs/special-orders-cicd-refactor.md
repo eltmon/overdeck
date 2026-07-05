@@ -33,6 +33,14 @@ mechanics are binding. Where this brief and the master plan disagree, the master
 
 ## This run
 
+- **START GATE (operator-directed 2026-07-04, do not dispatch past it):** no order-book
+  dispatch (`pan plan` / `pan start` for any Lane A or B item) until BOTH hold: (1) the
+  v0.42.0 release is verifiably published (Release workflow green, GitHub Release exists,
+  npm packages at 0.42.0) — if the workflow goes red, escalate to the operator, never
+  fix-forward into a release; and (2) the pipeline is fully clear — inherited swarms
+  dispositioned, their sessions gone, no other agents in flight. The inherited-cleanup
+  work below proceeds immediately; it is what clears the table. Report when the gate
+  opens and you begin A1/B1.
 - **Scope:** ONLY the order book (18 issues across the two campaigns) + shepherding
   [PAN-2265](https://github.com/eltmon/overdeck/issues/2265) (already in review) to close.
 - **Saturation:** the order book replaces backlog saturation. Keep Lane B always occupied
