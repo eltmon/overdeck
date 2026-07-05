@@ -222,6 +222,7 @@ export class SupervisorWatchdog {
     const url = `${dashboardBaseUrl}/api/health`;
     let restartReason: string | null = null;
     let restartLogReason: string | null = null;
+    let restartEligibleForBootGrace = false;
     try {
       const response = await this.fetchFn(url, {
         signal: AbortSignal.timeout(this.config.requestTimeoutMs),
@@ -295,9 +296,14 @@ export class SupervisorWatchdog {
         ? `dashboard unreachable: ${this.state.lastError ?? 'health check failed'}`
         : `sustained health-probe timeouts: ${this.state.lastError ?? 'health check timed out'}`;
       restartLogReason = hardDown ? 'dashboard unreachable' : 'sustained timeouts — dashboard starved';
+      restartEligibleForBootGrace = hardDown;
     }
 
-    if (!this.state.hasBecomeHealthy && startedAt - this.state.bootGraceStartedAt < this.config.bootGraceMs) {
+    if (
+      restartEligibleForBootGrace
+      && !this.state.hasBecomeHealthy
+      && startedAt - this.state.bootGraceStartedAt < this.config.bootGraceMs
+    ) {
       await this.log(
         `watchdog: deferring restart during boot grace (${restartLogReason ?? 'dashboard health check failed'}); `
         + `${Math.max(0, this.config.bootGraceMs - (startedAt - this.state.bootGraceStartedAt))}ms remaining`,

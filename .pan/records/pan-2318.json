@@ -47,6 +47,21 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-05T06:45:47.729Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-05T06:51:35.583Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-05T06:52Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-05T06:52:49.819Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-05T06:52Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-05T06:52:52.370Z"
     }
   ],
   "feedback": [
@@ -54,8 +69,15 @@
       "seq": 1,
       "specialist": "review-agent",
       "outcome": "changes-requested",
-      "timestamp": "2026-07-04T14:57:00Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2318\n\nPUT /api/cloister/config saves the file but no longer reloads the running child Cloister process, so live settings remain stale until restart.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2318 -m \"Fixed review issues\"`"
+      "timestamp": "2026-07-05T06:52:49Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2318\n\nBoot grace also suppresses deacon-patrol stale restarts\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2318 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-05T06:52:52Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2318\n\nBoot grace also suppresses deacon-patrol stale restarts\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2318 -m \"Fixed review issues\"`"
     }
   ],
   "scopeDrift": {
@@ -232,17 +254,16 @@
   },
   "pipeline": {
     "issueId": "PAN-2318",
-    "reviewStatus": "passed",
+    "reviewStatus": "blocked",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "merged",
+    "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T18:22:10.239Z",
-    "testNotes": "Skipped: issue is already merged",
+    "updatedAt": "2026-07-05T06:53:11.609Z",
+    "reviewNotes": "Boot grace also suppresses deacon-patrol stale restarts",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
-    "prUrl": "https://github.com/eltmon/overdeck/pull/2327",
-    "lastVerifiedCommit": "a74bebc649d119383c6cd0ef46a845b5cf9eee3c"
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2327"
   },
   "closeOut": {
     "usage": {
@@ -257,18 +278,18 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 28768,
-            "output": 1045,
+            "input": 55742,
+            "output": 1571,
             "cacheRead": 0,
             "cacheWrite": 0
           }
         },
         "plan": {
           "anthropic/claude-opus-4-8": {
-            "input": 17641,
-            "output": 38691,
-            "cacheRead": 2794255,
-            "cacheWrite": 160275
+            "input": 37110,
+            "output": 81896,
+            "cacheRead": 7273182,
+            "cacheWrite": 334472
           }
         },
         "test": {
@@ -279,9 +300,9 @@
             "cacheWrite": 226169
           },
           "custom/kimi-k2.7-code": {
-            "input": 1396832,
-            "output": 90240,
-            "cacheRead": 43533486,
+            "input": 1708174,
+            "output": 98607,
+            "cacheRead": 46225582,
             "cacheWrite": 0
           }
         }
@@ -294,16 +315,16 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 28768,
-          "output": 1045,
+          "input": 55742,
+          "output": 1571,
           "cacheRead": 0,
           "cacheWrite": 0
         },
         "anthropic/claude-opus-4-8": {
-          "input": 17641,
-          "output": 38691,
-          "cacheRead": 2794255,
-          "cacheWrite": 160275
+          "input": 37110,
+          "output": 81896,
+          "cacheRead": 7273182,
+          "cacheWrite": 334472
         },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 59,
@@ -312,15 +333,15 @@
           "cacheWrite": 226169
         },
         "custom/kimi-k2.7-code": {
-          "input": 1396832,
-          "output": 90240,
-          "cacheRead": 43533486,
+          "input": 1708174,
+          "output": 98607,
+          "cacheRead": 46225582,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 17.752606,
-        "pricingAsOf": "2026-07-04T18:22:10.279Z"
+        "usd": 23.099014,
+        "pricingAsOf": "2026-07-05T06:53:11.667Z"
       }
     },
     "merges": [
@@ -329,5 +350,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-04T14:07:04.245Z",
-  "updated": "2026-07-05T06:45:47.733Z"
+  "updated": "2026-07-05T06:53:11.668Z"
 }

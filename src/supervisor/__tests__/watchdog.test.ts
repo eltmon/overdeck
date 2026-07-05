@@ -388,6 +388,33 @@ describe('SupervisorWatchdog', () => {
     expect(logs.some((msg) => msg.includes('deacon patrol heartbeat stale'))).toBe(true);
   });
 
+  it('does not apply boot grace to deacon patrol stale restarts', async () => {
+    const spawns = { count: 0 };
+    const logs: string[] = [];
+    const watchdog = makeWatchdog({
+      spawns,
+      logs,
+      fetchOk: true,
+      config: {
+        ...config,
+        busyFailThreshold: 1,
+        bootGraceMs: 300_000,
+      },
+      now: () => Date.parse('2026-05-17T15:35:00.000Z'),
+      deaconStatus: {
+        isRunning: true,
+        config: { patrolIntervalMs: 60_000 },
+        state: { lastPatrol: '2026-05-17T15:30:00.000Z' },
+      },
+    });
+
+    await watchdog.checkOnce();
+
+    expect(spawns.count).toBe(1);
+    expect(logs.some((msg) => msg.includes('deferring restart during boot grace'))).toBe(false);
+    expect(logs.some((msg) => msg.includes('deacon patrol heartbeat stale'))).toBe(true);
+  });
+
   it('waits three patrol intervals before restarting a missing initial patrol heartbeat', async () => {
     let now = Date.parse('2026-05-17T15:30:00.000Z');
     const spawns = { count: 0 };
