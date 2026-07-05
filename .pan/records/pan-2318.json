@@ -62,6 +62,11 @@
       "reason": "feedback",
       "note": "[2026-07-05T06:52Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-05T06:52:52.370Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-05T07:02Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-07-05T07:02:09.529Z"
     }
   ],
   "feedback": [
@@ -78,6 +83,13 @@
       "outcome": "changes-requested",
       "timestamp": "2026-07-05T06:52:52Z",
       "markdownBody": "# Review CHANGES REQUESTED for PAN-2318\n\nBoot grace also suppresses deacon-patrol stale restarts\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2318 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 3,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-07-05T07:02:09Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-2318 (attempt 1/3):\n\nFailed check: vbrief-ac\n\nAcceptance criteria check FAILED — 5/5 AC incomplete:\n\n### Add a boot-grace window to SupervisorWatchdog so a warming-up dashboard is not restarted as 'unreachable' (5/5 incomplete)\n  - [ ] Given the watchdog has never received a healthy /api/health response, when connection-refused failures reach failThreshold within bootGraceMs, then spawnRestart is NOT called and a log line stating the restart was deferred during boot grace is emitted.\n  - [ ] Given the dashboard answers /api/health OK once (hasBecomeHealthy becomes true) and then hard-fails to failThreshold, when runCheck assesses the failure, then spawnRestart IS called — boot grace no longer applies after the first healthy check.\n  - [ ] Given the dashboard has never been healthy and the injected clock has advanced past bootGraceMs, when the next hard failure is assessed, then spawnRestart IS called — a never-responding boot is not shielded past the cap.\n  - [ ] Given the watchdog triggers a restart, when the newly-spawned dashboard is probed with refused connections within a fresh window, then those failures are deferred (hasBecomeHealthy reset to false and bootGraceStartedAt reseeded) rather than immediately restarting again.\n  - [ ] Given OVERDECK_SUPERVISOR_BOOT_GRACE_MS is set to a value, when readWatchdogConfig parses env, then the returned config.bootGraceMs equals that value; and when it is unset, config.bootGraceMs defaults to 300000.\n\n## REQUIRED: Complete all acceptance criteria BEFORE resubmitting\n\n1. Review the incomplete AC above\n2. Implement the missing requirements and write tests\n3. Close every completed bead with `bd close` — AC statuses sync from closed beads automatically; never hand-edit spec files\n4. Commit and push ALL changes\n5. ONLY THEN resubmit: pan review request PAN-2318 -m \"Completed acceptance criteria\"\n\nDo NOT resubmit until all AC are completed."
     }
   ],
   "scopeDrift": {
@@ -250,19 +262,25 @@
     "wi-10-eventloop-gauge": "completed",
     "wi-10-eventloop-gauge.ac1": "completed",
     "wi-10-eventloop-gauge.ac2": "completed",
-    "wi-10-eventloop-gauge.ac3": "completed"
+    "wi-10-eventloop-gauge.ac3": "completed",
+    "watchdog-boot-grace": "completed",
+    "watchdog-boot-grace.watchdog-boot-grace.ac1": "completed",
+    "watchdog-boot-grace.watchdog-boot-grace.ac2": "completed",
+    "watchdog-boot-grace.watchdog-boot-grace.ac3": "completed",
+    "watchdog-boot-grace.watchdog-boot-grace.ac4": "completed",
+    "watchdog-boot-grace.watchdog-boot-grace.ac5": "completed"
   },
   "pipeline": {
     "issueId": "PAN-2318",
     "reviewStatus": "blocked",
     "testStatus": "passed",
-    "verificationStatus": "passed",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-05T06:53:11.609Z",
+    "updatedAt": "2026-07-05T07:02:09.519Z",
     "reviewNotes": "Boot grace also suppresses deacon-patrol stale restarts",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "verificationNotes": "Acceptance criteria check FAILED — 5/5 AC incomplete:\n\n### Add a boot-grace window to SupervisorWatchdog so a warming-up dashboard is not restarted as 'unreachable' (5/5 incomplete)\n  - [ ] Given the watchdog has never received a healthy /api/health response, when connection-refused failures reach failThreshold within bootGraceMs, then spawnRestart is NOT called and a log line stating the restart was deferred during boot grace is emitted.\n  - [ ] Given the dashboard answers /api/health OK once (hasBecomeHealthy becomes true) and then hard-fails to failThreshold, when runCheck assesses the failure, then spawnRestart IS called — boot grace no longer applies after the first healthy check.\n  - [ ] Given the dashboard has never been healthy and the injected clock has advanced past bootGraceMs, when the next hard failure is assessed, then spawnRestart IS called — a never-responding boot is not shielded past the cap.\n  - [ ] Given the watchdog triggers a restart, when the newly-spawned dashboard is probed with refused connections within a fresh window, then those failures are deferred (hasBecomeHealthy reset to false and bootGraceStartedAt reseeded) rather than immediately restarting again.\n  - [ ] Given OVERDECK_SUPERVISOR_BOOT_GRACE_MS is set to a value, when readWatchdogConfig parses env, then the returned config.bootGraceMs equals that value; and when it is unset, config.bootGraceMs defaults to 300000.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2327"
   },
   "closeOut": {
@@ -278,8 +296,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 55742,
-            "output": 1571,
+            "input": 57240,
+            "output": 2288,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -300,9 +318,9 @@
             "cacheWrite": 226169
           },
           "custom/kimi-k2.7-code": {
-            "input": 1708174,
-            "output": 98607,
-            "cacheRead": 46225582,
+            "input": 1709172,
+            "output": 98865,
+            "cacheRead": 46430382,
             "cacheWrite": 0
           }
         }
@@ -315,8 +333,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 55742,
-          "output": 1571,
+          "input": 57240,
+          "output": 2288,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -333,15 +351,15 @@
           "cacheWrite": 226169
         },
         "custom/kimi-k2.7-code": {
-          "input": 1708174,
-          "output": 98607,
-          "cacheRead": 46225582,
+          "input": 1709172,
+          "output": 98865,
+          "cacheRead": 46430382,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 23.099014,
-        "pricingAsOf": "2026-07-05T06:53:11.667Z"
+        "usd": 23.139906,
+        "pricingAsOf": "2026-07-05T07:02:09.546Z"
       }
     },
     "merges": [
@@ -350,5 +368,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-04T14:07:04.245Z",
-  "updated": "2026-07-05T06:53:11.668Z"
+  "updated": "2026-07-05T07:04:00.455Z"
 }
