@@ -139,7 +139,14 @@ async function saveSettings(settings: SettingsConfig): Promise<SaveSettingsRespo
   });
   if (!res.ok) {
     const error = await res.text();
-    throw new Error(error || 'Failed to save settings');
+    let message = error || 'Failed to save settings';
+    try {
+      const parsed = JSON.parse(error) as { error?: unknown };
+      if (typeof parsed.error === 'string') message = parsed.error;
+    } catch {
+      // Non-JSON error bodies are already usable as text.
+    }
+    throw new Error(message);
   }
   return res.json();
 }
@@ -226,6 +233,7 @@ export function SettingsPage() {
     flushAutosave,
     markSaveError,
     markSaved,
+    saveErrorMessage,
     saveStatus,
     scheduleAutosave,
     setSaveStatus,
@@ -524,7 +532,12 @@ export function SettingsPage() {
         onCodexPermissionModeChange={handleCodexPermissionModeChange}
       />
 
-      <TieredExecutionSection formData={formData} />
+      <TieredExecutionSection
+        formData={formData}
+        saveErrorMessage={saveErrorMessage}
+        saveStatus={saveStatus}
+        onSettingsChange={applySettings}
+      />
 
       <CloisterSection
         cloisterConfigError={cloisterConfigError}

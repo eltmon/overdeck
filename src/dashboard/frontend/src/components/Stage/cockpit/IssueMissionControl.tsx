@@ -14,7 +14,6 @@ import {
   usePlanningQuery,
   usePrQuery,
   useReviewStatusQuery,
-  useSettingsQuery,
   type IssueCheckRun,
   type IssueCheckRunsResponse,
   type PullRequestData,
@@ -310,32 +309,6 @@ function HeaderStat({ label, value }: { label: string; value: ReactNode }) {
       <div className="text-[9px] uppercase tracking-[0.06em] text-muted-foreground">{label}</div>
       <div className="text-[11.5px] text-foreground">{value}</div>
     </div>
-  )
-}
-
-function tieredOverride(value: unknown): 'on' | 'off' | null {
-  return value === 'on' || value === 'off' ? value : null
-}
-
-function TieredExecutionChip({ issueId }: { issueId: string }) {
-  const planning = usePlanningQuery(issueId)
-  const settings = useSettingsQuery()
-  const override = tieredOverride(planning.data?.planMetadata?.tiered_execution)
-  const enabled = override ? override === 'on' : settings.data?.tiered_execution?.enabled === true
-  const source = override ? 'issue override' : 'global'
-
-  return (
-    <span className="inline-flex h-5 items-center gap-1.5 rounded-[var(--radius-sm)] border border-border bg-muted/30 px-2 text-[11px] font-medium text-muted-foreground">
-      <span>tiered: {enabled ? 'on' : 'off'} ({source})</span>
-      <a
-        href="https://github.com/eltmon/overdeck/blob/main/docs/TIERED-EXECUTION.md"
-        target="_blank"
-        rel="noreferrer"
-        className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-      >
-        docs
-      </a>
-    </span>
   )
 }
 
@@ -1091,7 +1064,6 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
               <span className="font-mono text-[13px] font-medium text-foreground">{issueId}</span>
               <h1 className="min-w-0 max-w-full break-words text-[16px] font-medium leading-snug text-foreground">{title}</h1>
               <CockpitPill tone={statusToTone(phase)}>{phase}</CockpitPill>
-              <TieredExecutionChip issueId={issueId} />
             </div>
           </div>
           <div className={styles.headerMeta}>

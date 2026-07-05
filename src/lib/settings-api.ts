@@ -31,7 +31,12 @@ import {
 } from './config-yaml.js';
 import { ModelId } from './settings.js';
 import type { Role } from './agents.js';
-import type { ValidatedTieredExecutionConfig } from './agents/tier-table.js';
+import {
+  TieredExecutionConfigError,
+  validateTieredExecutionConfig,
+  type TieredExecutionConfig,
+  type ValidatedTieredExecutionConfig,
+} from './agents/tier-table.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { getBuiltInDefaultHarness } from './providers.js';
 import { defaultBackgroundAiFeatures, type BackgroundAiFeature } from './background-ai/registry.js';
@@ -265,7 +270,7 @@ export interface ApiSettingsConfig {
     resiliency_tier?: 'ephemeral' | 'durable';
     max_concurrent_agents?: number;
   };
-  tiered_execution?: ValidatedTieredExecutionConfig;
+  tiered_execution?: Partial<TieredExecutionConfig> | ValidatedTieredExecutionConfig;
   deprecation_warnings?: ApiDeprecationWarning[];
 }
 
@@ -794,6 +799,7 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     ['experimental', config.experimental],
     ['claude', config.claude],
     ['codex', config.codex],
+    ['tiered_execution', config.tiered_execution],
   ];
 
   for (const [key, value] of topLevelSections) {
@@ -839,6 +845,28 @@ function providerConfigForSave(
   const harness = harnessValue === '' ? undefined : harnessValue;
   if (!auth && !plan && harness === undefined) return enabled;
   return pruneUndefined({ enabled, auth, plan, harness });
+}
+
+function tieredExecutionConfigForSave(
+  settings: ApiSettingsConfig,
+  currentConfig: ReturnType<typeof loadConfigSync>['config'],
+): Partial<TieredExecutionConfig> | undefined {
+  if (settings.tiered_execution === undefined) return undefined;
+
+  const validated = validateTieredExecutionConfig(settings.tiered_execution, {
+    providerAuth: currentConfig.providerAuth,
+  });
+
+  return {
+    enabled: validated.enabled,
+    tiers: validated.tiers,
+    supervisor: validated.supervisor,
+    by_kind: validated.by_kind,
+    feed: validated.feed,
+    escalation: validated.escalation,
+    compaction_reroute: validated.compaction_reroute,
+    replay_threshold: validated.replay_threshold,
+  };
 }
 
 async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void> {
@@ -934,6 +962,7 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
       ? { permissionMode: settings.codex.permissionMode }
       : undefined,
     remote: settings.remote,
+    tiered_execution: tieredExecutionConfigForSave(settings, currentConfig),
   };
 
   await writeYamlConfigPreservingComments(yamlConfig);
@@ -1221,6 +1250,21 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
         (!Number.isInteger(settings.remote.max_concurrent_agents) || settings.remote.max_concurrent_agents < 0)
       ) {
         errors.push('remote.max_concurrent_agents must be a non-negative integer');
+      }
+    }
+  }
+
+  if (settings.tiered_execution !== undefined) {
+    try {
+      const { config: currentConfig } = loadConfigSync();
+      validateTieredExecutionConfig(settings.tiered_execution, {
+        providerAuth: currentConfig.providerAuth,
+      });
+    } catch (error) {
+      if (error instanceof TieredExecutionConfigError) {
+        errors.push(error.message);
+      } else {
+        throw error;
       }
     }
   }

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { PaneType } from '../../../lib/panesStore'
@@ -22,8 +22,7 @@ const queryMocks = vi.hoisted(() => {
       summary: { total: 1, passed: 1, failed: 0, running: 0, skipped: 0, pending: 0, cancelled: 0 },
     },
   }
-  const planningQuery = { data: { prd: '# PRD', state: '# STATE', planMetadata: {} }, isLoading: false }
-  const settingsQuery = { data: { tiered_execution: { enabled: true } }, isLoading: false }
+  const planningQuery = { data: { prd: '# PRD', state: '# STATE' }, isLoading: false }
   const prQuery = { data: { pr: { number: 1661, additions: 4, deletions: 1, changedFiles: 2, isDraft: false, state: 'OPEN' } } }
   const reviewStatusQuery = {
     data: {
@@ -39,14 +38,13 @@ const queryMocks = vi.hoisted(() => {
   }
   const issueCostsQuery = { data: { totalCost: 1.23, totalTokens: 1000, byModel: {}, sessions: [] } }
   const workspaceQuery = { data: null, isLoading: false }
-  return { activityQuery, issueCheckRunsQuery, planningQuery, settingsQuery, prQuery, reviewStatusQuery, issueCostsQuery, workspaceQuery }
+  return { activityQuery, issueCheckRunsQuery, planningQuery, prQuery, reviewStatusQuery, issueCostsQuery, workspaceQuery }
 })
 
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/queries', () => ({
   useActivityQuery: () => queryMocks.activityQuery,
   useIssueCheckRunsQuery: () => queryMocks.issueCheckRunsQuery,
   usePlanningQuery: () => queryMocks.planningQuery,
-  useSettingsQuery: () => queryMocks.settingsQuery,
   usePrQuery: () => queryMocks.prQuery,
   useReviewStatusQuery: () => queryMocks.reviewStatusQuery,
   useIssueCostsQuery: () => queryMocks.issueCostsQuery,
@@ -113,11 +111,6 @@ vi.mock('./ChangedFilesView', () => ({ ChangedFilesView: () => <div>Changed file
 
 import { IssueMissionControl } from './IssueMissionControl'
 
-beforeEach(() => {
-  queryMocks.planningQuery.data.planMetadata = {}
-  queryMocks.settingsQuery.data.tiered_execution.enabled = true
-})
-
 function renderMissionControl(extra?: { onOpenPane?: (pane: string) => void }) {
   const onOpenPane = extra?.onOpenPane ?? vi.fn()
   const queryClient = new QueryClient({
@@ -154,38 +147,6 @@ describe('IssueMissionControl', () => {
     expect(screen.getByRole('button', { name: 'Overview' })).toBeTruthy()
     expect(screen.getAllByRole('button', { name: /Code/ }).length).toBeGreaterThan(0)
     expect(screen.getByText('Blocker spotlight')).toBeTruthy()
-  })
-
-  it('shows a read-only tiered execution chip for an on issue override', () => {
-    queryMocks.planningQuery.data.planMetadata = { tiered_execution: 'on' }
-    queryMocks.settingsQuery.data.tiered_execution.enabled = false
-
-    renderMissionControl()
-
-    expect(screen.getByText('tiered: on (issue override)')).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'docs' })).toHaveAttribute(
-      'href',
-      'https://github.com/eltmon/overdeck/blob/main/docs/TIERED-EXECUTION.md',
-    )
-    expect(screen.queryByRole('checkbox', { name: /tiered/i })).toBeNull()
-    expect(screen.queryByRole('button', { name: /tiered/i })).toBeNull()
-  })
-
-  it('shows a read-only tiered execution chip for an off issue override', () => {
-    queryMocks.planningQuery.data.planMetadata = { tiered_execution: 'off' }
-    queryMocks.settingsQuery.data.tiered_execution.enabled = true
-
-    renderMissionControl()
-
-    expect(screen.getByText('tiered: off (issue override)')).toBeTruthy()
-  })
-
-  it('falls back to the global tiered execution state when there is no issue override', () => {
-    queryMocks.settingsQuery.data.tiered_execution.enabled = false
-
-    renderMissionControl()
-
-    expect(screen.getByText('tiered: off (global)')).toBeTruthy()
   })
 
   it('renders the v3 command bar: pipeline progress, gates, and a blocked merge CTA', () => {
