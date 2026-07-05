@@ -261,6 +261,38 @@ describe('TieredExecutionSection', () => {
     expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.by_kind.backend).toBe('cheap');
   });
 
+  it('prefers editable by_kind over stale derived byKind values', () => {
+    const onSettingsChange = vi.fn();
+    render(
+      <TieredExecutionSection
+        formData={baseSettings({
+          tiered_execution: {
+            enabled: false,
+            tiers: {
+              cheap: {
+                model: 'claude-haiku-4-5',
+                harness: 'claude-code',
+                difficulties: ['trivial', 'simple'],
+              },
+              expensive: {
+                model: 'claude-opus-4-8',
+                harness: 'claude-code',
+                difficulties: ['medium', 'complex', 'expert'],
+              },
+            },
+            by_kind: { backend: 'cheap' },
+            byKind: { backend: 'expensive' },
+            supervisor: { model: 'claude-opus-4-8', harness: 'claude-code', subscribe: 'flagged' },
+            replay_threshold: 0.5,
+          },
+        })}
+        onSettingsChange={onSettingsChange}
+      />,
+    );
+
+    expect(screen.getByLabelText('backend')).toHaveValue('cheap');
+  });
+
   it('edits feed, escalation, and replay threshold values', () => {
     const onSettingsChange = vi.fn();
     render(

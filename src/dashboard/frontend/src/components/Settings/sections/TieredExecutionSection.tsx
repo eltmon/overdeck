@@ -165,7 +165,7 @@ export function TieredExecutionSection({
   const config = formData.tiered_execution;
   const tiers = Object.entries(config?.tiers ?? {});
   const difficultyMap = inputDifficultyMap(config);
-  const byKind = config?.byKind ?? config?.by_kind ?? {};
+  const byKind = config?.by_kind ?? config?.byKind ?? {};
   const reason = validationReason(config);
   const enabled = config?.enabled ?? false;
   const resolvedState = enabled && !reason ? 'Enabled' : reason ? 'Invalid' : 'Disabled';

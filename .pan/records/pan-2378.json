@@ -26,9 +26,59 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-05T05:53:31.417Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-05T05:54Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-05T05:54:52.964Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-05T05:54Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-05T05:54:57.758Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-05T05:55:39.208Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-05T05:56:10.067Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-05T05:56:25.561Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-05T05:56Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-05T05:56:59.375Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-05T05:57Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-05T05:57:08.009Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-05T05:56:59Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2378\n\nKind override edits are masked by stale derived byKind\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2378 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-05T05:57:08Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2378\n\nKind override edits are masked by stale derived byKind\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2378 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/drafts/PAN-2378.md",
@@ -114,16 +164,16 @@
   },
   "pipeline": {
     "issueId": "PAN-2378",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-05T05:53:37.442Z",
-    "reviewNotes": "Tier-name editing still remounts the controlled input on every keystroke",
+    "updatedAt": "2026-07-05T05:56:59.333Z",
+    "reviewNotes": "Kind override edits are masked by stale derived byKind",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2380",
-    "lastVerifiedCommit": "8229f83242aa81a16620168c5778a940d41759cc",
+    "lastVerifiedCommit": "2230fb3f558797eb5b40d44c8fcf501073c7c410",
     "reviewRequestedAt": "2026-07-05T05:53:30.996Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -230,7 +280,7 @@
       },
       "costAtCloseOut": {
         "usd": 10.57664,
-        "pricingAsOf": "2026-07-05T05:53:37.481Z"
+        "pricingAsOf": "2026-07-05T05:56:59.369Z"
       }
     },
     "merges": [
@@ -249,5 +299,5 @@
     ]
   },
   "created": "2026-07-05T05:48:58.706Z",
-  "updated": "2026-07-05T05:53:37.481Z"
+  "updated": "2026-07-05T05:57:08.009Z"
 }
