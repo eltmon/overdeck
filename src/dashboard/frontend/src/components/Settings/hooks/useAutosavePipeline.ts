@@ -39,9 +39,11 @@ export function useAutosavePipeline({
   const lastSaveOkRef = useRef(true);
   const savedStatusResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
 
   const markSaved = useCallback(() => {
     lastSaveOkRef.current = true;
+    setSaveErrorMessage(null);
     setSaveStatus('saved');
     if (savedStatusResetRef.current) clearTimeout(savedStatusResetRef.current);
     savedStatusResetRef.current = setTimeout(() => {
@@ -50,8 +52,9 @@ export function useAutosavePipeline({
     }, 2500);
   }, []);
 
-  const markSaveError = useCallback(() => {
+  const markSaveError = useCallback((message?: string) => {
     lastSaveOkRef.current = false;
+    setSaveErrorMessage(message ?? null);
     setSaveStatus('error');
   }, []);
 
@@ -82,8 +85,9 @@ export function useAutosavePipeline({
           }
           markSaved();
         } catch (error) {
-          markSaveError();
-          toast.error(`Failed to save settings: ${error instanceof Error ? error.message : String(error)}`);
+          const message = error instanceof Error ? error.message : String(error);
+          markSaveError(message);
+          toast.error(`Failed to save settings: ${message}`);
         }
       }
     })();
@@ -140,6 +144,7 @@ export function useAutosavePipeline({
     flushAutosave,
     markSaveError,
     markSaved,
+    saveErrorMessage,
     saveStatus,
     scheduleAutosave,
     setSaveStatus,

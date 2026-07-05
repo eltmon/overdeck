@@ -1,18 +1,79 @@
 import { Route } from 'lucide-react';
-import { type SettingsConfig } from '../types';
+import { type SettingsConfig, type TieredExecutionConfig } from '../types';
+import type { SaveStatus } from '../hooks/useAutosavePipeline';
 
 interface TieredExecutionSectionProps {
   formData: SettingsConfig;
+  saveErrorMessage?: string | null;
+  saveStatus?: SaveStatus;
+  onSettingsChange: (next: SettingsConfig, opts?: { debounce?: boolean }) => void;
 }
 
 const DIFFICULTIES = ['trivial', 'simple', 'medium', 'complex', 'expert'] as const;
 
-export function TieredExecutionSection({ formData }: TieredExecutionSectionProps) {
+function defaultTieredExecution(enabled: boolean): TieredExecutionConfig {
+  return {
+    enabled,
+    tiers: {},
+    by_kind: {},
+    replay_threshold: 0.5,
+  };
+}
+
+function validationReason(config: TieredExecutionConfig | undefined): string | null {
+  if (!config) return null;
+  const tiers = Object.entries(config.tiers ?? {});
+  const shouldValidateTierTable = config.enabled || tiers.length > 0 || Object.keys(config.by_kind ?? {}).length > 0 || config.supervisor !== undefined;
+  if (!shouldValidateTierTable) return null;
+
+  const owners = new Map<string, string[]>();
+  for (const [tierName, tier] of tiers) {
+    if (!tier.model) return `tiered_execution.tiers.${tierName}.model is required`;
+    if (!tier.harness) return `tiered_execution.tiers.${tierName}.harness is required`;
+    if (!Array.isArray(tier.difficulties) || tier.difficulties.length === 0) {
+      return `tiered_execution.tiers.${tierName}.difficulties must contain at least one difficulty`;
+    }
+    for (const difficulty of tier.difficulties) {
+      owners.set(difficulty, [...(owners.get(difficulty) ?? []), tierName]);
+    }
+  }
+
+  for (const difficulty of DIFFICULTIES) {
+    const mapped = owners.get(difficulty) ?? [];
+    if (mapped.length === 0) return `tiered_execution difficulty '${difficulty}' is not mapped to any tier`;
+    if (mapped.length > 1) return `tiered_execution difficulty '${difficulty}' is mapped to multiple tiers: ${mapped.join(', ')}`;
+  }
+
+  if (!config.supervisor) return 'tiered_execution.supervisor is required when tiered execution tiers are configured';
+  return null;
+}
+
+export function TieredExecutionSection({
+  formData,
+  saveErrorMessage,
+  saveStatus = 'idle',
+  onSettingsChange,
+}: TieredExecutionSectionProps) {
   const config = formData.tiered_execution;
   const tiers = Object.entries(config?.tiers ?? {});
   const difficultyMap = config?.difficultyToTier ?? {};
   const byKind = config?.byKind ?? config?.by_kind ?? {};
   const byKindEntries = Object.entries(byKind).filter(([, tierName]) => Boolean(tierName));
+  const reason = validationReason(config);
+  const enabled = config?.enabled ?? false;
+  const resolvedState = enabled && !reason ? 'Enabled' : reason ? 'Invalid' : 'Disabled';
+  const serverTieredError = saveErrorMessage?.includes('tiered_execution') ? saveErrorMessage : null;
+
+  const handleEnabledChange = () => {
+    onSettingsChange({
+      ...formData,
+      tiered_execution: {
+        ...defaultTieredExecution(!enabled),
+        ...config,
+        enabled: !enabled,
+      },
+    });
+  };
 
   return (
     <section id="tiered-execution" className="py-6 scroll-mt-4">
@@ -23,20 +84,47 @@ export function TieredExecutionSection({ formData }: TieredExecutionSectionProps
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-lg bg-muted/20">
           <div>
-            <span className="text-sm font-medium text-foreground">Resolved state</span>
+            <span className="text-sm font-medium text-foreground">Tiered execution</span>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Configure YAML in <code className="font-mono">tiered_execution</code>; issue metadata can override with <code className="font-mono">tiered_execution: on|off</code>.
+              Global default for bead routing; issue metadata can override with <code className="font-mono">tiered_execution: on|off</code>.
             </p>
           </div>
-          <div className="text-right">
-            <span className={`text-xs font-semibold ${config?.enabled ? 'text-success' : 'text-muted-foreground'}`}>
-              {config?.enabled ? 'Enabled' : 'Disabled'}
-            </span>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {tiers.length} tier{tiers.length === 1 ? '' : 's'} configured
-            </p>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={enabled}
+              aria-label="Enable tiered execution"
+              onClick={handleEnabledChange}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                enabled ? 'bg-primary' : 'bg-muted'
+              }`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
+              }`} />
+            </button>
+            <div className="text-right">
+              <span className={`text-xs font-semibold ${reason ? 'text-destructive' : enabled ? 'text-success' : 'text-muted-foreground'}`}>
+                {resolvedState}
+              </span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {tiers.length} tier{tiers.length === 1 ? '' : 's'} configured
+              </p>
+            </div>
           </div>
         </div>
+
+        {(reason || serverTieredError) && (
+          <div className="rounded-lg border border-destructive/50 bg-destructive/5 px-4 py-3">
+            <p className="text-xs font-semibold text-destructive">
+              {saveStatus === 'error' && serverTieredError ? 'Not saved — fix errors' : 'Invalid tiered execution'}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {serverTieredError ?? reason}
+            </p>
+          </div>
+        )}
 
         <div className="px-4 py-3 rounded-lg border border-border/70">
           <div className="flex items-center justify-between gap-3 mb-3">
