@@ -100,6 +100,17 @@ Surfaces: depth via tonal layering (`--card`, `--card-2`), not shadows;
 borders `white/6%` dark, `black/5%` light; light-mode cards are borderless
 (ambient shadow instead).
 
+### Brand mark — the control ring (guide §18)
+
+The Overdeck logo is the **control ring**: orbit ring + center hub + one agent
+satellite on the ring (reads as the O of Overdeck). In-app, render it ONLY via
+the `OverdeckMark` component (`src/dashboard/frontend/src/components/OverdeckMark.tsx`)
+with `text-primary` — never inline a copy of the geometry, never use the lucide
+Eye, the old stacked diamonds, or tan/copper colors. Canonical SVGs:
+`/favicon.svg`, `logo/overdeck-{light,dark}.svg`, desktop icons in
+`apps/desktop/resources/`. Two-tone indigo (#4f46e5 + #818cf8 light bg,
+#6366f1 + #a5b4fc dark bg); minimum size 16px, mark-only below wordmark scale.
+
 ## Workflow
 
 - Before styling anything new, open the system map mockup and find the

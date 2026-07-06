@@ -1,13 +1,14 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
-  Eye, Home, LayoutGrid, Bot, Server,
+  Home, LayoutGrid, Bot, Server,
   Terminal, BarChart3, DollarSign, HeartPulse, Cpu, Settings,
   Zap, Compass, GitBranch, GitMerge, ChevronsLeft, ChevronsRight, Sun, Moon, Menu,
   Hammer, Loader2, History, Mic, FileText, ChevronDown, ChevronRight, MoreHorizontal, Shield, ListOrdered,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { fetchProjects, isUnscopedConversation, NO_PROJECT_KEY, NO_PROJECT_LABEL, type RegisteredProjectLite } from './CommandDeck/projectsData';
+import { OverdeckMark } from './OverdeckMark';
 import { fetchConversations } from './CommandDeck/ConversationList';
 import { FreshnessIndicator } from './FreshnessIndicator';
 import { useTheme } from '../hooks/useTheme';
@@ -361,7 +362,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
               className="flex items-center gap-2 hover:opacity-80 transition-opacity min-w-0"
               title="Go to Home"
             >
-              <Eye className="w-5 h-5 text-primary shrink-0" />
+              <OverdeckMark className="w-5 h-5 text-primary shrink-0" />
               {/* PAN-698: Space Grotesk is reserved for the sidebar wordmark only */}
               <span className="text-base font-semibold text-foreground font-display truncate">
                 Overdeck
@@ -377,7 +378,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
               className="flex items-center justify-center w-full hover:opacity-80 transition-opacity"
               title="Go to Home"
             >
-              <Eye className="w-5 h-5 text-primary" />
+              <OverdeckMark className="w-5 h-5 text-primary" />
             </button>
           )}
           {!collapsed && (
