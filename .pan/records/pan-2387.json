@@ -39,17 +39,14 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-06T21:33:32.858Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-07-06T21:30:41Z",
-      "markdownBody": "VERIFICATION FAILED for PAN-2387 (attempt 1/3):\n\nFailed check: frontend-typecheck\n\nVerification FAILED at frontend-typecheck (16550ms):\n\n never read.\n../../lib/pan-dir/records.ts(46,8): error TS6133: 'PanIssueCloseOutRecord' is declared but its value is never read.\n../../lib/projects.ts(12,10): error TS6133: 'ConfigError' is declared but its value is never read.\n../../lib/registry/feature-registry-population.ts(3,60): error TS6196: 'FeatureRegistryTagInput' is declared but never used.\n../../lib/shadow-state.ts(115,3): error TS6133: 'triggeredBy' is declared but its value is never read.\n../../lib/skills-merge.ts(9,3): error TS6133: 'statSync' is declared but its value is never read.\n../../lib/skills-merge.ts(20,8): error TS6133: 'Manifest' is declared but its value is never read.\n../../lib/skills-merge.ts(92,16): error TS6133: 'category' is declared but its value is never read.\n../../lib/vbrief/acceptance-criteria.ts(11,88): error TS6133: 'VBriefSubItem' is declared but its value is never read.\n../../lib/vbrief/dag.ts(325,10): error TS6133: 'pathMatchesAny' is declared but its value is never read.\n../../lib/vbrief/lifecycle-io.ts(11,20): error TS6133: 'dirname' is declared but its value is never read.\n../../lib/vbrief/lifecycle-io.ts(13,10): error TS6133: 'copyFileSync' is declared but its value is never read.\n../../lib/vbrief/lifecycle-io.ts(15,10): error TS6133: 'PAN_CONTINUE_FILENAME' is declared but its value is never read.\n../../lib/vbrief/lifecycle-io.ts(30,10): error TS6133: 'findSpecByIssue' is declared but its value is never read.\n../../lib/vbrief/lifecycle-io.ts(30,65): error TS6133: 'writeSpecForIssue' is declared but its value is never read.\n../../lib/vbrief/vbrief-index.ts(20,10): error TS6133: 'VBriefMergeConflictError' is declared but its value is never read.\n../../lib/workspace-manager.ts(16,3): error TS6133: 'relocateVenvScripts' is declared but its value is never read.\n../../lib/workspace-manager.ts(25,3): error TS6196: 'WorkspaceProgress' is declared but never used.\n../../lib/workspace/stack-health.ts(114,10): error TS6133: 'isInitContainer' is declared but its value is never read.\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-2387 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-2387 -m \"Fixed frontend-typecheck\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-06T21:41:16.674Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/drafts/pan-2387.md",
@@ -112,16 +109,16 @@
     "recordedAt": "2026-07-06T21:29:43.951Z"
   },
   "created": "2026-07-05T21:49:28.368Z",
-  "updated": "2026-07-06T21:33:32.884Z",
+  "updated": "2026-07-06T21:41:16.674Z",
   "pipeline": {
     "issueId": "PAN-2387",
-    "reviewStatus": "failed",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T21:33:32.867Z",
+    "updatedAt": "2026-07-06T21:41:16.611Z",
     "reviewNotes": "Review role spawn failed: CLIProxyAPI sidecar is not running. GPT subscription role runs route through a local cliproxy process managed by `pan up`. Run `pan up` (or restart the dashboard) before spawning a GPT role run.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Bead attribution-classifier ack: commit d1e8cb6f25 (fix(costs): add no-issue attribution classifier) satisfies all 4 acceptance criteria — classifySessionBucket returns FLYWHEEL for a matched flywheel-orchestrator conversation (AC1), CONVERSATIONS for any other matched conversation via sessionId or conv-* agentId (AC2), UNATTRIBUTED (never UNKNOWN) on no match (AC3); findConversationForCostSessionSync matches conversation_files.locator=sessionId and conversations.tmux_session=agentId for conv-* prefixes, returning null when absent (AC4). Verified via git show d1e8cb6f25 diff plus a live run of npx vitest run src/lib/costs/__tests__/attribution.test.ts at current HEAD — 5/5 pass. Confirmed the function was later relocated to src/lib/overdeck/conversation-cost-session.ts and re-exported from conversations.ts by unrelated commit d162c89a93 without behavior change. This supersedes the earlier BLOCKED verdict, which was posted against the wrong commit (8d5f3d5209, a delivery routing mismatch).",
@@ -260,7 +257,7 @@
       },
       "costAtCloseOut": {
         "usd": 36.91574,
-        "pricingAsOf": "2026-07-06T21:33:32.883Z"
+        "pricingAsOf": "2026-07-06T21:41:16.638Z"
       }
     },
     "merges": [
