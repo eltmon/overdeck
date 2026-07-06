@@ -2,13 +2,16 @@
   "issueId": "PAN-2253",
   "schemaVersion": 2,
   "created": "2026-07-03T15:49:51.408Z",
-  "updated": "2026-07-03T15:49:54.061Z",
+  "updated": "2026-07-06T14:05:24.564Z",
   "pipeline": {
     "issueId": "PAN-2253",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T15:49:51.408Z"
+    "updatedAt": "2026-07-06T14:05:24.564Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-06T14:05:24.564Z",
+    "mergeStatus": "merged"
   },
   "closeOut": {
     "usage": {
