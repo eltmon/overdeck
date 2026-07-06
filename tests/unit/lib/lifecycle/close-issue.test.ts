@@ -143,7 +143,12 @@ describe('close-issue', () => {
     });
 
     it('adds closed-out and removes workflow labels in one GitHub edit', async () => {
-      mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command.includes('gh issue view') && command.includes('--json labels')) {
+          return { stdout: JSON.stringify(['verifying-on-main', 'needs-close-out', 'merged', 'ready']), stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
 
       const ctx = {
         issueId: 'PAN-100',

@@ -80,7 +80,7 @@ describe('commitWorkspaceRecordBeforeAutoSpawn', () => {
     expect(calls).toContain('status --porcelain -- .pan/records/pan-2390.json');
     expect(calls).toContain('add -- .pan/records/pan-2390.json');
     expect(calls).toContain('diff --cached --quiet -- .pan/records/pan-2390.json');
-    expect(calls.some(c => c.includes('commit') && c.includes('chore(records): update PAN-2390 per-issue record before auto-start'))).toBe(true);
+    expect(calls.some(c => c.includes('commit') && !c.includes('--no-verify') && c.includes('chore(records): update PAN-2390 per-issue record before auto-start'))).toBe(true);
   });
 
   it('is a no-op when the record is already committed', async () => {
