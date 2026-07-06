@@ -302,6 +302,20 @@ export function recordTierPromotion(
  * statusOverrides applied from the per-issue record.
  * Returns null if no plan exists on main or locally.
  */
+/**
+ * PAN-2401: overlay the per-issue record's statusOverrides onto an
+ * already-loaded plan document. The single overlay door for read paths that
+ * resolve the spec themselves (e.g. the /plan API route) — without this, a
+ * merged bead reads 'pending' forever in every display.
+ */
+export function mergeRecordStatusOverrides(doc: VBriefDocument, workspacePath: string): VBriefDocument {
+  const overrides = readStatusOverridesSync(workspacePath);
+  if (overrides && Object.keys(overrides).length > 0) {
+    return applyStatusOverrides(doc, overrides);
+  }
+  return doc;
+}
+
 export function readWorkspacePlanSync(workspacePath: string): VBriefDocument | null {
   const planPath = findPlanSync(workspacePath);
   if (!planPath) return null;

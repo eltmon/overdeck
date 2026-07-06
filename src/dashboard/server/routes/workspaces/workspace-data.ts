@@ -39,7 +39,7 @@ import { listSessionNames, capturePane } from '../../../../lib/tmux.js';
 import { getActiveSessionModelSync } from '../../../../lib/cost-parsers/jsonl-parser.js';
 import { getReviewStatusSync } from '../../../../lib/review-status.js';
 import { listStashes, isSalvageableStash } from '../../../../lib/stashes.js';
-import { findPlan, isPlanningComplete, readPlan } from '../../../../lib/vbrief/io.js';
+import { findPlan, isPlanningComplete, mergeRecordStatusOverrides, readPlan } from '../../../../lib/vbrief/io.js';
 import { getCostsForIssueSync } from '../../../../lib/costs/index.js';
 import { resolveIssueHeadlineCost } from '../../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../../services/running-agents-cache.js';
@@ -180,23 +180,29 @@ async function getIndexStats(workspacePath: string): Promise<{
 }
 function resolvePlanLocation(projectPath: string, issueId: string): Effect.Effect<{ path: string; lifecycleDir: string; doc: VBriefDocument } | null, unknown> {
   return Effect.gen(function* () {
+    // PAN-2401: every doc this route returns gets the per-issue record's
+    // statusOverrides applied — merged beads must read 'completed', not the
+    // spec's immutable 'pending'.
+    const issueLower = issueId.toLowerCase();
+    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+
     const found = yield* findVBriefByIssue(projectPath, issueId);
     if (found) {
+      const doc = yield* readVBriefDocument(found.path);
       return {
         path: found.path,
         lifecycleDir: found.lifecycleDir,
-        doc: yield* readVBriefDocument(found.path),
+        doc: mergeRecordStatusOverrides(doc, workspacePath),
       };
     }
 
-    const issueLower = issueId.toLowerCase();
-    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     const planPath = yield* findPlan(workspacePath);
     if (!planPath) return null;
+    const doc = yield* readPlan(planPath);
     return {
       path: planPath,
       lifecycleDir: 'workspace',
-      doc: yield* readPlan(planPath),
+      doc: mergeRecordStatusOverrides(doc, workspacePath),
     };
   });
 }
