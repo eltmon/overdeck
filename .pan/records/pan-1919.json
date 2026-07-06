@@ -78,7 +78,7 @@
   ],
   "feedback": [],
   "created": "2026-06-21T00:03:06.401Z",
-  "updated": "2026-06-25T03:15:59.110Z",
+  "updated": "2026-07-06T12:54:00.419Z",
   "pipeline": {
     "issueId": "PAN-1919",
     "reviewStatus": "passed",
@@ -192,7 +192,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-4-6",
+  "model": "claude-opus-4-8",
   "statusOverrides": {
     "audit-empty-guard-and-tests": "completed",
     "audit-empty-guard-and-tests.ac1": "completed",
