@@ -11,15 +11,16 @@
   ],
   "feedback": [],
   "created": "2026-07-06T16:44:33.470Z",
-  "updated": "2026-07-06T17:39:56.879Z",
+  "updated": "2026-07-06T18:24:35.555Z",
   "pipeline": {
     "issueId": "PAN-2371",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T17:33:15.076Z"
+    "updatedAt": "2026-07-06T18:22:49.479Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-06T18:22:49.479Z"
   },
   "closeOut": {
     "usage": {
