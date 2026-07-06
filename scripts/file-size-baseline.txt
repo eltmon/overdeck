@@ -11,6 +11,7 @@
 1149 src/dashboard/server/routes/settings.ts
 1753 src/dashboard/server/routes/workspaces.ts
 1924 src/dashboard/server/routes/workspaces/merge-ops.ts
+1013 src/dashboard/server/routes/workspaces/workspace-data.ts
 1521 src/dashboard/server/services/issue-data-service.ts
 1321 src/dashboard/server/ws-rpc.ts
 3480 src/lib/cloister/deacon.ts
