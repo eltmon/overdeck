@@ -1,30 +1,71 @@
 {
   "issueId": "PAN-2386",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-06T01:58:20.391Z",
+      "reason": "end",
+      "note": "Fixed three root causes for dirty-workspace refusal in multi-repo auto-start: (1) polyrepo workspaces now get .gitignore for sub-repos/records; (2) dirty-workspace refusal emits activity event; (3) .pan/records ignored in git. Note: issue AC were malformed (problem statements rather than implementation criteria). All fixes tested, tests pass."
+    }
+  ],
   "feedback": [],
   "created": "2026-07-06T01:51:00.754Z",
-  "updated": "2026-07-06T01:51:00.780Z",
+  "updated": "2026-07-06T01:58:27.282Z",
   "pipeline": {
     "issueId": "PAN-2386",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T01:51:00.755Z"
+    "updatedAt": "2026-07-06T01:58:27.247Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2403",
+    "reviewRequestedAt": "2026-07-06T01:58:20.391Z"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 7731,
+            "output": 400,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "work": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 2586,
+            "output": 18811,
+            "cacheRead": 7397097,
+            "cacheWrite": 168463
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 7731,
+          "output": 400,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 2586,
+          "output": 18811,
+          "cacheRead": 7397097,
+          "cacheWrite": 168463
+        }
+      },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-07-06T01:51:00.779Z"
+        "usd": 1.0469330000000001,
+        "pricingAsOf": "2026-07-06T01:58:27.281Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2403"
+    ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-haiku-4-5"
+  "harness": "codex",
+  "model": "gpt-5.5"
 }
