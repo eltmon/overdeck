@@ -16,6 +16,7 @@ import {
   getAgentRollup,
   getDailyTrendsSync as getDailyTrends,
   getCostForIssueSync as getCostForIssueFromDb,
+  getAgentDailyCostSync,
 } from '../overdeck/cost-sync.js';
 
 /**
@@ -202,9 +203,10 @@ export function checkCostLimits(
   const alerts: CostAlert[] = [];
   const now = new Date().toISOString();
 
-  // Read agent cost from DB (the single source of truth for recorded spend)
-  const agentCost = getAgentRollup().find(r => r.agentId === agentId)?.totalCost ?? 0;
+  // Read agent cost from DB (scoped to today, matching the cap's window)
+  // The accumulator should match the cap's window: per-agent daily cap compares daily spend
   if (config.per_agent_usd > 0) {
+    const agentCost = getAgentDailyCostSync(agentId);
     const agentPercent = agentCost / config.per_agent_usd;
 
     if (agentPercent >= 1.0) {
@@ -230,9 +232,10 @@ export function checkCostLimits(
     }
   }
 
-  // Read issue cost from DB
+  // Read issue cost from DB (scoped to today, matching the cap's window)
   if (issueId && config.per_issue_usd > 0) {
-    const issueCost = getCostForIssueFromDb(issueId)?.totalCost ?? 0;
+    const issueDailyTrends = getDailyTrends({ days: 1, issueId });
+    const issueCost = issueDailyTrends.reduce((sum, t) => sum + t.totalCost, 0);
     const issuePercent = issueCost / config.per_issue_usd;
 
     if (issuePercent >= 1.0) {
