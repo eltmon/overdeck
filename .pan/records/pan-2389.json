@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-2389",
   "schemaVersion": 2,
-  "created": "2026-07-05T21:50:11.351Z",
-  "updated": "2026-07-05T22:22:56.076Z",
-  "pipeline": {
-    "issueId": "PAN-2389",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-05T21:50:11.351Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -26,8 +9,64 @@
       "timestamp": "2026-07-05T21:50:11.351Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-05T21:50:11.351Z",
+  "updated": "2026-07-06T18:36:43.595Z",
+  "pipeline": {
+    "issueId": "PAN-2389",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "inspectStatus": "failed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-06T18:36:42.969Z",
+    "inspectNotes": "Bead door-scan-roots BLOCKED: commit dd09d685 (.github/workflows/pages.yml only) does not implement any acceptance criteria. No changes touch the codex reconcile scan-roots logic, session_meta cwd→issueId inference, sourceFile dedup, or default per-agent walk. Required: land the actual scan-roots implementation (extra roots param including ~/.codex/sessions, cost event emission with model/token counts/sourceFile, issue-from-path inference with UNKNOWN fallback, dedup-on-sourceFile, and unchanged default-walk behavior) with matching tests, or repoint this bead at the correct commit."
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 21932,
+            "output": 477,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 18331,
+            "output": 61061,
+            "cacheRead": 5475378,
+            "cacheWrite": 372017
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 21932,
+          "output": 477,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 18331,
+          "output": 61061,
+          "cacheRead": 5475378,
+          "cacheWrite": 372017
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 13.361959,
+        "pricingAsOf": "2026-07-06T18:36:43.321Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
-  "model": "claude-fable-5",
+  "model": "claude-sonnet-5",
   "statusOverrides": {
     "backfill-cli": "pending",
     "door-scan-roots": "pending",
