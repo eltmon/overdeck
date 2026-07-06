@@ -16,3 +16,6 @@ src/dashboard/server/routes/__tests__/operator-interventions.test.ts  # PAN-2421
 src/dashboard/server/services/__tests__/issue-lifecycle.test.ts  # PAN-2421
 tests/unit/lib/cloister/deacon-swarm-enumerate.test.ts  # PAN-2421
 tests/unit/lib/cloister/deacon-swarm-hold.test.ts  # PAN-2421
+tests/cli/commands/work/reopen.test.ts  # PAN-2421
+tests/unit/cli/commands/pause.test.ts  # PAN-2421
+tests/unit/lib/cloister/deacon-swarm-doneness.test.ts  # PAN-2421
