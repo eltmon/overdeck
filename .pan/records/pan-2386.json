@@ -1,213 +1,26 @@
 {
   "issueId": "PAN-2386",
   "schemaVersion": 2,
-  "sessionHistory": [
-    {
-      "timestamp": "2026-07-06T16:17:49.788Z",
-      "reason": "end",
-      "note": "Addressed review and verification feedback: polyrepo .gitignore is now committed so it is not untracked, record auto-commit no longer uses --no-verify, and lifecycle close-out tests are updated to mock the conditional label-removal path."
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-06T16:17:50.446Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-06T16:18Z] review-agent → CHANGES-REQUESTED — seq 1",
-      "timestamp": "2026-07-06T16:18:56.118Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-06T16:19Z] review-agent → CHANGES-REQUESTED — seq 2",
-      "timestamp": "2026-07-06T16:19:05.604Z"
-    },
-    {
-      "timestamp": "2026-07-06T16:23:10.484Z",
-      "reason": "end",
-      "note": "Review feedback: .gitignore is now staged as part of the complete-planning workspace commit so auto-start sees a clean tree regardless of when the workspace git repo was initialized."
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-06T16:23:10.890Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-06T16:42:15.164Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "kimi-k2.7-code",
-      "timestamp": "2026-07-06T16:49:38.492Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "kimi-k2.7-code",
-      "timestamp": "2026-07-06T16:51:15.684Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "kimi-k2.7-code",
-      "timestamp": "2026-07-06T16:54:50.922Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-06T17:09:28.504Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-06T17:09:28.516Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-06T17:15:26.467Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-06T17:21Z] review-agent → CHANGES-REQUESTED — seq 1",
-      "timestamp": "2026-07-06T17:21:49.456Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-06T17:21Z] review-agent → CHANGES-REQUESTED — seq 2",
-      "timestamp": "2026-07-06T17:21:59.315Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-06T18:22Z] verification-gate → FAILED — seq 3",
-      "timestamp": "2026-07-06T18:22:57.526Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-06T18:32:17.666Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-06T18:51Z] verification-gate → FAILED — seq 1",
-      "timestamp": "2026-07-06T18:51:23.676Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-06T19:07:23.704Z"
-    }
-  ],
-  "feedback": [],
-  "harness": "codex",
-  "model": "gpt-5.5",
-  "statusOverrides": {
-    "auto-start": "completed",
-    "auto-start.ac1": "completed",
-    "auto-start.ac2": "completed",
-    "auto-start.ac3": "completed",
-    "auto-start.ac4": "completed",
-    "auto-start.ac5": "completed",
-    "auto-start.ac6": "completed",
-    "auto-start.ac7": "completed",
-    "auto-start.ac8": "completed"
-  },
+  "created": "2026-07-06T19:32:13.188Z",
+  "updated": "2026-07-06T19:32:15.693Z",
   "pipeline": {
     "issueId": "PAN-2386",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
-    "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T19:07:28.783Z",
-    "reviewNotes": "Agent re-review request (2/25): Fixed test",
-    "testNotes": "Skipped: no code changed since pre-review verification gate",
-    "verificationNotes": "Verification FAILED at test (160927ms):\n\ncheckTrackerRateLimits > returns ok when no rate limit rows exist\n FAIL  |root| tests/unit/cli/doctor-rate-limits.test.ts > checkTrackerRateLimits > returns warn when a tracker is suspended\nError: Hook timed out in 5000ms.\nIf this is a long-running hook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n ❯ tests/unit/cli/doctor-rate-limits.test.ts:11:3\n      9|   let checkTrackerRateLimits: () => CheckResult;\n     10|\n     11|   beforeEach(async () => {\n       |   ^\n     12|     testDir = mkdtempSync(join(tmpdir(), 'doctor-rate-limits-test-'));\n     13|     const overdeckHome = join(testDir, '.overdeck');\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/16]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts > fork pipeline recovery and re-entry > re-enters a handoff fork without re-authoring or double-spawning when doc and live session already exist\nError: Hook timed out in 5000ms.\nIf this is a long-running hook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n ❯ src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts:84:1\n     82| }\n     83|\n     84| beforeEach(async () => {\n       | ^\n     85|   await resetDb();\n     86|   TEST_HOME = join(tmpdir(), `pan-1744-fork-recovery-${Date.now()}-${M…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/16]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts > fork pipeline recovery and re-entry > re-enters a handoff fork without re-authoring or double-spawning when doc and live session already exist\nError: Hook timed out in 5000ms.\nIf this is a long-running hook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n ❯ src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts:132:1\n    130| });\n    131|\n    132| afterEach(async () => {\n       | ^\n    133|   const {\n    134|     __resetForkPipelineRuntimeOverridesForTest,\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/16]⎯\n\n",
-    "prUrl": "https://github.com/eltmon/overdeck/pull/2403",
-    "lastVerifiedCommit": "c8b9ecb3e24723f31a79b5c4ffbb9ee163c0e5ae",
-    "reviewRequestedAt": "2026-07-06T17:09:27.416Z"
+    "updatedAt": "2026-07-06T19:32:15.693Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-06T19:32:15.693Z",
+    "mergeStatus": "merged"
   },
   "closeOut": {
     "usage": {
-      "byStage": {
-        "implementation": {
-          "anthropic/claude-fable-5": {
-            "input": 2844,
-            "output": 23662,
-            "cacheRead": 23760647,
-            "cacheWrite": 32715
-          }
-        },
-        "memory-extraction": {
-          "cliproxy/gpt-5.4-mini": {
-            "input": 27209,
-            "output": 933,
-            "cacheRead": 0,
-            "cacheWrite": 0
-          }
-        },
-        "test": {
-          "custom/kimi-k2.7-code": {
-            "input": 606209,
-            "output": 13058,
-            "cacheRead": 6137600,
-            "cacheWrite": 0
-          }
-        },
-        "work": {
-          "anthropic/claude-haiku-4-5-20251001": {
-            "input": 2629,
-            "output": 43065,
-            "cacheRead": 19126990,
-            "cacheWrite": 463338
-          },
-          "custom/kimi-k2.7-code": {
-            "input": 962537,
-            "output": 159493,
-            "cacheRead": 85544192,
-            "cacheWrite": 0
-          }
-        }
-      },
-      "totals": {
-        "anthropic/claude-fable-5": {
-          "input": 2844,
-          "output": 23662,
-          "cacheRead": 23760647,
-          "cacheWrite": 32715
-        },
-        "cliproxy/gpt-5.4-mini": {
-          "input": 27209,
-          "output": 933,
-          "cacheRead": 0,
-          "cacheWrite": 0
-        },
-        "custom/kimi-k2.7-code": {
-          "input": 1568746,
-          "output": 172551,
-          "cacheRead": 91681792,
-          "cacheWrite": 0
-        },
-        "anthropic/claude-haiku-4-5-20251001": {
-          "input": 2629,
-          "output": 43065,
-          "cacheRead": 19126990,
-          "cacheWrite": 463338
-        }
-      },
-      "costAtCloseOut": {
-        "usd": 47.691013,
-        "pricingAsOf": "2026-07-06T19:07:28.896Z"
-      }
+      "byStage": {},
+      "totals": {}
     },
-    "merges": [
-      "https://github.com/eltmon/overdeck/pull/2403"
-    ],
+    "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "created": "2026-07-06T16:04:26.393Z",
-  "updated": "2026-07-06T19:07:28.898Z",
-  "swarm": {
-    "finalizedAt": "2026-07-06T17:09:32.802Z"
-  }
+  "harness": "codex",
+  "model": "gpt-5.5"
 }

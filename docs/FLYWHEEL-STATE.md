@@ -207,6 +207,28 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-58 tick 12 (2026-07-06) — A3 (PAN-2336) merge-ready → SCHEDULED auto-merge; 2386 closed out; M3 planning; merge mechanism clarified
+
+**Order book: 2/19 landed (B0+A2); A3 (PAN-2336) merge SCHEDULED (~3rd); A1+B1 review; M1 running; M3 planning.** Main GREEN (bb88350d2a).
+
+- **A3 (PAN-2336) MERGE-READY → SCHEDULED.** review=passed test=passed, PR #2427 MERGEABLE/CLEAN. Scheduled auto-merge (id 16, status pending, fires ~19:51Z, 5-min cooldown). **MERGE MECHANISM CLARIFIED (trains ON / UAT OFF): the train does NOT auto-pick-up from `pan review pending --ready` alone — I must `POST /api/flywheel/auto-merge/schedule` with `{"issueId":"PAN-<n>"}` per ready OVERDECK item** (internal-token). It then merges after a ~5-min cooldown (cancelable via `pan merge` during cooldown). Emit the shipping verb first (snapshot), then schedule.
+- **PAN-2386 CLOSED OUT** (background retry completed: CLOSED). Tail clean.
+- **M3 (MIN-854) planning** (`planning-min-854` live). Lane M: M1 running + M3 planning. M2=MIN-861 waits on M1.
+- A1 (PAN-2373) + B1 (PAN-2207) still in review/test — schedule them when they hit ready. Trio 2388/2389, kimi 2407 in review.
+- Still open: MIN-831 MYN-train gap (no flywheel lever); 2387 stalled pre-finalize (operator kill+re-plan); B1↔strike-2417 done.ts collision; MIN-857 held; PAN-2383+PAN-1491 operator-owned. Swap easing ~97% / RAM ample.
+- **Next: after A3 merges (~19:51) → close it out + Lane A opens for A4 (PAN-2095). When B1 merges+closes → Lane B advances to B2 (PAN-2341).**
+
+## RUN-58 tick 11 (2026-07-06) — PAN-2386 MERGED (train working); A3→review; close-2386 + M3 planning dispatched; main green
+
+**Order book: 2/19 landed (B0+A2); A1+A3 review (Lane A), B1 review+test (Lane B), M1 running (Lane M); +PAN-2386 merged (non-order-book kimi).** Main GREEN (bb88350d2a).
+
+- **PAN-2386 MERGED** via train (`bb88350d2a` #2403, sessions reaped) — confirms merge trains ARE auto-merging ready overdeck items. Non-order-book (kimi tiered) but proves the mechanism. **Closing out PAN-2386** (backgrounded, `close2386.sh`).
+- **A3 (PAN-2336) → REVIEW** already (1 bead, fast). A1 (PAN-2373) still review; B1 (PAN-2207) still review+test. None at merge-ready yet (only MIN-831 shows ready).
+- **MIN-831 (MYN, GitLab MR68) persistently READY across ticks — NOT auto-merging.** It's non-order-book (not in Lane M) and a GitLab MR (overdeck merge tools don't touch it). **Possible MYN-merge-train gap** — surfaced; flywheel has no GitLab merge lever. Operator/MYN-train owns it.
+- **Lane M advancing:** M1 (agent-min-860) running; planned **M3=MIN-854** (background) to keep the lane deep. M2=MIN-861 waits on M1 landing; M4/M5 next as capacity/bd allows. **Don't flood** — each proposed spec the server auto-finalizes adds bd contention.
+- **REUSABLE confirmed:** background `pan start`/`pan close` with OVERDECK_BD_TIMEOUT_MS=180000 rides out the server auto-finalize (A3 spawned first try that way; close-2386 same pattern).
+- Still open: 2387 stalled pre-finalize (operator kill+re-plan); B1↔strike-2417 done.ts collision; MIN-857 held; PAN-2383 + PAN-1491 operator-owned. Swap ~99% / RAM ample.
+
 ## RUN-58 tick 10 (2026-07-06) — RESUMED from operator pause; main green, fleet healthy; A3 backgrounded; bd contention = SERVER auto-finalize (new lesson)
 
 **Order book: 2/19 landed (B0 + A2); A1+B1 in review/test, M1 (MIN-860) running, A3 start (bg); Lane B at B1.** Main GREEN (dbcf2ec880). require_uat_before_merge now confirmed OFF in config; merge trains ON.
