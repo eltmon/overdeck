@@ -47,6 +47,11 @@ export interface VBriefPlan {
   title: string;
   status: string;
   metadata?: { tiered_execution?: 'on' | 'off'; [key: string]: unknown };
+  tieredExecution?: {
+    effective: boolean;
+    source: 'issue-override' | 'plan-metadata' | 'global';
+    override?: 'on' | 'off' | null;
+  };
   author?: string;
   uid?: string;
   sequence?: number;
