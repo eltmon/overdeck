@@ -1,68 +1,28 @@
 {
   "issueId": "PAN-2402",
   "schemaVersion": 2,
-  "sessionHistory": [
-    {
-      "timestamp": "2026-07-06T15:30:27.172Z",
-      "reason": "end",
-      "note": "Integrated/verified PAN-2402 cost-limit attribution fix (already present from predecessor agent's salvage work on rescue/pan-2402-primary-salvage). Anomalies addressed: (1) three pre-existing unit-test failures in close-issue/workflows tests caused by commit 2518d740db adding a 'gh issue view --json labels' query that the mocks returned empty — fixed the mocks to return the expected workflow labels; (2) file-size guard required updating scripts/file-size-baseline.txt from 2051 to 2054 lines for the audited service.ts growth from the attribution fix. Delivered: cost warnings now use explicit '(unattributed)' bucket instead of 'undefined'; per-agent/per-issue accumulators are scoped to today's spend via getAgentDailyCostSync() and getDailyTrends({ days: 1, issueId }); regression tests cover both bugs. Note: rescue/pan-2402-primary-salvage branch remains on remote and should be cleaned up by operator."
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-06T15:32Z] review-agent → CHANGES-REQUESTED — seq 1",
-      "timestamp": "2026-07-06T15:32:41.271Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-06T15:32Z] review-agent → CHANGES-REQUESTED — seq 2",
-      "timestamp": "2026-07-06T15:32:43.671Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "kimi-k2.7-code",
-      "timestamp": "2026-07-06T15:32:43.769Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-06T15:41:13.763Z"
-    },
-    {
-      "timestamp": "2026-07-06T16:06:25.655Z",
-      "reason": "end",
-      "note": "Addressed review-agent feedback by adding tests/lib/cloister/service-cost-alerts.test.ts covering the service.ts (unattributed) log fallback for daily_total alerts. Review passed. Pre-existing close-issue/workflows test mock fixes and service.ts baseline update remain in branch. Rescue branch rescue/pan-2402-primary-salvage still exists for operator cleanup."
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-06T16:06:25.914Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-06T16:45:12.144Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-06T16:45:12.149Z"
-    }
-  ],
   "feedback": [],
-  "created": "2026-07-06T14:44:54.009Z",
-  "updated": "2026-07-06T16:45:16.460Z",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
+  "statusOverrides": {
+    "auto-start": "completed",
+    "auto-start.ac1": "completed",
+    "auto-start.ac2": "completed",
+    "auto-start.ac3": "completed"
+  },
   "pipeline": {
     "issueId": "PAN-2402",
     "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T16:45:12.569Z",
-    "reviewNotes": "Review role spawn failed: Role run agent-pan-2402-review already running. Use 'pan tell' to message it.",
+    "updatedAt": "2026-07-06T16:52:58.000Z",
+    "reviewNotes": "Verification failed at test",
+    "verificationNotes": "Verification FAILED at test (68327ms):\n\nefaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| tests/lib/cloister/auto-resume-gating.test.ts > auto-resume gates > skips paused agents even when review feedback is pending\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ tests/lib/cloister/auto-resume-gating.test.ts:335:3\n    333|   }\n    334|\n    335|   it('skips paused agents even when review feedback is pending', async…\n       |   ^\n    336|     const agentId = 'agent-pan-1141-paused';\n    337|     resumeAgentMock.mockResolvedValue({ success: true });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  |root| src/lib/__tests__/agent-state-role.test.ts > AgentState role persistence > resolves the work role model through role config defaults\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/lib/__tests__/agent-state-role.test.ts:39:3\n     37|   });\n     38|\n     39|   it('resolves the work role model through role config defaults', asyn…\n       |   ^\n     40|     vi.doMock('../config-yaml.js', async (importOriginal) => {\n     41|       const actual = await importOriginal<typeof import('../config-yam…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2411",
     "lastVerifiedCommit": "9cd4bec6da43dafa0b63986a9568f101d279f0c6",
-    "reviewRequestedAt": "2026-07-06T16:45:11.929Z"
+    "reviewRequestedAt": "2026-07-06T16:47:58.704Z"
   },
   "closeOut": {
     "usage": {
@@ -91,9 +51,9 @@
             "cacheWrite": 339334
           },
           "custom/kimi-k2.7-code": {
-            "input": 785140,
-            "output": 54312,
-            "cacheRead": 25487872,
+            "input": 789780,
+            "output": 55554,
+            "cacheRead": 26946560,
             "cacheWrite": 0
           }
         }
@@ -106,9 +66,9 @@
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 1199861,
-          "output": 58770,
-          "cacheRead": 27177472,
+          "input": 1204501,
+          "output": 60012,
+          "cacheRead": 28636160,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -119,8 +79,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 8.645212,
-        "pricingAsOf": "2026-07-06T16:45:12.600Z"
+        "usd": 8.931738,
+        "pricingAsOf": "2026-07-06T16:52:58.043Z"
       }
     },
     "merges": [
@@ -128,15 +88,9 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
-  "statusOverrides": {
-    "auto-start": "completed",
-    "auto-start.ac1": "completed",
-    "auto-start.ac2": "completed",
-    "auto-start.ac3": "completed"
-  },
   "swarm": {
     "finalizedAt": "2026-07-06T16:45:16.460Z"
-  }
+  },
+  "created": "2026-07-06T16:52:52.528Z",
+  "updated": "2026-07-06T16:52:58.055Z"
 }
