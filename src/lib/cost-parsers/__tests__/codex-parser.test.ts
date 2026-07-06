@@ -71,6 +71,26 @@ describe('parseCodexSessionSync', () => {
       // + output, all > 0 with gpt-5.5 pricing.
       expect(result?.cost_v2).toBeGreaterThan(0);
     });
+
+    it('defaults to "unknown" model when no turn_context/task_started model is found', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'codex-no-model-'));
+      const file = join(dir, 'no-model.jsonl');
+      const content = [
+        '{"type":"session_meta","timestamp":"2026-07-06T00:00:00Z","payload":{"id":"thread-no-model"}}',
+        '{"type":"event_msg","timestamp":"2026-07-06T00:00:01Z","payload":{"type":"agent_message","message":"hello"}}',
+        '{"type":"event_msg","timestamp":"2026-07-06T00:00:02Z","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"cached_input_tokens":10,"output_tokens":20,"total_tokens":130},"last_token_usage":{"input_tokens":100,"cached_input_tokens":10,"output_tokens":20,"total_tokens":130}}}}',
+      ].join('\n') + '\n';
+      writeFileSync(file, content, 'utf-8');
+
+      try {
+        const result = parseCodexSessionSync(file);
+        expect(result).not.toBeNull();
+        expect(result!.model).toBe('unknown');
+        expect(result!.cost_v2).toBe(0);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
   });
 });
 
