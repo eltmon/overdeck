@@ -31,6 +31,26 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-06T16:23:10.890Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-06T16:42:15.164Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-06T16:49:38.492Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-06T16:51:15.684Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-06T16:54:50.922Z"
     }
   ],
   "feedback": [],
@@ -54,16 +74,16 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T16:40:25.390Z",
+    "updatedAt": "2026-07-06T17:08:36.854Z",
     "blockerReasons": [
       {
         "type": "merge_conflict",
         "summary": "Merge conflict with target branch",
-        "detectedAt": "2026-07-06T16:39:36.134Z"
+        "detectedAt": "2026-07-06T17:08:36.853Z"
       }
     ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2403",
-    "reviewedAtCommit": "5658edad6d3c0935bd57113d90a0093746d768e1",
+    "reviewedAtCommit": "673b1b4029d93eb884e0669a68c05c7c813b74ce",
     "lastVerifiedCommit": "5658edad6d3c0935bd57113d90a0093746d768e1"
   },
   "closeOut": {
@@ -79,9 +99,9 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 325778,
-            "output": 7247,
-            "cacheRead": 2896896,
+            "input": 606209,
+            "output": 13058,
+            "cacheRead": 6137600,
             "cacheWrite": 0
           }
         },
@@ -93,9 +113,9 @@
             "cacheWrite": 463338
           },
           "custom/kimi-k2.7-code": {
-            "input": 930959,
-            "output": 155035,
-            "cacheRead": 76877568,
+            "input": 962537,
+            "output": 159493,
+            "cacheRead": 85544192,
             "cacheWrite": 0
           }
         }
@@ -108,9 +128,9 @@
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 1256737,
-          "output": 162282,
-          "cacheRead": 79774464,
+          "input": 1568746,
+          "output": 172551,
+          "cacheRead": 91681792,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -121,8 +141,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 19.710001,
-        "pricingAsOf": "2026-07-06T16:40:25.498Z"
+        "usd": 22.309881,
+        "pricingAsOf": "2026-07-06T17:08:36.955Z"
       }
     },
     "merges": [
@@ -131,5 +151,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-06T16:04:26.393Z",
-  "updated": "2026-07-06T16:40:25.499Z"
+  "updated": "2026-07-06T17:08:36.957Z"
 }
