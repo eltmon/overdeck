@@ -12,6 +12,16 @@
       "timestamp": "2026-07-06T19:28:26.892Z",
       "reason": "end",
       "note": "Anomalies: full CI=1 npm test reported broad unrelated failures across existing suites and then hung until interrupted; bd sync is unavailable in this bd version. Deviations: preserved the execFile options argument on mockExecAsync so the existing timeout assertion remains meaningful, while still routing through the execFile callback/custom-promisify path. Delivered: create-beads test now mocks child_process.execFile instead of util.promisify; targeted suite passes 38/38 and 20 consecutive CI-mode runs passed; typecheck and lint passed."
+    },
+    {
+      "timestamp": "2026-07-06T19:29:39.652Z",
+      "reason": "end",
+      "note": "Anomalies: full CI=1 npm test reported broad unrelated failures across existing suites and then hung until interrupted; bd sync is unavailable in this bd version. Deviations: preserved the execFile options argument on mockExecAsync so the existing timeout assertion remains meaningful, while still routing through the execFile callback/custom-promisify path. Delivered: create-beads test now mocks child_process.execFile instead of util.promisify; targeted suite passes 38/38 and 20 consecutive CI-mode runs passed; typecheck and lint passed."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-06T19:29:40.526Z"
     }
   ],
   "feedback": [],
@@ -29,10 +39,10 @@
       ".pan/records/pan-2336.json",
       "src/lib/vbrief/__tests__/create-beads.test.ts"
     ],
-    "recordedAt": "2026-07-06T19:28:15.504Z"
+    "recordedAt": "2026-07-06T19:29:32.663Z"
   },
   "created": "2026-07-06T18:16:13.947Z",
-  "updated": "2026-07-06T19:28:35.551Z",
+  "updated": "2026-07-06T19:29:48.800Z",
   "pipeline": {
     "issueId": "PAN-2336",
     "reviewStatus": "reviewing",
@@ -40,9 +50,9 @@
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T19:28:35.433Z",
+    "updatedAt": "2026-07-06T19:29:48.433Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2427",
-    "reviewRequestedAt": "2026-07-06T19:28:26.894Z",
+    "reviewRequestedAt": "2026-07-06T19:29:39.653Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/drafts/PAN-2336.md",
@@ -57,7 +67,7 @@
         ".pan/records/pan-2336.json",
         "src/lib/vbrief/__tests__/create-beads.test.ts"
       ],
-      "recordedAt": "2026-07-06T19:28:15.504Z"
+      "recordedAt": "2026-07-06T19:29:32.663Z"
     }
   },
   "closeOut": {
@@ -118,7 +128,7 @@
       },
       "costAtCloseOut": {
         "usd": 6.019611,
-        "pricingAsOf": "2026-07-06T19:28:35.543Z"
+        "pricingAsOf": "2026-07-06T19:29:48.784Z"
       }
     },
     "merges": [
