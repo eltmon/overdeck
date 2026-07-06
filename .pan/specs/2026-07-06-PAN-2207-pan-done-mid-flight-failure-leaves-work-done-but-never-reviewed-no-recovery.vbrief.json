@@ -3,7 +3,8 @@
     "version": "0.6",
     "created": "2026-07-06T16:46:52Z",
     "author": "overdeck/0.0.0",
-    "description": "Plan for PAN-2207: pan done that fails mid-flight (e.g. GraphQL rate limit at PR creation) leaves an issue done-but-never-reviewed — no recovery"
+    "description": "Plan for PAN-2207: pan done that fails mid-flight (e.g. GraphQL rate limit at PR creation) leaves an issue done-but-never-reviewed — no recovery",
+    "updated": "2026-07-06T17:01:12.569Z"
   },
   "plan": {
     "id": "pan-2207",
@@ -11,9 +12,9 @@
     "status": "proposed",
     "uid": "550deb2a-d0c8-402d-bdd3-ce65d59613a0",
     "author": "agent:claude-opus-4-8",
-    "sequence": 1,
+    "sequence": 2,
     "created": "2026-07-06T16:46:52Z",
-    "updated": "2026-07-06T16:46:52Z",
+    "updated": "2026-07-06T17:01:12.569Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2207",
@@ -264,7 +265,10 @@
         "to": "b3-deacon-patrol",
         "type": "blocks"
       }
-    ]
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-06-PAN-2207-pan-done-mid-flight-failure-leaves-work-done-but-never-reviewed-no-recovery.vbrief.json"
+    }
   },
   "status": "proposed"
 }
