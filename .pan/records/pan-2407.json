@@ -16,19 +16,19 @@
   ],
   "feedback": [],
   "created": "2026-07-06T14:55:36.922Z",
-  "updated": "2026-07-06T17:23:25.044Z",
+  "updated": "2026-07-06T17:26:55.305Z",
   "pipeline": {
     "issueId": "PAN-2407",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T17:23:25.010Z",
+    "updatedAt": "2026-07-06T17:26:55.171Z",
     "inspectNotes": "Bead route-unplanned-to-planning ack: no-plan+auto/interactive now POST start-planning with correct auto/autoStart flags and post-finalize messaging, no-plan+skip and dry-run send no request/create no files, and plan-exists (via findPlanSync main-spec-first) falls through to the unchanged spawn path; all 5 ACs covered by new start-plan-routing.test.ts.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2415",
-    "lastVerifiedCommit": "d198f758097bef5f8667a63c6a8da2a95449e19f"
+    "lastVerifiedCommit": "f8b9ae733b3af83c312ff18576a70fdc27016f50"
   },
   "closeOut": {
     "usage": {
@@ -67,9 +67,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1225503,
-            "output": 245469,
-            "cacheRead": 148025344,
+            "input": 1235245,
+            "output": 247873,
+            "cacheRead": 152001536,
             "cacheWrite": 0
           }
         }
@@ -94,15 +94,15 @@
           "cacheWrite": 102613
         },
         "custom/kimi-k2.7-code": {
-          "input": 1225503,
-          "output": 245469,
-          "cacheRead": 148025344,
+          "input": 1235245,
+          "output": 247873,
+          "cacheRead": 152001536,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 40.818443,
-        "pricingAsOf": "2026-07-06T17:23:25.042Z"
+        "usd": 41.592789,
+        "pricingAsOf": "2026-07-06T17:26:55.282Z"
       }
     },
     "merges": [
