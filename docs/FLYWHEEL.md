@@ -96,6 +96,18 @@ The `gh-issue-trailer-hook` Claude Code PreToolUse Bash hook injects the trailer
 
 Telemetry consumes these trailers as the bridge between GitHub issues and local Flywheel stats. The substrate-bug poller reads candidate GitHub issues, parses the trailer block, stores each issue in the substrate-bug projection, and uses `Flywheel-Discovered-In` for substrate-attributable failure metrics.
 
+## Metric-aware prioritization
+
+When a substrate bug declares one or more affected v1.0 criteria (`Flywheel-Affects-Criterion: 1,5`), the Flywheel computes a per-bug weight against the rolling 30-day metric snapshot:
+
+- **Status dominates.** A red criterion contributes more than a green criterion even when the green one has larger raw drift, because the status multiplier (`red=3`, `yellow=2`, `green=1`) is applied on top of a status floor.
+- **Drift breaks ties.** Within the same status, the normalized distance from the readiness threshold increases the weight.
+- **Insufficient data contributes zero.** A criterion without enough telemetry never drives prioritization.
+
+The resulting weight is attached to `FlywheelSuggestion` as `weight` (numeric) and `weightReason` (human-readable sentence). The dashboard renders the weight as a badge and the reason as a muted sub-line; within the same priority tier, suggestions sort by weight descending. `urgent` suggestions remain untouched by weight.
+
+Use `pan flywheel weights [--window <dur>] [--issue <id>] [--json]` to inspect the computed ranking from the CLI. The same data is available at `GET /api/flywheel/substrate-bug-weights?window=30d`.
+
 ## Lifecycle
 
 The Flywheel lifecycle is exposed as `pan flywheel` commands and mirrored by dashboard routes.
@@ -106,6 +118,7 @@ The Flywheel lifecycle is exposed as `pan flywheel` commands and mirrored by das
 | `pan flywheel pause` | Stops the loop from launching more work while preserving run state. |
 | `pan flywheel resume` | Continues a paused run from its saved state. |
 | `pan flywheel status` | Reads the latest `FlywheelStatus` snapshot. |
+| `pan flywheel weights` | Lists substrate bugs ranked by computed criterion weight for a window (default 30d). |
 | `pan flywheel emit-status --file <json>` | Validates and writes a status snapshot from the orchestrator. |
 | `pan flywheel report` | Writes the per-run report under the run directory and commits any pending changes to `docs/FLYWHEEL-STATE.md`. |
 
