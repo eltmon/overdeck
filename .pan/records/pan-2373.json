@@ -17,16 +17,16 @@
   ],
   "feedback": [],
   "created": "2026-07-05T22:08:30.118Z",
-  "updated": "2026-07-06T17:49:27.752Z",
+  "updated": "2026-07-06T17:51:28.955Z",
   "pipeline": {
     "issueId": "PAN-2373",
-    "reviewStatus": "failed",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T17:49:21.083Z",
-    "reviewNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-2373-review -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-2373 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://127.0.0.1:8317 -e ANTHROPIC_AUTH_TOKEN=overdeck-local-cliproxy-key -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-2373-review -e OVERDECK_ISSUE_ID=PAN-2373 -e OVERDECK_SESSION_TYPE=review -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-58 -e OVERDECK_FLYWHEEL_AGENT_ROLE=review bash /home/eltmon/.overdeck/agents/agent-pan-2373-review/launcher.sh\nduplicate session: agent-pan-2373-review\n",
+    "updatedAt": "2026-07-06T17:51:28.868Z",
+    "reviewNotes": "Quarantine exclusion applies outside CI/verification and flake accounting adds a PR-comment bot instead of the required job summary",
     "reviewRequestedAt": "2026-07-06T17:49:16.248Z"
   },
   "closeOut": {
@@ -56,9 +56,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 340781,
-            "output": 45995,
-            "cacheRead": 15973632,
+            "input": 347993,
+            "output": 47837,
+            "cacheRead": 17447168,
             "cacheWrite": 0
           }
         }
@@ -83,15 +83,15 @@
           "cacheWrite": 149608
         },
         "custom/kimi-k2.7-code": {
-          "input": 340781,
-          "output": 45995,
-          "cacheRead": 15973632,
+          "input": 347993,
+          "output": 47837,
+          "cacheRead": 17447168,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 10.926735,
-        "pricingAsOf": "2026-07-06T17:49:21.120Z"
+        "usd": 11.220927,
+        "pricingAsOf": "2026-07-06T17:51:28.951Z"
       }
     },
     "merges": [],
