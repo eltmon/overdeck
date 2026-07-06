@@ -9,10 +9,10 @@
     "status": "verified unchanged after backfill"
   },
   "canonicalEventsJsonl": {
-    "lines": 76379,
-    "bytes": 30006199,
+    "lines": 76462,
+    "bytes": 30031413,
     "earliestEventTs": "2026-04-11T11:14:11.719Z",
-    "latestEventTs": "2026-07-06T19:37:18.014Z"
+    "latestEventTs": "2026-07-06T19:44:25.302Z"
   },
   "coverageBoundaries": {
     "claude": {
