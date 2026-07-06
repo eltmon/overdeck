@@ -4,17 +4,17 @@
     "created": "2026-07-03T19:58:53.500Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2231: forbid source-introspection tests (tests that readFileSync src/ and regex it)",
-    "updated": "2026-07-03T20:05:53.339Z"
+    "updated": "2026-07-06T14:04:33.156Z"
   },
   "plan": {
     "id": "pan-2231",
     "title": "chore(lint): forbid source-introspection tests (tests that readFileSync src/ and regex it)",
-    "status": "proposed",
+    "status": "completed",
     "uid": "4e1ba123-be35-4dd7-b142-ae4ec26c9d4d",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-03T19:58:53.500Z",
-    "updated": "2026-07-03T20:05:53.339Z",
+    "updated": "2026-07-06T14:04:33.156Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2231",
@@ -232,5 +232,5 @@
       "canonicalFilename": "2026-07-03-PAN-2231-chore-lint-forbid-source-introspection-tests-tests-that-readfilesync-src-and-regex-it.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
