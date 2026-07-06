@@ -467,11 +467,19 @@ async function applyLabelGitHubImpl(ctx: LifecycleContext): Promise<StepResult> 
       `gh label create "${CLOSED_OUT_LABEL}" --repo ${owner}/${repo} --color "${CLOSED_OUT_COLOR}" --description "Verified and closed out" --force 2>/dev/null || true`,
       { encoding: 'utf-8' },
     );
+    // Only remove labels actually on the issue — `gh issue edit` fails the
+    // whole edit if any --remove-label names a label missing from the repo.
+    const { stdout: labelsJson } = await execAsync(
+      `gh issue view ${number} --repo ${owner}/${repo} --json labels --jq '[.labels[].name]'`,
+      { encoding: 'utf-8' },
+    );
+    const currentLabels: string[] = JSON.parse(labelsJson.trim() || '[]');
     const removeLabelArgs = CLOSE_OUT_LABELS_TO_REMOVE
+      .filter(label => currentLabels.includes(label))
       .map(label => `--remove-label "${label}"`)
       .join(' ');
     await execAsync(
-      `gh issue edit ${number} --repo ${owner}/${repo} --add-label "${CLOSED_OUT_LABEL}" ${removeLabelArgs}`,
+      `gh issue edit ${number} --repo ${owner}/${repo} --add-label "${CLOSED_OUT_LABEL}" ${removeLabelArgs}`.trim(),
       { encoding: 'utf-8' },
     );
     return stepOk(step, [`Applied '${CLOSED_OUT_LABEL}' label on GitHub`]);
