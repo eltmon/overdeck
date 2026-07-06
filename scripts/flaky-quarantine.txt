@@ -1,0 +1,11 @@
+# Flaky-test quarantine list.
+# A single intermittent test blocks the verification gate for unrelated PRs.
+# Entries are excluded from blocking CI/verification-gate runs and instead run
+# in the non-blocking flake-lane job.
+#
+# Format: <relative-path-from-repo-root>  # <issue-ref>
+# Issue refs must match ([A-Z]+-[0-9]+|#[0-9]+).
+# Adding an entry REQUIRES an issue reference. Removing an entry is always free.
+
+tests/playwright/conversation-supervisor-uat.test.ts  # PAN-2371
+src/lib/vbrief/__tests__/create-beads.test.ts  # PAN-2336
