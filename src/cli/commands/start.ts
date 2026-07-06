@@ -94,6 +94,7 @@ import { isRemoteAvailable } from '../../lib/remote/index.js';
 import type { RemoteWorkspaceMetadata } from '../../lib/remote/interface.js';
 import type { SpawnRemoteAgentOptions } from '../../lib/remote/remote-agents.js';
 import { assertCanStartFreshSync } from '../../lib/work-agent-lifecycle.js';
+import { getWorkAgentLifecycleStateSync } from '../../lib/work-agent-lifecycle.js';
 import { normalizeModelOverrideSync } from '../../lib/model-validation.js';
 import { resolvePlanningMode, type PlanningMode } from './planning-mode.js';
 
@@ -950,6 +951,20 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
     process.stderr.write(chalk.red(`Investigate the crash cause, then run pan untroubled ${id} before starting.\n`));
     process.exit(1);
+  }
+
+  // No-op with exit 0 when the work agent is already live and running.
+  // Paused/troubled cases are handled above; stopped-but-resumable cases are
+  // left for assertCanStartFreshSync below so the user sees the resume/fresh
+  // guidance unchanged (hazard H2).
+  const lifecycleState = getWorkAgentLifecycleStateSync(agentId);
+  if (lifecycleState.isRunning && !lifecycleState.isRunningButStuck) {
+    console.log(chalk.green(`Work agent for ${id} is already running.`));
+    console.log('');
+    console.log(chalk.dim('Message it:'), chalk.cyan(`pan tell ${id} "..."`));
+    console.log(chalk.dim('Attach:  '), chalk.cyan(`tmux -L overdeck attach -t ${agentId}`));
+    process.exitCode = 0;
+    return;
   }
 
   const spinner = ora(`Preparing workspace for ${id}...`).start();
