@@ -237,7 +237,7 @@ export function completePlanningWorkspaceGitAddCommands(gitRoot: string): string
  * pending auto-commits and explicitly stage/commit the per-issue record so the
  * tree handed to auto-start is clean.
  */
-async function commitWorkspaceRecordBeforeAutoSpawn(gitRoot: string, issueId: string): Promise<void> {
+export async function commitWorkspaceRecordBeforeAutoSpawn(gitRoot: string, issueId: string): Promise<void> {
   if (!existsSync(join(gitRoot, '.git'))) return;
   const issueLower = issueId.toLowerCase();
 

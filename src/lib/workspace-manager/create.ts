@@ -41,6 +41,53 @@ import {
 
 const execAsync = promisify(exec);
 
+interface PolyrepoWorkspaceRepoRef {
+  name: string;
+}
+
+/**
+ * PAN-2386: ensure a polyrepo scaffold workspace has a .gitignore that excludes
+ * workspace-local Overdeck state and sub-repository directories. The scaffold repo
+ * is separate from the sub-repos; without these entries, git status shows hundreds
+ * of untracked files and blocks agent auto-start.
+ *
+ * Returns the entries that were added (empty array if nothing changed).
+ */
+export function ensurePolyrepoWorkspaceGitignoreSync(
+  workspacePath: string,
+  repos: readonly PolyrepoWorkspaceRepoRef[],
+): { added: string[] } {
+  const gitignorePath = join(workspacePath, '.gitignore');
+  let content = existsSync(gitignorePath) ? readFileSync(gitignorePath, 'utf-8') : '';
+  const normalizedLines = content.split('\n').map(l => l.trim()).filter(Boolean);
+  const added: string[] = [];
+
+  if (!normalizedLines.includes('.pan/records/')) {
+    added.push('.pan/records/');
+  }
+
+  for (const repo of repos) {
+    const entry = `${repo.name}/`;
+    if (!normalizedLines.includes(entry) && !normalizedLines.includes(repo.name)) {
+      added.push(entry);
+    }
+  }
+
+  if (added.length === 0) {
+    return { added };
+  }
+
+  if (content && !content.endsWith('\n')) {
+    content += '\n';
+  }
+  if (!normalizedLines.some(l => l.includes('Polyrepo') || l.includes('polyrepo'))) {
+    content += '\n# Polyrepo workspace-local state and sub-repositories\n';
+  }
+  content += added.join('\n') + '\n';
+  writeFileSync(gitignorePath, content, 'utf-8');
+  return { added };
+}
+
 export async function createWorkspacePromise(options: WorkspaceCreateOptions): Promise<WorkspaceCreateResult> {
   const { projectConfig, featureName, startDocker, dryRun, onProgress } = options;
   const progress = (label: string, detail: string, status: 'active' | 'complete' | 'error' = 'active') => {
@@ -189,35 +236,9 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
     // sub-repo directories and workspace-local Overdeck state show as untracked and
     // block agent auto-start. Write a scaffold .gitignore before any git status checks.
     try {
-      const workspaceGitignore = join(workspacePath, '.gitignore');
-      let content = existsSync(workspaceGitignore) ? readFileSync(workspaceGitignore, 'utf-8') : '';
-      const normalizedLines = content.split('\n').map(l => l.trim()).filter(Boolean);
-      const entriesToAdd: string[] = [];
-
-      // Workspace-local issue state is rebuilt from sources of truth and should never
-      // be committed in the scaffold repo.
-      if (!normalizedLines.includes('.pan/records/')) {
-        entriesToAdd.push('.pan/records/');
-      }
-
-      // Sub-repo directories are independent git repositories, not scaffold content.
-      for (const repo of workspaceConfig.repos) {
-        const entry = `${repo.name}/`;
-        if (!normalizedLines.includes(entry) && !normalizedLines.includes(repo.name)) {
-          entriesToAdd.push(entry);
-        }
-      }
-
-      if (entriesToAdd.length > 0) {
-        if (content && !content.endsWith('\n')) {
-          content += '\n';
-        }
-        if (!normalizedLines.some(l => l.includes('Polyrepo') || l.includes('polyrepo'))) {
-          content += '\n# Polyrepo workspace-local state and sub-repositories\n';
-        }
-        content += entriesToAdd.join('\n') + '\n';
-        writeFileSync(workspaceGitignore, content, 'utf-8');
-        result.steps.push(`Created .gitignore for polyrepo workspace (${entriesToAdd.length} entries)`);
+      const { added } = ensurePolyrepoWorkspaceGitignoreSync(workspacePath, workspaceConfig.repos);
+      if (added.length > 0) {
+        result.steps.push(`Created .gitignore for polyrepo workspace (${added.length} entries)`);
       }
     } catch (gitignoreErr: any) {
       // Non-fatal — log but do not block workspace creation
