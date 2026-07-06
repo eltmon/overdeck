@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.6",
     "created": "2026-07-06T14:43:55.531Z",
-    "updated": "2026-07-06T14:45:02.116Z",
+    "updated": "2026-07-06T15:17:46.887Z",
     "author": "overdeck/auto-start",
     "description": "Auto-synthesized minimal plan for PAN-2402: bug(costs): cost-limit accounting/attribution anomalies — flywheel-orchestrator $683 vs $10 cap, daily_total attributed to project 'undefined'",
     "inspectionPolicy": "never"
@@ -10,12 +10,12 @@
   "plan": {
     "id": "pan-2402",
     "title": "bug(costs): cost-limit accounting/attribution anomalies — flywheel-orchestrator $683 vs $10 cap, daily_total attributed to project 'undefined'",
-    "status": "running",
+    "status": "approved",
     "uid": "0ac6e1c3-e309-4820-b81f-99acc8acfe88",
     "author": "overdeck/auto-start",
-    "sequence": 3,
+    "sequence": 6,
     "created": "2026-07-06T14:43:55.531Z",
-    "updated": "2026-07-06T14:45:02.116Z",
+    "updated": "2026-07-06T15:17:46.887Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2402",
