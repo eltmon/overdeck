@@ -1,0 +1,113 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-06T14:45:25.191Z",
+    "updated": "2026-07-06T14:46:54.681Z",
+    "author": "overdeck/auto-start",
+    "description": "Auto-synthesized minimal plan for PAN-2404: bug(cli): pan start --auto synthesizes unfixable acceptance criteria from narrative issue-body bullets — verification gate burns all 3 cycles on them",
+    "inspectionPolicy": "never"
+  },
+  "plan": {
+    "id": "pan-2404",
+    "title": "bug(cli): pan start --auto synthesizes unfixable acceptance criteria from narrative issue-body bullets — verification gate burns all 3 cycles on them",
+    "status": "running",
+    "uid": "cb737ae4-56ca-4034-a273-675e70ab51bd",
+    "author": "overdeck/auto-start",
+    "sequence": 3,
+    "created": "2026-07-06T14:45:25.191Z",
+    "updated": "2026-07-06T14:46:54.681Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2404",
+        "label": "PAN-2404",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "auto-start"
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-06-PAN-2404-bug-cli-pan-start-auto-synthesizes-unfixable-acceptance-criteria-from-narrative-issue-body-bullets-verification-gate-burns-all-3-cycles-on-them.vbrief.json"
+    },
+    "narratives": {
+      "Problem": "## Observed (2026-07-05, PAN-2386 tiered test-drive)\n\n`pan start PAN-2386 --auto` synthesized the minimal vBRIEF by scraping the issue body's bullet lists into acceptance criteria. PAN-2386's body is an incident writeup, so the resulting 8 \"AC\" included pure evidence pointers that no code change can ever satisfy, e.g.:\n\n- `~/.overdeck/agents/agent-min-857/lifecycle.log (refusal event, 2026-07-05T18:37:40Z)`\n- `Workspace: /home/eltmon/Projects/myn/workspaces/feature-min-857 (scaffold repo on master, ...)`\n- `[deacon] Error coordinating swarm MIN-857: Command failed: git branch --list ...` (a quoted log line)\n\nThe work agent (haiku, tier-1) implemented the real fixes, but the `vbrief-ac` verification check requires every AC row complete — so it failed 3/3 cycles on criteria that are not criteria, generating three feedback files and three fix-resubmit round-trips before the gate's max-cycle bypass let review proceed. Wasted agent cycles + noisy feedback, and a cheaper model could easily have spiraled trying to \"complete\" a log path.\n\n## Root cause\n\nAuto-start's vBRIEF synthesis treats every `- ` bullet in the issue body as an acceptance criterion. Narrative sections (Observed, Evidence, Context) are indistinguishable from real criteria in that heuristic.\n\n## Fix directions\n\n1. Only synthesize AC from an explicit `## Acceptance`/`## Acceptance criteria` section when one exists; otherwise synthesize a single generic AC (\"issue's stated fix implemented with tests\") rather than scraping bullets.\n2. Never turn bullets containing file paths, log excerpts, or timestamps into AC (cheap heuristics: leading `~/`, `/home/`, `[deacon]`, ISO timestamps).\n3. The vbrief-ac verification failure message should say WHICH synthesis produced the AC so the operator can tell auto-synthesized junk from planned criteria.\n\n## Acceptance\n\n- Auto-starting an issue whose body has narrative bullets but an explicit Acceptance section yields only that section's AC.\n- Auto-starting an issue with no Acceptance section yields one generic AC, not scraped bullets.\n- Regression test for both.",
+      "Proposal": "Implement the issue directly from the tracker-provided title and body."
+    },
+    "items": [
+      {
+        "id": "auto-start",
+        "title": "Implement issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-06T14:45:25.191Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2404",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "## Observed (2026-07-05, PAN-2386 tiered test-drive)\n\n`pan start PAN-2386 --auto` synthesized the minimal vBRIEF by scraping the issue body's bullet lists into acceptance criteria. PAN-2386's body is an incident writeup, so the resulting 8 \"AC\" included pure evidence pointers that no code change can ever satisfy, e.g.:\n\n- `~/.overdeck/agents/agent-min-857/lifecycle.log (refusal event, 2026-07-05T18:37:40Z)`\n- `Workspace: /home/eltmon/Projects/myn/workspaces/feature-min-857 (scaffold repo on master, ...)`\n- `[deacon] Error coordinating swarm MIN-857: Command failed: git branch --list ...` (a quoted log line)\n\nThe work agent (haiku, tier-1) implemented the real fixes, but the `vbrief-ac` verification check requires every AC row complete — so it failed 3/3 cycles on criteria that are not criteria, generating three feedback files and three fix-resubmit round-trips before the gate's max-cycle bypass let review proceed. Wasted agent cycles + noisy feedback, and a cheaper model could easily have spiraled trying to \"complete\" a log path.\n\n## Root cause\n\nAuto-start's vBRIEF synthesis treats every `- ` bullet in the issue body as an acceptance criterion. Narrative sections (Observed, Evidence, Context) are indistinguishable from real criteria in that heuristic.\n\n## Fix directions\n\n1. Only synthesize AC from an explicit `## Acceptance`/`## Acceptance criteria` section when one exists; otherwise synthesize a single generic AC (\"issue's stated fix implemented with tests\") rather than scraping bullets.\n2. Never turn bullets containing file paths, log excerpts, or timestamps into AC (cheap heuristics: leading `~/`, `/home/`, `[deacon]`, ISO timestamps).\n3. The vbrief-ac verification failure message should say WHICH synthesis produced the AC so the operator can tell auto-synthesized junk from planned criteria.\n\n## Acceptance\n\n- Auto-starting an issue whose body has narrative bullets but an explicit Acceptance section yields only that section's AC.\n- Auto-starting an issue with no Acceptance section yields one generic AC, not scraped bullets.\n- Regression test for both."
+        },
+        "items": [
+          {
+            "id": "auto-start.ac1",
+            "title": "~/.overdeck/agents/agent-min-857/lifecycle.log (refusal event, 2026-07-05T18:37:40Z)",
+            "status": "pending",
+            "created": "2026-07-06T14:45:25.191Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac2",
+            "title": "Workspace: /home/eltmon/Projects/myn/workspaces/feature-min-857 (scaffold repo on master, ...)",
+            "status": "pending",
+            "created": "2026-07-06T14:45:25.191Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac3",
+            "title": "[deacon] Error coordinating swarm MIN-857: Command failed: git branch --list ... (a quoted log line)",
+            "status": "pending",
+            "created": "2026-07-06T14:45:25.191Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac4",
+            "title": "Auto-starting an issue whose body has narrative bullets but an explicit Acceptance section yields only that section's AC.",
+            "status": "pending",
+            "created": "2026-07-06T14:45:25.191Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac5",
+            "title": "Auto-starting an issue with no Acceptance section yields one generic AC, not scraped bullets.",
+            "status": "pending",
+            "created": "2026-07-06T14:45:25.191Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac6",
+            "title": "Regression test for both.",
+            "status": "pending",
+            "created": "2026-07-06T14:45:25.191Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "active"
+}
