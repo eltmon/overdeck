@@ -29,6 +29,10 @@ export interface ClaudeMessage {
       output_tokens?: number;
       cache_creation_input_tokens?: number;
       cache_read_input_tokens?: number;
+      cache_creation?: {
+        ephemeral_1h_input_tokens?: number;
+        ephemeral_5m_input_tokens?: number;
+      };
     };
   };
   // Some messages have usage at top level
@@ -37,6 +41,10 @@ export interface ClaudeMessage {
     output_tokens?: number;
     cache_creation_input_tokens?: number;
     cache_read_input_tokens?: number;
+    cache_creation?: {
+      ephemeral_1h_input_tokens?: number;
+      ephemeral_5m_input_tokens?: number;
+    };
   };
   model?: string;
 }
@@ -65,18 +73,21 @@ export interface SessionUsage {
 }
 
 // Claude projects directory
-const CLAUDE_PROJECTS_DIR = join(homedir(), '.claude', 'projects');
+function getClaudeProjectsDir(): string {
+  return process.env.CLAUDE_PROJECTS_DIR || join(homedir(), '.claude', 'projects');
+}
 
 /**
  * Get all Claude Code project directories
  */
 export function getProjectDirsSync(): string[] {
-  if (!existsSync(CLAUDE_PROJECTS_DIR)) {
+  const claudeProjectsDir = getClaudeProjectsDir();
+  if (!existsSync(claudeProjectsDir)) {
     return [];
   }
 
-  return readdirSync(CLAUDE_PROJECTS_DIR)
-    .map(name => join(CLAUDE_PROJECTS_DIR, name))
+  return readdirSync(claudeProjectsDir)
+    .map(name => join(claudeProjectsDir, name))
     .filter(path => {
       try {
         return statSync(path).isDirectory();
@@ -157,6 +168,8 @@ export function normalizeModelName(model: string): { provider: AIProvider; model
     // Sonnet models
     if (model.includes('sonnet-5') || model.includes('sonnet.5')) {
       normalizedModel = 'claude-sonnet-5';
+    } else if (model.includes('sonnet-4-6') || model.includes('sonnet-4.6')) {
+      normalizedModel = 'claude-sonnet-4-6';
     } else if (model.includes('sonnet-4-5') || model.includes('sonnet-4.5')) {
       normalizedModel = 'claude-sonnet-4-6';
     } else if (model.includes('sonnet-4') || model.includes('sonnet')) {
@@ -242,6 +255,8 @@ export function parseClaudeSessionSync(sessionFile: string): SessionUsage | null
     inputTokens: number;
     outputTokens: number;
     messageCount: number;
+    cacheReadTokens?: number;
+    cacheWriteTokens?: number;
   }> = {};
   let totalCostV2 = 0;
 
@@ -296,6 +311,10 @@ export function parseClaudeSessionSync(sessionFile: string): SessionUsage | null
               outputTokens: usage.output_tokens || 0,
               cacheReadTokens: usage.cache_read_input_tokens || 0,
               cacheWriteTokens: usage.cache_creation_input_tokens || 0,
+              cacheTTL: usage.cache_creation?.ephemeral_1h_input_tokens
+                && !usage.cache_creation?.ephemeral_5m_input_tokens
+                ? '1h'
+                : '5m',
             };
 
             // Calculate cost for this message
@@ -314,6 +333,10 @@ export function parseClaudeSessionSync(sessionFile: string): SessionUsage | null
             modelBreakdown[modelId].cost += msgCost;
             modelBreakdown[modelId].inputTokens += msgUsage.inputTokens;
             modelBreakdown[modelId].outputTokens += msgUsage.outputTokens;
+            modelBreakdown[modelId].cacheReadTokens = (modelBreakdown[modelId].cacheReadTokens || 0)
+              + (msgUsage.cacheReadTokens || 0);
+            modelBreakdown[modelId].cacheWriteTokens = (modelBreakdown[modelId].cacheWriteTokens || 0)
+              + (msgUsage.cacheWriteTokens || 0);
             modelBreakdown[modelId].messageCount++;
           }
         }
@@ -421,7 +444,7 @@ export function getActiveSessionModelSync(workspacePath: string): string | null 
     //    -> -home-user-projects-myn-workspaces-feature-min-664
     // NOTE: The directory name KEEPS the leading dash
     const projectDirName = encodeClaudeProjectDir(workspacePath);
-    const projectDir = join(CLAUDE_PROJECTS_DIR, projectDirName);
+    const projectDir = join(getClaudeProjectsDir(), projectDirName);
 
     // Find most recently modified session file
     const sessions = getSessionFilesSync(projectDir);
