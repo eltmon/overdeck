@@ -152,6 +152,7 @@ import { workResumeSlotsAvailable, getConcurrencyLimits, countRunningAgents, res
 import { setReviewStatusSync, loadReviewStatuses, getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { needsReviewDispatch } from '../review-dispatch-decision.js';
 import { readIssueRecordSync, ensureIssueRecordSync, writeIssueRecordSync } from '../pan-dir/record.js';
+import { queryBeadsForIssue } from '../beads-query.js';
 import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
 import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
@@ -1143,8 +1144,8 @@ export type { ReviewConvoyLiveness } from './deacon-review.js';
 /**
  * Detect issues where `pan done` failed mid-flight: PR is open, all beads are
  * closed, reviewStatus is pending, and reviewRequestedAt was never written.
- * Re-dispatch review by setting reviewRequestedAt and mark the record with a
- * tombstone so the patrol does not loop.
+ * Verify all beads are closed before re-dispatching review; mark the record
+ * with a tombstone so the patrol does not loop.
  */
 export async function checkOrphanedCompletions(): Promise<string[]> {
   const actions: string[] = [];
@@ -1168,6 +1169,13 @@ export async function checkOrphanedCompletions(): Promise<string[]> {
         if (record?.pipeline?.panDoneRecoveredAt) continue;
 
         const issueLower = issueId.toLowerCase();
+        const workspacePath = findWorkspacePath(resolved.projectPath, issueLower);
+        if (!workspacePath || !existsSync(workspacePath)) continue;
+
+        const { beads } = await Effect.runPromise(queryBeadsForIssue(workspacePath, issueId));
+        if (beads.length === 0) continue;
+        if (beads.some((bead) => bead.status !== 'closed')) continue;
+
         const { stdout } = await execAsync(
           `gh pr list --head feature/${issueLower} --state open --json url --jq '.[0].url'`,
           { encoding: 'utf-8', timeout: 15000 }
