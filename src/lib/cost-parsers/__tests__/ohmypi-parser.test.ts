@@ -192,6 +192,52 @@ describe('parseOhmypiSession (PAN-1989)', () => {
     expect(result.usage!.usage.inputTokens).toBe(200)
   })
 
+  it('PAN-2388: recomputes event cost from pricing when inline cost is absent', () => {
+    const content = [
+      '{"type":"session","version":3,"id":"fallback-session","timestamp":"2026-07-06T00:00:00.000Z"}',
+      '{"type":"message","id":"assistant-1","parentId":null,"timestamp":"2026-07-06T00:00:01.000Z","message":{"role":"assistant","provider":"openai-codex","model":"gpt-5.5","usage":{"input":1000,"output":100,"cacheRead":500,"cacheWrite":0,"totalTokens":1600}}}',
+    ].join('\n')
+
+    const result = parseOhmypiSessionContent(content)
+
+    expect(result.ok).toBe(true)
+    expect(result.usageEvents).toHaveLength(1)
+    expect(result.usageEvents![0]!.cost).toBeCloseTo(0.00825, 12)
+    expect(result.usage!.cost_v2).toBeCloseTo(0.00825, 12)
+    expect(result.unpricedModels).toEqual([])
+  })
+
+  it('PAN-2388: preserves inline usage.cost.total without recomputing', () => {
+    const content = [
+      '{"type":"session","version":3,"id":"inline-session","timestamp":"2026-07-06T00:00:00.000Z"}',
+      '{"type":"message","id":"assistant-1","parentId":null,"timestamp":"2026-07-06T00:00:01.000Z","message":{"role":"assistant","provider":"openai-codex","model":"gpt-5.5","usage":{"input":1000,"output":100,"cacheRead":500,"cacheWrite":0,"totalTokens":1600,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0.123456}}}}',
+    ].join('\n')
+
+    const result = parseOhmypiSessionContent(content)
+
+    expect(result.ok).toBe(true)
+    expect(result.usageEvents).toHaveLength(1)
+    expect(result.usageEvents![0]!.cost).toBe(0.123456)
+    expect(result.usage!.cost_v2).toBe(0.123456)
+  })
+
+  it('PAN-2388: reports a machine-readable reason when tokens have no pricing row', () => {
+    const content = [
+      '{"type":"session","version":3,"id":"unpriced-session","timestamp":"2026-07-06T00:00:00.000Z"}',
+      '{"type":"message","id":"assistant-1","parentId":null,"timestamp":"2026-07-06T00:00:01.000Z","message":{"role":"assistant","provider":"mystery","model":"mystery-model","usage":{"input":100,"output":10,"cacheRead":0,"cacheWrite":0,"totalTokens":110}}}',
+    ].join('\n')
+
+    const result = parseOhmypiSessionContent(content)
+
+    expect(result.ok).toBe(true)
+    expect(result.usageEvents).toHaveLength(1)
+    expect(result.usageEvents![0]!.cost).toBe(0)
+    expect(result.usage!.cost_v2).toBe(0)
+    expect(result.unpricedModels).toEqual([
+      { provider: 'mystery', model: 'mystery-model', reason: 'unknown-provider' },
+    ])
+  })
+
   it('AC3: transcript-source harness filter — ohmypi sessions included in snapshot', () => {
     // This is a structural assertion: the filter in transcript-source.ts now
     // checks harness === 'ohmypi' in addition to 'pi'. The actual behavior is
