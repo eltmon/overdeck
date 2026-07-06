@@ -5,10 +5,12 @@ import {
   recoverAgent,
   autoRecoverAgents,
   normalizeAgentId,
+  resumeAgent,
 } from '../../lib/agents.js';
 
 interface RecoverOptions {
   all?: boolean;
+  compact?: boolean;
   json?: boolean;
   model?: string;
 }
@@ -17,6 +19,11 @@ export async function recoverCommand(id?: string, options: RecoverOptions = {}):
   const spinner = ora('Checking for crashed agents...').start();
 
   try {
+    if (options.compact && !id) {
+      spinner.fail('Specify an agent ID when using --compact');
+      process.exit(1);
+    }
+
     // Auto-recover all crashed agents
     if (options.all || !id) {
       const crashed = detectCrashedAgents();
@@ -83,6 +90,24 @@ export async function recoverCommand(id?: string, options: RecoverOptions = {}):
     spinner.text = options.model
       ? `Recovering ${agentId} on ${options.model}...`
       : `Recovering ${agentId}...`;
+
+    if (options.compact) {
+      const result = await resumeAgent(agentId, undefined, {
+        compact: true,
+        recoverGated: true,
+        model: options.model,
+      });
+      if (!result.success) {
+        spinner.fail(result.error || `Failed to compact-recover ${agentId}`);
+        process.exit(1);
+      }
+
+      spinner.succeed(`Compact-recovered: ${agentId}`);
+      console.log('');
+      console.log(chalk.dim('This recovered a context-wedged agent by spawning a fresh session seeded from the saved transcript summary.'));
+      console.log(chalk.dim(`Message: pan tell ${agentId} "your message"`));
+      return;
+    }
 
     const state = await recoverAgent(agentId, { modelOverride: options.model });
 

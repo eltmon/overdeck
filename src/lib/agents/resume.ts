@@ -115,7 +115,7 @@ export async function buildCompactRecoverySeed(agentId: string): Promise<{ seed:
   };
 }
 
-export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string; harness?: RuntimeName; allowHost?: boolean; compact?: boolean }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
+export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string; harness?: RuntimeName; allowHost?: boolean; compact?: boolean; recoverGated?: boolean }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
   const normalizedId = normalizeAgentId(agentId);
   const requestedModel = normalizeModelOverrideSync(opts?.model);
   logAgentLifecycleSync(normalizedId, `resumeAgent called (message=${message ? 'yes' : 'no'}, harness=${opts?.harness || 'unchanged'})`);
@@ -124,10 +124,14 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
   const runtimeState = getAgentRuntimeStateSync(normalizedId);
   const agentState = getAgentStateSync(normalizedId);
   const gateBlockReason = agentState ? getAgentResumeGateBlockReason(agentState) : undefined;
-  if (gateBlockReason) {
+  const bypassTroubledGate = opts?.compact === true && opts.recoverGated === true && agentState?.troubled === true && agentState.paused !== true;
+  if (gateBlockReason && !bypassTroubledGate) {
     const reason = `Cannot resume ${normalizedId}: ${gateBlockReason}. Clear the gate before resuming.`;
     logAgentLifecycleSync(normalizedId, `resumeAgent BLOCKED: ${reason}`);
     return { success: false, error: reason };
+  }
+  if (bypassTroubledGate) {
+    logAgentLifecycleSync(normalizedId, `resumeAgent: bypassing troubled gate for explicit compact recovery (${gateBlockReason})`);
   }
   const hasWorkspace = !!agentState?.workspace && existsSync(agentState.workspace);
   const isPlaceholder = !!agentState && agentState.status === 'starting' && typeof agentState.model === 'string' && agentState.model.startsWith('pending-');
@@ -331,7 +335,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     // PAN-1980: refuse to rotate to a new session. A resume that would need a
     // fresh session — compact/overflow recovery or model/harness drift — now
     // errors and stops instead of starting a new transcript.
-    if (sessionRotationRefused({ compactSeed: Boolean(compactSeed), driftReasons: resumeDriftReasons })) {
+    if (sessionRotationRefused({ compactSeed: Boolean(compactSeed), driftReasons: resumeDriftReasons, allowExplicitRecovery: opts?.compact === true && opts.recoverGated === true })) {
       const reason = compactSeed
         ? 'context-overflow compaction would respawn a fresh session'
         : `session drift (${resumeDriftReasons.join(', ')})`;
@@ -487,6 +491,15 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
 
     // Update agent state
     if (agentState) {
+      if (bypassTroubledGate) {
+        delete agentState.troubled;
+        delete agentState.troubledAt;
+        delete agentState.consecutiveFailures;
+        delete agentState.firstFailureInRunAt;
+        delete agentState.lastFailureAt;
+        delete agentState.lastFailureReason;
+        delete agentState.lastFailureNextRetryAt;
+      }
       agentState.lastResumeAt = resumeStartedAt;
       markAgentRunning(agentState, { preserveFailureTracking: true });
       saveAgentStateSync(agentState);
