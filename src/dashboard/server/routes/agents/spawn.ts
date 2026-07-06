@@ -53,6 +53,28 @@ import {
   handleRemoteAgentSpawn,
 } from './spawn-helpers.js';
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * PAN-2386: emit a dashboard activity event when start-agent refuses to spawn
+ * because the workspace is dirty. Kept as a pure function so the refusal path
+ * can be unit-tested without booting the full Effect route stack.
+ */
+export function emitDirtyWorkspaceRefusalActivity(issueId: string, porcelain: string): void {
+  try {
+    emitActivityEntrySync({
+      source: 'dashboard',
+      level: 'warn',
+      message: `Workspace dirty — agent start refused for ${issueId}`,
+      issueId,
+      details: JSON.stringify({
+        reason: 'Workspace has uncommitted changes. Commit, discard, or resolve and retry.',
+        porcelain: porcelain.split('\n').slice(0, 5),
+      }),
+    });
+  } catch { /* non-fatal — activity emit should not block the response */ }
+}
+
 // ─── Route: POST /api/agents (start agent) ───────────────────────────────────
 
 export const postAgentsRoute = HttpRouter.add(
@@ -607,6 +629,9 @@ export const postAgentsRoute = HttpRouter.add(
             workspacePath,
             porcelain: statusOut.trim(),
           }));
+          // PAN-2386: surface the refusal in the dashboard activity feed so the operator
+          // sees a toast instead of having to dig through lifecycle.log.
+          emitDirtyWorkspaceRefusalActivity(issueId, statusOut.trim());
           return jsonResponse({
             error: `Workspace ${workspacePath} has uncommitted changes. Choose an action and retry start with acknowledgeDirtyWorkspace=true.`,
             code: 'WORKSPACE_DIRTY',
