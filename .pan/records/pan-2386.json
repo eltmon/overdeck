@@ -94,8 +94,8 @@
       "markdownBody": "# Review CHANGES REQUESTED for PAN-2386\n\nPolyrepo scaffold ignores .pan/records, hiding durable per-issue records instead of committing them\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2386 -m \"Fixed review issues\"`"
     }
   ],
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "auto-start": "completed",
     "auto-start.ac1": "completed",
@@ -109,15 +109,13 @@
   },
   "pipeline": {
     "issueId": "PAN-2386",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T17:21:49.406Z",
-    "reviewNotes": "Polyrepo scaffold ignores .pan/records, hiding durable per-issue records instead of committing them",
+    "updatedAt": "2026-07-06T18:07:31.876Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2403",
-    "lastVerifiedCommit": "5658edad6d3c0935bd57113d90a0093746d768e1",
     "reviewRequestedAt": "2026-07-06T17:09:27.416Z"
   },
   "closeOut": {
@@ -125,10 +123,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 1253,
-            "output": 7327,
-            "cacheRead": 9401617,
-            "cacheWrite": 10040
+            "input": 2844,
+            "output": 23662,
+            "cacheRead": 23760647,
+            "cacheWrite": 32715
           }
         },
         "memory-extraction": {
@@ -164,10 +162,10 @@
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 1253,
-          "output": 7327,
-          "cacheRead": 9401617,
-          "cacheWrite": 10040
+          "input": 2844,
+          "output": 23662,
+          "cacheRead": 23760647,
+          "cacheWrite": 32715
         },
         "cliproxy/gpt-5.4-mini": {
           "input": 20916,
@@ -189,8 +187,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 32.21588,
-        "pricingAsOf": "2026-07-06T17:21:49.451Z"
+        "usd": 47.691013,
+        "pricingAsOf": "2026-07-06T18:07:31.913Z"
       }
     },
     "merges": [
@@ -199,7 +197,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-06T16:04:26.393Z",
-  "updated": "2026-07-06T18:06:07.041Z",
+  "updated": "2026-07-06T18:07:31.914Z",
   "swarm": {
     "finalizedAt": "2026-07-06T17:09:32.802Z"
   }
