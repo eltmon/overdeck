@@ -1,7 +1,7 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
+import { readQuarantineList } from './src/lib/test-infra/quarantine.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const includeBenchmarks = process.env['VITEST_INCLUDE_BENCH'] === '1';
@@ -9,20 +9,9 @@ const isCI = process.env['CI'] === 'true';
 const isVerification = process.env['OVERDECK_VERIFICATION'] === '1';
 const isFlakeLane = process.env['OVERDECK_FLAKE_LANE'] === '1';
 const retryEnabled = isCI || isVerification || isFlakeLane;
+const excludeQuarantined = (isCI || isVerification) && !isFlakeLane;
 
-function readQuarantine(): string[] {
-  const quarantinePath = path.resolve(__dirname, 'scripts/flaky-quarantine.txt');
-  if (!fs.existsSync(quarantinePath)) {
-    return [];
-  }
-  return fs
-    .readFileSync(quarantinePath, 'utf8')
-    .split('\n')
-    .map((line) => line.split('#')[0].trim())
-    .filter((line) => line.length > 0);
-}
-
-const quarantined = readQuarantine();
+const quarantined = readQuarantineList(__dirname);
 const defaultInclude = includeBenchmarks
   ? ['tests/**/*.test.ts', 'tests/**/*.spec.ts', 'tests/**/*.bench.ts', 'src/**/__tests__/**/*.test.ts', 'packages/**/src/__tests__/**/*.test.ts', 'src/**/*.bench.ts']
   : ['tests/**/*.test.ts', 'tests/**/*.spec.ts', 'src/**/__tests__/**/*.test.ts', 'packages/**/src/__tests__/**/*.test.ts'];
@@ -55,10 +44,10 @@ export default defineConfig({
       // subset (e.g. `npm test -- foo.test.ts`) skips re-transpilation of unchanged files.
       fsModuleCache: true,
     },
-    include: isFlakeLane ? quarantined : defaultInclude,
-    exclude: isFlakeLane
-      ? ['**/node_modules/**', '**/dist/**', 'src/dashboard/frontend/**']
-      : ['**/node_modules/**', '**/dist/**', 'src/dashboard/frontend/**', ...quarantined],
+    include: defaultInclude,
+    exclude: excludeQuarantined
+      ? ['**/node_modules/**', '**/dist/**', 'src/dashboard/frontend/**', ...quarantined]
+      : ['**/node_modules/**', '**/dist/**', 'src/dashboard/frontend/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
