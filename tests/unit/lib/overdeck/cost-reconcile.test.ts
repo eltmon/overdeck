@@ -21,7 +21,7 @@ vi.mock('../../../../src/lib/cost-parsers/ohmypi-parser.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/cost-parsers/codex-parser.js', () => ({
-  parseCodexSessionSync: vi.fn(),
+  parseCodexSessionCostEventsSync: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/paths.js', async (importOriginal) => {
@@ -36,7 +36,7 @@ vi.mock('../../../../src/lib/paths.js', async (importOriginal) => {
 
 import { existsSync, readdirSync } from 'node:fs';
 import { parseOhmypiSessionCostEventsSync, parseOhmypiSessionSync } from '../../../../src/lib/cost-parsers/ohmypi-parser.js';
-import { parseCodexSessionSync } from '../../../../src/lib/cost-parsers/codex-parser.js';
+import { parseCodexSessionCostEventsSync } from '../../../../src/lib/cost-parsers/codex-parser.js';
 import { Db, EventBus, CostArchive } from '../../../../src/lib/overdeck/infra.js';
 import { CostWriter, CostWriterLive } from '../../../../src/lib/overdeck/cost.js';
 
@@ -54,7 +54,9 @@ function makeTestLayer() {
   const filterRows = (cond: unknown): Row[] => {
     const chunks = (cond as { queryChunks?: Array<{ name?: string; value?: unknown }> })?.queryChunks;
     const column = chunks?.find((chunk) => typeof chunk?.name === 'string')?.name;
-    const value = chunks?.find((chunk) => Object.prototype.hasOwnProperty.call(chunk ?? {}, 'value'))?.value;
+    const value = chunks?.find((chunk) =>
+      Object.prototype.hasOwnProperty.call(chunk ?? {}, 'value') && !Array.isArray(chunk.value)
+    )?.value;
     if (column === 'request_id') return rows.filter((row) => row.requestId === value);
     if (column === 'source_file') return rows.filter((row) => row.sourceFile === value);
     return rows;
@@ -121,20 +123,6 @@ function makeTestLayer() {
   return { dbLayer, busLayer, archiveLayer, insertedValues, rows };
 }
 
-function makeSessionUsage(sessionFile: string, model = 'claude-sonnet-4-6') {
-  return {
-    sessionId:    'sess-abc',
-    sessionFile,
-    startTime:    '2026-06-17T10:00:00Z',
-    endTime:      '2026-06-17T10:05:00Z',
-    model,
-    usage:        { inputTokens: 1000, outputTokens: 500, cacheReadTokens: 200 },
-    cost:         0.05,
-    cost_v2:      0.04,
-    messageCount: 3,
-  };
-}
-
 function makePiCostEvents(sessionFile: string) {
   return [
     {
@@ -162,6 +150,37 @@ function makePiCostEvents(sessionFile: string) {
       cacheRead:   0,
       cacheWrite:  0,
       cost:        0.01,
+    },
+  ];
+}
+
+function makeCodexCostEvents(sessionFile: string) {
+  return [
+    {
+      requestId:  'codex:sess-abc:0',
+      timestamp:  '2026-06-17T10:00:01Z',
+      sessionId:  'sess-abc',
+      sessionFile,
+      provider:   'openai' as const,
+      model:      'gpt-5.5',
+      input:      1000,
+      output:     500,
+      cacheRead:  200,
+      cacheWrite: 0,
+      cost:       0.03,
+    },
+    {
+      requestId:  'codex:sess-abc:1',
+      timestamp:  '2026-06-17T10:00:02Z',
+      sessionId:  'sess-abc',
+      sessionFile,
+      provider:   'openai' as const,
+      model:      'gpt-5.5',
+      input:      200,
+      output:     100,
+      cacheRead:  0,
+      cacheWrite: 0,
+      cost:       0.01,
     },
   ];
 }
@@ -252,12 +271,12 @@ describe('CostWriter.reconcile — codex source', () => {
   beforeEach(() => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([]);
-    vi.mocked(parseCodexSessionSync).mockReturnValue(null);
+    vi.mocked(parseCodexSessionCostEventsSync).mockReturnValue([]);
   });
 
   afterEach(() => vi.clearAllMocks());
 
-  it('imports one codex session and returns { imported: 1 }', async () => {
+  it('imports one codex cost event per token_count turn with request ids', async () => {
     const agentDir = '/fake/pan/agents';
     const rolloutFile = '/fake/pan/agents/agent-2/codex-home/sessions/2026/06/17/rollout-abc.jsonl';
 
@@ -271,7 +290,7 @@ describe('CostWriter.reconcile — codex source', () => {
       return [];
     });
 
-    vi.mocked(parseCodexSessionSync).mockReturnValue(makeSessionUsage(rolloutFile, 'gpt-4o'));
+    vi.mocked(parseCodexSessionCostEventsSync).mockReturnValue(makeCodexCostEvents(rolloutFile));
 
     const { dbLayer, busLayer, archiveLayer, insertedValues } = makeTestLayer();
     const layer = CostWriterLive.pipe(
@@ -283,20 +302,63 @@ describe('CostWriter.reconcile — codex source', () => {
     );
 
     expect(result).toMatchObject({
-      imported: 1,
+      imported: 2,
       sessionsScanned: 1,
-      eventsImported: 1,
+      eventsImported: 2,
       duplicatesSkipped: 0,
       errors: [],
-      earliestEventTs: '2026-06-17T10:00:00.000Z',
-      latestEventTs: '2026-06-17T10:00:00.000Z',
+      earliestEventTs: '2026-06-17T10:00:01.000Z',
+      latestEventTs: '2026-06-17T10:00:02.000Z',
     });
-    expect(insertedValues).toHaveLength(1);
+    expect(insertedValues).toHaveLength(2);
     const row = insertedValues[0] as Record<string, unknown>;
     expect(row.agentId).toBe('agent-2');
-    expect(row.sessionType).toBe('work');
-    expect(row.model).toBe('gpt-4o');
+    expect(row.sessionType).toBe('codex');
+    expect(row.provider).toBe('openai');
+    expect(row.model).toBe('gpt-5.5');
+    expect(row.requestId).toBe('codex:sess-abc:0');
     expect(row.sourceFile).toBe(rolloutFile);
+    expect((insertedValues[1] as Record<string, unknown>).requestId).toBe('codex:sess-abc:1');
+  });
+
+  it('imports only new codex turns when a rollout file grows', async () => {
+    const agentDir = '/fake/pan/agents';
+    const rolloutFile = '/fake/pan/agents/agent-pan-2/codex-home/sessions/2026/06/17/rollout-abc.jsonl';
+    const events = makeCodexCostEvents(rolloutFile);
+
+    vi.mocked(readdirSync).mockImplementation((dir, _opts) => {
+      if (String(dir) === agentDir) return [makeDirent('agent-pan-2', true)];
+      if (String(dir) === '/fake/pan/agents/agent-pan-2/codex-home/sessions') return [makeDirent('2026', true)];
+      if (String(dir) === '/fake/pan/agents/agent-pan-2/codex-home/sessions/2026') return [makeDirent('06', true)];
+      if (String(dir) === '/fake/pan/agents/agent-pan-2/codex-home/sessions/2026/06') return [makeDirent('17', true)];
+      if (String(dir) === '/fake/pan/agents/agent-pan-2/codex-home/sessions/2026/06/17')
+        return [makeDirent('rollout-abc.jsonl', false)];
+      return [];
+    });
+
+    vi.mocked(parseCodexSessionCostEventsSync)
+      .mockReturnValueOnce(events.slice(0, 1))
+      .mockReturnValueOnce(events);
+
+    const { dbLayer, busLayer, archiveLayer, insertedValues } = makeTestLayer();
+    const layer = CostWriterLive.pipe(
+      Layer.provide(dbLayer), Layer.provide(busLayer), Layer.provide(archiveLayer),
+    );
+
+    const first = await Effect.runPromise(
+      CostWriter.use((w) => w.reconcile({ source: 'codex' })).pipe(Effect.provide(layer)),
+    );
+    const second = await Effect.runPromise(
+      CostWriter.use((w) => w.reconcile({ source: 'codex' })).pipe(Effect.provide(layer)),
+    );
+
+    expect(first).toEqual({ imported: 1 });
+    expect(second).toEqual({ imported: 1 });
+    expect(insertedValues).toHaveLength(2);
+    expect(insertedValues.map((row) => (row as Record<string, unknown>).requestId)).toEqual([
+      'codex:sess-abc:0',
+      'codex:sess-abc:1',
+    ]);
   });
 });
 

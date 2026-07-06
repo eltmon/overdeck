@@ -16,7 +16,7 @@ import {
 } from '../cost.js';
 import type { CostBudget } from '../cost.js';
 import { parseOhmypiSessionCostEventsSync } from '../cost-parsers/ohmypi-parser.js';
-import { parseCodexSessionSync } from '../cost-parsers/codex-parser.js';
+import { parseCodexSessionCostEventsSync } from '../cost-parsers/codex-parser.js';
 import { getOverdeckHome } from '../paths.js';
 import { deriveTieredAgentCostRole } from '../agents/tier-metrics.js';
 
@@ -572,49 +572,6 @@ export const CostWriterLive = Layer.effect(
         return true;
       });
 
-    const recordCodexCumulative = (event: CostEvent, opts?: { dryRun?: boolean }) =>
-      Effect.gen(function* () {
-        if (!event.sourceFile) return yield* record(event, opts);
-        const existing = yield* Effect.promise(async () => {
-          const rows = await q
-            .select({
-              id:        costEventsTable.id,
-              input:     costEventsTable.input,
-              output:    costEventsTable.output,
-              cacheRead: costEventsTable.cacheRead,
-            })
-            .from(costEventsTable)
-            .where(eq(costEventsTable.sourceFile, event.sourceFile as string))
-            .limit(1);
-          return rows as Array<{ id: number; input: number | null; output: number | null; cacheRead: number | null }>;
-        });
-
-        const row = existing[0];
-        if (!row) return yield* record(event, opts);
-
-        const previousTokens = (row.input ?? 0) + (row.output ?? 0) + (row.cacheRead ?? 0);
-        const nextTokens = event.input + event.output + event.cacheRead;
-        if (nextTokens <= previousTokens) return false;
-        if (opts?.dryRun) return true;
-
-        yield* Effect.promise(() =>
-          q
-            .update(costEventsTable)
-            .set({
-              ts:          event.ts,
-              input:       event.input,
-              output:      event.output,
-              cacheRead:   event.cacheRead,
-              cost:        event.cost,
-              model:       event.model,
-              sessionType: event.sessionType,
-            })
-            .where(eq(costEventsTable.sourceFile, event.sourceFile as string)),
-        );
-        yield* bus.emit({ type: 'cost.recorded', payload: { issueId: event.issueId, cost: event.cost } });
-        return true;
-      });
-
     // Catch-up sweep for pi/codex session files.
     // Walks OVERDECK_HOME/agents/<id>/sessions/**/*.jsonl (pi) or
     // OVERDECK_HOME/agents/<id>/codex-home/sessions/**/*.jsonl (codex),
@@ -773,39 +730,39 @@ export const CostWriterLive = Layer.effect(
               continue;
             }
 
-            const session = yield* Effect.sync(() => {
+            const events = yield* Effect.sync(() => {
               try {
-                return parseCodexSessionSync(sessionFile);
+                return parseCodexSessionCostEventsSync(sessionFile);
               } catch (cause) {
                 errors.push(`${sessionFile}: ${cause instanceof Error ? cause.message : String(cause)}`);
-                return null;
+                return [];
               }
             });
-            if (!session) continue;
+            for (const usage of events) {
+              const ts = new Date(usage.timestamp);
+              const event: CostEvent = {
+                ts,
+                issueId:     root.issueId,
+                agentId:     root.agentName,
+                sessionId:   usage.sessionId,
+                sessionType: root.sessionType,
+                provider:    usage.provider,
+                model:       usage.model,
+                input:       usage.input,
+                output:      usage.output,
+                cacheRead:   usage.cacheRead,
+                cacheWrite:  usage.cacheWrite,
+                cost:        usage.cost,
+                requestId:   usage.requestId,
+                sourceFile:  sessionFile,
+              };
 
-            const ts = new Date(session.startTime);
-            const event: CostEvent = {
-              ts,
-              issueId:     root.inferIssueFromCwd ? (inferIssueFromPath(session.cwd) ?? 'UNKNOWN' as IssueIdType) : root.issueId,
-              agentId:     root.agentName,
-              sessionId:   session.sessionId,
-              sessionType: root.inferIssueFromCwd ? root.sessionType : readAgentRoleSync(join(agentsDir, root.agentName)),
-              provider:    null,
-              model:       session.model ?? null,
-              input:       session.usage.inputTokens,
-              output:      session.usage.outputTokens,
-              cacheRead:   session.usage.cacheReadTokens ?? 0,
-              cacheWrite:  0,
-              cost:        session.cost_v2 ?? session.cost,
-              requestId:   null,
-              sourceFile:  sessionFile,
-            };
-
-            if (yield* recordCodexCumulative(event, { dryRun: opts?.dryRun })) {
-              imported++;
-              noteImportedTimestamp(ts);
-            } else {
-              duplicatesSkipped++;
+              if (yield* record(event, { dryRun: opts?.dryRun })) {
+                imported++;
+                noteImportedTimestamp(ts);
+              } else {
+                duplicatesSkipped++;
+              }
             }
           }
         }
