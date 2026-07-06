@@ -1001,6 +1001,28 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // Find workspace (local or remote based on preference)
     const { workspacePath, isRemote } = findWorkspaceWithLocation(id, locationPreference);
 
+    // Overflow scale-out (PAN-1676): a FRESH issue (no workspace anywhere, no
+    // explicit --local) routes to a fly.io machine when the local work pool is
+    // already at max_work_agents and remote.overflow_to_remote is enabled.
+    // Compute this before the PAN-2407 planning route so the start-planning
+    // request reports the resolved workspace location (local vs remote).
+    let overflowToRemote = false;
+    if (!isRemote && !workspacePath && !options.local && locationPreference !== 'local') {
+      const overflowConfig = loadConfigSync().remote;
+      if (overflowConfig?.enabled && overflowConfig.overflow_to_remote) {
+        const { getConcurrencyLimits, countRunningAgents } = await import('../../lib/cloister/concurrency.js');
+        const limits = getConcurrencyLimits();
+        const counts = countRunningAgents();
+        if (counts.work >= limits.maxWorkAgents) {
+          overflowToRemote = true;
+          console.log(chalk.cyan(
+            `Local work pool full (${counts.work}/${limits.maxWorkAgents}) — overflowing ${id} to a remote fly.io machine.`
+          ));
+        }
+      }
+    }
+    const effectiveRemote = isRemote || overflowToRemote || (locationPreference === 'remote' && !workspacePath);
+
     // PAN-2407: route unplanned issues to the start-planning endpoint before
     // any workspace creation or remote provisioning.
     const projectRoot = findProjectRoot(id);
@@ -1030,7 +1052,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
                 model: options.model,
                 harness: options.harness,
                 effort: options.effort,
-                workspaceLocation: isRemote ? 'remote' : 'local',
+                workspaceLocation: effectiveRemote ? 'remote' : 'local',
               }),
             },
           );
@@ -1114,27 +1136,8 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       }
     }
 
-    // Overflow scale-out (PAN-1676): a FRESH issue (no workspace anywhere, no
-    // explicit --local) routes to a fly.io machine when the local work pool is
-    // already at max_work_agents and remote.overflow_to_remote is enabled.
-    let overflowToRemote = false;
-    if (!isRemote && !workspacePath && !options.local && locationPreference !== 'local') {
-      const overflowConfig = loadConfigSync().remote;
-      if (overflowConfig?.enabled && overflowConfig.overflow_to_remote) {
-        const { getConcurrencyLimits, countRunningAgents } = await import('../../lib/cloister/concurrency.js');
-        const limits = getConcurrencyLimits();
-        const counts = countRunningAgents();
-        if (counts.work >= limits.maxWorkAgents) {
-          overflowToRemote = true;
-          console.log(chalk.cyan(
-            `Local work pool full (${counts.work}/${limits.maxWorkAgents}) — overflowing ${id} to a remote fly.io machine.`
-          ));
-        }
-      }
-    }
-
     // Handle remote workspace
-    if (isRemote || overflowToRemote || (locationPreference === 'remote' && !workspacePath)) {
+    if (effectiveRemote) {
       await handleRemoteWorkspace(id, options, spinner, shouldClearPauseBeforeSpawn);
       return;
     }

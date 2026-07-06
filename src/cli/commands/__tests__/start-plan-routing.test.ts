@@ -4,10 +4,15 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { Effect } from 'effect';
 
+const loadConfigSyncMock = vi.hoisted(() => vi.fn(() => ({ remote: { enabled: false } })));
 const fetchMock = vi.hoisted(() => vi.fn());
 const findPlanSyncMock = vi.hoisted(() => vi.fn());
 const findSpecByIssueMock = vi.hoisted(() => vi.fn(() => Effect.succeed(null)));
 const findRemoteWorkspaceMetadataSyncMock = vi.hoisted(() => vi.fn(() => null));
+const concurrencyMocks = vi.hoisted(() => ({
+  getConcurrencyLimits: vi.fn(() => ({ maxWorkAgents: 5 })),
+  countRunningAgents: vi.fn(() => ({ work: 0 })),
+}));
 const autoSynthesizeMocks = vi.hoisted(() => ({
   writeAutoStartVBrief: vi.fn(() => Effect.succeed(undefined)),
 }));
@@ -83,6 +88,8 @@ vi.mock('../../../lib/remote/workspace-metadata.js', () => ({
   saveWorkspaceMetadataSync: vi.fn(),
 }));
 
+vi.mock('../../../lib/cloister/concurrency.js', () => concurrencyMocks);
+
 vi.mock('../../../lib/vbrief/auto-synthesize.js', () => autoSynthesizeMocks);
 
 vi.mock('../../../lib/vbrief/beads.js', () => beadsMocks);
@@ -114,7 +121,7 @@ vi.mock('ora', () => ({ default: oraMocks.ora }));
 vi.mock('../../../lib/config.js', async (importActual) => ({
   ...(await importActual<typeof import('../../../lib/config.js')>('../../../lib/config.js')),
   getDashboardApiUrlSync: () => 'http://pan.test',
-  loadConfigSync: () => ({ remote: { enabled: false } }),
+  loadConfigSync: loadConfigSyncMock,
 }));
 
 describe('pan start planning-mode routing (PAN-2407)', () => {
@@ -142,6 +149,9 @@ describe('pan start planning-mode routing (PAN-2407)', () => {
     findPlanSyncMock.mockReset();
     findSpecByIssueMock.mockReset().mockReturnValue(Effect.succeed(null));
     findRemoteWorkspaceMetadataSyncMock.mockReset().mockReturnValue(null);
+    loadConfigSyncMock.mockReset().mockReturnValue({ remote: { enabled: false } });
+    concurrencyMocks.getConcurrencyLimits.mockReset().mockReturnValue({ maxWorkAgents: 5 });
+    concurrencyMocks.countRunningAgents.mockReset().mockReturnValue({ work: 0 });
     autoSynthesizeMocks.writeAutoStartVBrief.mockReset().mockReturnValue(Effect.succeed(undefined));
     beadsMocks.createBeadsFromVBrief.mockReset().mockReturnValue(Effect.succeed({ created: [{ id: 'bead-1' }], errors: [], success: true }));
     spawnAgentMock.mockReset().mockResolvedValue({
@@ -267,6 +277,24 @@ describe('pan start planning-mode routing (PAN-2407)', () => {
       created: new Date(),
       location: 'remote',
     });
+
+    const originalCwd = process.cwd();
+    process.chdir(tmpDir);
+
+    const { issueCommand } = await import('../start.js');
+    await issueCommand('PAN-X', { model: 'claude-sonnet-4-6', plan: 'auto' } as any);
+
+    process.chdir(originalCwd);
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body).toMatchObject({ auto: true, autoStart: true, workspaceLocation: 'remote' });
+  });
+
+  it('POSTs start-planning with workspaceLocation: remote when overflow_to_remote triggers for a fresh issue', async () => {
+    mockFetchStream();
+    loadConfigSyncMock.mockReturnValue({ remote: { enabled: true, overflow_to_remote: true } });
+    concurrencyMocks.getConcurrencyLimits.mockReturnValue({ maxWorkAgents: 3 });
+    concurrencyMocks.countRunningAgents.mockReturnValue({ work: 3 });
 
     const originalCwd = process.cwd();
     process.chdir(tmpDir);
