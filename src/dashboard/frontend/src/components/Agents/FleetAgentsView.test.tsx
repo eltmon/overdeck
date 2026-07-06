@@ -167,6 +167,33 @@ describe('FleetAgentsView', () => {
     expect(within(screen.getByText('Stuck').closest('[data-component="metric-tile"]') as HTMLElement).getByText('2')).toBeInTheDocument();
   });
 
+  it('renders a local strike with no live tmux session as unreachable instead of running', () => {
+    useDashboardStore.setState({
+      agentsById: {
+        'strike-pan-1996': agent({
+          id: 'strike-pan-1996',
+          issueId: 'PAN-1996',
+          status: 'unknown',
+          role: 'strike',
+          startedAt: '2026-05-01T00:00:00.000Z',
+          hasLiveTmuxSession: false,
+          lastFailureReason: 'No live tmux session found for registered agent',
+        }),
+      },
+      agentOutputById: {
+        'strike-pan-1996': [],
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderFleetView();
+
+    expect(screen.getByText('UNREACHABLE')).toBeInTheDocument();
+    expect(screen.queryByText('STRIKE RUNNING')).not.toBeInTheDocument();
+    expect(screen.getByText('No live tmux session found for registered agent')).toBeInTheDocument();
+    expect(within(screen.getByText('Running').closest('[data-component="metric-tile"]') as HTMLElement).getByText('0')).toBeInTheDocument();
+    expect(within(screen.getByText('Stuck').closest('[data-component="metric-tile"]') as HTMLElement).getByText('1')).toBeInTheDocument();
+  });
+
   it('opens an agent-scoped action menu from the fleet card overflow trigger', () => {
     renderFleetView();
 

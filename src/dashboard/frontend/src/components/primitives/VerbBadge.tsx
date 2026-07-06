@@ -13,6 +13,7 @@ export type VerbBadgeVariant =
   | 'MERGE BLOCKED'
   | 'CI BLOCKED'
   | 'STUCK · Nh'
+  | 'UNREACHABLE'
   | 'QUEUED FOR PLAN'
   | 'READY'
   | 'STOPPED';
@@ -82,6 +83,11 @@ const STATIC_VARIANTS = {
   'CI BLOCKED': {
     label: 'CI BLOCKED',
     className: 'badge-bg-warning badge-border-warning text-warning-foreground',
+    pulse: false,
+  },
+  UNREACHABLE: {
+    label: 'UNREACHABLE',
+    className: 'badge-bg-destructive badge-border-destructive text-destructive-foreground',
     pulse: false,
   },
   'QUEUED FOR PLAN': {
