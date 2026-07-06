@@ -17,7 +17,7 @@ interface FeedLine {
 }
 
 function compactModelName(model: string | undefined): string {
-  if (!model) return 'an agent'
+  if (!model || model === 'unknown') return 'a crew member'
   return model.replace(/^claude-/, '').replace(/-202\d{5,8}$/, '')
 }
 
@@ -56,6 +56,9 @@ export function HappenedFeed({ issueId }: { issueId: string }) {
 
   const lines: FeedLine[] = []
   for (const section of activity.data?.sections ?? []) {
+    // Pre-migration records surface as type 'legacy' with model 'unknown' —
+    // "unknown started legacy" is noise, not news. Skip them.
+    if (section.type === 'legacy') continue
     const verbs = ROLE_VERB[section.type] ?? { doing: `started ${section.type}`, done: `finished ${section.type}` }
     const who = compactModelName(section.model)
     const startMs = new Date(section.startedAt).getTime()
