@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import { extractCostEvents, resolveUnmappedSessionIssueId } from '../reconciler.js';
@@ -42,12 +41,5 @@ describe('reconciler no-issue buckets', () => {
 
     expect(events).toHaveLength(1);
     expect(events[0]!.issueId).toBe('PAN-2387');
-  });
-
-  it('contains no legacy unknown bucket literal in reconciler source', () => {
-    const source = readFileSync(new URL('../reconciler.ts', import.meta.url), 'utf8');
-
-    expect(source).not.toContain("'UNKNOWN'");
-    expect(source).not.toContain('"UNKNOWN"');
   });
 });

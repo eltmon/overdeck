@@ -1003,43 +1003,7 @@ export function getConversationByClaudeSessionId(claudeSessionId: string): Legac
     .get(claudeSessionId) as LegacyConversationRow | undefined;
   return row ? rowToLegacyConversation(row) : null;
 }
-
-export function findConversationForCostSessionSync(input: {
-  sessionId?: string | null;
-  agentId?: string | null;
-}): { name: string } | null {
-  const db = overdeckDb();
-
-  if (input.sessionId) {
-    const row = db
-      .prepare(
-        `SELECT c.name
-         FROM conversation_files cf
-         JOIN conversations c ON c.id = cf.conversation_id
-         WHERE cf.locator = ?
-         ORDER BY cf.created_at DESC, cf.id DESC
-         LIMIT 1`,
-      )
-      .get(input.sessionId) as { name: string } | undefined;
-    if (row) return { name: row.name };
-  }
-
-  if (input.agentId?.startsWith('conv-')) {
-    const row = db
-      .prepare(
-        `SELECT c.name
-         FROM conversations c
-         WHERE c.tmux_session = ?
-         ORDER BY c.created_at DESC
-         LIMIT 1`,
-      )
-      .get(input.agentId) as { name: string } | undefined;
-    if (row) return { name: row.name };
-  }
-
-  return null;
-}
-
+export { findConversationForCostSessionSync } from './conversation-cost-session.js';
 export function getConversationByTmuxSession(tmuxSession: string): LegacyConversation | null {
   const name = tmuxSession.startsWith('conv-') ? tmuxSession.slice(5) : tmuxSession;
   const row = overdeckDb()

@@ -1,4 +1,4 @@
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { Context, Effect, Layer, Schema } from 'effect';
@@ -31,6 +31,15 @@ function walkJsonl(dir: string): string[] {
     else if (entry.name.endsWith('.jsonl')) result.push(full);
   }
   return result;
+}
+
+function readAgentRoleSync(agentDir: string): string {
+  try {
+    const raw = JSON.parse(readFileSync(join(agentDir, 'state.json'), 'utf8')) as { role?: unknown };
+    return typeof raw.role === 'string' && raw.role.trim() ? raw.role : 'work';
+  } catch {
+    return 'work';
+  }
 }
 
 // ── Local Drizzle table definition ───────────────────────────────────────────
@@ -530,6 +539,48 @@ export const CostWriterLive = Layer.effect(
         return true;
       });
 
+    const recordCodexCumulative = (event: CostEvent) =>
+      Effect.gen(function* () {
+        if (!event.sourceFile) return yield* record(event);
+        const existing = yield* Effect.promise(async () => {
+          const rows = await q
+            .select({
+              id:        costEventsTable.id,
+              input:     costEventsTable.input,
+              output:    costEventsTable.output,
+              cacheRead: costEventsTable.cacheRead,
+            })
+            .from(costEventsTable)
+            .where(eq(costEventsTable.sourceFile, event.sourceFile as string))
+            .limit(1);
+          return rows as Array<{ id: number; input: number | null; output: number | null; cacheRead: number | null }>;
+        });
+
+        const row = existing[0];
+        if (!row) return yield* record(event);
+
+        const previousTokens = (row.input ?? 0) + (row.output ?? 0) + (row.cacheRead ?? 0);
+        const nextTokens = event.input + event.output + event.cacheRead;
+        if (nextTokens <= previousTokens) return false;
+
+        yield* Effect.promise(() =>
+          q
+            .update(costEventsTable)
+            .set({
+              ts:          event.ts,
+              input:       event.input,
+              output:      event.output,
+              cacheRead:   event.cacheRead,
+              cost:        event.cost,
+              model:       event.model,
+              sessionType: event.sessionType,
+            })
+            .where(eq(costEventsTable.sourceFile, event.sourceFile as string)),
+        );
+        yield* bus.emit({ type: 'cost.recorded', payload: { issueId: event.issueId, cost: event.cost } });
+        return true;
+      });
+
     // Catch-up sweep for pi/codex session files.
     // Walks OVERDECK_HOME/agents/<id>/sessions/**/*.jsonl (pi) or
     // OVERDECK_HOME/agents/<id>/codex-home/sessions/**/*.jsonl (codex),
@@ -554,6 +605,7 @@ export const CostWriterLive = Layer.effect(
             source === 'ohmypi'
               ? join(agentsDir, agentName, 'sessions')
               : join(agentsDir, agentName, 'codex-home', 'sessions');
+          const agentDir = join(agentsDir, agentName);
 
           const sessionFiles = yield* Effect.sync(() => walkJsonl(sessionRoot));
 
@@ -594,7 +646,7 @@ export const CostWriterLive = Layer.effect(
               issueId:     issueIdFromAgentName(agentName),
               agentId:     agentName,
               sessionId:   session.sessionId,
-              sessionType: source,
+              sessionType: readAgentRoleSync(agentDir),
               provider:    null,
               model:       session.model ?? null,
               input:       session.usage.inputTokens,
@@ -606,10 +658,7 @@ export const CostWriterLive = Layer.effect(
               sourceFile:  sessionFile,
             };
 
-            const wasDuplicate = yield* checkDuplicate(event);
-            if (!wasDuplicate) {
-              if (yield* record(event)) imported++;
-            }
+            if (yield* recordCodexCumulative(event)) imported++;
           }
         }
 

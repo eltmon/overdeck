@@ -270,7 +270,7 @@ describe('CostWriter.reconcile — codex source', () => {
     expect(insertedValues).toHaveLength(1);
     const row = insertedValues[0] as Record<string, unknown>;
     expect(row.agentId).toBe('agent-2');
-    expect(row.sessionType).toBe('codex');
+    expect(row.sessionType).toBe('work');
     expect(row.model).toBe('gpt-4o');
     expect(row.sourceFile).toBe(rolloutFile);
   });

@@ -1,4 +1,6 @@
 import { reconcilePiTranscripts } from '../../../lib/costs/reconciler.js';
+import { Effect } from 'effect';
+import { CostDoorLive, CostWriter } from '../../../lib/overdeck/cost.js';
 
 const RECONCILE_INTERVAL_MS = 5 * 60_000;
 
@@ -19,6 +21,18 @@ async function runCostReconcileOnce(reason: 'startup' | 'interval'): Promise<voi
       for (const err of result.errors.slice(0, 5)) {
         console.warn(`[cost-reconciler] ${err.path}: ${err.error}`);
       }
+    }
+    try {
+      const codexResult = await Effect.runPromise(
+        CostWriter.use((writer) => writer.reconcile({ source: 'codex' })).pipe(
+          Effect.provide(CostDoorLive),
+        ),
+      );
+      if (codexResult.imported > 0) {
+        console.log(`[cost-reconciler] ${reason} codex sweep: ${codexResult.imported} imported`);
+      }
+    } catch (err) {
+      console.warn('[cost-reconciler] codex sweep failed:', err instanceof Error ? err.message : err);
     }
   })().finally(() => {
     inFlight = null;
