@@ -6,7 +6,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  :root{--bg:#0e1116;--panel:#161b22;--panel2:#1c2230;--line:#2a3140;--text:#e6e9ef;--dim:#8b94a7;--faint:#5c6577;
+  :root{color-scheme:dark;--bg:#0e1116;--panel:#161b22;--panel2:#1c2230;--line:#2a3140;--text:#e6e9ef;--dim:#8b94a7;--faint:#5c6577;
     --teal:#2dd4bf;--amber:#f5b04c;--red:#ef6a6a;--blue:#6ea8fe;--violet:#b18cff;--green:#4ade80;}
   *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 "DM Sans",sans-serif;padding:26px;}
   h1{font:600 19px "Space Grotesk";margin:0 0 4px}.sub{color:var(--dim);font-size:13px;margin-bottom:18px}
@@ -68,9 +68,47 @@
   .tab2{padding:6px 13px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--dim);cursor:pointer;font-size:12.5px}
   .tab2.on{color:var(--text);border-color:var(--teal)}
   .note{color:var(--faint);font-size:11.5px;margin-top:8px}
+
+  body.light{--bg:#f7f8fa;--panel:#ffffff;--panel2:#eef1f5;--line:#dde3ec;--text:#1c2330;--dim:#5b6575;--faint:#8b94a7;
+    --teal:#0d9488;--amber:#b45309;--red:#dc2626;--blue:#2563eb;--violet:#7c3aed;--green:#15803d;color-scheme:light}
+  .themebtn{position:fixed;top:18px;right:22px;z-index:9;padding:6px 12px;border:1px solid var(--line);border-radius:8px;
+    background:var(--panel);color:var(--dim);cursor:pointer;font:500 12px "DM Sans"}
+  /* perspective drawer */
+  .drawer{position:fixed;top:0;right:-460px;width:440px;height:100vh;background:var(--panel);border-left:1px solid var(--line);
+    padding:20px;transition:right .25s ease;z-index:8;overflow-y:auto}
+  .drawer.open{right:0}
+  .drawer h3{font:600 15px "Space Grotesk";margin:0 0 2px}
+  .drawer .who2{color:var(--dim);font-size:12px;margin-bottom:14px}
+  .persp{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;font-family:"DM Mono";font-size:11.5px;
+    color:var(--dim);white-space:pre-wrap;margin-bottom:12px;max-height:200px;overflow:hidden}
+  .persp .in{color:var(--teal)} .persp .out{color:var(--text)}
+  .plabel{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em;margin:10px 0 6px}
+  .openconv{display:inline-block;margin-top:8px;padding:7px 14px;border-radius:8px;background:var(--blue);color:#fff;font-size:12.5px;text-decoration:none}
+  .avatar{cursor:pointer}
+  /* DAG */
+  .dagwrap{overflow-x:auto}
+  .daglegend{display:flex;gap:16px;color:var(--dim);font-size:12px;margin-top:8px}
+  .dg{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
 </style>
 </head>
 <body>
+<button class="themebtn" onclick="document.body.classList.toggle('light');this.textContent=document.body.classList.contains('light')?'🌙 dark':'☀ light'">☀ light</button>
+
+<div class="drawer" id="drawer">
+  <h3 id="dTitle">standard · GPT-5.5</h3>
+  <div class="who2" id="dSub">working on: api-write-door · $2.10 so far</div>
+  <div class="plabel">What it's seeing (live commit stream + its task)</div>
+  <div class="persp"><span class="in">◀ commit a3a3a6c received — "record-backed override + resolver precedence" (Opus, design-override-home)
+◀ commit a28ed6a received — "server-compute tieredExecution block" (Haiku, fe-effective-chip)
+◀ task brief: api-write-door — PATCH write door persists the override to the record…</span></div>
+  <div class="plabel">What it's writing (last output)</div>
+  <div class="persp"><span class="out">Editing src/dashboard/server/routes/issues.ts
++ router.patch('/api/issues/:id/tiered-execution', …)
+Running: npx tsc --noEmit … ✓
+Committing: feat(api): PATCH write door persists tiered override</span></div>
+  <a class="openconv" href="#">Open full conversation →</a>
+  <div class="note">Every crew member has this drill — the click target is the avatar or any tree row.</div>
+</div>
 <h1>PAN-2383 — Let each issue turn its Standing Crew on or off from the page</h1>
 <div class="sub">panopticon-cli · started 2:09 PM · <span class="mono">feature/pan-2383</span></div>
 
@@ -109,25 +147,25 @@
 <div class="crewwrap">
   <div class="card stagebox">
     <div class="member" style="left:30px;top:26px">
-      <div class="avatar listening">H</div>
+      <div class="avatar listening" onclick="openDrawer('cheap · Haiku','listening · $1.79 · 3 tasks done')">H</div>
       <div class="nm">cheap · Haiku</div>
       <div class="st l">listening</div>
       <div class="c">$1.79 · 3 tasks</div>
     </div>
     <div class="member" style="left:190px;top:26px">
-      <div class="avatar working">G5</div>
+      <div class="avatar working" onclick="openDrawer('standard · GPT-5.5','working on: api-write-door · $2.10 so far')">G5</div>
       <div class="nm">standard · GPT-5.5</div>
       <div class="st w">working: api-write-door</div>
       <div class="c">$2.10 · 4 tasks</div>
     </div>
     <div class="member" style="left:350px;top:26px">
-      <div class="avatar idle">O</div>
+      <div class="avatar idle" onclick="openDrawer('frontier · Opus','done for now · $9.64 · 1 task')">O</div>
       <div class="nm">frontier · Opus</div>
       <div class="st i">done for now</div>
       <div class="c">$9.64 · 1 task</div>
     </div>
     <div class="sup">
-      <div class="avatar reviewing">S5</div>
+      <div class="avatar reviewing" onclick="openDrawer('supervisor · Sonnet 5','reviewing commit · 7 passed, 1 blocked')">S5</div>
       <div class="nm">supervisor · Sonnet 5</div>
       <div class="st r">reviewing commit</div>
       <div class="c">$2.88 · 8 reviews</div>
@@ -142,7 +180,7 @@
   <div class="card sidefeed">
     <div style="font:600 13px 'Space Grotesk';margin-bottom:6px">What just happened</div>
     <div class="item"><span class="t">2:41p</span><span><span class="verdict">✓ approved</span> — supervisor passed “server-computed chip”</span></div>
-    <div class="item"><span class="t">2:39p</span><span>GPT-5.5 finished <b>plan read door</b> and started <b>write door</b></span></div>
+    <div class="item"><span class="t">2:39p</span><span>GPT-5.5 finished task <b>api-read-door</b> ✓ and started <b>api-write-door</b> <span class="badge">4 of 7</span></span></div>
     <div class="item"><span class="t">2:34p</span><span><span class="verdict blk">✕ blocked</span> — supervisor caught a re-render bug; task retried and passed</span></div>
     <div class="item"><span class="t">2:28p</span><span>Haiku finished the docs task ($0.11)</span></div>
     <div class="item"><span class="t">2:15p</span><span>Crew came aboard: Haiku, GPT-5.5, Opus + Sonnet 5 supervising</span></div>
@@ -165,6 +203,64 @@
   <div class="note">Every row is clickable → that member's live conversation, where you can watch it receive the commit stream.</div>
 </div>
 
-<script>function sw(i){document.getElementById('v0').style.display=i===0?'':'none';document.getElementById('v1').style.display=i===1?'':'none';document.querySelectorAll('.tab2').forEach((t,j)=>t.classList.toggle('on',j===i));}</script>
+
+<!-- ═══ 4. THE PLAN MAP — DAG, non-technical ═══ -->
+<div class="card dagwrap" id="dagcard">
+  <div style="font:600 14px 'Space Grotesk';margin-bottom:2px">The plan, as a map</div>
+  <div class="note" style="margin:0 0 10px">Each box is one task. Arrows mean “this must finish first.” Proper arrows, proper zoom — always.</div>
+  <svg viewBox="0 0 980 250" width="100%" height="250" style="min-width:820px">
+    <defs>
+      <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="var(--faint)"/>
+      </marker>
+    </defs>
+    <g stroke="var(--faint)" stroke-width="1.6" fill="none" opacity="0.8">
+      <path d="M 190 60 C 240 60 240 60 285 60" marker-end="url(#arr)"/>
+      <path d="M 190 75 C 250 100 250 130 285 138" marker-end="url(#arr)"/>
+      <path d="M 445 60 C 490 60 490 60 530 60" marker-end="url(#arr)"/>
+      <path d="M 445 145 C 490 145 490 145 530 145" marker-end="url(#arr)"/>
+      <path d="M 690 60 C 735 60 735 95 775 108" marker-end="url(#arr)"/>
+      <path d="M 690 145 C 735 145 735 122 775 116" marker-end="url(#arr)"/>
+      <path d="M 190 195 C 400 230 620 220 775 130" marker-end="url(#arr)"/>
+    </g>
+    <g font-family="DM Sans" font-size="12.5">
+      <!-- done -->
+      <g><rect x="30" y="38" width="160" height="44" rx="10" fill="var(--teal)" opacity="0.16" stroke="var(--teal)"/>
+        <text x="110" y="57" text-anchor="middle" fill="var(--text)">design the storage ✓</text>
+        <text x="110" y="73" text-anchor="middle" fill="var(--dim)" font-size="10.5">Opus · done</text></g>
+      <g><rect x="30" y="173" width="160" height="44" rx="10" fill="var(--teal)" opacity="0.16" stroke="var(--teal)"/>
+        <text x="110" y="192" text-anchor="middle" fill="var(--text)">write the docs ✓</text>
+        <text x="110" y="208" text-anchor="middle" fill="var(--dim)" font-size="10.5">Haiku · done</text></g>
+      <g><rect x="285" y="38" width="160" height="44" rx="10" fill="var(--teal)" opacity="0.16" stroke="var(--teal)"/>
+        <text x="365" y="57" text-anchor="middle" fill="var(--text)">wire the dispatch ✓</text>
+        <text x="365" y="73" text-anchor="middle" fill="var(--dim)" font-size="10.5">GPT-5.5 · done</text></g>
+      <g><rect x="285" y="123" width="160" height="44" rx="10" fill="var(--teal)" opacity="0.16" stroke="var(--teal)"/>
+        <text x="365" y="142" text-anchor="middle" fill="var(--text)">read door ✓</text>
+        <text x="365" y="158" text-anchor="middle" fill="var(--dim)" font-size="10.5">GPT-5.5 · done</text></g>
+      <!-- doing -->
+      <g><rect x="530" y="123" width="160" height="44" rx="10" fill="var(--blue)" opacity="0.18" stroke="var(--blue)" stroke-width="2">
+          <animate attributeName="opacity" values="0.18;0.32;0.18" dur="2s" repeatCount="indefinite"/></rect>
+        <text x="610" y="142" text-anchor="middle" fill="var(--text)">write door ● now</text>
+        <text x="610" y="158" text-anchor="middle" fill="var(--dim)" font-size="10.5">GPT-5.5 · in progress</text></g>
+      <g><rect x="530" y="38" width="160" height="44" rx="10" fill="var(--teal)" opacity="0.16" stroke="var(--teal)"/>
+        <text x="610" y="57" text-anchor="middle" fill="var(--text)">show the chip ✓</text>
+        <text x="610" y="73" text-anchor="middle" fill="var(--dim)" font-size="10.5">Haiku · done</text></g>
+      <!-- waiting -->
+      <g><rect x="775" y="86" width="170" height="44" rx="10" fill="var(--panel2)" stroke="var(--line)" stroke-dasharray="4 3"/>
+        <text x="860" y="105" text-anchor="middle" fill="var(--dim)">editable toggle</text>
+        <text x="860" y="121" text-anchor="middle" fill="var(--faint)" font-size="10.5">waiting on write door</text></g>
+    </g>
+  </svg>
+  <div class="daglegend">
+    <span><i class="dg" style="background:var(--teal)"></i>done</span>
+    <span><i class="dg" style="background:var(--blue)"></i>happening now (pulses)</span>
+    <span><i class="dg" style="background:var(--panel2);border:1px dashed var(--faint)"></i>waiting its turn</span>
+  </div>
+</div>
+
+<script>
+function openDrawer(title, sub){document.getElementById('dTitle').textContent=title;document.getElementById('dSub').textContent=sub;document.getElementById('drawer').classList.add('open');}
+document.addEventListener('click',(e)=>{const d=document.getElementById('drawer');if(d.classList.contains('open')&&!d.contains(e.target)&&!e.target.classList.contains('avatar'))d.classList.remove('open');});
+function sw(i){document.getElementById('v0').style.display=i===0?'':'none';document.getElementById('v1').style.display=i===1?'':'none';document.querySelectorAll('.tab2').forEach((t,j)=>t.classList.toggle('on',j===i));}</script>
 </body>
 </html>
