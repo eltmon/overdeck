@@ -12772,6 +12772,14 @@ const DEFAULT_PRICING = [
 	},
 	{
 		provider: "openai",
+		model: "gpt-4.1-nano",
+		inputPer1k: 1e-4,
+		outputPer1k: 4e-4,
+		cacheReadPer1k: 25e-6,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
 		model: "gpt-5.3-codex",
 		inputPer1k: .00175,
 		outputPer1k: .014,
