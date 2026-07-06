@@ -134,6 +134,42 @@ describe('FlywheelStatusDetails', () => {
     expect(within(suggestions!).getByText('System-wide starter suggestion')).toBeInTheDocument();
   });
 
+  it('renders weight badge and reason only when weight is present', () => {
+    render(<FlywheelStatusDetails status={{
+      ...status,
+      suggestions: [
+        { priority: 'high', action: 'start', issueId: 'PAN-55', rationale: 'Weighted suggestion', weight: 4.8, weightReason: 'criterion 1 red' },
+        { priority: 'high', action: 'wait', issueId: 'PAN-56', rationale: 'Unweighted suggestion' },
+      ],
+    }} />);
+
+    const rows = screen.getAllByTestId('flywheel-suggestion');
+    expect(rows).toHaveLength(2);
+    expect(within(rows[0]).getByText('4.80')).toBeInTheDocument();
+    expect(within(rows[0]).getByText('criterion 1 red')).toBeInTheDocument();
+    expect(within(rows[1]).queryByText('4.80')).not.toBeInTheDocument();
+    expect(within(rows[1]).queryByText('criterion 1 red')).not.toBeInTheDocument();
+  });
+
+  it('sorts equal-priority suggestions by weight descending without crossing priority tiers', () => {
+    render(<FlywheelStatusDetails status={{
+      ...status,
+      suggestions: [
+        { priority: 'medium', action: 'review', issueId: 'PAN-30', rationale: 'Medium weight 1', weight: 1.0 },
+        { priority: 'low', action: 'wait', issueId: 'PAN-40', rationale: 'Low weight 5', weight: 5.0 },
+        { priority: 'medium', action: 'start', issueId: 'PAN-31', rationale: 'Medium weight 3', weight: 3.0 },
+        { priority: 'high', action: 'start', issueId: 'PAN-20', rationale: 'High weight 0.5', weight: 0.5 },
+      ],
+    }} />);
+
+    const rows = screen.getAllByTestId('flywheel-suggestion');
+    expect(rows).toHaveLength(4);
+    expect(within(rows[0]).getByText('PAN-20')).toBeInTheDocument();
+    expect(within(rows[1]).getByText('PAN-31')).toBeInTheDocument();
+    expect(within(rows[2]).getByText('PAN-30')).toBeInTheDocument();
+    expect(within(rows[3]).getByText('PAN-40')).toBeInTheDocument();
+  });
+
   it('renders the suggestions empty state', () => {
     render(<FlywheelStatusDetails status={{ ...status, suggestions: [] }} />);
 

@@ -100,12 +100,24 @@ function SuggestionPriorityBadge({ priority }: { priority: FlywheelSuggestion['p
   );
 }
 
+function SuggestionWeightBadge({ weight }: { weight: number }) {
+  return (
+    <span className={cn('inline-flex rounded-full border bg-info/15 px-2 py-0.5 text-[11px] font-mono font-semibold uppercase tracking-wide text-info-foreground border-info/30')}>
+      {weight.toFixed(2)}
+    </span>
+  );
+}
+
 function sortSuggestions(suggestions: ReadonlyArray<FlywheelSuggestion>): FlywheelSuggestion[] {
   return suggestions
     .map((suggestion, index) => ({ suggestion, index }))
     .sort((left, right) => {
       const priorityDiff = SUGGESTION_PRIORITY_ORDER[left.suggestion.priority] - SUGGESTION_PRIORITY_ORDER[right.suggestion.priority];
-      return priorityDiff === 0 ? left.index - right.index : priorityDiff;
+      if (priorityDiff !== 0) return priorityDiff;
+      const leftWeight = left.suggestion.weight ?? Number.NEGATIVE_INFINITY;
+      const rightWeight = right.suggestion.weight ?? Number.NEGATIVE_INFINITY;
+      if (rightWeight !== leftWeight) return rightWeight - leftWeight;
+      return left.index - right.index;
     })
     .map(({ suggestion }) => suggestion);
 }
@@ -137,6 +149,7 @@ export function FlywheelStatusDetails({ status, onNavigateAgent, onNavigateIssue
                 <div key={`${suggestion.priority}-${suggestion.action}-${issueId ?? 'system'}-${index}`} data-testid="flywheel-suggestion" className="rounded-md border border-border bg-background p-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <SuggestionPriorityBadge priority={suggestion.priority} />
+                    {suggestion.weight != null && <SuggestionWeightBadge weight={suggestion.weight} />}
                     <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                       {suggestion.action}
                     </span>
@@ -147,6 +160,9 @@ export function FlywheelStatusDetails({ status, onNavigateAgent, onNavigateIssue
                     )}
                   </div>
                   <p className="mt-2 text-sm text-foreground">{suggestion.rationale}</p>
+                  {suggestion.weightReason && (
+                    <p className="mt-1 text-xs text-muted-foreground">{suggestion.weightReason}</p>
+                  )}
                 </div>
               );
             })}
