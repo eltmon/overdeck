@@ -207,6 +207,15 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-58 tick 24 (2026-07-06) — PAN-2389 MERGED (7ed8c4d74b); A3 re-CI'ing; pair PROGRESSING (2388=5, 2387=0). Order book 3/19.
+
+**Order book: 3/19 landed (B0 + A2 + PAN-2389).** MAIN GREEN.
+- **PAN-2389 (trio spend-report) MERGED** `7ed8c4d74b PAN-2389 (#2431)` — closing out (bg). Main CI in_progress on it.
+- **A3/PAN-2336 (#2427) re-CI'ing** — build/lint/smoke/reviews PASS, only **test job pending** (re-running on new base). Its schedule was consumed while UNSTABLE; **re-schedule returned `review status is not readyForMerge`** (it's not marked ready while test re-runs). Will re-reach readyForMerge when test passes → schedule then. (auto-merge/schedule REQUIRES review status = readyForMerge; can't pre-schedule an UNSTABLE PR.)
+- **PAIR PROGRESSING (ceiling relief working):** PAN-2388 = **5 open** (was 6), PAN-2387 = **0 open** (review feedback ADDRESSED, done again → will re-reach review→ready). Report each tick.
+- **PAN-2388 still surfaced/operator-gated:** slot-3 merge fails + swarm budget held by operator-owned PAN-2383. Bead progressed 6→5 (a slot advanced) but the ready-slot convergence + next-bead dispatch still need an operator lever (assemble / free 2383 budget / infer_completion:auto).
+- **REUSABLE: after main moves, a ready PR's review status flips OFF readyForMerge while its `test` re-runs on the new base → you CANNOT re-POST auto-merge/schedule (400 'not readyForMerge') until test re-passes. Wait for it to re-reach ready, then schedule.**
+
 ## RUN-58 tick 23 (2026-07-06) — MAIN GREEN; drain in progress (2389/A3 UNSTABLE, re-CI'ing); PAN-2388 swarm doubly-stuck (operator lever needed); 2387 back to 3 beads (review feedback)
 
 **Order book: 2/19 landed; MAIN GREEN (053537b024 CI success).** Red main #2 fully resolved.

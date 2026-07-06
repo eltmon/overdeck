@@ -181,11 +181,10 @@
     "issueId": "PAN-2389",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
     "inspectStatus": "failed",
-    "mergeStatus": "merging",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T22:39:19.459Z",
+    "updatedAt": "2026-07-06T23:00:16.269Z",
     "inspectNotes": "Bead door-scan-roots BLOCKED: commit dd09d685 (.github/workflows/pages.yml only) does not implement any acceptance criteria. No changes touch the codex reconcile scan-roots logic, session_meta cwd→issueId inference, sourceFile dedup, or default per-agent walk. Required: land the actual scan-roots implementation (extra roots param including ~/.codex/sessions, cost event emission with model/token counts/sourceFile, issue-from-path inference with UNKNOWN fallback, dedup-on-sourceFile, and unchanged default-walk behavior) with matching tests, or repoint this bead at the correct commit.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2431",
     "lastVerifiedCommit": "de2db5d5c8dadc8653e8f9efbfbb8e2a7e8a6bbb",
@@ -310,7 +309,9 @@
         "tests/unit/lib/overdeck/cost.test.ts"
       ],
       "recordedAt": "2026-07-06T21:01:10.915Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-06T23:00:16.269Z"
   },
   "closeOut": {
     "usage": {
@@ -410,5 +411,5 @@
     "slotAssignments": []
   },
   "created": "2026-07-06T20:57:58.338Z",
-  "updated": "2026-07-06T22:39:19.522Z"
+  "updated": "2026-07-06T23:00:16.269Z"
 }
