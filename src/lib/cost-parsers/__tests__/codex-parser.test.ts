@@ -297,4 +297,15 @@ describe('parseCodexSessionCostEventsSync (PAN-2388)', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('keeps real nested fixture content fields redacted', () => {
+    for (const file of ['rollout-nested-single-turn.jsonl', 'rollout-nested-multi-turn.jsonl']) {
+      const raw = readFileSync(join(FIXTURE_DIR, file), 'utf-8');
+
+      expect(raw).toContain('[redacted instructions]');
+      expect(raw).toContain('[redacted content]');
+      expect(raw).not.toContain('developer_instructions":"#');
+      expect(raw).not.toContain('encrypted_content":"gAAAA');
+    }
+  });
 });
