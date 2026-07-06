@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Effect, Layer } from 'effect';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { Db, EventBus, CostArchive } from '../infra.js';
 import { CostWriter, CostWriterLive } from '../cost.js';
@@ -26,6 +26,39 @@ function writeCodexRollout(root: string, cwd: string, name = 'rollout-test.jsonl
   return file;
 }
 
+function writePiSession(file: string, sessionId: string, messageId: string, model = 'kimi-k2', provider: string | null = 'custom'): string {
+  mkdirSync(dirname(file), { recursive: true });
+  const rows = [
+    { type: 'session', version: 3, id: sessionId, timestamp: '2026-06-18T12:00:00Z' },
+    {
+      type: 'message',
+      id: messageId,
+      parentId: null,
+      timestamp: '2026-06-18T12:00:02Z',
+      message: {
+        role: 'assistant',
+        ...(provider == null ? {} : { provider }),
+        model,
+        usage: {
+          input: 900,
+          output: 70,
+          cacheRead: 120,
+          cacheWrite: 15,
+          cost: {
+            input: 0.001,
+            output: 0.002,
+            cacheRead: 0.0001,
+            cacheWrite: 0.0002,
+            total: 0.0033,
+          },
+        },
+      },
+    },
+  ];
+  writeFileSync(file, rows.map((row) => JSON.stringify(row)).join('\n') + '\n');
+  return file;
+}
+
 function makeTestLayer() {
   type Row = { id: number; sourceFile: string | null; requestId?: string | null; [k: string]: unknown };
   const rows: Row[] = [];
@@ -33,16 +66,14 @@ function makeTestLayer() {
   const insertedValues: unknown[] = [];
 
   const filterRows = (cond: unknown): Row[] => {
-    const chunks = (cond as { queryChunks?: Array<{ name?: string; value?: unknown }> })?.queryChunks;
+    const chunks = (cond as { queryChunks?: Array<{ name?: string; value?: unknown; constructor?: { name?: string } }> })?.queryChunks;
     const column = chunks?.find((chunk) => typeof chunk?.name === 'string')?.name;
-    const value = chunks?.find((chunk) => Object.prototype.hasOwnProperty.call(chunk ?? {}, 'value'))?.value;
+    const value = chunks?.find((chunk) => chunk?.constructor?.name === 'Param')?.value;
     if (column === 'request_id') {
-      const matches = rows.filter((row) => row.requestId === value);
-      return matches.length > 0 ? matches : rows;
+      return rows.filter((row) => row.requestId === value);
     }
     if (column === 'source_file') {
-      const matches = rows.filter((row) => row.sourceFile === value);
-      return matches.length > 0 ? matches : rows;
+      return rows.filter((row) => row.sourceFile === value);
     }
     return rows;
   };
@@ -183,6 +214,105 @@ describe('CostWriter.reconcile — codex extra roots', () => {
       });
     } finally {
       rmSync(codexHome, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('CostWriter.reconcile — pi extra roots', () => {
+  let overdeckHome: string;
+
+  beforeEach(() => {
+    overdeckHome = makeDir('pan-cost-roots-home-');
+    process.env.OVERDECK_HOME = overdeckHome;
+  });
+
+  afterEach(() => {
+    rmSync(overdeckHome, { recursive: true, force: true });
+    if (originalOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = originalOverdeckHome;
+  });
+
+  it('imports global pi and legacy pi roots with issue attribution exactly once', async () => {
+    const piHome = makeDir('pan-cost-pi-');
+    const globalRoot = join(piHome, '.pi', 'agent', 'sessions');
+    const legacyRoot = join(piHome, '.panopticon', 'agents');
+    const globalSession = writePiSession(
+      join(globalRoot, '--home-eltmon-Projects-overdeck-workspaces-feature-pan-1788--', 'global.jsonl'),
+      'pi-global-session',
+      'global-message',
+    );
+    const legacySession = writePiSession(
+      join(legacyRoot, 'agent-pan-913', 'sessions', 'legacy.jsonl'),
+      'pi-legacy-session',
+      'legacy-message',
+      'claude-3-5-sonnet',
+      null,
+    );
+    const { layer, insertedValues } = makeTestLayer();
+
+    try {
+      const opts = {
+        source: 'ohmypi' as const,
+        extraRootSpecs: [
+          { kind: 'ohmypi-global' as const, root: globalRoot },
+          { kind: 'ohmypi-legacy-agents' as const, root: legacyRoot },
+        ],
+      };
+      const first = await Effect.runPromise(
+        CostWriter.use((writer) => writer.reconcile(opts)).pipe(Effect.provide(layer)),
+      );
+      const second = await Effect.runPromise(
+        CostWriter.use((writer) => writer.reconcile(opts)).pipe(Effect.provide(layer)),
+      );
+
+      expect(first).toMatchObject({
+        imported: 2,
+        sessionsScanned: 2,
+        eventsImported: 2,
+        duplicatesSkipped: 0,
+        errors: [],
+        earliestEventTs: '2026-06-18T12:00:02.000Z',
+        latestEventTs: '2026-06-18T12:00:02.000Z',
+      });
+      expect(second).toMatchObject({
+        imported: 0,
+        sessionsScanned: 2,
+        eventsImported: 0,
+        duplicatesSkipped: 2,
+      });
+      expect(insertedValues).toHaveLength(2);
+      expect(insertedValues).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          issueId: 'PAN-1788',
+          agentId: 'pi-global',
+          sessionType: 'ohmypi',
+          provider: 'custom',
+          model: 'kimi-k2',
+          input: 900,
+          output: 70,
+          cacheRead: 120,
+          cacheWrite: 15,
+          cost: 0.0033,
+          requestId: 'ohmypi:pi-global-session:global-message',
+          sourceFile: globalSession,
+        }),
+        expect.objectContaining({
+          issueId: 'PAN-913',
+          agentId: 'agent-pan-913',
+          sessionType: 'ohmypi',
+          provider: 'anthropic',
+          model: 'claude-3-5-sonnet',
+          input: 900,
+          output: 70,
+          cacheRead: 120,
+          cacheWrite: 15,
+          cost: 0.0033,
+          requestId: 'ohmypi:pi-legacy-session:legacy-message',
+          sourceFile: legacySession,
+        }),
+      ]));
+    } finally {
+      rmSync(piHome, { recursive: true, force: true });
     }
   });
 });

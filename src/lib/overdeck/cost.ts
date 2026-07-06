@@ -149,6 +149,11 @@ export interface CostReconcileSummary {
   latestEventTs: string | null;
 }
 
+export type CostReconcileExtraRoot =
+  | { kind: 'codex-global'; root: string }
+  | { kind: 'ohmypi-global'; root: string }
+  | { kind: 'ohmypi-legacy-agents'; root: string };
+
 // ── Errors ────────────────────────────────────────────────────────────────────
 
 export class CostIngestError extends Schema.TaggedErrorClass<CostIngestError>()(
@@ -205,6 +210,10 @@ function inferIssueFromPath(path: string | undefined): IssueIdType | null {
   if (!path) return null;
   const match = path.match(/(?:feature[-/])?(pan|min|aud|krux|cli)[-/](\d+)/i);
   return match ? `${match[1]!.toUpperCase()}-${match[2]}` as IssueIdType : null;
+}
+
+function inferIssueFromPiEncodedRootName(name: string): IssueIdType | null {
+  return inferIssueFromPath(name.replace(/--+/g, '/'));
 }
 
 function inferPiProvider(model: string, provider: string | null): string | null {
@@ -473,6 +482,7 @@ export class CostWriter extends Context.Service<
       source?: 'claude' | 'ohmypi' | 'codex' | 'wal';
       dryRun?: boolean;
       extraRoots?: string[];
+      extraRootSpecs?: CostReconcileExtraRoot[];
     }) => Effect.Effect<CostReconcileSummary, CostIngestError>;
     // Full rebuild from archive; recomputes cost from tokens
     readonly rebuild: () => Effect.Effect<{ events: number }, CostIngestError>;
@@ -553,7 +563,12 @@ export const CostWriterLive = Layer.effect(
     // Walks OVERDECK_HOME/agents/<id>/sessions/**/*.jsonl (pi) or
     // OVERDECK_HOME/agents/<id>/codex-home/sessions/**/*.jsonl (codex),
     // parses each with the existing parsers, and feeds into record() (which deduplicates).
-    const reconcile = (opts?: { source?: 'claude' | 'ohmypi' | 'codex' | 'wal'; dryRun?: boolean; extraRoots?: string[] }) =>
+    const reconcile = (opts?: {
+      source?: 'claude' | 'ohmypi' | 'codex' | 'wal';
+      dryRun?: boolean;
+      extraRoots?: string[];
+      extraRootSpecs?: CostReconcileExtraRoot[];
+    }) =>
       Effect.gen(function* () {
         const source = opts?.source ?? 'claude';
         const empty: CostReconcileSummary = {
@@ -593,7 +608,7 @@ export const CostWriterLive = Layer.effect(
           agentName: string;
           issueId: IssueIdType | null;
           sessionType: 'ohmypi' | 'codex';
-          inferIssueFromCwd: boolean;
+          inferIssueFromCwd?: boolean;
         };
 
         const roots: ScanRoot[] = agentNames.map((agentName) => ({
@@ -603,7 +618,6 @@ export const CostWriterLive = Layer.effect(
           agentName,
           issueId: issueIdFromAgentName(agentName),
           sessionType: source,
-          inferIssueFromCwd: false,
         }));
 
         if (source === 'codex') {
@@ -615,6 +629,48 @@ export const CostWriterLive = Layer.effect(
               sessionType: 'codex',
               inferIssueFromCwd: true,
             });
+          }
+        }
+
+        for (const extra of opts?.extraRootSpecs ?? []) {
+          if (source === 'codex' && extra.kind === 'codex-global') {
+            roots.push({
+              root: extra.root,
+              agentName: 'codex-global',
+              issueId: null,
+              sessionType: 'codex',
+              inferIssueFromCwd: true,
+            });
+          }
+
+          if (source === 'ohmypi' && extra.kind === 'ohmypi-global') {
+            const encodedRoots = yield* Effect.sync(() => {
+              if (!existsSync(extra.root)) return [] as ScanRoot[];
+              return readdirSync(extra.root, { withFileTypes: true })
+                .filter(e => e.isDirectory())
+                .map(e => ({
+                  root: join(extra.root, e.name),
+                  agentName: 'pi-global',
+                  issueId: inferIssueFromPiEncodedRootName(e.name) ?? 'UNKNOWN' as IssueIdType,
+                  sessionType: 'ohmypi' as const,
+                }));
+            });
+            roots.push(...encodedRoots);
+          }
+
+          if (source === 'ohmypi' && extra.kind === 'ohmypi-legacy-agents') {
+            const legacyRoots = yield* Effect.sync(() => {
+              if (!existsSync(extra.root)) return [] as ScanRoot[];
+              return readdirSync(extra.root, { withFileTypes: true })
+                .filter(e => e.isDirectory())
+                .map(e => ({
+                  root: join(extra.root, e.name, 'sessions'),
+                  agentName: e.name,
+                  issueId: issueIdFromAgentName(e.name),
+                  sessionType: 'ohmypi' as const,
+                }));
+            });
+            roots.push(...legacyRoots);
           }
         }
 
