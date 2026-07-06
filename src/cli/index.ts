@@ -410,7 +410,7 @@ const planCmd = program
   .description('Planning lifecycle commands')
   .argument('[id]', 'Issue ID to plan')
   .option('--auto', 'Run non-interactive planning; inferred choices are recorded in plan.autoDecisions[]')
-  .option('--auto-start', 'After planning completes, automatically start the work agent — used by autonomous orchestrators')
+  .option('--auto-start', '[deprecated: use pan start <id>] After planning completes, automatically start the work agent — used by autonomous orchestrators')
   .option('--probe', 'Add an adversarial pre-finalize probe pass to the planning prompt')
   .option('--model <model>', 'Model to use for the planning role')
   .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex (defaults to role/provider settings)')

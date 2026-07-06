@@ -20,6 +20,13 @@ export async function planCommand(id: string | undefined, options: PlanOptions):
   }
 
   const issueId = id.toUpperCase();
+
+  if (options.autoStart) {
+    console.warn(chalk.yellow(
+      '--auto-start is deprecated — pan start <id> now plans and starts work in one command. This flag keeps working through the deprecation window.',
+    ));
+  }
+
   const spinner = ora(`${options.auto ? 'Auto-planning' : 'Starting planning for'} ${issueId}...`).start();
 
   try {
