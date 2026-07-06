@@ -201,6 +201,12 @@ function issueIdFromAgentName(agentName: string): IssueIdType | null {
   return match ? match[1]!.toUpperCase() as IssueIdType : null;
 }
 
+function inferIssueFromPath(path: string | undefined): IssueIdType | null {
+  if (!path) return null;
+  const match = path.match(/(?:feature[-/])?(pan|min|aud|krux|cli)[-/](\d+)/i);
+  return match ? `${match[1]!.toUpperCase()}-${match[2]}` as IssueIdType : null;
+}
+
 function inferPiProvider(model: string, provider: string | null): string | null {
   if (provider) return provider;
   const lower = model.toLowerCase();
@@ -466,6 +472,7 @@ export class CostWriter extends Context.Service<
     readonly reconcile: (opts?: {
       source?: 'claude' | 'ohmypi' | 'codex' | 'wal';
       dryRun?: boolean;
+      extraRoots?: string[];
     }) => Effect.Effect<CostReconcileSummary, CostIngestError>;
     // Full rebuild from archive; recomputes cost from tokens
     readonly rebuild: () => Effect.Effect<{ events: number }, CostIngestError>;
@@ -546,7 +553,7 @@ export const CostWriterLive = Layer.effect(
     // Walks OVERDECK_HOME/agents/<id>/sessions/**/*.jsonl (pi) or
     // OVERDECK_HOME/agents/<id>/codex-home/sessions/**/*.jsonl (codex),
     // parses each with the existing parsers, and feeds into record() (which deduplicates).
-    const reconcile = (opts?: { source?: 'claude' | 'ohmypi' | 'codex' | 'wal'; dryRun?: boolean }) =>
+    const reconcile = (opts?: { source?: 'claude' | 'ohmypi' | 'codex' | 'wal'; dryRun?: boolean; extraRoots?: string[] }) =>
       Effect.gen(function* () {
         const source = opts?.source ?? 'claude';
         const empty: CostReconcileSummary = {
@@ -581,13 +588,38 @@ export const CostWriterLive = Layer.effect(
           if (latestEventTs == null || iso > latestEventTs) latestEventTs = iso;
         };
 
-        for (const agentName of agentNames) {
-          const sessionRoot =
-            source === 'ohmypi'
-              ? join(agentsDir, agentName, 'sessions')
-              : join(agentsDir, agentName, 'codex-home', 'sessions');
+        type ScanRoot = {
+          root: string;
+          agentName: string;
+          issueId: IssueIdType | null;
+          sessionType: 'ohmypi' | 'codex';
+          inferIssueFromCwd: boolean;
+        };
 
-          const sessionFiles = yield* Effect.sync(() => walkJsonl(sessionRoot));
+        const roots: ScanRoot[] = agentNames.map((agentName) => ({
+          root: source === 'ohmypi'
+            ? join(agentsDir, agentName, 'sessions')
+            : join(agentsDir, agentName, 'codex-home', 'sessions'),
+          agentName,
+          issueId: issueIdFromAgentName(agentName),
+          sessionType: source,
+          inferIssueFromCwd: false,
+        }));
+
+        if (source === 'codex') {
+          for (const root of opts?.extraRoots ?? []) {
+            roots.push({
+              root,
+              agentName: 'codex-global',
+              issueId: null,
+              sessionType: 'codex',
+              inferIssueFromCwd: true,
+            });
+          }
+        }
+
+        for (const root of roots) {
+          const sessionFiles = yield* Effect.sync(() => walkJsonl(root.root));
 
           for (const sessionFile of sessionFiles) {
             sessionsScanned++;
@@ -604,10 +636,10 @@ export const CostWriterLive = Layer.effect(
                 const ts = new Date(usage.timestamp);
                 const event: CostEvent = {
                   ts,
-                  issueId:     issueIdFromAgentName(agentName),
-                  agentId:     agentName,
+                  issueId:     root.issueId,
+                  agentId:     root.agentName,
                   sessionId:   usage.sessionId,
-                  sessionType: source,
+                  sessionType: root.sessionType,
                   provider:    inferPiProvider(usage.model, usage.provider),
                   model:       usage.model,
                   input:       usage.input,
@@ -642,10 +674,10 @@ export const CostWriterLive = Layer.effect(
             const ts = new Date(session.startTime);
             const event: CostEvent = {
               ts,
-              issueId:     issueIdFromAgentName(agentName),
-              agentId:     agentName,
+              issueId:     root.inferIssueFromCwd ? (inferIssueFromPath(session.cwd) ?? 'UNKNOWN' as IssueIdType) : root.issueId,
+              agentId:     root.agentName,
               sessionId:   session.sessionId,
-              sessionType: source,
+              sessionType: root.sessionType,
               provider:    null,
               model:       session.model ?? null,
               input:       session.usage.inputTokens,
@@ -778,6 +810,7 @@ export const CostApi = HttpApiGroup.make('costs')
       payload: Schema.Struct({
         source: Schema.optional(Schema.Literals(['claude', 'ohmypi', 'codex', 'wal'])),
         dryRun: Schema.optional(Schema.Boolean),
+        extraRoots: Schema.optional(Schema.Array(Schema.String)),
       }),
       success: Schema.Struct({
         imported:          Schema.Number,

@@ -51,6 +51,7 @@ export interface SessionUsage {
   usage: TokenUsage;  // Total tokens across all models
   cost: number;  // DEPRECATED: Uses first-model pricing (kept for backward compatibility)
   cost_v2?: number;  // NEW: Accurate per-message pricing
+  cwd?: string;
   messageCount: number;
   modelBreakdown?: Record<string, {  // NEW: Cost/token breakdown by exact model ID
     cost: number;

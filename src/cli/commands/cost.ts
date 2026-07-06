@@ -1,4 +1,6 @@
 import { Effect } from 'effect';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 /**
  * Cost CLI Commands
  *
@@ -120,6 +122,7 @@ function printBackfillSummary(summaries: BackfillSourceSummary[], write: boolean
 
 export async function runCostBackfill(options: { write?: boolean } = {}): Promise<BackfillSourceSummary[]> {
   const dryRun = !options.write;
+  const codexSessionRoot = join(process.env.CODEX_HOME ?? join(homedir(), '.codex'), 'sessions');
   const claude = await Effect.runPromise(reconcileClaudeTranscripts({ dryRun, includePi: false }));
   const ohmypi = await Effect.runPromise(
     CostWriter.use((writer) => writer.reconcile({ source: 'ohmypi', dryRun })).pipe(
@@ -127,7 +130,7 @@ export async function runCostBackfill(options: { write?: boolean } = {}): Promis
     ),
   );
   const codex = await Effect.runPromise(
-    CostWriter.use((writer) => writer.reconcile({ source: 'codex', dryRun })).pipe(
+    CostWriter.use((writer) => writer.reconcile({ source: 'codex', dryRun, extraRoots: [codexSessionRoot] })).pipe(
       Effect.provide(CostDoorLive),
     ),
   );

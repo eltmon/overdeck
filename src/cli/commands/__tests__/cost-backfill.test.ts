@@ -5,6 +5,7 @@ import { join } from 'node:path';
 
 const originalHome = process.env.HOME;
 const originalOverdeckHome = process.env.OVERDECK_HOME;
+const originalCodexHome = process.env.CODEX_HOME;
 
 function makeFixtureHome(): string {
   const home = mkdtempSync(join(tmpdir(), 'pan-cost-backfill-'));
@@ -52,6 +53,7 @@ async function loadBackfill(home: string) {
   vi.resetModules();
   process.env.HOME = home;
   process.env.OVERDECK_HOME = join(home, '.overdeck');
+  process.env.CODEX_HOME = join(home, '.codex');
   const infra = await import('../../../lib/overdeck/infra.js');
   const cost = await import('../cost.js');
   infra.getOverdeckDatabaseSync();
@@ -63,6 +65,8 @@ describe('pan cost backfill', () => {
     process.env.HOME = originalHome;
     if (originalOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
     else process.env.OVERDECK_HOME = originalOverdeckHome;
+    if (originalCodexHome === undefined) delete process.env.CODEX_HOME;
+    else process.env.CODEX_HOME = originalCodexHome;
     vi.restoreAllMocks();
   });
 
