@@ -186,7 +186,7 @@
   ],
   "feedback": [],
   "created": "2026-06-29T21:42:04.849Z",
-  "updated": "2026-07-03T11:21:26.730Z",
+  "updated": "2026-07-06T12:55:08.794Z",
   "pipeline": {
     "issueId": "PAN-2181",
     "reviewStatus": "passed",
@@ -296,7 +296,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "model": "claude-opus-4-8",
   "statusOverrides": {
     "restyle-modal-tokens": "completed",
     "restyle-modal-tokens.ac1": "completed",
