@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
-import { CheckCircle2, Circle } from 'lucide-react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { CheckCircle2, Circle, ExternalLink } from 'lucide-react'
 import {
   usePlanningSummaryQuery,
   useWorkspacePlanQuery,
@@ -29,11 +29,27 @@ function tieredChipLabel(effective: boolean, source: 'issue-override' | 'plan-me
  * here — it lives in the vBRIEF dig tab. (Command Deck remodel S3.)
  */
 export function PlanCard({ issueId }: { issueId: string }) {
+  const queryClient = useQueryClient()
   const planning = usePlanningSummaryQuery(issueId)
   const workspacePlan = useWorkspacePlanQuery(issueId)
   const ac = planning.data?.acceptanceProgress
   const tieredExecution = workspacePlan.data?.plan?.tieredExecution
   const tieredLabel = tieredExecution ? tieredChipLabel(tieredExecution.effective, tieredExecution.source) : 'tiered: (loading)'
+
+  const updateTieredExecution = useMutation({
+    mutationFn: async (override: 'on' | 'off' | null) => {
+      const res = await fetch(`/api/workspaces/${issueId}/tiered-execution`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ override }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`)
+      return res.json()
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['workspace-plan', issueId], updated)
+    },
+  })
 
   const beadsQuery = useQuery<BeadsResponse>({
     queryKey: ['beads', issueId],
@@ -61,13 +77,28 @@ export function PlanCard({ issueId }: { issueId: string }) {
       }
     >
       <div className="mb-3 flex flex-wrap items-center gap-2">
+        <select
+          value={tieredExecution?.override ?? 'inherit'}
+          onChange={(e) => {
+            const val = e.target.value
+            updateTieredExecution.mutate(val === 'inherit' ? null : (val as 'on' | 'off'))
+          }}
+          disabled={updateTieredExecution.isPending}
+          className="h-6 rounded-md border border-border bg-muted/20 px-2 font-mono text-[11px] text-muted-foreground disabled:opacity-50"
+        >
+          <option value="on">on</option>
+          <option value="off">off</option>
+          <option value="inherit">inherit</option>
+        </select>
+        <span className="font-mono text-[11px] text-muted-foreground">{tieredLabel}</span>
         <a
           href="https://github.com/eltmon/overdeck/blob/main/docs/TIERED-EXECUTION.md"
           target="_blank"
           rel="noreferrer"
-          className="inline-flex h-6 items-center rounded-md border border-border bg-muted/20 px-2 font-mono text-[11px] text-muted-foreground hover:bg-muted/40"
+          className="inline-flex h-5 w-5 items-center justify-center text-muted-foreground hover:text-foreground"
+          title="Tiered execution documentation"
         >
-          {tieredLabel}
+          <ExternalLink className="h-3.5 w-3.5" />
         </a>
       </div>
 
