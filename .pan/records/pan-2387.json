@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-2387",
   "schemaVersion": 2,
-  "created": "2026-07-05T21:49:28.368Z",
-  "updated": "2026-07-06T18:24:34.986Z",
-  "pipeline": {
-    "issueId": "PAN-2387",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-05T21:49:28.368Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -38,6 +21,96 @@
       "timestamp": "2026-07-06T18:24:34.986Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-05T21:49:28.368Z",
+  "updated": "2026-07-06T20:47:47.533Z",
+  "pipeline": {
+    "issueId": "PAN-2387",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-06T20:47:46.833Z",
+    "inspectNotes": "Bead attribution-classifier ack: commit d1e8cb6f25 (fix(costs): add no-issue attribution classifier) satisfies all 4 acceptance criteria — classifySessionBucket returns FLYWHEEL for a matched flywheel-orchestrator conversation (AC1), CONVERSATIONS for any other matched conversation via sessionId or conv-* agentId (AC2), UNATTRIBUTED (never UNKNOWN) on no match (AC3); findConversationForCostSessionSync matches conversation_files.locator=sessionId and conversations.tmux_session=agentId for conv-* prefixes, returning null when absent (AC4). Verified via git show d1e8cb6f25 diff plus a live run of npx vitest run src/lib/costs/__tests__/attribution.test.ts at current HEAD — 5/5 pass. Confirmed the function was later relocated to src/lib/overdeck/conversation-cost-session.ts and re-exported from conversations.ts by unrelated commit d162c89a93 without behavior change. This supersedes the earlier BLOCKED verdict, which was posted against the wrong commit (8d5f3d5209, a delivery routing mismatch)."
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 79889,
+            "output": 6715,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 15745,
+            "output": 69403,
+            "cacheRead": 12511882,
+            "cacheWrite": 232630
+          },
+          "anthropic/claude-opus-4-8": {
+            "input": 32128,
+            "output": 107107,
+            "cacheRead": 19845931,
+            "cacheWrite": 646815
+          }
+        },
+        "planning": {
+          "anthropic/claude-opus-4-8": {
+            "input": 135,
+            "output": 3394,
+            "cacheRead": 744103,
+            "cacheWrite": 2821
+          }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 6705,
+            "output": 5617,
+            "cacheRead": 1067167,
+            "cacheWrite": 90694
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 79889,
+          "output": 6715,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 15745,
+          "output": 69403,
+          "cacheRead": 12511882,
+          "cacheWrite": 232630
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 32263,
+          "output": 110501,
+          "cacheRead": 20590034,
+          "cacheWrite": 649636
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 6705,
+          "output": 5617,
+          "cacheRead": 1067167,
+          "cacheWrite": 90694
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 36.836216,
+        "pricingAsOf": "2026-07-06T20:47:47.465Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "model": "claude-sonnet-5"
 }
