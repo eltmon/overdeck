@@ -950,7 +950,7 @@ const patchWorkspaceTieredExecutionRoute = HttpRouter.add(
 
     // Persist via the record write door
     yield* Effect.promise(() =>
-      import('../../../pan-dir/record.js').then(m =>
+      import('../../../../lib/pan-dir/record.js').then(m =>
         m.writeRecordTieredExecutionOverride(project, issueId, override as 'on' | 'off' | null)
       )
     );
