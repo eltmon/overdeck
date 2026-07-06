@@ -36,29 +36,33 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-06T16:06:25.914Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-06T16:45:12.144Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-06T16:45:12.149Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-06T14:44:54.009Z",
-  "updated": "2026-07-06T16:39:32.455Z",
+  "updated": "2026-07-06T16:45:16.460Z",
   "pipeline": {
     "issueId": "PAN-2402",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
-    "verificationStatus": "passed",
+    "reviewStatus": "failed",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T16:39:32.355Z",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Merge conflict with target branch",
-        "detectedAt": "2026-07-06T16:38:36.203Z"
-      }
-    ],
+    "updatedAt": "2026-07-06T16:45:12.569Z",
+    "reviewNotes": "Review role spawn failed: Role run agent-pan-2402-review already running. Use 'pan tell' to message it.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2411",
-    "reviewedAtCommit": "9cd4bec6da43dafa0b63986a9568f101d279f0c6",
-    "lastVerifiedCommit": "9cd4bec6da43dafa0b63986a9568f101d279f0c6"
+    "lastVerifiedCommit": "9cd4bec6da43dafa0b63986a9568f101d279f0c6",
+    "reviewRequestedAt": "2026-07-06T16:45:11.929Z"
   },
   "closeOut": {
     "usage": {
@@ -87,9 +91,9 @@
             "cacheWrite": 339334
           },
           "custom/kimi-k2.7-code": {
-            "input": 507848,
-            "output": 44804,
-            "cacheRead": 19294208,
+            "input": 785140,
+            "output": 54312,
+            "cacheRead": 25487872,
             "cacheWrite": 0
           }
         }
@@ -102,9 +106,9 @@
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 922569,
-          "output": 49262,
-          "cacheRead": 20983808,
+          "input": 1199861,
+          "output": 58770,
+          "cacheRead": 27177472,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -115,8 +119,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 7.166954,
-        "pricingAsOf": "2026-07-06T16:39:32.454Z"
+        "usd": 8.645212,
+        "pricingAsOf": "2026-07-06T16:45:12.600Z"
       }
     },
     "merges": [
@@ -124,12 +128,15 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "auto-start": "completed",
     "auto-start.ac1": "completed",
     "auto-start.ac2": "completed",
     "auto-start.ac3": "completed"
+  },
+  "swarm": {
+    "finalizedAt": "2026-07-06T16:45:16.460Z"
   }
 }
