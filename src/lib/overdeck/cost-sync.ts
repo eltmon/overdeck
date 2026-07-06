@@ -415,6 +415,22 @@ export function getDailyTrendsSync(opts: { days?: number; issueId?: string } = {
   }));
 }
 
+/**
+ * Get today's (last 24 hours) cost for a specific agent.
+ * Used for per-agent cost limit checks to match the cap's daily window.
+ */
+export function getAgentDailyCostSync(agentId: string): number {
+  const db = getOverdeckDatabaseSync();
+  const sinceMillis = Date.now() - 24 * 60 * 60 * 1000; // Last 24 hours
+  const row = db
+    .prepare(
+      `SELECT COALESCE(SUM(cost), 0) AS total_cost FROM cost_events
+       WHERE agent_id = ? AND ts >= ?`,
+    )
+    .get(agentId, sinceMillis) as { total_cost: number } | undefined;
+  return row?.total_cost ?? 0;
+}
+
 export interface ModelRollup {
   model: string;
   totalCost: number;
