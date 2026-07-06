@@ -235,9 +235,7 @@ export function parseCodexSessionSync(sessionFile: string): SessionUsage | null 
   }
 
   if (!hasUsage && messageCount === 0) return null;
-  // Subscription Codex conversations are GPT-5.x; fall back to gpt-5.5 pricing
-  // when the rollout carried no model so cost stays non-zero.
-  if (!model) model = 'gpt-5.5';
+  if (!model) model = 'unknown';
 
   const pricing = getPricingSync('openai', model);
   // total_token_usage.input_tokens includes the cached portion, so charge only
