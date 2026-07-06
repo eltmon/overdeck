@@ -269,14 +269,17 @@ async function syncWorkspaceBeadsImpl(
 
   try {
     // Export workspace beads to JSONL
+    // 120s: bd export cold-starts a dolt server per workspace .beads and can
+    // block on the global bd lock; a timeout kill bypasses `|| true` and
+    // aborts the whole close-out ceremony (observed at 15s, 14/32 closes).
     await execAsync(
       'bd export --output .beads/issues-export.jsonl 2>&1 || true',
-      { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 }
+      { cwd: workspacePath, encoding: 'utf-8', timeout: 120000 }
     );
 
     const exportPath = join(workspacePath, '.beads', 'issues-export.jsonl');
     if (!existsSync(exportPath)) {
-      await execAsync('bd export --output .beads/issues.jsonl 2>&1 || true', { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 });
+      await execAsync('bd export --output .beads/issues.jsonl 2>&1 || true', { cwd: workspacePath, encoding: 'utf-8', timeout: 120000 });
     }
 
     // Import workspace beads into project-root database
@@ -284,7 +287,7 @@ async function syncWorkspaceBeadsImpl(
     try {
       await execAsync(
         `bd import "${join(workspacePath, '.beads', 'issues.jsonl')}" 2>&1 || true`,
-        { cwd: projectPath, encoding: 'utf-8', timeout: 15000 }
+        { cwd: projectPath, encoding: 'utf-8', timeout: 120000 }
       );
       return stepOk(step, [`Synced workspace beads to project root for ${issueLower}`]);
     } catch {
