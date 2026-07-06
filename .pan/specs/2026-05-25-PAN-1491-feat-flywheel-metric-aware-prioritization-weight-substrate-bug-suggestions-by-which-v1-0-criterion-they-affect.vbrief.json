@@ -3,7 +3,8 @@
     "version": "0.6",
     "created": "2026-07-06T16:31:30.000Z",
     "author": "overdeck/0.0.0",
-    "description": "Plan for PAN-1491: metric-aware flywheel prioritization — weight substrate-bug suggestions by which v1.0 criterion they affect"
+    "description": "Plan for PAN-1491: metric-aware flywheel prioritization — weight substrate-bug suggestions by which v1.0 criterion they affect",
+    "updated": "2026-07-06T17:08:22.203Z"
   },
   "plan": {
     "id": "pan-1491",
@@ -11,9 +12,9 @@
     "status": "proposed",
     "uid": "4f862c7d-d398-4b8e-850a-c0f581c16da7",
     "author": "agent:claude-opus-4-8",
-    "sequence": 1,
+    "sequence": 2,
     "created": "2026-07-06T16:31:30.000Z",
-    "updated": "2026-07-06T16:31:30.000Z",
+    "updated": "2026-07-06T17:08:22.203Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1491",
@@ -728,7 +729,10 @@
         "to": "b10-user-docs",
         "type": "blocks"
       }
-    ]
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-06-PAN-1491-feat-flywheel-metric-aware-prioritization-weight-substrate-bug-suggestions-by-which-v1-0-criterion-they-affect.vbrief.json"
+    }
   },
   "status": "proposed"
 }
