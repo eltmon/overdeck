@@ -7,7 +7,7 @@
 1106 src/dashboard/frontend/src/components/PlanDialog.tsx
 1533 src/dashboard/frontend/src/components/chat/ConversationPanel.tsx
 1413 src/dashboard/server/routes/command-deck.ts
-1005 src/dashboard/server/routes/flywheel.ts
+1021 src/dashboard/server/routes/flywheel.ts
 1149 src/dashboard/server/routes/settings.ts
 1753 src/dashboard/server/routes/workspaces.ts
 1924 src/dashboard/server/routes/workspaces/merge-ops.ts
