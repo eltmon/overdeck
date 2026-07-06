@@ -16,25 +16,35 @@
   ],
   "feedback": [],
   "created": "2026-07-06T14:55:36.922Z",
-  "updated": "2026-07-06T17:03:46.246Z",
+  "updated": "2026-07-06T17:23:25.044Z",
   "pipeline": {
     "issueId": "PAN-2407",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T16:07:37.255Z",
-    "inspectNotes": "Bead route-unplanned-to-planning ack: no-plan+auto/interactive now POST start-planning with correct auto/autoStart flags and post-finalize messaging, no-plan+skip and dry-run send no request/create no files, and plan-exists (via findPlanSync main-spec-first) falls through to the unchanged spawn path; all 5 ACs covered by new start-plan-routing.test.ts."
+    "updatedAt": "2026-07-06T17:23:25.010Z",
+    "inspectNotes": "Bead route-unplanned-to-planning ack: no-plan+auto/interactive now POST start-planning with correct auto/autoStart flags and post-finalize messaging, no-plan+skip and dry-run send no request/create no files, and plan-exists (via findPlanSync main-spec-first) falls through to the unchanged spawn path; all 5 ACs covered by new start-plan-routing.test.ts.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2415",
+    "lastVerifiedCommit": "d198f758097bef5f8667a63c6a8da2a95449e19f"
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 287,
+            "output": 974,
+            "cacheRead": 1829861,
+            "cacheWrite": 3784
+          }
+        },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 22631,
-            "output": 469,
+            "input": 38992,
+            "output": 815,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -49,53 +59,55 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 19063,
-            "output": 3901,
-            "cacheRead": 216262,
-            "cacheWrite": 85935
+            "input": 19067,
+            "output": 4792,
+            "cacheRead": 449443,
+            "cacheWrite": 102613
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 503064,
-            "output": 117455,
-            "cacheRead": 50809856,
+            "input": 1225503,
+            "output": 245469,
+            "cacheRead": 148025344,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
+        "anthropic/claude-fable-5": {
+          "input": 14833,
+          "output": 43265,
+          "cacheRead": 5577807,
+          "cacheWrite": 178052
+        },
         "cliproxy/gpt-5.4-mini": {
-          "input": 22631,
-          "output": 469,
+          "input": 38992,
+          "output": 815,
           "cacheRead": 0,
           "cacheWrite": 0
         },
-        "anthropic/claude-fable-5": {
-          "input": 14546,
-          "output": 42291,
-          "cacheRead": 3747946,
-          "cacheWrite": 174268
-        },
         "anthropic/claude-sonnet-5": {
-          "input": 19063,
-          "output": 3901,
-          "cacheRead": 216262,
-          "cacheWrite": 85935
+          "input": 19067,
+          "output": 4792,
+          "cacheRead": 449443,
+          "cacheWrite": 102613
         },
         "custom/kimi-k2.7-code": {
-          "input": 503064,
-          "output": 117455,
-          "cacheRead": 50809856,
+          "input": 1225503,
+          "output": 245469,
+          "cacheRead": 148025344,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 19.12314,
-        "pricingAsOf": "2026-07-06T16:07:37.390Z"
+        "usd": 40.818443,
+        "pricingAsOf": "2026-07-06T17:23:25.042Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2415"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
