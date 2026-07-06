@@ -81,7 +81,7 @@
     }
   ],
   "created": "2026-06-27T03:27:37.390Z",
-  "updated": "2026-07-03T03:12:13.413Z",
+  "updated": "2026-07-06T12:54:39.523Z",
   "pipeline": {
     "issueId": "PAN-2088",
     "reviewStatus": "passed",
@@ -152,8 +152,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-opus-4-8",
   "statusOverrides": {
     "wi1-widen-extension-api": "completed",
     "wi1-widen-extension-api.ac1": "completed",
