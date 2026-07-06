@@ -82,3 +82,145 @@ describe('parseOhmypiSession (PAN-1989)', () => {
     expect(src).toContain("agent.harness === 'ohmypi'")
   })
 })
+
+describe('parseOhmypiSession per-provider fixtures (PAN-2388)', () => {
+  interface FixtureCase {
+    file: string
+    synthetic: boolean
+    expected: {
+      sessionId: string
+      requestId: string
+      provider: string
+      model: string
+      input: number
+      output: number
+      cacheRead: number
+      cacheWrite: number
+      cost: number
+    }
+  }
+
+  const cases: FixtureCase[] = [
+    {
+      // Existing real fixture harvested from a zai/GLM omp session.
+      file: 'rpc-toolcall.jsonl',
+      synthetic: false,
+      expected: {
+        sessionId: '019ef4f8-6317-7000-9277-81d3e9dd941e',
+        requestId: 'ohmypi:019ef4f8-6317-7000-9277-81d3e9dd941e:56f1fdfa',
+        provider: 'zai',
+        model: 'glm-4.5-flash',
+        input: 51444,
+        output: 39,
+        cacheRead: 0,
+        cacheWrite: 0,
+        cost: 0,
+      },
+    },
+    {
+      // Real fixture derived from ~/.omp/agent/sessions (openai-codex/gpt-5.5).
+      file: 'openai-codex.jsonl',
+      synthetic: false,
+      expected: {
+        sessionId: '019f0988-e30d-7000-b11c-23c3826c54ab',
+        requestId: 'ohmypi:019f0988-e30d-7000-b11c-23c3826c54ab:8f73f17b',
+        provider: 'openai-codex',
+        model: 'gpt-5.5',
+        input: 42853,
+        output: 125,
+        cacheRead: 0,
+        cacheWrite: 0,
+        cost: 0.21801500000000001,
+      },
+    },
+    {
+      // Synthetic: no real on-disk omp session for this provider was found.
+      file: 'kimi.jsonl',
+      synthetic: true,
+      expected: {
+        sessionId: 'sess-synthetic-kimi-001',
+        requestId: 'ohmypi:sess-synthetic-kimi-001:msg-kimi-assistant-001',
+        provider: 'kimi',
+        model: 'kimi-k2',
+        input: 1000,
+        output: 200,
+        cacheRead: 50,
+        cacheWrite: 25,
+        cost: 0.0007175,
+      },
+    },
+    {
+      // Synthetic: no real on-disk omp session for this provider was found.
+      file: 'minimax.jsonl',
+      synthetic: true,
+      expected: {
+        sessionId: 'sess-synthetic-minimax-001',
+        requestId: 'ohmypi:sess-synthetic-minimax-001:msg-minimax-assistant-001',
+        provider: 'minimax',
+        model: 'minimax-pro',
+        input: 2000,
+        output: 300,
+        cacheRead: 100,
+        cacheWrite: 75,
+        cost: 0.0013475,
+      },
+    },
+    {
+      // Synthetic: no real on-disk omp session for this provider was found.
+      file: 'gemini.jsonl',
+      synthetic: true,
+      expected: {
+        sessionId: 'sess-synthetic-gemini-001',
+        requestId: 'ohmypi:sess-synthetic-gemini-001:msg-gemini-assistant-001',
+        provider: 'google',
+        model: 'gemini-2.5',
+        input: 3000,
+        output: 400,
+        cacheRead: 150,
+        cacheWrite: 100,
+        cost: 0.001965,
+      },
+    },
+  ]
+
+  it.each(cases)('returns cost events for $expected.provider ($file)', ({ file, expected }) => {
+    const events = parseOhmypiSessionCostEventsSync(join(FIXTURES, file))
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({
+      requestId: expected.requestId,
+      sessionId: expected.sessionId,
+      provider: expected.provider,
+      model: expected.model,
+      input: expected.input,
+      output: expected.output,
+      cacheRead: expected.cacheRead,
+      cacheWrite: expected.cacheWrite,
+      cost: expected.cost,
+    })
+  })
+
+  it.each(cases)('returns session totals equal to event sums for $expected.provider ($file)', ({ file, expected }) => {
+    const result = parseOhmypiSessionSync(join(FIXTURES, file))
+    expect(result).not.toBeNull()
+    expect(result!.sessionId).toBe(expected.sessionId)
+    expect(result!.usage.inputTokens).toBe(expected.input)
+    expect(result!.usage.outputTokens).toBe(expected.output)
+    expect(result!.usage.cacheReadTokens).toBe(expected.cacheRead)
+    expect(result!.usage.cacheWriteTokens).toBe(expected.cacheWrite)
+    expect(result!.cost_v2).toBeCloseTo(expected.cost, 9)
+    expect(result!.messageCount).toBe(1)
+
+    const modelEntry = result!.modelBreakdown?.[expected.model]
+    expect(modelEntry).toBeDefined()
+    expect(modelEntry!.inputTokens).toBe(expected.input)
+    expect(modelEntry!.outputTokens).toBe(expected.output)
+    expect(modelEntry!.cacheReadTokens).toBe(expected.cacheRead)
+    expect(modelEntry!.cacheWriteTokens).toBe(expected.cacheWrite)
+    expect(modelEntry!.cost).toBeCloseTo(expected.cost, 9)
+  })
+
+  it('marks synthetic fixtures explicitly in test metadata', () => {
+    const syntheticFiles = cases.filter((c) => c.synthetic).map((c) => c.file)
+    expect(syntheticFiles).toEqual(['kimi.jsonl', 'minimax.jsonl', 'gemini.jsonl'])
+  })
+})
