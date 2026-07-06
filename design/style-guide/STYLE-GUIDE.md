@@ -1,8 +1,8 @@
 # Overdeck Style Guide
 
-**Version:** 1.2
-**Issue:** PAN-460 (v1.1) · PAN-1148 (v1.2 signal-semantics tightening)
-**Last Updated:** 2026-06-11
+**Version:** 1.3
+**Issue:** PAN-460 (v1.1) · PAN-1148 (v1.2 signal-semantics tightening) · v1.3 control-ring brand mark
+**Last Updated:** 2026-07-06
 **Design Reference:** T3Code (`/home/eltmon/Projects/t3code/apps/web/src/index.css`)
 
 ---
@@ -677,7 +677,7 @@ Animation:
 
 ```
 Sidebar
-├── Logo section (Overdeck eye + text)
+├── Logo section (Overdeck control-ring mark + text)
 ├── Group: OPERATIONS
 │   ├── Command Deck (Compass icon)
 │   ├── Board (LayoutGrid icon)
@@ -724,7 +724,7 @@ Collapsed mode:
   Show icons only, centered
   Tooltip on hover showing full label
   Group labels hidden
-  Logo shows icon only (eye)
+  Logo shows icon only (OverdeckMark)
 
 Toggle:
   Click collapse button in footer
@@ -1084,3 +1084,54 @@ COLOR RESTRAINT (dense views):
   Column colors: neutral=idle, primary=machine working, warning=human needed, success=done
   Priority border: destructive=urgent, warning=high, muted-foreground=medium, border=low
 ```
+
+---
+
+## 18. Brand Mark (Control Ring)
+
+The Overdeck mark is the **control ring**: an orbit ring with a center hub and
+one agent satellite sitting on the ring. It reads as the O of Overdeck, the
+orchestrator hub, and an agent in its orbit. It replaced the stacked-diamond
+"deck" mark and the lucide Eye (v1.3, 2026-07-06).
+
+### Canonical geometry (32×32 viewBox)
+
+```
+Ring:       circle cx=16 cy=16 r=12.5, stroke-width 4
+Hub:        circle cx=16 cy=16 r=4.5, filled
+Satellite:  circle cx=26.8 cy=9.2 r=3.4, filled (center sits ON the ring)
+```
+
+### Canonical assets — edit these, never fork the geometry
+
+```
+/favicon.svg                                    root favicon (Mintlify docs)
+src/dashboard/frontend/public/favicon.svg      dashboard favicon
+logo/overdeck-light.svg                        mark + wordmark, light backgrounds
+logo/overdeck-dark.svg                         mark + wordmark, dark backgrounds
+apps/desktop/resources/icon.png / icon.ico     desktop app (mark on #0f1117 disc)
+src/.../components/OverdeckMark.tsx            in-app React component (sidebar logo)
+```
+
+### Colors
+
+Two-tone indigo, aligned with `--primary`:
+
+```
+Light backgrounds:  ring/hub #4f46e5, satellite #818cf8
+Dark backgrounds:   ring/hub #6366f1, satellite #a5b4fc
+In-app:             OverdeckMark is monochrome currentColor (use text-primary);
+                    the satellite is mask-punched out of the ring instead of
+                    being a second tone, so it works at any theme color.
+```
+
+### Rules
+
+- Never recolor the mark outside the palettes above (in-app currentColor via
+  `OverdeckMark` is the one sanctioned exception).
+- Never re-add the eye, the stacked diamonds, or any tan/copper (#D4A27F-era)
+  branding.
+- Minimum size 16px; at that size use the mark alone, never mark + wordmark.
+- The wordmark stays Space Grotesk in the sidebar (PAN-698); the `logo/*.svg`
+  wordmark files use system-ui for portable rendering (README, docs site).
+

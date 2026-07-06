@@ -1,8 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 40" fill="none">
-  <!-- Overdeck mark: the deck above the decks -->
-  <path d="M19 24.5 L32 31 L19 37.5 L6 31 Z" fill="#B8886A" opacity="0.45"/>
-  <path d="M19 19 L32 25.5 L19 32 L6 25.5 Z" fill="#B8886A" opacity="0.8"/>
-  <path d="M19 3.5 L32 10 L19 16.5 L6 10 Z" fill="#D4A27F"/>
+  <!-- Overdeck mark: control ring — orbit + hub + agent satellite -->
+  <g transform="translate(4 4)">
+    <circle cx="16" cy="16" r="12.5" stroke="#4f46e5" stroke-width="4"/>
+    <circle cx="16" cy="16" r="4.5" fill="#4f46e5"/>
+    <circle cx="26.8" cy="9.2" r="3.4" fill="#818cf8"/>
+  </g>
   <!-- Wordmark -->
   <text x="44" y="27" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="20" font-weight="600" fill="#2d2d2d" letter-spacing="0.5">Overdeck</text>
 </svg>

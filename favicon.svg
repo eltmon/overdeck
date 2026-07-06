@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <!-- Overdeck mark: the deck above the decks -->
-  <path d="M16 20 L27 25.5 L16 31 L5 25.5 Z" fill="#B8886A" opacity="0.45"/>
-  <path d="M16 15.5 L27 21 L16 26.5 L5 21 Z" fill="#B8886A" opacity="0.8"/>
-  <path d="M16 2.5 L27 8 L16 13.5 L5 8 Z" fill="#D4A27F"/>
+  <!-- Overdeck mark: control ring — orbit + hub + agent satellite -->
+  <circle cx="16" cy="16" r="12.5" stroke="#4f46e5" stroke-width="4"/>
+  <circle cx="16" cy="16" r="4.5" fill="#4f46e5"/>
+  <circle cx="26.8" cy="9.2" r="3.4" fill="#818cf8"/>
 </svg>
