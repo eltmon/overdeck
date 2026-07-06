@@ -36,7 +36,7 @@ export type {
   WorkspaceRemoveResult,
 } from './workspace-manager/types.js';
 export { copyOverdeckSettingsToWorkspaceSync, ensurePanGitignoreSync, migrateOverdeckToPanSync } from './workspace-manager/migration.js';
-export { preTrustDirectorySync } from './workspace-manager/worktree-ops.js';
+export { preTrustDirectorySync, relocateVenvScripts } from './workspace-manager/worktree-ops.js';
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 //
