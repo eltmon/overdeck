@@ -269,6 +269,16 @@ Record every call (issue, decision, divergence evidence) in `docs/FLYWHEEL-STATE
   on (the default).
 - **Stalled review convoy:** `pan review restart <id>` (re-dispatch), or `pan review
   request|abort|reset <id>`. Pipeline-recovery, distinct from the forbidden `pan resume`/`pan wake`.
+- **Usage-limit halts (Claude/Anthropic subscription models):** an agent that hit the plan's
+  usage cap dies looking like a clean stop — the registry records no limit reason. Detection:
+  capture the pane (`tmux -L overdeck capture-pane -t <session> -p -S -60`) or the transcript
+  tail for the banner `You've hit your session limit · resets <time>` (also "usage limit").
+  When found: (1) record agent + parsed reset time in your run notes; (2) do NOT thrash
+  resume attempts before that time — schedule the re-dispatch for after the reset (ScheduleWakeup
+  where available, else check on later ticks); (3) `pan start <id>` after reset (plain restart
+  resumes the session with its context). The operator may also tell you limits refreshed early
+  ("I upgraded the plan", "limits reset") — treat that as authorization to re-dispatch all
+  limit-halted agents immediately, without waiting for the parsed reset times.
 
 ## Discretion on parked items (decide, don't delegate)
 
