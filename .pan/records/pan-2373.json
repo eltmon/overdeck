@@ -100,13 +100,13 @@
   },
   "pipeline": {
     "issueId": "PAN-2373",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T18:09:22.630Z",
-    "reviewNotes": "Verification failed at lint",
+    "updatedAt": "2026-07-06T18:09:28.618Z",
+    "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (95558ms):\n\nN-100');\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/18]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/agents-switch-model.test.ts > POST /api/agents/:id/switch-model > rejects model switching for pipeline agents\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/routes/__tests__/agents-switch-model.test.ts:29:3\n     27|\n     28| describe('POST /api/agents/:id/switch-model', () => {\n     29|   it('rejects model switching for pipeline agents', async () => {\n       |   ^\n     30|     const response = await postAgentSwitchModel('agent-pan-1928', { mo…\n     31|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/18]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/cloister-config.test.ts > cloister config route > reloads the live child Cloister after saving config updates\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/routes/__tests__/cloister-config.test.ts:47:3\n     45|   });\n     46|\n     47|   it('reloads the live child Cloister after saving config updates', as…\n       |   ^\n     48|     const updates = { monitoring: { check_interval: 17 } };\n     49|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/18]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts > fork pipeline recovery and re-entry > re-enters a handoff fork without re-authoring or double-spawning when doc and live session already exist\nError: Hook timed out in 5000ms.\nIf this is a long-running hook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n ❯ src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts:84:1\n     82| }\n     83|\n     84| beforeEach(async () => {\n       | ^\n     85|   await resetDb();\n     86|   TEST_HOME = join(tmpdir(), `pan-1744-fork-recovery-${Date.now()}-${M…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/18]⎯\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2419",
     "reviewRequestedAt": "2026-07-06T18:04:17.392Z",
@@ -212,7 +212,7 @@
       },
       "costAtCloseOut": {
         "usd": 12.906365,
-        "pricingAsOf": "2026-07-06T18:09:22.719Z"
+        "pricingAsOf": "2026-07-06T18:09:28.666Z"
       }
     },
     "merges": [
@@ -224,5 +224,5 @@
     "finalizedAt": "2026-07-06T17:49:27.751Z"
   },
   "created": "2026-07-06T18:00:22.350Z",
-  "updated": "2026-07-06T18:09:22.753Z"
+  "updated": "2026-07-06T18:09:28.671Z"
 }
