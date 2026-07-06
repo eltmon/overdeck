@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Circle, CheckCircle2, Clock, List, GitFork, ListTodo, RefreshCw, Loader2, Download, ChevronDown, ChevronRight } from 'lucide-react';
-import { PlanDAGViewer, type VBriefItem, type VBriefDocument } from './PlanDAG.js';
+import { PlanMapViewer } from './vbrief/PlanMapViewer.js';
+import type { VBriefItem, VBriefDocument } from './vbrief/types.js';
 
 interface BeadTask {
   id: string;
@@ -147,7 +148,7 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
       {view === 'graph' && planHasItems && (
         <div className="space-y-2">
           <div style={{ height: 320 }}>
-            <PlanDAGViewer
+            <PlanMapViewer
               issueId={issueId}
               onNodeClick={item => setSelectedItem(prev => prev?.id === item.id ? null : item)}
               className="rounded border border-border overflow-hidden"
