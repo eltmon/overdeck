@@ -45,7 +45,7 @@
     "auto-start.ac3": "completed"
   },
   "created": "2026-06-26T03:33:27.321Z",
-  "updated": "2026-07-03T03:12:15.109Z",
+  "updated": "2026-07-06T12:54:28.125Z",
   "pipeline": {
     "issueId": "PAN-1084",
     "reviewStatus": "passed",
@@ -131,6 +131,6 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5"
+  "harness": "claude-code",
+  "model": "claude-opus-4-8"
 }
