@@ -15,7 +15,7 @@ import {
   deleteBudgetSync,
 } from '../cost.js';
 import type { CostBudget } from '../cost.js';
-import { parseOhmypiSessionCostEventsSync } from '../cost-parsers/ohmypi-parser.js';
+import { parseOhmypiSessionCostResultSync } from '../cost-parsers/ohmypi-parser.js';
 import { parseCodexSessionCostEventsSync } from '../cost-parsers/codex-parser.js';
 import { getOverdeckHome } from '../paths.js';
 import { deriveTieredAgentCostRole } from '../agents/tier-metrics.js';
@@ -82,6 +82,11 @@ export const CostEvent = Schema.Struct({
   sourceFile:  Schema.NullOr(Schema.String),
 });
 export type CostEvent = typeof CostEvent.Type;
+
+export interface SkippedCostSession {
+  file: string;
+  reason: string;
+}
 
 export const Rollup = Schema.Struct({
   key:    Schema.String,
@@ -455,7 +460,7 @@ export class CostWriter extends Context.Service<
     // Catch-up sweep (PAN-1935: pi/codex sweep lands here)
     readonly reconcile: (opts?: {
       source?: 'claude' | 'ohmypi' | 'codex' | 'wal';
-    }) => Effect.Effect<{ imported: number }, CostIngestError>;
+    }) => Effect.Effect<{ imported: number; skipped: SkippedCostSession[] }, CostIngestError>;
     // Full rebuild from archive; recomputes cost from tokens
     readonly rebuild: () => Effect.Effect<{ events: number }, CostIngestError>;
     // Budget writes (budgets.json — separate from cost_events)
@@ -537,7 +542,7 @@ export const CostWriterLive = Layer.effect(
     const reconcile = (opts?: { source?: 'claude' | 'ohmypi' | 'codex' | 'wal' }) =>
       Effect.gen(function* () {
         const source = opts?.source ?? 'claude';
-        if (source !== 'ohmypi' && source !== 'codex') return { imported: 0 };
+        if (source !== 'ohmypi' && source !== 'codex') return { imported: 0, skipped: [] };
 
         const agentsDir = join(getOverdeckHome(), 'agents');
         const agentNames = yield* Effect.sync(() => {
@@ -548,6 +553,11 @@ export const CostWriterLive = Layer.effect(
         });
 
         let imported = 0;
+        const skipped: SkippedCostSession[] = [];
+        const markSkipped = (file: string, reason: string) => {
+          skipped.push({ file, reason });
+          console.warn(`[cost-reconcile] skipped ${file}: ${reason}`);
+        };
 
         for (const agentName of agentNames) {
           const sessionRoot =
@@ -559,7 +569,21 @@ export const CostWriterLive = Layer.effect(
 
           for (const sessionFile of sessionFiles) {
             if (source === 'ohmypi') {
-              const events = yield* Effect.sync(() => parseOhmypiSessionCostEventsSync(sessionFile));
+              const parsed = yield* Effect.sync(() => parseOhmypiSessionCostResultSync(sessionFile));
+              if (!parsed.ok) {
+                markSkipped(sessionFile, parsed.reason ?? 'unreadable');
+                continue;
+              }
+
+              const events = parsed.usageEvents ?? [];
+              if (events.length === 0) {
+                markSkipped(sessionFile, 'no-usage');
+                continue;
+              }
+              if (parsed.unpricedModels?.length) {
+                markSkipped(sessionFile, 'unpriced-model');
+              }
+
               for (const usage of events) {
                 const event: CostEvent = {
                   ts:          new Date(usage.timestamp),
@@ -587,6 +611,13 @@ export const CostWriterLive = Layer.effect(
             }
 
             const events = yield* Effect.sync(() => parseCodexSessionCostEventsSync(sessionFile));
+            if (events.length === 0) {
+              markSkipped(sessionFile, 'no-usage');
+              continue;
+            }
+            if (events.some((event) => event.model === 'unknown')) {
+              markSkipped(sessionFile, 'unknown-model');
+            }
             for (const usage of events) {
               const event: CostEvent = {
                 ts:          new Date(usage.timestamp),
@@ -613,7 +644,7 @@ export const CostWriterLive = Layer.effect(
           }
         }
 
-        return { imported };
+        return { imported, skipped };
       });
 
     // Stub — full rebuild (recomputes cost from tokens) deferred to
@@ -717,7 +748,10 @@ export const CostApi = HttpApiGroup.make('costs')
       payload: Schema.Struct({
         source: Schema.optional(Schema.Literals(['claude', 'ohmypi', 'codex', 'wal'])),
       }),
-      success: Schema.Struct({ imported: Schema.Number }),
+      success: Schema.Struct({
+        imported: Schema.Number,
+        skipped: Schema.Array(Schema.Struct({ file: Schema.String, reason: Schema.String })),
+      }),
       error:   CostIngestError,
     }),
   )

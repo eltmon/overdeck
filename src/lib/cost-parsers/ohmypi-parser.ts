@@ -144,7 +144,7 @@ function tsMs(timestamp: string | undefined): number {
   return Number.isFinite(t) ? t : 0;
 }
 
-interface ParseResult {
+export interface ParseResult {
   ok: boolean;
   reason?: string;
   usage?: SessionUsage;
@@ -183,6 +183,15 @@ export function parseOhmypiSessionCostEventsSync(filePath: string): OhmypiCostEv
   if (!existsSync(filePath)) return [];
   const result = parseOhmypiSessionContent(readFileSync(filePath, 'utf8'), filePath);
   return result.ok ? result.usageEvents ?? [] : [];
+}
+
+export function parseOhmypiSessionCostResultSync(filePath: string): ParseResult {
+  if (!existsSync(filePath)) return { ok: false, reason: 'unreadable' };
+  try {
+    return parseOhmypiSessionContent(readFileSync(filePath, 'utf8'), filePath);
+  } catch {
+    return { ok: false, reason: 'unreadable' };
+  }
 }
 
 /**
