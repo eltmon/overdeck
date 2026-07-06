@@ -4,17 +4,17 @@
     "created": "2026-07-03T15:57:39Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2253: Dashboard recovery guardian — make the supervisor sidecar durable via a systemd user unit",
-    "updated": "2026-07-03T16:07:26.002Z"
+    "updated": "2026-07-06T14:04:53.804Z"
   },
   "plan": {
     "id": "pan-2253",
     "title": "Dashboard recovery guardian — durable supervisor via systemd user unit",
-    "status": "proposed",
+    "status": "completed",
     "uid": "3c30a93c-b9cc-4626-b4db-87265375139d",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-03T15:57:39Z",
-    "updated": "2026-07-03T16:07:26.002Z",
+    "updated": "2026-07-06T14:04:53.804Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2253",
@@ -640,5 +640,5 @@
       "canonicalFilename": "2026-07-03-PAN-2253-dashboard-recovery-guardian-durable-supervisor-via-systemd-user-unit.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
