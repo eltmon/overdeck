@@ -607,6 +607,20 @@ export const postAgentsRoute = HttpRouter.add(
             workspacePath,
             porcelain: statusOut.trim(),
           }));
+          // PAN-2386: surface the refusal in the dashboard activity feed so the operator
+          // sees a toast instead of having to dig through lifecycle.log.
+          try {
+            emitActivityEntrySync({
+              source: 'dashboard',
+              level: 'warn',
+              message: `Workspace dirty — agent start refused for ${issueId}`,
+              issueId,
+              details: JSON.stringify({
+                reason: 'Workspace has uncommitted changes. Commit, discard, or resolve and retry.',
+                porcelain: statusOut.trim().split('\n').slice(0, 5),
+              }),
+            });
+          } catch { /* non-fatal — activity emit should not block the response */ }
           return jsonResponse({
             error: `Workspace ${workspacePath} has uncommitted changes. Choose an action and retry start with acknowledgeDirtyWorkspace=true.`,
             code: 'WORKSPACE_DIRTY',
