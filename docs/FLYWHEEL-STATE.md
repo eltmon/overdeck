@@ -207,6 +207,18 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-58 tick 9 (2026-07-06) — 2371 close-out LANDED; M1 (MIN-860 urgent) STARTED (14 beads); B1→review; A3 on waiter; main green
+
+**Order book: 2/19 landed (B0 + A2/PAN-2371 closed-out); A1+B1 in review, A3 start-pending; Lane M M1 in flight.** Main GREEN (23b2d0969d success).
+
+- **PAN-2371 close-out LANDED** (background retry completed: CLOSED + closed-out label, review-status cleared). A2 fully done.
+- **M1 (MIN-860, URGENT push-notif) STARTED** — `agent-min-860`, 14 beads, work/high. Lane M's urgent first item is in flight (`pan start MIN-860` resolved the MYN project fine).
+- **B1 (PAN-2207) → REVIEW** (agent-pan-2207-review). Lane B still serial at B1 (B2=PAN-2341 waits for B1 close-out). A1 (PAN-2373) in review too.
+- **A3 (PAN-2336) planned** (spec on main); start timed out on bd twice → on `w2336.sh` waiter.
+- **Ready set EMPTY** (`pan review pending --ready`) — MIN-831 cleared; no overdeck items ready yet. Nothing to assemble.
+- **PAN-2383 slots running again** (agent-pan-2383-slot-1/2) — operator's Standing-Crew test-drive; operator-owned, LEFT untouched.
+- Still open: 2387 stalled pre-finalize (operator kill+re-plan); B1↔strike-2417 done.ts collision (watch B1 submit); MIN-857 held (oversight); PAN-1491 deacon-swarm; bd contention persists. Swap ~98% / RAM ample.
+
 ## RUN-58 tick 8 (2026-07-06) — A2 (PAN-2371) MERGED via UAT promote; re-derived clean ready set; M1(MIN-860)+A3(2336) planned; MIN-831 ready via MYN train
 
 **Order book: 2/19 landed (B0 + A2/PAN-2371); A1+B1+2389 in flight; Lane M live (M1 planning).** Main = cac3ae7e12 (CI in_progress).

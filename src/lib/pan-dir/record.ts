@@ -137,6 +137,8 @@ export interface PanIssueRecord {
   model?: string;
   /** Per-issue review mode override; beats project/global config. */
   reviewMode?: ReviewMode;
+  /** Per-issue tiered execution override; beats plan-metadata and global config. */
+  tieredExecutionOverride?: 'on' | 'off';
 
   decisions?: ContinueDecision[];
   hazards?: ContinueHazard[];
@@ -611,6 +613,38 @@ export function writeRecordScopeDriftSync(
 ): void {
   const record = ensureIssueRecordSync(project, issueId);
   record.scopeDrift = scopeDrift;
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
+/** Write tiered execution override into the per-issue record (sync). Passing null clears the override. */
+export function writeRecordTieredExecutionOverrideSync(
+  project: ProjectConfig,
+  issueId: string,
+  override: 'on' | 'off' | null,
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  if (override === null) {
+    delete record.tieredExecutionOverride;
+  } else {
+    record.tieredExecutionOverride = override;
+  }
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
+/** Write tiered execution override into the per-issue record (async). Passing null clears the override. */
+export async function writeRecordTieredExecutionOverride(
+  project: ProjectConfig,
+  issueId: string,
+  override: 'on' | 'off' | null,
+): Promise<void> {
+  const record = await ensureIssueRecord(project, issueId);
+  if (override === null) {
+    delete record.tieredExecutionOverride;
+  } else {
+    record.tieredExecutionOverride = override;
+  }
   const recordPath = writeIssueRecordSync(project, issueId, record);
   queueIssueRecordCommit(project, issueId, recordPath);
 }
