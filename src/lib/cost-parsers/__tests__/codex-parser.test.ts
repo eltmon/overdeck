@@ -152,8 +152,13 @@ describe('parseCodexSessionSync', () => {
 
     try {
       writeFileSync(file, `${content}\n`, 'utf-8');
+      const session = parseCodexSessionSync(file);
       const events = parseCodexSessionCostEventsSync(file);
 
+      expect(session).toMatchObject({
+        model: 'unknown',
+        cost_v2: 0,
+      });
       expect(events).toHaveLength(1);
       expect(events[0]).toMatchObject({
         requestId: 'codex:no-model-thread:0',
