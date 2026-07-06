@@ -16,6 +16,7 @@ const getAgentStateSyncMock = vi.hoisted(() => vi.fn());
 const execSyncMock = vi.hoisted(() => vi.fn());
 const execFileSyncMock = vi.hoisted(() => vi.fn());
 const resolveProjectFromIssueSyncMock = vi.hoisted(() => vi.fn());
+const findPlanSyncMock = vi.hoisted(() => vi.fn());
 const vbriefLifecycleMocks = vi.hoisted(() => ({
   transitionVBriefOnMain: vi.fn(),
   updatePlanStatus: vi.fn(),
@@ -76,6 +77,11 @@ vi.mock('child_process', async () => {
 
 vi.mock('../../../lib/work-agent-lifecycle.js', () => ({
   assertCanStartFreshSync: vi.fn(() => ({ canStartFresh: true })),
+  getWorkAgentLifecycleStateSync: vi.fn(() => ({ isRunning: false, isRunningButStuck: false })),
+}));
+
+vi.mock('../../../lib/vbrief/io.js', () => ({
+  findPlanSync: findPlanSyncMock,
 }));
 
 vi.mock('../../../lib/vbrief/lifecycle-io.js', () => ({
@@ -130,6 +136,7 @@ describe('pan start sync-main conflict (PAN-1872)', () => {
     execSyncMock.mockReset();
     execFileSyncMock.mockReset();
     resolveProjectFromIssueSyncMock.mockReset();
+    findPlanSyncMock.mockReset();
     vbriefLifecycleMocks.transitionVBriefOnMain.mockReset();
     vbriefLifecycleMocks.updatePlanStatus.mockReset();
     promptMocks.buildWorkAgentPrompt.mockClear();
@@ -156,6 +163,7 @@ describe('pan start sync-main conflict (PAN-1872)', () => {
     }));
 
     syncMainMock.mockResolvedValue({ success: true, commitCount: 0 });
+    findPlanSyncMock.mockReturnValue(join(tmpDir, '.pan', 'specs', 'PAN-1872.vbrief.json'));
     execSyncMock.mockImplementation((cmd: string) => {
       if (cmd.includes('git branch --show-current')) return 'feature/pan-1872\n';
       return '';

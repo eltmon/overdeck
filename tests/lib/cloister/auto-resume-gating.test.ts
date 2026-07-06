@@ -287,6 +287,7 @@ describe('auto-resume gates', () => {
     vi.doMock('../../../src/lib/work-agent-lifecycle.js', () => ({
       assertCanStartFresh: vi.fn(),
       assertCanStartFreshSync: vi.fn(),
+      getWorkAgentLifecycleStateSync: vi.fn(() => ({ isRunning: false, isRunningButStuck: false })),
     }));
     vi.doMock('../../../src/lib/cloister/work-agent-prompt.js', () => ({
       buildWorkAgentPrompt: vi.fn().mockResolvedValue('prompt'),

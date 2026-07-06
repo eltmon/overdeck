@@ -22,6 +22,7 @@ const agentMocks = vi.hoisted(() => ({
 }));
 
 const resolveProjectMock = vi.hoisted(() => vi.fn());
+const findPlanSyncMock = vi.hoisted(() => vi.fn());
 
 const oraMocks = vi.hoisted(() => {
   const spinner = {
@@ -37,6 +38,10 @@ const oraMocks = vi.hoisted(() => {
 });
 
 vi.mock('../../../lib/work-agent-lifecycle.js', () => lifecycleMocks);
+
+vi.mock('../../../lib/vbrief/io.js', () => ({
+  findPlanSync: findPlanSyncMock,
+}));
 
 vi.mock('../../../lib/agents.js', async () => {
   const actual = await vi.importActual<typeof import('../../../lib/agents.js')>('../../../lib/agents.js');
@@ -87,6 +92,7 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
     agentMocks.clearAgentPausedSync.mockReset();
     agentMocks.spawnAgent.mockReset();
     resolveProjectMock.mockReset();
+    findPlanSyncMock.mockReset();
     oraMocks.ora.mockClear();
     oraMocks.spinner.text = '';
     oraMocks.spinner.start.mockClear();
@@ -190,6 +196,7 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
 
   it('preserves the resume/fresh refusal for a stopped agent with a resumable session', async () => {
     createWorkspace('PAN-X');
+    findPlanSyncMock.mockReturnValue('/tmp/.pan/specs/PAN-X.vbrief.json');
     agentMocks.getAgentStateSync.mockReturnValue({
       id: 'agent-pan-x',
       issueId: 'PAN-X',
@@ -203,7 +210,7 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
     });
 
     const { issueCommand } = await import('../start.js');
-    await expect(issueCommand('PAN-X', { model: '' } as any)).rejects.toThrow(/__exit__:1/);
+    await expect(issueCommand('PAN-X', { model: '', plan: 'auto' } as any)).rejects.toThrow(/__exit__:1/);
 
     expect(oraMocks.spinner.fail).toHaveBeenCalledWith(expect.stringContaining('use pan resume or --fresh'));
   });
