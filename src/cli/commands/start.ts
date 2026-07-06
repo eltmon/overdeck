@@ -95,6 +95,7 @@ import type { RemoteWorkspaceMetadata } from '../../lib/remote/interface.js';
 import type { SpawnRemoteAgentOptions } from '../../lib/remote/remote-agents.js';
 import { assertCanStartFreshSync } from '../../lib/work-agent-lifecycle.js';
 import { normalizeModelOverrideSync } from '../../lib/model-validation.js';
+import { resolvePlanningMode, type PlanningMode } from './planning-mode.js';
 
 interface IssueOptions {
   model: string;
@@ -108,6 +109,9 @@ interface IssueOptions {
   local?: boolean;
   /** Remote workspace resiliency tier override: ephemeral | durable. */
   tier?: string;
+  /** Explicit planning-depth flag: interactive | auto | skip. */
+  plan?: string;
+  /** Legacy auto-skip-planning flag; deprecated — use --plan skip instead. */
   auto?: boolean;
   host?: boolean;
   yes?: boolean;
@@ -115,6 +119,8 @@ interface IssueOptions {
   /** Drop the saved Claude session pointer (non-destructive) and start a brand-new
    *  session — the one-step "restart fresh" path, e.g. to switch a stopped agent's model. */
   fresh?: boolean;
+  /** Resolved planning mode for this start invocation. Set by issueCommand. */
+  planningMode?: PlanningMode;
 }
 
 /**
@@ -904,6 +910,28 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       process.exit(1);
     }
   }
+
+  // Resolve planning mode for pan start (PAN-2407): explicit --plan wins over
+  // legacy --auto, then config.planning.default_mode, then shipped default 'auto'.
+  let resolvedPlanningMode: PlanningMode;
+  try {
+    const planningResolution = resolvePlanningMode({
+      planFlag: options.plan,
+      legacyAuto: options.auto,
+      configDefault: yamlConfig.planning?.defaultMode,
+    });
+    resolvedPlanningMode = planningResolution.mode;
+    for (const warning of planningResolution.warnings) {
+      console.warn(warning);
+    }
+  } catch (error) {
+    process.stderr.write(chalk.red(`${error instanceof Error ? error.message : String(error)}\n`));
+    process.exit(1);
+  }
+  options.planningMode = resolvedPlanningMode;
+  // Preserve legacy behavior until route-unplanned-to-planning bead fully wires
+  // resolved mode into the spawn path.
+  options.auto = resolvedPlanningMode === 'skip';
 
   const shouldClearPauseBeforeSpawn = existingAgentState?.paused === true && options.force === true;
   if (existingAgentState?.paused === true && !options.force) {
