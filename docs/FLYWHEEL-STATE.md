@@ -207,6 +207,19 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-58 tick 13 (2026-07-06) — RED MAIN (P0) struck: unresolved import in workspace-data.ts (PAN-2383/2401 write-door); A3 merge failed (red + 403); 2387 recovered
+
+**Order book: 2/19 landed; RED MAIN blocks all merges.** Main RED (2e97a43812 — build fails).
+
+**RED MAIN (P0) — struck.** ALL 4 CI jobs fail on `2e97a43812` ("chore(infra): baseline workspace-data.ts at 1013 — PAN-2383 write door + PAN-2401 overlay") with `[UNRESOLVED_IMPORT] Could not resolve '../../../pan-dir/record.js' in routes/workspaces/workspace-data.ts`. **Root cause (verified):** `workspace-data.ts:953` dynamic-imports `'../../../pan-dir/record.js'` — wrong path (missing `lib/`, one `../` too shallow → resolves to nonexistent `src/dashboard/pan-dir/record.js`). `record.ts` lives at `src/lib/pan-dir/record.ts`; correct path = **`'../../../../lib/pan-dir/record.js'`** (proven by sibling `routes/agents/spawn.ts:550` at same depth). Filed **PAN-2429 (blocks-main)** + struck `strike-pan-2429` (codex/gpt-5.5). One-line fix; I own the merge. **This landed via the operator's PAN-2383 write-door work — the operator's PAN-2383 slots are still editing workspace-data.ts, so the strike's fix must survive PAN-2383's eventual merge (they must carry the corrected path).**
+- REUSABLE: a build-breaking import fails ALL jobs (build/smoke/test/lint) identically — the `[UNRESOLVED_IMPORT]` line in any job's log is the tell.
+
+**A3 (PAN-2336) scheduled merge (id 16) FAILED** — "GitHub merge failed: 403 Resource not accessible" (App merge-permission error) AND red main blocks it. **Reschedule A3 after main greens**; if the 403 persists on green main, surface it as a merge-backend App-permission issue. (Other auto-merge/problems entries — PAN-1982/2063/1718/2338/1917 — are STALE cruft, ignore.)
+
+**PAN-2387 RECOVERED** — now `in-progress` with a work agent (agent-pan-2387); pre-finalize stall resolved. No longer needs operator kill+re-plan.
+
+**Still in flight (blocked from merge until green):** A1 (PAN-2373 review), B1 (PAN-2207 review+test), trio 2388/2389, M1 (agent-min-860), M3 (planning-min-854), 2407. MIN-857 held. Swap ~97% / RAM ample.
+
 ## RUN-58 tick 12 (2026-07-06) — A3 (PAN-2336) merge-ready → SCHEDULED auto-merge; 2386 closed out; M3 planning; merge mechanism clarified
 
 **Order book: 2/19 landed (B0+A2); A3 (PAN-2336) merge SCHEDULED (~3rd); A1+B1 review; M1 running; M3 planning.** Main GREEN (bb88350d2a).
