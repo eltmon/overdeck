@@ -21,6 +21,11 @@
       "reason": "resume",
       "agentModel": "kimi-k2.7-code",
       "timestamp": "2026-07-06T15:32:43.769Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-06T15:41:13.763Z"
     }
   ],
   "feedback": [
@@ -40,18 +45,20 @@
     }
   ],
   "created": "2026-07-06T14:44:54.009Z",
-  "updated": "2026-07-06T15:33:23.492Z",
+  "updated": "2026-07-06T15:42:25.844Z",
   "pipeline": {
     "issueId": "PAN-2402",
     "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T15:33:23.386Z",
-    "reviewNotes": "Attribution regression test does not cover service log fallback",
+    "updatedAt": "2026-07-06T15:42:25.780Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: added service-cost-alerts test covering the (unattributed) log fallback",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2411",
-    "lastVerifiedCommit": "20a022d4d542bc319ea3ef1a5bc2f9c85df0e6ba",
+    "lastVerifiedCommit": "7dcad064366c345c546f5652bd8896b95c8d84b4",
     "reviewRequestedAt": "2026-07-06T15:30:27.180Z"
   },
   "closeOut": {
@@ -73,9 +80,9 @@
             "cacheWrite": 339334
           },
           "custom/kimi-k2.7-code": {
-            "input": 448261,
-            "output": 26915,
-            "cacheRead": 9388032,
+            "input": 482795,
+            "output": 36776,
+            "cacheRead": 14976000,
             "cacheWrite": 0
           }
         }
@@ -94,15 +101,15 @@
           "cacheWrite": 339334
         },
         "custom/kimi-k2.7-code": {
-          "input": 448261,
-          "output": 26915,
-          "cacheRead": 9388032,
+          "input": 482795,
+          "output": 36776,
+          "cacheRead": 14976000,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 4.42377,
-        "pricingAsOf": "2026-07-06T15:33:23.489Z"
+        "usd": 5.557735,
+        "pricingAsOf": "2026-07-06T15:42:25.844Z"
       }
     },
     "merges": [
@@ -110,8 +117,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "auto-start": "completed",
     "auto-start.ac1": "completed",
