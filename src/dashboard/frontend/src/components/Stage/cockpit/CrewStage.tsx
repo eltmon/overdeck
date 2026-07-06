@@ -32,7 +32,7 @@ function compactModelName(model: string | undefined): string {
 
 function initialsFor(model: string | undefined): string {
   const compact = compactModelName(model)
-  const match = compact.match(/^([a-z]+)[^a-z]*([\d.]*)/i)
+  const match = compact.match(/^([a-z]+)[^a-z0-9]*([\d.]*)/i)
   const word = match?.[1] ?? compact
   const num = (match?.[2] ?? '').split('.')[0]
   return `${word.slice(0, 1).toUpperCase()}${num}`.slice(0, 3)

@@ -26866,7 +26866,7 @@ const PROVIDERS = {
 			haiku: "gpt-5.4-mini"
 		},
 		tested: true,
-		description: "Route through the local CLIProxyAPI Anthropic-compatible sidecar using Codex/ChatGPT subscription auth."
+		description: "First-party Codex CLI harness (default) using ChatGPT-subscription or API-key auth. The local CLIProxyAPI sidecar remains a legacy alternate for routing GPT models into claude-code."
 	},
 	google: {
 		name: "google",
@@ -27388,9 +27388,37 @@ function validateTieredExecutionConfig(rawConfig, context = {}) {
 	const normalizedTiers = {};
 	for (const [tierName, tier] of Object.entries(config.tiers)) {
 		const path = `tiered_execution.tiers.${tierName}`;
-		validateHarness(tier.harness, path);
-		const model = validateModel(tier.model, path);
-		validateModelHarnessPolicy(model, tier.harness, path, context);
+		const rawDistribution = tier.distribution;
+		let normalizedDistribution;
+		let model;
+		let harness;
+		if (rawDistribution !== void 0) {
+			if (!Array.isArray(rawDistribution) || rawDistribution.length === 0) throw new TieredExecutionConfigError(`${path}.distribution must be a non-empty array of {model, harness, weight}`);
+			normalizedDistribution = rawDistribution.map((entry, index) => {
+				const entryPath = `${path}.distribution[${index}]`;
+				const candidate = entry;
+				validateHarness(candidate.harness, entryPath);
+				const entryModel = validateModel(candidate.model, entryPath);
+				validateModelHarnessPolicy(entryModel, candidate.harness, entryPath, context);
+				if (!Number.isInteger(candidate.weight) || candidate.weight <= 0) throw new TieredExecutionConfigError(`${entryPath}.weight must be a positive integer`);
+				return {
+					model: entryModel,
+					harness: candidate.harness,
+					weight: candidate.weight
+				};
+			});
+			const total = normalizedDistribution.reduce((sum, entry) => sum + entry.weight, 0);
+			if (total !== 100) throw new TieredExecutionConfigError(`${path}.distribution weights must total exactly 100 (got ${total})`);
+			const representative = normalizedDistribution.reduce((best, entry) => entry.weight > best.weight ? entry : best);
+			if (tier.model !== void 0 && tier.model !== representative.model || tier.harness !== void 0 && tier.harness !== representative.harness) throw new TieredExecutionConfigError(`${path} must declare either model/harness or distribution, not both`);
+			model = representative.model;
+			harness = representative.harness;
+		} else {
+			validateHarness(tier.harness, path);
+			model = validateModel(tier.model, path);
+			validateModelHarnessPolicy(model, tier.harness, path, context);
+			harness = tier.harness;
+		}
 		if (!Array.isArray(tier.difficulties) || tier.difficulties.length === 0) throw new TieredExecutionConfigError(`${path}.difficulties must contain at least one difficulty`);
 		const difficulties = [];
 		for (const difficulty of tier.difficulties) {
@@ -27400,8 +27428,9 @@ function validateTieredExecutionConfig(rawConfig, context = {}) {
 		}
 		normalizedTiers[tierName] = {
 			model,
-			harness: tier.harness,
-			difficulties
+			harness,
+			difficulties,
+			...normalizedDistribution ? { distribution: normalizedDistribution } : {}
 		};
 	}
 	const difficultyToTier = {};
@@ -27429,7 +27458,7 @@ function validateTieredExecutionConfig(rawConfig, context = {}) {
 			model: supervisorModel,
 			harness: config.supervisor.harness,
 			subscribe: config.supervisor.subscribe,
-			owns_inspection: config.supervisor.owns_inspection ?? false
+			owns_inspection: config.supervisor.owns_inspection ?? true
 		},
 		by_kind: byKind,
 		byKind,
@@ -27804,6 +27833,19 @@ function resolveEnvVar(value) {
 /**
 * Merge multiple configs with precedence: project > global > defaults
 */
+let lastTieredInvalidReasonWarned;
+function degradeInvalidTieredExecution(result, err) {
+	if (!(err instanceof TieredExecutionConfigError)) throw err;
+	if (lastTieredInvalidReasonWarned !== err.message) {
+		lastTieredInvalidReasonWarned = err.message;
+		console.error(`[config] tiered_execution is INVALID — tiered staffing disabled until fixed: ${err.message}`);
+	}
+	result.tieredExecutionInvalid = { reason: err.message };
+	result.tieredExecution = {
+		...DEFAULT_TIERED_EXECUTION_CONFIG,
+		enabled: false
+	};
+}
 function mergeConfigs(...configs) {
 	const result = {
 		...DEFAULT_CONFIG,
@@ -28006,7 +28048,12 @@ function mergeConfigs(...configs) {
 		}
 		if (config.openrouter?.favorites) result.openrouterFavorites = config.openrouter.favorites;
 		mergeRoleConfig(result, config);
-		if (config.tiered_execution) result.tieredExecution = validateTieredExecutionConfig(config.tiered_execution, { providerAuth: result.providerAuth });
+		if (config.tiered_execution) try {
+			result.tieredExecution = validateTieredExecutionConfig(config.tiered_execution, { providerAuth: result.providerAuth });
+			result.tieredExecutionInvalid = void 0;
+		} catch (err) {
+			degradeInvalidTieredExecution(result, err);
+		}
 		if (config.api_keys) {
 			if (config.api_keys.openai) {
 				result.apiKeys.openai = resolveEnvVar(config.api_keys.openai);
@@ -28106,7 +28153,11 @@ function mergeConfigs(...configs) {
 		}
 	}
 	validateRoleModelRefs(result);
-	result.tieredExecution = validateTieredExecutionConfig(result.tieredExecution, { providerAuth: result.providerAuth });
+	if (!result.tieredExecutionInvalid) try {
+		result.tieredExecution = validateTieredExecutionConfig(result.tieredExecution, { providerAuth: result.providerAuth });
+	} catch (err) {
+		degradeInvalidTieredExecution(result, err);
+	}
 	return {
 		config: result,
 		explicitlyDisabled
