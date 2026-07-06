@@ -38,6 +38,8 @@ export interface ReconcileResult {
   eventsImported: number;
   duplicatesSkipped: number;
   errors: Array<{ path: string; error: string }>;
+  earliestEventTs: string | null;
+  latestEventTs: string | null;
 }
 
 interface SessionMapping {
@@ -466,6 +468,8 @@ export async function reconcilePiTranscripts(): Promise<ReconcileResult> {
     eventsImported: 0,
     duplicatesSkipped: 0,
     errors: [],
+    earliestEventTs: null,
+    latestEventTs: null,
   };
 
   const agentsDir = getAgentsDir();
@@ -506,9 +510,10 @@ export async function reconcilePiTranscripts(): Promise<ReconcileResult> {
         const events = extractPiCostEvents(content, agentDirName, issueId, sessionType, sessionId);
         if (events.length === 0) continue;
         result.sessionsWithNewData++;
-        const { inserted, duplicates } = await recordCostEventsThroughOverdeck(events, `reconciler:${transcriptPath}`);
+        const { inserted, duplicates, earliestEventTs, latestEventTs } = await recordCostEventsThroughOverdeck(events, `reconciler:${transcriptPath}`);
         result.eventsImported += inserted;
         result.duplicatesSkipped += duplicates;
+        mergeCoverage(result, { earliestEventTs, latestEventTs });
       } catch (err) {
         result.errors.push({
           path: transcriptPath,
@@ -543,28 +548,51 @@ function toOverdeckCostEvent(event: CostEvent, sourceFile: string): OverdeckCost
 async function recordCostEventsThroughOverdeck(
   events: CostEvent[],
   sourceFile: string,
-): Promise<{ inserted: number; duplicates: number }> {
+  opts: { dryRun?: boolean } = {},
+): Promise<{ inserted: number; duplicates: number; earliestEventTs: string | null; latestEventTs: string | null }> {
   let inserted = 0;
   let duplicates = 0;
+  let earliestEventTs: string | null = null;
+  let latestEventTs: string | null = null;
   for (const event of events) {
     const didInsert = await Effect.runPromise(
-      CostWriter.use((writer) => writer.record(toOverdeckCostEvent(event, sourceFile))).pipe(
+      CostWriter.use((writer) => writer.record(toOverdeckCostEvent(event, sourceFile), { dryRun: opts.dryRun })).pipe(
         Effect.provide(CostDoorLive),
       ),
     );
-    if (didInsert) inserted++;
-    else duplicates++;
+    if (didInsert) {
+      inserted++;
+      const iso = new Date(event.ts).toISOString();
+      if (earliestEventTs == null || iso < earliestEventTs) earliestEventTs = iso;
+      if (latestEventTs == null || iso > latestEventTs) latestEventTs = iso;
+    } else {
+      duplicates++;
+    }
   }
-  return { inserted, duplicates };
+  return { inserted, duplicates, earliestEventTs, latestEventTs };
 }
 
-async function reconcilePromise(): Promise<ReconcileResult> {
+function mergeCoverage(
+  result: Pick<ReconcileResult, 'earliestEventTs' | 'latestEventTs'>,
+  coverage: Pick<ReconcileResult, 'earliestEventTs' | 'latestEventTs'>,
+): void {
+  if (coverage.earliestEventTs != null && (result.earliestEventTs == null || coverage.earliestEventTs < result.earliestEventTs)) {
+    result.earliestEventTs = coverage.earliestEventTs;
+  }
+  if (coverage.latestEventTs != null && (result.latestEventTs == null || coverage.latestEventTs > result.latestEventTs)) {
+    result.latestEventTs = coverage.latestEventTs;
+  }
+}
+
+async function reconcilePromise(opts: { dryRun?: boolean; includePi?: boolean } = {}): Promise<ReconcileResult> {
   const result: ReconcileResult = {
     sessionsScanned: 0,
     sessionsWithNewData: 0,
     eventsImported: 0,
     duplicatesSkipped: 0,
     errors: [],
+    earliestEventTs: null,
+    latestEventTs: null,
   };
 
   const claudeProjectsDir = getClaudeProjectsDir();
@@ -621,7 +649,7 @@ async function reconcilePromise(): Promise<ReconcileResult> {
         // Read new bytes
         const readResult = readNewBytes(transcriptPath, lastOffset);
         if (!readResult || !readResult.content) {
-          if (readResult && readResult.newSize > lastOffset) {
+          if (!opts.dryRun && readResult && readResult.newSize > lastOffset) {
             saveSessionOffset(sessionId, readResult.newSize, 0, agentId, issueId, transcriptPath);
           }
           continue;
@@ -631,17 +659,22 @@ async function reconcilePromise(): Promise<ReconcileResult> {
         const events = extractCostEvents(readResult.content, agentId, issueId, sessionType, sessionId);
 
         if (events.length === 0) {
-          saveSessionOffset(sessionId, readResult.newSize, 0, agentId, issueId, transcriptPath);
+          if (!opts.dryRun) {
+            saveSessionOffset(sessionId, readResult.newSize, 0, agentId, issueId, transcriptPath);
+          }
           continue;
         }
 
         result.sessionsWithNewData++;
 
-        const { inserted, duplicates } = await recordCostEventsThroughOverdeck(events, `reconciler:${transcriptPath}`);
+        const { inserted, duplicates, earliestEventTs, latestEventTs } = await recordCostEventsThroughOverdeck(events, `reconciler:${transcriptPath}`, { dryRun: opts.dryRun });
         result.eventsImported += inserted;
         result.duplicatesSkipped += duplicates;
+        mergeCoverage(result, { earliestEventTs, latestEventTs });
 
-        saveSessionOffset(sessionId, readResult.newSize, inserted, agentId, issueId, transcriptPath);
+        if (!opts.dryRun) {
+          saveSessionOffset(sessionId, readResult.newSize, inserted, agentId, issueId, transcriptPath);
+        }
       } catch (err) {
         result.errors.push({
           path: transcriptPath,
@@ -673,15 +706,20 @@ async function reconcilePromise(): Promise<ReconcileResult> {
             const events = extractCostEvents(readResult.content, agentId, issueId, sessionType, sessionId);
 
             if (events.length === 0) {
-              saveSessionOffset(sessionId, readResult.newSize, 0, agentId, issueId, transcriptPath);
+              if (!opts.dryRun) {
+                saveSessionOffset(sessionId, readResult.newSize, 0, agentId, issueId, transcriptPath);
+              }
               continue;
             }
 
             result.sessionsWithNewData++;
-            const { inserted, duplicates } = await recordCostEventsThroughOverdeck(events, `reconciler:${transcriptPath}`);
+            const { inserted, duplicates, earliestEventTs, latestEventTs } = await recordCostEventsThroughOverdeck(events, `reconciler:${transcriptPath}`, { dryRun: opts.dryRun });
             result.eventsImported += inserted;
             result.duplicatesSkipped += duplicates;
-            saveSessionOffset(sessionId, readResult.newSize, inserted, agentId, issueId, transcriptPath);
+            mergeCoverage(result, { earliestEventTs, latestEventTs });
+            if (!opts.dryRun) {
+              saveSessionOffset(sessionId, readResult.newSize, inserted, agentId, issueId, transcriptPath);
+            }
           } catch (err) {
             result.errors.push({
               path: transcriptPath,
@@ -697,12 +735,15 @@ async function reconcilePromise(): Promise<ReconcileResult> {
 
   // PAN-1935: also sweep pi/oh-my-pi harness transcripts under
   // ~/.overdeck/agents/*/ (the Claude scan above only covers ~/.claude/projects).
-  const piResult = await reconcilePiTranscripts();
-  result.sessionsScanned += piResult.sessionsScanned;
-  result.sessionsWithNewData += piResult.sessionsWithNewData;
-  result.eventsImported += piResult.eventsImported;
-  result.duplicatesSkipped += piResult.duplicatesSkipped;
-  result.errors.push(...piResult.errors);
+  if (opts.includePi ?? true) {
+    const piResult = await reconcilePiTranscripts();
+    result.sessionsScanned += piResult.sessionsScanned;
+    result.sessionsWithNewData += piResult.sessionsWithNewData;
+    result.eventsImported += piResult.eventsImported;
+    result.duplicatesSkipped += piResult.duplicatesSkipped;
+    result.errors.push(...piResult.errors);
+    mergeCoverage(result, piResult);
+  }
 
   return result;
 }
@@ -714,8 +755,8 @@ async function reconcilePromise(): Promise<ReconcileResult> {
  * `result.errors`; only catastrophic failures (e.g. SQLite open failure)
  * surface on the Effect error channel.
  */
-export const reconcile = (): Effect.Effect<ReconcileResult, FsError> =>
+export const reconcile = (opts: { dryRun?: boolean; includePi?: boolean } = {}): Effect.Effect<ReconcileResult, FsError> =>
   Effect.tryPromise({
-    try: () => reconcilePromise(),
+    try: () => reconcilePromise(opts),
     catch: (cause) => new FsError({ path: '<reconciler>', operation: 'reconcile', cause }),
   });

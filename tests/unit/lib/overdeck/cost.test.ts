@@ -414,7 +414,15 @@ describe('CostWriter — record persists to archive then DB then bus', () => {
       CostWriter.use((w) => w.reconcile()).pipe(Effect.provide(layer)),
     );
 
-    expect(result).toEqual({ imported: 0 });
+    expect(result).toMatchObject({
+      imported: 0,
+      sessionsScanned: 0,
+      eventsImported: 0,
+      duplicatesSkipped: 0,
+      errors: [],
+      earliestEventTs: null,
+      latestEventTs: null,
+    });
   });
 
   it('rebuild() returns { events: 0 } (stub)', async () => {

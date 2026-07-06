@@ -17,7 +17,7 @@ interface BeadsResponse {
   tasks: BeadTask[]
 }
 
-function tieredChipLabel(effective: boolean, source: 'issue-override' | 'plan-metadata' | 'global'): string {
+function tieredChipLabel(effective: boolean, source: string): string {
   const sourceLabel = source === 'issue-override' ? 'issue override' : source === 'plan-metadata' ? 'plan metadata' : 'global'
   return `tiered: ${effective ? 'on' : 'off'} (${sourceLabel})`
 }

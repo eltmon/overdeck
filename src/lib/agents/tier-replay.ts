@@ -1,7 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { ModelId } from '../settings.js';
-import type { RuntimeName } from '../runtimes/types.js';
 import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
 import type { TierOverridesMap } from '../vbrief/io.js';
 import { getModelCapabilitySync, hasModelCapabilitySync, resolveModelIdSync } from '../model-capabilities.js';

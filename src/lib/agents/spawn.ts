@@ -574,7 +574,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   let prompt = options.prompt || '';
 
   // FPP: Check for pending work on hook
-  const { hasWork, items } = checkHookSync(agentId);
+  const { hasWork } = checkHookSync(agentId);
   if (hasWork) {
     const fixedPointPrompt = generateFixedPointPromptSync(agentId);
     if (fixedPointPrompt) {

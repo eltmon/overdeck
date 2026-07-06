@@ -9,12 +9,8 @@
  * no Schema crashes. This is the T3Code pattern.
  */
 
-import { existsSync } from 'fs';
-import { join } from 'path';
 import { Effect, Layer, Context } from 'effect';
-import { getSharedDb } from './event-store.js';
 import type { DashboardSnapshot, DomainEvent, TurnDiffSummary } from '@overdeck/contracts';
-import { AGENTS_DIR } from '../../lib/paths.js';
 import {
   type ReadModelState,
   INITIAL_READ_MODEL_STATE,
@@ -23,9 +19,8 @@ import {
   isTerminalTurnDiffSummaryStatus,
   trimTurnDiffSummaries,
 } from '@overdeck/contracts';
-import type { AgentSnapshot, AgentStatus, Role, AgentResolution, ReviewStatusSnapshot, ReviewStatusValue, TestStatusValue, UatStatusValue, MergeStatusValue, VerificationStatusValue, ResourceStats } from '@overdeck/contracts';
+import type { AgentSnapshot, AgentStatus, Role, AgentResolution, ReviewStatusSnapshot, ReviewStatusValue, TestStatusValue, UatStatusValue, MergeStatusValue, VerificationStatusValue } from '@overdeck/contracts';
 import type { ReviewStatus } from '../../lib/review-status.js';
-import { logDeaconEventSync } from '../../lib/persistent-logger.js';
 import { listOverdeckAgentStatesSync } from '../../lib/overdeck/agent-state-sync.js';
 import { computeQueuePositionFromStatusSync } from '../../lib/queue-position.js'
 import { AgentsResolver, type Agent as OverdeckAgent } from '../../lib/overdeck/agents.js';

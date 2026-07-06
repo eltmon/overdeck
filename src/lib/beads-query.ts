@@ -180,7 +180,7 @@ export async function queryReadyBeadsByIssueLabelsPromise(
   }
 }
 
-async function assertIssueHasBeadsPromise(
+export async function assertIssueHasBeadsPromise(
   workspacePath: string,
   issueId: string,
   retryOptions: Omit<RunBdWithRetryOptions, 'workspacePath'> = {},

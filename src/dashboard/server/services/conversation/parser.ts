@@ -144,8 +144,6 @@ export async function parseConversationMessages(
 
   // Pending assistant message being assembled from content blocks
   let pendingAssistant: ChatMessage | null = null;
-  // Track last user message timestamp for duration calculation
-  let lastUserTimestamp: string | null = null;
   // Map tool_use id → WorkLogEntry (waiting for tool_result)
   const pendingToolUse = priorState?.pendingToolUse ?? new Map<string, WorkLogEntry>();
   // Map tool_use id → pre-arrived tool_result (waiting for tool_use)
@@ -206,7 +204,6 @@ export async function parseConversationMessages(
         const text = renderableUserText(rawContent);
         if (text !== null) {
           const ts = entry.timestamp ?? new Date().toISOString();
-          lastUserTimestamp = ts;
           messages.push({
             id: entry.uuid ?? `user-${messages.length}`,
             role: 'user',
@@ -270,7 +267,6 @@ export async function parseConversationMessages(
         }
         if (textBlocks.length > 0) {
           const ts = entry.timestamp ?? new Date().toISOString();
-          lastUserTimestamp = ts;
           messages.push({
             id: entry.uuid ?? `user-${messages.length}`,
             role: 'user',
@@ -566,7 +562,6 @@ export async function parseConversationMessages(
             pendingAssistant = null;
           }
           const ts = entry.timestamp ?? new Date().toISOString();
-          lastUserTimestamp = ts;
           messages.push({
             id: ((entry as Record<string, unknown>).uuid as string | undefined) ?? `queued-${lineSequence}`,
             role: 'user',

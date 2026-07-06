@@ -6,7 +6,7 @@
  */
 
 import { Effect } from 'effect';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, readdirSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
 import { join } from 'path';
 import { COSTS_DIR } from './paths.js';
 import { FsError } from './errors.js';
