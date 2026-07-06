@@ -81,6 +81,7 @@ Substrate bug issues filed during a Flywheel run carry a trailer block at the bo
 Flywheel-Run-Id: RUN-123
 Flywheel-Filed-By: agent
 Flywheel-Discovered-In: PAN-1487
+Flywheel-Affects-Criterion: 3
 ```
 
 `Flywheel-Run-Id` identifies the active Flywheel orchestrator run that exposed the bug. The hook only injects the block when the run id matches the canonical `RUN-<number>` form.
@@ -88,6 +89,8 @@ Flywheel-Discovered-In: PAN-1487
 `Flywheel-Filed-By` is `agent` only when the singleton `flywheel-orchestrator` files the issue itself. Work, plan, review, test, ship, and operator-requested issue creation are recorded as `operator` because a human or non-Flywheel role decided to file the record.
 
 `Flywheel-Discovered-In` names the pipeline issue whose run exposed the substrate bug. It is resolved from the filing agent's Overdeck state at `${OVERDECK_HOME}/agents/<agent-id>/state.json`; the line is omitted when no issue id is available.
+
+`Flywheel-Affects-Criterion` is an optional, author-supplied line naming the v1.0 readiness criterion (or criteria) the bug degrades. Use the criterion numbers `1` through `7` from [Reading the Stats panel](#reading-the-stats-panel); multiple criteria may be listed as a comma-separated list (e.g., `Flywheel-Affects-Criterion: 3,7`). Omit the line when the affected criterion is unknown. This trailer is semantic guidance for ranking and filtering suggestions; it is not a GitHub label and is not injected by the `gh-issue-trailer-hook`.
 
 The `gh-issue-trailer-hook` Claude Code PreToolUse Bash hook injects the trailer into `gh issue create` calls before later Bash filters run. It handles inline `--body`, `--body-file <path>`, and `--body-file -` stdin bodies, and it leaves commands unchanged when a `Flywheel-Run-Id:` line already exists.
 

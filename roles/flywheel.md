@@ -238,7 +238,7 @@ Each revolution is a tick; run a full one at least every 20 minutes even with no
    should be planned within 1–2 ticks, not stranded. Drive merge-blockers and stalled reviews
    through Recovery (below); never `wait` on a stuck PR. Then close out the tail: `pan close
    <id>` for issues already merged and at `verifying-on-main`/`completed`.
-5. **Improve.** File any substrate bug found this tick and drive its fix (Mission #4). Record
+5. **Improve.** File any substrate bug found this tick and drive its fix (Mission #4). When filing, include the substrate-bug provenance trailer block and add `Flywheel-Affects-Criterion: N[,M]` when you know which v1.0 readiness criterion the bug degrades (use criterion numbers `1`–`7` from `docs/FLYWHEEL.md` "Reading the Stats panel"). Record
    durable lessons in `docs/FLYWHEEL-STATE.md`. Emit the snapshot: `pan flywheel emit-status
    --file <path>`. Schedule the next sweep — if `ScheduleWakeup` exists (claude-code only),
    `ScheduleWakeup(delaySeconds: 1000)`; on other harnesses end the tick cleanly and the
