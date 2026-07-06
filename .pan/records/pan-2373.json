@@ -1,7 +1,60 @@
 {
   "issueId": "PAN-2373",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-06T19:57:11.433Z"
+    },
+    {
+      "timestamp": "2026-07-06T20:05:19.422Z",
+      "reason": "end",
+      "note": "Refactored to planned design: quarantine.ts module, positional-arg flake-lane, GITHUB_STEP_SUMMARY ledger, verification fork cap"
+    }
+  ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/drafts/PAN-2373.md",
+      ".pan/records/pan-2373.json",
+      "scripts/run-flake-lane.sh",
+      "tests/unit/lib/test-infra/quarantine.test.ts",
+      "tests/unit/scripts/lint-quarantine-audit.test.ts",
+      "tests/unit/vitest-config.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/lib/test-infra/__tests__/quarantine.test.ts",
+      "tests/unit/lib/cloister/verification-gate-env.test.ts"
+    ],
+    "declaredScope": [
+      ".github/workflows/ci.yml",
+      "package.json",
+      "scripts/flaky-quarantine.txt",
+      "scripts/lint-quarantine-audit.sh",
+      "src/lib/cloister/validation.ts",
+      "src/lib/test-infra/__tests__/quarantine.test.ts",
+      "src/lib/test-infra/quarantine.ts",
+      "tests/unit/lib/cloister/verification-gate-env.test.ts",
+      "vitest.config.ts"
+    ],
+    "actualChangedFiles": [
+      ".github/workflows/ci.yml",
+      ".pan/drafts/PAN-2373.md",
+      ".pan/records/pan-2373.json",
+      "package.json",
+      "scripts/flaky-quarantine.txt",
+      "scripts/lint-quarantine-audit.sh",
+      "scripts/run-flake-lane.sh",
+      "src/lib/cloister/validation.ts",
+      "src/lib/test-infra/quarantine.ts",
+      "tests/unit/lib/test-infra/quarantine.test.ts",
+      "tests/unit/scripts/lint-quarantine-audit.test.ts",
+      "tests/unit/vitest-config.test.ts",
+      "vitest.config.ts"
+    ],
+    "recordedAt": "2026-07-06T20:05:07.521Z"
+  },
   "harness": "claude-code",
   "model": "kimi-k2.7-code",
   "statusOverrides": {
@@ -29,14 +82,13 @@
   },
   "pipeline": {
     "issueId": "PAN-2373",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T19:03:35.789Z",
+    "updatedAt": "2026-07-06T20:05:19.531Z",
     "reviewNotes": "Verification failed at test",
-    "verificationNotes": "Verification FAILED at test (320301ms):\n\ncommands/conversations/__tests__/search.test.ts > searchAction > prints \"no sessions\" when nothing matches\nError: Hook timed out in 5000ms.\nIf this is a long-running hook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n ❯ src/cli/commands/conversations/__tests__/search.test.ts:22:1\n     20| let odb: OverdeckTestDb;\n     21|\n     22| beforeEach(() => {\n       | ^\n     23|   odb = setupOverdeckTestDb();\n     24| });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[55/57]⎯\n\n FAIL  |root| src/dashboard/server/services/__tests__/conversation-compaction.test.ts > conversation native compaction > writes the compact boundary to a forked file without mutating the source\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/services/__tests__/conversation-compaction.test.ts:63:3\n     61|\n     62| describe('conversation native compaction', () => {\n     63|   it('writes the compact boundary to a forked file without mutating th…\n       |   ^\n     64|     const file = await writeJsonl('session.jsonl', [\n     65|       { type: 'user', message: { role: 'user', content: [{ type: 'text…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[56/57]⎯\n\n FAIL  |root| src/dashboard/server/services/__tests__/issue-lifecycle.unit.test.ts > IssueLifecycle — integration > transitionTo (Linear) > transitions issue to in_progress state via Linear\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/services/__tests__/issue-lifecycle.unit.test.ts:137:5\n    135|\n    136|   describe('transitionTo (Linear)', () => {\n    137|     it('transitions issue to in_progress state via Linear', async () =…\n       |     ^\n    138|       const layer = await makeTestLayer();\n    139|       const { IssueLifecycle } = await import('../issue-lifecycle.js');\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[57/57]⎯\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2419",
     "reviewRequestedAt": "2026-07-06T18:51:05.539Z",
     "scopeDrift": {
@@ -82,6 +134,22 @@
   "closeOut": {
     "usage": {
       "byStage": {
+        "codex": {
+          "unknown": {
+            "input": 508407,
+            "output": 5968,
+            "cacheRead": 431488,
+            "cacheWrite": 0
+          }
+        },
+        "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 2,
+            "output": 7700,
+            "cacheRead": 143935,
+            "cacheWrite": 2818
+          }
+        },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
             "input": 49154,
@@ -104,44 +172,58 @@
             "cacheWrite": 149608
           }
         },
+        "planning": {
+          "anthropic/claude-opus-4-8": {
+            "input": 2,
+            "output": 617,
+            "cacheRead": 165443,
+            "cacheWrite": 1287
+          }
+        },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 806623,
-            "output": 101769,
-            "cacheRead": 44897024,
+            "input": 1262930,
+            "output": 127385,
+            "cacheRead": 55103488,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
+        "unknown": {
+          "input": 508407,
+          "output": 5968,
+          "cacheRead": 431488,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 14633,
+          "output": 17303,
+          "cacheRead": 1428431,
+          "cacheWrite": 130920
+        },
         "cliproxy/gpt-5.4-mini": {
           "input": 49154,
           "output": 4604,
           "cacheRead": 1280,
           "cacheWrite": 0
         },
-        "anthropic/claude-fable-5": {
-          "input": 14631,
-          "output": 9603,
-          "cacheRead": 1284496,
-          "cacheWrite": 128102
-        },
         "anthropic/claude-opus-4-8": {
-          "input": 18730,
-          "output": 34796,
-          "cacheRead": 3946371,
-          "cacheWrite": 149608
+          "input": 18732,
+          "output": 35413,
+          "cacheRead": 4111814,
+          "cacheWrite": 150895
         },
         "custom/kimi-k2.7-code": {
-          "input": 806623,
-          "output": 101769,
-          "cacheRead": 44897024,
+          "input": 1262930,
+          "output": 127385,
+          "cacheRead": 55103488,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 17.087833,
-        "pricingAsOf": "2026-07-06T19:03:35.842Z"
+        "usd": 21.012777,
+        "pricingAsOf": "2026-07-06T20:05:19.669Z"
       }
     },
     "merges": [
@@ -153,12 +235,5 @@
     "finalizedAt": "2026-07-06T17:49:27.751Z"
   },
   "created": "2026-07-06T19:03:35.745Z",
-  "updated": "2026-07-06T19:57:11.433Z",
-  "sessionHistory": [
-    {
-      "reason": "resume",
-      "agentModel": "kimi-k2.7-code",
-      "timestamp": "2026-07-06T19:57:11.433Z"
-    }
-  ]
+  "updated": "2026-07-06T20:05:19.687Z"
 }
