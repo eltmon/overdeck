@@ -207,6 +207,21 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-58 tick 6 (2026-07-06) — A2 started (review+test); 3 order-book items in flight; OPERATOR striking the merge-gate bug (PAN-2417 verdict loop); trio 2389 on waiter, 2387 stalled
+
+**Order book: 1/19 landed (B0); A1 (PAN-2373) + A2 (PAN-2371) + B1 (PAN-2207) IN FLIGHT; lane B at B1.** Main GREEN (a5d400abe1).
+
+**A2 (PAN-2371) STARTED via waiter** — `agent-pan-2371` (+ review + test live; its single bead completed fast → already in review/test). Lane A now holds A1 + A2 (within the 1-3 overlap). A1 (agent-pan-2373) + B1 (agent-pan-2207) both progressing (real diffs +391/-8 and +418/-21; both ~82% ctx — compact-respawn will handle).
+
+**OPERATOR-LAUNCHED `strike-pan-2417` = the real merge gate right now (NOT mine, don't touch).** PAN-2417 (author eltmon, ~13:37) = "self-feeding verdict loop — recording a review/test pass as a `chore(state)` commit invalidates the pass it records, so **readyForMerge never holds**." This is why `pan review pending --ready` = "No issues ready for merge" and the UAT/merge queue is EMPTY despite 2386/2402/2407 + A2 sitting in review+test. **Until 2417 lands, NOTHING reaches merge-ready** — the pipeline's merge throughput is gated on the operator's strike, not on my dispatch rate. strike-2417 (gpt-5.5, ~11min) is modifying `done.ts` (+ new `src/lib/pipeline-state-paths.ts`) + tests, "done.ts back under 1000-line ceiling", typecheck running.
+- **COLLISION WATCH:** strike-2417 edits `done.ts`; **B1 (PAN-2207) also edits `done.ts`** (W1 doneCommand REST-fallback). When 2417 lands first, B1 must rebase over it — possible conflict. Surfaced to operator (they launched 2417 knowing B1 is running). If B1 hits a hard conflict at submit, resync/restart it then.
+
+**Trio (v0.44.x, operator priority):** 2389 planned → start timed out on bd twice → on a background waiter (`w2389.sh`, fires when lock free AND no finalize proc). 2388 swarm converging (slots 1+3 + review-supervisor). **2387 STILL stalled pre-finalize (no spec)** — planning-pan-2387 idle. I CANNOT `pan kill` it (forbidden flywheel lever) and re-dispatching `pan plan --auto` risks a duplicate-planning race (RUN-56) — so **surfaced to operator**: 2387 needs a kill + re-plan (operator lever). Root cause = planning-agent-stops-pre-finalize gap (RUN-53 class). Not order-book-blocking.
+
+**Held this tick (bd discipline):** did NOT plan A3 (PAN-2336) — adding a finalize while starts are already timing out re-creates the wave. A3 next tick when bd is quiet. One bead-op at a time remains the rule.
+
+**Fleet ~19 sessions** (A1/A2/B1 + 2386/2402/2407 review+test + 2388 swarm + 1491 swarm + min-857 + strike-2417 + planning-2387). This IS the bd-contention driver. Swap ~96% / RAM ample (cold-page). No merge-ready items (gated on 2417).
+
 ## RUN-58 tick 5 (2026-07-06) — ORDER BOOK MOVING: A1 + B1 STARTED (both lanes occupied); drain-then-fire beat the bd-lock; A2 on a waiter; 2387 planning stalled pre-finalize
 
 **Order book: 1/19 landed (B0); A1 (PAN-2373) + B1 (PAN-2207) RUNNING; A2 (PAN-2371) start-pending; lane B occupied at B1.** Main GREEN (a5d400abe1 `success`).
