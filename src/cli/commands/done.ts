@@ -28,8 +28,10 @@ import { changedFilesVsMain } from '../../lib/flywheel-merge-order.js';
 import {
   appendSessionEntrySync,
   getProjectConfigFromWorkspacePath,
+  readIssueRecordSync,
   readRecordContinueViewSync,
   resolveProjectForIssue,
+  writeIssueRecordSync,
   writeRecordDecisionsSync,
   writeRecordScopeDriftSync,
 } from '../../lib/pan-dir/record.js';
@@ -574,6 +576,18 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     }
   }
 
+  // PAN-2207: clear stale deacon recovery tombstone before pre-flight.
+  try {
+    const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(process.cwd());
+    const record = readIssueRecordSync(project, issueId);
+    if (record?.pipeline?.panDoneRecoveredAt) {
+      const { panDoneRecoveredAt: _, ...pipeline } = record.pipeline;
+      writeIssueRecordSync(project, issueId, { ...record, pipeline });
+    }
+  } catch (e: any) {
+    console.warn(`[pan done] Failed to clear recovery tombstone (non-fatal): ${e?.message ?? e}`);
+  }
+
   // Pre-flight completion checks (unless --force)
   if (!options.force) {
     const { workspacePath } = await resolveDoneWorkspace(issueId, agentId);
@@ -740,7 +754,21 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     spinner.text = 'Creating review artifacts...';
     const { createReviewArtifactsForIssue } = await import('../../lib/review-artifacts.js');
     const { setReviewStatusSync } = await import('../../lib/review-status.js');
-    const artifactResult = await Effect.runPromise(createReviewArtifactsForIssue(issueId, workspacePath));
+    let artifactResult;
+    try {
+      artifactResult = await Effect.runPromise(createReviewArtifactsForIssue(issueId, workspacePath));
+    } catch (artifactErr: any) {
+      // PAN-2207: GraphQL/App rate limit → REST-only PR lookup fallback.
+      const { stdout } = await execAsync(
+        `gh pr list --head feature/${issueId.toLowerCase()} --state open --json url --jq '.[0].url'`,
+        { cwd: workspacePath, encoding: 'utf-8' }
+      );
+      const existingPrUrl = stdout.trim();
+      if (!existingPrUrl) throw artifactErr;
+      console.log(chalk.yellow(`  ⚠ Review artifact creation failed, but found existing PR via REST fallback: ${existingPrUrl}`));
+      setReviewStatusSync(issueId, { prUrl: existingPrUrl });
+      artifactResult = { mergeSet: null, artifacts: [{ repoKey: 'primary', created: false, skipped: false, url: existingPrUrl }] };
+    }
     const primaryArtifact = artifactResult.mergeSet?.repos.find(repo => !!repo.artifactUrl);
     if (primaryArtifact?.artifactUrl) {
       setReviewStatusSync(issueId, { prUrl: primaryArtifact.artifactUrl });
