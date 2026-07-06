@@ -9,3 +9,8 @@
 
 tests/playwright/conversation-supervisor-uat.test.ts  # PAN-2371
 src/lib/vbrief/__tests__/create-beads.test.ts  # PAN-2336
+src/dashboard/server/routes/__tests__/agents-switch-model.test.ts  # PAN-2421
+src/dashboard/server/routes/__tests__/cloister-config.test.ts  # PAN-2421
+src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts  # PAN-2421
+src/dashboard/server/routes/__tests__/operator-interventions.test.ts  # PAN-2421
+src/dashboard/server/services/__tests__/issue-lifecycle.test.ts  # PAN-2421
