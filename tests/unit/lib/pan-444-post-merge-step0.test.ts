@@ -92,6 +92,7 @@ vi.mock('../../../src/lib/tmux.js', () => ({
 vi.mock('../../../src/lib/paths.js', () => ({
   OVERDECK_HOME: '/tmp/overdeck-test',
   AGENTS_DIR: '/tmp/overdeck-test/agents',
+  COSTS_DIR: '/tmp/overdeck-test/costs',
   getOverdeckHome: vi.fn(() => '/tmp/overdeck-test'),
   PROJECT_DOCS_SUBDIR: 'docs',
   PROJECT_PRDS_SUBDIR: 'prds',
