@@ -43,7 +43,7 @@
   ],
   "feedback": [],
   "created": "2026-06-29T15:41:56.572Z",
-  "updated": "2026-07-03T07:58:14.668Z",
+  "updated": "2026-07-06T12:54:58.570Z",
   "pipeline": {
     "issueId": "PAN-2155",
     "reviewStatus": "pending",
@@ -101,8 +101,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-opus-4-8",
   "statusOverrides": {
     "wi1-extract-types-and-helpers": "completed",
     "wi1-extract-types-and-helpers.ac1": "completed",
