@@ -2,7 +2,7 @@
   "issueId": "PAN-2389",
   "schemaVersion": 2,
   "created": "2026-07-05T21:50:11.351Z",
-  "updated": "2026-07-05T21:50:12.274Z",
+  "updated": "2026-07-05T22:22:56.076Z",
   "pipeline": {
     "issueId": "PAN-2389",
     "reviewStatus": "pending",
@@ -27,5 +27,13 @@
     }
   ],
   "harness": "claude-code",
-  "model": "claude-fable-5"
+  "model": "claude-fable-5",
+  "statusOverrides": {
+    "backfill-cli": "pending",
+    "door-scan-roots": "pending",
+    "pages-workflow": "pending"
+  },
+  "swarm": {
+    "slotAssignments": []
+  }
 }
