@@ -15,8 +15,6 @@ import {
   usePrQuery,
   useReviewStatusQuery,
   type IssueCheckRun,
-  type IssueCheckRunsResponse,
-  type PullRequestData,
   type ReviewStatusData,
 } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import DrawerArtifactsPanel from '../../drawer/DrawerArtifactsPanel'
@@ -67,7 +65,6 @@ type MissionTab =
   | 'terminal'     // tool — #10
   | 'beads'        // not a visible tab; reachable from the rail's "open full"
 
-type PipelineState = 'done' | 'active' | 'fail' | 'todo'
 
 type PipelinePhaseKey = 'plan' | 'work' | 'review' | 'test' | 'ci' | 'ship' | 'merge'
 
@@ -141,58 +138,6 @@ function phaseStatus(rs: ReviewStatusData | undefined) {
   if (rs.testStatus === 'failed' || rs.testStatus === 'dispatch_failed') return rs.testStatus
   if (rs.readyForMerge) return 'ready'
   return rs.reviewStatus ?? 'pending'
-}
-
-/**
- * Single source of truth for the seven pipeline-phase states. Both the
- * command-bar progress bar and the left lane read from here so they never
- * disagree on whether Review is blocked, CI is green, etc.
- */
-function computePipelineStates(args: {
-  hasPlan: boolean
-  rs: ReviewStatusData | undefined
-  ci: IssueCheckRunsResponse | undefined
-  work: { status: string } | undefined
-}): Record<PipelinePhaseKey, PipelineState> {
-  const { hasPlan, rs, ci, work } = args
-  const review: PipelineState = rs?.reviewStatus === 'blocked' || rs?.reviewStatus === 'failed'
-    ? 'fail'
-    : rs?.reviewStatus === 'reviewing'
-      ? 'active'
-      : rs?.reviewStatus === 'passed'
-        ? 'done'
-        : 'todo'
-  const test: PipelineState = rs?.testStatus === 'failed' || rs?.testStatus === 'dispatch_failed'
-    ? 'fail'
-    : rs?.testStatus === 'testing'
-      ? 'active'
-      : rs?.testStatus === 'passed' || rs?.testStatus === 'skipped'
-        ? 'done'
-        : 'todo'
-  const summary = ci?.summary
-  const ciState: PipelineState = summary && (summary.failed || summary.cancelled)
-    ? 'fail'
-    : summary && (summary.running || summary.pending)
-      ? 'active'
-      : summary && summary.total
-        ? 'done'
-        : 'todo'
-  const ship: PipelineState = rs?.mergeStatus === 'failed'
-    ? 'fail'
-    : rs?.mergeStatus === 'queued' || rs?.mergeStatus === 'merging' || rs?.mergeStatus === 'verifying'
-      ? 'active'
-      : rs?.mergeStatus === 'merged'
-        ? 'done'
-        : 'todo'
-  return {
-    plan: hasPlan ? 'done' : 'todo',
-    work: work?.status === 'running' ? 'active' : work ? 'done' : 'todo',
-    review,
-    test,
-    ci: ciState,
-    ship,
-    merge: rs?.mergeStatus === 'merged' ? 'done' : rs?.readyForMerge ? 'active' : 'todo',
-  }
 }
 
 function nextAction(rs: ReviewStatusData | undefined): string {
