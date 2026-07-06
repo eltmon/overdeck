@@ -207,6 +207,16 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-58 tick 10 (2026-07-06) — RESUMED from operator pause; main green, fleet healthy; A3 backgrounded; bd contention = SERVER auto-finalize (new lesson)
+
+**Order book: 2/19 landed (B0 + A2); A1+B1 in review/test, M1 (MIN-860) running, A3 start (bg); Lane B at B1.** Main GREEN (dbcf2ec880). require_uat_before_merge now confirmed OFF in config; merge trains ON.
+
+- **RESUMED cleanly** — nothing broke during the pause. B1 (PAN-2207) → review+test (agent-pan-2207-review + test); A1 (PAN-2373) → review; M1 (agent-min-860) running; trio 2388 swarm + 2389 (review-supervisor). Ready set EMPTY (nothing merge-ready yet).
+- **KEY LESSON (new memory `project_dashboard_server_autofinalizes_races_cli`): the bd "create beads from vBRIEF" contention is the DASHBOARD SERVER auto-finalizing proposed specs** (no `pan plan finalize` proc present) — I can't sequence it away by spacing my CLI dispatches. AND **my 2-min foreground tool timeout SIGTERMs `pan start`** — that's why A3 kept "timing out." **FIX: run `pan start`/finalize in the BACKGROUND (run_in_background) with `OVERDECK_BD_TIMEOUT_MS=180000`** so the internal retry rides out the server auto-finalize without being killed. A3 (PAN-2336) now backgrounded (task, a3-start.log) — verify session next tick.
+- **Merge trains ON but idle** — `auto-merge/problems` shows only a STALE week-old entry (PAN-1982/#2112, 06-29, "not mergeable") — not current/order-book, ignore. When A1/B1/etc. reach ready, trains should auto-merge; re-derive/emit/close-out on each.
+- **Held further dispatches this tick** (fleet ~13 agents saturated; bd contended). Lane M M2=MIN-861 waits on M1 landing; M3/M4/M5 (MIN-854/858/859) plan next tick when contention eases. Don't over-plan — every proposed spec the server auto-finalizes adds bd contention.
+- Still open: 2387 stalled pre-finalize (operator kill+re-plan); B1↔strike-2417 done.ts collision; MIN-857 held (oversight); PAN-2383 slots + PAN-1491 deacon-swarm (operator-owned, leave). Swap ~99% / RAM ample.
+
 ## RUN-58 tick 9 (2026-07-06) — 2371 close-out LANDED; M1 (MIN-860 urgent) STARTED (14 beads); B1→review; A3 on waiter; main green
 
 **Order book: 2/19 landed (B0 + A2/PAN-2371 closed-out); A1+B1 in review, A3 start-pending; Lane M M1 in flight.** Main GREEN (23b2d0969d success).
