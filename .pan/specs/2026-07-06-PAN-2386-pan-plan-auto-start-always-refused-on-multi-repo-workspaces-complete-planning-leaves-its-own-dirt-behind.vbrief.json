@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.6",
     "created": "2026-07-06T01:50:20.796Z",
-    "updated": "2026-07-06T01:51:11.564Z",
+    "updated": "2026-07-06T15:19:31.796Z",
     "author": "overdeck/auto-start",
     "description": "Auto-synthesized minimal plan for PAN-2386: pan plan --auto-start always refused on multi-repo workspaces: complete-planning leaves its own dirt behind",
     "inspectionPolicy": "never"
@@ -13,9 +13,9 @@
     "status": "running",
     "uid": "bbe6ba0a-9289-4e2c-9c3e-4da04ff2c57d",
     "author": "overdeck/auto-start",
-    "sequence": 3,
+    "sequence": 5,
     "created": "2026-07-06T01:50:20.796Z",
-    "updated": "2026-07-06T01:51:11.564Z",
+    "updated": "2026-07-06T15:19:31.796Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2386",

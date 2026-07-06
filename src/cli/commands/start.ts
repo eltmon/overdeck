@@ -866,6 +866,18 @@ function failTransientBeadsValidation(spinner: Ora, issueId: string, cause?: unk
   process.exit(RETRYABLE_BD_LOCK_EXIT_CODE);
 }
 
+/** PAN-2410: --fresh means fresh STAFFING, not just a fresh session. Never
+ * inherit the dead agent's recorded model — with no explicit --model the
+ * tier/role resolvers run against current config. A plain restart (no
+ * --fresh) keeps the recorded staffing, by design. */
+export function resolveSpawnModel(
+  explicitModel: string | undefined,
+  fresh: boolean | undefined,
+  recordedModel: string | undefined,
+): string | undefined {
+  return explicitModel || (fresh ? undefined : recordedModel);
+}
+
 export async function issueCommand(id: string, options: IssueOptions): Promise<void> {
   try {
     const model = normalizeModelOverrideSync(options.model);
@@ -883,7 +895,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   const normalizedId = id.toLowerCase();
   const agentId = `agent-${normalizedId}`;
   const existingAgentState = getAgentStateSync(agentId);
-  const spawnModel = options.model || existingAgentState?.model;
+  const spawnModel = resolveSpawnModel(options.model, options.fresh, existingAgentState?.model);
 
   // PAN-636 — validate only an explicit --harness flag up front. Flagless
   // spawns intentionally forward undefined so spawnAgent's resolveHarness()
