@@ -30,10 +30,9 @@
     "issueId": "PAN-2336",
     "reviewStatus": "reviewing",
     "testStatus": "passed",
-    "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T20:46:49.718Z",
+    "updatedAt": "2026-07-06T23:26:16.205Z",
     "reviewNotes": "Global frontend unused-code checks are disabled in tsconfig outside PAN-2336 scope",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -56,7 +55,9 @@
         "src/lib/vbrief/__tests__/create-beads.test.ts"
       ],
       "recordedAt": "2026-07-06T19:29:32.663Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-06T23:26:16.205Z"
   },
   "closeOut": {
     "usage": {
@@ -139,5 +140,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-06T20:32:19.057Z",
-  "updated": "2026-07-06T20:46:49.786Z"
+  "updated": "2026-07-06T23:26:16.205Z"
 }

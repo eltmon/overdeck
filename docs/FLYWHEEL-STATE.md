@@ -207,6 +207,33 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-58 tick 26 (2026-07-06) — CORRECTION: bead counts are NOISY (unreliable); 2435/2336 closed; pipeline advancing (A1/B1/2387 review+test); PAN-2388 still needs operator assembly
+
+**Order book: 4/19 landed. Main GREEN (greening on 51777af6c5).** 2435 + 2336 close-outs LANDED (both OK).
+- **CORRECTION / REUSABLE — bead counts from `bd list --status open --title-contains <id>` in a slot workspace are NOISY/UNRELIABLE for swarms + review-iteration** (2388 read 6→5→0→2, 2387 read 0→3→0→6 across ticks). Causes: bd sync churn, swarm bead reassignment across slots, review-feedback creating/closing beads. Do NOT report a transient 0 as "work done." **Use `pan swarm status` (stable slot-level state) for swarms, and the review phase for single agents.**
+- **PAN-2388 (priority): STABLE signal = `pan swarm status` shows slots 1+3 still `ready-to-merge`/unmerged** — assembly still stuck (slot-3 merge fails + PAN-2383 holds swarm budget → the deferred beads codex/reconcile/ohmypi/claude-fixture-parity can't dispatch). Operator has NOT assembled yet. **Last-mile is operator's: assemble PAN-2388 (resolve slot-3 merge + slots→integration→main PR) or free 2383 budget.** Flywheel levers exhausted.
+- **PAN-2387 (priority): in a REVIEW-FEEDBACK ITERATION** (agent-pan-2387 + review + test live; bead count reflects the current changes-requested round). Progressing/iterating, not stuck.
+- **Pipeline advancing (ceiling relaxed post-drain — no recent PAN-1665 block):** A1 (PAN-2373 review), B1 (PAN-2207 review+test), 2387 (review+test) all advancing → will reach ready → drain. Ready set currently empty (all mid-review).
+- Nothing to dispatch this tick (ready set empty, no lane freed, pair operator-gated/iterating). Order-book fillers (A4/A10, Lane M M3, B2 after B1) dispatch as lanes free.
+
+## RUN-58 tick 25 (2026-07-06) — #2437 MERGED (test-verdict fix) + A3 MERGED (order book 4/19); pair WORK-COMPLETE (2388=0, 2387=0); PAN-2388 awaits operator assembly
+
+**Order book: 4/19 landed (B0/2318 + A2/2371 + PAN-2389 + A3/2336).** Main GREEN (83cf6550a1).
+- **PR #2437 (PAN-2435 test-verdict-reset fix) MERGED** `83cf6550a1` — state-only commits no longer reset review/test verdicts → stops the drain's wasted test re-runs. Close-out (bg).
+- **A3/PAN-2336 MERGED** (#2427; drain landed it after its test re-passed) → close-out (bg). 2389 + A3 both drained post-red-main.
+- **PAIR WORK-COMPLETE:** PAN-2388 = **0 open beads** (all work done), PAN-2387 = **0 open beads**. Report each tick.
+  - **PAN-2388: WORK DONE, needs OPERATOR ASSEMBLY.** All beads closed but the swarm slots 1 (codex-fixtures) + 3 (ohmypi-fixtures) are still `ready-to-merge`/unmerged — slot-3's merge into integration keeps failing + budget held by operator-owned PAN-2383. This is now a pure manual-assembly situation (like PAN-2378/2383): resolve slot-3's merge conflict + merge slots → integration → main PR. Flywheel levers exhausted (recover ×2). **Operator: assemble PAN-2388 (its work is complete — this is the last mile).**
+  - **PAN-2387: 0 beads, in review** (in `pan review pending`) → re-reaching ready → will merge via drain.
+- **New in-flight (not order-book, noted):** PAN-2438/2439/2440 (new, operator/deacon-filed) in the review queue — not managed unless they block.
+- **Order book resumes (secondary):** ready set currently empty; A1 (PAN-2373 review), B1 (PAN-2207 review) → schedule when ready; Lane B B2=PAN-2341 after B1; Lane M M1(MIN-860)/M3(MIN-854); A4/A10.
+
+## RUN-58 tick 24b (2026-07-06) — adopting operator strike PAN-2435 (test-verdict-reset-on-state-commit fix) → PR #2437, merging on green
+
+**PAN-2435 (operator-filed, eltmon): "test verdicts reset on state-only commits — PAN-2417's exemption missed the test path, every gate wastes a full test run."** This is the exact cause of the drain's wasted test re-runs (A3/2389 re-running test after main moves). Operator-launched strike pushed `4c91798a7d` (7 files); held (per strike role, no self-merge) + reported to flywheel → **I own the merge (adopt-externally-completed-work, PAN-1735).**
+- **Diff reviewed — clean, sound:** `deacon.ts checkPostReviewCommits()` adds a `hasOnlyPipelineStateChangesSinceCommit(ws, reviewedAtCommit, currentHead)` check that preserves review/test/readyForMerge for state-only post-review commits (extends the existing tree-identical-rebase preservation). +31 test in `specialists-reviewed-at-commit.test.ts`. Touches deacon.ts (TENET-10) → **full suite must be green before merge; PR CI authoritative** (strike's local "broad failures + missing @types/node + hung test" = env-blocked workspace, not the fix).
+- **Opened PR #2437.** Merge on GREEN CI (--squash --delete-branch) → `pan close --force PAN-2435`. This fix STOPS the test-verdict churn → faster drains going forward.
+- Main HEAD 9c35110934c (CI in_progress); pair unchanged (2388=5, 2387=0) — continue drain + pair tracking per tick 25.
+
 ## RUN-58 tick 24 (2026-07-06) — PAN-2389 MERGED (7ed8c4d74b); A3 re-CI'ing; pair PROGRESSING (2388=5, 2387=0). Order book 3/19.
 
 **Order book: 3/19 landed (B0 + A2 + PAN-2389).** MAIN GREEN.
