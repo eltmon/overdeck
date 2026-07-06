@@ -16,6 +16,14 @@ describe('memory extraction pricing', () => {
     expect(cost.usd).toBe(expectedCost('openai', 'gpt-5.4-mini', usage));
   });
 
+  it('prices default cliproxy gpt-4.1-nano from the shared pricing table', () => {
+    const usage = { input: 10, output: 4 };
+    const cost = calculateExtractionCost('cliproxy', 'gpt-4.1-nano', usage);
+
+    expect(cost.usd).toBeGreaterThan(0);
+    expect(cost.usd).toBe(expectedCost('openai', 'gpt-4.1-nano', usage));
+  });
+
   it('prices Anthropic Haiku from the shared pricing table', () => {
     const usage = { input: 2000, cacheRead: 500, cacheWrite: 100, output: 300 };
     const cost = calculateExtractionCost('anthropic', 'claude-haiku-4-5', usage);

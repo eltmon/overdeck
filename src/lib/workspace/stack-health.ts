@@ -111,10 +111,6 @@ function isStackContainer(container: DockerContainerLifecycle, issueId: string):
   return hasNameToken(name, `feature-${normalized}`) || hasNameToken(name, normalized);
 }
 
-function isInitContainer(name: string): boolean {
-  return /(^|[-_])init($|[-_])/.test(name.toLowerCase());
-}
-
 function isSuccessfulOneShotContainer(name: string): boolean {
   return /(^|[-_])(?:init|test-unit)($|[-_])/.test(name.toLowerCase());
 }

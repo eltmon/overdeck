@@ -188,7 +188,6 @@ export function createEventStore(db: DbAdapter): EventStore {
   }
   let writeQueue: QueuedEvent[] = [];
   let flushScheduled = false;
-  let inMemorySequence = 0;
 
   function scheduleFlush(): void {
     if (flushScheduled) return;

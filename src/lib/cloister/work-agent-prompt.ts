@@ -1,7 +1,6 @@
-import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
+import { existsSync, readdirSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { Effect } from 'effect';
-import { PAN_DIRNAME } from '../pan-dir/types.js';
 import type { ContinueFeedbackEntry } from '../vbrief/continue-state.js';
 import { renderPrompt } from './prompts.js';
 import { extractTeamPrefix, findProjectByTeamSync } from '../projects.js';
@@ -143,7 +142,6 @@ async function buildActiveSliceContext(workspacePath: string, issueId: string): 
  */
 async function readPendingFeedback(workspacePath: string): Promise<string> {
   const issueId = inferIssueIdFromWorkspace(workspacePath);
-  const projectRoot = join(workspacePath, '..', '..');
 
   const continueEntries: ContinueFeedbackEntry[] = [];
   if (issueId) {
@@ -304,10 +302,8 @@ export async function getTrackerContext(
 
         for (const comment of newComments) {
           let body = comment.body;
-          let commentTruncated = false;
           if (body.length > COMMENT_BODY_LIMIT) {
             body = body.slice(0, COMMENT_BODY_LIMIT) + ' [truncated — read full comment on tracker]';
-            commentTruncated = true;
             truncatedAny = true;
           }
 

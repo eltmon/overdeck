@@ -95,7 +95,7 @@ describe('memory extraction providers', () => {
       provider: 'cliproxy',
       usage: { input: 10, output: 4 },
     });
-    expect(result.cost.usd).toBe(0);
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('cliproxy/gpt-4.1-nano'));
+    expect(result.cost.usd).toBeGreaterThan(0);
+    expect(warn).not.toHaveBeenCalled();
   });
 });

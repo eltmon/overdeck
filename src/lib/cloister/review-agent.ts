@@ -44,7 +44,7 @@ import { Effect } from 'effect';
 import { killSession, listSessionNames, isPaneDead } from '../tmux.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { removeAgentSync, listAgentIdsByPrefixSync } from '../overdeck/agents.js';
-import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
+import { setReviewStatusSync } from '../review-status.js';
 import { loadConfigSync as loadYamlConfig, resolveModel, type ReviewMode } from '../config-yaml.js';
 import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } from './review-context.js';
 import { buildRealConflictGateDeps, getCachedConflictGateMergeability, resolveConflictGate } from './conflict-gate.js';
