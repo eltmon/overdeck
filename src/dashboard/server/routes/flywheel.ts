@@ -31,6 +31,7 @@ import {
 import { readFlywheelState } from '../services/flywheel-state.js';
 import { computeFlywheelStats, parseFlywheelStatsWindow } from '../services/flywheel-telemetry.js';
 import { derivePipelineRunStatsInputs } from '../services/pipeline-run-metrics.js';
+import { listSubstrateBugWeights } from '../../../lib/overdeck/substrate-bug-weights-service.js';
 import {
   isFlywheelAutoPickupBacklog,
   isFlywheelGloballyPaused,
@@ -539,6 +540,20 @@ const getFlywheelStatsRoute = HttpRouter.add(
   })),
 );
 
+const getSubstrateBugWeightsRoute = HttpRouter.add(
+  'GET',
+  '/api/flywheel/substrate-bug-weights',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const window = HttpServerRequest.toURL(request).pipe(Option.match({
+      onNone: () => undefined,
+      onSome: (url) => url.searchParams.get('window') ?? undefined,
+    }));
+    const weights = yield* Effect.promise(() => listSubstrateBugWeights(window ?? '30d'));
+    return jsonResponse(weights);
+  })),
+);
+
 const getFlywheelConfigRoute = HttpRouter.add(
   'GET',
   '/api/flywheel/config',
@@ -975,6 +990,7 @@ export const flywheelRouteLayer = Layer.mergeAll(
   getFlywheelConversationRoute,
   getFlywheelCurrentRoute,
   getFlywheelStatsRoute,
+  getSubstrateBugWeightsRoute,
   getFlywheelConfigRoute,
   postFlywheelConfigRoute,
   getPendingAutoMergeRoute,

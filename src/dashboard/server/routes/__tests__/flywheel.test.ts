@@ -50,6 +50,11 @@ const uatTrainMocks = vi.hoisted(() => ({
 
 vi.mock('../../services/uat-train.js', () => uatTrainMocks);
 vi.mock('../specialists.js', () => ({ firePostMergeLifecycle: vi.fn(() => true) }));
+vi.mock('../../../../lib/overdeck/substrate-bug-weights-service.js', () => ({
+  listSubstrateBugWeights: vi.fn(),
+}));
+
+import { listSubstrateBugWeights } from '../../../../lib/overdeck/substrate-bug-weights-service.js';
 
 interface RouteResult {
   status: number;
@@ -281,6 +286,38 @@ describe('flywheel stats payload helper', () => {
       delete process.env.OVERDECK_HOME;
       rmSync(overdeckHome, { recursive: true, force: true });
     }
+  });
+});
+
+describe('GET /api/flywheel/substrate-bug-weights', () => {
+  beforeEach(() => {
+    vi.mocked(listSubstrateBugWeights).mockReset();
+  });
+
+  it('returns weighted substrate bugs sorted by weight descending', async () => {
+    vi.mocked(listSubstrateBugWeights).mockResolvedValue([
+      { issueId: 'PAN-100', severity: 'P1', filedBy: 'agent', affectedCriteria: [1], weight: 4.8, weightReason: 'criterion 1 red' },
+      { issueId: 'PAN-101', severity: 'P2', filedBy: 'operator', affectedCriteria: [3], weight: 1.02, weightReason: 'criterion 3 yellow' },
+    ]);
+
+    const result = await requestFlywheelRoute('/api/flywheel/substrate-bug-weights');
+
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual([
+      { issueId: 'PAN-100', severity: 'P1', filedBy: 'agent', affectedCriteria: [1], weight: 4.8, weightReason: 'criterion 1 red' },
+      { issueId: 'PAN-101', severity: 'P2', filedBy: 'operator', affectedCriteria: [3], weight: 1.02, weightReason: 'criterion 3 yellow' },
+    ]);
+    expect(listSubstrateBugWeights).toHaveBeenCalledWith('30d');
+  });
+
+  it('passes the window query param through', async () => {
+    vi.mocked(listSubstrateBugWeights).mockResolvedValue([]);
+
+    const result = await requestFlywheelRoute('/api/flywheel/substrate-bug-weights?window=7d');
+
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual([]);
+    expect(listSubstrateBugWeights).toHaveBeenCalledWith('7d');
   });
 });
 
