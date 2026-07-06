@@ -34,6 +34,7 @@ import { ChangedFilesView } from './ChangedFilesView'
 import { StatusHistoryTab } from './StatusHistoryTab'
 import { CrewStage } from './CrewStage'
 import { HappenedFeed } from './HappenedFeed'
+import { PlanMapCard } from './PlanMapCard'
 import { StatusNarrative, type JourneyStageKey } from './StatusNarrative'
 import { CockpitCard, CockpitPill, type CockpitTone } from './CockpitCard'
 import type { ProjectSessionTree, SessionNode } from '@overdeck/contracts'
@@ -64,7 +65,6 @@ type MissionTab =
   | 'files'        // tool — #10
   | 'terminal'     // tool — #10
   | 'beads'        // not a visible tab; reachable from the rail's "open full"
-
 
 type PipelinePhaseKey = 'plan' | 'work' | 'review' | 'test' | 'ci' | 'ship' | 'merge'
 
@@ -768,14 +768,14 @@ function NowPanel({ issueId, onTab, onOpenAgent }: { issueId: string; onTab: (ta
   )
 }
 
-/** Overview — blocker spotlight + the lean Now panel (PAN-1991 #9). The status
- * grid that used to live here is the header gates + pipeline; not repeated. */
+/** Overview — crew, feed, plan map, blocker spotlight, Now panel (PAN-2398). */
 type OverviewTabProps = { issueId: string; onTab: (tab: MissionTab) => void; onOpenAgent: (type: string) => void; sessions?: readonly SessionNode[]; onSelectSession?: (session: SessionNode) => void }
 function OverviewTab({ issueId, onTab, onOpenAgent, sessions, onSelectSession }: OverviewTabProps) {
   return (
     <div className="space-y-3.5">
       {sessions && onSelectSession && <CrewStage sessions={sessions} onSelectSession={onSelectSession} />}
       <HappenedFeed issueId={issueId} />
+      <PlanMapCard issueId={issueId} />
       <IssueBlockerSpotlight issueId={issueId} />
       <NowPanel issueId={issueId} onTab={onTab} onOpenAgent={onOpenAgent} />
       <PickupGateCard issueId={issueId} />
