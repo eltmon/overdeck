@@ -207,6 +207,15 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-58 tick 27 (2026-07-06) — steady; M1(MIN-860)→review; A4(PAN-2095) planning dispatched (Lane A filler); PAN-2388 unchanged (operator assembly pending)
+
+**Order book: 4/19 landed. Main GREEN (churning: 1713853cb0 etc. — operator fixes landing: compact-window-for-proxied-models, bd-lock budget, strike-badge).**
+- **Ready set EMPTY** (all items mid-review). Pipeline advancing: A1 (PAN-2373 review), B1 (PAN-2207 review+test), 2387 (review+test), **M1 (MIN-860) → REVIEW** (agent-min-860-review — Lane M's urgent item advanced). Nothing to drain this moment.
+- **PAN-2388 (priority): UNCHANGED — `pan swarm status` slots 1+3 still ready-to-merge/unmerged.** Operator has NOT assembled. Last-mile operator assembly still pending (slot-3 merge + slots→integration→main; or free PAN-2383 budget).
+- **PAN-2387 (priority): review-feedback iteration continuing** (agent + review + test live).
+- **Dispatched A4 (PAN-2095) planning** (bg, has PRD) to keep Lane A queue deep for when A1 merges (flywheel #1 job = launch; pair is operator-gated so no conflict). Checked M3 (MIN-854) state in the same bg task — start it if proposed next tick.
+- Order-book fillers pending: A4 (planning), A10 (PAN-2420, no PRD), Lane M M3(MIN-854)/M2/M6/M7, Lane B B2=PAN-2341 (after B1). Dispatch as lanes free.
+
 ## RUN-58 tick 26 (2026-07-06) — CORRECTION: bead counts are NOISY (unreliable); 2435/2336 closed; pipeline advancing (A1/B1/2387 review+test); PAN-2388 still needs operator assembly
 
 **Order book: 4/19 landed. Main GREEN (greening on 51777af6c5).** 2435 + 2336 close-outs LANDED (both OK).
