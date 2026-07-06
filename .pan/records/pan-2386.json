@@ -1,0 +1,30 @@
+{
+  "issueId": "PAN-2386",
+  "schemaVersion": 2,
+  "feedback": [],
+  "created": "2026-07-06T01:51:00.754Z",
+  "updated": "2026-07-06T01:51:00.780Z",
+  "pipeline": {
+    "issueId": "PAN-2386",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-06T01:51:00.755Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {},
+      "costAtCloseOut": {
+        "usd": 0,
+        "pricingAsOf": "2026-07-06T01:51:00.779Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "claude-haiku-4-5"
+}
