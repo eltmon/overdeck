@@ -37,7 +37,6 @@ import {
   inferMemoryProjectId,
   roleAgentDefinitionPath,
   roleSystemPromptInjectionSync,
-  getRoleRuntimeBaseCommand,
 } from './runtime-command.js';
 
 export type FlywheelSpawnEnv = {

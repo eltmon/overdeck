@@ -797,7 +797,7 @@ function computeCodexCommandTokens(config: LauncherConfig, useExec: boolean): st
   return [useExec ? `exec ${cmd}` : cmd];
 }
 
-function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
+export function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
   const piMode = config.piMode ?? 'rpc';
   if (!config.piSessionDir) {
     throw new Error('Pi launcher requires piSessionDir');

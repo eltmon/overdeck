@@ -2,7 +2,7 @@
  * Merge Agent - Automatic merge conflict resolution using Claude Code
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'fs';
+import { existsSync, mkdirSync, appendFileSync } from 'fs';
 import { writeFile } from 'fs/promises';
 import { join, dirname, basename, relative } from 'path';
 import { fileURLToPath } from 'url';
@@ -10,7 +10,7 @@ import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { capturePane, killSession, listSessionNames, sendKeys, sessionExists } from '../tmux.js';
-import { emitActivityEntrySync, emitActivityTtsSync, emitDashboardLifecycleSync } from '../activity-logger.js';
+import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 
 const execAsync = promisify(exec);
 
@@ -130,12 +130,11 @@ import {
 } from '../paths.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 
-import { resolveProjectFromIssueSync } from '../projects.js';
 import { restoreTrackedBeadsExport } from '../beads-restore.js';
-import { runMergeValidation, autoRevertMerge, runQualityGates } from './validation.js';
+import { runQualityGates } from './validation.js';
 import { loadProjectsConfigSync } from '../projects.js';
 import { cleanupStaleLocks } from '../git-utils.js';
-import { gitPush, gitForcePush, MainDivergedError } from '../git/operations.js';
+import { gitPush, MainDivergedError } from '../git/operations.js';
 import { markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
 import { appendGitOperationSync, type GitOperationType } from '../git-activity.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
@@ -187,12 +186,10 @@ interface MergeHistoryEntry {
 /**
  * Timeout for merge agent in milliseconds (15 minutes)
  */
-const MERGE_TIMEOUT_MS = 15 * 60 * 1000;
-
 /**
  * Notify TLDR daemon to reindex changed files after merge
  */
-export async function notifyTldrDaemon(projectPath: string, sourceBranch: string): Promise<void> {
+export async function notifyTldrDaemon(projectPath: string, _sourceBranch: string): Promise<void> {
   try {
     console.log(`[merge-agent] Notifying TLDR daemon to reindex changed files...`);
 
@@ -648,7 +645,7 @@ export function resetPostMergeState(issueId: string): void {
 /**
  * Parse result markers from agent output
  */
-function parseAgentOutput(output: string): MergeResult {
+export function parseAgentOutput(output: string): MergeResult {
   const lines = output.split('\n');
 
   let mergeResult: 'SUCCESS' | 'FAILURE' | null = null;
@@ -869,7 +866,7 @@ async function resolveMainPreferredSyncConflicts(
 /**
  * Log merge to history
  */
-function logMergeHistory(context: MergeConflictContext, result: MergeResult, sessionId?: string): void {
+export function logMergeHistory(context: MergeConflictContext, result: MergeResult, sessionId?: string): void {
   // Ensure history directory exists
   if (!existsSync(MERGE_HISTORY_DIR)) {
     mkdirSync(MERGE_HISTORY_DIR, { recursive: true });
@@ -946,7 +943,7 @@ function announceMerge(
 /**
  * Capture tmux output and look for result markers (async)
  */
-async function captureTmuxOutput(sessionName: string): Promise<string> {
+export async function captureTmuxOutput(sessionName: string): Promise<string> {
   try {
     return await Effect.runPromise(capturePane(sessionName));
   } catch {
@@ -1011,14 +1008,14 @@ export function scanGitPatterns(
 /**
  * Check if specialist-merge-agent tmux session is running (async)
  */
-async function isMergeAgentRunning(): Promise<boolean> {
+export async function isMergeAgentRunning(): Promise<boolean> {
   return Effect.runPromise(sessionExists('specialist-merge-agent'));
 }
 
 /**
  * Send a message to an agent's tmux session (async)
  */
-async function sendMessageToAgent(issueId: string, message: string): Promise<boolean> {
+export async function sendMessageToAgent(issueId: string, message: string): Promise<boolean> {
   // Agent sessions are typically named agent-{issueId} (lowercase)
   const sessionName = `agent-${issueId.toLowerCase()}`;
 
@@ -1046,7 +1043,7 @@ async function sendMessageToAgent(issueId: string, message: string): Promise<boo
 // defaultWorkspaceForIssue) removed. Rebase is now performed in-process via
 // rebaseFeatureBranch() in src/lib/cloister/merge-rebase.ts. See docs/MERGE-WORKFLOW.md.
 
-async function salvageStrandedMerge(
+export async function salvageStrandedMerge(
   projectPath: string,
   targetBranch: string,
   headBefore: string,
