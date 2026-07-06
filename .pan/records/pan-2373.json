@@ -1,7 +1,78 @@
 {
   "issueId": "PAN-2373",
   "schemaVersion": 2,
-  "feedback": [],
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-06T18:04:17.389Z",
+      "reason": "end",
+      "note": "Re-submit after transient verification failures; tests and build pass locally with OVERDECK_VERIFICATION=1"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-06T18:06Z] verification-gate → FAILED — seq 4",
+      "timestamp": "2026-07-06T18:06:57.697Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-06T18:09Z] verification-gate → FAILED — seq 5",
+      "timestamp": "2026-07-06T18:09:22.666Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 4,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-07-06T18:06:57Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-2373 (attempt 1/3):\n\nFailed check: lint\n\nVerification FAILED at lint (73812ms):\n\nd passed (no new god files; no baselined file grew)\n\n> @overdeck/core@0.43.0 lint:source-introspection\n> bash scripts/lint-source-introspection.sh\n\n✓ source-introspection guard passed (no new source-text tests; baseline is current)\n\n> @overdeck/core@0.43.0 lint:ratchet-audit\n> bash scripts/lint-ratchet-audit.sh\n\n✖ ratchet audit: commit da7fdd772e0a (fix(cloister): cost-limit attribution + limit-window accounting (PAN-2402) (#2411)) increases a ratchet without an issue reference\nbaseline raised: src/lib/cloister/service.ts 2051 -> 2054\nA ratchet increase must reference an issue — amend the commit message with e.g. PAN-XXXX.\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugin `tsdown:deps`. See https://rolldown.rs/options/checks#plugintimings for more details.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (77%)\n  - rolldown-plugin-dts:fake-js (16%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/agents.ts is dynamically imported by src/cli/commands/done.ts, src/cli/commands/reopen.ts, src/cli/commands/start.ts, src/lib/agents/messaging.ts, src/lib/cloister/merge-agent.ts, ... but also statically imported by src/cli/commands/admin/fpp-handler.ts, src/cli/commands/cv.ts, src/cli/commands/doctor.ts, src/cli/commands/done.ts, src/cli/commands/flywheel.ts, ..., dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/memory/rollup.ts is dynamically imported by src/lib/memory/pending.ts but also statically imported by src/lib/memory/cli.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (58%)\n  - tsdown:deps (37%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-2373 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-2373 -m \"Fixed lint\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
+    },
+    {
+      "seq": 5,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-07-06T18:09:22Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-2373 (attempt 1/3):\n\nFailed check: test\n\nVerification FAILED at test (95558ms):\n\nN-100');\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/18]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/agents-switch-model.test.ts > POST /api/agents/:id/switch-model > rejects model switching for pipeline agents\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/routes/__tests__/agents-switch-model.test.ts:29:3\n     27|\n     28| describe('POST /api/agents/:id/switch-model', () => {\n     29|   it('rejects model switching for pipeline agents', async () => {\n       |   ^\n     30|     const response = await postAgentSwitchModel('agent-pan-1928', { mo…\n     31|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/18]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/cloister-config.test.ts > cloister config route > reloads the live child Cloister after saving config updates\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/routes/__tests__/cloister-config.test.ts:47:3\n     45|   });\n     46|\n     47|   it('reloads the live child Cloister after saving config updates', as…\n       |   ^\n     48|     const updates = { monitoring: { check_interval: 17 } };\n     49|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/18]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts > fork pipeline recovery and re-entry > re-enters a handoff fork without re-authoring or double-spawning when doc and live session already exist\nError: Hook timed out in 5000ms.\nIf this is a long-running hook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n ❯ src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts:84:1\n     82| }\n     83|\n     84| beforeEach(async () => {\n       | ^\n     85|   await resetDb();\n     86|   TEST_HOME = join(tmpdir(), `pan-1744-fork-recovery-${Date.now()}-${M…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/18]⎯\n\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-2373 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-2373 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
+    }
+  ],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/drafts/PAN-2373.md",
+      ".pan/records/pan-2373.json",
+      "scripts/generate-flake-summary.sh",
+      "tests/unit/scripts/lint-quarantine-audit.test.ts",
+      "tests/unit/vitest-config.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/lib/test-infra/__tests__/quarantine.test.ts",
+      "src/lib/test-infra/quarantine.ts",
+      "tests/unit/lib/cloister/verification-gate-env.test.ts"
+    ],
+    "declaredScope": [
+      ".github/workflows/ci.yml",
+      "package.json",
+      "scripts/flaky-quarantine.txt",
+      "scripts/lint-quarantine-audit.sh",
+      "src/lib/cloister/validation.ts",
+      "src/lib/test-infra/__tests__/quarantine.test.ts",
+      "src/lib/test-infra/quarantine.ts",
+      "tests/unit/lib/cloister/verification-gate-env.test.ts",
+      "vitest.config.ts"
+    ],
+    "actualChangedFiles": [
+      ".github/workflows/ci.yml",
+      ".pan/drafts/PAN-2373.md",
+      ".pan/records/pan-2373.json",
+      "package.json",
+      "scripts/flaky-quarantine.txt",
+      "scripts/generate-flake-summary.sh",
+      "scripts/lint-quarantine-audit.sh",
+      "src/lib/cloister/validation.ts",
+      "tests/unit/scripts/lint-quarantine-audit.test.ts",
+      "tests/unit/vitest-config.test.ts",
+      "vitest.config.ts"
+    ],
+    "recordedAt": "2026-07-06T18:03:39.561Z"
+  },
   "harness": "claude-code",
   "model": "kimi-k2.7-code",
   "statusOverrides": {
@@ -29,16 +100,16 @@
   },
   "pipeline": {
     "issueId": "PAN-2373",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T18:00:28.180Z",
-    "reviewNotes": "Verification failed at test",
-    "verificationNotes": "Verification FAILED at test (185300ms):\n\nersations-fork-recovery.test.ts:84:1\n     82| }\n     83|\n     84| beforeEach(async () => {\n       | ^\n     85|   await resetDb();\n     86|   TEST_HOME = join(tmpdir(), `pan-1744-fork-recovery-${Date.now()}-${M…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[33/35]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/operator-interventions.test.ts > operator.intervention dashboard routes > emits deep_wipe from the successful dashboard deep-wipe route\nAssertionError: expected [ { …(3) } ] to deep equally contain ObjectContaining{…}\n\n- Expected:\nObjectContaining {\n  \"payload\": {\n    \"issueId\": \"PAN-1\",\n    \"kind\": \"deep_wipe\",\n    \"source\": \"dashboard\",\n  },\n  \"type\": \"operator.intervention\",\n}\n\n+ Received:\n[\n  {\n    \"payload\": {\n      \"issueId\": \"PAN-1\",\n    },\n    \"timestamp\": \"2026-07-06T17:58:27.453Z\",\n    \"type\": \"workspace.wipe_started\",\n  },\n]\n\n ❯ src/dashboard/server/routes/__tests__/operator-interventions.test.ts:281:30\n    279|     expect(response.status).toBe(200);\n    280|     await vi.waitFor(() => {\n    281|       expect(appendedEvents).toContainEqual(expect.objectContaining({\n       |                              ^\n    282|         type: 'operator.intervention',\n    283|         payload: { issueId: 'PAN-1', kind: 'deep_wipe', source: 'dashb…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[34/35]⎯\n\n FAIL  |root| src/dashboard/server/services/__tests__/issue-lifecycle.test.ts > IssueLifecycle Effect service > transitionTo — Linear > transitions to \"in_progress\" on Linear\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/services/__tests__/issue-lifecycle.test.ts:122:5\n    120|\n    121|   describe('transitionTo — Linear', () => {\n    122|     it('transitions to \"in_progress\" on Linear', async () => {\n       |     ^\n    123|       const { IssueLifecycle } = await import('../issue-lifecycle.js');\n    124|       const layer = await makeTestLayer();\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[35/35]⎯\n\n",
+    "updatedAt": "2026-07-06T18:09:22.630Z",
+    "reviewNotes": "Verification failed at lint",
+    "verificationNotes": "Verification FAILED at test (95558ms):\n\nN-100');\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/18]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/agents-switch-model.test.ts > POST /api/agents/:id/switch-model > rejects model switching for pipeline agents\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/routes/__tests__/agents-switch-model.test.ts:29:3\n     27|\n     28| describe('POST /api/agents/:id/switch-model', () => {\n     29|   it('rejects model switching for pipeline agents', async () => {\n       |   ^\n     30|     const response = await postAgentSwitchModel('agent-pan-1928', { mo…\n     31|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/18]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/cloister-config.test.ts > cloister config route > reloads the live child Cloister after saving config updates\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/routes/__tests__/cloister-config.test.ts:47:3\n     45|   });\n     46|\n     47|   it('reloads the live child Cloister after saving config updates', as…\n       |   ^\n     48|     const updates = { monitoring: { check_interval: 17 } };\n     49|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/18]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts > fork pipeline recovery and re-entry > re-enters a handoff fork without re-authoring or double-spawning when doc and live session already exist\nError: Hook timed out in 5000ms.\nIf this is a long-running hook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n ❯ src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts:84:1\n     82| }\n     83|\n     84| beforeEach(async () => {\n       | ^\n     85|   await resetDb();\n     86|   TEST_HOME = join(tmpdir(), `pan-1744-fork-recovery-${Date.now()}-${M…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/18]⎯\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2419",
-    "reviewRequestedAt": "2026-07-06T17:52:25.571Z",
+    "reviewRequestedAt": "2026-07-06T18:04:17.392Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/drafts/PAN-2373.md",
@@ -76,7 +147,7 @@
         "tests/unit/vitest-config.test.ts",
         "vitest.config.ts"
       ],
-      "recordedAt": "2026-07-06T17:51:44.426Z"
+      "recordedAt": "2026-07-06T18:03:39.561Z"
     }
   },
   "closeOut": {
@@ -84,8 +155,8 @@
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 42142,
-            "output": 1397,
+            "input": 49154,
+            "output": 4604,
             "cacheRead": 1280,
             "cacheWrite": 0
           }
@@ -106,17 +177,17 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 351891,
-            "output": 49185,
-            "cacheRead": 18341120,
+            "input": 393555,
+            "output": 65461,
+            "cacheRead": 25719040,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 42142,
-          "output": 1397,
+          "input": 49154,
+          "output": 4604,
           "cacheRead": 1280,
           "cacheWrite": 0
         },
@@ -133,15 +204,15 @@
           "cacheWrite": 149608
         },
         "custom/kimi-k2.7-code": {
-          "input": 351891,
-          "output": 49185,
-          "cacheRead": 18341120,
+          "input": 393555,
+          "output": 65461,
+          "cacheRead": 25719040,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 11.399873,
-        "pricingAsOf": "2026-07-06T18:00:28.233Z"
+        "usd": 12.906365,
+        "pricingAsOf": "2026-07-06T18:09:22.719Z"
       }
     },
     "merges": [
@@ -153,5 +224,5 @@
     "finalizedAt": "2026-07-06T17:49:27.751Z"
   },
   "created": "2026-07-06T18:00:22.350Z",
-  "updated": "2026-07-06T18:00:28.235Z"
+  "updated": "2026-07-06T18:09:22.753Z"
 }
