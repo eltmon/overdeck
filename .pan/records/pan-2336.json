@@ -1,7 +1,15 @@
 {
   "issueId": "PAN-2336",
   "schemaVersion": 2,
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-06T20:39:33Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2336\n\nGlobal frontend unused-code checks are disabled in tsconfig outside PAN-2336 scope\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2336 -m \"Fixed review issues\"`"
+    }
+  ],
   "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
@@ -13,18 +21,18 @@
   },
   "pipeline": {
     "issueId": "PAN-2336",
-    "reviewStatus": "pending",
-    "testStatus": "passed",
-    "verificationStatus": "failed",
+    "reviewStatus": "blocked",
+    "testStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T20:32:19.027Z",
-    "reviewNotes": "Verification failed at frontend-typecheck",
+    "updatedAt": "2026-07-06T20:39:27.033Z",
+    "reviewNotes": "Global frontend unused-code checks are disabled in tsconfig outside PAN-2336 scope",
     "testNotes": "Typecheck passed (tsc --noEmit + hooks + evals). Lint passed (eslint + effect + permissions + state-writes + overdeck-boundaries + skills + prompts + file-size + source-introspection + ratchet-audit). Targeted test src/lib/vbrief/__tests__/create-beads.test.ts passed 38/38. 10 consecutive CI=1 runs of the targeted test all passed (38/38 each). No browser UAT required: test-only CI-flake fix for beads DB setup race.",
     "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/dashboard/frontend/src/components/vbrief/types.ts",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2427",
     "reviewedAtCommit": "2c0a915f25d36975e61b4e4e9fa7b86127b83971",
-    "lastVerifiedCommit": "551ef3b86a1b6117e15cda2c4eb2fc2d59f28550",
+    "lastVerifiedCommit": "2f22930dcf4cabcb9b34c87596c75cba4762d088",
     "reviewRequestedAt": "2026-07-06T19:29:39.653Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -115,7 +123,7 @@
       },
       "costAtCloseOut": {
         "usd": 7.844447000000001,
-        "pricingAsOf": "2026-07-06T20:32:19.053Z"
+        "pricingAsOf": "2026-07-06T20:39:27.065Z"
       }
     },
     "merges": [
@@ -124,5 +132,12 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-06T20:32:19.057Z",
-  "updated": "2026-07-06T20:32:19.057Z"
+  "updated": "2026-07-06T20:39:33.050Z",
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-07-06T20:39Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-06T20:39:33.050Z"
+    }
+  ]
 }

@@ -5,7 +5,6 @@ import { ExternalLink, User, Play, Eye, DollarSign, ChevronDown, ChevronRight, S
 import { useDashboardStore, selectReviewStatus } from '../../../lib/store';
 import { Issue, Agent, STATUS_LABELS } from '../../../types';
 import { getFriendlyModelName } from '../../../lib/dashboard-utils';
-import { parseDifficultyLabel } from '../../../../../../lib/cloister/complexity.js';
 import { deriveIssueActionPhase, type PipelinePhase } from '../../../lib/issueActions';
 import { cn } from '../../../lib/utils';
 import { getIssueWorkAgentMap, isAgentSessionAttachable } from '../../../lib/workAgents';
@@ -16,6 +15,7 @@ import { VerifyingOnMainBadge } from '../../VerifyingOnMainBadge';
 import { CostBreakdownModal } from '../../CostBreakdownModal';
 import type { WorkspaceData } from '../../CommandDeck/ZoneCOverviewTabs/queries';
 import { DifficultyBadge, TrackerShadowBadges } from '../badges';
+import { parseDifficultyLabel } from '../difficulty';
 import { avatarGradient, cardAvatarInitials, formatCost, formatRuntime, getCostColor } from '../kanban-utils';
 import type { IssueCost, PlanningState } from '../types';
 
