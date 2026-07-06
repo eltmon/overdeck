@@ -31,6 +31,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-06T23:08:45.501Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-06T23:30:57.338Z"
     }
   ],
   "feedback": [],
@@ -161,14 +166,16 @@
     "issueId": "PAN-2387",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T23:08:51.718Z",
+    "updatedAt": "2026-07-06T23:31:01.564Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed verification failure",
     "inspectNotes": "Bead attribution-classifier ack: delivered commit 27b56a2f is an unrelated beads-close chore (codex sweep bead) touching no relevant files. Verified the actual implementation at commit 1548526f3a (already in history) satisfies all 4 ACs: classifySessionBucket returns FLYWHEEL for flywheel-orchestrator, CONVERSATIONS for other matches, UNATTRIBUTED (never UNKNOWN) on no match; findConversationForCostSessionSync in conversations.ts matches conversation_files.locator and conv-* tmux_session, returns null when absent. Tests in attribution.test.ts cover all cases.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2432",
-    "lastVerifiedCommit": "0cab11da7fdc2a927cd24ee69cf2e973cc1e40db",
+    "reviewedAtCommit": "1b020fe4b8800f4920949efd92f58da559211072",
+    "lastVerifiedCommit": "d0bc65d3273deed16b2ea327fa019d4a6cdbaad2",
     "reviewRequestedAt": "2026-07-06T23:08:44.604Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -257,8 +264,8 @@
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 99347,
-            "output": 11964,
+            "input": 108674,
+            "output": 15216,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -295,17 +302,17 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 746717,
-            "output": 19299,
-            "cacheRead": 5150464,
+            "input": 1126520,
+            "output": 29958,
+            "cacheRead": 7633152,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 99347,
-          "output": 11964,
+          "input": 108674,
+          "output": 15216,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -328,15 +335,15 @@
           "cacheWrite": 183359
         },
         "custom/kimi-k2.7-code": {
-          "input": 746717,
-          "output": 19299,
-          "cacheRead": 5150464,
+          "input": 1126520,
+          "output": 29958,
+          "cacheRead": 7633152,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 39.054251,
-        "pricingAsOf": "2026-07-06T23:08:51.774Z"
+        "usd": 39.929415,
+        "pricingAsOf": "2026-07-06T23:31:01.607Z"
       }
     },
     "merges": [
@@ -345,5 +352,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-06T22:14:47.667Z",
-  "updated": "2026-07-06T23:09:02.376Z"
+  "updated": "2026-07-06T23:31:01.609Z"
 }
