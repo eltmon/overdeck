@@ -92,7 +92,7 @@
   ],
   "feedback": [],
   "created": "2026-06-24T16:16:16.756Z",
-  "updated": "2026-06-25T12:05:16.634Z",
+  "updated": "2026-07-06T12:54:15.335Z",
   "pipeline": {
     "issueId": "PAN-2044",
     "reviewStatus": "pending",
@@ -197,8 +197,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "ohmypi",
-  "model": "glm-5.2",
+  "harness": "claude-code",
+  "model": "claude-opus-4-8",
   "statusOverrides": {
     "driver-readonly-option": "completed",
     "driver-readonly-option.ac1": "completed",
