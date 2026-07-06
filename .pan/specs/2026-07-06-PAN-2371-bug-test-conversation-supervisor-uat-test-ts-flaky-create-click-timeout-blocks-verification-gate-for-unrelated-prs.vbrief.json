@@ -4,17 +4,17 @@
     "created": "2026-07-06T16:54:07.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2371: stabilize conversation-supervisor-uat.test.ts flake (#create click timeout) that blocks the verification gate for unrelated PRs",
-    "updated": "2026-07-06T17:33:25.218Z"
+    "updated": "2026-07-06T18:17:03.668Z"
   },
   "plan": {
     "id": "pan-2371",
     "title": "bug(test): conversation-supervisor-uat.test.ts flaky (#create click timeout) blocks verification gate for unrelated PRs",
-    "status": "running",
+    "status": "completed",
     "uid": "d0f2bd78-b29c-4160-b262-9709e07538a7",
     "author": "agent:claude-opus-4-8",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-06T16:54:07.000Z",
-    "updated": "2026-07-06T17:33:25.218Z",
+    "updated": "2026-07-06T18:17:03.668Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2371",
@@ -130,5 +130,5 @@
       "canonicalFilename": "2026-07-06-PAN-2371-bug-test-conversation-supervisor-uat-test-ts-flaky-create-click-timeout-blocks-verification-gate-for-unrelated-prs.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
