@@ -88,6 +88,43 @@ export function ensurePolyrepoWorkspaceGitignoreSync(
   return { added };
 }
 
+/**
+ * PAN-2386: commit a freshly-written polyrepo workspace .gitignore so the file
+ * itself does not show as untracked and block agent auto-start. Non-fatal: if
+ * the commit cannot be made, the workspace is still usable and the caller can
+ * surface the warning.
+ */
+export async function commitPolyrepoWorkspaceGitignoreAsync(workspacePath: string): Promise<string | null> {
+  if (!existsSync(join(workspacePath, '.git'))) return null;
+
+  try {
+    await execAsync('git add .gitignore', { cwd: workspacePath });
+    try {
+      await execAsync('git diff --cached --quiet', { cwd: workspacePath });
+      return null;
+    } catch {
+      // There are staged changes — commit them.
+    }
+
+    await execAsync(
+      'git commit -m "chore(workspace): add polyrepo scaffold .gitignore"',
+      {
+        cwd: workspacePath,
+        env: {
+          ...process.env,
+          GIT_AUTHOR_NAME: 'Overdeck',
+          GIT_AUTHOR_EMAIL: 'agent@overdeck.ai',
+          GIT_COMMITTER_NAME: 'Overdeck',
+          GIT_COMMITTER_EMAIL: 'agent@overdeck.ai',
+        },
+      },
+    );
+    return 'Committed polyrepo workspace .gitignore';
+  } catch (err: any) {
+    return `Warning: could not commit workspace .gitignore: ${err.message}`;
+  }
+}
+
 export async function createWorkspacePromise(options: WorkspaceCreateOptions): Promise<WorkspaceCreateResult> {
   const { projectConfig, featureName, startDocker, dryRun, onProgress } = options;
   const progress = (label: string, detail: string, status: 'active' | 'complete' | 'error' = 'active') => {
@@ -239,6 +276,13 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
       const { added } = ensurePolyrepoWorkspaceGitignoreSync(workspacePath, workspaceConfig.repos);
       if (added.length > 0) {
         result.steps.push(`Created .gitignore for polyrepo workspace (${added.length} entries)`);
+        // The .gitignore itself must be committed or it becomes the untracked file
+        // that blocks auto-start. Only commit when workspacePath is a git repo
+        // (myn-style polyrepo workspaces use the scaffold repo as workspacePath).
+        const commitMessage = await commitPolyrepoWorkspaceGitignoreAsync(workspacePath);
+        if (commitMessage) {
+          result.steps.push(commitMessage);
+        }
       }
     } catch (gitignoreErr: any) {
       // Non-fatal — log but do not block workspace creation

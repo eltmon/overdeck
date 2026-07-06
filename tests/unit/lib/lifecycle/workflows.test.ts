@@ -155,7 +155,12 @@ describe('workflows', () => {
     vi.clearAllMocks();
     process.env.HOME = testDir;
     delete process.env.LINEAR_API_KEY;
-    mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
+    mockExecAsync.mockImplementation(async (command: string) => {
+      if (command.includes('gh issue view') && command.includes('--json labels')) {
+        return { stdout: JSON.stringify(['verifying-on-main', 'needs-close-out', 'merged', 'ready']), stderr: '' };
+      }
+      return { stdout: '', stderr: '' };
+    });
   });
 
   afterEach(() => {
@@ -420,6 +425,9 @@ describe('workflows', () => {
         }
         if (command.startsWith('git worktree remove')) {
           rmSync(wsPath, { recursive: true, force: true });
+        }
+        if (command.includes('gh issue view') && command.includes('--json labels')) {
+          return { stdout: JSON.stringify(['verifying-on-main', 'needs-close-out']), stderr: '' };
         }
         return { stdout: '', stderr: '' };
       });

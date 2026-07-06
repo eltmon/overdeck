@@ -265,7 +265,7 @@ export async function commitWorkspaceRecordBeforeAutoSpawn(gitRoot: string, issu
 
     await execFileAsync(
       'git',
-      ['commit', '-m', `chore(records): update ${issueId.toUpperCase()} per-issue record before auto-start`, '--no-verify', '--', recordPath],
+      ['commit', '-m', `chore(records): update ${issueId.toUpperCase()} per-issue record before auto-start`, '--', recordPath],
       { cwd: gitRoot, encoding: 'utf-8' },
     );
     console.log(`[complete-planning] Committed per-issue record for ${issueId.toUpperCase()} before auto-start`);
