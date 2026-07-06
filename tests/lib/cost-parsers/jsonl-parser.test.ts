@@ -9,6 +9,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { fileURLToPath } from 'url';
 import { tmpdir, homedir } from 'os';
 import { getActiveSessionModelSync, parseClaudeSessionSync } from '../../../src/lib/cost-parsers/jsonl-parser.js';
 
@@ -526,5 +527,40 @@ describe('parseClaudeSession', () => {
     expect(result!.model).toBe('claude-sonnet-4');
     // Should not have modelBreakdown since no model IDs found
     expect(result!.modelBreakdown).toBeUndefined();
+  });
+
+  it('should parse a sanitized real Claude Code session fixture', () => {
+    const fixturePath = fileURLToPath(
+      new URL('../../../src/lib/cost-parsers/__tests__/fixtures/claude/real-session.jsonl', import.meta.url),
+    );
+
+    const result = parseClaudeSessionSync(fixturePath);
+
+    expect(result).not.toBeNull();
+    expect(result!.model).toBe('claude-sonnet-4-6');
+    expect(result!.sessionId).toBe('dce5e02f-4dd7-421d-952e-e6aca624d284');
+    expect(result!.messageCount).toBe(1);
+
+    // Usage fields preserved verbatim from the real session
+    expect(result!.usage.inputTokens).toBe(3);
+    expect(result!.usage.outputTokens).toBe(1);
+    expect(result!.usage.cacheReadTokens).toBe(0);
+    expect(result!.usage.cacheWriteTokens).toBe(31249);
+
+    // Per-message cost_v2 uses the exact model's pricing
+    const expectedCost =
+      (3 * 0.003 / 1000) +   // input
+      (1 * 0.015 / 1000) +   // output
+      (31249 * 0.00375 / 1000); // cache write (5m TTL)
+    expect(result!.cost_v2).toBeCloseTo(expectedCost, 5);
+
+    // Model breakdown keyed by exact model ID
+    expect(result!.modelBreakdown).toBeDefined();
+    expect(result!.modelBreakdown!['claude-sonnet-4-5-20250929']).toBeDefined();
+    const breakdown = result!.modelBreakdown!['claude-sonnet-4-5-20250929'];
+    expect(breakdown.messageCount).toBe(1);
+    expect(breakdown.inputTokens).toBe(3);
+    expect(breakdown.outputTokens).toBe(1);
+    expect(breakdown.cost).toBeCloseTo(expectedCost, 5);
   });
 });
