@@ -618,3 +618,31 @@ describe('isPlanningComplete', () => {
     expect(isPlanningCompleteSync(WORKSPACE_PATH)).toBe(false);
   });
 });
+
+// PAN-2401: the plan read door must overlay the per-issue record's
+// statusOverrides — merged beads read 'completed', never the spec's
+// immutable 'pending'.
+describe('mergeRecordStatusOverrides (PAN-2401)', () => {
+  it('applies record overrides onto a loaded doc', async () => {
+    const { mergeRecordStatusOverrides, applyStatusOverrides } = await import('../io.js');
+    const doc = {
+      plan: {
+        id: 'pan-2401', title: 't', status: 'running',
+        items: [
+          { id: 'a', title: 'a', status: 'pending', items: [] },
+          { id: 'b', title: 'b', status: 'pending', items: [] },
+        ],
+        edges: [],
+      },
+    } as never;
+    // applyStatusOverrides is the underlying pure transform — assert the
+    // shape it produces so the route-level wiring has a locked contract.
+    const merged = applyStatusOverrides(doc, { a: 'completed' });
+    expect(merged.plan.items.find((i: { id: string }) => i.id === 'a')!.status).toBe('completed');
+    expect(merged.plan.items.find((i: { id: string }) => i.id === 'b')!.status).toBe('pending');
+    // mergeRecordStatusOverrides with a workspace that has no record is a
+    // pass-through (no throw, doc unchanged).
+    const untouched = mergeRecordStatusOverrides(doc, '/nonexistent/workspace-path');
+    expect(untouched.plan.items[0]!.status).toBe('pending');
+  });
+});
