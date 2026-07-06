@@ -1030,7 +1030,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
                 model: options.model,
                 harness: options.harness,
                 effort: options.effort,
-                workspaceLocation: options.remote ? 'remote' : 'local',
+                workspaceLocation: isRemote ? 'remote' : 'local',
               }),
             },
           );

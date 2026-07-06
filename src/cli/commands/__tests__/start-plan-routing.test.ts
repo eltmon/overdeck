@@ -7,6 +7,7 @@ import { Effect } from 'effect';
 const fetchMock = vi.hoisted(() => vi.fn());
 const findPlanSyncMock = vi.hoisted(() => vi.fn());
 const findSpecByIssueMock = vi.hoisted(() => vi.fn(() => Effect.succeed(null)));
+const findRemoteWorkspaceMetadataSyncMock = vi.hoisted(() => vi.fn(() => null));
 const autoSynthesizeMocks = vi.hoisted(() => ({
   writeAutoStartVBrief: vi.fn(() => Effect.succeed(undefined)),
 }));
@@ -76,6 +77,12 @@ vi.mock('../../../lib/pan-dir/specs.js', () => ({
   projectPanPaths: vi.fn(() => ({ specsDir: '/tmp/.pan/specs' })),
 }));
 
+vi.mock('../../../lib/remote/workspace-metadata.js', () => ({
+  findRemoteWorkspaceMetadataSync: findRemoteWorkspaceMetadataSyncMock,
+  loadWorkspaceMetadataSync: vi.fn(() => null),
+  saveWorkspaceMetadataSync: vi.fn(),
+}));
+
 vi.mock('../../../lib/vbrief/auto-synthesize.js', () => autoSynthesizeMocks);
 
 vi.mock('../../../lib/vbrief/beads.js', () => beadsMocks);
@@ -107,6 +114,7 @@ vi.mock('ora', () => ({ default: oraMocks.ora }));
 vi.mock('../../../lib/config.js', async (importActual) => ({
   ...(await importActual<typeof import('../../../lib/config.js')>('../../../lib/config.js')),
   getDashboardApiUrlSync: () => 'http://pan.test',
+  loadConfigSync: () => ({ remote: { enabled: false } }),
 }));
 
 describe('pan start planning-mode routing (PAN-2407)', () => {
@@ -133,6 +141,7 @@ describe('pan start planning-mode routing (PAN-2407)', () => {
     fetchMock.mockReset();
     findPlanSyncMock.mockReset();
     findSpecByIssueMock.mockReset().mockReturnValue(Effect.succeed(null));
+    findRemoteWorkspaceMetadataSyncMock.mockReset().mockReturnValue(null);
     autoSynthesizeMocks.writeAutoStartVBrief.mockReset().mockReturnValue(Effect.succeed(undefined));
     beadsMocks.createBeadsFromVBrief.mockReset().mockReturnValue(Effect.succeed({ created: [{ id: 'bead-1' }], errors: [], success: true }));
     spawnAgentMock.mockReset().mockResolvedValue({
@@ -245,6 +254,30 @@ describe('pan start planning-mode routing (PAN-2407)', () => {
 
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body).toMatchObject({ auto: false, autoStart: true });
+  });
+
+  it('POSTs start-planning with workspaceLocation: remote when a remote workspace exists without --remote flag', async () => {
+    mockFetchStream();
+    findRemoteWorkspaceMetadataSyncMock.mockReturnValue({
+      id: 'pan-x',
+      issue: 'PAN-X',
+      provider: 'fly',
+      vmName: 'pan-x-vm',
+      urls: {},
+      created: new Date(),
+      location: 'remote',
+    });
+
+    const originalCwd = process.cwd();
+    process.chdir(tmpDir);
+
+    const { issueCommand } = await import('../start.js');
+    await issueCommand('PAN-X', { model: 'claude-sonnet-4-6', plan: 'auto' } as any);
+
+    process.chdir(originalCwd);
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body).toMatchObject({ auto: true, autoStart: true, workspaceLocation: 'remote' });
   });
 
   it('synthesizes vBRIEF and beads in skip mode without calling start-planning', async () => {
