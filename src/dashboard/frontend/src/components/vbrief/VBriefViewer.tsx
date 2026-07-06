@@ -100,14 +100,14 @@ export function VBriefViewer({ doc, initialTab, onInspectionPolicyChange, isUpda
   );
 }
 
-/** Lazy-load PlanDAGViewer to avoid bundling ReactFlow unless needed */
+/** Lazy-load the plan map so the DAG code stays out of the base bundle */
 function DAGPlaceholder({ issueId }: { issueId: string }) {
   const [DAGViewer, setDAGViewer] = useState<React.ComponentType<{ issueId: string }> | null>(null);
 
   useEffect(() => {
-    import('../PlanDAG.js').then(m => {
-      setDAGViewer(() => m.PlanDAGViewer);
-    }).catch(() => {/* PlanDAG unavailable */});
+    import('./PlanMapViewer.js').then(m => {
+      setDAGViewer(() => m.PlanMapViewer);
+    }).catch(() => {/* plan map unavailable */});
   }, []);
 
   if (!DAGViewer) {
