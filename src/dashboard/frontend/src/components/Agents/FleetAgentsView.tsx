@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Component, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { useCostStream, type CostEvent } from '../../hooks/useCostStream';
 import { isAgentProblemStatus, isAgentRunningStatus } from '../../lib/pipeline-state';
@@ -86,7 +86,31 @@ function issueProjectOption(issue: Issue | undefined): FilterOption {
   return { id: issue?.project?.id ?? issue?.project?.name ?? issue?.sourceRepo ?? issue?.source ?? name, name };
 }
 
-function compactModel(model: string) {
+
+/** PAN-2384: one malformed agent row must never take down the whole fleet
+ * view — exactly when agents are spawning is when the operator looks here.
+ * A row that throws renders a single broken-card placeholder instead. */
+class AgentCardBoundary extends Component<{ agentId: string; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    if (this.state.failed) {
+      return (
+        <div className="rounded-[18px] border border-border bg-card px-4 py-6 text-xs text-muted-foreground">
+          Agent card failed to render ({this.props.agentId}) — see console; the rest of the fleet is unaffected.
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function compactModel(model: string | null | undefined) {
+  // PAN-2384: agent rows can lack a model during their spawn window despite
+  // the type — a partial row must never crash the fleet view.
+  if (!model) return 'model pending';
   return model.replace(/^claude-/, '').replace(/-202\d{5,8}$/, '');
 }
 
@@ -309,6 +333,7 @@ export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: (
   const modelOptions = useMemo(() => {
     const map = new Map<string, FilterOption>();
     for (const agent of fleetAgents) {
+      if (!agent.model) continue; // PAN-2384: spawn-window rows have no model yet
       if (!map.has(agent.model)) map.set(agent.model, { id: agent.model, name: compactModel(agent.model) });
     }
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
@@ -466,8 +491,8 @@ export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: (
                 const runtime = formatDuration(now.getTime() - new Date(agent.startedAt).getTime());
 
                 return (
+                  <AgentCardBoundary key={agent.id} agentId={agent.id}>
                   <AgentCard
-                    key={agent.id}
                     id={agent.id}
                     name={agent.issueId ?? agent.id}
                     role={role}
@@ -490,6 +515,7 @@ export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: (
                       <IssueActionMenu issueId={agent.issueId} mode="overflow-only" agentScopeOnly className="inline-flex" />
                     ) : undefined}
                   />
+                  </AgentCardBoundary>
                 );
               })}
             </div>
