@@ -62,6 +62,26 @@ draft) → `pan start <id>`. They do not consume the Lane B slot.
 | B12 | [PAN-2190](https://github.com/eltmon/overdeck/issues/2190) | Refactor P3 | routes/workspaces/merge-ops.ts — re-verify PRD |
 | B13 | [PAN-2189](https://github.com/eltmon/overdeck/issues/2189) | Refactor P3 | deacon.ts — **PRD deliberately not written yet**; author it fresh only after B1–B12 land (its seams shift with each) |
 
+## Lane M — Mind Your Now (parallel project lane, operator-added 2026-07-06)
+
+Different project ⇒ fully parallel with Lanes A/B; shares only the global agent-load
+governor. Source: operator conversation 501 (MIN backlog audit) + conv 485 (voice).
+**Operator holds UAT on this lane where flagged: work everything, assemble merge
+trains, but flagged items wait for operator review before merge.**
+
+| Order | Issue | Note |
+|---|---|---|
+| M0 | MIN-857 | Gemini voice UX overhaul — already in pipeline (gpt-5.5). **UAT-hold: operator reviews before merge.** |
+| M1 | MIN-860 | Push notification delivery fix (Urgent — no pushes reach iPhone/Android until landed). Dispatch first in this lane. |
+| M2 | MIN-861 | Smartwatch notifications — depends on M1. |
+| M3 | MIN-854 | Fizzy-style notification tray adoption (styling + primary notification system). |
+| M4 | MIN-858 | System comment authorship. |
+| M5 | MIN-859 | Zone entropy. |
+
+Related, NOT in the lane: MIN-75 carries a scope note (delivery-status tracking,
+per-category rate limiting) referencing the MIN-860 PRD — normal backlog flow.
+PRDs for M1–M5 are in the mind-your-now-docs repo (committed by conv 501, e0862b0).
+
 ## Rules for the drip orchestrator
 
 1. **Concurrency:** any number of Lane A items in the pipeline + at most ONE Lane B

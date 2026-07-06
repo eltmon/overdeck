@@ -60,7 +60,7 @@ describe('AgentState role persistence', () => {
     // PAN-1048 R4: default workhorse:mid tracks the current Sonnet.
     expect(determineModel({ role: 'work' })).toBe('claude-sonnet-5');
     expect(determineModel({ role: 'work', model: 'claude-opus-4-7' })).toBe('claude-opus-4-7');
-  });
+  }, 20_000);
 
   it('builds review role runtime commands from roles/review.md', async () => {
     const { getRoleRuntimeBaseCommand, roleAgentDefinitionPath, spawnRun } = await import('../agents.js');

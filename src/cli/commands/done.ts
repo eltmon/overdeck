@@ -38,6 +38,7 @@ import { readWorkspacePlanSync } from '../../lib/vbrief/io.js';
 import { compileGlob } from '../../lib/vbrief/dag.js';
 import type { ScopeDriftRecord } from '../../lib/vbrief/continue-state.js';
 import type { VBriefDocument } from '../../lib/vbrief/types.js';
+import { hasOnlyPipelineStateChangesSinceCommit } from '../../lib/pipeline-state-paths.js';
 
 const childProcessLayer = NodeChildProcessSpawner.layer.pipe(
   Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
@@ -822,6 +823,12 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         if (HEAD === currentStatus.reviewedAtCommit) {
           spinner.succeed(`Work complete: ${issueId} (review already passed at ${HEAD.slice(0, 8)} — no new commits, skipping re-review)`);
           console.log(chalk.green(`  ✓ Review already passed and no new commits detected. Pipeline continues normally.`));
+          console.log('');
+          return;
+        }
+        if (await hasOnlyPipelineStateChangesSinceCommit(workspacePath, currentStatus.reviewedAtCommit, HEAD)) {
+          spinner.succeed(`Work complete: ${issueId} (review still valid — only pipeline state changed since ${currentStatus.reviewedAtCommit.slice(0, 8)})`);
+          console.log(chalk.green(`  ✓ Review/test verdicts remain valid because post-verdict commits only touched pipeline state.`));
           console.log('');
           return;
         }
