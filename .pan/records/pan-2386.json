@@ -81,31 +81,14 @@
       "reason": "feedback",
       "note": "[2026-07-06T18:22Z] verification-gate → FAILED — seq 3",
       "timestamp": "2026-07-06T18:22:57.526Z"
-    }
-  ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-06T17:21:49Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2386\n\nPolyrepo scaffold ignores .pan/records, hiding durable per-issue records instead of committing them\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2386 -m \"Fixed review issues\"`"
     },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-06T17:21:59Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2386\n\nPolyrepo scaffold ignores .pan/records, hiding durable per-issue records instead of committing them\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2386 -m \"Fixed review issues\"`"
-    },
-    {
-      "seq": 3,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-07-06T18:22:57Z",
-      "markdownBody": "VERIFICATION FAILED for PAN-2386 (attempt 1/3):\n\nFailed check: sync-target-branch\n\nSync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - tests/unit/lib/lifecycle/workflows.test.ts\n\n## REQUIRED: Resolve merge conflicts BEFORE resubmitting\n\n1. Run: `git fetch origin main && git merge origin/main`\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request PAN-2386 -m \"Fixed sync-target-branch\"\n\nDo NOT resubmit until all repos sync cleanly and tests pass."
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-06T18:32:17.666Z"
     }
   ],
+  "feedback": [],
   "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
@@ -121,14 +104,17 @@
   },
   "pipeline": {
     "issueId": "PAN-2386",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "verificationStatus": "failed",
+    "reviewStatus": "reviewing",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T18:22:57.491Z",
-    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - tests/unit/lib/lifecycle/workflows.test.ts",
+    "updatedAt": "2026-07-06T18:33:55.242Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed sync-target-branch",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2403",
+    "lastVerifiedCommit": "4a909f47f8ac94ddd906fcd1e1222352cd69fe4d",
     "reviewRequestedAt": "2026-07-06T17:09:27.416Z"
   },
   "closeOut": {
@@ -201,7 +187,7 @@
       },
       "costAtCloseOut": {
         "usd": 47.691013,
-        "pricingAsOf": "2026-07-06T18:22:57.575Z"
+        "pricingAsOf": "2026-07-06T18:33:55.324Z"
       }
     },
     "merges": [
@@ -210,7 +196,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-06T16:04:26.393Z",
-  "updated": "2026-07-06T18:22:57.575Z",
+  "updated": "2026-07-06T18:33:55.330Z",
   "swarm": {
     "finalizedAt": "2026-07-06T17:09:32.802Z"
   }
