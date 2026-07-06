@@ -134,6 +134,15 @@ function successfulTracker() {
   } as any;
 }
 
+function mockCurrentGitHubLabels(labels = ['verifying-on-main', 'needs-close-out', 'merged', 'ready']) {
+  mockExecAsync.mockImplementation(async (command: string) => {
+    if (command.includes('gh issue view') && command.includes('--json labels')) {
+      return { stdout: JSON.stringify(labels), stderr: '' };
+    }
+    return { stdout: '', stderr: '' };
+  });
+}
+
 describe('workflows', () => {
   let testDir: string;
 
@@ -406,8 +415,8 @@ describe('workflows', () => {
       mkdirSync(wsPath, { recursive: true });
       await writeSpecForIssue(testDir, makeVBrief('PAN-100'), 'active');
       mockExecAsync.mockImplementation(async (command: string) => {
-        if (command.includes('gh issue view 100') && command.includes('--json labels')) {
-          return { stdout: JSON.stringify(['verifying-on-main', 'needs-close-out']), stderr: '' };
+        if (command.includes('gh issue view') && command.includes('--json labels')) {
+          return { stdout: JSON.stringify(['verifying-on-main', 'needs-close-out', 'merged', 'ready']), stderr: '' };
         }
         if (command.startsWith('git worktree remove')) {
           rmSync(wsPath, { recursive: true, force: true });
@@ -529,12 +538,7 @@ describe('workflows', () => {
     });
 
     it('should remove verifying labels when applying the closed-out label', async () => {
-      mockExecAsync.mockImplementation(async (command: string) => {
-        if (command.includes('gh issue view 100') && command.includes('--json labels')) {
-          return { stdout: JSON.stringify(['verifying-on-main', 'needs-close-out']), stderr: '' };
-        }
-        return { stdout: '', stderr: '' };
-      });
+      mockCurrentGitHubLabels();
 
       const ctx = {
         issueId: 'PAN-100',
