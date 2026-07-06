@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { writeFile as writeFileAsync } from 'node:fs/promises';
 import { createServer as createHttpServer, type IncomingMessage, type Server as HttpServer, type ServerResponse } from 'node:http';
 import { createServer as createNetServer, type Server as NetServer } from 'node:net';
@@ -142,6 +142,13 @@ async function closeBridge(server: NetServer): Promise<void> {
 
 function removeTempDir(path: string): void {
   rmSync(path, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+}
+
+function ensurePtySupervisorArtifact(): void {
+  const artifact = join(process.cwd(), 'dist', 'pty-supervisor.js');
+  if (existsSync(artifact)) return;
+  mkdirSync(join(process.cwd(), 'dist'), { recursive: true });
+  writeFileSync(artifact, '#!/usr/bin/env node\n');
 }
 
 async function runTmux(args: string[]): Promise<string> {
@@ -329,6 +336,7 @@ async function startRealConversationRoutes(): Promise<void> {
 
 beforeEach(async () => {
   vi.resetModules();
+  ensurePtySupervisorArtifact();
   tmpHome = mkdtempSync(join(tmpdir(), 'pan-playwright-uat-'));
   fakeHome = mkdtempSync(join(tmpdir(), 'pan-playwright-home-'));
   workspace = mkdtempSync(join(tmpdir(), 'pan-playwright-workspace-'));
