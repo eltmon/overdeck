@@ -21,9 +21,15 @@ import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { getWorkspacePanPaths } from '../../lib/pan-dir/index.js';
 import type { RuntimeName } from '../../lib/runtimes/types.js';
 import { findPlanSync } from '../../lib/vbrief/io.js';
+import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
 import { writeAutoStartVBrief, type AutoSynthesizeIssueInput } from '../../lib/vbrief/auto-synthesize.js';
 import { createBeadsFromVBrief } from '../../lib/vbrief/beads.js';
 import { transitionVBriefOnMain, updatePlanStatus } from '../../lib/vbrief/lifecycle-io.js';
+import {
+  buildStartPlanningBody,
+  printPlanningConnectionError,
+  streamPlanningSession,
+} from './planning-stream.js';
 import {
   BdTransientFailure,
   isTransientBdError,
@@ -79,7 +85,7 @@ async function updateLinearToInProgress(apiKey: string, issueIdentifier: string)
 
 import { shouldSkipTrackerUpdate, getShadowModeStatus } from '../../lib/shadow-mode.js';
 import { createShadowState, updateShadowState } from '../../lib/shadow-state.js';
-import { loadConfigSync } from '../../lib/config.js';
+import { getDashboardApiUrlSync, loadConfigSync } from '../../lib/config.js';
 import {
   loadWorkspaceMetadataSync,
   findRemoteWorkspaceMetadataSync,
@@ -983,6 +989,71 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // Find workspace (local or remote based on preference)
     const { workspacePath, isRemote } = findWorkspaceWithLocation(id, locationPreference);
 
+    // PAN-2407: route unplanned issues to the start-planning endpoint before
+    // any workspace creation or remote provisioning.
+    const projectRoot = findProjectRoot(id);
+    const existingPlan = workspacePath
+      ? findPlanSync(workspacePath)
+      : await Effect.runPromise(findSpecByIssue(projectRoot, id));
+
+    if (!existingPlan) {
+      if (resolvedPlanningMode === 'auto' || resolvedPlanningMode === 'interactive') {
+        if (options.dryRun) {
+          spinner.info(`Would start ${resolvedPlanningMode} planning session for ${id} (work agent auto-starts on finalize)`);
+          return;
+        }
+
+        spinner.text = `Starting ${resolvedPlanningMode} planning session for ${id}...`;
+        let sessionName = '';
+        try {
+          const response = await fetch(
+            `${getDashboardApiUrlSync()}/api/issues/${encodeURIComponent(id)}/start-planning`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: buildStartPlanningBody({
+                auto: resolvedPlanningMode === 'auto',
+                autoStart: true,
+                probe: false,
+                model: options.model,
+                harness: options.harness,
+                effort: options.effort,
+                workspaceLocation: options.remote ? 'remote' : 'local',
+              }),
+            },
+          );
+
+          if (!response.ok) {
+            let message = `Planning failed (${response.status})`;
+            try {
+              const data = (await response.json()) as { error?: string; hint?: string };
+              message = data.error || data.hint || message;
+            } catch {
+              const text = await response.text().catch(() => '');
+              if (text) message = text;
+            }
+            throw new Error(message);
+          }
+
+          await streamPlanningSession(response, {
+            issueId: id,
+            setSpinnerText: (text) => { spinner.text = text; },
+            onComplete: (name) => { sessionName = name; },
+          });
+
+          spinner.succeed(
+            `${resolvedPlanningMode === 'auto' ? 'Auto-planning' : 'Planning'} session started for ${id}${sessionName ? ` (${sessionName})` : ''}. The work agent will start automatically after planning finalizes.`,
+          );
+          return;
+        } catch (error) {
+          spinner.fail(error instanceof Error ? error.message : String(error));
+          printPlanningConnectionError(id);
+          process.exit(1);
+        }
+      }
+      // mode === 'skip': fall through to the existing auto-synthesize path.
+    }
+
     // --fresh: wipe the work agent's state directory under
     // ~/.overdeck/agents/agent-<id>/ (PAN-1985) so the start below opens a
     // brand-new session against a clean dir. The new agent reads
@@ -1057,7 +1128,6 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
 
     // Handle local workspace
-    const projectRoot = findProjectRoot(id);
     let workspace = workspacePath;
     const workspaceExisted = !!workspace;
     let workspaceCreatedThisRun = false;
