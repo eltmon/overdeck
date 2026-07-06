@@ -109,21 +109,21 @@
     "recordedAt": "2026-07-06T21:29:43.951Z"
   },
   "created": "2026-07-05T21:49:28.368Z",
-  "updated": "2026-07-06T21:41:16.674Z",
+  "updated": "2026-07-06T21:43:11.289Z",
   "pipeline": {
     "issueId": "PAN-2387",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T21:41:16.611Z",
-    "reviewNotes": "Review role spawn failed: CLIProxyAPI sidecar is not running. GPT subscription role runs route through a local cliproxy process managed by `pan up`. Run `pan up` (or restart the dashboard) before spawning a GPT role run.",
+    "updatedAt": "2026-07-06T21:43:11.272Z",
+    "reviewNotes": "Approved; e9127eb7 only changes pipeline metadata since prior passed code review",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Bead attribution-classifier ack: commit d1e8cb6f25 (fix(costs): add no-issue attribution classifier) satisfies all 4 acceptance criteria — classifySessionBucket returns FLYWHEEL for a matched flywheel-orchestrator conversation (AC1), CONVERSATIONS for any other matched conversation via sessionId or conv-* agentId (AC2), UNATTRIBUTED (never UNKNOWN) on no match (AC3); findConversationForCostSessionSync matches conversation_files.locator=sessionId and conversations.tmux_session=agentId for conv-* prefixes, returning null when absent (AC4). Verified via git show d1e8cb6f25 diff plus a live run of npx vitest run src/lib/costs/__tests__/attribution.test.ts at current HEAD — 5/5 pass. Confirmed the function was later relocated to src/lib/overdeck/conversation-cost-session.ts and re-exported from conversations.ts by unrelated commit d162c89a93 without behavior change. This supersedes the earlier BLOCKED verdict, which was posted against the wrong commit (8d5f3d5209, a delivery routing mismatch).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2432",
-    "reviewedAtCommit": "3965b47aaca0b27efb4072ac37dca1abed6a75cc",
+    "reviewedAtCommit": "6d08c06012c53cd26994d069f5ad2b75cf9c8781",
     "reviewRequestedAt": "2026-07-06T21:29:52.932Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -192,8 +192,8 @@
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 91132,
-            "output": 10269,
+            "input": 92171,
+            "output": 10408,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -231,8 +231,8 @@
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 91132,
-          "output": 10269,
+          "input": 92171,
+          "output": 10408,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -257,7 +257,7 @@
       },
       "costAtCloseOut": {
         "usd": 36.91574,
-        "pricingAsOf": "2026-07-06T21:41:16.638Z"
+        "pricingAsOf": "2026-07-06T21:43:11.288Z"
       }
     },
     "merges": [
@@ -265,8 +265,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "unknown-backfill": "completed",
     "unknown-backfill.ac1": "completed",
