@@ -25,6 +25,7 @@ import {
   migrateAllSessionsSync,
   rebuildCacheSync,
   deduplicateEventsSync,
+  reconcile,
 } from '../../../lib/costs/index.js';
 import {
   getCostsByIssueSync,
@@ -38,7 +39,7 @@ import { syncWalFromAllProjects } from '../../../lib/costs/sync-wal.js';
 import { httpHandler } from './http-handler.js';
 // PAN-1938: overdeck read door — CostResolver replaces direct DB calls for read endpoints.
 // CostWriter is deferred until CostArchiveLive is wired (write endpoints stay on legacy path).
-import { CostResolver, CostWriter, CostDoorLive } from '../../../lib/overdeck/cost.js';
+import { CostDoorLive, CostResolver, CostWriter } from '../../../lib/overdeck/cost.js';
 import type { IssueId } from '../../../lib/overdeck/cost.js';
 
 // ─── Route: GET /api/costs/summary ───────────────────────────────────────────
@@ -329,25 +330,38 @@ const postCostsSyncWalRoute = HttpRouter.add(
 );
 
 // ─── Route: POST /api/costs/reconcile ────────────────────────────────────────
-// TODO PAN-1938: migrate to CostWriter once CostArchiveLive is wired.
-
 const postCostsReconcileRoute = HttpRouter.add(
   'POST',
   '/api/costs/reconcile',
   httpHandler(Effect.gen(function* () {
-    const ohmypiResult = yield* CostWriter.use((writer) => writer.reconcile({ source: 'ohmypi' })).pipe(
-      Effect.provide(CostDoorLive),
-    );
-    const codexResult = yield* CostWriter.use((writer) => writer.reconcile({ source: 'codex' })).pipe(
-      Effect.provide(CostDoorLive),
-    );
+    const result = yield* Effect.tryPromise({
+      try: () => Effect.runPromise(reconcile()),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+    const overdeck = yield* Effect.tryPromise({
+      try: async () => {
+        const run = (source: 'ohmypi' | 'codex') =>
+          Effect.runPromise(
+            CostWriter.use((writer) => writer.reconcile({ source })).pipe(
+              Effect.provide(CostDoorLive),
+            ),
+          );
+        const [ohmypi, codex] = await Promise.all([run('ohmypi'), run('codex')]);
+        return { ohmypi, codex };
+      },
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
     console.log(
-      `[reconciler] Sweep complete: ohmypi=${ohmypiResult.imported} codex=${codexResult.imported} imported`
+      `[reconciler] Sweep complete: ${(result as { eventsImported?: number }).eventsImported ?? 0} imported`
     );
     return jsonResponse({
       success: true,
-      ohmypi: { imported: ohmypiResult.imported },
-      codex: { imported: codexResult.imported },
+      ...result,
+      overdeck,
+      skipped: {
+        ohmypi: overdeck.ohmypi.skipped,
+        codex: overdeck.codex.skipped,
+      },
     });
   })),
 );

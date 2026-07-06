@@ -15,7 +15,7 @@ import {
   deleteBudgetSync,
 } from '../cost.js';
 import type { CostBudget } from '../cost.js';
-import { parseOhmypiSessionCostEventsSync } from '../cost-parsers/ohmypi-parser.js';
+import { parseOhmypiSessionCostResultSync } from '../cost-parsers/ohmypi-parser.js';
 import { parseCodexSessionCostEventsSync } from '../cost-parsers/codex-parser.js';
 import { getOverdeckHome } from '../paths.js';
 import { deriveTieredAgentCostRole } from '../agents/tier-metrics.js';
@@ -92,6 +92,11 @@ export const CostEvent = Schema.Struct({
 });
 export type CostEvent = typeof CostEvent.Type;
 
+export interface SkippedCostSession {
+  file: string;
+  reason: string;
+}
+
 export const Rollup = Schema.Struct({
   key:    Schema.String,
   role:   Schema.optional(Schema.String),
@@ -150,6 +155,7 @@ export type BudgetStatus = typeof BudgetStatus.Type;
 
 export interface CostReconcileSummary {
   imported: number;
+  skipped: SkippedCostSession[];
   sessionsScanned: number;
   eventsImported: number;
   duplicatesSkipped: number;
@@ -586,6 +592,7 @@ export const CostWriterLive = Layer.effect(
         const source = opts?.source ?? 'claude';
         const empty: CostReconcileSummary = {
           imported: 0,
+          skipped: [],
           sessionsScanned: 0,
           eventsImported: 0,
           duplicatesSkipped: 0,
@@ -604,11 +611,16 @@ export const CostWriterLive = Layer.effect(
         });
 
         let imported = 0;
+        const skipped: SkippedCostSession[] = [];
         let duplicatesSkipped = 0;
         let sessionsScanned = 0;
         let earliestEventTs: string | null = null;
         let latestEventTs: string | null = null;
         const errors: string[] = [];
+        const markSkipped = (file: string, reason: string) => {
+          skipped.push({ file, reason });
+          console.warn(`[cost-reconcile] skipped ${file}: ${reason}`);
+        };
 
         const noteImportedTimestamp = (ts: Date) => {
           const iso = ts.toISOString();
@@ -693,14 +705,29 @@ export const CostWriterLive = Layer.effect(
           for (const sessionFile of sessionFiles) {
             sessionsScanned++;
             if (source === 'ohmypi') {
-              const events = yield* Effect.sync(() => {
+              const parsed = yield* Effect.sync(() => {
                 try {
-                  return parseOhmypiSessionCostEventsSync(sessionFile);
+                  return parseOhmypiSessionCostResultSync(sessionFile);
                 } catch (cause) {
-                  errors.push(`${sessionFile}: ${cause instanceof Error ? cause.message : String(cause)}`);
-                  return [];
+                  const reason = cause instanceof Error ? cause.message : String(cause);
+                  errors.push(`${sessionFile}: ${reason}`);
+                  return { ok: false as const, reason };
                 }
               });
+              if (!parsed.ok) {
+                markSkipped(sessionFile, parsed.reason ?? 'unreadable');
+                continue;
+              }
+
+              const events = parsed.usageEvents ?? [];
+              if (events.length === 0) {
+                markSkipped(sessionFile, 'no-usage');
+                continue;
+              }
+              if (parsed.unpricedModels?.length) {
+                markSkipped(sessionFile, 'unpriced-model');
+              }
+
               for (const usage of events) {
                 const ts = new Date(usage.timestamp);
                 const event: CostEvent = {
@@ -738,6 +765,13 @@ export const CostWriterLive = Layer.effect(
                 return [];
               }
             });
+            if (events.length === 0) {
+              markSkipped(sessionFile, 'no-usage');
+              continue;
+            }
+            if (events.some((event) => event.model === 'unknown')) {
+              markSkipped(sessionFile, 'unknown-model');
+            }
             for (const usage of events) {
               const ts = new Date(usage.timestamp);
               const event: CostEvent = {
@@ -769,6 +803,7 @@ export const CostWriterLive = Layer.effect(
 
         return {
           imported,
+          skipped,
           sessionsScanned,
           eventsImported: imported,
           duplicatesSkipped,
@@ -883,6 +918,7 @@ export const CostApi = HttpApiGroup.make('costs')
       }),
       success: Schema.Struct({
         imported:          Schema.Number,
+        skipped:           Schema.Array(Schema.Struct({ file: Schema.String, reason: Schema.String })),
         sessionsScanned:   Schema.Number,
         eventsImported:    Schema.Number,
         duplicatesSkipped: Schema.Number,

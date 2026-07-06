@@ -18,6 +18,7 @@ vi.mock('node:fs', async (importOriginal) => {
 vi.mock('../../../../src/lib/cost-parsers/ohmypi-parser.js', () => ({
   parseOhmypiSessionSync: vi.fn(),
   parseOhmypiSessionCostEventsSync: vi.fn(),
+  parseOhmypiSessionCostResultSync: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/cost-parsers/codex-parser.js', () => ({
@@ -35,7 +36,7 @@ vi.mock('../../../../src/lib/paths.js', async (importOriginal) => {
 });
 
 import { existsSync, readdirSync } from 'node:fs';
-import { parseOhmypiSessionCostEventsSync, parseOhmypiSessionSync } from '../../../../src/lib/cost-parsers/ohmypi-parser.js';
+import { parseOhmypiSessionCostEventsSync, parseOhmypiSessionCostResultSync, parseOhmypiSessionSync } from '../../../../src/lib/cost-parsers/ohmypi-parser.js';
 import { parseCodexSessionCostEventsSync } from '../../../../src/lib/cost-parsers/codex-parser.js';
 import { Db, EventBus, CostArchive } from '../../../../src/lib/overdeck/infra.js';
 import { CostWriter, CostWriterLive } from '../../../../src/lib/overdeck/cost.js';
@@ -193,9 +194,13 @@ describe('CostWriter.reconcile — ohmypi source', () => {
     vi.mocked(readdirSync).mockReturnValue([]);
     vi.mocked(parseOhmypiSessionSync).mockReturnValue(null);
     vi.mocked(parseOhmypiSessionCostEventsSync).mockReturnValue([]);
+    vi.mocked(parseOhmypiSessionCostResultSync).mockReturnValue({ ok: true, usageEvents: [] });
   });
 
-  afterEach(() => vi.clearAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.clearAllMocks();
+  });
 
   it('returns { imported: 0 } when no agent directories exist', async () => {
     vi.mocked(existsSync).mockReturnValue(false);  // agents dir absent
@@ -211,6 +216,7 @@ describe('CostWriter.reconcile — ohmypi source', () => {
 
     expect(result).toMatchObject({
       imported: 0,
+      skipped: [],
       sessionsScanned: 0,
       eventsImported: 0,
       duplicatesSkipped: 0,
@@ -232,7 +238,10 @@ describe('CostWriter.reconcile — ohmypi source', () => {
       return [];
     });
 
-    vi.mocked(parseOhmypiSessionCostEventsSync).mockReturnValue(makePiCostEvents(sessionFile));
+    vi.mocked(parseOhmypiSessionCostResultSync).mockReturnValue({
+      ok: true,
+      usageEvents: makePiCostEvents(sessionFile),
+    });
 
     const { dbLayer, busLayer, archiveLayer, insertedValues } = makeTestLayer();
     const layer = CostWriterLive.pipe(
@@ -245,6 +254,7 @@ describe('CostWriter.reconcile — ohmypi source', () => {
 
     expect(result).toMatchObject({
       imported: 2,
+      skipped: [],
       sessionsScanned: 1,
       eventsImported: 2,
       duplicatesSkipped: 0,
@@ -265,6 +275,37 @@ describe('CostWriter.reconcile — ohmypi source', () => {
     expect((insertedValues[1] as Record<string, unknown>).requestId).toBe('ohmypi:sess-abc:e2');
   });
 
+  it('reports unpriced ohmypi models while preserving their events', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const agentDir = '/fake/pan/agents';
+    const sessionFile = '/fake/pan/agents/agent-pan-1/sessions/sess.jsonl';
+
+    vi.mocked(readdirSync).mockImplementation((dir, _opts) => {
+      if (String(dir) === agentDir) return [makeDirent('agent-pan-1', true)];
+      if (String(dir) === '/fake/pan/agents/agent-pan-1/sessions') return [makeDirent('sess.jsonl', false)];
+      return [];
+    });
+    vi.mocked(parseOhmypiSessionCostResultSync).mockReturnValue({
+      ok: true,
+      usageEvents: makePiCostEvents(sessionFile),
+      unpricedModels: [{ provider: 'custom', model: 'unknown-model', reason: 'unpriced-model' }],
+    });
+
+    const { dbLayer, busLayer, archiveLayer, insertedValues } = makeTestLayer();
+    const layer = CostWriterLive.pipe(
+      Layer.provide(dbLayer), Layer.provide(busLayer), Layer.provide(archiveLayer),
+    );
+
+    const result = await Effect.runPromise(
+      CostWriter.use((w) => w.reconcile({ source: 'ohmypi' })).pipe(Effect.provide(layer)),
+    );
+
+    expect(result).toMatchObject({ imported: 2, skipped: [{ file: sessionFile, reason: 'unpriced-model' }] });
+    expect(insertedValues).toHaveLength(2);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(`[cost-reconcile] skipped ${sessionFile}: unpriced-model`);
+  });
+
 });
 
 describe('CostWriter.reconcile — codex source', () => {
@@ -274,7 +315,10 @@ describe('CostWriter.reconcile — codex source', () => {
     vi.mocked(parseCodexSessionCostEventsSync).mockReturnValue([]);
   });
 
-  afterEach(() => vi.clearAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.clearAllMocks();
+  });
 
   it('imports one codex cost event per token_count turn with request ids', async () => {
     const agentDir = '/fake/pan/agents';
@@ -303,6 +347,7 @@ describe('CostWriter.reconcile — codex source', () => {
 
     expect(result).toMatchObject({
       imported: 2,
+      skipped: [],
       sessionsScanned: 1,
       eventsImported: 2,
       duplicatesSkipped: 0,
@@ -352,13 +397,46 @@ describe('CostWriter.reconcile — codex source', () => {
       CostWriter.use((w) => w.reconcile({ source: 'codex' })).pipe(Effect.provide(layer)),
     );
 
-    expect(first).toEqual({ imported: 1 });
-    expect(second).toEqual({ imported: 1 });
+    expect(first).toMatchObject({ imported: 1, skipped: [] });
+    expect(second).toMatchObject({ imported: 1, skipped: [] });
     expect(insertedValues).toHaveLength(2);
     expect(insertedValues.map((row) => (row as Record<string, unknown>).requestId)).toEqual([
       'codex:sess-abc:0',
       'codex:sess-abc:1',
     ]);
+  });
+
+  it('reports unknown-model codex sessions while preserving their events', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const agentDir = '/fake/pan/agents';
+    const rolloutFile = '/fake/pan/agents/agent-pan-2/codex-home/sessions/2026/06/17/rollout-abc.jsonl';
+    const [event] = makeCodexCostEvents(rolloutFile);
+
+    vi.mocked(readdirSync).mockImplementation((dir, _opts) => {
+      if (String(dir) === agentDir) return [makeDirent('agent-pan-2', true)];
+      if (String(dir) === '/fake/pan/agents/agent-pan-2/codex-home/sessions') return [makeDirent('2026', true)];
+      if (String(dir) === '/fake/pan/agents/agent-pan-2/codex-home/sessions/2026') return [makeDirent('06', true)];
+      if (String(dir) === '/fake/pan/agents/agent-pan-2/codex-home/sessions/2026/06') return [makeDirent('17', true)];
+      if (String(dir) === '/fake/pan/agents/agent-pan-2/codex-home/sessions/2026/06/17')
+        return [makeDirent('rollout-abc.jsonl', false)];
+      return [];
+    });
+    vi.mocked(parseCodexSessionCostEventsSync).mockReturnValue([{ ...event!, model: 'unknown', cost: 0 }]);
+
+    const { dbLayer, busLayer, archiveLayer, insertedValues } = makeTestLayer();
+    const layer = CostWriterLive.pipe(
+      Layer.provide(dbLayer), Layer.provide(busLayer), Layer.provide(archiveLayer),
+    );
+
+    const result = await Effect.runPromise(
+      CostWriter.use((w) => w.reconcile({ source: 'codex' })).pipe(Effect.provide(layer)),
+    );
+
+    expect(result).toMatchObject({ imported: 1, skipped: [{ file: rolloutFile, reason: 'unknown-model' }] });
+    expect(insertedValues).toHaveLength(1);
+    expect((insertedValues[0] as Record<string, unknown>).model).toBe('unknown');
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(`[cost-reconcile] skipped ${rolloutFile}: unknown-model`);
   });
 });
 
@@ -375,6 +453,7 @@ describe('CostWriter.reconcile — non-pi/codex source', () => {
 
     expect(result).toMatchObject({
       imported: 0,
+      skipped: [],
       sessionsScanned: 0,
       eventsImported: 0,
       duplicatesSkipped: 0,
