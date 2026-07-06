@@ -226,6 +226,12 @@ export function completePlanningWorkspaceGitAddCommands(gitRoot: string): string
   if (existsSync(join(gitRoot, '.beads'))) {
     commands.push(['add', '.beads/']);
   }
+  // PAN-2386: the polyrepo scaffold .gitignore is created during workspace setup
+  // but the workspace may not be a git repo yet, leaving it untracked. Stage it
+  // as part of the planning commit so auto-start sees a clean tree.
+  if (existsSync(join(gitRoot, '.gitignore'))) {
+    commands.push(['add', '.gitignore']);
+  }
   return commands;
 }
 
