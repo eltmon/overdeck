@@ -183,6 +183,46 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
         }
       }
     }
+
+    // PAN-2386: polyrepo scaffold workspaces are separate git repos that check out
+    // sub-repos as sibling directories. Without a workspace-level .gitignore, those
+    // sub-repo directories and workspace-local Overdeck state show as untracked and
+    // block agent auto-start. Write a scaffold .gitignore before any git status checks.
+    try {
+      const workspaceGitignore = join(workspacePath, '.gitignore');
+      let content = existsSync(workspaceGitignore) ? readFileSync(workspaceGitignore, 'utf-8') : '';
+      const normalizedLines = content.split('\n').map(l => l.trim()).filter(Boolean);
+      const entriesToAdd: string[] = [];
+
+      // Workspace-local issue state is rebuilt from sources of truth and should never
+      // be committed in the scaffold repo.
+      if (!normalizedLines.includes('.pan/records/')) {
+        entriesToAdd.push('.pan/records/');
+      }
+
+      // Sub-repo directories are independent git repositories, not scaffold content.
+      for (const repo of workspaceConfig.repos) {
+        const entry = `${repo.name}/`;
+        if (!normalizedLines.includes(entry) && !normalizedLines.includes(repo.name)) {
+          entriesToAdd.push(entry);
+        }
+      }
+
+      if (entriesToAdd.length > 0) {
+        if (content && !content.endsWith('\n')) {
+          content += '\n';
+        }
+        if (!normalizedLines.some(l => l.includes('Polyrepo') || l.includes('polyrepo'))) {
+          content += '\n# Polyrepo workspace-local state and sub-repositories\n';
+        }
+        content += entriesToAdd.join('\n') + '\n';
+        writeFileSync(workspaceGitignore, content, 'utf-8');
+        result.steps.push(`Created .gitignore for polyrepo workspace (${entriesToAdd.length} entries)`);
+      }
+    } catch (gitignoreErr: any) {
+      // Non-fatal — log but do not block workspace creation
+      result.steps.push(`Warning: could not create workspace .gitignore: ${gitignoreErr.message}`);
+    }
   }
 
   progress('Creating git worktree', 'Worktree ready', 'complete');
