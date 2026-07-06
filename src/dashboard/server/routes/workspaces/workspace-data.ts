@@ -920,6 +920,85 @@ const getWorkspaceTldrRoute = HttpRouter.add(
   }))
 );
 
+// ─── Route: PATCH /api/workspaces/:issueId/tiered-execution ──────────────────
+
+const patchWorkspaceTieredExecutionRoute = HttpRouter.add(
+  'PATCH',
+  '/api/workspaces/:issueId/tiered-execution',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedMutationOrigin(request);
+    if (originError) return originError;
+
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    if (!parseIssueIdSync(issueId)) {
+      return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
+    }
+
+    const body = yield* readJsonBody;
+    const override = (body as { override?: unknown }).override;
+    if (override !== 'on' && override !== 'off' && override !== null && override !== undefined) {
+      return jsonResponse({ error: 'Invalid tiered-execution override' }, { status: 400 });
+    }
+
+    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const project = getProjectSync(issuePrefix);
+    if (!project) {
+      return jsonResponse({ error: 'Project not found' }, { status: 404 });
+    }
+
+    // Persist via the record write door
+    yield* Effect.promise(() =>
+      import('../../../pan-dir/record.js').then(m =>
+        m.writeRecordTieredExecutionOverride(project, issueId, override as 'on' | 'off' | null)
+      )
+    );
+
+    // Return the updated computed tieredExecution block (same shape as read door)
+    const projectPath = project.path;
+    const location = yield* resolvePlanLocation(projectPath, issueId);
+    if (!location) {
+      return jsonResponse(
+        { error: 'No vBRIEF plan found for this workspace' },
+        { status: 404 }
+      );
+    }
+
+    // Compute tieredExecution block using the same logic as the read door
+    const config = loadConfigSync().config;
+    const tieredExecutionConfig = config.tieredExecution;
+    const globalEnabled = tieredExecutionConfig?.enabled ?? false;
+    const planMetadata = location.doc.plan?.metadata;
+
+    // Determine source and effective state with record override precedence
+    let source: 'issue-override' | 'plan-metadata' | 'global';
+    let effective: boolean;
+
+    if (override !== null && override !== undefined) {
+      source = 'issue-override';
+      effective = override === 'on';
+    } else if (planMetadata?.tiered_execution === 'on') {
+      source = 'plan-metadata';
+      effective = true;
+    } else if (planMetadata?.tiered_execution === 'off') {
+      source = 'plan-metadata';
+      effective = false;
+    } else {
+      source = 'global';
+      effective = globalEnabled;
+    }
+
+    const tieredExecution = {
+      effective,
+      source,
+      override: (override as 'on' | 'off' | null) ?? null,
+    };
+
+    return jsonResponse({ ...location.doc, tieredExecution, lifecycleDir: location.lifecycleDir });
+  }))
+);
+
 export const workspaceDataRouteLayer = Layer.mergeAll(
   getWorkspaceStackHealthBatchRoute,
   getWorkspaceRoute,
@@ -927,6 +1006,7 @@ export const workspaceDataRouteLayer = Layer.mergeAll(
   getWorkspacePlanRoute,
   getWorkspaceUatContextRoute,
   patchWorkspacePlanInspectionPolicyRoute,
+  patchWorkspaceTieredExecutionRoute,
   getWorkspaceTldrRoute,
 );
 
