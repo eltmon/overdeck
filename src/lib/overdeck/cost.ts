@@ -16,7 +16,7 @@ import {
 } from '../cost.js';
 import type { CostBudget } from '../cost.js';
 import { parseOhmypiSessionCostEventsSync } from '../cost-parsers/ohmypi-parser.js';
-import { parseCodexSessionSync } from '../cost-parsers/codex-parser.js';
+import { parseCodexSessionCostEventsSync } from '../cost-parsers/codex-parser.js';
 import { getOverdeckHome } from '../paths.js';
 import { deriveTieredAgentCostRole } from '../agents/tier-metrics.js';
 
@@ -586,29 +586,29 @@ export const CostWriterLive = Layer.effect(
               continue;
             }
 
-            const session = yield* Effect.sync(() => parseCodexSessionSync(sessionFile));
-            if (!session) continue;
+            const events = yield* Effect.sync(() => parseCodexSessionCostEventsSync(sessionFile));
+            for (const usage of events) {
+              const event: CostEvent = {
+                ts:          new Date(usage.timestamp),
+                issueId:     issueIdFromAgentName(agentName),
+                agentId:     agentName,
+                sessionId:   usage.sessionId,
+                sessionType: source,
+                provider:    usage.provider,
+                model:       usage.model,
+                input:       usage.input,
+                output:      usage.output,
+                cacheRead:   usage.cacheRead,
+                cacheWrite:  usage.cacheWrite,
+                cost:        usage.cost,
+                requestId:   usage.requestId,
+                sourceFile:  sessionFile,
+              };
 
-            const event: CostEvent = {
-              ts:          new Date(session.startTime),
-              issueId:     issueIdFromAgentName(agentName),
-              agentId:     agentName,
-              sessionId:   session.sessionId,
-              sessionType: source,
-              provider:    null,
-              model:       session.model ?? null,
-              input:       session.usage.inputTokens,
-              output:      session.usage.outputTokens,
-              cacheRead:   session.usage.cacheReadTokens ?? 0,
-              cacheWrite:  0,
-              cost:        session.cost_v2 ?? session.cost,
-              requestId:   null,
-              sourceFile:  sessionFile,
-            };
-
-            const wasDuplicate = yield* checkDuplicate(event);
-            if (!wasDuplicate) {
-              if (yield* record(event)) imported++;
+              const wasDuplicate = yield* checkDuplicate(event);
+              if (!wasDuplicate) {
+                if (yield* record(event)) imported++;
+              }
             }
           }
         }
