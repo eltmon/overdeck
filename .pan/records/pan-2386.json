@@ -21,24 +21,19 @@
       "reason": "feedback",
       "note": "[2026-07-06T16:19Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-06T16:19:05.604Z"
-    }
-  ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-06T16:18:56Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2386\n\nPolyrepo .gitignore commit helper is a no-op before root git init, so auto-start still sees untracked .gitignore\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2386 -m \"Fixed review issues\"`"
     },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-06T16:19:05Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2386\n\nPolyrepo .gitignore commit helper is a no-op before root git init, so auto-start still sees untracked .gitignore\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2386 -m \"Fixed review issues\"`"
+      "timestamp": "2026-07-06T16:23:10.484Z",
+      "reason": "end",
+      "note": "Review feedback: .gitignore is now staged as part of the complete-planning workspace commit so auto-start sees a clean tree regardless of when the workspace git repo was initialized."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-06T16:23:10.890Z"
     }
   ],
+  "feedback": [],
   "harness": "claude-code",
   "model": "kimi-k2.7-code",
   "statusOverrides": {
@@ -54,25 +49,39 @@
   },
   "pipeline": {
     "issueId": "PAN-2386",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T16:22:27.249Z",
-    "reviewNotes": "Polyrepo .gitignore commit helper is a no-op before root git init, so auto-start still sees untracked .gitignore",
+    "updatedAt": "2026-07-06T16:40:25.390Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-07-06T16:39:36.134Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2403",
-    "lastVerifiedCommit": "698c9fc32f32d395edd0fcb065da83be271fb4f1",
-    "reviewRequestedAt": "2026-07-06T16:17:49.789Z"
+    "reviewedAtCommit": "5658edad6d3c0935bd57113d90a0093746d768e1",
+    "lastVerifiedCommit": "5658edad6d3c0935bd57113d90a0093746d768e1"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 18312,
-            "output": 538,
+            "input": 19351,
+            "output": 648,
             "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 325778,
+            "output": 7247,
+            "cacheRead": 2896896,
             "cacheWrite": 0
           }
         },
@@ -84,18 +93,24 @@
             "cacheWrite": 463338
           },
           "custom/kimi-k2.7-code": {
-            "input": 930087,
-            "output": 154667,
-            "cacheRead": 76381952,
+            "input": 930959,
+            "output": 155035,
+            "cacheRead": 76877568,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 18312,
-          "output": 538,
+          "input": 19351,
+          "output": 648,
           "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 1256737,
+          "output": 162282,
+          "cacheRead": 79774464,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -103,17 +118,11 @@
           "output": 43065,
           "cacheRead": 19126990,
           "cacheWrite": 463338
-        },
-        "custom/kimi-k2.7-code": {
-          "input": 930087,
-          "output": 154667,
-          "cacheRead": 76381952,
-          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 18.724649,
-        "pricingAsOf": "2026-07-06T16:22:27.292Z"
+        "usd": 19.710001,
+        "pricingAsOf": "2026-07-06T16:40:25.498Z"
       }
     },
     "merges": [
@@ -122,5 +131,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-06T16:04:26.393Z",
-  "updated": "2026-07-06T16:22:27.293Z"
+  "updated": "2026-07-06T16:40:25.499Z"
 }
