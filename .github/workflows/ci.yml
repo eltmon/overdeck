@@ -191,6 +191,73 @@ jobs:
           DASHBOARD_URL: http://localhost:3011
         run: cd src/dashboard/frontend && npm run test:playwright
 
+  flake-lane:
+    runs-on: ubuntu-latest
+    name: Non-blocking flake lane
+    # PAN-2373: run quarantined flaky tests separately so they cannot block the
+    # merge gate, while still observing whether they pass with retry enabled.
+    timeout-minutes: 30
+    permissions:
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build
+        run: npm run build
+
+      - name: Install Playwright browsers for quarantined tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Run quarantined tests (non-blocking)
+        # Non-blocking: failures are logged but do not fail the job or block the PR.
+        continue-on-error: true
+        env:
+          OVERDECK_FLAKE_LANE: '1'
+        run: npx vitest run
+
+      - name: Generate flake summary
+        id: summary
+        run: |
+          {
+            echo 'markdown<<FLAKE_EOF'
+            bash scripts/generate-flake-summary.sh
+            echo 'FLAKE_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Post flake summary comment
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          marker='<!-- flake-lane-summary -->'
+          pr_number='${{ github.event.pull_request.number }}'
+          body='${{ steps.summary.outputs.markdown }}'
+
+          existing=$(gh api "repos/${{ github.repository }}/issues/${pr_number}/comments" \
+            --jq ".[] | select(.body | contains(\"${marker}\")) | .id" | tail -n 1)
+
+          if [ -n "$existing" ]; then
+            gh api --method PATCH "repos/${{ github.repository }}/issues/comments/${existing}" \
+              -f body="$body"
+          else
+            gh api --method POST "repos/${{ github.repository }}/issues/${pr_number}/comments" \
+              -f body="$body"
+          fi
+
   clean-install:
     runs-on: ubuntu-latest
     name: Clean install + server smoke test
