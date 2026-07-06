@@ -1,6 +1,23 @@
 {
   "issueId": "PAN-2402",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-06T16:56:34.712Z",
+      "reason": "end",
+      "note": "Fixed verification gate test timeouts. Two unrelated dynamic-import tests (auto-resume-gating and agent-state-role) exceeded the default 5s timeout under CI parallelism; extended both to 20s to match neighboring slow tests in the same file. Rebased onto origin/main."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-06T16:56:35.147Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-06T16:59:45.540Z"
+    }
+  ],
   "feedback": [],
   "harness": "claude-code",
   "model": "kimi-k2.7-code",
@@ -12,17 +29,16 @@
   },
   "pipeline": {
     "issueId": "PAN-2402",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T16:52:58.000Z",
+    "updatedAt": "2026-07-06T17:04:36.393Z",
     "reviewNotes": "Verification failed at test",
-    "verificationNotes": "Verification FAILED at test (68327ms):\n\nefaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| tests/lib/cloister/auto-resume-gating.test.ts > auto-resume gates > skips paused agents even when review feedback is pending\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ tests/lib/cloister/auto-resume-gating.test.ts:335:3\n    333|   }\n    334|\n    335|   it('skips paused agents even when review feedback is pending', async…\n       |   ^\n    336|     const agentId = 'agent-pan-1141-paused';\n    337|     resumeAgentMock.mockResolvedValue({ success: true });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  |root| src/lib/__tests__/agent-state-role.test.ts > AgentState role persistence > resolves the work role model through role config defaults\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/lib/__tests__/agent-state-role.test.ts:39:3\n     37|   });\n     38|\n     39|   it('resolves the work role model through role config defaults', asyn…\n       |   ^\n     40|     vi.doMock('../config-yaml.js', async (importOriginal) => {\n     41|       const actual = await importOriginal<typeof import('../config-yam…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2411",
-    "lastVerifiedCommit": "9cd4bec6da43dafa0b63986a9568f101d279f0c6",
-    "reviewRequestedAt": "2026-07-06T16:47:58.704Z"
+    "lastVerifiedCommit": "fe00335f1f5d425926c50216be5588b59a31890d",
+    "reviewRequestedAt": "2026-07-06T16:56:34.713Z"
   },
   "closeOut": {
     "usage": {
@@ -51,9 +67,9 @@
             "cacheWrite": 339334
           },
           "custom/kimi-k2.7-code": {
-            "input": 789780,
-            "output": 55554,
-            "cacheRead": 26946560,
+            "input": 814080,
+            "output": 64216,
+            "cacheRead": 32430592,
             "cacheWrite": 0
           }
         }
@@ -66,9 +82,9 @@
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 1204501,
-          "output": 60012,
-          "cacheRead": 28636160,
+          "input": 1228801,
+          "output": 68674,
+          "cacheRead": 34120192,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -79,8 +95,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 8.931738,
-        "pricingAsOf": "2026-07-06T16:52:58.043Z"
+        "usd": 10.03144,
+        "pricingAsOf": "2026-07-06T17:04:36.415Z"
       }
     },
     "merges": [
@@ -92,5 +108,5 @@
     "finalizedAt": "2026-07-06T16:45:16.460Z"
   },
   "created": "2026-07-06T16:52:52.528Z",
-  "updated": "2026-07-06T16:52:58.055Z"
+  "updated": "2026-07-06T17:04:36.422Z"
 }
