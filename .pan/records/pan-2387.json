@@ -181,8 +181,8 @@
     ],
     "recordedAt": "2026-07-06T22:17:19.426Z"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-sonnet-5",
   "statusOverrides": {
     "unknown-backfill": "completed",
     "unknown-backfill.ac1": "completed",
@@ -225,19 +225,16 @@
   },
   "pipeline": {
     "issueId": "PAN-2387",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-06T22:21:23.756Z",
-    "reviewNotes": "Approved; reviewed live head 85570f3b with no blocking findings",
-    "testNotes": "Ran quality gates in workspace /home/eltmon/Projects/overdeck/workspaces/feature-pan-2387. typecheck passed. lint passed. npm test failed with 3 failures: (1) tests/unit/lib/pan-444-post-merge-step0.test.ts fails at import because its vi.mock('../../../src/lib/paths.js') is missing COSTS_DIR, now required after src/lib/memory/providers/types.ts imports getPricingSync from cost.js (which imports COSTS_DIR). (2) tests/unit/lib/cloister/scan-git-patterns.test.ts fails for the same missing-COSTS_DIR mock reason. (3) tests/lib/memory/providers.test.ts > 'routes cliproxy extraction through the local Anthropic-compatible messages endpoint' expects result.cost.usd > 0 for model gpt-4.1-nano but calculateExtractionCost now uses getPricingSync and emits '[memory] unpriced extraction model cliproxy/gpt-4.1-nano; recording $0 cost'. PAN-2387-specific unit tests (attribution, reconciler-buckets, unknown-backfill, cost-sync, cost-codex-reconcile, codex-parser-gpt55, cost-bucket-labels, extraction-pricing) all pass when run in isolation. No browser UAT was required because acceptance criteria are data/aggregation-level, not UI-render-level.",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-06T22:48:47.979Z",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
-    "inspectNotes": "Bead attribution-classifier ack: commit d1e8cb6f25 (fix(costs): add no-issue attribution classifier) satisfies all 4 acceptance criteria — classifySessionBucket returns FLYWHEEL for a matched flywheel-orchestrator conversation (AC1), CONVERSATIONS for any other matched conversation via sessionId or conv-* agentId (AC2), UNATTRIBUTED (never UNKNOWN) on no match (AC3); findConversationForCostSessionSync matches conversation_files.locator=sessionId and conversations.tmux_session=agentId for conv-* prefixes, returning null when absent (AC4). Verified via git show d1e8cb6f25 diff plus a live run of npx vitest run src/lib/costs/__tests__/attribution.test.ts at current HEAD — 5/5 pass. Confirmed the function was later relocated to src/lib/overdeck/conversation-cost-session.ts and re-exported from conversations.ts by unrelated commit d162c89a93 without behavior change. This supersedes the earlier BLOCKED verdict, which was posted against the wrong commit (8d5f3d5209, a delivery routing mismatch).",
+    "inspectNotes": "Bead attribution-classifier ack: delivered commit 27b56a2f is an unrelated beads-close chore (codex sweep bead) touching no relevant files. Verified the actual implementation at commit 1548526f3a (already in history) satisfies all 4 ACs: classifySessionBucket returns FLYWHEEL for flywheel-orchestrator, CONVERSATIONS for other matches, UNATTRIBUTED (never UNKNOWN) on no match; findConversationForCostSessionSync in conversations.ts matches conversation_files.locator and conv-* tmux_session, returns null when absent. Tests in attribution.test.ts cover all cases.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2432",
-    "reviewedAtCommit": "85570f3bb611a2bb005ffc1a648a38da0342ac3a",
     "lastVerifiedCommit": "0cab11da7fdc2a927cd24ee69cf2e973cc1e40db",
     "reviewRequestedAt": "2026-07-06T22:17:26.144Z",
     "scopeDrift": {
@@ -395,8 +392,8 @@
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 97091,
-            "output": 11308,
+            "input": 97657,
+            "output": 11436,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -425,10 +422,10 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 6709,
-            "output": 8135,
-            "cacheRead": 1296821,
-            "cacheWrite": 94056
+            "input": 13269,
+            "output": 11465,
+            "cacheRead": 1515191,
+            "cacheWrite": 179617
           }
         },
         "test": {
@@ -442,8 +439,8 @@
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 97091,
-          "output": 11308,
+          "input": 97657,
+          "output": 11436,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -460,10 +457,10 @@
           "cacheWrite": 649636
         },
         "anthropic/claude-sonnet-5": {
-          "input": 6709,
-          "output": 8135,
-          "cacheRead": 1296821,
-          "cacheWrite": 94056
+          "input": 13269,
+          "output": 11465,
+          "cacheRead": 1515191,
+          "cacheWrite": 179617
         },
         "custom/kimi-k2.7-code": {
           "input": 746717,
@@ -473,8 +470,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 38.68091,
-        "pricingAsOf": "2026-07-06T22:21:23.784Z"
+        "usd": 38.984907,
+        "pricingAsOf": "2026-07-06T22:48:48.039Z"
       }
     },
     "merges": [
@@ -483,5 +480,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-06T22:14:47.667Z",
-  "updated": "2026-07-06T22:21:23.785Z"
+  "updated": "2026-07-06T22:48:48.039Z"
 }
