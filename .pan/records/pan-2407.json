@@ -12,23 +12,29 @@
       "reason": "resume",
       "agentModel": "kimi-k2.7-code",
       "timestamp": "2026-07-06T16:27:27.782Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-06T18:34:05.488Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-06T14:55:36.922Z",
-  "updated": "2026-07-06T18:23:28.666Z",
+  "updated": "2026-07-06T18:34:05.705Z",
   "pipeline": {
     "issueId": "PAN-2407",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T18:23:28.169Z",
+    "updatedAt": "2026-07-06T18:34:05.096Z",
+    "reviewNotes": "Agent re-review request (1/25): Inspect passed on remote workspace location fix; please run test/merge pipeline",
     "inspectNotes": "Bead route-unplanned-to-planning ack: fix 599f26fa12 corrects workspaceLocation in the start-planning POST body to use the already-resolved isRemote flag from findWorkspaceWithLocation() instead of raw options.remote, so an existing remote workspace is reported correctly even without --remote; regression test added and verified against findWorkspaceWithLocation/determineWorkspaceLocation source. No regression to the prior 5 ACs.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2415",
-    "lastVerifiedCommit": "f8b9ae733b3af83c312ff18576a70fdc27016f50"
+    "lastVerifiedCommit": "258be7e8d61702efef3b908f87085feaffd6630c"
   },
   "closeOut": {
     "usage": {
@@ -59,17 +65,17 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 26036,
-            "output": 7620,
-            "cacheRead": 1552096,
-            "cacheWrite": 221715
+            "input": 26038,
+            "output": 8138,
+            "cacheRead": 1693974,
+            "cacheWrite": 222913
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1665147,
-            "output": 254493,
-            "cacheRead": 161143296,
+            "input": 1673917,
+            "output": 256889,
+            "cacheRead": 164875264,
             "cacheWrite": 0
           }
         }
@@ -88,21 +94,21 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 26036,
-          "output": 7620,
-          "cacheRead": 1552096,
-          "cacheWrite": 221715
+          "input": 26038,
+          "output": 8138,
+          "cacheRead": 1693974,
+          "cacheWrite": 222913
         },
         "custom/kimi-k2.7-code": {
-          "input": 1665147,
-          "output": 254493,
-          "cacheRead": 161143296,
+          "input": 1673917,
+          "output": 256889,
+          "cacheRead": 164875264,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 44.325113,
-        "pricingAsOf": "2026-07-06T18:23:28.475Z"
+        "usd": 45.088656,
+        "pricingAsOf": "2026-07-06T18:34:05.268Z"
       }
     },
     "merges": [
@@ -110,8 +116,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "config-default-mode": "completed",
     "config-default-mode.ac1": "completed",
