@@ -39,6 +39,47 @@ Ignore this bullet:
       'Implement Start work automatically',
     ]);
   });
+
+  it('ignores narrative bullets and returns generic AC when no explicit Acceptance section', () => {
+    const criteria = extractAcceptanceCriteriaFromIssue('Fix deacon crash', `
+## Observed
+\`pan start PAN-2386 --auto\` synthesized the minimal vBRIEF by scraping the issue body's bullet lists into acceptance criteria.
+
+- \`~/.overdeck/agents/agent-min-857/lifecycle.log (refusal event, 2026-07-05T18:37:40Z)\`
+- \`Workspace: /home/eltmon/Projects/myn/workspaces/feature-min-857 (scaffold repo on master, ...)\`
+- \`[deacon] Error coordinating swarm MIN-857: Command failed: git branch --list ...\`
+
+## Context
+This is just background information.
+- More context bullets
+- That should be ignored
+`);
+
+    expect(criteria).toEqual(["Issue's stated fix implemented with tests"]);
+  });
+
+  it('returns generic AC when body has no Acceptance section and no bullets', () => {
+    const criteria = extractAcceptanceCriteriaFromIssue('Fix performance', 'This is just plain text with no bullets or sections.');
+
+    expect(criteria).toEqual(["Issue's stated fix implemented with tests"]);
+  });
+
+  it('extracts bullets from Acceptance section but ignores narrative bullets elsewhere', () => {
+    const criteria = extractAcceptanceCriteriaFromIssue('Fix workflow', `
+## Observed
+- This bullet should be ignored
+- As should this one
+
+## Acceptance Criteria
+- [ ] Fixes the workflow
+- [ ] Adds unit tests
+
+## Context
+- More bullets to ignore
+`);
+
+    expect(criteria).toEqual(['Fixes the workflow', 'Adds unit tests']);
+  });
 });
 
 describe('synthesizeMinimalVBrief', () => {

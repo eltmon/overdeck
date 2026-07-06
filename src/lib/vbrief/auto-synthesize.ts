@@ -35,27 +35,37 @@ export function extractAcceptanceCriteriaFromIssue(title: string, body?: string 
   if (!text) return [`Implement ${title}`];
 
   const lines = text.split(/\r?\n/);
-  const headingIndex = lines.findIndex((line) => /acceptance criteria/i.test(line));
-  const candidateLines = headingIndex >= 0 ? lines.slice(headingIndex + 1) : lines;
-  const checklist = candidateLines
-    .filter((line) => /^\s*[-*+]\s+\[[ xX]\]\s+/.test(line))
-    .map(cleanMarkdownLine)
-    .filter(Boolean);
-  if (checklist.length > 0) return checklist;
+  // Only a real heading (or standalone bold/label line) counts — the phrase
+  // appearing mid-prose must not start a section (PAN-2404).
+  const headingIndex = lines.findIndex((line) =>
+    /^#{1,6}\s+.*acceptance(\s+criteria)?\b/i.test(line)
+    || /^\s*\*{0,2}acceptance criteria\*{0,2}:?\s*$/i.test(line));
 
-  const bullets = candidateLines
-    .filter((line) => /^\s*[-*+]\s+/.test(line))
-    .map(cleanMarkdownLine)
-    .filter(Boolean)
-    .slice(0, 8);
-  if (bullets.length > 0) return bullets;
+  // If an explicit Acceptance Criteria section exists, use only that section
+  if (headingIndex >= 0) {
+    // Find the end of this section (next heading or end of text)
+    const sectionEndIndex = lines.findIndex((line, idx) =>
+      idx > headingIndex && /^#+\s+/.test(line)
+    );
+    const endIndex = sectionEndIndex >= 0 ? sectionEndIndex : lines.length;
+    const sectionLines = lines.slice(headingIndex + 1, endIndex);
 
-  const paragraphs = text
-    .split(/\n\s*\n/)
-    .map((paragraph) => paragraph.replace(/\s+/g, ' ').trim())
-    .filter((paragraph) => paragraph && !paragraph.startsWith('#'))
-    .slice(0, 3);
-  return paragraphs.length > 0 ? paragraphs : [`Implement ${title}`];
+    const checklist = sectionLines
+      .filter((line) => /^\s*[-*+]\s+\[[ xX]\]\s+/.test(line))
+      .map(cleanMarkdownLine)
+      .filter(Boolean);
+    if (checklist.length > 0) return checklist;
+
+    const bullets = sectionLines
+      .filter((line) => /^\s*[-*+]\s+/.test(line))
+      .map(cleanMarkdownLine)
+      .filter(Boolean)
+      .slice(0, 8);
+    if (bullets.length > 0) return bullets;
+  }
+
+  // No explicit Acceptance Criteria section: return a single generic AC
+  return [`Issue's stated fix implemented with tests`];
 }
 
 export function synthesizeMinimalVBrief(issue: AutoSynthesizeIssueInput): VBriefDocument {
