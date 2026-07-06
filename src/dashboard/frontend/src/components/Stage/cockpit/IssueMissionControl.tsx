@@ -35,6 +35,7 @@ import { PickupGateCard } from './PickupGateCard'
 import { ChangedFilesView } from './ChangedFilesView'
 import { StatusHistoryTab } from './StatusHistoryTab'
 import { StatusNarrative, type JourneyStageKey } from './StatusNarrative'
+import { CrewStage } from './CrewStage'
 import { CockpitCard, CockpitPill, type CockpitTone } from './CockpitCard'
 import type { ProjectSessionTree, SessionNode } from '@overdeck/contracts'
 import styles from './cockpitBody.module.css'
@@ -830,9 +831,16 @@ function NowPanel({ issueId, onTab, onOpenAgent }: { issueId: string; onTab: (ta
 
 /** Overview — blocker spotlight + the lean Now panel (PAN-1991 #9). The status
  * grid that used to live here is the header gates + pipeline; not repeated. */
-function OverviewTab({ issueId, onTab, onOpenAgent }: { issueId: string; onTab: (tab: MissionTab) => void; onOpenAgent: (type: string) => void }) {
+function OverviewTab({ issueId, onTab, onOpenAgent, sessions, onSelectSession }: {
+  issueId: string
+  onTab: (tab: MissionTab) => void
+  onOpenAgent: (type: string) => void
+  sessions?: readonly SessionNode[]
+  onSelectSession?: (session: SessionNode) => void
+}) {
   return (
     <div className="space-y-3.5">
+      {sessions && onSelectSession && <CrewStage sessions={sessions} onSelectSession={onSelectSession} />}
       <IssueBlockerSpotlight issueId={issueId} />
       <NowPanel issueId={issueId} onTab={onTab} onOpenAgent={onOpenAgent} />
       <PickupGateCard issueId={issueId} />
@@ -1011,7 +1019,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                 onOpenAgent={openAgentByType}
               />
             )}
-            {activeTab === 'overview' && <OverviewTab issueId={issueId} onTab={selectTab} onOpenAgent={openAgentByType} />}
+            {activeTab === 'overview' && <OverviewTab issueId={issueId} onTab={selectTab} onOpenAgent={openAgentByType} sessions={treeSessions} onSelectSession={selectSessionFromTree} />}
             {activeTab === 'code' && (
               <div className="space-y-3.5">
                 <GitHubCiPanel issueId={issueId} />
