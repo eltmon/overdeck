@@ -46,6 +46,7 @@ import { createInFlightGuard } from './in-flight-guard.js';
 import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
 import { isContextOverflowTail } from '../context-overflow.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
+import { hasOnlyPipelineStateChangesSinceCommit } from '../pipeline-state-paths.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -1518,31 +1519,31 @@ export async function checkPostReviewCommits(): Promise<string[]> {
 
       if (currentHead === status.reviewedAtCommit) continue;
 
-      // PAN-1213: A tree-identical rebase (ship agent rebasing onto fresh main
-      // for a clean merge, or any pure history rewrite) moves HEAD but leaves
-      // the reviewed tree unchanged. Resetting review/test in this case wipes
-      // a passed verification for no reason and strands the PR at pending forever
-      // (the deacon does not auto-redispatch). Compare tree SHAs — if equal,
-      // there is nothing new to review.
+      // Tree-identical rebases and state-plane-only commits move HEAD without
+      // invalidating review/test verdicts. Preserve the gates and advance the
+      // snapshot so this patrol does not repeatedly compare against old HEAD.
       try {
         const [oldTree, newTree] = await Promise.all([
           execAsync(`git rev-parse ${status.reviewedAtCommit}^{tree}`, { cwd: workspacePath }),
           execAsync(`git rev-parse ${currentHead}^{tree}`, { cwd: workspacePath }),
         ]);
         if (oldTree.stdout.trim() === newTree.stdout.trim()) {
-          // Tree-identical rebase: advance reviewedAtCommit to the new HEAD so
-          // we stop comparing against a SHA the workspace no longer carries,
-          // but preserve review/test/readyForMerge.
           setReviewStatusSync(issueId, { reviewedAtCommit: currentHead });
-          console.log(
-            `[deacon] Tree-identical rebase for ${issueId}: ` +
-            `${status.reviewedAtCommit.substring(0, 8)} → ${currentHead.substring(0, 8)} ` +
-            `(same tree) — review/test preserved`,
-          );
+          console.log(`[deacon] Tree-identical rebase for ${issueId}: ${status.reviewedAtCommit.substring(0, 8)} → ${currentHead.substring(0, 8)} (same tree) — review/test preserved`);
           continue;
         }
       } catch {
         // Fall through to reset if we can't read tree SHAs — safer than skipping
+      }
+
+      try {
+        if (await hasOnlyPipelineStateChangesSinceCommit(workspacePath, status.reviewedAtCommit, currentHead)) {
+          setReviewStatusSync(issueId, { reviewedAtCommit: currentHead });
+          console.log(`[deacon] State-only post-review commit for ${issueId}: ${status.reviewedAtCommit.substring(0, 8)} → ${currentHead.substring(0, 8)} — review/test preserved`);
+          continue;
+        }
+      } catch {
+        // Fall through to reset if the diff cannot be inspected.
       }
 
       // HEAD moved with a real tree change — new commits since review. Reset review pipeline.
@@ -1569,10 +1570,7 @@ export async function checkPostReviewCommits(): Promise<string[]> {
       // starts fresh. Without this, ciRetryMap retains count=6 from the previous
       // CI failure cycle, permanently blocking transient retries for this issue.
       ciRetryMap.delete(issueId);
-      actions.push(
-        `Reset review for ${issueId}: new commits after review passed ` +
-        `(${status.reviewedAtCommit.substring(0, 8)} → ${currentHead.substring(0, 8)})`,
-      );
+      actions.push(`Reset review for ${issueId}: new commits after review passed (${status.reviewedAtCommit.substring(0, 8)} → ${currentHead.substring(0, 8)})`);
 
       // Redispatch a fresh review convoy. Re-read status to guard against races
       // with other dispatch paths (HTTP request-review, manual CLI) that may have
