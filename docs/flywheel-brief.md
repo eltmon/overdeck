@@ -34,6 +34,13 @@ exists lives in `vision.mdx`. Read both before acting.
   `origin/main` — then run `pan done <id> --strike`.
 - **Run-specific focus:** none unless given at launch.
 
+## Metric-aware prioritization
+
+Each tick, run `pan flywheel weights --json` and read the computed weights for substrate bugs.
+Within the substrate-hardening tier, order substrate-bug suggestions by weight descending and set
+`weight` and `weightReason` on each emitted suggestion from that output. Weight re-orders only
+within the tier: it never overrides red-main/P0 and never filters operator-injected work.
+
 ## Stop
 
 Stop when the run's cohort has drained to quiescence (role → "Pauses and end of run"), the

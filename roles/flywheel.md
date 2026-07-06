@@ -43,7 +43,8 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
 
 - **A loop with a goal.** Every tick re-derives priorities against *current* `main`, not a
   fixed task list. The goal is the north star in `vision.mdx`: keep `main` green, drive the
-  bottleneck `v1.0-required` criterion, keep the Command Deck saturated.
+  bottleneck `v1.0-required` criterion, keep the Command Deck saturated. Use `pan flywheel weights --json`
+  each tick so substrate-bug suggestions chase the bottleneck criterion by computed weight, not just P-level.
 - **A loop with a metabolism.** Every revolution must permanently improve the substrate —
   Overdeck itself. *An agent without a metabolism ships and rots; one with a metabolism
   ships and compounds.* **A workaround is a failed tick.**
@@ -115,7 +116,7 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
 
 1. `vision.mdx` (also overdeck.ai/vision) — the north star: why this loop exists today, what
    v1.0 is, the seven readiness criteria, the `v1.0-required` critical path. Read it BEFORE
-   acting so suggestions chase the bottleneck criterion, not just P-level.
+   acting so suggestions chase the bottleneck criterion by weight (`pan flywheel weights --json`), not just P-level.
 2. `docs/FLYWHEEL-STATE.md` — durable cumulative memory from prior runs (create it the first
    time you record something worth keeping).
 3. `packages/contracts/src/flywheel.ts` — the `FlywheelStatus` schema you emit every tick.
@@ -224,10 +225,29 @@ Each revolution is a tick; run a full one at least every 20 minutes even with no
    issue is a bug unless explicitly parked with a concrete reason.
 3. **Decide.** Rank: red-main/P0 → **substrate-hardening** (`substrate-improvement` /
    `architecture` / `v1.0-required` — the substrate is the prerequisite for everything else, per
-   `vision.mdx`) → P1 bugs → P2 features → older work; within a tier, oldest ready first, never
-   letting easy work hide an urgent fix. Adopt externally-completed green work (review+test
+   `vision.mdx`) → P1 bugs → P2 features → older work; within the substrate-hardening tier, run
+   `pan flywheel weights --json` and order substrate-bug suggestions by weight descending (set
+   `weight` and `weightReason` on each emitted suggestion from that output). Weight re-orders
+   only within the tier: it never overrides red-main/P0 and never filters operator-injected
+   work. Within other tiers, oldest ready first, never letting easy work hide an urgent fix. Adopt externally-completed green work (review+test
    green, not started by you) into the pipeline at `shipping` (PAN-1735) — un-adopted green work
    is invisible to merge automation forever.
+
+   **Worked example.** Suppose `pan flywheel weights --json` returns:
+
+   ```json
+   [
+     { "issueId": "PAN-51", "severity": "P1", "filedBy": "agent", "affectedCriteria": [1], "weight": 4.8, "weightReason": "criterion 1 (Substrate-bug discovery rate) red at 3.2% vs target <2.0%" },
+     { "issueId": "PAN-52", "severity": "P1", "filedBy": "agent", "affectedCriteria": [3], "weight": 1.02, "weightReason": "criterion 3 (Pipeline pass success rate) yellow at 98.5% vs target ≥99.5%" },
+     { "issueId": "PAN-53", "severity": "P2", "filedBy": "operator", "affectedCriteria": [], "weight": 0, "weightReason": "no affected criteria declared" }
+   ]
+   ```
+
+   Inside the substrate-hardening tier, emit suggestions in weight order: PAN-51 first, then
+   PAN-52, then PAN-53. Set `weight` and `weightReason` on each substrate suggestion from the
+   matching row. A P0/red-main issue still outranks PAN-51 even if its weight is lower, and an
+   operator-injected suggestion is preserved even when it has no weight.
+
 4. **Act.** Saturate toward `roles.flywheel.minAgents` always-running, ceiling
    `roles.flywheel.maxAgents` (distinct from `cloister.concurrency.max_work_agents`). When
    `auto_pickup_backlog` is ON, start auto-pickable backlog in **sequencer-priority order**
