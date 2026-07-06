@@ -410,6 +410,7 @@ const PROVIDER_ENV_UNSETS = [
   'GEMINI_API_KEY',
   'API_TIMEOUT_MS',
   'CLAUDE_CODE_API_KEY_HELPER_TTL_MS',
+  'CLAUDE_CODE_AUTO_COMPACT_WINDOW',
 ];
 
 function buildCommand(config: LauncherConfig): string[] {
