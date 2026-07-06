@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-06T18:16:13.947Z",
-  "updated": "2026-07-06T19:15:20.051Z",
+  "updated": "2026-07-06T19:28:06.846Z",
   "pipeline": {
     "issueId": "PAN-2336",
     "reviewStatus": "pending",
@@ -72,5 +72,12 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.5"
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "execfile-callback-mock": "completed",
+    "execfile-callback-mock.ac1": "completed",
+    "execfile-callback-mock.ac2": "completed",
+    "execfile-callback-mock.ac3": "completed",
+    "execfile-callback-mock.ac4": "completed"
+  }
 }
