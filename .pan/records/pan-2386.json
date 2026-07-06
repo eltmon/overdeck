@@ -109,12 +109,11 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T18:33:55.242Z",
+    "updatedAt": "2026-07-06T18:41:02.361Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed sync-target-branch",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
-    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2403",
-    "lastVerifiedCommit": "4a909f47f8ac94ddd906fcd1e1222352cd69fe4d",
+    "lastVerifiedCommit": "a2bee543c319578fb61402232ff13d5bd61ad0f9",
     "reviewRequestedAt": "2026-07-06T17:09:27.416Z"
   },
   "closeOut": {
@@ -187,7 +186,7 @@
       },
       "costAtCloseOut": {
         "usd": 47.691013,
-        "pricingAsOf": "2026-07-06T18:33:55.324Z"
+        "pricingAsOf": "2026-07-06T18:41:02.428Z"
       }
     },
     "merges": [
@@ -196,7 +195,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-06T16:04:26.393Z",
-  "updated": "2026-07-06T18:33:55.330Z",
+  "updated": "2026-07-06T18:41:02.428Z",
   "swarm": {
     "finalizedAt": "2026-07-06T17:09:32.802Z"
   }
