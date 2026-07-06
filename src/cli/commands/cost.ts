@@ -22,6 +22,8 @@ import {
   summarizeCostsSync,
 } from '../../lib/cost.js';
 import { syncWalFromAllProjects } from '../../lib/costs/sync-wal.js';
+import { reconcile as reconcileClaudeTranscripts, type ReconcileResult } from '../../lib/costs/reconciler.js';
+import { CostDoorLive, CostWriter, type CostReconcileSummary } from '../../lib/overdeck/cost.js';
 import { getAgentRollup, getCostForIssueAggregateSync, type IssueAggregate } from '../../lib/overdeck/cost-sync.js';
 
 /**
@@ -61,6 +63,82 @@ export async function runCostSync(): Promise<void> {
     console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
+}
+
+interface BackfillSourceSummary {
+  source: 'claude' | 'ohmypi' | 'codex';
+  sessionsScanned: number;
+  eventsImported: number;
+  duplicatesSkipped: number;
+  errors: number;
+  earliestEventTs: string | null;
+  latestEventTs: string | null;
+}
+
+function fromClaudeReconcile(result: ReconcileResult): BackfillSourceSummary {
+  return {
+    source: 'claude',
+    sessionsScanned: result.sessionsScanned,
+    eventsImported: result.eventsImported,
+    duplicatesSkipped: result.duplicatesSkipped,
+    errors: result.errors.length,
+    earliestEventTs: result.earliestEventTs,
+    latestEventTs: result.latestEventTs,
+  };
+}
+
+function fromDoorReconcile(source: 'ohmypi' | 'codex', result: CostReconcileSummary): BackfillSourceSummary {
+  return {
+    source,
+    sessionsScanned: result.sessionsScanned,
+    eventsImported: result.eventsImported,
+    duplicatesSkipped: result.duplicatesSkipped,
+    errors: result.errors.length,
+    earliestEventTs: result.earliestEventTs,
+    latestEventTs: result.latestEventTs,
+  };
+}
+
+function printBackfillSummary(summaries: BackfillSourceSummary[], write: boolean): void {
+  const importedLabel = write ? 'Events imported' : 'Would import';
+  console.log(chalk.bold(write ? 'Cost Backfill Summary' : 'Cost Backfill Summary (dry run)'));
+  console.log();
+  for (const summary of summaries) {
+    console.log(chalk.bold(summary.source));
+    console.log(`  Sessions scanned:     ${summary.sessionsScanned}`);
+    console.log(`  ${importedLabel}:        ${write ? chalk.green(summary.eventsImported) : chalk.yellow(summary.eventsImported)}`);
+    console.log(`  Duplicates skipped:   ${chalk.dim(summary.duplicatesSkipped)}`);
+    console.log(`  Errors:               ${summary.errors === 0 ? summary.errors : chalk.yellow(summary.errors)}`);
+    console.log(`  Earliest event ts:    ${summary.earliestEventTs ?? chalk.dim('none')}`);
+    console.log(`  Latest event ts:      ${summary.latestEventTs ?? chalk.dim('none')}`);
+    console.log();
+  }
+  if (!write) {
+    console.log(chalk.dim('Run with --write to persist non-duplicate cost events.'));
+  }
+}
+
+export async function runCostBackfill(options: { write?: boolean } = {}): Promise<BackfillSourceSummary[]> {
+  const dryRun = !options.write;
+  const claude = await Effect.runPromise(reconcileClaudeTranscripts({ dryRun, includePi: false }));
+  const ohmypi = await Effect.runPromise(
+    CostWriter.use((writer) => writer.reconcile({ source: 'ohmypi', dryRun })).pipe(
+      Effect.provide(CostDoorLive),
+    ),
+  );
+  const codex = await Effect.runPromise(
+    CostWriter.use((writer) => writer.reconcile({ source: 'codex', dryRun })).pipe(
+      Effect.provide(CostDoorLive),
+    ),
+  );
+
+  const summaries = [
+    fromClaudeReconcile(claude),
+    fromDoorReconcile('ohmypi', ohmypi),
+    fromDoorReconcile('codex', codex),
+  ];
+  printBackfillSummary(summaries, Boolean(options.write));
+  return summaries;
 }
 
 export function formatIssueCostAggregate(issueId: string, aggregate: IssueAggregate): string[] {
@@ -461,6 +539,19 @@ export function createCostCommand(): Command {
     .command('sync')
     .description('Import cost events from per-project WAL files into the local database')
     .action(runCostSync);
+
+  cost
+    .command('backfill')
+    .description('Reconstruct cost events from stored harness session transcripts')
+    .option('--write', 'Persist non-duplicate reconstructed cost events')
+    .action(async (options) => {
+      try {
+        await runCostBackfill({ write: Boolean(options.write) });
+      } catch (error: unknown) {
+        console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
+        process.exit(1);
+      }
+    });
 
   return cost;
 }
