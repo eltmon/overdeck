@@ -77,6 +77,8 @@ trains, but flagged items wait for operator review before merge.**
 | M3 | MIN-854 | Fizzy-style notification tray adoption (styling + primary notification system). |
 | M4 | MIN-858 | System comment authorship. |
 | M5 | MIN-859 | Zone entropy. |
+| M6 | MIN-862 | Reminders backend enablement (mostly one-line-ish change + verification) — the epic's point made real. **Slots after M1.** |
+| M7 | MIN-729 | Strikethrough animation remainder — **slots after M3** (the tray likely fixes its display half; re-verify remaining scope post-M3). |
 
 Related, NOT in the lane: MIN-75 carries a scope note (delivery-status tracking,
 per-category rate limiting) referencing the MIN-860 PRD — normal backlog flow.
