@@ -1,6 +1,6 @@
+import { useQuery } from '@tanstack/react-query';
 import { Component, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import { useCostStream, type CostEvent } from '../../hooks/useCostStream';
 import { isAgentProblemStatus, isAgentRunningStatus } from '../../lib/pipeline-state';
 import { isAwaitingInput } from '../../lib/pendingInput';
 import { useSharedTick } from '../../lib/useSharedTick';
@@ -44,6 +44,19 @@ type FilterOption = {
 type AgentsViewMode = 'grid' | 'table' | 'timeline';
 const VIEW_MODES: AgentsViewMode[] = ['grid', 'table', 'timeline'];
 
+type CostSummaryResponse = {
+  today?: {
+    totalCost?: number;
+    totalTokens?: number;
+  };
+};
+
+async function fetchCostSummary(): Promise<CostSummaryResponse> {
+  const res = await fetch('/api/costs/summary');
+  if (!res.ok) throw new Error('Failed to fetch cost summary');
+  return res.json();
+}
+
 function readViewMode(): AgentsViewMode {
   if (typeof window === 'undefined') return 'grid';
   const params = new URLSearchParams(window.location.search);
@@ -60,13 +73,6 @@ function replaceViewUrl(view: AgentsViewMode) {
     url.searchParams.set('view', view);
   }
   window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
-}
-
-function sumIssueCostEvents(events: CostEvent[] | undefined) {
-  return (events ?? []).reduce(
-    (totals, event) => ({ cost: totals.cost + event.cost, tokens: totals.tokens + event.tokens }),
-    { cost: 0, tokens: 0 },
-  );
 }
 
 function agentRole(agent: Agent): AgentCardRole {
@@ -288,7 +294,11 @@ export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: (
   const openIssue = useDashboardStore((state) => state.openIssue);
   const [filter, setFilter] = useState(readFilterState);
   const [viewMode, setViewMode] = useState<AgentsViewMode>(readViewMode);
-  const { eventsByIssue } = useCostStream({ limit: 500 });
+  const { data: costSummary } = useQuery({
+    queryKey: ['agents-fleet-cost-summary'],
+    queryFn: fetchCostSummary,
+    refetchInterval: 30_000,
+  });
 
   useEffect(() => {
     const handlePopState = () => {
@@ -359,17 +369,8 @@ export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: (
       const sum = finiteDurations.reduce((total, t) => total + Math.max(0, now.getTime() - t), 0);
       return sum / finiteDurations.length;
     })();
-    const costIssueIds = new Set(fleetAgents.map((agent) => issueKey(agent.issueId)).filter(Boolean));
-    const { cost24h, tokens24h } = Array.from(costIssueIds).reduce(
-      (totals, issueId) => {
-        const issueTotals = sumIssueCostEvents(eventsByIssue[issueId] ?? eventsByIssue[issueId.toUpperCase()]);
-        return {
-          cost24h: totals.cost24h + issueTotals.cost,
-          tokens24h: totals.tokens24h + issueTotals.tokens,
-        };
-      },
-      { cost24h: 0, tokens24h: 0 },
-    );
+    const cost24h = costSummary?.today?.totalCost ?? 0;
+    const tokens24h = costSummary?.today?.totalTokens ?? 0;
 
     return [
       { id: 'running', eyebrow: 'Running', value: runningAgents.length, sub: 'live agents', icon: <MetricIcon label="▶" />, signal: 'info' as const },
@@ -387,7 +388,7 @@ export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: (
       { id: 'runtime', eyebrow: 'Avg runtime', value: formatDuration(avgRuntime), sub: 'running agents', icon: <MetricIcon label="⏱" />, signal: 'review' as const },
       { id: 'queue', eyebrow: 'Queue', value: queuedAgents.length, sub: 'starting agents', icon: <MetricIcon label="…" />, signal: 'warning' as const },
     ];
-  }, [eventsByIssue, fleetAgents, now]);
+  }, [costSummary, fleetAgents, now]);
 
   function updateFilter(next: AgentsFilterState) {
     setFilter(next);
