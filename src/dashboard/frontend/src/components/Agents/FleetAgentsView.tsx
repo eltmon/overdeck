@@ -160,6 +160,9 @@ function stuckHours(agent: Agent, now: Date) {
 }
 
 function verbBadgeForAgent(agent: Agent, now: Date): VerbBadgeProps {
+  if (agent.status === 'unknown' && agent.hasLiveTmuxSession === false) {
+    return { variant: 'UNREACHABLE' };
+  }
   if (isAgentProblemStatus(agent.status) || agent.troubled) {
     return { variant: 'STUCK · Nh', hours: stuckHours(agent, now) };
   }
