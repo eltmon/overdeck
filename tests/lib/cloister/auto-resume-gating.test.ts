@@ -95,6 +95,40 @@ describe('auto-resume gates', () => {
     return workspace;
   }
 
+  /** PAN-2407: `pan start` on an unplanned issue routes to dashboard planning.
+   *  Auto-resume gating tests are not exercising that path, so give the
+   *  workspace a minimal vBRIEF so issueCommand falls through to spawn. */
+  function writeMinimalPlan(workspacePath: string, issueId: string): void {
+    const panDir = join(workspacePath, '.pan');
+    mkdirSync(panDir, { recursive: true });
+    writeFileSync(
+      join(panDir, 'spec.vbrief.json'),
+      JSON.stringify({
+        vBRIEFInfo: {
+          version: '0.6',
+          created: BASE_TIME.toISOString(),
+          author: 'test',
+          description: 'minimal plan for test',
+        },
+        plan: {
+          id: issueId.toLowerCase(),
+          title: 'test plan',
+          status: 'approved',
+          uid: '00000000-0000-0000-0000-000000000000',
+          author: 'test',
+          sequence: 1,
+          created: BASE_TIME.toISOString(),
+          updated: BASE_TIME.toISOString(),
+          references: [],
+          tags: [],
+          narratives: { Problem: '', Proposal: '', NonGoals: '' },
+          items: [],
+          edges: [],
+        },
+      }),
+    );
+  }
+
   async function loadDeaconWithResumeMock(osOverrides?: { loadavg?: number[]; cpusCount?: number }) {
     // PAN-1665: throttle tests need deterministic load/core counts. Default to
     // low load so unrelated auto-resume tests do not depend on the host machine.
@@ -844,6 +878,7 @@ describe('auto-resume gates', () => {
     });
     mkdirSync(join(projectRoot, 'workspaces', 'feature-pan-1141', '.beads'), { recursive: true });
     writeFileSync(join(projectRoot, 'workspaces', 'feature-pan-1141', '.beads', 'issues.jsonl'), '{"id":"PAN-1141","labels":["pan-1141"]}\n');
+    writeMinimalPlan(join(projectRoot, 'workspaces', 'feature-pan-1141'), 'PAN-1141');
     agents.saveAgentStateSync({
       id: agentId,
       issueId: 'PAN-1141',
@@ -881,6 +916,7 @@ describe('auto-resume gates', () => {
       const workspace = join(projectRoot, 'workspaces', 'feature-pan-1141');
       mkdirSync(join(workspace, '.beads'), { recursive: true });
       writeFileSync(join(workspace, '.beads', 'issues.jsonl'), '{"id":"PAN-1141","labels":["pan-1141"]}\n');
+      writeMinimalPlan(workspace, 'PAN-1141');
 
       const startedAt = Date.now();
       await Promise.all(Array.from({ length: 5 }, () => issueCommand('PAN-1141', {

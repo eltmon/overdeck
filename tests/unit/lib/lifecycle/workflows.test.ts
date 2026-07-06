@@ -406,6 +406,9 @@ describe('workflows', () => {
       mkdirSync(wsPath, { recursive: true });
       await writeSpecForIssue(testDir, makeVBrief('PAN-100'), 'active');
       mockExecAsync.mockImplementation(async (command: string) => {
+        if (command.includes('gh issue view 100') && command.includes('--json labels')) {
+          return { stdout: JSON.stringify(['verifying-on-main', 'needs-close-out']), stderr: '' };
+        }
         if (command.startsWith('git worktree remove')) {
           rmSync(wsPath, { recursive: true, force: true });
         }
@@ -526,6 +529,13 @@ describe('workflows', () => {
     });
 
     it('should remove verifying labels when applying the closed-out label', async () => {
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command.includes('gh issue view 100') && command.includes('--json labels')) {
+          return { stdout: JSON.stringify(['verifying-on-main', 'needs-close-out']), stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+
       const ctx = {
         issueId: 'PAN-100',
         projectPath: testDir,
