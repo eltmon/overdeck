@@ -3,152 +3,12 @@
   "schemaVersion": 2,
   "sessionHistory": [
     {
-      "timestamp": "2026-07-06T20:53:04.583Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
       "reason": "resume",
       "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-06T20:53:05.059Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-06T20:54Z] review-agent → CHANGES-REQUESTED — seq 2",
-      "timestamp": "2026-07-06T20:54:35.008Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-06T20:55:53.535Z"
+      "timestamp": "2026-07-06T20:59:27.132Z"
     }
   ],
   "feedback": [],
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      ".pan/records/pan-2389.json",
-      "scripts/file-size-baseline.txt",
-      "src/cli/commands/__tests__/cost-backfill.test.ts",
-      "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.tsx",
-      "src/dashboard/server/event-store.ts",
-      "src/dashboard/server/read-model.ts",
-      "src/dashboard/server/services/cache-service.ts",
-      "src/dashboard/server/services/conversation-compaction.ts",
-      "src/dashboard/server/services/conversation/parser.ts",
-      "src/dashboard/server/services/issue-data-service.ts",
-      "src/lib/agents/activity.ts",
-      "src/lib/agents/messaging.ts",
-      "src/lib/agents/recovery.ts",
-      "src/lib/agents/resume.ts",
-      "src/lib/agents/spawn-prep.ts",
-      "src/lib/agents/spawn.ts",
-      "src/lib/agents/supervisor-channels.ts",
-      "src/lib/agents/tier-replay.ts",
-      "src/lib/beads-query.ts",
-      "src/lib/cloister/merge-agent.ts",
-      "src/lib/cloister/review-agent.ts",
-      "src/lib/cloister/review-monitor.ts",
-      "src/lib/cloister/work-agent-prompt.ts",
-      "src/lib/config-yaml/domain-mergers.ts",
-      "src/lib/config-yaml/merge.ts",
-      "src/lib/conversations/smart-compaction.ts",
-      "src/lib/cost-parsers/jsonl-parser.ts",
-      "src/lib/cost.ts",
-      "src/lib/launcher-generator.ts",
-      "src/lib/manifest.ts",
-      "src/lib/memory/cli.ts",
-      "src/lib/overdeck/infra.ts",
-      "src/lib/pan-dir/records.ts",
-      "src/lib/projects.ts",
-      "src/lib/registry/feature-registry-population.ts",
-      "src/lib/shadow-state.ts",
-      "src/lib/skills-merge.ts",
-      "src/lib/vbrief/acceptance-criteria.ts",
-      "src/lib/vbrief/dag.ts",
-      "src/lib/vbrief/lifecycle-io.ts",
-      "src/lib/vbrief/vbrief-index.ts",
-      "src/lib/workspace-manager.ts",
-      "src/lib/workspace/stack-health.ts",
-      "sync-sources/hooks/record-cost-event.js",
-      "sync-sources/hooks/record-cost-event.js.map",
-      "tests/unit/lib/overdeck/cost-reconcile.test.ts",
-      "tests/unit/lib/overdeck/cost.test.ts"
-    ],
-    "declaredScopeUntouched": [
-      "src/lib/costs/__tests__/reconciler-backfill.test.ts"
-    ],
-    "declaredScope": [
-      ".github/workflows/pages.yml",
-      "docs/token-spend-report/coverage.json",
-      "docs/token-spend-report/index.html",
-      "src/cli/commands/cost.ts",
-      "src/lib/cost-parsers/codex-parser.ts",
-      "src/lib/costs/__tests__/reconciler-backfill.test.ts",
-      "src/lib/costs/reconciler.ts",
-      "src/lib/overdeck/__tests__/cost-backfill-roots.test.ts",
-      "src/lib/overdeck/cost.ts",
-      "sync-sources/dev-skills/token-spend-report/SKILL.md"
-    ],
-    "actualChangedFiles": [
-      ".github/workflows/pages.yml",
-      ".pan/records/pan-2389.json",
-      "docs/token-spend-report/coverage.json",
-      "docs/token-spend-report/index.html",
-      "scripts/file-size-baseline.txt",
-      "src/cli/commands/__tests__/cost-backfill.test.ts",
-      "src/cli/commands/cost.ts",
-      "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.tsx",
-      "src/dashboard/server/event-store.ts",
-      "src/dashboard/server/read-model.ts",
-      "src/dashboard/server/services/cache-service.ts",
-      "src/dashboard/server/services/conversation-compaction.ts",
-      "src/dashboard/server/services/conversation/parser.ts",
-      "src/dashboard/server/services/issue-data-service.ts",
-      "src/lib/agents/activity.ts",
-      "src/lib/agents/messaging.ts",
-      "src/lib/agents/recovery.ts",
-      "src/lib/agents/resume.ts",
-      "src/lib/agents/spawn-prep.ts",
-      "src/lib/agents/spawn.ts",
-      "src/lib/agents/supervisor-channels.ts",
-      "src/lib/agents/tier-replay.ts",
-      "src/lib/beads-query.ts",
-      "src/lib/cloister/merge-agent.ts",
-      "src/lib/cloister/review-agent.ts",
-      "src/lib/cloister/review-monitor.ts",
-      "src/lib/cloister/work-agent-prompt.ts",
-      "src/lib/config-yaml/domain-mergers.ts",
-      "src/lib/config-yaml/merge.ts",
-      "src/lib/conversations/smart-compaction.ts",
-      "src/lib/cost-parsers/codex-parser.ts",
-      "src/lib/cost-parsers/jsonl-parser.ts",
-      "src/lib/cost.ts",
-      "src/lib/costs/reconciler.ts",
-      "src/lib/launcher-generator.ts",
-      "src/lib/manifest.ts",
-      "src/lib/memory/cli.ts",
-      "src/lib/overdeck/__tests__/cost-backfill-roots.test.ts",
-      "src/lib/overdeck/cost.ts",
-      "src/lib/overdeck/infra.ts",
-      "src/lib/pan-dir/records.ts",
-      "src/lib/projects.ts",
-      "src/lib/registry/feature-registry-population.ts",
-      "src/lib/shadow-state.ts",
-      "src/lib/skills-merge.ts",
-      "src/lib/vbrief/acceptance-criteria.ts",
-      "src/lib/vbrief/dag.ts",
-      "src/lib/vbrief/lifecycle-io.ts",
-      "src/lib/vbrief/vbrief-index.ts",
-      "src/lib/workspace-manager.ts",
-      "src/lib/workspace/stack-health.ts",
-      "sync-sources/dev-skills/token-spend-report/SKILL.md",
-      "sync-sources/hooks/record-cost-event.js",
-      "sync-sources/hooks/record-cost-event.js.map",
-      "tests/unit/lib/overdeck/cost-reconcile.test.ts",
-      "tests/unit/lib/overdeck/cost.test.ts"
-    ],
-    "recordedAt": "2026-07-06T20:52:57.549Z"
-  },
   "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
@@ -189,17 +49,19 @@
   "pipeline": {
     "issueId": "PAN-2389",
     "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T20:55:57.936Z",
-    "reviewNotes": "Live cost hook artifact changed despite explicit must-not constraint",
-    "testNotes": "configured project test gate failed: 4 tests in src/lib/__tests__/relocate-venv-scripts.test.ts fail with relocateVenvScripts is not a function, caused by branch scope drift removing the export from src/lib/workspace-manager.ts; root typecheck, frontend typecheck, lint, build, PAN-2389-specific tests, and frontend tests all passed",
+    "updatedAt": "2026-07-06T21:00:38.332Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "inspectNotes": "Bead door-scan-roots BLOCKED: commit dd09d685 (.github/workflows/pages.yml only) does not implement any acceptance criteria. No changes touch the codex reconcile scan-roots logic, session_meta cwd→issueId inference, sourceFile dedup, or default per-agent walk. Required: land the actual scan-roots implementation (extra roots param including ~/.codex/sessions, cost event emission with model/token counts/sourceFile, issue-from-path inference with UNKNOWN fallback, dedup-on-sourceFile, and unchanged default-walk behavior) with matching tests, or repoint this bead at the correct commit.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2431",
-    "lastVerifiedCommit": "c0ce732105ccd6a58220866326e5225afb56d3cd",
+    "reviewedAtCommit": "560f1002d56a31d4c7800f2c0bb655a27a14509a",
+    "lastVerifiedCommit": "560f1002d56a31d4c7800f2c0bb655a27a14509a",
     "reviewRequestedAt": "2026-07-06T20:53:04.584Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -372,9 +234,9 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 367692,
-            "output": 15792,
-            "cacheRead": 6302208,
+            "input": 803547,
+            "output": 30830,
+            "cacheRead": 8805120,
             "cacheWrite": 0
           }
         }
@@ -405,15 +267,15 @@
           "cacheWrite": 72876
         },
         "custom/kimi-k2.7-code": {
-          "input": 367692,
-          "output": 15792,
-          "cacheRead": 6302208,
+          "input": 803547,
+          "output": 30830,
+          "cacheRead": 8805120,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 31.844457000000002,
-        "pricingAsOf": "2026-07-06T20:55:57.969Z"
+        "usd": 32.794226,
+        "pricingAsOf": "2026-07-06T21:00:38.375Z"
       }
     },
     "merges": [
@@ -424,6 +286,6 @@
   "swarm": {
     "slotAssignments": []
   },
-  "created": "2026-07-06T20:49:11.236Z",
-  "updated": "2026-07-06T20:55:58.017Z"
+  "created": "2026-07-06T20:57:58.338Z",
+  "updated": "2026-07-06T21:00:38.376Z"
 }
