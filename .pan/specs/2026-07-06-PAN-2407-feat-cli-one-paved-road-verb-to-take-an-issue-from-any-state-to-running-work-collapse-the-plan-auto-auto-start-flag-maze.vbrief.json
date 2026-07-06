@@ -4,17 +4,17 @@
     "created": "2026-07-06T15:12:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2407: feat(cli): one paved-road verb to take an issue from any state to running work — collapse the plan/--auto/--auto-start flag maze",
-    "updated": "2026-07-06T15:25:13.059Z"
+    "updated": "2026-07-06T16:30:30.319Z"
   },
   "plan": {
     "id": "pan-2407",
     "title": "feat(cli): one paved-road verb to take an issue from any state to running work — collapse the plan/--auto/--auto-start flag maze",
-    "status": "running",
+    "status": "approved",
     "uid": "7f3a9c2e-4b1d-4e8a-9c6f-2d5b8e1a4f37",
     "author": "agent:claude-fable-5",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-06T15:12:00.000Z",
-    "updated": "2026-07-06T15:25:13.059Z",
+    "updated": "2026-07-06T16:30:30.319Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2407",
