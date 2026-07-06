@@ -73,9 +73,7 @@ type PipelinePhaseKey = 'plan' | 'work' | 'review' | 'test' | 'ci' | 'ship' | 'm
 
 type IssueTreeContext = 'issue'
 
-// PAN-1991 #6 / PAN-2398: deep-content groups only. Status lives in the
-// StatusNarrative header (one representation). Beads is the rail;
-// Conversation/Files/Terminal are tools.
+// PAN-2398: status lives in StatusNarrative; beads = rail; tools = panes.
 const TABS: Array<{ id: MissionTab; label: string }> = [
   { id: 'overview', label: 'Overview' },
   { id: 'code', label: 'Code' },
