@@ -430,7 +430,8 @@ afterEach(async () => {
 
 describe('conversation supervisor Playwright UAT', () => {
   it('resumes Codex conversations through the real route with codex resume', async () => {
-    await page.goto(baseUrl);
+    const response = await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
+    if (!response?.ok()) throw new Error('page.goto returned ' + response?.status() + ' for ' + baseUrl);
     const conversation = await page.evaluate(async () => {
       return await (window as any).api('/api/conversations', {
         method: 'POST',
@@ -462,7 +463,9 @@ describe('conversation supervisor Playwright UAT', () => {
   }, 45_000);
 
   it('delivers through real conversation routes and keeps plain forks off Channels MCP', async () => {
-    await page.goto(baseUrl);
+    const response = await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
+    if (!response?.ok()) throw new Error('page.goto returned ' + response?.status() + ' for ' + baseUrl);
+    await page.locator('#create').waitFor({ state: 'visible', timeout: 15_000 });
     await page.locator('#create').click();
     await expect.poll(async () => {
       const state = await page.evaluate(() => ({ current: (window as any).current, error: (window as any).lastError }));
