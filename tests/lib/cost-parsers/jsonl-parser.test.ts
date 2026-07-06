@@ -10,6 +10,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { fileURLToPath } from 'url';
 import { getActiveSessionModelSync, parseClaudeSessionSync } from '../../../src/lib/cost-parsers/jsonl-parser.js';
 
 const CLAUDE_FIXTURE_DIR = join(__dirname, '../../../src/lib/cost-parsers/__tests__/fixtures/claude');
