@@ -37,6 +37,7 @@ incidents (live bleeding); the refactors don't bleed.
 | A7 | [PAN-2230](https://github.com/eltmon/overdeck/issues/2230) | Circular-dep ratchet. Independent. |
 | A8 | [PAN-2297](https://github.com/eltmon/overdeck/issues/2297) | Baseline auto-lower in post-merge-deploy.sh. Independent of Lane A, **but must LAND before Lane B reaches [PAN-2233](https://github.com/eltmon/overdeck/issues/2233)** (merge-agent decomposition shifts its PRD's call-path context). |
 | A9 | [PAN-2229](https://github.com/eltmon/overdeck/issues/2229) | Prompt-regression evals. Pre-epic PRD — re-verify before dispatch. |
+| A10 | [PAN-2420](https://github.com/eltmon/overdeck/issues/2420) | GitHub App merge-door hardening (operator-added 2026-07-06): boot preflight verifying the App can merge (names missing scopes), permission-vs-transient error distinction, auto-reconcile when a PR merges out-of-band after a door failure. Permission itself already fixed; this is the durable guard. |
 | — | [PAN-2265](https://github.com/eltmon/overdeck/issues/2265) | Already in-review — shepherd to close, no dispatch. |
 | — | [PAN-2358](https://github.com/eltmon/overdeck/issues/2358) | Not part of either campaign; normal pipeline flow whenever convenient. |
 
