@@ -88,6 +88,19 @@ export interface ActivityResponse {
   resolvedTotalCost?: number | null;
 }
 
+export type TieredExecutionOverride = 'on' | 'off' | null;
+export type TieredExecutionSource = 'issue-override' | 'plan-metadata' | 'global';
+
+export interface WorkspacePlanTieredExecution {
+  effective: boolean;
+  source: TieredExecutionSource;
+  override: TieredExecutionOverride;
+}
+
+export type WorkspacePlanResponse = VBriefDocument & {
+  tieredExecution?: WorkspacePlanTieredExecution;
+};
+
 export interface SessionCost {
   sessionId: string;
   agentId?: string;
@@ -157,19 +170,32 @@ export function usePlanningQuery(
 
 export function useWorkspacePlanQuery(
   issueId: string,
-  options?: Omit<UseQueryOptions<VBriefDocument | null>, 'queryKey' | 'queryFn'>,
-): UseQueryResult<VBriefDocument | null> {
+  options?: Omit<UseQueryOptions<WorkspacePlanResponse | null>, 'queryKey' | 'queryFn'>,
+): UseQueryResult<WorkspacePlanResponse | null> {
   return useQuery({
     queryKey: ['workspace-plan', issueId],
     queryFn: async () => {
       const res = await fetch(`/api/workspaces/${issueId}/plan`);
       if (res.status === 404) return null;
       if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} — /api/workspaces/${issueId}/plan`);
-      return res.json() as Promise<VBriefDocument>;
+      return res.json() as Promise<WorkspacePlanResponse>;
     },
     refetchInterval: 30_000,
     ...options,
   });
+}
+
+export async function updateWorkspaceTieredExecution(
+  issueId: string,
+  override: TieredExecutionOverride,
+): Promise<WorkspacePlanResponse> {
+  const res = await fetch(`/api/workspaces/${issueId}/tiered-execution`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ override }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} — /api/workspaces/${issueId}/tiered-execution`);
+  return res.json() as Promise<WorkspacePlanResponse>;
 }
 
 export function useSettingsQuery(
