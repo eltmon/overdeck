@@ -1,4 +1,25 @@
 /**
+ * ⚠️ RETIRED SCHEDULER (PAN-2397 W3, 2026-07-05) — do not add production callers.
+ *
+ * StandingTierManager / computeTierRunSchedule shipped with PAN-1791 as a
+ * second scheduler alongside the swarm slot allocator and never gained a
+ * production caller. The Always Tiered unification made the swarm allocator
+ * (deacon-swarm.ts dispatchNextWave + resolveStaffing) THE scheduler.
+ *
+ * No-loss audit of this module's capabilities at retirement:
+ *  - lazy per-tier spawn        → swarm dispatch waves already spawn lazily
+ *  - per-bead tier staffing     → resolveStaffing (staffing.ts), all spawn paths
+ *  - cross-bead session reuse   → INAPPLICABLE under the swarm's
+ *    branch-per-item slots (a slot branch carries one bead, merges, is GC'd);
+ *    adopting it would require a branch-per-tier architecture — a separate,
+ *    deliberate epic decision, recorded in .pan/drafts/pan-2397.md.
+ *  - replay on context threshold → tier-replay.ts remains live; its production
+ *    seam is the slot-recovery/respawn path (PAN-2397 W3b follow-up).
+ *
+ * computeTierRunSchedule is kept as a pure planning helper (tests cover it);
+ * the manager below is test-only until deleted.
+ *
+ * Original module doc:
  * Standing tier agents for tiered execution (PAN-1791, FR-6 scheduling half).
  *
  * A standing tier agent is a long-lived registered slot — spawned through
