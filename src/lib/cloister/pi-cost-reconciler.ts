@@ -5,15 +5,21 @@ import { CostDoorLive, CostWriter } from '../overdeck/cost.js';
 type RunningAgent = AgentState & { tmuxActive: boolean };
 
 export async function reconcilePiCostEventsForRunningAgents(runningAgents: readonly RunningAgent[]): Promise<void> {
-  if (!runningAgents.some((agent) => getAgentStateSync(agent.id)?.harness === 'ohmypi')) return;
+  const harnesses = new Set(runningAgents.map((agent) => getAgentStateSync(agent.id)?.harness));
+  const sources: Array<'ohmypi' | 'codex'> = [];
+  if (harnesses.has('ohmypi')) sources.push('ohmypi');
+  if (harnesses.has('codex')) sources.push('codex');
+  if (sources.length === 0) return;
 
-  try {
-    await Effect.runPromise(
-      CostWriter.use((writer) => writer.reconcile({ source: 'ohmypi' })).pipe(
-        Effect.provide(CostDoorLive),
-      ),
-    );
-  } catch (error) {
-    console.warn('[cloister] ohmypi cost reconcile failed:', error instanceof Error ? error.message : String(error));
+  for (const source of sources) {
+    try {
+      await Effect.runPromise(
+        CostWriter.use((writer) => writer.reconcile({ source })).pipe(
+          Effect.provide(CostDoorLive),
+        ),
+      );
+    } catch (error) {
+      console.warn(`[cloister] ${source} cost reconcile failed:`, error instanceof Error ? error.message : String(error));
+    }
   }
 }
