@@ -14,4 +14,6 @@ export interface PlanningState {
   planningComplete: boolean;
 }
 
+export type ComplexityLevel = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
+
 export type CycleFilter = 'current' | 'all' | 'backlog' | 'canceled';
