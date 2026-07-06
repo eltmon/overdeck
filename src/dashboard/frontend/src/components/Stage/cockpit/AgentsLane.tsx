@@ -5,7 +5,7 @@ import {
   ChevronRight, ChevronDown, GitPullRequest, GitBranch,
   CircleCheck, CircleX, Circle, type LucideIcon,
 } from 'lucide-react'
-import { useReviewStatusQuery, useWorkspaceQuery, type ReviewStatusData } from '../../CommandDeck/ZoneCOverviewTabs/queries'
+import { useIssueCostsQuery, useReviewStatusQuery, useWorkspaceQuery, type ReviewStatusData } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import { useIssueActions, type IssueActionView } from '../../IssueActionMenu/useIssueActions'
 import { UatStackStatus, getUatStackSummary } from '../../CommandDeck/UatStackStatus'
 import type { ProjectFeature } from '../../CommandDeck/ProjectTree/ProjectNode'
@@ -291,6 +291,22 @@ function StackDrawer({ issueId, feature, branch }: { issueId: string; feature?: 
   )
 }
 
+/** PAN-2393: per-session cost lookup — every line item shows what IT cost.
+ * Sourced from the same per-issue cost data the Costs page uses (one read
+ * door, no parallel rollup). Matches by sessionId, falling back to agentId
+ * ~ tmux session name. */
+function useSessionCostLookup(issueId: string): (session: SessionNode) => string | undefined {
+  const costs = useIssueCostsQuery(issueId)
+  const sessions = costs.data?.sessions ?? []
+  return (session: SessionNode) => {
+    const hit = sessions.find((entry) =>
+      entry.sessionId === session.sessionId
+      || (entry.agentId && (entry.agentId === session.tmuxSession || entry.agentId === session.sessionId)))
+    if (!hit?.cost || hit.cost <= 0) return undefined
+    return `$${hit.cost.toFixed(2)}`
+  }
+}
+
 export function AgentsLane({
   issueId, sessions, feature, branch, selectedSessionId, onSelectSession, onOpenVerification,
 }: {
@@ -307,6 +323,7 @@ export function AgentsLane({
   const review = useReviewStatusQuery(issueId)
   const rs = review.data
 
+  const costOf = useSessionCostLookup(issueId)
   const plan = sessions.find((s) => s.type === 'planning' || s.type === 'legacy')
   const works = sessions.filter((s) => s.type === 'work' || s.type === 'strike')
   const reviewParent = sessions.find((s) => s.type === 'review')
@@ -327,13 +344,13 @@ export function AgentsLane({
 
       {plan && (
         <Row icon={typeIcon(plan)} verdictTile={plan.status === 'error' ? 'bad' : 'ok'}
-          name="Plan" status={sessionStatus(plan)} model={shortModel(plan.model)} sub={formatDur(plan.duration)}
+          name="Plan" status={sessionStatus(plan)} model={shortModel(plan.model)} sub={[formatDur(plan.duration), costOf(plan)].filter(Boolean).join(' · ')}
           selected={plan.sessionId === selectedSessionId} onClick={() => onSelectSession(plan)} />
       )}
 
       {works.map((w) => (
         <Row key={w.sessionId} icon={typeIcon(w)} tileClass={styles.work}
-          name={sessionLabel(w)} status={sessionStatus(w)} model={shortModel(w.model)} sub={formatDur(w.duration)}
+          name={sessionLabel(w)} status={sessionStatus(w)} model={shortModel(w.model)} sub={[formatDur(w.duration), costOf(w)].filter(Boolean).join(' · ')}
           selected={w.sessionId === selectedSessionId} onClick={() => onSelectSession(w)} />
       ))}
 
@@ -367,7 +384,7 @@ export function AgentsLane({
       {/* Test — its session if dispatched (click → its terminal/output), else a synthetic step. */}
       {testSession ? (
         <Row icon={FlaskConical} name="Test" status={sessionStatus(testSession)} model={shortModel(testSession.model)}
-          sub={formatDur(testSession.duration)} selected={testSession.sessionId === selectedSessionId}
+          sub={[formatDur(testSession.duration), costOf(testSession)].filter(Boolean).join(' · ')} selected={testSession.sessionId === selectedSessionId}
           onClick={() => onSelectSession(testSession)} />
       ) : (
         <Row icon={FlaskConical} name="Test" status={TEST_TONE[rs?.testStatus ?? 'pending'] ?? TEST_TONE.pending}
@@ -376,7 +393,7 @@ export function AgentsLane({
 
       {ships.map((s) => (
         <Row key={s.sessionId} icon={typeIcon(s)} name="Ship" status={sessionStatus(s)} model={shortModel(s.model)}
-          sub={formatDur(s.duration)} selected={s.sessionId === selectedSessionId} onClick={() => onSelectSession(s)} />
+          sub={[formatDur(s.duration), costOf(s)].filter(Boolean).join(' · ')} selected={s.sessionId === selectedSessionId} onClick={() => onSelectSession(s)} />
       ))}
 
       <StackDrawer issueId={issueId} feature={feature} branch={branch} />
