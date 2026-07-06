@@ -16,17 +16,17 @@
   ],
   "feedback": [],
   "created": "2026-07-06T14:55:36.922Z",
-  "updated": "2026-07-06T17:26:55.305Z",
+  "updated": "2026-07-06T18:23:28.666Z",
   "pipeline": {
     "issueId": "PAN-2407",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T17:26:55.171Z",
-    "inspectNotes": "Bead route-unplanned-to-planning ack: no-plan+auto/interactive now POST start-planning with correct auto/autoStart flags and post-finalize messaging, no-plan+skip and dry-run send no request/create no files, and plan-exists (via findPlanSync main-spec-first) falls through to the unchanged spawn path; all 5 ACs covered by new start-plan-routing.test.ts.",
+    "updatedAt": "2026-07-06T18:23:28.169Z",
+    "inspectNotes": "Bead route-unplanned-to-planning ack: fix 599f26fa12 corrects workspaceLocation in the start-planning POST body to use the already-resolved isRemote flag from findWorkspaceWithLocation() instead of raw options.remote, so an existing remote workspace is reported correctly even without --remote; regression test added and verified against findWorkspaceWithLocation/determineWorkspaceLocation source. No regression to the prior 5 ACs.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2415",
     "lastVerifiedCommit": "f8b9ae733b3af83c312ff18576a70fdc27016f50"
   },
@@ -59,17 +59,17 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 19067,
-            "output": 4792,
-            "cacheRead": 449443,
-            "cacheWrite": 102613
+            "input": 26036,
+            "output": 7620,
+            "cacheRead": 1552096,
+            "cacheWrite": 221715
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1235245,
-            "output": 247873,
-            "cacheRead": 152001536,
+            "input": 1665147,
+            "output": 254493,
+            "cacheRead": 161143296,
             "cacheWrite": 0
           }
         }
@@ -88,21 +88,21 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 19067,
-          "output": 4792,
-          "cacheRead": 449443,
-          "cacheWrite": 102613
+          "input": 26036,
+          "output": 7620,
+          "cacheRead": 1552096,
+          "cacheWrite": 221715
         },
         "custom/kimi-k2.7-code": {
-          "input": 1235245,
-          "output": 247873,
-          "cacheRead": 152001536,
+          "input": 1665147,
+          "output": 254493,
+          "cacheRead": 161143296,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 41.592789,
-        "pricingAsOf": "2026-07-06T17:26:55.282Z"
+        "usd": 44.325113,
+        "pricingAsOf": "2026-07-06T18:23:28.475Z"
       }
     },
     "merges": [
