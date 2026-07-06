@@ -5,7 +5,6 @@ import { ExternalLink, User, Play, Eye, DollarSign, ChevronDown, ChevronRight, S
 import { useDashboardStore, selectReviewStatus } from '../../../lib/store';
 import { Issue, Agent, STATUS_LABELS } from '../../../types';
 import { getFriendlyModelName } from '../../../lib/dashboard-utils';
-import { parseDifficultyLabel } from '../../../../../../lib/cloister/complexity.js';
 import { deriveIssueActionPhase, type PipelinePhase } from '../../../lib/issueActions';
 import { cn } from '../../../lib/utils';
 import { getIssueWorkAgentMap, isAgentSessionAttachable } from '../../../lib/workAgents';
@@ -17,7 +16,15 @@ import { CostBreakdownModal } from '../../CostBreakdownModal';
 import type { WorkspaceData } from '../../CommandDeck/ZoneCOverviewTabs/queries';
 import { DifficultyBadge, TrackerShadowBadges } from '../badges';
 import { avatarGradient, cardAvatarInitials, formatCost, formatRuntime, getCostColor } from '../kanban-utils';
-import type { IssueCost, PlanningState } from '../types';
+import type { ComplexityLevel, IssueCost, PlanningState } from '../types';
+
+const DIFFICULTY_LEVELS: ComplexityLevel[] = ['trivial', 'simple', 'medium', 'complex', 'expert'];
+
+function parseDifficultyLabel(labels: string[]): ComplexityLevel | null {
+  const difficultyLabel = labels.find((label) => label.startsWith('difficulty:'));
+  const level = difficultyLabel?.split(':')[1] as ComplexityLevel | undefined;
+  return level && DIFFICULTY_LEVELS.includes(level) ? level : null;
+}
 
 // Feature card — rich card for Rally Features with progress and expand/collapse
 // Children (user stories) render INSIDE the card
