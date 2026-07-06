@@ -51,9 +51,49 @@
       "reason": "resume",
       "agentModel": "kimi-k2.7-code",
       "timestamp": "2026-07-06T16:54:50.922Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-06T17:09:28.504Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-06T17:09:28.516Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-06T17:15:26.467Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-06T17:21Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-06T17:21:49.456Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-06T17:21Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-06T17:21:59.315Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-06T17:21:49Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2386\n\nPolyrepo scaffold ignores .pan/records, hiding durable per-issue records instead of committing them\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2386 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-06T17:21:59Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2386\n\nPolyrepo scaffold ignores .pan/records, hiding durable per-issue records instead of committing them\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2386 -m \"Fixed review issues\"`"
+    }
+  ],
   "harness": "claude-code",
   "model": "kimi-k2.7-code",
   "statusOverrides": {
@@ -69,30 +109,32 @@
   },
   "pipeline": {
     "issueId": "PAN-2386",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
-    "verificationStatus": "passed",
+    "reviewStatus": "blocked",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T17:08:36.854Z",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Merge conflict with target branch",
-        "detectedAt": "2026-07-06T17:08:36.853Z"
-      }
-    ],
+    "updatedAt": "2026-07-06T17:21:49.406Z",
+    "reviewNotes": "Polyrepo scaffold ignores .pan/records, hiding durable per-issue records instead of committing them",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2403",
-    "reviewedAtCommit": "673b1b4029d93eb884e0669a68c05c7c813b74ce",
-    "lastVerifiedCommit": "5658edad6d3c0935bd57113d90a0093746d768e1"
+    "lastVerifiedCommit": "5658edad6d3c0935bd57113d90a0093746d768e1",
+    "reviewRequestedAt": "2026-07-06T17:09:27.416Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 1253,
+            "output": 7327,
+            "cacheRead": 9401617,
+            "cacheWrite": 10040
+          }
+        },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 19351,
-            "output": 648,
+            "input": 20916,
+            "output": 810,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -121,9 +163,15 @@
         }
       },
       "totals": {
+        "anthropic/claude-fable-5": {
+          "input": 1253,
+          "output": 7327,
+          "cacheRead": 9401617,
+          "cacheWrite": 10040
+        },
         "cliproxy/gpt-5.4-mini": {
-          "input": 19351,
-          "output": 648,
+          "input": 20916,
+          "output": 810,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -141,8 +189,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 22.309881,
-        "pricingAsOf": "2026-07-06T17:08:36.955Z"
+        "usd": 32.21588,
+        "pricingAsOf": "2026-07-06T17:21:49.451Z"
       }
     },
     "merges": [
@@ -151,5 +199,8 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-06T16:04:26.393Z",
-  "updated": "2026-07-06T17:08:36.957Z"
+  "updated": "2026-07-06T18:06:07.041Z",
+  "swarm": {
+    "finalizedAt": "2026-07-06T17:09:32.802Z"
+  }
 }
