@@ -17,18 +17,25 @@ fi
 
 offending=()
 valid=0
+had_entry=false
 
 while IFS= read -r line || [[ -n "$line" ]]; do
   # Skip empty lines and comment lines.
   [[ -z "${line// /}" ]] && continue
   [[ "$line" =~ ^[[:space:]]*# ]] && continue
 
+  had_entry=true
   if [[ ! "$line" =~ $ISSUE_REF_RE ]]; then
     offending+=("$line")
   else
     ((valid++)) || true
   fi
 done < "$QUARANTINE"
+
+if [[ "$had_entry" == false ]]; then
+  echo "✓ quarantine audit passed (no quarantine file or file is empty)"
+  exit 0
+fi
 
 if [[ ${#offending[@]} -gt 0 ]]; then
   echo "✖ quarantine audit: the following entries lack an issue reference" >&2

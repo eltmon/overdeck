@@ -17,24 +17,26 @@
   ],
   "feedback": [],
   "created": "2026-07-05T22:08:30.118Z",
-  "updated": "2026-07-06T17:27:39.202Z",
+  "updated": "2026-07-06T17:49:27.752Z",
   "pipeline": {
     "issueId": "PAN-2373",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T17:27:39.179Z"
+    "updatedAt": "2026-07-06T17:49:21.083Z",
+    "reviewNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-2373-review -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-2373 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://127.0.0.1:8317 -e ANTHROPIC_AUTH_TOKEN=overdeck-local-cliproxy-key -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-2373-review -e OVERDECK_ISSUE_ID=PAN-2373 -e OVERDECK_SESSION_TYPE=review -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-58 -e OVERDECK_FLYWHEEL_AGENT_ROLE=review bash /home/eltmon/.overdeck/agents/agent-pan-2373-review/launcher.sh\nduplicate session: agent-pan-2373-review\n",
+    "reviewRequestedAt": "2026-07-06T17:49:16.248Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 15311,
-            "output": 321,
-            "cacheRead": 0,
+            "input": 39147,
+            "output": 980,
+            "cacheRead": 1280,
             "cacheWrite": 0
           }
         },
@@ -51,13 +53,21 @@
             "cacheRead": 3946371,
             "cacheWrite": 149608
           }
+        },
+        "work": {
+          "custom/kimi-k2.7-code": {
+            "input": 340781,
+            "output": 45995,
+            "cacheRead": 15973632,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 15311,
-          "output": 321,
-          "cacheRead": 0,
+          "input": 39147,
+          "output": 980,
+          "cacheRead": 1280,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -71,16 +81,48 @@
           "output": 34796,
           "cacheRead": 3946371,
           "cacheWrite": 149608
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 340781,
+          "output": 45995,
+          "cacheRead": 15973632,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 7.384024,
-        "pricingAsOf": "2026-07-06T17:27:39.201Z"
+        "usd": 10.926735,
+        "pricingAsOf": "2026-07-06T17:49:21.120Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code"
+  "harness": "codex",
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "pan-2373-flake-lane": "completed",
+    "pan-2373-flake-lane.ac1": "completed",
+    "pan-2373-flake-lane.ac2": "completed",
+    "pan-2373-flake-lane.ac3": "completed",
+    "pan-2373-flake-lane.ac4": "completed",
+    "pan-2373-vitest-flake-config": "completed",
+    "pan-2373-vitest-flake-config.ac1": "completed",
+    "pan-2373-vitest-flake-config.ac2": "completed",
+    "pan-2373-vitest-flake-config.ac3": "completed",
+    "pan-2373-vitest-flake-config.ac4": "completed",
+    "pan-2373-vitest-flake-config.ac5": "completed",
+    "pan-2373-verify-gate-env": "completed",
+    "pan-2373-verify-gate-env.ac1": "completed",
+    "pan-2373-verify-gate-env.ac2": "completed",
+    "pan-2373-verify-gate-env.ac3": "completed",
+    "pan-2373-quarantine-file": "completed",
+    "pan-2373-quarantine-file.ac1": "completed",
+    "pan-2373-quarantine-file.ac2": "completed",
+    "pan-2373-quarantine-file.ac3": "completed",
+    "pan-2373-quarantine-file.ac4": "completed",
+    "pan-2373-quarantine-file.ac5": "completed"
+  },
+  "swarm": {
+    "finalizedAt": "2026-07-06T17:49:27.751Z"
+  }
 }
