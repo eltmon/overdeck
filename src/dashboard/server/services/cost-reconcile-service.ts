@@ -1,5 +1,6 @@
-import { reconcilePiTranscripts } from '../../../lib/costs/reconciler.js';
 import { Effect } from 'effect';
+import { reclassifyUnknownCostEventsSync } from '../../../lib/costs/attribution.js';
+import { reconcilePiTranscripts } from '../../../lib/costs/reconciler.js';
 import { CostDoorLive, CostWriter } from '../../../lib/overdeck/cost.js';
 
 const RECONCILE_INTERVAL_MS = 5 * 60_000;
@@ -21,6 +22,10 @@ async function runCostReconcileOnce(reason: 'startup' | 'interval'): Promise<voi
       for (const err of result.errors.slice(0, 5)) {
         console.warn(`[cost-reconciler] ${err.path}: ${err.error}`);
       }
+    }
+    const backfillResult = reclassifyUnknownCostEventsSync();
+    if (backfillResult.updated > 0) {
+      console.log(`[cost-reconciler] ${reason} UNKNOWN backfill: ${backfillResult.updated} updated`);
     }
     try {
       const codexResult = await Effect.runPromise(
