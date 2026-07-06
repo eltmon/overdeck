@@ -143,21 +143,27 @@ describe('IssueMissionControl', () => {
     expect(screen.getByRole('heading', { name: 'Mission control' })).toBeTruthy()
     expect(screen.getAllByText('PAN-1661').length).toBeGreaterThan(0)
     expect(screen.getByLabelText('Issue tree')).toBeTruthy()
-    expect(screen.getAllByText('Work').length).toBeGreaterThan(0)
+    expect(screen.getByTestId('status-narrative')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Overview' })).toBeTruthy()
     expect(screen.getAllByRole('button', { name: /Code/ }).length).toBeGreaterThan(0)
     expect(screen.getByText('Blocker spotlight')).toBeTruthy()
   })
 
-  it('renders the v3 command bar: pipeline progress, gates, and a blocked merge CTA', () => {
+  it('renders the status narrative + journey strip in place of the chip and gate rows (PAN-2398)', () => {
     renderMissionControl()
 
-    // 7-segment pipeline progress bar (replaces the legacy lifecycle-date strip)
-    expect(screen.getByTestId('cockpit-pipeline-progress')).toBeTruthy()
-    expect(screen.getByText('CI/CD')).toBeTruthy()
-    // gates pill row
-    expect(screen.getByTestId('cockpit-gates')).toBeTruthy()
-    expect(screen.getAllByText('Merge-ready').length).toBeGreaterThan(0)
+    // ONE status representation: plain-language narrative + 5-stage journey.
+    expect(screen.getByTestId('status-narrative')).toBeTruthy()
+    expect(screen.getByTestId('journey-strip')).toBeTruthy()
+    expect(screen.getByText('Building')).toBeTruthy()
+    expect(screen.getByText('Reviewing')).toBeTruthy()
+    expect(screen.getByText('Shipping')).toBeTruthy()
+    // the fixture's review is blocked — the narrative says so in plain words
+    expect(screen.getByText('The reviewer found problems')).toBeTruthy()
+    // the old jargon rows are gone
+    expect(screen.queryByTestId('cockpit-pipeline-progress')).toBeNull()
+    expect(screen.queryByTestId('cockpit-gates')).toBeNull()
+    expect(screen.queryByText('Merge-ready')).toBeNull()
     // primary merge CTA reflects the blocking reason
     expect(screen.getByText(/Merge — blocked by review/)).toBeTruthy()
     // breadcrumb context
@@ -185,7 +191,7 @@ describe('IssueMissionControl', () => {
   it('keeps tabs visible but unselected when an issue-tree node drives the pane', () => {
     renderMissionControl()
 
-    fireEvent.click(screen.getByRole('button', { name: /Work/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Building/ }))
 
     expect(screen.getByTestId('issue-tree-context-panel')).toBeTruthy()
     expect(screen.getByTestId('session-panel')).toBeTruthy()

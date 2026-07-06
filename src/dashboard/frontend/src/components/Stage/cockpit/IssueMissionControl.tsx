@@ -34,6 +34,7 @@ import { BeadsRail } from './BeadsRail'
 import { PickupGateCard } from './PickupGateCard'
 import { ChangedFilesView } from './ChangedFilesView'
 import { StatusHistoryTab } from './StatusHistoryTab'
+import { StatusNarrative, type JourneyStageKey } from './StatusNarrative'
 import { CockpitCard, CockpitPill, type CockpitTone } from './CockpitCard'
 import type { ProjectSessionTree, SessionNode } from '@overdeck/contracts'
 import styles from './cockpitBody.module.css'
@@ -116,31 +117,8 @@ const GROUP_ORDER: IssueActionGroup[] = [
 // PAN-1991 #4: active = blue (a machine is working), not purple (purple is
 // reserved for review/ship/planning specialist activity). done = emerald,
 // failed = red, ahead = neutral track.
-const PROGRESS_BAR_CLASS: Record<PipelineState, string> = {
-  done: 'bg-success',
-  active: 'bg-info animate-pulse',
-  fail: 'bg-destructive',
-  todo: 'bg-muted-foreground/20',
-}
-
-const PROGRESS_TICK_CLASS: Record<PipelineState, string> = {
-  done: 'border-success/50 bg-success/15 text-success-foreground',
-  active: 'border-info/50 bg-info/15 text-info-foreground',
-  fail: 'border-destructive/50 bg-destructive/15 text-destructive-foreground',
-  todo: 'border-border bg-muted/30 text-muted-foreground',
-}
-
-type GateTone = 'ok' | 'bad' | 'run' | 'wait'
-
 // PAN-1991 #5: gate dots follow the law — emerald=passing, red=failing,
 // blue=running (a machine is working; was purple), neutral=pending/rest.
-const GATE_DOT: Record<GateTone, string> = {
-  ok: 'bg-success',
-  bad: 'bg-destructive',
-  run: 'bg-info',
-  wait: 'bg-muted-foreground',
-}
-
 function statusToTone(status: string | undefined | null): CockpitTone {
   const normalized = (status ?? '').toLowerCase()
   if (['passed', 'success', 'completed', 'merged', 'ready'].includes(normalized)) return 'success'
@@ -148,13 +126,6 @@ function statusToTone(status: string | undefined | null): CockpitTone {
   if (['running', 'reviewing', 'testing', 'queued', 'merging', 'verifying', 'in_progress'].includes(normalized)) return 'info'
   if (['skipped', 'neutral', 'cancelled'].includes(normalized)) return 'muted'
   return 'warning'
-}
-
-function pipelineGlyph(state: PipelineState): string {
-  if (state === 'done') return '✓'
-  if (state === 'fail') return '✕'
-  if (state === 'active') return '◆'
-  return '○'
 }
 
 function checkRunLabel(run: Pick<IssueCheckRun, 'status' | 'conclusion'>): string {
@@ -248,60 +219,6 @@ function mergeBlockReason(rs: ReviewStatusData | undefined): string {
   return 'not ready'
 }
 
-function computeGates(
-  rs: ReviewStatusData | undefined,
-  ci: IssueCheckRunsResponse | undefined,
-  pr: Pick<PullRequestData, 'mergeable'> | null,
-): Array<{ label: string; value: string; tone: GateTone }> {
-  const review: { value: string; tone: GateTone } = rs?.reviewStatus === 'blocked' || rs?.reviewStatus === 'failed'
-    ? { value: (rs?.reviewStatus ?? '').toUpperCase(), tone: 'bad' }
-    : rs?.reviewStatus === 'reviewing'
-      ? { value: 'reviewing', tone: 'run' }
-      : rs?.reviewStatus === 'passed'
-        ? { value: 'passed', tone: 'ok' }
-        : { value: 'pending', tone: 'wait' }
-  const test: { value: string; tone: GateTone } = rs?.testStatus === 'failed' || rs?.testStatus === 'dispatch_failed'
-    ? { value: 'failed', tone: 'bad' }
-    : rs?.testStatus === 'testing'
-      ? { value: 'testing', tone: 'run' }
-      : rs?.testStatus === 'passed' || rs?.testStatus === 'skipped'
-        ? { value: rs.testStatus, tone: 'ok' }
-        : { value: 'pending', tone: 'wait' }
-  const verify: { value: string; tone: GateTone } = rs?.verificationStatus === 'passed'
-    ? { value: 'passed', tone: 'ok' }
-    : rs?.verificationStatus === 'failed'
-      ? { value: 'failed', tone: 'bad' }
-      : rs?.verificationStatus === 'running'
-        ? { value: 'running', tone: 'run' }
-        : { value: 'pending', tone: 'wait' }
-  const summary = ci?.summary
-  const ciGate: { value: string; tone: GateTone } = !summary || summary.total === 0
-    ? { value: 'no checks', tone: 'wait' }
-    : summary.failed || summary.cancelled
-      ? { value: `${summary.passed}/${summary.total}`, tone: 'bad' }
-      : summary.running || summary.pending
-        ? { value: `${summary.passed}/${summary.total}`, tone: 'run' }
-        : { value: `${summary.passed}/${summary.total} ✓`, tone: 'ok' }
-  const mergeable = (pr?.mergeable ?? '').toUpperCase()
-  const prGate: { value: string; tone: GateTone } = !pr
-    ? { value: 'no PR', tone: 'wait' }
-    : mergeable === 'MERGEABLE' || mergeable === 'CLEAN'
-      ? { value: 'mergeable', tone: 'ok' }
-      : mergeable === 'CONFLICTING'
-        ? { value: 'conflicting', tone: 'bad' }
-        : { value: 'unknown', tone: 'wait' }
-  const mergeReady: { value: string; tone: GateTone } = rs?.readyForMerge
-    ? { value: 'yes', tone: 'ok' }
-    : { value: 'no', tone: 'bad' }
-  return [
-    { label: 'Review', ...review },
-    { label: 'Test', ...test },
-    { label: 'Verification', ...verify },
-    { label: 'CI', ...ciGate },
-    { label: 'PR', ...prGate },
-    { label: 'Merge-ready', ...mergeReady },
-  ]
-}
 
 function HeaderStat({ label, value }: { label: string; value: ReactNode }) {
   return (
@@ -336,65 +253,7 @@ function MergeCta({ issueId, rs }: { issueId: string; rs: ReviewStatusData | und
   )
 }
 
-function PipelineProgressBar({ issueId, onPhase }: { issueId: string; onPhase: (phase: PipelinePhaseKey) => void }) {
-  const review = useReviewStatusQuery(issueId)
-  const ci = useIssueCheckRunsQuery(issueId)
-  const activity = useActivityQuery(issueId)
-  const actions = useIssueActions(issueId)
-  const work = activity.data?.sections.find((section) => section.type === 'work')
-  const states = computePipelineStates({ hasPlan: actions.state.hasPlan, rs: review.data, ci: ci.data, work })
-  const summary = ci.data?.summary
-  const segments: Array<{ key: PipelinePhaseKey; label: string; sub?: string; state: PipelineState }> = [
-    { key: 'plan', label: 'Plan', sub: states.plan === 'done' ? 'approved' : undefined, state: states.plan },
-    { key: 'work', label: 'Work', sub: states.work === 'done' ? 'done' : states.work === 'active' ? 'running' : undefined, state: states.work },
-    { key: 'review', label: 'Review', sub: review.data?.reviewStatus, state: states.review },
-    { key: 'test', label: 'Test', sub: review.data?.testStatus, state: states.test },
-    { key: 'ci', label: 'CI/CD', sub: summary?.total ? `${summary.passed}/${summary.total}` : undefined, state: states.ci },
-    { key: 'ship', label: 'Ship', sub: review.data?.mergeStatus && review.data.mergeStatus !== 'pending' ? review.data.mergeStatus : undefined, state: states.ship },
-    { key: 'merge', label: 'Merge', sub: states.merge === 'active' ? 'ready' : undefined, state: states.merge },
-  ]
-  return (
-    <div className="flex items-stretch gap-1.5" data-testid="cockpit-pipeline-progress">
-      {segments.map((seg) => (
-        <button
-          key={seg.key}
-          type="button"
-          onClick={() => onPhase(seg.key)}
-          className="flex min-w-0 flex-1 flex-col gap-1.5 rounded-[8px] p-1 text-left transition-colors hover:bg-accent"
-        >
-          <div className="flex items-center gap-1.5">
-            <span className={`grid h-[15px] w-[15px] shrink-0 place-items-center rounded-full border text-[9px] ${PROGRESS_TICK_CLASS[seg.state]}`}>
-              {pipelineGlyph(seg.state)}
-            </span>
-            <span className="min-w-0 truncate text-[10.5px] text-muted-foreground">
-              <span className="font-medium text-foreground">{seg.label}</span>
-              {seg.sub ? ` ${seg.sub}` : ''}
-            </span>
-          </div>
-          <div className={`h-[5px] rounded-full ${PROGRESS_BAR_CLASS[seg.state]}`} />
-        </button>
-      ))}
-    </div>
-  )
-}
 
-function GatesRow({ issueId }: { issueId: string }) {
-  const review = useReviewStatusQuery(issueId)
-  const ci = useIssueCheckRunsQuery(issueId)
-  const pr = usePrQuery(issueId)
-  const gates = computeGates(review.data, ci.data, pr.data?.pr ?? null)
-  return (
-    <div className="flex flex-wrap items-center gap-2" data-testid="cockpit-gates">
-      {gates.map((gate) => (
-        <span key={gate.label} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[11px]">
-          <span className={`h-2 w-2 rounded-[2px] ${GATE_DOT[gate.tone]}`} />
-          <span className="font-medium text-muted-foreground">{gate.label}</span>
-          <span className="text-foreground">{gate.value}</span>
-        </span>
-      ))}
-    </div>
-  )
-}
 
 function IssueActionMegaMenu({ issueId }: { issueId: string }) {
   const [open, setOpen] = useState(false)
@@ -1009,6 +868,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
   const pr = usePrQuery(issueId)
   const checks = useIssueCheckRunsQuery(issueId)
   const costs = useIssueCostsQuery(issueId)
+  const headerActions = useIssueActions(issueId)
   const phase = phaseStatus(review.data)
   const cost = costs.data?.resolvedTotalCost ?? costs.data?.totalCost ?? 0
   const selectTab = (tab: MissionTab) => {
@@ -1036,6 +896,12 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
   // PAN-1991 #4/#6: clicking a pipeline phase opens that phase's info. Work/
   // Review/Test open the agent's own conversation/findings (per #6, review
   // findings live on the Review agent, not a status tab); CI/CD opens Code.
+  const handleStageClick = (stage: JourneyStageKey) => {
+    const map: Record<JourneyStageKey, PipelinePhaseKey> = {
+      planned: 'plan', building: 'work', reviewing: 'review', testing: 'test', shipping: 'merge',
+    }
+    handlePhaseClick(map[stage])
+  }
   const handlePhaseClick = (phase: PipelinePhaseKey) => {
     if (phase === 'work') { if (!openAgentByType('work')) selectTab('overview'); return }
     if (phase === 'review') { if (!openAgentByType('review')) selectTab('overview'); return }
@@ -1086,8 +952,15 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             </div>
           </div>
         </div>
-        <div className="mt-4 border-t border-border pt-4"><PipelineProgressBar issueId={issueId} onPhase={handlePhaseClick} /></div>
-        <div className="mt-3"><GatesRow issueId={issueId} /></div>
+        <div className="mt-4 border-t border-border pt-4">
+          <StatusNarrative
+            issueId={issueId}
+            hasPlan={headerActions.state.hasPlan}
+            workRunning={phase === 'pending'}
+            cost={cost > 0 ? `$${cost.toFixed(2)}` : undefined}
+            onStageClick={handleStageClick}
+          />
+        </div>
       </header>
 
       <div className={styles.missionBody}>
