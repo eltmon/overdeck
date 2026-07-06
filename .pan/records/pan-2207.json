@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-06T16:43:28.780Z",
-  "updated": "2026-07-06T17:29:14.235Z",
+  "updated": "2026-07-06T18:21:08.822Z",
   "pipeline": {
     "issueId": "PAN-2207",
     "reviewStatus": "pending",
@@ -64,5 +64,20 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "kimi-k2.7-code"
+  "model": "kimi-k2.7-code",
+  "statusOverrides": {
+    "b3-deacon-patrol": "completed",
+    "b3-deacon-patrol.ac1": "completed",
+    "b3-deacon-patrol.ac2": "completed",
+    "b3-deacon-patrol.ac3": "completed",
+    "b3-deacon-patrol.ac4": "completed",
+    "b2-done-resilient": "completed",
+    "b2-done-resilient.ac1": "completed",
+    "b2-done-resilient.ac2": "completed",
+    "b2-done-resilient.ac3": "completed",
+    "b2-done-resilient.ac4": "completed",
+    "b1-tombstone-field": "completed",
+    "b1-tombstone-field.ac1": "completed",
+    "b1-tombstone-field.ac2": "completed"
+  }
 }
