@@ -2,6 +2,7 @@ import type { RuntimeName } from '../runtimes/types.js';
 import type { VBriefDifficulty, VBriefItem } from '../vbrief/types.js';
 import { resolveTier, type ResolveTierConfig } from './resolve-tier.js';
 import { resolveTieredExecutionEnabled } from './tier-table.js';
+import { resolveTieredExecutionEnabledForIssue } from './tiered-execution-issue.js';
 
 export type DispatchTier = 'in-context' | 'registered-slot';
 
@@ -61,9 +62,15 @@ export function assignDispatchTier(
   item: Pick<VBriefItem, 'id' | 'title' | 'metadata'>,
   config?: TierAssignmentConfig,
   planMetadata?: { [key: string]: unknown },
+  issueId?: string,
 ): TierAssignment {
   const dispatch = chooseDispatchTier(item);
-  if (!config || !resolveTieredExecutionEnabled(config, planMetadata)) {
+  const enabled = issueId
+    ? resolveTieredExecutionEnabledForIssue(issueId, planMetadata)
+    : config
+      ? resolveTieredExecutionEnabled(config, planMetadata)
+      : false;
+  if (!config || !enabled) {
     return { dispatch };
   }
   const tier = resolveTier(item, config);

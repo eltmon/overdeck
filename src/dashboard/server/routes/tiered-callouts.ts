@@ -17,6 +17,7 @@ import {
   resolveTieredExecutionEnabled,
   type ValidatedTieredExecutionConfig,
 } from '../../../lib/agents/tier-table.js';
+import { resolveTieredExecutionEnabledForIssue } from '../../../lib/agents/tiered-execution-issue.js';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 
@@ -42,6 +43,7 @@ export interface TieredCalloutDeps {
   loadPlanMetadata?: (issueId: string) => Record<string, unknown> | undefined;
   getWorkspacePath?: (issueId: string) => string | null;
   getItem?: (issueId: string, beadId: string) => VBriefItem | undefined;
+  resolveEnabled?: (issueId: string, planMetadata?: Record<string, unknown>) => boolean;
   recordCallout?: (callout: TieredCalloutBody) => void | Promise<void>;
   surfaceCallout?: (callout: TieredCalloutBody) => Promise<unknown>;
   deliverSupervisorReview?: (options: DeliverCommitForReviewOptions) => Promise<DeliveryResult>;
@@ -134,7 +136,12 @@ export async function handleTieredCallout(
 
   const config = deps.loadConfig?.(callout.issueId) ?? defaultConfig();
   const planMetadata = deps.loadPlanMetadata?.(callout.issueId) ?? defaultPlanMetadata(callout.issueId);
-  if (!resolveTieredExecutionEnabled(config, planMetadata)) {
+  const enabled = deps.resolveEnabled
+    ? deps.resolveEnabled(callout.issueId, planMetadata)
+    : deps.loadConfig || deps.loadPlanMetadata
+      ? resolveTieredExecutionEnabled(config, planMetadata)
+      : resolveTieredExecutionEnabledForIssue(callout.issueId, planMetadata);
+  if (!enabled) {
     return { status: 404, body: { error: 'tiered execution is not enabled for this issue' } };
   }
 

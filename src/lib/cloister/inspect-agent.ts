@@ -40,7 +40,7 @@ import type { ModelId } from '../settings.js';
 import { getProviderEnvForModel, saveAgentRuntimeState, saveAgentState } from '../agents.js';
 import { isIssueClosed } from './issue-closed.js';
 import { readWorkspacePlanSync } from '../vbrief/io.js';
-import { resolveTieredExecutionEnabled } from '../agents/tier-table.js';
+import { resolveTieredExecutionEnabledForIssue } from '../agents/tiered-execution-issue.js';
 import {
   deliverCommitForReview,
   loadPrdDraft,
@@ -153,7 +153,7 @@ async function routeInspectToStandingSupervisorIfEnabled(
   if (!tiered?.supervisor?.owns_inspection) return undefined;
 
   const doc = readWorkspacePlanSync(context.workspace);
-  const enabled = resolveTieredExecutionEnabled(tiered, doc?.plan.metadata);
+  const enabled = resolveTieredExecutionEnabledForIssue(context.issueId, doc?.plan.metadata);
   if (!enabled) return undefined;
 
   const item = doc?.plan.items.find(candidate => candidate.id === context.beadId);
