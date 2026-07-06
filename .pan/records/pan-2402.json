@@ -1,32 +1,117 @@
 {
   "issueId": "PAN-2402",
   "schemaVersion": 2,
-  "feedback": [],
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-06T15:30:27.172Z",
+      "reason": "end",
+      "note": "Integrated/verified PAN-2402 cost-limit attribution fix (already present from predecessor agent's salvage work on rescue/pan-2402-primary-salvage). Anomalies addressed: (1) three pre-existing unit-test failures in close-issue/workflows tests caused by commit 2518d740db adding a 'gh issue view --json labels' query that the mocks returned empty — fixed the mocks to return the expected workflow labels; (2) file-size guard required updating scripts/file-size-baseline.txt from 2051 to 2054 lines for the audited service.ts growth from the attribution fix. Delivered: cost warnings now use explicit '(unattributed)' bucket instead of 'undefined'; per-agent/per-issue accumulators are scoped to today's spend via getAgentDailyCostSync() and getDailyTrends({ days: 1, issueId }); regression tests cover both bugs. Note: rescue/pan-2402-primary-salvage branch remains on remote and should be cleaned up by operator."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-06T15:32Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-06T15:32:41.271Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-06T15:32Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-06T15:32:43.671Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-06T15:32:43.769Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-06T15:32:41Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2402\n\nAttribution regression test does not cover service log fallback\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2402 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-06T15:32:43Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2402\n\nAttribution regression test does not cover service log fallback\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2402 -m \"Fixed review issues\"`"
+    }
+  ],
   "created": "2026-07-06T14:44:54.009Z",
-  "updated": "2026-07-06T15:30:12.473Z",
+  "updated": "2026-07-06T15:33:23.492Z",
   "pipeline": {
     "issueId": "PAN-2402",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T14:44:54.010Z"
+    "updatedAt": "2026-07-06T15:33:23.386Z",
+    "reviewNotes": "Attribution regression test does not cover service log fallback",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2411",
+    "lastVerifiedCommit": "20a022d4d542bc319ea3ef1a5bc2f9c85df0e6ba",
+    "reviewRequestedAt": "2026-07-06T15:30:27.180Z"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 20553,
+            "output": 657,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "work": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 89,
+            "output": 38549,
+            "cacheRead": 14895238,
+            "cacheWrite": 339334
+          },
+          "custom/kimi-k2.7-code": {
+            "input": 448261,
+            "output": 26915,
+            "cacheRead": 9388032,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 20553,
+          "output": 657,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 89,
+          "output": 38549,
+          "cacheRead": 14895238,
+          "cacheWrite": 339334
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 448261,
+          "output": 26915,
+          "cacheRead": 9388032,
+          "cacheWrite": 0
+        }
+      },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-07-06T14:44:54.029Z"
+        "usd": 4.42377,
+        "pricingAsOf": "2026-07-06T15:33:23.489Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2411"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "auto-start": "completed",
     "auto-start.ac1": "completed",
