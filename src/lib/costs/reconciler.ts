@@ -27,7 +27,9 @@ import { Effect } from 'effect';
 import { calculateCostSync, getPricingSync, type AIProvider, type TokenUsage } from '../cost.js';
 import { FsError } from '../errors.js';
 import { CostDoorLive, CostWriter, type CostEvent as OverdeckCostEvent } from '../overdeck/cost.js';
+import { findConversationForCostSessionSync } from '../overdeck/conversations.js';
 import type { IssueId } from '../overdeck/issues.js';
+import { classifySessionBucket, type ConversationSessionLookup } from './attribution.js';
 import type { CostEvent } from './events.js';
 
 // ============== Types ==============
@@ -42,7 +44,7 @@ export interface ReconcileResult {
 
 interface SessionMapping {
   agentId: string;
-  issueId: string;
+  issueId: string | null;
   sessionType: string;  // planning, implementation, review, test, merge
 }
 
@@ -123,6 +125,13 @@ function extractSessionId(filename: string): string {
   return basename(filename, '.jsonl');
 }
 
+export function resolveUnmappedSessionIssueId(
+  input: { sessionId?: string | null; agentId?: string | null },
+  lookup: ConversationSessionLookup = findConversationForCostSessionSync,
+): string {
+  return classifySessionBucket(input, lookup);
+}
+
 /**
  * Decode a Claude projects directory name back to the original cwd path.
  * e.g., "-home-eltmon-Projects-krux-workspaces-feature-krux-4" → "/home/eltmon/Projects/krux/workspaces/feature-krux-4"
@@ -168,7 +177,7 @@ function buildSessionIndex(): Map<string, SessionMapping> {
 
     // Read state.json for issue/workspace context and role.
     const stateFile = join(agentPath, 'state.json');
-    let issueId = inferIssueId(agentDir) || 'UNKNOWN';
+    let issueId: string | null = inferIssueId(agentDir);
     let stateRole: string | undefined;
     if (existsSync(stateFile)) {
       try {
@@ -197,7 +206,7 @@ function buildSessionIndex(): Map<string, SessionMapping> {
     for (const sid of sessionIds) {
       index.set(sid, {
         agentId: agentDir,
-        issueId,
+        issueId: issueId ?? resolveUnmappedSessionIssueId({ sessionId: sid, agentId: agentDir }),
         sessionType,
       });
     }
@@ -285,7 +294,7 @@ function readNewBytes(filePath: string, fromOffset: number): { content: string; 
  * Parse transcript content and extract cost events.
  * Only processes assistant messages with usage data and a requestId.
  */
-function extractCostEvents(
+export function extractCostEvents(
   content: string,
   agentId: string,
   issueId: string,
@@ -483,7 +492,7 @@ export async function reconcilePiTranscripts(): Promise<ReconcileResult> {
 
     // Resolve issueId + sessionType from state.json (authoritative), falling
     // back to inference from the directory name.
-    let issueId = inferIssueId(agentDirName) || 'UNKNOWN';
+    let issueId: string | null = inferIssueId(agentDirName);
     let sessionType = 'work';
     const stateFile = join(agentPath, 'state.json');
     if (existsSync(stateFile)) {
@@ -500,10 +509,11 @@ export async function reconcilePiTranscripts(): Promise<ReconcileResult> {
     const transcripts = findPiTranscriptFiles(agentPath);
     for (const transcriptPath of transcripts) {
       const sessionId = basename(transcriptPath, '.jsonl');
+      const resolvedIssueId = issueId ?? resolveUnmappedSessionIssueId({ sessionId, agentId: agentDirName });
       result.sessionsScanned++;
       try {
         const content = readFileSync(transcriptPath, 'utf-8');
-        const events = extractPiCostEvents(content, agentDirName, issueId, sessionType, sessionId);
+        const events = extractPiCostEvents(content, agentDirName, resolvedIssueId, sessionType, sessionId);
         if (events.length === 0) continue;
         result.sessionsWithNewData++;
         const { inserted, duplicates } = await recordCostEventsThroughOverdeck(events, `reconciler:${transcriptPath}`);
@@ -612,7 +622,7 @@ async function reconcilePromise(): Promise<ReconcileResult> {
         // Look up agent mapping for this session
         const mapping = sessionIndex.get(sessionId);
         const agentId = mapping?.agentId || 'unattributed';
-        const issueId = mapping?.issueId || pathIssueId || 'UNKNOWN';
+        const issueId = mapping?.issueId || pathIssueId || resolveUnmappedSessionIssueId({ sessionId, agentId });
         const sessionType = mapping?.sessionType || 'implementation';
 
         // Get last processed offset
@@ -663,7 +673,7 @@ async function reconcilePromise(): Promise<ReconcileResult> {
           try {
             const mapping = sessionIndex.get(sessionId);
             const agentId = mapping?.agentId || 'unattributed-subagent';
-            const issueId = mapping?.issueId || pathIssueId || 'UNKNOWN';
+            const issueId = mapping?.issueId || pathIssueId || resolveUnmappedSessionIssueId({ sessionId, agentId });
             const sessionType = mapping?.sessionType || 'implementation';
 
             const lastOffset = getSessionOffset(sessionId);
