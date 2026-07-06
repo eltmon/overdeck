@@ -183,6 +183,81 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
         }
       }
     }
+
+    // For polyrepo scaffold workspaces, create a .gitignore that excludes:
+    // 1. .pan/records/ - workspace-local issue state (not committed)
+    // 2. Sub-repo directories - these are separate git repos, not tracked by scaffold
+    try {
+      const workspaceGitignore = join(workspacePath, '.gitignore');
+      let content = existsSync(workspaceGitignore) ? readFileSync(workspaceGitignore, 'utf-8') : '';
+      const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+
+      const entriesToAdd: string[] = [];
+
+      // Add .pan/records/ if not present
+      if (!lines.includes('.pan/records/')) {
+        entriesToAdd.push('.pan/records/');
+      }
+
+      // Add sub-repo directories if not present
+      for (const repo of workspaceConfig.repos) {
+        if (!lines.includes(repo.name) && !lines.includes(`${repo.name}/`)) {
+          entriesToAdd.push(`${repo.name}/`);
+        }
+      }
+
+      if (entriesToAdd.length > 0) {
+        if (content && !content.endsWith('\n')) {
+          content += '\n';
+        }
+        if (!lines.some(l => l.includes('Polyrepo'))) {
+          content += '\n# Polyrepo sub-repos and workspace-local state\n';
+        }
+        content += entriesToAdd.join('\n') + '\n';
+        writeFileSync(workspaceGitignore, content, 'utf-8');
+        result.steps.push(`Created .gitignore for polyrepo workspace (${entriesToAdd.length} entries)`);
+      }
+    } catch (gitignoreErr: any) {
+      // Non-fatal — log but do not block workspace creation
+      result.steps.push(`Warning: could not create workspace .gitignore: ${gitignoreErr.message}`);
+    }
+    // For polyrepo scaffold workspaces, create a .gitignore that excludes:
+    // 1. .pan/records/ - workspace-local issue state (not committed)
+    // 2. Sub-repo directories - these are separate git repos, not tracked by scaffold
+    try {
+      const workspaceGitignore = join(workspacePath, '.gitignore');
+      let content = existsSync(workspaceGitignore) ? readFileSync(workspaceGitignore, 'utf-8') : '';
+      const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+
+      const entriesToAdd: string[] = [];
+
+      // Add .pan/records/ if not present
+      if (!lines.includes('.pan/records/')) {
+        entriesToAdd.push('.pan/records/');
+      }
+
+      // Add sub-repo directories if not present
+      for (const repo of workspaceConfig.repos) {
+        if (!lines.includes(repo.name) && !lines.includes(`${repo.name}/`)) {
+          entriesToAdd.push(`${repo.name}/`);
+        }
+      }
+
+      if (entriesToAdd.length > 0) {
+        if (content && !content.endsWith('\n')) {
+          content += '\n';
+        }
+        if (!lines.some(l => l.includes('Polyrepo'))) {
+          content += '\n# Polyrepo sub-repos and workspace-local state\n';
+        }
+        content += entriesToAdd.join('\n') + '\n';
+        writeFileSync(workspaceGitignore, content, 'utf-8');
+        result.steps.push(`Created .gitignore for polyrepo workspace (${entriesToAdd.length} entries)`);
+      }
+    } catch (gitignoreErr: any) {
+      // Non-fatal — log but don't block workspace creation
+      result.steps.push(`Warning: could not create workspace .gitignore: ${gitignoreErr.message}`);
+    }
   }
 
   progress('Creating git worktree', 'Worktree ready', 'complete');
@@ -520,79 +595,9 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
         }
       }
     }
-
-    // Start workspace containers
-    const composeLocations = [
-      join(workspacePath, 'docker-compose.yml'),
-      join(workspacePath, 'docker-compose.yaml'),
-      join(workspacePath, '.devcontainer', 'docker-compose.yml'),
-      join(workspacePath, '.devcontainer', 'docker-compose.devcontainer.yml'),
-    ];
-
-    for (const composePath of composeLocations) {
-      if (existsSync(composePath)) {
-        try {
-          // Don't pass -p: the compose file's `name:` field is the authority.
-          // Passing -p with a different value creates a second Docker project
-          // on container restart, splitting services onto separate networks.
-          await execAsync(`docker compose -f "${composePath}" up -d --build`, { cwd: dirname(composePath), timeout: 300000 });
-          result.steps.push(`Started containers from ${basename(composePath)}`);
-        } catch (error) {
-          result.errors.push(`Failed to start containers: ${error}`);
-        }
-        break;
-      }
-    }
-  }
-
-  if (startDocker) {
-    progress('Starting Docker containers', 'Containers running', 'complete');
-  }
-
-  // Pre-trust workspace directory in Claude Code so agents don't get the trust prompt
-  try {
-    preTrustDirectorySync(workspacePath);
-    result.steps.push('Pre-trusted workspace in Claude Code');
-  } catch {
-    // Non-fatal — agent can still work, user will just see trust prompt
-  }
-
-  // Inject caveman hooks into workspace .claude/settings.json (if enabled in config)
-  try {
-    const { determineCavemanVariant, injectCavemanSettings } = await import('../caveman/workspace.js');
-    const yamlConfig = loadYamlConfig();
-    const cavemanConfig = yamlConfig.config.caveman;
-    const variant = determineCavemanVariant(cavemanConfig);
-    await Effect.runPromise(injectCavemanSettings(workspacePath, variant));
-    if (variant === 'enabled') {
-      result.steps.push('Injected caveman compression hooks into .claude/settings.json');
-    } else if (variant === 'disabled') {
-      result.steps.push('Caveman A/B test: assigned disabled variant for this workspace');
-    }
-  } catch (cavemanErr: unknown) {
-    // Non-fatal — workspace works without caveman
-    result.steps.push(`Caveman setup skipped: ${cavemanErr instanceof Error ? cavemanErr.message : String(cavemanErr)}`);
-  }
-
-  // Copy Overdeck global settings into workspace so agents testing Overdeck
-  // itself have the same projects, model assignments, and hooks.
-  try {
-    const settingsResult = copyOverdeckSettingsToWorkspaceSync(workspacePath);
-    if (settingsResult.copied.length > 0) {
-      result.steps.push(`Copied Overdeck settings into workspace (${settingsResult.copied.length} file(s))`);
-    }
-  } catch (settingsErr: unknown) {
-    result.steps.push(`Overdeck settings copy skipped: ${settingsErr instanceof Error ? settingsErr.message : String(settingsErr)}`);
-  }
-
-  try {
-    const { injectMemoryHookSettings } = await import('../caveman/workspace.js');
-    await injectMemoryHookSettings(workspacePath);
-    result.steps.push('Injected memory hooks into .claude/settings.json');
-  } catch (memoryHookErr: unknown) {
-    result.steps.push(`Memory hook setup skipped: ${memoryHookErr instanceof Error ? memoryHookErr.message : String(memoryHookErr)}`);
   }
 
   result.success = result.errors.length === 0;
+  progress('Workspace creation', result.success ? 'Complete' : 'Complete with errors', 'complete');
   return result;
 }
