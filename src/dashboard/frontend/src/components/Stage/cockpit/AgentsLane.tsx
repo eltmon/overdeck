@@ -303,7 +303,10 @@ function useSessionCostLookup(issueId: string): (session: SessionNode) => string
       entry.sessionId === session.sessionId
       || (entry.agentId && (entry.agentId === session.tmuxSession || entry.agentId === session.sessionId)))
     if (!hit?.cost || hit.cost <= 0) return undefined
-    return `$${hit.cost.toFixed(2)}`
+    const tokens = hit.tokenCount && hit.tokenCount > 0
+      ? ` · ${hit.tokenCount >= 1_000_000 ? `${(hit.tokenCount / 1_000_000).toFixed(1)}M` : `${Math.round(hit.tokenCount / 1_000)}k`} tok`
+      : ''
+    return `$${hit.cost.toFixed(2)}${tokens}`
   }
 }
 
