@@ -76,7 +76,7 @@
     }
   ],
   "created": "2026-07-06T01:51:00.754Z",
-  "updated": "2026-07-06T15:19:24.129Z",
+  "updated": "2026-07-06T15:59:25.446Z",
   "pipeline": {
     "issueId": "PAN-2386",
     "reviewStatus": "pending",
@@ -133,5 +133,16 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "kimi-k2.7-code"
+  "model": "kimi-k2.7-code",
+  "statusOverrides": {
+    "auto-start": "completed",
+    "auto-start.ac1": "completed",
+    "auto-start.ac2": "completed",
+    "auto-start.ac3": "completed",
+    "auto-start.ac4": "completed",
+    "auto-start.ac5": "completed",
+    "auto-start.ac6": "completed",
+    "auto-start.ac7": "completed",
+    "auto-start.ac8": "completed"
+  }
 }
