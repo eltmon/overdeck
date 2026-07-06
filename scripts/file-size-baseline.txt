@@ -15,7 +15,7 @@
 1321 src/dashboard/server/ws-rpc.ts
 3480 src/lib/cloister/deacon.ts
 1377 src/lib/cloister/merge-agent.ts
-2051 src/lib/cloister/service.ts
+2054 src/lib/cloister/service.ts
 1749 src/lib/cloister/specialists.ts
 1195 src/lib/conversations/smart-compaction.ts
 1650 src/lib/database/schema.ts
