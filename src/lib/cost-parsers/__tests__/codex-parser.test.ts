@@ -411,3 +411,107 @@ describe('parseCodexSessionCostEventsSync (PAN-2388)', () => {
     }
   });
 });
+
+describe('parseCodexSessionCostEventsSync (PAN-2388)', () => {
+  it('returns an empty array for a nonexistent file', () => {
+    expect(parseCodexSessionCostEventsSync(NONEXISTENT)).toEqual([]);
+  });
+
+  it('AC1: emits one event per token_count record with distinct codex:<threadId>:<seq> requestIds', () => {
+    const events = parseCodexSessionCostEventsSync(FIXTURE);
+    expect(events).toHaveLength(2);
+    expect(events[0].requestId).toBe('codex:abc1234567890def:0');
+    expect(events[1].requestId).toBe('codex:abc1234567890def:1');
+  });
+
+  it('AC2: event token sums equal session totals and each event has a positive cost', () => {
+    const events = parseCodexSessionCostEventsSync(FIXTURE);
+    const session = parseCodexSessionSync(FIXTURE);
+    expect(session).not.toBeNull();
+
+    expect(events.reduce((sum, e) => sum + e.input, 0)).toBe(session!.usage.inputTokens);
+    expect(events.reduce((sum, e) => sum + e.output, 0)).toBe(session!.usage.outputTokens);
+    expect(events.reduce((sum, e) => sum + e.cacheRead, 0)).toBe(session!.usage.cacheReadTokens);
+
+    for (const event of events) {
+      expect(event.cost).toBeGreaterThan(0);
+      expect(event.provider).toBe('openai');
+      expect(event.model).toBe('codex-4o');
+      expect(event.cacheWrite).toBe(0);
+    }
+  });
+
+  it('AC3: truncating the fixture returns a strict prefix of the full event list', () => {
+    const fullEvents = parseCodexSessionCostEventsSync(FIXTURE);
+    expect(fullEvents).toHaveLength(2);
+
+    const raw = readFileSync(FIXTURE, 'utf-8');
+    const lines = raw.split('\n');
+    // Truncate after the first token_count line (line index 2 in the fixture).
+    const truncated = lines.slice(0, 3).join('\n') + '\n';
+    const dir = mkdtempSync(join(tmpdir(), 'codex-trunc-'));
+    const truncatedFile = join(dir, 'truncated.jsonl');
+    writeFileSync(truncatedFile, truncated, 'utf-8');
+
+    try {
+      const prefixEvents = parseCodexSessionCostEventsSync(truncatedFile);
+      expect(prefixEvents).toHaveLength(1);
+      expect(prefixEvents[0]).toMatchObject({
+        requestId: fullEvents[0].requestId,
+        input: fullEvents[0].input,
+        output: fullEvents[0].output,
+        cacheRead: fullEvents[0].cacheRead,
+        cost: fullEvents[0].cost,
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('AC4: token_count with no preceding model uses "unknown"', () => {
+    const content = [
+      '{"type":"session_meta","timestamp":"2026-07-06T00:00:00Z","payload":{"id":"thread-no-model"}}',
+      '{"type":"event_msg","timestamp":"2026-07-06T00:00:01Z","payload":{"type":"agent_message","message":"hello"}}',
+      '{"type":"event_msg","timestamp":"2026-07-06T00:00:02Z","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"cached_input_tokens":10,"output_tokens":20,"total_tokens":130},"last_token_usage":{"input_tokens":100,"cached_input_tokens":10,"output_tokens":20,"total_tokens":130}}}}',
+    ].join('\n') + '\n';
+    const dir = mkdtempSync(join(tmpdir(), 'codex-no-model-'));
+    const file = join(dir, 'no-model.jsonl');
+    writeFileSync(file, content, 'utf-8');
+
+    try {
+      const events = parseCodexSessionCostEventsSync(file);
+      expect(events).toHaveLength(1);
+      expect(events[0].model).toBe('unknown');
+      expect(events[0].requestId).toBe('codex:thread-no-model:0');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('uses cumulative-delta arithmetic when last_token_usage does not sum to total_token_usage', () => {
+    // Simulate a real-style rollout where last_token_usage is cumulative per-turn
+    // rather than a delta. last values (100, 0, 10) + (120, 0, 15) = (220, 0, 25),
+    // but final total is (120, 0, 15). The emitter must fall back to deltas.
+    const content = [
+      '{"type":"task_started","timestamp":"2026-07-06T00:00:00Z","model":"gpt-5.5","thread_id":"thread-delta"}',
+      '{"type":"agent_message","timestamp":"2026-07-06T00:00:01Z"}',
+      '{"type":"token_count","timestamp":"2026-07-06T00:00:02Z","info":{"total_token_usage":{"input_tokens":100,"cached_input_tokens":0,"output_tokens":10,"total_tokens":110},"last_token_usage":{"input_tokens":100,"cached_input_tokens":0,"output_tokens":10,"total_tokens":110}}}',
+      '{"type":"agent_message","timestamp":"2026-07-06T00:00:03Z"}',
+      '{"type":"token_count","timestamp":"2026-07-06T00:00:04Z","info":{"total_token_usage":{"input_tokens":120,"cached_input_tokens":0,"output_tokens":15,"total_tokens":135},"last_token_usage":{"input_tokens":120,"cached_input_tokens":0,"output_tokens":15,"total_tokens":135}}}',
+    ].join('\n') + '\n';
+    const dir = mkdtempSync(join(tmpdir(), 'codex-delta-'));
+    const file = join(dir, 'delta.jsonl');
+    writeFileSync(file, content, 'utf-8');
+
+    try {
+      const events = parseCodexSessionCostEventsSync(file);
+      expect(events).toHaveLength(2);
+      expect(events[0].input).toBe(100);
+      expect(events[0].output).toBe(10);
+      expect(events[1].input).toBe(20); // 120 - 100
+      expect(events[1].output).toBe(5); // 15 - 10
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
