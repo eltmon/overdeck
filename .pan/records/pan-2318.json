@@ -234,8 +234,8 @@
     ],
     "recordedAt": "2026-07-04T14:36:37.246Z"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "wi-3-control-surface-audit": "completed",
     "wi-3-control-surface-audit.ac1": "completed",
@@ -297,17 +297,18 @@
     "issueId": "PAN-2318",
     "reviewStatus": "passed",
     "testStatus": "testing",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-05T07:15:07.665Z",
+    "updatedAt": "2026-07-06T14:10:34.487Z",
     "reviewNotes": "Review passed; current cycle only changed pipeline metadata",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2327",
     "reviewedAtCommit": "acd711decf36f0167b77825353794e4e41fbdf5e",
     "lastVerifiedCommit": "16a6cc0ca90b0b056d239a4595698d370ba59b46",
-    "reviewRequestedAt": "2026-07-05T07:04:42.664Z"
+    "reviewRequestedAt": "2026-07-05T07:04:42.664Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-06T14:10:34.487Z"
   },
   "closeOut": {
     "usage": {
@@ -394,7 +395,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-04T14:07:04.245Z",
-  "updated": "2026-07-05T07:15:07.684Z",
+  "updated": "2026-07-06T14:10:34.487Z",
   "swarm": {
     "finalizedAt": "2026-07-05T07:04:42.866Z"
   }

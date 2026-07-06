@@ -48,18 +48,19 @@
   ],
   "feedback": [],
   "created": "2026-06-30T01:20:28.481Z",
-  "updated": "2026-07-02T19:21:51.935Z",
+  "updated": "2026-07-06T14:00:22.519Z",
   "pipeline": {
     "issueId": "PAN-2154",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T19:21:51.870Z",
+    "updatedAt": "2026-07-06T14:00:22.519Z",
     "inspectNotes": "Spec fidelity passed for workspace-zjh9e: the diff extracts the nine public interfaces and PRE_WORKTREE_METADATA_DIRS into src/lib/workspace-manager/types.ts, re-exports only the interfaces from the barrel, and leaves PRE_WORKTREE_METADATA_DIRS off the public barrel surface. Constraint check passed: no call-site or test files were edited, no new any or execSync appeared in the new types module, and the scoped diff is pure relocation/wiring.",
-    "prUrl": "https://github.com/eltmon/overdeck/pull/2236"
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2236",
+    "closedOut": true,
+    "closedOutAt": "2026-07-06T14:00:22.519Z"
   },
   "closeOut": {
     "usage": {

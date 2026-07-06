@@ -56,16 +56,15 @@
     "recordedAt": "2026-07-02T23:53:34.525Z"
   },
   "created": "2026-06-30T01:25:48.391Z",
-  "updated": "2026-07-02T23:53:42.286Z",
+  "updated": "2026-07-06T13:56:55.667Z",
   "pipeline": {
     "issueId": "PAN-2153",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T23:53:42.249Z",
+    "updatedAt": "2026-07-06T13:56:55.667Z",
     "inspectNotes": "workspace-zou59: spec fidelity passed; helper/foundation block moved into src/dashboard/server/routes/specialists/shared.ts, required symbols exported, barrel re-exports preserved, import depth correct, and no CLAUDE/PRD constraints violated.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2250",
     "reviewRequestedAt": "2026-07-02T23:53:42.248Z",
@@ -96,7 +95,9 @@
         "tests/lib/cloister/review-agent.test.ts"
       ],
       "recordedAt": "2026-07-02T23:53:34.525Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-06T13:56:55.667Z"
   },
   "closeOut": {
     "usage": {

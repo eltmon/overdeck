@@ -175,14 +175,15 @@
     "issueId": "PAN-2311",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T17:09:48.676Z",
+    "updatedAt": "2026-07-06T14:09:42.977Z",
     "reviewNotes": "Agent re-review request (6/25): Resolved origin/main conflict by preserving PAN-2325 test artifact ignore, merged remote branch state, and reverified build/typecheck/lint/npm test.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2317",
-    "lastVerifiedCommit": "3605f6b56d07190c6b6e93c9f68543a8e6f717bf"
+    "lastVerifiedCommit": "3605f6b56d07190c6b6e93c9f68543a8e6f717bf",
+    "closedOut": true,
+    "closedOutAt": "2026-07-06T14:09:42.977Z"
   },
   "closeOut": {
     "usage": {
@@ -257,5 +258,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T18:03:53.979Z",
-  "updated": "2026-07-04T17:09:48.703Z"
+  "updated": "2026-07-06T14:09:42.977Z"
 }

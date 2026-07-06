@@ -102,16 +102,15 @@
     "recordedAt": "2026-07-04T01:50:22.147Z"
   },
   "created": "2026-07-03T13:52:41.087Z",
-  "updated": "2026-07-06T14:02:04.584Z",
+  "updated": "2026-07-06T14:02:07.583Z",
   "pipeline": {
     "issueId": "PAN-2145",
     "reviewStatus": "passed",
     "testStatus": "testing",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T01:52:26.840Z",
+    "updatedAt": "2026-07-06T14:02:07.583Z",
     "reviewNotes": "No blocking findings; extraction preserves route surface and reviewed behavior.",
     "testNotes": "TypeScript typecheck passed (tsc --noEmit + hooks + evals). ESLint passed (eslint + effect/permissions/state-writes/overdeck-boundaries/skills/prompts/file-size/ratchet-audit). Focused Vitest suites passed: 9 files, 135 tests. Suites: github-app, flywheel-surfaces, cloister/issue-closed, cloister/orphan-proposed-reconciler, cloister/merge-agent, forge, webhook-handlers, github-graphql-cooldown, dashboard issue-pr + issue-discussions routes. Browser UAT not required: PAN-2265 is a backend-only GitHub App REST migration with no dashboard/UI acceptance criteria (frontend explicitly listed as NonGoal).",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -180,7 +179,9 @@
         "tests/unit/dashboard/server/routes/conversations-no-loss.test.ts"
       ],
       "recordedAt": "2026-07-04T01:50:22.147Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-06T14:02:07.583Z"
   },
   "closeOut": {
     "usage": {
