@@ -1,6 +1,13 @@
 {
   "issueId": "PAN-2336",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-07-06T20:39Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-06T20:39:33.050Z"
+    }
+  ],
   "feedback": [
     {
       "seq": 2,
@@ -21,18 +28,18 @@
   },
   "pipeline": {
     "issueId": "PAN-2336",
-    "reviewStatus": "blocked",
-    "testStatus": "pending",
+    "reviewStatus": "reviewing",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T20:39:27.033Z",
+    "updatedAt": "2026-07-06T20:46:49.718Z",
     "reviewNotes": "Global frontend unused-code checks are disabled in tsconfig outside PAN-2336 scope",
-    "testNotes": "Typecheck passed (tsc --noEmit + hooks + evals). Lint passed (eslint + effect + permissions + state-writes + overdeck-boundaries + skills + prompts + file-size + source-introspection + ratchet-audit). Targeted test src/lib/vbrief/__tests__/create-beads.test.ts passed 38/38. 10 consecutive CI=1 runs of the targeted test all passed (38/38 each). No browser UAT required: test-only CI-flake fix for beads DB setup race.",
-    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/dashboard/frontend/src/components/vbrief/types.ts",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2427",
     "reviewedAtCommit": "2c0a915f25d36975e61b4e4e9fa7b86127b83971",
-    "lastVerifiedCommit": "2f22930dcf4cabcb9b34c87596c75cba4762d088",
+    "lastVerifiedCommit": "452dff1d3069a7f1ad3b2f14d8d4da14556abcbb",
     "reviewRequestedAt": "2026-07-06T19:29:39.653Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -123,7 +130,7 @@
       },
       "costAtCloseOut": {
         "usd": 7.844447000000001,
-        "pricingAsOf": "2026-07-06T20:39:27.065Z"
+        "pricingAsOf": "2026-07-06T20:46:49.785Z"
       }
     },
     "merges": [
@@ -132,12 +139,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-06T20:32:19.057Z",
-  "updated": "2026-07-06T20:39:33.050Z",
-  "sessionHistory": [
-    {
-      "reason": "feedback",
-      "note": "[2026-07-06T20:39Z] review-agent → CHANGES-REQUESTED — seq 2",
-      "timestamp": "2026-07-06T20:39:33.050Z"
-    }
-  ]
+  "updated": "2026-07-06T20:46:49.786Z"
 }
