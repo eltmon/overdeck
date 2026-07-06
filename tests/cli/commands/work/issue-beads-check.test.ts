@@ -160,6 +160,14 @@ describe('hasBeadsTasks', () => {
     expect(childProcessMocks.execFile).toHaveBeenCalledTimes(12);
   });
 
+  it('uses a 180s acquisition timeout by default for pan start bead checks', async () => {
+    const { __testInternals } = await import('../../../../src/cli/commands/start.js');
+
+    expect(__testInternals.panStartBdRetryOptions).toMatchObject({
+      acquisitionTimeoutMs: 180_000,
+    });
+  });
+
   // SKIPPED — structurally flaky under CI parallel-worker load; red-gated the
   // v0.30.0 release (run 27969902569, the sole failure: 1/7189). Passes
   // reliably in isolation locally but intermittently fails in CI.

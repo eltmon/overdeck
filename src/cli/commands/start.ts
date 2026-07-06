@@ -32,7 +32,7 @@ import {
 } from '../../lib/bd-process-lock.js';
 
 export const RETRYABLE_BD_LOCK_EXIT_CODE = 75;
-const PAN_START_BD_RETRY_OPTIONS: Omit<RunBdWithRetryOptions, 'workspacePath'> = { maxAttempts: 12, initialDelayMs: 1_000, maxDelayMs: 5_000, acquisitionTimeoutMs: 60_000 };
+const PAN_START_BD_RETRY_OPTIONS: Omit<RunBdWithRetryOptions, 'workspacePath'> = { maxAttempts: 12, initialDelayMs: 1_000, maxDelayMs: 5_000, acquisitionTimeoutMs: 180_000 };
 
 /**
  * Check if an issue ID is a Linear issue (has team prefix like MIN-, PAN-, etc.)
@@ -1453,7 +1453,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
 export const __testInternals = {
   failPostCreateValidation,
-  failTransientBeadsValidation,
+  failTransientBeadsValidation, panStartBdRetryOptions: PAN_START_BD_RETRY_OPTIONS,
   repairMainBranchWorkspace,
   resolveExplicitHarnessFlag,
 };
