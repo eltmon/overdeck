@@ -34,7 +34,7 @@
     }
   ],
   "created": "2026-06-29T19:19:51.780Z",
-  "updated": "2026-07-03T10:04:57.988Z",
+  "updated": "2026-07-06T12:55:12.415Z",
   "pipeline": {
     "issueId": "PAN-2174",
     "reviewStatus": "pending",
@@ -107,7 +107,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "model": "claude-opus-4-8",
   "statusOverrides": {
     "config-fields": "completed",
     "config-fields.ac1": "completed",
