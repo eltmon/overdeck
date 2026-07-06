@@ -12,6 +12,7 @@
 import { useQuery } from '@tanstack/react-query'
 import {
   useIssueCheckRunsQuery,
+  usePrQuery,
   useReviewStatusQuery,
   type IssueCheckRunsResponse,
   type ReviewStatusData,
@@ -115,6 +116,46 @@ export function deriveNarrative(args: {
   return { headline, next, needsYou, stages }
 }
 
+
+export function detailFragments(args: {
+  rs: ReviewStatusData | undefined
+  ci: IssueCheckRunsResponse | undefined
+  prMergeable: string | null | undefined
+  hasPr: boolean
+}): string[] {
+  const { rs, ci, prMergeable, hasPr } = args
+  const fragments: string[] = []
+  fragments.push(
+    rs?.reviewStatus === 'passed' ? 'review passed ✓'
+    : rs?.reviewStatus === 'reviewing' ? 'review in progress'
+    : rs?.reviewStatus === 'blocked' || rs?.reviewStatus === 'failed' ? 'review found problems'
+    : 'review not started')
+  fragments.push(
+    rs?.testStatus === 'passed' ? 'tests passed ✓'
+    : rs?.testStatus === 'skipped' ? 'tests skipped'
+    : rs?.testStatus === 'testing' ? 'tests running'
+    : rs?.testStatus === 'failed' || rs?.testStatus === 'dispatch_failed' ? 'tests failed'
+    : 'tests not run')
+  if (rs?.verificationStatus) {
+    fragments.push(
+      rs.verificationStatus === 'passed' ? 'build check passed ✓'
+      : rs.verificationStatus === 'failed' ? 'build check failed'
+      : rs.verificationStatus === 'running' ? 'build check running'
+      : 'build check pending')
+  }
+  const summary = ci?.summary
+  fragments.push(!summary || summary.total === 0
+    ? 'no automated checks yet'
+    : `checks ${summary.passed}/${summary.total}${summary.failed || summary.cancelled ? ' failing' : summary.running || summary.pending ? ' running' : ' ✓'}`)
+  const mergeable = (prMergeable ?? '').toUpperCase()
+  fragments.push(!hasPr ? 'no PR yet'
+    : mergeable === 'MERGEABLE' || mergeable === 'CLEAN' ? 'PR ready ✓'
+    : mergeable === 'CONFLICTING' ? 'PR has conflicts'
+    : 'PR state unknown')
+  fragments.push(rs?.readyForMerge ? 'cleared to ship ✓' : 'not cleared to ship yet')
+  return fragments
+}
+
 const BAR_CLASS: Record<StageState, string> = {
   done: 'bg-teal-500',
   now: 'bg-blue-500',
@@ -137,6 +178,7 @@ export function StatusNarrative({ issueId, workRunning, hasPlan, cost, onStageCl
 }) {
   const review = useReviewStatusQuery(issueId)
   const ci = useIssueCheckRunsQuery(issueId)
+  const pr = usePrQuery(issueId)
   const plan = useQuery<{ plan?: { items?: Array<{ status: string }> } }>({
     queryKey: ['plan', issueId],
     queryFn: async () => {
@@ -185,6 +227,9 @@ export function StatusNarrative({ issueId, workRunning, hasPlan, cost, onStageCl
             <span className="block text-[10px] font-normal text-muted-foreground/70">{stage.gloss}</span>
           </button>
         ))}
+      </div>
+      <div className="mt-2 text-[11px] text-muted-foreground/80" data-testid="status-details">
+        {detailFragments({ rs: review.data, ci: ci.data, prMergeable: pr.data?.pr?.mergeable, hasPr: Boolean(pr.data?.pr) }).join(' · ')}
       </div>
     </div>
   )
