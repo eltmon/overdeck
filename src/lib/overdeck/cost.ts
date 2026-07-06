@@ -524,12 +524,16 @@ export const CostWriterLive = Layer.effect(
 
     const record = (event: CostEvent, opts?: { dryRun?: boolean }) =>
       Effect.gen(function* () {
-        if (yield* checkDuplicate(event)) return false;
-        if (opts?.dryRun) return true;
+        if (opts?.dryRun) {
+          if (yield* checkDuplicate(event)) return false;
+          return true;
+        }
 
-        // 1. DURABLE ARCHIVE FIRST — events.jsonl + WAL. Archive decides no-op
-        //    vs append by event source (transcript-backed events are no-ops).
+        // 1. DURABLE ARCHIVE FIRST — events.jsonl. Archive deduplicates by
+        //    requestId/sourceFile so DB-only retries can repair the JSONL log.
         yield* archive.append(event);
+
+        if (yield* checkDuplicate(event)) return false;
 
         // 2. Cache insert — UNIQUE(request_id) makes it idempotent on re-import.
         yield* Effect.promise(() =>

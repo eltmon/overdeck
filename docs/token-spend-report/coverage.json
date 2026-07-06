@@ -1,0 +1,137 @@
+{
+  "generatedAt": "2026-07-06T19:37:32Z",
+  "source": "/home/eltmon/.overdeck/costs/events.jsonl",
+  "safetySnapshot": {
+    "path": "/home/eltmon/.overdeck/costs/events.jsonl.pre-pan2389-backfill.bak",
+    "lines": 37158,
+    "bytes": 12398649,
+    "mtimeEpochSeconds": 1783288657,
+    "status": "verified unchanged after backfill"
+  },
+  "canonicalEventsJsonl": {
+    "lines": 76379,
+    "bytes": 30006199,
+    "earliestEventTs": "2026-04-11T11:14:11.719Z",
+    "latestEventTs": "2026-07-06T19:37:18.014Z"
+  },
+  "coverageBoundaries": {
+    "claude": {
+      "earliestEventTs": "2026-06-06T09:17:11.190Z",
+      "latestEventTs": "2026-07-06T19:32:40.124Z",
+      "sessionsScanned": 7735
+    },
+    "ohmypi": {
+      "earliestEventTs": "2026-04-11T11:14:11.719Z",
+      "latestEventTs": "2026-06-12T05:38:26.066Z",
+      "sessionsScanned": 10
+    },
+    "codex": {
+      "earliestEventTs": "2026-06-21T05:54:44.456Z",
+      "latestEventTs": "2026-07-06T19:28:36.203Z",
+      "sessionsScanned": 216
+    }
+  },
+  "runs": [
+    {
+      "mode": "dry-run",
+      "completed": true,
+      "summaries": {
+        "claude": {
+          "sessionsScanned": 7718,
+          "wouldImport": 30882,
+          "duplicatesSkipped": 227138,
+          "errors": 0,
+          "earliestEventTs": "2026-06-06T09:17:11.190Z",
+          "latestEventTs": "2026-07-06T19:02:14.118Z"
+        },
+        "ohmypi": {
+          "sessionsScanned": 10,
+          "wouldImport": 62,
+          "duplicatesSkipped": 0,
+          "errors": 0,
+          "earliestEventTs": "2026-04-11T11:14:11.719Z",
+          "latestEventTs": "2026-06-12T05:38:26.066Z"
+        },
+        "codex": {
+          "sessionsScanned": 212,
+          "wouldImport": 211,
+          "duplicatesSkipped": 0,
+          "errors": 0,
+          "earliestEventTs": "2026-06-21T05:54:44.456Z",
+          "latestEventTs": "2026-07-06T18:47:14.532Z"
+        }
+      }
+    },
+    {
+      "mode": "write",
+      "completed": false,
+      "note": "The first write was interrupted by a live SQLite insert failure after partially inserting DB rows. The failed row reproduced successfully against a DB copy, indicating live DB contention rather than bad event data. Reruns were idempotent against DB duplicates."
+    },
+    {
+      "mode": "write-retry",
+      "completed": true,
+      "summaries": {
+        "claude": {
+          "sessionsScanned": 7727,
+          "eventsImported": 24,
+          "duplicatesSkipped": 258160,
+          "errors": 0,
+          "earliestEventTs": "2026-06-11T00:32:22.980Z",
+          "latestEventTs": "2026-07-06T19:14:15.432Z"
+        },
+        "ohmypi": {
+          "sessionsScanned": 10,
+          "eventsImported": 0,
+          "duplicatesSkipped": 62,
+          "errors": 0,
+          "earliestEventTs": null,
+          "latestEventTs": null
+        },
+        "codex": {
+          "sessionsScanned": 215,
+          "eventsImported": 172,
+          "duplicatesSkipped": 42,
+          "errors": 0,
+          "earliestEventTs": "2026-06-21T05:54:44.456Z",
+          "latestEventTs": "2026-07-06T19:16:08.071Z"
+        }
+      }
+    },
+    {
+      "mode": "write-idempotence-check",
+      "completed": true,
+      "note": "The live machine continued producing new Claude/Codex events during repeated scans, so subsequent writes imported only live-tail events with timestamps after the prior pass. Ohmypi stayed at 0 imported; Codex reached 0 imported on one pass before a new live Codex event appeared.",
+      "summaries": {
+        "claude": {
+          "sessionsScanned": 7735,
+          "eventsImported": 9,
+          "duplicatesSkipped": 258335,
+          "errors": 0,
+          "earliestEventTs": "2026-07-06T19:28:50.850Z",
+          "latestEventTs": "2026-07-06T19:32:40.124Z"
+        },
+        "ohmypi": {
+          "sessionsScanned": 10,
+          "eventsImported": 0,
+          "duplicatesSkipped": 62,
+          "errors": 0,
+          "earliestEventTs": null,
+          "latestEventTs": null
+        },
+        "codex": {
+          "sessionsScanned": 210,
+          "eventsImported": 0,
+          "duplicatesSkipped": 209,
+          "errors": 0,
+          "earliestEventTs": null,
+          "latestEventTs": null
+        }
+      }
+    }
+  ],
+  "notes": [
+    "The pre-rebrand Feb 2025-Jun 2026 legacy database was deliberately not imported.",
+    "Backfill reads transcript stores only; live agent sessions may append new transcript lines while scans are running.",
+    "Attribution quality is bounded by the current parsers and pending PAN-2387/PAN-2388 follow-ups."
+  ]
+}
