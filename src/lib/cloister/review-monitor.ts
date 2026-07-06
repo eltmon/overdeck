@@ -63,6 +63,96 @@ interface ReviewerState {
   settled: boolean;
   stalledAt?: number;
   lastModifiedMs: number;
+}export async function waitForReviewerOutputsPromise(
+  opts: WaitForReviewerOutputsOpts,
+): Promise<ReviewerResult[]> {
+  const {
+    issueId,
+    runId,
+    workspace,
+    subRoles = REVIEW_SUB_ROLES,
+    pollIntervalMs = 10_000,
+    timeoutMs = 20 * 60 * 1_000,
+    staleAfterMs = 8 * 60 * 1_000,
+  } = opts;
+
+  const reviewDir = join(workspace, PAN_DIRNAME, 'review', runId);
+  const deadline = Date.now() + timeoutMs;
+
+  const states: ReviewerState[] = subRoles.map((subRole) => ({
+    subRole,
+    outputPath: join(reviewDir, `${subRole}.md`),
+    sessionId: `agent-${issueId.toLowerCase()}-review-${subRole}`,
+    settled: false,
+    lastModifiedMs: 0,
+  }));
+
+  while (true) {
+    const now = Date.now();
+
+    for (const s of states) {
+      if (s.settled) continue;
+
+      if (existsSync(s.outputPath)) {
+        try {
+          const mtime = (await stat(s.outputPath)).mtimeMs;
+          if (mtime === s.lastModifiedMs && now - mtime > staleAfterMs) {
+            // File stopped growing — reviewer is done or stuck
+            s.settled = true;
+            s.stalledAt = undefined;
+            continue;
+          }
+          s.lastModifiedMs = mtime;
+        } catch {
+          // stat race — try again next poll
+        }
+      }
+
+      // Check if the tmux session is dead
+      try {
+        const dead = await Effect.runPromise(isPaneDead(s.sessionId));
+        if (dead) {
+          s.settled = true;
+          if (!existsSync(s.outputPath)) {
+            s.stalledAt = now; // → missing
+          } else if (s.lastModifiedMs > 0 && now - s.lastModifiedMs <= staleAfterMs) {
+            s.stalledAt = now; // session died before file settled → stalled
+          }
+          // else: file exists and mtime settled → done
+          continue;
+        }
+      } catch {
+        // Session may not exist
+        const exists = await Effect.runPromise(sessionExists(s.sessionId));
+        if (!exists) {
+          s.settled = true;
+          if (!existsSync(s.outputPath)) {
+            s.stalledAt = now;
+          }
+        }
+      }
+
+      // Hard timeout
+      if (now >= deadline) {
+        s.settled = true;
+        s.stalledAt = now;
+      }
+    }
+
+    if (states.every((s) => s.settled)) break;
+
+    await new Promise<void>((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+
+  return states.map((s) => {
+    if (!existsSync(s.outputPath)) {
+      return { subRole: s.subRole, outputPath: s.outputPath, status: 'missing' as const };
+    }
+    if (s.stalledAt !== undefined) {
+      return { subRole: s.subRole, outputPath: s.outputPath, status: 'stalled' as const };
+    }
+    return { subRole: s.subRole, outputPath: s.outputPath, status: 'done' as const };
+  });
 }
 
 /**

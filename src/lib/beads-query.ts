@@ -180,6 +180,21 @@ export async function queryReadyBeadsByIssueLabelsPromise(
   }
 }
 
+export async function assertIssueHasBeadsPromise(
+  workspacePath: string,
+  issueId: string,
+  retryOptions: Omit<RunBdWithRetryOptions, 'workspacePath'> = {},
+): Promise<void> {
+  const result = await Effect.runPromise(queryBeadsForIssue(workspacePath, issueId, retryOptions));
+  if (result.beads.length === 0) {
+    throw new BeadsMissingError({
+      issueId,
+      workspacePath,
+      transientFailure: result.transientFailure,
+    });
+  }
+}
+
 async function queryBeadByIdPromise(
   workspacePath: string,
   beadId: string,

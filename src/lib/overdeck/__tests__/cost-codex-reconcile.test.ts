@@ -29,7 +29,7 @@ describe('CostWriter.reconcile — codex update-on-growth', () => {
     const first = await Effect.runPromise(
       CostWriter.use((w) => w.reconcile({ source: 'codex' })).pipe(Effect.provide(layer)),
     );
-    expect(first).toEqual({ imported: 1 });
+    expect(first).toMatchObject({ imported: 1, eventsImported: 1, duplicatesSkipped: 0 });
     let rows = readRows(odb);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
@@ -48,14 +48,14 @@ describe('CostWriter.reconcile — codex update-on-growth', () => {
     const unchanged = await Effect.runPromise(
       CostWriter.use((w) => w.reconcile({ source: 'codex' })).pipe(Effect.provide(layer)),
     );
-    expect(unchanged).toEqual({ imported: 0 });
+    expect(unchanged).toMatchObject({ imported: 0, eventsImported: 0, duplicatesSkipped: 1 });
     expect(readRows(odb)).toHaveLength(1);
 
     appendTokenCount(rolloutFile, { input: 18000, cached: 6000, output: 1500 });
     const grown = await Effect.runPromise(
       CostWriter.use((w) => w.reconcile({ source: 'codex' })).pipe(Effect.provide(layer)),
     );
-    expect(grown).toEqual({ imported: 1 });
+    expect(grown).toMatchObject({ imported: 1, eventsImported: 1, duplicatesSkipped: 0 });
     rows = readRows(odb);
     expect(rows).toHaveLength(1);
     expect(rows[0]!.input).toBe(18000);

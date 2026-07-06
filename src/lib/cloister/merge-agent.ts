@@ -2,14 +2,14 @@
  * Merge Agent - Automatic merge conflict resolution using Claude Code
  */
 
-import { existsSync } from 'fs';
+import { existsSync, mkdirSync, appendFileSync } from 'fs';
 import { writeFile } from 'fs/promises';
 import { join, dirname, basename, relative } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
-import { killSession, listSessionNames } from '../tmux.js';
+import { capturePane, killSession, listSessionNames, sendKeys, sessionExists } from '../tmux.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 
 const execAsync = promisify(exec);
@@ -134,10 +134,15 @@ import { restoreTrackedBeadsExport } from '../beads-restore.js';
 import { runQualityGates } from './validation.js';
 import { loadProjectsConfigSync } from '../projects.js';
 import { cleanupStaleLocks } from '../git-utils.js';
-import { setReviewStatusSync } from '../review-status.js';
+import { gitPush, MainDivergedError } from '../git/operations.js';
+import { markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
 import { appendGitOperationSync, type GitOperationType } from '../git-activity.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
 import { verifyMergedBeforeLifecycle, type PostMergeLifecycleOptions } from './merge-verification.js';
+
+const SPECIALISTS_DIR = join(OVERDECK_HOME, 'specialists');
+const MERGE_HISTORY_DIR = join(SPECIALISTS_DIR, 'merge-agent');
+const MERGE_HISTORY_FILE = join(MERGE_HISTORY_DIR, 'history.jsonl');
 
 /**
  * Context for a merge conflict resolution request
@@ -165,6 +170,22 @@ export interface MergeResult {
   output?: string;
 }
 
+/**
+ * Merge history entry
+ */
+interface MergeHistoryEntry {
+  timestamp: string;
+  issueId: string;
+  sourceBranch: string;
+  targetBranch: string;
+  conflictFiles: string[];
+  result: MergeResult;
+  sessionId?: string;
+}
+
+/**
+ * Timeout for merge agent in milliseconds (15 minutes)
+ */
 /**
  * Notify TLDR daemon to reindex changed files after merge
  */
@@ -622,6 +643,159 @@ export function resetPostMergeState(issueId: string): void {
 }
 
 /**
+ * Parse result markers from agent output
+ */
+export function parseAgentOutput(output: string): MergeResult {
+  const lines = output.split('\n');
+
+  let mergeResult: 'SUCCESS' | 'FAILURE' | null = null;
+  let resolvedFiles: string[] = [];
+  let failedFiles: string[] = [];
+  let testsStatus: 'PASS' | 'FAIL' | 'SKIP' | null = null;
+  let validationStatus: 'PASS' | 'FAIL' | null = null;
+  let reason = '';
+  let notes = '';
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Match MERGE_RESULT
+    if (trimmed.startsWith('MERGE_RESULT:')) {
+      const value = trimmed.substring('MERGE_RESULT:'.length).trim();
+      if (value === 'SUCCESS' || value === 'FAILURE') {
+        mergeResult = value;
+      }
+    }
+
+    // Match RESOLVED_FILES
+    if (trimmed.startsWith('RESOLVED_FILES:')) {
+      const value = trimmed.substring('RESOLVED_FILES:'.length).trim();
+      resolvedFiles = value
+        .split(',')
+        .map((f) => f.trim())
+        .filter((f) => f.length > 0);
+    }
+
+    // Match FAILED_FILES
+    if (trimmed.startsWith('FAILED_FILES:')) {
+      const value = trimmed.substring('FAILED_FILES:'.length).trim();
+      failedFiles = value
+        .split(',')
+        .map((f) => f.trim())
+        .filter((f) => f.length > 0);
+    }
+
+    // Match TESTS
+    if (trimmed.startsWith('TESTS:')) {
+      const value = trimmed.substring('TESTS:'.length).trim();
+      if (value === 'PASS' || value === 'FAIL' || value === 'SKIP') {
+        testsStatus = value;
+      }
+    }
+
+    // Match VALIDATION
+    if (trimmed.startsWith('VALIDATION:')) {
+      const value = trimmed.substring('VALIDATION:'.length).trim();
+      if (value === 'PASS' || value === 'FAIL') {
+        validationStatus = value;
+      }
+    }
+
+    // Match REASON
+    if (trimmed.startsWith('REASON:')) {
+      reason = trimmed.substring('REASON:'.length).trim();
+    }
+
+    // Match NOTES
+    if (trimmed.startsWith('NOTES:')) {
+      notes = trimmed.substring('NOTES:'.length).trim();
+    }
+  }
+
+  // Build result
+  if (mergeResult === 'SUCCESS') {
+    return {
+      success: true,
+      resolvedFiles,
+      testsStatus: testsStatus || 'SKIP',
+      validationStatus: validationStatus || 'NOT_RUN',
+      notes,
+      output,
+    };
+  } else if (mergeResult === 'FAILURE') {
+    return {
+      success: false,
+      failedFiles,
+      validationStatus: validationStatus || 'NOT_RUN',
+      reason,
+      notes,
+      output,
+    };
+  } else {
+    // No structured result markers found - try to detect human-readable format
+    // Agents sometimes output "MERGE TASK COMPLETE" instead of "MERGE_RESULT: SUCCESS"
+    const lowerOutput = output.toLowerCase();
+
+    // Check for success indicators
+    const successIndicators = [
+      'merge task complete',
+      'successfully merged',
+      'merge complete',
+      'pushed merge commit',
+      'successfully merged and pushed',
+    ];
+
+    const failureIndicators = [
+      'merge failed',
+      'merge task failed',
+      'could not merge',
+      'conflict not resolved',
+    ];
+
+    const hasSuccessIndicator = successIndicators.some(i => lowerOutput.includes(i));
+    const hasFailureIndicator = failureIndicators.some(i => lowerOutput.includes(i));
+
+    if (hasSuccessIndicator && !hasFailureIndicator) {
+      // Extract test status from output if mentioned
+      let detectedTestStatus: 'PASS' | 'FAIL' | 'SKIP' = 'SKIP';
+      if (lowerOutput.includes('tests: pass') || lowerOutput.includes('tests passed') ||
+          output.match(/\d+ passed/)) {
+        detectedTestStatus = 'PASS';
+      } else if (lowerOutput.includes('tests: fail') || lowerOutput.includes('tests failed')) {
+        detectedTestStatus = 'FAIL';
+      }
+
+      console.log('[merge-agent] Detected success from human-readable output');
+      return {
+        success: true,
+        testsStatus: detectedTestStatus,
+        validationStatus: 'PASS',
+        notes: 'Detected from human-readable output (agent did not use structured format)',
+        output,
+      };
+    }
+
+    if (hasFailureIndicator) {
+      console.log('[merge-agent] Detected failure from human-readable output');
+      return {
+        success: false,
+        validationStatus: 'NOT_RUN',
+        reason: 'Detected merge failure from agent output',
+        output,
+      };
+    }
+
+    // Truly unrecognized output
+    return {
+      success: false,
+      validationStatus: 'NOT_RUN',
+      reason: 'Agent did not report result in expected format',
+      output,
+    };
+  }
+}
+
+/**
  * Get conflict files from git status (async)
  */
 async function getConflictFiles(projectPath: string): Promise<string[]> {
@@ -690,6 +864,31 @@ async function resolveMainPreferredSyncConflicts(
 }
 
 /**
+ * Log merge to history
+ */
+export function logMergeHistory(context: MergeConflictContext, result: MergeResult, sessionId?: string): void {
+  // Ensure history directory exists
+  if (!existsSync(MERGE_HISTORY_DIR)) {
+    mkdirSync(MERGE_HISTORY_DIR, { recursive: true });
+  }
+
+  const entry: MergeHistoryEntry = {
+    timestamp: new Date().toISOString(),
+    issueId: context.issueId,
+    sourceBranch: context.sourceBranch,
+    targetBranch: context.targetBranch,
+    conflictFiles: context.conflictFiles,
+    result: {
+      ...result,
+      output: undefined, // Don't store full output in history
+    },
+    sessionId,
+  };
+
+  appendFileSync(MERGE_HISTORY_FILE, JSON.stringify(entry) + '\n', 'utf-8');
+}
+
+/**
  * Log activity to the dashboard activity log (event-sourced via emitActivityEntry)
  */
 function logActivity(action: string, details: string, issueId?: string): void {
@@ -739,6 +938,17 @@ function announceMerge(
     source: 'merge-agent',
     eventType: `mergeStatus.${status === 'completed' ? 'merged' : status === 'started' ? 'merging' : 'failed'}`,
   });
+}
+
+/**
+ * Capture tmux output and look for result markers (async)
+ */
+export async function captureTmuxOutput(sessionName: string): Promise<string> {
+  try {
+    return await Effect.runPromise(capturePane(sessionName));
+  } catch {
+    return '';
+  }
 }
 
 /** Patterns to match in tmux capture-pane output (git push/fetch lines) */
@@ -795,10 +1005,110 @@ export function scanGitPatterns(
   }
 }
 
+/**
+ * Check if specialist-merge-agent tmux session is running (async)
+ */
+export async function isMergeAgentRunning(): Promise<boolean> {
+  return Effect.runPromise(sessionExists('specialist-merge-agent'));
+}
+
+/**
+ * Send a message to an agent's tmux session (async)
+ */
+export async function sendMessageToAgent(issueId: string, message: string): Promise<boolean> {
+  // Agent sessions are typically named agent-{issueId} (lowercase)
+  const sessionName = `agent-${issueId.toLowerCase()}`;
+
+  try {
+    // Check if session exists
+    if (!await Effect.runPromise(sessionExists(sessionName))) {
+      console.log(`[merge-agent] Could not send message to ${sessionName} (session does not exist)`);
+      return false;
+    }
+
+    // Send the message using centralized sendKeys
+    await Effect.runPromise(sendKeys(sessionName, message));
+
+    console.log(`[merge-agent] Sent message to ${sessionName}`);
+    logActivity('agent_message', `Sent to ${sessionName}: ${message.slice(0, 100)}...`);
+    return true;
+  } catch {
+    console.log(`[merge-agent] Could not send message to ${sessionName} (session may not exist)`);
+    return false;
+  }
+}
+
 // PAN-1531: ship-role machinery (buildShipPreparationPrompt, buildShipSyncMainPrompt,
 // spawnShipRoleForTask, spawnMergeAgentForBranches, spawnRebaseAgentForBranch,
 // defaultWorkspaceForIssue) removed. Rebase is now performed in-process via
 // rebaseFeatureBranch() in src/lib/cloister/merge-rebase.ts. See docs/MERGE-WORKFLOW.md.
+
+export async function salvageStrandedMerge(
+  projectPath: string,
+  targetBranch: string,
+  headBefore: string,
+  issueId: string,
+  logActivity: (action: string, detail: string) => void,
+): Promise<{ success: boolean; reason?: string } | null> {
+  try {
+    const { stdout: currentHeadRaw } = await execAsync('git rev-parse HEAD', {
+      cwd: projectPath,
+      encoding: 'utf-8',
+    });
+    const currentHead = currentHeadRaw.trim();
+
+    if (currentHead === headBefore) {
+      // No local merge happened — nothing to salvage
+      return null;
+    }
+
+    // Local HEAD changed — check if it's ahead of remote
+    await execAsync(`git fetch origin ${targetBranch}`, {
+      cwd: projectPath,
+      encoding: 'utf-8',
+      timeout: 10000,
+    }).catch(() => {});
+
+    const { stdout: remoteHeadRaw } = await execAsync(`git rev-parse origin/${targetBranch}`, {
+      cwd: projectPath,
+      encoding: 'utf-8',
+    });
+
+    if (remoteHeadRaw.trim() === currentHead) {
+      // Already pushed (maybe by another process)
+      console.log(`[merge-agent] Salvage check: merge already pushed`);
+      return { success: true };
+    }
+
+    // Stranded merge detected — push it (with divergence guard to protect hotfixes)
+    console.log(`[merge-agent] SALVAGING stranded merge for ${issueId}: local HEAD ${currentHead.slice(0, 8)} != remote ${remoteHeadRaw.trim().slice(0, 8)}`);
+    logActivity('merge_salvage', `Pushing stranded merge commit ${currentHead.slice(0, 8)} for ${issueId}`);
+
+    try {
+      await Effect.runPromise(gitPush(projectPath, 'origin', targetBranch, { issueId }));
+    } catch (pushErr: unknown) {
+      if (pushErr instanceof MainDivergedError) {
+        // origin has advanced past our local ancestor — a hotfix landed.
+        // Mark stuck so Deacon won't re-trigger, then let the caller handle it.
+        markWorkspaceStuck(issueId, 'main_diverged', {
+          localSha: pushErr.localSha,
+          remoteSha: pushErr.remoteSha,
+        });
+        logActivity('merge_salvage_diverged', `Salvage aborted: origin/${targetBranch} diverged (remote ${pushErr.remoteSha.slice(0, 7)} not ancestor of local ${pushErr.localSha.slice(0, 7)})`);
+        return { success: false, reason: pushErr.message };
+      }
+      throw pushErr;
+    }
+
+    console.log(`[merge-agent] Salvage push successful for ${issueId}`);
+    logActivity('merge_salvage_success', `Stranded merge pushed successfully`);
+    return { success: true };
+  } catch (error: any) {
+    console.error(`[merge-agent] Salvage failed: ${error.message}`);
+    logActivity('merge_salvage_failed', `Salvage push failed: ${error.message}`);
+    return null;
+  }
+}
 
 /**
  * Result of syncing main into a workspace branch

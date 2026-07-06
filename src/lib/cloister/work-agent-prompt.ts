@@ -142,7 +142,6 @@ async function buildActiveSliceContext(workspacePath: string, issueId: string): 
  */
 async function readPendingFeedback(workspacePath: string): Promise<string> {
   const issueId = inferIssueIdFromWorkspace(workspacePath);
-
   const continueEntries: ContinueFeedbackEntry[] = [];
   if (issueId) {
     try {

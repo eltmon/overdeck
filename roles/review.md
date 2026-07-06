@@ -55,6 +55,17 @@ hooks:
 > standard for **your own** review. Do NOT spawn anything, do NOT wait for any signal,
 > do NOT edit code. (The convoy/synthesis machinery below is kept for a later opt-in —
 > #1862 / #1982.)
+>
+> **Batch, don't ping-pong (throughput rule, operator-mandated 2026-07-06).** Each
+> review cycle costs the pipeline ~30-50 minutes, so ALL blockers must land in ONE
+> pass: sweep every dimension exhaustively before writing the verdict — never hold
+> back findings for a later cycle. On cycle 2 and later, apply the convergence gate
+> below strictly: block ONLY on code changed since your previous verdict; anything
+> you already saw and passed is not promotable. Nits, style, and could-be-betters
+> are `~` advisory ALWAYS — a finding blocks only if shipping it would break users,
+> security, or the stated acceptance criteria. If you find yourself writing a 3rd
+> blocked verdict on one issue, your top finding must explain why it could not have
+> been raised in cycle 1.
 
 # Overdeck Review Role
 

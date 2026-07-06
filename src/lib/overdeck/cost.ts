@@ -148,6 +148,21 @@ export const BudgetStatus = Schema.Struct({
 });
 export type BudgetStatus = typeof BudgetStatus.Type;
 
+export interface CostReconcileSummary {
+  imported: number;
+  sessionsScanned: number;
+  eventsImported: number;
+  duplicatesSkipped: number;
+  errors: string[];
+  earliestEventTs: string | null;
+  latestEventTs: string | null;
+}
+
+export type CostReconcileExtraRoot =
+  | { kind: 'codex-global'; root: string }
+  | { kind: 'ohmypi-global'; root: string }
+  | { kind: 'ohmypi-legacy-agents'; root: string };
+
 // ── Errors ────────────────────────────────────────────────────────────────────
 
 export class CostIngestError extends Schema.TaggedErrorClass<CostIngestError>()(
@@ -198,6 +213,16 @@ function toRollup(key: string, r: TokenRow & { cost: number | null }, role?: str
 function issueIdFromAgentName(agentName: string): IssueIdType | null {
   const match = agentName.match(/(?:^|-)((?:pan|min|aud|krux|cli)-\d+)(?:-|$)/i);
   return match ? match[1]!.toUpperCase() as IssueIdType : null;
+}
+
+function inferIssueFromPath(path: string | undefined): IssueIdType | null {
+  if (!path) return null;
+  const match = path.match(/(?:feature[-/])?(pan|min|aud|krux|cli)[-/](\d+)/i);
+  return match ? `${match[1]!.toUpperCase()}-${match[2]}` as IssueIdType : null;
+}
+
+function inferIssueFromPiEncodedRootName(name: string): IssueIdType | null {
+  return inferIssueFromPath(name.replace(/--+/g, '/'));
 }
 
 function inferPiProvider(model: string, provider: string | null): string | null {
@@ -460,11 +485,14 @@ export class CostWriter extends Context.Service<
   CostWriter,
   {
     // The ONLY ingest primitive — owns archive fan-out and dedup
-    readonly record: (event: CostEvent) => Effect.Effect<boolean, CostIngestError>;
+    readonly record: (event: CostEvent, opts?: { dryRun?: boolean }) => Effect.Effect<boolean, CostIngestError>;
     // Catch-up sweep (PAN-1935: pi/codex sweep lands here)
     readonly reconcile: (opts?: {
       source?: 'claude' | 'ohmypi' | 'codex' | 'wal';
-    }) => Effect.Effect<{ imported: number }, CostIngestError>;
+      dryRun?: boolean;
+      extraRoots?: string[];
+      extraRootSpecs?: CostReconcileExtraRoot[];
+    }) => Effect.Effect<CostReconcileSummary, CostIngestError>;
     // Full rebuild from archive; recomputes cost from tokens
     readonly rebuild: () => Effect.Effect<{ events: number }, CostIngestError>;
     // Budget writes (budgets.json — separate from cost_events)
@@ -503,13 +531,18 @@ export const CostWriterLive = Layer.effect(
         return (existing as unknown[]).length > 0;
       });
 
-    const record = (event: CostEvent) =>
+    const record = (event: CostEvent, opts?: { dryRun?: boolean }) =>
       Effect.gen(function* () {
-        if (yield* checkDuplicate(event)) return false;
+        if (opts?.dryRun) {
+          if (yield* checkDuplicate(event)) return false;
+          return true;
+        }
 
-        // 1. DURABLE ARCHIVE FIRST — events.jsonl + WAL. Archive decides no-op
-        //    vs append by event source (transcript-backed events are no-ops).
+        // 1. DURABLE ARCHIVE FIRST — events.jsonl. Archive deduplicates by
+        //    requestId/sourceFile so DB-only retries can repair the JSONL log.
         yield* archive.append(event);
+
+        if (yield* checkDuplicate(event)) return false;
 
         // 2. Cache insert — UNIQUE(request_id) makes it idempotent on re-import.
         yield* Effect.promise(() =>
@@ -539,9 +572,9 @@ export const CostWriterLive = Layer.effect(
         return true;
       });
 
-    const recordCodexCumulative = (event: CostEvent) =>
+    const recordCodexCumulative = (event: CostEvent, opts?: { dryRun?: boolean }) =>
       Effect.gen(function* () {
-        if (!event.sourceFile) return yield* record(event);
+        if (!event.sourceFile) return yield* record(event, opts);
         const existing = yield* Effect.promise(async () => {
           const rows = await q
             .select({
@@ -557,11 +590,12 @@ export const CostWriterLive = Layer.effect(
         });
 
         const row = existing[0];
-        if (!row) return yield* record(event);
+        if (!row) return yield* record(event, opts);
 
         const previousTokens = (row.input ?? 0) + (row.output ?? 0) + (row.cacheRead ?? 0);
         const nextTokens = event.input + event.output + event.cacheRead;
         if (nextTokens <= previousTokens) return false;
+        if (opts?.dryRun) return true;
 
         yield* Effect.promise(() =>
           q
@@ -585,10 +619,24 @@ export const CostWriterLive = Layer.effect(
     // Walks OVERDECK_HOME/agents/<id>/sessions/**/*.jsonl (pi) or
     // OVERDECK_HOME/agents/<id>/codex-home/sessions/**/*.jsonl (codex),
     // parses each with the existing parsers, and feeds into record() (which deduplicates).
-    const reconcile = (opts?: { source?: 'claude' | 'ohmypi' | 'codex' | 'wal' }) =>
+    const reconcile = (opts?: {
+      source?: 'claude' | 'ohmypi' | 'codex' | 'wal';
+      dryRun?: boolean;
+      extraRoots?: string[];
+      extraRootSpecs?: CostReconcileExtraRoot[];
+    }) =>
       Effect.gen(function* () {
         const source = opts?.source ?? 'claude';
-        if (source !== 'ohmypi' && source !== 'codex') return { imported: 0 };
+        const empty: CostReconcileSummary = {
+          imported: 0,
+          sessionsScanned: 0,
+          eventsImported: 0,
+          duplicatesSkipped: 0,
+          errors: [],
+          earliestEventTs: null,
+          latestEventTs: null,
+        };
+        if (source !== 'ohmypi' && source !== 'codex') return empty;
 
         const agentsDir = join(getOverdeckHome(), 'agents');
         const agentNames = yield* Effect.sync(() => {
@@ -599,26 +647,111 @@ export const CostWriterLive = Layer.effect(
         });
 
         let imported = 0;
+        let duplicatesSkipped = 0;
+        let sessionsScanned = 0;
+        let earliestEventTs: string | null = null;
+        let latestEventTs: string | null = null;
+        const errors: string[] = [];
 
-        for (const agentName of agentNames) {
-          const sessionRoot =
-            source === 'ohmypi'
-              ? join(agentsDir, agentName, 'sessions')
-              : join(agentsDir, agentName, 'codex-home', 'sessions');
-          const agentDir = join(agentsDir, agentName);
+        const noteImportedTimestamp = (ts: Date) => {
+          const iso = ts.toISOString();
+          if (earliestEventTs == null || iso < earliestEventTs) earliestEventTs = iso;
+          if (latestEventTs == null || iso > latestEventTs) latestEventTs = iso;
+        };
 
-          const sessionFiles = yield* Effect.sync(() => walkJsonl(sessionRoot));
+        type ScanRoot = {
+          root: string;
+          agentName: string;
+          issueId: IssueIdType | null;
+          sessionType: 'ohmypi' | 'codex';
+          inferIssueFromCwd?: boolean;
+        };
+
+        const roots: ScanRoot[] = agentNames.map((agentName) => ({
+          root: source === 'ohmypi'
+            ? join(agentsDir, agentName, 'sessions')
+            : join(agentsDir, agentName, 'codex-home', 'sessions'),
+          agentName,
+          issueId: issueIdFromAgentName(agentName),
+          sessionType: source,
+        }));
+
+        if (source === 'codex') {
+          for (const root of opts?.extraRoots ?? []) {
+            roots.push({
+              root,
+              agentName: 'codex-global',
+              issueId: null,
+              sessionType: 'codex',
+              inferIssueFromCwd: true,
+            });
+          }
+        }
+
+        for (const extra of opts?.extraRootSpecs ?? []) {
+          if (source === 'codex' && extra.kind === 'codex-global') {
+            roots.push({
+              root: extra.root,
+              agentName: 'codex-global',
+              issueId: null,
+              sessionType: 'codex',
+              inferIssueFromCwd: true,
+            });
+          }
+
+          if (source === 'ohmypi' && extra.kind === 'ohmypi-global') {
+            const encodedRoots = yield* Effect.sync(() => {
+              if (!existsSync(extra.root)) return [] as ScanRoot[];
+              return readdirSync(extra.root, { withFileTypes: true })
+                .filter(e => e.isDirectory())
+                .map(e => ({
+                  root: join(extra.root, e.name),
+                  agentName: 'pi-global',
+                  issueId: inferIssueFromPiEncodedRootName(e.name) ?? 'UNKNOWN' as IssueIdType,
+                  sessionType: 'ohmypi' as const,
+                }));
+            });
+            roots.push(...encodedRoots);
+          }
+
+          if (source === 'ohmypi' && extra.kind === 'ohmypi-legacy-agents') {
+            const legacyRoots = yield* Effect.sync(() => {
+              if (!existsSync(extra.root)) return [] as ScanRoot[];
+              return readdirSync(extra.root, { withFileTypes: true })
+                .filter(e => e.isDirectory())
+                .map(e => ({
+                  root: join(extra.root, e.name, 'sessions'),
+                  agentName: e.name,
+                  issueId: issueIdFromAgentName(e.name),
+                  sessionType: 'ohmypi' as const,
+                }));
+            });
+            roots.push(...legacyRoots);
+          }
+        }
+
+        for (const root of roots) {
+          const sessionFiles = yield* Effect.sync(() => walkJsonl(root.root));
 
           for (const sessionFile of sessionFiles) {
+            sessionsScanned++;
             if (source === 'ohmypi') {
-              const events = yield* Effect.sync(() => parseOhmypiSessionCostEventsSync(sessionFile));
+              const events = yield* Effect.sync(() => {
+                try {
+                  return parseOhmypiSessionCostEventsSync(sessionFile);
+                } catch (cause) {
+                  errors.push(`${sessionFile}: ${cause instanceof Error ? cause.message : String(cause)}`);
+                  return [];
+                }
+              });
               for (const usage of events) {
+                const ts = new Date(usage.timestamp);
                 const event: CostEvent = {
-                  ts:          new Date(usage.timestamp),
-                  issueId:     issueIdFromAgentName(agentName),
-                  agentId:     agentName,
+                  ts,
+                  issueId:     root.issueId,
+                  agentId:     root.agentName,
                   sessionId:   usage.sessionId,
-                  sessionType: source,
+                  sessionType: root.sessionType,
                   provider:    inferPiProvider(usage.model, usage.provider),
                   model:       usage.model,
                   input:       usage.input,
@@ -630,23 +763,33 @@ export const CostWriterLive = Layer.effect(
                   sourceFile:  sessionFile,
                 };
 
-                const wasDuplicate = yield* checkDuplicate(event);
-                if (!wasDuplicate) {
-                  if (yield* record(event)) imported++;
+                if (yield* record(event, { dryRun: opts?.dryRun })) {
+                  imported++;
+                  noteImportedTimestamp(ts);
+                } else {
+                  duplicatesSkipped++;
                 }
               }
               continue;
             }
 
-            const session = yield* Effect.sync(() => parseCodexSessionSync(sessionFile));
+            const session = yield* Effect.sync(() => {
+              try {
+                return parseCodexSessionSync(sessionFile);
+              } catch (cause) {
+                errors.push(`${sessionFile}: ${cause instanceof Error ? cause.message : String(cause)}`);
+                return null;
+              }
+            });
             if (!session) continue;
 
+            const ts = new Date(session.startTime);
             const event: CostEvent = {
-              ts:          new Date(session.startTime),
-              issueId:     issueIdFromAgentName(agentName),
-              agentId:     agentName,
+              ts,
+              issueId:     root.inferIssueFromCwd ? (inferIssueFromPath(session.cwd) ?? 'UNKNOWN' as IssueIdType) : root.issueId,
+              agentId:     root.agentName,
               sessionId:   session.sessionId,
-              sessionType: readAgentRoleSync(agentDir),
+              sessionType: root.inferIssueFromCwd ? root.sessionType : readAgentRoleSync(join(agentsDir, root.agentName)),
               provider:    null,
               model:       session.model ?? null,
               input:       session.usage.inputTokens,
@@ -658,11 +801,24 @@ export const CostWriterLive = Layer.effect(
               sourceFile:  sessionFile,
             };
 
-            if (yield* recordCodexCumulative(event)) imported++;
+            if (yield* recordCodexCumulative(event, { dryRun: opts?.dryRun })) {
+              imported++;
+              noteImportedTimestamp(ts);
+            } else {
+              duplicatesSkipped++;
+            }
           }
         }
 
-        return { imported };
+        return {
+          imported,
+          sessionsScanned,
+          eventsImported: imported,
+          duplicatesSkipped,
+          errors,
+          earliestEventTs,
+          latestEventTs,
+        };
       });
 
     // Stub — full rebuild (recomputes cost from tokens) deferred to
@@ -765,8 +921,18 @@ export const CostApi = HttpApiGroup.make('costs')
     HttpApiEndpoint.post('reconcile', '/costs/reconcile', {
       payload: Schema.Struct({
         source: Schema.optional(Schema.Literals(['claude', 'ohmypi', 'codex', 'wal'])),
+        dryRun: Schema.optional(Schema.Boolean),
+        extraRoots: Schema.optional(Schema.Array(Schema.String)),
       }),
-      success: Schema.Struct({ imported: Schema.Number }),
+      success: Schema.Struct({
+        imported:          Schema.Number,
+        sessionsScanned:   Schema.Number,
+        eventsImported:    Schema.Number,
+        duplicatesSkipped: Schema.Number,
+        errors:            Schema.Array(Schema.String),
+        earliestEventTs:   Schema.NullOr(Schema.String),
+        latestEventTs:     Schema.NullOr(Schema.String),
+      }),
       error:   CostIngestError,
     }),
   )

@@ -111,7 +111,8 @@ function getShadowStatePath(issueId: string): string {
   return (await Effect.runPromise(getShadowState(issueId))) !== null;
 }async function createShadowStatePromise(
   issueId: string,
-  initialTrackerStatus: IssueState = 'open'
+  initialTrackerStatus: IssueState = 'open',
+  _triggeredBy: string = 'unknown'
 ): Promise<ShadowState> {
   ensureShadowStateDir();
 
@@ -384,10 +385,10 @@ export const isShadowed = (issueId: string): Effect.Effect<boolean, ShadowStateE
 export const createShadowState = (
   issueId: string,
   initialTrackerStatus: IssueState = 'open',
-  _triggeredBy: string = 'unknown',
+  triggeredBy: string = 'unknown',
 ): Effect.Effect<ShadowState, ShadowStateError> =>
   Effect.tryPromise({
-    try: () => createShadowStatePromise(issueId, initialTrackerStatus),
+    try: () => createShadowStatePromise(issueId, initialTrackerStatus, triggeredBy),
     catch: (cause) =>
       new ShadowStateError({
         operation: 'createShadowState',
