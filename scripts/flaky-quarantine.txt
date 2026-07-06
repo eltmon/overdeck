@@ -19,3 +19,4 @@ tests/unit/lib/cloister/deacon-swarm-hold.test.ts  # PAN-2421
 tests/cli/commands/work/reopen.test.ts  # PAN-2421
 tests/unit/cli/commands/pause.test.ts  # PAN-2421
 tests/unit/lib/cloister/deacon-swarm-doneness.test.ts  # PAN-2421
+tests/cli/commands/work/start-workspace-rollback.test.ts  # PAN-2421

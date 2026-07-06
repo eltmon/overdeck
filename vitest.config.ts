@@ -39,11 +39,12 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     pool: 'forks',
-    // GitHub Actions runners have limited memory (~7GB). Keep CI parallel but
-    // bounded; tests that OOM under two forks need fixture/timer cleanup, not
-    // suite-wide serialization. Local development can use up to 4 workers.
+    // GitHub Actions runners and the Overdeck verification gate have limited
+    // memory (~7GB). Keep CI/verification parallel but bounded; tests that OOM
+    // under two forks need fixture/timer cleanup, not suite-wide serialization.
+    // Local development can use up to 4 workers.
     // Vitest 4 moved these settings out of poolOptions; keeping the old shape is ignored.
-    forks: { minForks: 1, maxForks: process.env.CI ? 2 : 4, singleFork: false },
+    forks: { minForks: 1, maxForks: (isCI || isVerification) ? 2 : 4, singleFork: false },
     // Retry once in CI, verification-gate, and flake-lane runs. Local dev stays
     // retry:0 so flakes remain visible during development. A retried-then-passed
     // test is still surfaced by vitest's default reporter.
