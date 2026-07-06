@@ -6,7 +6,6 @@ import {
   type NormalizedConfig,
   type NormalizedDocsConfig,
   type NormalizedFeatureRegistryConfig,
-  type NormalizedRemoteConfig,
   type NormalizedRtkConfig,
   type NormalizedShadowConfig,
   type NormalizedTldrConfig,

@@ -17,7 +17,7 @@ import {
   type VBriefLifecycleDir,
 } from './lifecycle.js';
 import type { VBriefDocument } from './types.js';
-import { VBriefMergeConflictError, VBriefInvalidFormatError, VBriefMergeConflictTaggedError, type VBriefReadError } from './io.js';
+import { VBriefInvalidFormatError, VBriefMergeConflictTaggedError, type VBriefReadError } from './io.js';
 import { FsError } from '../errors.js';
 import { PAN_DIRNAME, PAN_SPECS_DIRNAME, isPanSpecStatus } from '../pan-dir/types.js';
 

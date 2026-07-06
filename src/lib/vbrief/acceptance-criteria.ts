@@ -8,7 +8,7 @@
 
 import { Effect } from 'effect';
 import { readWorkspacePlanSync, readWorkspacePlan, type VBriefReadError } from './io.js';
-import { subItemsOf, type VBriefDocument, type VBriefItem, type VBriefItemStatus, type VBriefSubItem } from './types.js';
+import { subItemsOf, type VBriefDocument, type VBriefItem, type VBriefItemStatus } from './types.js';
 
 /** A single acceptance criterion with its parent task context. */
 export interface AcceptanceCriterion {

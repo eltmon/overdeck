@@ -21,7 +21,6 @@ import {
   getAgentStateSync,
   markAgentRunning,
   saveAgentStateSync,
-  type AgentState,
 } from './agent-state.js';
 import { getLatestSessionIdSync, saveSessionId } from './activity.js';
 import {

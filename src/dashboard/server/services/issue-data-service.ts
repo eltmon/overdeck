@@ -19,7 +19,6 @@ import { join } from 'path';
 import { mapGitHubStateToCanonical } from '../../../core/state-mapping.js';
 import { CacheService, DEFAULT_TTLS, parseIntegerHeader } from './cache-service.js';
 import { getGitHubConfig, getLinearApiKey, getRallyConfig, validateRallyConfig } from './tracker-config.js';
-import type { GitHubConfig, RallyConfig } from './tracker-config.js';
 import { loadReviewStatusesForIssues, type ReviewStatus } from '../../../lib/review-status.js';
 import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { findPlan, readWorkspacePlan } from '../../../lib/vbrief/io.js';
