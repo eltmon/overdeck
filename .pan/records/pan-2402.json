@@ -41,11 +41,16 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-06T17:34:57.296Z"
+    },
+    {
+      "timestamp": "2026-07-06T17:36:04.560Z",
+      "reason": "end",
+      "note": "Review passed, verification passed, tests passed, CI green. Ready for merge."
     }
   ],
   "feedback": [],
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "auto-start": "completed",
     "auto-start.ac1": "completed",
@@ -59,30 +64,30 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": true,
-    "updatedAt": "2026-07-06T17:34:56.902Z",
-    "reviewNotes": "Review bypassed: verification passed but review infrastructure repeatedly failed.",
-    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "updatedAt": "2026-07-06T17:45:47.930Z",
+    "reviewNotes": "Approved: no blocking findings across correctness, security, requirements, or performance.",
+    "testNotes": "Gates run from workspace /home/eltmon/Projects/overdeck/workspaces/feature-pan-2402 on branch feature/pan-2402. npm run typecheck: passed. npm run lint: passed (effect pinning, permissions, state-writes, overdeck-boundaries, skills, prompts, file-size, source-introspection, ratchet-audit all green). npm test: passed (848 test files passed / 4 skipped; 8485 tests passed / 52 skipped; frontend 3 files / 32 tests passed). Browser UAT not required: PAN-2402 is a backend cost-limit attribution/windowing fix with no UI/dashboard acceptance criteria; coverage is via unit tests including tests/lib/cloister/service-cost-alerts.test.ts for the (unattributed) fallback and the existing cost-monitor regression tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2411",
-    "reviewedAtCommit": "bc456b81d99f42678ca5c480cb6eac0027cc3506",
-    "lastVerifiedCommit": "bc456b81d99f42678ca5c480cb6eac0027cc3506",
-    "reviewRequestedAt": "2026-07-06T17:31:38.398Z"
+    "reviewedAtCommit": "4bd3e7197e83c40a23db3338f302b08d0804d1b1",
+    "lastVerifiedCommit": "4bd3e7197e83c40a23db3338f302b08d0804d1b1",
+    "reviewRequestedAt": "2026-07-06T17:36:04.568Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 21592,
-            "output": 808,
+            "input": 24164,
+            "output": 1182,
             "cacheRead": 0,
             "cacheWrite": 0
           }
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 414721,
-            "output": 4458,
-            "cacheRead": 1689600,
+            "input": 710216,
+            "output": 8519,
+            "cacheRead": 3237376,
             "cacheWrite": 0
           }
         },
@@ -94,24 +99,24 @@
             "cacheWrite": 339334
           },
           "custom/kimi-k2.7-code": {
-            "input": 874697,
-            "output": 79927,
-            "cacheRead": 52345856,
+            "input": 899923,
+            "output": 87325,
+            "cacheRead": 56327680,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 21592,
-          "output": 808,
+          "input": 24164,
+          "output": 1182,
           "cacheRead": 0,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 1289418,
-          "output": 84385,
-          "cacheRead": 54035456,
+          "input": 1610139,
+          "output": 95844,
+          "cacheRead": 59565056,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -122,8 +127,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 13.935769,
-        "pricingAsOf": "2026-07-06T17:34:56.998Z"
+        "usd": 15.336914,
+        "pricingAsOf": "2026-07-06T17:45:48.209Z"
       }
     },
     "merges": [
@@ -135,5 +140,5 @@
     "finalizedAt": "2026-07-06T16:45:16.460Z"
   },
   "created": "2026-07-06T16:52:52.528Z",
-  "updated": "2026-07-06T17:34:57.299Z"
+  "updated": "2026-07-06T17:45:48.221Z"
 }
