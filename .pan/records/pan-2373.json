@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-2373",
   "schemaVersion": 2,
-  "created": "2026-07-05T22:08:30.118Z",
-  "updated": "2026-07-06T15:53:50.171Z",
-  "pipeline": {
-    "issueId": "PAN-2373",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-05T22:08:30.118Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -32,6 +15,72 @@
       "timestamp": "2026-07-06T15:53:49.690Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-05T22:08:30.118Z",
+  "updated": "2026-07-06T17:27:39.202Z",
+  "pipeline": {
+    "issueId": "PAN-2373",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-06T17:27:39.179Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 15311,
+            "output": 321,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 14631,
+            "output": 9603,
+            "cacheRead": 1284496,
+            "cacheWrite": 128102
+          },
+          "anthropic/claude-opus-4-8": {
+            "input": 18730,
+            "output": 34796,
+            "cacheRead": 3946371,
+            "cacheWrite": 149608
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 15311,
+          "output": 321,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 14631,
+          "output": 9603,
+          "cacheRead": 1284496,
+          "cacheWrite": 128102
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 18730,
+          "output": 34796,
+          "cacheRead": 3946371,
+          "cacheWrite": 149608
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 7.384024,
+        "pricingAsOf": "2026-07-06T17:27:39.201Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "model": "kimi-k2.7-code"
 }
