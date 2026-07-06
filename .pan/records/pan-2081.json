@@ -28,7 +28,7 @@
   ],
   "feedback": [],
   "created": "2026-06-27T02:46:24.299Z",
-  "updated": "2026-07-03T11:15:13.018Z",
+  "updated": "2026-07-06T12:54:35.925Z",
   "pipeline": {
     "issueId": "PAN-2081",
     "reviewStatus": "passed",
@@ -102,8 +102,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-opus-4-8",
   "statusOverrides": {
     "epic-data-thread": "completed",
     "epic-data-thread.ac1": "completed",
