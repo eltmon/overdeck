@@ -91,17 +91,14 @@
       "reason": "feedback",
       "note": "[2026-07-06T18:51Z] verification-gate → FAILED — seq 1",
       "timestamp": "2026-07-06T18:51:23.676Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-07-06T18:51:23Z",
-      "markdownBody": "VERIFICATION FAILED for PAN-2386 (attempt 2/3):\n\nFailed check: test\n\nVerification FAILED at test (160927ms):\n\ncheckTrackerRateLimits > returns ok when no rate limit rows exist\n FAIL  |root| tests/unit/cli/doctor-rate-limits.test.ts > checkTrackerRateLimits > returns warn when a tracker is suspended\nError: Hook timed out in 5000ms.\nIf this is a long-running hook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n ❯ tests/unit/cli/doctor-rate-limits.test.ts:11:3\n      9|   let checkTrackerRateLimits: () => CheckResult;\n     10|\n     11|   beforeEach(async () => {\n       |   ^\n     12|     testDir = mkdtempSync(join(tmpdir(), 'doctor-rate-limits-test-'));\n     13|     const overdeckHome = join(testDir, '.overdeck');\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/16]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts > fork pipeline recovery and re-entry > re-enters a handoff fork without re-authoring or double-spawning when doc and live session already exist\nError: Hook timed out in 5000ms.\nIf this is a long-running hook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n ❯ src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts:84:1\n     82| }\n     83|\n     84| beforeEach(async () => {\n       | ^\n     85|   await resetDb();\n     86|   TEST_HOME = join(tmpdir(), `pan-1744-fork-recovery-${Date.now()}-${M…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/16]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts > fork pipeline recovery and re-entry > re-enters a handoff fork without re-authoring or double-spawning when doc and live session already exist\nError: Hook timed out in 5000ms.\nIf this is a long-running hook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n ❯ src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts:132:1\n    130| });\n    131|\n    132| afterEach(async () => {\n       | ^\n    133|   const {\n    134|     __resetForkPipelineRuntimeOverridesForTest,\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/16]⎯\n\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-2386 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-2386 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-06T19:07:23.704Z"
     }
   ],
+  "feedback": [],
   "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
@@ -117,17 +114,17 @@
   },
   "pipeline": {
     "issueId": "PAN-2386",
-    "reviewStatus": "pending",
-    "testStatus": "passed",
-    "verificationStatus": "failed",
+    "reviewStatus": "reviewing",
+    "testStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T18:51:23.580Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed sync-target-branch",
+    "updatedAt": "2026-07-06T19:07:28.783Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed test",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Verification FAILED at test (160927ms):\n\ncheckTrackerRateLimits > returns ok when no rate limit rows exist\n FAIL  |root| tests/unit/cli/doctor-rate-limits.test.ts > checkTrackerRateLimits > returns warn when a tracker is suspended\nError: Hook timed out in 5000ms.\nIf this is a long-running hook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n ❯ tests/unit/cli/doctor-rate-limits.test.ts:11:3\n      9|   let checkTrackerRateLimits: () => CheckResult;\n     10|\n     11|   beforeEach(async () => {\n       |   ^\n     12|     testDir = mkdtempSync(join(tmpdir(), 'doctor-rate-limits-test-'));\n     13|     const overdeckHome = join(testDir, '.overdeck');\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/16]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts > fork pipeline recovery and re-entry > re-enters a handoff fork without re-authoring or double-spawning when doc and live session already exist\nError: Hook timed out in 5000ms.\nIf this is a long-running hook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n ❯ src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts:84:1\n     82| }\n     83|\n     84| beforeEach(async () => {\n       | ^\n     85|   await resetDb();\n     86|   TEST_HOME = join(tmpdir(), `pan-1744-fork-recovery-${Date.now()}-${M…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/16]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts > fork pipeline recovery and re-entry > re-enters a handoff fork without re-authoring or double-spawning when doc and live session already exist\nError: Hook timed out in 5000ms.\nIf this is a long-running hook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n ❯ src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts:132:1\n    130| });\n    131|\n    132| afterEach(async () => {\n       | ^\n    133|   const {\n    134|     __resetForkPipelineRuntimeOverridesForTest,\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/16]⎯\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2403",
-    "lastVerifiedCommit": "a2bee543c319578fb61402232ff13d5bd61ad0f9",
+    "lastVerifiedCommit": "c8b9ecb3e24723f31a79b5c4ffbb9ee163c0e5ae",
     "reviewRequestedAt": "2026-07-06T17:09:27.416Z"
   },
   "closeOut": {
@@ -200,7 +197,7 @@
       },
       "costAtCloseOut": {
         "usd": 47.691013,
-        "pricingAsOf": "2026-07-06T18:51:24.803Z"
+        "pricingAsOf": "2026-07-06T19:07:28.896Z"
       }
     },
     "merges": [
@@ -209,7 +206,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-06T16:04:26.393Z",
-  "updated": "2026-07-06T18:51:25.011Z",
+  "updated": "2026-07-06T19:07:28.898Z",
   "swarm": {
     "finalizedAt": "2026-07-06T17:09:32.802Z"
   }
