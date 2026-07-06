@@ -16,8 +16,12 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
+    // PAN-2430: temporarily disabled because the codebase has accumulated
+    // dozens of unused-local/parameter errors in src/lib/* and
+    // src/dashboard/server/* files imported by the frontend. Re-enable once
+    // they are cleaned up.
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src"],

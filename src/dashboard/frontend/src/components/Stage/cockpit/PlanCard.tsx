@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query'
 import { CheckCircle2, Circle } from 'lucide-react'
 import {
   usePlanningSummaryQuery,
-  useWorkspacePlanQuery,
 } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import { CockpitCard } from './CockpitCard'
 
@@ -17,11 +16,6 @@ interface BeadsResponse {
   tasks: BeadTask[]
 }
 
-function tieredChipLabel(effective: boolean, source: 'issue-override' | 'plan-metadata' | 'global'): string {
-  const sourceLabel = source === 'issue-override' ? 'issue override' : source === 'plan-metadata' ? 'plan metadata' : 'global'
-  return `tiered: ${effective ? 'on' : 'off'} (${sourceLabel})`
-}
-
 /**
  * PlanCard — the plan at a glance: acceptance-criteria progress + the beads
  * list (sourced from the authoritative /api/issues/:id/beads endpoint, shared
@@ -30,10 +24,7 @@ function tieredChipLabel(effective: boolean, source: 'issue-override' | 'plan-me
  */
 export function PlanCard({ issueId }: { issueId: string }) {
   const planning = usePlanningSummaryQuery(issueId)
-  const workspacePlan = useWorkspacePlanQuery(issueId)
   const ac = planning.data?.acceptanceProgress
-  const tieredExecution = workspacePlan.data?.plan?.tieredExecution
-  const tieredLabel = tieredExecution ? tieredChipLabel(tieredExecution.effective, tieredExecution.source) : 'tiered: (loading)'
 
   const beadsQuery = useQuery<BeadsResponse>({
     queryKey: ['beads', issueId],
@@ -60,17 +51,6 @@ export function PlanCard({ issueId }: { issueId: string }) {
         </span>
       }
     >
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <a
-          href="https://github.com/eltmon/overdeck/blob/main/docs/TIERED-EXECUTION.md"
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex h-6 items-center rounded-md border border-border bg-muted/20 px-2 font-mono text-[11px] text-muted-foreground hover:bg-muted/40"
-        >
-          {tieredLabel}
-        </a>
-      </div>
-
       {ac && ac.total > 0 && (
         <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-muted">
           <div
