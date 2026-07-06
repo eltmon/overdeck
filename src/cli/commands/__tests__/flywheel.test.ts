@@ -122,6 +122,10 @@ const mergeBackendMocks = vi.hoisted(() => ({
 
 vi.mock('../../../lib/github-app.js', () => mergeBackendMocks);
 
+vi.mock('../../../lib/overdeck/substrate-bug-weights-service.js', () => ({
+  listSubstrateBugWeights: vi.fn(),
+}));
+
 import {
   emitStatusCommand,
   flywheelAbortCommand,
@@ -139,6 +143,8 @@ import {
   readFlywheelStatusJson,
   registerFlywheelCommands,
 } from '../flywheel.js';
+import { flywheelWeightsCommand } from '../flywheel-surfaces.js';
+import { listSubstrateBugWeights } from '../../../lib/overdeck/substrate-bug-weights-service.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -837,5 +843,52 @@ describe('flywheel CLI commands', () => {
     expect(flywheelLifecycleMocks.stoppedAgents).toEqual([]);
     expect(logSpy).toHaveBeenCalledWith('No flywheel run is active and nothing is left to report.');
     expect(process.exitCode).toBeUndefined();
+  });
+
+  describe('flywheel weights', () => {
+    beforeEach(() => {
+      vi.mocked(listSubstrateBugWeights).mockReset();
+    });
+
+    it('prints an aligned table ordered by weight descending', async () => {
+      vi.mocked(listSubstrateBugWeights).mockResolvedValue([
+        { issueId: 'PAN-100', severity: 'P1', filedBy: 'agent', affectedCriteria: [1], weight: 4.8, weightReason: 'criterion 1 red' },
+        { issueId: 'PAN-101', severity: 'P2', filedBy: 'operator', affectedCriteria: [3], weight: 1.02, weightReason: 'criterion 3 yellow' },
+      ]);
+
+      await flywheelWeightsCommand({});
+
+      expect(listSubstrateBugWeights).toHaveBeenCalledWith('30d');
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('PAN-100'));
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('PAN-101'));
+      const calls = logSpy.mock.calls.map((c) => String(c[0]));
+      const pan100Index = calls.findIndex((c) => c.includes('PAN-100'));
+      const pan101Index = calls.findIndex((c) => c.includes('PAN-101'));
+      expect(pan100Index).toBeLessThan(pan101Index);
+    });
+
+    it('emits JSON with --json and filters with --issue', async () => {
+      vi.mocked(listSubstrateBugWeights).mockResolvedValue([
+        { issueId: 'PAN-100', severity: 'P1', filedBy: 'agent', affectedCriteria: [1], weight: 4.8, weightReason: 'criterion 1 red' },
+        { issueId: 'PAN-101', severity: 'P2', filedBy: 'operator', affectedCriteria: [3], weight: 1.02, weightReason: 'criterion 3 yellow' },
+      ]);
+
+      await flywheelWeightsCommand({ issue: 'PAN-101', json: true, window: '7d' });
+
+      expect(listSubstrateBugWeights).toHaveBeenCalledWith('7d');
+      const emitted = JSON.parse(logSpy.mock.calls.find((c) => {
+        try { JSON.parse(String(c[0])); return true; } catch { return false; }
+      })?.[0] as string);
+      expect(emitted).toHaveLength(1);
+      expect(emitted[0].issueId).toBe('PAN-101');
+    });
+
+    it('prints a friendly message when no bugs are in the window', async () => {
+      vi.mocked(listSubstrateBugWeights).mockResolvedValue([]);
+
+      await flywheelWeightsCommand({});
+
+      expect(logSpy).toHaveBeenCalledWith('No substrate bugs in window.');
+    });
   });
 });

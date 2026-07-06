@@ -14,6 +14,7 @@ import {
   selectNeedsPlanning,
 } from '../../lib/backlog/pickup.js';
 import { isFlywheelAutoPickupBacklog } from '../../lib/overdeck/control-settings.js';
+import { listSubstrateBugWeights, type WeightedSubstrateBug } from '../../lib/overdeck/substrate-bug-weights-service.js';
 import { getMergeBlockersPayload } from '../../lib/cloister/merge-blockers.js';
 import { isGitHubAppConfigured, listOpenIssuesWithLabels } from '../../lib/github-app.js';
 
@@ -129,6 +130,30 @@ export function flywheelMergeBlockersCommand(opts: { json?: boolean } = {}): voi
   }
 }
 
+export async function flywheelWeightsCommand(options: { issue?: string; window?: string; json?: boolean }): Promise<void> {
+  const rows = await listSubstrateBugWeights(options.window ?? '30d');
+  const filtered = options.issue ? rows.filter((r) => r.issueId === options.issue) : rows;
+
+  if (options.json) {
+    console.log(JSON.stringify(filtered, null, 2));
+    return;
+  }
+
+  if (filtered.length === 0) {
+    console.log('No substrate bugs in window.');
+    return;
+  }
+
+  const maxId = Math.max(...filtered.map((r) => r.issueId.length));
+  const maxSev = Math.max(...filtered.map((r) => r.severity.length));
+  for (const r of filtered) {
+    const id = r.issueId.padEnd(maxId);
+    const sev = r.severity.padEnd(maxSev);
+    const weight = String(r.weight).padStart(6);
+    console.log(`${id}  ${sev}  ${weight}  ${r.weightReason}`);
+  }
+}
+
 /**
  * Attaches the sandbox-safe surface subcommands onto the already-registered `flywheel` and
  * `backlog` commands. Kept here (not in flywheel.ts) so flywheel.ts stays under the file-size
@@ -141,6 +166,14 @@ export function registerFlywheelSurfaceCommands(program: Command): void {
     .description('PRs that passed review but cannot merge (GitHub-native reasons) — reads SQLite directly, no HTTP (sandbox-safe)')
     .option('--json', 'Output JSON')
     .action((o: { json?: boolean }) => flywheelMergeBlockersCommand(o));
+
+  flywheel
+    ?.command('weights')
+    .description('Substrate-bug weights for the current window — reads SQLite directly, no HTTP (sandbox-safe)')
+    .option('--issue <id>', 'Filter to a single issue id')
+    .option('--window <dur>', 'Window duration (default 30d)')
+    .option('--json', 'Output JSON')
+    .action((o: { issue?: string; window?: string; json?: boolean }) => flywheelWeightsCommand(o));
 
   const backlog = program.commands.find((c) => c.name() === 'backlog');
   backlog
