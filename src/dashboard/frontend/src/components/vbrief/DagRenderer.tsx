@@ -40,8 +40,8 @@ export interface DagRendererProps {
   showLegend?: boolean;
 }
 
-const NODE_W = 168;
-const NODE_H = 46;
+const NODE_W = 176;
+const NODE_H = 54;
 const COL_GAP = 92;
 const ROW_GAP = 26;
 const PAD = 18;
@@ -123,6 +123,22 @@ export function layoutDag(nodes: DagNode[], edges: DagEdge[]): { positioned: Pos
   return { positioned, width, height };
 }
 
+/** Wrap a title onto at most two lines at word boundaries; ellipsize line 2. */
+function wrapTitle(title: string, perLine = 24): string[] {
+  if (title.length <= perLine) return [title];
+  const words = title.split(' ');
+  let line1 = '';
+  let index = 0;
+  while (index < words.length && (line1 + ' ' + words[index]).trim().length <= perLine) {
+    line1 = (line1 + ' ' + words[index]).trim();
+    index += 1;
+  }
+  if (!line1) { line1 = title.slice(0, perLine); return [line1, `${title.slice(perLine, perLine * 2 - 1)}…`]; }
+  const rest = words.slice(index).join(' ');
+  if (!rest) return [line1];
+  return [line1, rest.length > perLine ? `${rest.slice(0, perLine - 1)}…` : rest];
+}
+
 const STATUS_LABEL: Record<DagNode['status'], string> = {
   done: 'done',
   'in-progress': 'happening now',
@@ -133,8 +149,6 @@ const STATUS_LABEL: Record<DagNode['status'], string> = {
 export function DagRenderer({ nodes, edges, onNodeClick, compact = false, showLegend = true }: DagRendererProps) {
   const { positioned, width, height } = useMemo(() => layoutDag(nodes, edges), [nodes, edges]);
   const byId = useMemo(() => new Map(positioned.map((node) => [node.id, node])), [positioned]);
-  const scale = compact ? 0.8 : 1;
-
   if (nodes.length === 0) {
     return <div className="text-xs text-muted-foreground px-2 py-4">No plan tasks to map yet.</div>;
   }
@@ -144,7 +158,7 @@ export function DagRenderer({ nodes, edges, onNodeClick, compact = false, showLe
       <svg
         viewBox={`0 0 ${width} ${height}`}
         width="100%"
-        style={{ minWidth: Math.min(width, 720) * scale, maxHeight: 480 }}
+        style={{ minWidth: width * (compact ? 0.7 : 0.9), maxHeight: 480 }}
         role="img"
         aria-label="Plan map: each box is one task; arrows mean the earlier task must finish first"
       >
@@ -200,10 +214,25 @@ export function DagRenderer({ nodes, edges, onNodeClick, compact = false, showLe
               >
                 {isNow && <animate attributeName="opacity" values="1;0.55;1" dur="2s" repeatCount="indefinite" />}
               </rect>
-              <text x={node.x + NODE_W / 2} y={node.y + 19} textAnchor="middle" className="fill-foreground" fontSize={12.5}>
-                {node.title.length > 22 ? `${node.title.slice(0, 21)}…` : node.title}{isDone ? ' ✓' : isNow ? ' ●' : ''}
-              </text>
-              <text x={node.x + NODE_W / 2} y={node.y + 35} textAnchor="middle" className="fill-muted-foreground" fontSize={10.5}>
+              <title>{node.title} — {STATUS_LABEL[node.status]}</title>
+              {(() => {
+                const lines = wrapTitle(node.title);
+                const mark = isDone ? ' ✓' : isNow ? ' ●' : '';
+                if (lines.length === 1) {
+                  return (
+                    <text x={node.x + NODE_W / 2} y={node.y + 22} textAnchor="middle" className="fill-foreground" fontSize={12}>
+                      {lines[0]}{mark}
+                    </text>
+                  );
+                }
+                return (
+                  <>
+                    <text x={node.x + NODE_W / 2} y={node.y + 17} textAnchor="middle" className="fill-foreground" fontSize={12}>{lines[0]}</text>
+                    <text x={node.x + NODE_W / 2} y={node.y + 30} textAnchor="middle" className="fill-foreground" fontSize={12}>{lines[1]}{mark}</text>
+                  </>
+                );
+              })()}
+              <text x={node.x + NODE_W / 2} y={node.y + 45} textAnchor="middle" className="fill-muted-foreground" fontSize={10}>
                 {node.assignee ? `${node.assignee} · ` : ''}{STATUS_LABEL[node.status]}
               </text>
             </g>
@@ -216,6 +245,7 @@ export function DagRenderer({ nodes, edges, onNodeClick, compact = false, showLe
           <span><i className="inline-block w-2.5 h-2.5 rounded-sm bg-blue-500 mr-1.5 align-[-1px]" />happening now</span>
           <span><i className="inline-block w-2.5 h-2.5 rounded-sm border border-dashed border-muted-foreground mr-1.5 align-[-1px]" />waiting its turn</span>
           <span><i className="inline-block w-2.5 h-2.5 rounded-sm bg-red-500 mr-1.5 align-[-1px]" />needs attention</span>
+          {width > 1200 && <span className="ml-auto text-muted-foreground/70">wide plan — scroll →</span>}
         </div>
       )}
     </div>
