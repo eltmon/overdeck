@@ -207,6 +207,32 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-58 tick 8 (2026-07-06) — A2 (PAN-2371) MERGED via UAT promote; re-derived clean ready set; M1(MIN-860)+A3(2336) planned; MIN-831 ready via MYN train
+
+**Order book: 2/19 landed (B0 + A2/PAN-2371); A1+B1+2389 in flight; Lane M live (M1 planning).** Main = cac3ae7e12 (CI in_progress).
+
+**OPERATOR PROMOTED `uat/pan-otter-0706` → main (cac3ae7e12) = A2/PAN-2371 MERGED.** Ran a fresh Observe→Act per operator: (1) re-derived activePipeline from source of truth, **excluded merged PAN-2371**; (2) fresh ready set = **MIN-831 only** (MYN, GitLab MR 68); (3) **re-assemble-uat = `idle`** — CORRECT: MIN-831 is a MYN/GitLab issue, not an overdeck-UAT-batch member; it merges via the MYN merge train (merge_train ON globally now). No overdeck items currently ready (2371 was the only one). (4) emitted fresh snapshot (MIN-831 shipping, 2371 excluded). (5) **PAN-2371 close-out backgrounded** (`close2371.sh`) — merged (cac3ae7e ancestor) but the close ceremony is bd-contended; retrying in clean windows; issue still OPEN/`in-review` until it lands. **REUSABLE: a MYN/GitLab ready item returns assemble-uat `idle` — that's not a bug, MYN has its own merge train; the overdeck UAT batch only holds GitHub/overdeck issues.**
+
+**M1 (MIN-860, URGENT) + A3 (PAN-2336) PLANNED** — the combined clean-window dispatcher landed both (`planning-min-860` + `planning-pan-2336` live). M1 = Lane M push-notif fix (urgent); start on proposed. A3 = Lane A next.
+
+**Still open:** PAN-2371 close-out completing (bg); 2387 stalled pre-finalize (operator kill+re-plan); B1↔strike-2417 done.ts collision; MIN-857 held (M0, oversight rebuilding stack — don't touch). bd contention persists (now also throttles close-out). Swap ~98% / RAM ample.
+
+## RUN-58 tick 7 (2026-07-06) — PIPELINE FLOWING: verdict-loop fixed, PAN-2402 merged, A2 merge-ready→UAT bundle; OPERATOR added Lane M (MYN) + flipped merge posture (UAT OFF, trains ON)
+
+**Order book: 1/19 landed (B0); A2 (PAN-2371) MERGE-READY (UAT bundle assembled); A1+B1+2389 in flight; Lane M (MYN) added.** Main GREEN (7d33e82358; c317f8de1b CI in_progress).
+
+**MERGE GATE CLEARED — pipeline flowing again.** `a83dc6ea35 fix(review): preserve verdicts for state-only commits` landed on main (the PAN-2417 verdict-loop fix — chore(state) pass-commits no longer invalidate the recorded pass). Result: **PAN-2402 MERGED** (`da7fdd772e` #2411) and **A2 (PAN-2371) reached merge-ready** (review=passed test=passed, PR #2418). strike-pan-2417 session still alive (operator's — leave it; the fix may have landed via a separate path). A1 (PAN-2373) now in review; 2389 SPAWNED (waiter fired) + in review; 2388 in review; 2386/2407 review/test.
+
+**A2 → UAT bundle `uat/pan-otter-0706`** (member PAN-2371 PR #2418, baseSha c317f8de1b, mergeOrder 1, no heldOut/conflicts). First order-book item to merge-ready. Emitted shipping verb for 2371 then POST assemble-uat (internal-token). **NOTE: merge posture just changed (below) — trains may now auto-merge it; the bundle is harmless either way.**
+
+**OPERATOR AMENDMENT (2026-07-06, authoritative) — Lane M (Mind Your Now) + merge-posture flip:**
+- **Lane M = MYN, fully parallel project lane** (shares only the global load governor with A/B; different project ⇒ run parallel). Master plan §Lane M. Order: **M0=MIN-857** (Gemini voice UX, in pipeline gpt-5.5, **per-issue UAT-HOLD — operator reviews before merge; DON'T merge flagged**; oversight is rebuilding its stuck workspace container `myn-feature-min-857-fe-1` + will unpause — **don't intervene this tick**). **M1=MIN-860** (push-notification delivery fix — **URGENT**, no pushes reach iPhone/Android until landed — dispatch FIRST). **M2=MIN-861** (dep M1). **M3=MIN-854**, **M4=MIN-858**, **M5=MIN-859**. PRDs in the **mind-your-now-docs** repo (e0862b0). MIN- issues are Linear (gh rejects them — use `pan plan MIN-<n> --auto`, project resolves via linear_team MIN).
+- **MERGE POSTURE FLIPPED: `require_uat_before_merge` now OFF globally + `merge_train_enabled` ON globally** (supersedes my run-brief's UAT=ON). So merge trains AUTO-MERGE ready items now — EXCEPT per-issue holds (MIN-857). **Next tick: verify the merge train is picking up ready items (A2 etc.) and auto-merging; confirm MIN-857's per-issue hold is respected; I no longer need to hand-assemble UAT bundles for operator except held items.**
+
+**M1 (MIN-860) + A3 (PAN-2336) dispatch — bd-locked, on a combined background dispatcher** (`dispatch-m1-a3.sh`): plans MIN-860 (urgent) THEN PAN-2336, each in a clean bd window, retrying. Both plan attempts hit "database is locked" / transient "pan up" (dashboard was RESPONSIVE — the errors are bd-lock, not dashboard-down). Verify they planned next tick.
+
+**Still open:** 2387 planning STALLED pre-finalize (no spec) — needs operator kill + re-plan (flywheel can't pan kill). PAN-1491 deacon-swarm left. B1↔strike-2417 done.ts collision still pending (watch B1 submit). bd contention persistent (the recurring throttle; PAN-2261 durable track). Swap ~98% / RAM ample.
+
 ## RUN-58 tick 6 (2026-07-06) — A2 started (review+test); 3 order-book items in flight; OPERATOR striking the merge-gate bug (PAN-2417 verdict loop); trio 2389 on waiter, 2387 stalled
 
 **Order book: 1/19 landed (B0); A1 (PAN-2373) + A2 (PAN-2371) + B1 (PAN-2207) IN FLIGHT; lane B at B1.** Main GREEN (a5d400abe1).
