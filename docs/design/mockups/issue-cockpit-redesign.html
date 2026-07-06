@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Mockup — Issue Cockpit redesign (PAN-2398)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0e1116;--panel:#161b22;--panel2:#1c2230;--line:#2a3140;--text:#e6e9ef;--dim:#8b94a7;--faint:#5c6577;
+    --teal:#2dd4bf;--amber:#f5b04c;--red:#ef6a6a;--blue:#6ea8fe;--violet:#b18cff;--green:#4ade80;}
+  *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 "DM Sans",sans-serif;padding:26px;}
+  h1{font:600 19px "Space Grotesk";margin:0 0 4px}.sub{color:var(--dim);font-size:13px;margin-bottom:18px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:14px}
+  .mono{font-family:"DM Mono";font-size:12px}
+  /* ── the ONE status narrative ── */
+  .narrative{display:flex;align-items:center;gap:14px}
+  .bigdot{width:12px;height:12px;border-radius:50%;background:var(--blue);animation:pulse 2s infinite;flex:none}
+  @keyframes pulse{50%{opacity:.3}}
+  .narrative h2{font:600 17px "Space Grotesk";margin:0}
+  .narrative .plain{color:var(--dim);font-size:13px;margin-top:2px}
+  .narrative .cost{margin-left:auto;text-align:right}
+  .narrative .cost .v{font:600 20px "Space Grotesk"}
+  .narrative .cost .l{color:var(--faint);font-size:11px}
+  /* journey strip — ONE progress representation */
+  .journey{display:flex;align-items:center;gap:0;margin-top:14px}
+  .stage{flex:1;text-align:center;position:relative;padding-top:16px;font-size:12px;color:var(--faint)}
+  .stage::before{content:'';position:absolute;top:4px;left:0;right:0;height:3px;background:var(--panel2)}
+  .stage.done{color:var(--dim)} .stage.done::before{background:var(--teal)}
+  .stage.now{color:var(--text);font-weight:600} .stage.now::before{background:var(--blue)}
+  .stage .plain2{display:block;color:var(--faint);font-weight:400;font-size:10.5px}
+  /* ── crew stage ── */
+  .crewwrap{display:grid;grid-template-columns:1fr 330px;gap:14px}
+  .stagebox{position:relative;min-height:290px}
+  .sup{position:absolute;top:14px;right:22px;text-align:center}
+  .avatar{width:52px;height:52px;border-radius:14px;background:var(--panel2);border:1.5px solid var(--line);
+    display:flex;align-items:center;justify-content:center;font:600 15px "Space Grotesk";margin:0 auto 6px}
+  .avatar.working{border-color:var(--blue);box-shadow:0 0 0 3px rgba(110,168,254,.14);animation:pulse 1.8s infinite}
+  .avatar.listening{border-color:var(--teal)}
+  .avatar.reviewing{border-color:var(--violet);box-shadow:0 0 0 3px rgba(177,140,255,.14);animation:pulse 2.4s infinite}
+  .avatar.idle{opacity:.55}
+  .member{position:absolute;text-align:center;width:120px}
+  .member .nm{font-size:12px;font-weight:600}
+  .member .st{font-size:11px}
+  .st.w{color:var(--blue)} .st.l{color:var(--teal)} .st.r{color:var(--violet)} .st.i{color:var(--faint)}
+  .member .c{font-family:"DM Mono";font-size:11px;color:var(--dim)}
+  /* commit river */
+  .river{position:absolute;left:24px;right:150px;bottom:52px;height:34px;border-radius:17px;background:var(--panel2);overflow:hidden}
+  .river .lbl{position:absolute;left:12px;top:8px;font-size:11px;color:var(--faint);z-index:2}
+  .drop{position:absolute;top:11px;width:12px;height:12px;border-radius:3px;background:var(--teal);animation:flow 7s linear infinite}
+  .drop.d2{background:var(--blue);animation-delay:2.4s}.drop.d3{background:var(--amber);animation-delay:4.8s}
+  @keyframes flow{from{left:-4%}to{left:102%}}
+  .sidefeed .item{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+  .sidefeed .item:last-child{border-bottom:none}
+  .sidefeed .t{color:var(--faint);font-family:"DM Mono";font-size:11px;flex:none;width:44px}
+  .verdict{color:var(--green)} .verdict.blk{color:var(--red)}
+  /* tree */
+  .trow{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;font-size:13px}
+  .trow:hover{background:var(--panel2)}
+  .trow .lbl{flex:1;display:flex;gap:8px;align-items:center}
+  .trow .tok{width:104px;text-align:right;color:var(--dim);font-family:"DM Mono";font-size:11.5px}
+  .trow .cost{width:74px;text-align:right;font-family:"DM Mono";font-weight:600;font-size:12.5px}
+  .lvl1{margin-left:20px}.lvl2{margin-left:40px}
+  .sd{width:8px;height:8px;border-radius:50%;flex:none}
+  .sd.b{background:var(--blue);animation:pulse 2s infinite}.sd.t{background:var(--teal)}.sd.v{background:var(--violet);animation:pulse 2.4s infinite}.sd.f{background:var(--faint)}
+  .badge{font-size:10px;border:1px solid var(--line);border-radius:4px;padding:1px 6px;color:var(--dim);text-transform:uppercase}
+  .needyou{background:rgba(245,176,76,.09);border:1px solid rgba(245,176,76,.3);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;display:none}
+  .tabs2{display:flex;gap:6px;margin:2px 0 14px}
+  .tab2{padding:6px 13px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--dim);cursor:pointer;font-size:12.5px}
+  .tab2.on{color:var(--text);border-color:var(--teal)}
+  .note{color:var(--faint);font-size:11.5px;margin-top:8px}
+</style>
+</head>
+<body>
+<h1>PAN-2383 — Let each issue turn its Standing Crew on or off from the page</h1>
+<div class="sub">panopticon-cli · started 2:09 PM · <span class="mono">feature/pan-2383</span></div>
+
+<!-- needs-you banner: ONLY appears when something actually waits on the human -->
+<div class="needyou">⚠ <b>Waiting on you:</b> nothing right now — this banner only exists when it isn't.</div>
+
+<!-- ═══ 1. ONE status narrative (replaces both chip rows) ═══ -->
+<div class="card">
+  <div class="narrative">
+    <span class="bigdot"></span>
+    <div>
+      <h2>The crew is writing code — 5 of 7 tasks done</h2>
+      <div class="plain">Up next: the reviewer checks the finished work. Nothing needs you yet.</div>
+    </div>
+    <div class="cost"><div class="v">$16.41</div><div class="l">spent so far</div></div>
+  </div>
+  <div class="journey">
+    <div class="stage done">Planned<span class="plain2">what to build</span></div>
+    <div class="stage now">Building<span class="plain2">5/7 tasks</span></div>
+    <div class="stage">Reviewing<span class="plain2">quality check</span></div>
+    <div class="stage">Testing<span class="plain2">does it work</span></div>
+    <div class="stage">Shipping<span class="plain2">merge to main</span></div>
+  </div>
+</div>
+
+<div class="tabs2">
+  <div class="tab2 on" onclick="sw(0)">Crew</div>
+  <div class="tab2" onclick="sw(1)">Work &amp; cost tree</div>
+  <div class="tab2">Conversation</div>
+  <div class="tab2">Code &amp; plan</div>
+  <div class="tab2">History</div>
+</div>
+
+<!-- ═══ 2. THE CREW STAGE — who is doing what right now ═══ -->
+<div id="v0">
+<div class="crewwrap">
+  <div class="card stagebox">
+    <div class="member" style="left:30px;top:26px">
+      <div class="avatar listening">H</div>
+      <div class="nm">cheap · Haiku</div>
+      <div class="st l">listening</div>
+      <div class="c">$1.79 · 3 tasks</div>
+    </div>
+    <div class="member" style="left:190px;top:26px">
+      <div class="avatar working">G5</div>
+      <div class="nm">standard · GPT-5.5</div>
+      <div class="st w">working: api-write-door</div>
+      <div class="c">$2.10 · 4 tasks</div>
+    </div>
+    <div class="member" style="left:350px;top:26px">
+      <div class="avatar idle">O</div>
+      <div class="nm">frontier · Opus</div>
+      <div class="st i">done for now</div>
+      <div class="c">$9.64 · 1 task</div>
+    </div>
+    <div class="sup">
+      <div class="avatar reviewing">S5</div>
+      <div class="nm">supervisor · Sonnet 5</div>
+      <div class="st r">reviewing commit</div>
+      <div class="c">$2.88 · 8 reviews</div>
+    </div>
+    <div class="river">
+      <span class="lbl">commit stream — every crew member reads every change</span>
+      <span class="drop" style="left:20%"></span><span class="drop d2" style="left:55%"></span><span class="drop d3" style="left:80%"></span>
+    </div>
+    <div class="note" style="position:absolute;bottom:14px;left:24px">Glow = actively spending tokens · teal ring = reading the stream (nearly free) · faded = finished</div>
+  </div>
+
+  <div class="card sidefeed">
+    <div style="font:600 13px 'Space Grotesk';margin-bottom:6px">What just happened</div>
+    <div class="item"><span class="t">2:41p</span><span><span class="verdict">✓ approved</span> — supervisor passed “server-computed chip”</span></div>
+    <div class="item"><span class="t">2:39p</span><span>GPT-5.5 finished <b>plan read door</b> and started <b>write door</b></span></div>
+    <div class="item"><span class="t">2:34p</span><span><span class="verdict blk">✕ blocked</span> — supervisor caught a re-render bug; task retried and passed</span></div>
+    <div class="item"><span class="t">2:28p</span><span>Haiku finished the docs task ($0.11)</span></div>
+    <div class="item"><span class="t">2:15p</span><span>Crew came aboard: Haiku, GPT-5.5, Opus + Sonnet 5 supervising</span></div>
+  </div>
+</div>
+</div>
+
+<!-- ═══ 3. WORK & COST TREE (PAN-2393 view, second tab) ═══ -->
+<div id="v1" style="display:none">
+  <div class="card">
+    <div class="trow"><span class="sd b"></span><span class="lbl"><b>PAN-2383</b> per-issue Standing Crew toggle <span class="badge">building</span></span><span class="tok">8.6M / 360k</span><span class="cost">$16.41</span></div>
+    <div class="trow lvl1"><span class="sd b"></span><span class="lbl">standing crew <span class="badge">tiered on</span></span><span class="tok">7.4M / 349k</span><span class="cost">$13.53</span></div>
+    <div class="trow lvl2"><span class="sd t"></span><span class="lbl">cheap — Haiku <span class="mono" style="color:var(--faint)">slot 2</span></span><span class="tok">2.1M / 148k</span><span class="cost">$1.79</span></div>
+    <div class="trow lvl2"><span class="sd b"></span><span class="lbl">standard — GPT-5.5 on codex <span class="mono" style="color:var(--faint)">slot 1</span></span><span class="tok">3.4M / 132k</span><span class="cost">$2.10</span></div>
+    <div class="trow lvl2"><span class="sd f"></span><span class="lbl">frontier — Opus <span class="mono" style="color:var(--faint)">slot 3</span></span><span class="tok">1.9M / 69k</span><span class="cost">$9.64</span></div>
+    <div class="trow lvl2"><span class="sd v"></span><span class="lbl">supervisor — Sonnet 5 <span class="badge">review-only</span></span><span class="tok">1.2M / 11k</span><span class="cost">$2.88</span></div>
+    <div class="trow lvl1"><span class="sd f"></span><span class="lbl">specialists (planning · review · test)</span><span class="tok">1.1M / 9k</span><span class="cost">$2.88</span></div>
+    <div class="trow" style="border-top:1px solid var(--line);margin-top:6px;padding-top:10px;font-weight:600"><span style="width:8px"></span><span class="lbl">everything adds up — matches the Costs page exactly</span><span class="tok">8.6M / 360k</span><span class="cost">$16.41</span></div>
+  </div>
+  <div class="note">Every row is clickable → that member's live conversation, where you can watch it receive the commit stream.</div>
+</div>
+
+<script>function sw(i){document.getElementById('v0').style.display=i===0?'':'none';document.getElementById('v1').style.display=i===1?'':'none';document.querySelectorAll('.tab2').forEach((t,j)=>t.classList.toggle('on',j===i));}</script>
+</body>
+</html>
