@@ -55,7 +55,6 @@ import {
   resolveTieredExecutionEnabledForIssue,
 } from '../../../../lib/agents/tiered-execution-issue.js';
 import type { TieredExecutionIssueOverride } from '../../../../lib/agents/tier-table.js';
-import { writeRecordTieredExecutionOverride } from '../../../../lib/pan-dir/record.js';
 import { getChangedFiles, getDiffBase, getDiffStat } from '../../../../lib/cloister/review-context.js';
 import type { ChangedFile } from '../../../../lib/cloister/review-context.js';
 import { getTldrDaemonServiceSync } from '../../../../lib/tldr-daemon.js';
@@ -71,6 +70,7 @@ import {
   requireTrustedMutationOrigin,
 } from '../workspaces.js';
 import { reconcileGitHubMergeStatus } from './merge-ops.js';
+import { createPatchWorkspaceTieredExecutionRoute } from './tiered-execution.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -903,56 +903,10 @@ const patchWorkspacePlanInspectionPolicyRoute = HttpRouter.add(
   }))
 );
 
-const patchWorkspaceTieredExecutionRoute = HttpRouter.add(
-  'PATCH',
-  '/api/workspaces/:issueId/tiered-execution',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const originError = requireTrustedMutationOrigin(request);
-    if (originError) return originError;
-
-    const params = yield* HttpRouter.params;
-    const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
-      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
-    }
-
-    const body = yield* readJsonBody;
-    const override = (body as { override?: unknown }).override;
-    if (override !== 'on' && override !== 'off' && override !== null) {
-      return jsonResponse({ error: 'Invalid tiered-execution override' }, { status: 400 });
-    }
-
-    const resolvedProject = resolveProjectFromIssueSync(issueId);
-    const project = resolvedProject ? getProjectSync(resolvedProject.projectKey) : null;
-    if (!project) {
-      return jsonResponse({ error: 'Project not found for issue' }, { status: 404 });
-    }
-
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
-    const projectPath = getProjectPath(undefined, issuePrefix);
-    const location = yield* resolvePlanLocation(projectPath, issueId);
-    if (!location) {
-      return jsonResponse(
-        { error: 'No vBRIEF plan found for this workspace' },
-        { status: 404 }
-      );
-    }
-
-    yield* Effect.promise(() =>
-      writeRecordTieredExecutionOverride(project, issueId, override as TieredExecutionIssueOverride | null),
-    );
-
-    const tieredExecution = assembleWorkspacePlanTieredExecution(issueId, location.doc.plan.metadata);
-    const cp = criticalPath(actionableDoc(location.doc));
-    return jsonResponse({
-      ...location.doc,
-      criticalPath: cp,
-      lifecycleDir: location.lifecycleDir,
-      tieredExecution,
-    });
-  }))
-);
+const patchWorkspaceTieredExecutionRoute = createPatchWorkspaceTieredExecutionRoute({
+  resolvePlanLocation,
+  assembleWorkspacePlanTieredExecution,
+});
 // ─── Route: GET /api/workspaces/:issueId/tldr ─────────────────────────────────
 
 const getWorkspaceTldrRoute = HttpRouter.add(
