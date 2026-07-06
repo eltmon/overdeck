@@ -34,8 +34,8 @@ import { BeadsRail } from './BeadsRail'
 import { PickupGateCard } from './PickupGateCard'
 import { ChangedFilesView } from './ChangedFilesView'
 import { StatusHistoryTab } from './StatusHistoryTab'
-import { StatusNarrative, type JourneyStageKey } from './StatusNarrative'
 import { CrewStage } from './CrewStage'
+import { StatusNarrative, type JourneyStageKey } from './StatusNarrative'
 import { CockpitCard, CockpitPill, type CockpitTone } from './CockpitCard'
 import type { ProjectSessionTree, SessionNode } from '@overdeck/contracts'
 import styles from './cockpitBody.module.css'
@@ -72,11 +72,9 @@ type PipelinePhaseKey = 'plan' | 'work' | 'review' | 'test' | 'ci' | 'ship' | 'm
 
 type IssueTreeContext = 'issue'
 
-// PAN-1991 #6: deep-content groups only. Status that the header gates, the
-// Agents lane, and the beads rail already show is NOT repeated here. Review/Test
-// status live in the lane + gates; review findings are reached by selecting the
-// Review agent. PR&CI + Diff merge into Code; Activity + History into Timeline.
-// Beads is the rail (#1). Conversation/Files/Terminal are tools → panes in #10.
+// PAN-1991 #6 / PAN-2398: deep-content groups only. Status lives in the
+// StatusNarrative header (one representation). Beads is the rail;
+// Conversation/Files/Terminal are tools.
 const TABS: Array<{ id: MissionTab; label: string }> = [
   { id: 'overview', label: 'Overview' },
   { id: 'code', label: 'Code' },
@@ -220,7 +218,6 @@ function mergeBlockReason(rs: ReviewStatusData | undefined): string {
   return 'not ready'
 }
 
-
 function HeaderStat({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex flex-col gap-px text-right">
@@ -253,8 +250,6 @@ function MergeCta({ issueId, rs }: { issueId: string; rs: ReviewStatusData | und
     </button>
   )
 }
-
-
 
 function IssueActionMegaMenu({ issueId }: { issueId: string }) {
   const [open, setOpen] = useState(false)
@@ -831,13 +826,8 @@ function NowPanel({ issueId, onTab, onOpenAgent }: { issueId: string; onTab: (ta
 
 /** Overview — blocker spotlight + the lean Now panel (PAN-1991 #9). The status
  * grid that used to live here is the header gates + pipeline; not repeated. */
-function OverviewTab({ issueId, onTab, onOpenAgent, sessions, onSelectSession }: {
-  issueId: string
-  onTab: (tab: MissionTab) => void
-  onOpenAgent: (type: string) => void
-  sessions?: readonly SessionNode[]
-  onSelectSession?: (session: SessionNode) => void
-}) {
+type OverviewTabProps = { issueId: string; onTab: (tab: MissionTab) => void; onOpenAgent: (type: string) => void; sessions?: readonly SessionNode[]; onSelectSession?: (session: SessionNode) => void }
+function OverviewTab({ issueId, onTab, onOpenAgent, sessions, onSelectSession }: OverviewTabProps) {
   return (
     <div className="space-y-3.5">
       {sessions && onSelectSession && <CrewStage sessions={sessions} onSelectSession={onSelectSession} />}
