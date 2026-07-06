@@ -1,7 +1,86 @@
 {
   "issueId": "PAN-2387",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-06T21:54:57.203Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-06T21:54:57.544Z"
+    }
+  ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/drafts/pan-2387.md",
+      ".pan/records/pan-2387.json",
+      "src/lib/overdeck/conversation-cost-session.ts",
+      "tests/lib/memory/providers.test.ts",
+      "tests/lib/overdeck/cost-sync.test.ts",
+      "tests/unit/lib/cloister/scan-git-patterns.test.ts",
+      "tests/unit/lib/overdeck/cost-reconcile.test.ts",
+      "tests/unit/lib/pan-444-post-merge-step0.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/lib/overdeck/__tests__/cost-sync.test.ts"
+    ],
+    "declaredScope": [
+      "src/dashboard/frontend/src/components/CostBreakdownModal.tsx",
+      "src/dashboard/frontend/src/components/CostsPage.tsx",
+      "src/dashboard/frontend/src/lib/__tests__/cost-bucket-labels.test.ts",
+      "src/dashboard/frontend/src/lib/cost-bucket-labels.ts",
+      "src/dashboard/server/routes/issues.ts",
+      "src/dashboard/server/services/cost-reconcile-service.ts",
+      "src/lib/cost-parsers/__tests__/codex-parser-gpt55.test.ts",
+      "src/lib/cost-parsers/__tests__/fixtures/rollout-gpt55-nested.jsonl",
+      "src/lib/costs/__tests__/attribution.test.ts",
+      "src/lib/costs/__tests__/reconciler-buckets.test.ts",
+      "src/lib/costs/__tests__/unknown-backfill.test.ts",
+      "src/lib/costs/attribution.ts",
+      "src/lib/costs/reconciler.ts",
+      "src/lib/memory/__tests__/extraction-pricing.test.ts",
+      "src/lib/memory/providers/types.ts",
+      "src/lib/overdeck/__tests__/cost-codex-reconcile.test.ts",
+      "src/lib/overdeck/__tests__/cost-sync.test.ts",
+      "src/lib/overdeck/conversations.ts",
+      "src/lib/overdeck/cost-sync.ts",
+      "src/lib/overdeck/cost.ts"
+    ],
+    "actualChangedFiles": [
+      ".pan/drafts/pan-2387.md",
+      ".pan/records/pan-2387.json",
+      "src/dashboard/frontend/src/components/CostBreakdownModal.tsx",
+      "src/dashboard/frontend/src/components/CostsPage.tsx",
+      "src/dashboard/frontend/src/lib/__tests__/cost-bucket-labels.test.ts",
+      "src/dashboard/frontend/src/lib/cost-bucket-labels.ts",
+      "src/dashboard/server/routes/issues.ts",
+      "src/dashboard/server/services/cost-reconcile-service.ts",
+      "src/lib/cost-parsers/__tests__/codex-parser-gpt55.test.ts",
+      "src/lib/cost-parsers/__tests__/fixtures/rollout-gpt55-nested.jsonl",
+      "src/lib/costs/__tests__/attribution.test.ts",
+      "src/lib/costs/__tests__/reconciler-buckets.test.ts",
+      "src/lib/costs/__tests__/unknown-backfill.test.ts",
+      "src/lib/costs/attribution.ts",
+      "src/lib/costs/reconciler.ts",
+      "src/lib/memory/__tests__/extraction-pricing.test.ts",
+      "src/lib/memory/providers/types.ts",
+      "src/lib/overdeck/__tests__/cost-codex-reconcile.test.ts",
+      "src/lib/overdeck/conversation-cost-session.ts",
+      "src/lib/overdeck/conversations.ts",
+      "src/lib/overdeck/cost-sync.ts",
+      "src/lib/overdeck/cost.ts",
+      "tests/lib/memory/providers.test.ts",
+      "tests/lib/overdeck/cost-sync.test.ts",
+      "tests/unit/lib/cloister/scan-git-patterns.test.ts",
+      "tests/unit/lib/overdeck/cost-reconcile.test.ts",
+      "tests/unit/lib/pan-444-post-merge-step0.test.ts"
+    ],
+    "recordedAt": "2026-07-06T21:54:50.319Z"
+  },
   "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
@@ -46,25 +125,27 @@
   },
   "pipeline": {
     "issueId": "PAN-2387",
-    "reviewStatus": "pending",
-    "testStatus": "failed",
-    "verificationStatus": "passed",
+    "reviewStatus": "reviewing",
+    "testStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T21:48:14.607Z",
+    "updatedAt": "2026-07-06T21:55:04.186Z",
     "testNotes": "typecheck passed; lint passed; npm test failed with 3 regressions. (1) tests/unit/lib/pan-444-post-merge-step0.test.ts: vi.mock of paths.js missing COSTS_DIR, now required because src/lib/memory/providers/types.ts imports getPricingSync from cost.js which imports COSTS_DIR. (2) tests/unit/lib/cloister/scan-git-patterns.test.ts: same missing-COSTS_DIR mock. (3) tests/lib/memory/providers.test.ts > cliproxy extraction endpoint: expects cost.usd > 0 for gpt-4.1-nano but getPricingSync has no rate, so cost is 0 with console warning. PAN-2387-specific unit tests pass in isolation. No UAT required (acceptance criteria are data-level).",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Bead attribution-classifier ack: commit d1e8cb6f25 (fix(costs): add no-issue attribution classifier) satisfies all 4 acceptance criteria — classifySessionBucket returns FLYWHEEL for a matched flywheel-orchestrator conversation (AC1), CONVERSATIONS for any other matched conversation via sessionId or conv-* agentId (AC2), UNATTRIBUTED (never UNKNOWN) on no match (AC3); findConversationForCostSessionSync matches conversation_files.locator=sessionId and conversations.tmux_session=agentId for conv-* prefixes, returning null when absent (AC4). Verified via git show d1e8cb6f25 diff plus a live run of npx vitest run src/lib/costs/__tests__/attribution.test.ts at current HEAD — 5/5 pass. Confirmed the function was later relocated to src/lib/overdeck/conversation-cost-session.ts and re-exported from conversations.ts by unrelated commit d162c89a93 without behavior change. This supersedes the earlier BLOCKED verdict, which was posted against the wrong commit (8d5f3d5209, a delivery routing mismatch).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2432",
-    "reviewRequestedAt": "2026-07-06T21:29:52.932Z",
+    "reviewRequestedAt": "2026-07-06T21:54:57.204Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/drafts/pan-2387.md",
         ".pan/records/pan-2387.json",
         "src/lib/overdeck/conversation-cost-session.ts",
+        "tests/lib/memory/providers.test.ts",
         "tests/lib/overdeck/cost-sync.test.ts",
-        "tests/unit/lib/overdeck/cost-reconcile.test.ts"
+        "tests/unit/lib/cloister/scan-git-patterns.test.ts",
+        "tests/unit/lib/overdeck/cost-reconcile.test.ts",
+        "tests/unit/lib/pan-444-post-merge-step0.test.ts"
       ],
       "declaredScopeUntouched": [
         "src/lib/overdeck/__tests__/cost-sync.test.ts"
@@ -114,10 +195,13 @@
         "src/lib/overdeck/conversations.ts",
         "src/lib/overdeck/cost-sync.ts",
         "src/lib/overdeck/cost.ts",
+        "tests/lib/memory/providers.test.ts",
         "tests/lib/overdeck/cost-sync.test.ts",
-        "tests/unit/lib/overdeck/cost-reconcile.test.ts"
+        "tests/unit/lib/cloister/scan-git-patterns.test.ts",
+        "tests/unit/lib/overdeck/cost-reconcile.test.ts",
+        "tests/unit/lib/pan-444-post-merge-step0.test.ts"
       ],
-      "recordedAt": "2026-07-06T21:29:43.951Z"
+      "recordedAt": "2026-07-06T21:54:50.319Z"
     }
   },
   "closeOut": {
@@ -125,8 +209,8 @@
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 92171,
-            "output": 10408,
+            "input": 94233,
+            "output": 10878,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -163,17 +247,17 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 326398,
-            "output": 12697,
-            "cacheRead": 2766848,
+            "input": 327262,
+            "output": 13397,
+            "cacheRead": 2992640,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 92171,
-          "output": 10408,
+          "input": 94233,
+          "output": 10878,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -196,15 +280,15 @@
           "cacheWrite": 94056
         },
         "custom/kimi-k2.7-code": {
-          "input": 326398,
-          "output": 12697,
-          "cacheRead": 2766848,
+          "input": 327262,
+          "output": 13397,
+          "cacheRead": 2992640,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 37.802309,
-        "pricingAsOf": "2026-07-06T21:48:14.636Z"
+        "usd": 37.848831,
+        "pricingAsOf": "2026-07-06T21:55:04.233Z"
       }
     },
     "merges": [
@@ -213,5 +297,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-06T21:48:07.316Z",
-  "updated": "2026-07-06T21:48:14.639Z"
+  "updated": "2026-07-06T21:55:04.233Z"
 }
