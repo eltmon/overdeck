@@ -16,11 +16,16 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-06T16:59:45.540Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-06T17:13:05.301Z"
     }
   ],
   "feedback": [],
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "auto-start": "completed",
     "auto-start.ac1": "completed",
@@ -34,10 +39,10 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T17:04:36.393Z",
+    "updatedAt": "2026-07-06T17:18:05.664Z",
     "reviewNotes": "Verification failed at test",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2411",
-    "lastVerifiedCommit": "fe00335f1f5d425926c50216be5588b59a31890d",
+    "lastVerifiedCommit": "5d41d1b43a8e26ef33adb1cc7c08284ec18f5b01",
     "reviewRequestedAt": "2026-07-06T16:56:34.713Z"
   },
   "closeOut": {
@@ -67,9 +72,9 @@
             "cacheWrite": 339334
           },
           "custom/kimi-k2.7-code": {
-            "input": 814080,
-            "output": 64216,
-            "cacheRead": 32430592,
+            "input": 825744,
+            "output": 68106,
+            "cacheRead": 36876800,
             "cacheWrite": 0
           }
         }
@@ -82,9 +87,9 @@
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 1228801,
-          "output": 68674,
-          "cacheRead": 34120192,
+          "input": 1240465,
+          "output": 72564,
+          "cacheRead": 38566400,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -95,8 +100,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 10.03144,
-        "pricingAsOf": "2026-07-06T17:04:36.415Z"
+        "usd": 10.90286,
+        "pricingAsOf": "2026-07-06T17:18:05.682Z"
       }
     },
     "merges": [
@@ -108,5 +113,5 @@
     "finalizedAt": "2026-07-06T16:45:16.460Z"
   },
   "created": "2026-07-06T16:52:52.528Z",
-  "updated": "2026-07-06T17:04:36.422Z"
+  "updated": "2026-07-06T17:18:05.689Z"
 }
