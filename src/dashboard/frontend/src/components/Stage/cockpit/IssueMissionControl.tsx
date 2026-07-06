@@ -35,6 +35,7 @@ import { PickupGateCard } from './PickupGateCard'
 import { ChangedFilesView } from './ChangedFilesView'
 import { StatusHistoryTab } from './StatusHistoryTab'
 import { CrewStage } from './CrewStage'
+import { HappenedFeed } from './HappenedFeed'
 import { StatusNarrative, type JourneyStageKey } from './StatusNarrative'
 import { CockpitCard, CockpitPill, type CockpitTone } from './CockpitCard'
 import type { ProjectSessionTree, SessionNode } from '@overdeck/contracts'
@@ -831,6 +832,7 @@ function OverviewTab({ issueId, onTab, onOpenAgent, sessions, onSelectSession }:
   return (
     <div className="space-y-3.5">
       {sessions && onSelectSession && <CrewStage sessions={sessions} onSelectSession={onSelectSession} />}
+      <HappenedFeed issueId={issueId} />
       <IssueBlockerSpotlight issueId={issueId} />
       <NowPanel issueId={issueId} onTab={onTab} onOpenAgent={onOpenAgent} />
       <PickupGateCard issueId={issueId} />
