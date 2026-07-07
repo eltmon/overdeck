@@ -34,6 +34,72 @@ require_grep 'ee67a5ca27044ebe7c38385f5b6cffc2305a9c1a' "$SPEC" "spec includes u
 require_grep 'Apache-2.0' "$SPEC" "spec includes Apache-2.0 attribution"
 require_grep '^# Open Knowledge Format \(OKF\)' "$SPEC" "spec includes vendored OKF text"
 
+python3 - "$ROOT" <<'PY'
+import importlib.util
+from pathlib import Path
+import sys
+import tempfile
+
+root = Path(sys.argv[1])
+spec = importlib.util.spec_from_file_location("okf_common", root / "scripts" / "okf_common.py")
+okf_common = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+sys.modules["okf_common"] = okf_common
+spec.loader.exec_module(okf_common)
+
+with tempfile.TemporaryDirectory() as tmp:
+    bundle = Path(tmp)
+    concept = bundle / "systems" / "payroll.md"
+    concept.parent.mkdir()
+    concept.write_text(
+        """---
+type: Module
+title: Payroll
+description: Payroll rules.
+x_custom: keep-me
+timestamp: 2026-07-07T00:00:00Z
+---
+
+# Payroll
+
+See [overtime](/policies/overtime.md).
+
+```markdown
+[ignored](ignored.md)
+```
+""",
+        encoding="utf-8",
+    )
+
+    parsed = okf_common.parse_concept(concept, bundle)
+    assert parsed.concept_id == "systems/payroll"
+    serialized = okf_common.serialize_concept(parsed.frontmatter, parsed.body)
+    reparsed_frontmatter, reparsed_body = okf_common.split_frontmatter(serialized)
+    assert reparsed_frontmatter["x_custom"] == "keep-me"
+    assert reparsed_frontmatter["type"] == "Module"
+    assert "# Payroll" in reparsed_body
+
+    changed_timestamp = dict(parsed.frontmatter)
+    changed_timestamp["timestamp"] = "2026-07-08T00:00:00Z"
+    assert okf_common.normalized_content_hash(parsed.frontmatter, parsed.body) == okf_common.normalized_content_hash(
+        changed_timestamp, parsed.body
+    )
+
+    links = okf_common.resolved_concept_links(concept, parsed.body, bundle)
+    assert links == ["policies/overtime"], links
+
+    fenced_only = "```markdown\n[ignored](other.md)\n```\n"
+    assert okf_common.markdown_links(fenced_only) == []
+
+print("ok - okf_common.py fixture round-trip, timestamp-stable hash, and fenced-link behavior")
+PY
+
+if grep -InE '^(from|import) ' "$ROOT/scripts/okf_common.py" | grep -Ev ' (annotations|dataclasses|hashlib|pathlib|re|typing|yaml)( |$)|^.*from __future__ import annotations$'; then
+  printf 'not ok - okf_common.py imports only stdlib and yaml\n' >&2
+  exit 1
+fi
+printf 'ok - okf_common.py imports only stdlib and yaml\n'
+
 if grep -RInE 'from +(overdeck|pan)|import +(overdeck|pan)|require\(["'\''](overdeck|pan)' "$ROOT" --include='*.py' --include='*.js' --include='*.ts' --include='*.sh'; then
   printf 'not ok - no Overdeck code dependency under skills/okf\n' >&2
   exit 1
