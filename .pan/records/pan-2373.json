@@ -1,117 +1,7 @@
 {
   "issueId": "PAN-2373",
   "schemaVersion": 2,
-  "sessionHistory": [
-    {
-      "reason": "resume",
-      "agentModel": "kimi-k2.7-code",
-      "timestamp": "2026-07-06T20:06:54.695Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-06T20:07Z] verification-gate → FAILED — seq 2",
-      "timestamp": "2026-07-06T20:07:41.640Z"
-    },
-    {
-      "timestamp": "2026-07-06T20:19:43.196Z",
-      "reason": "end",
-      "note": "Fixed frontend-typecheck: disabled unused-local checks (PAN-2430) and removed broken tieredExecution usage in PlanCard.tsx"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-06T20:22Z] verification-gate → FAILED — seq 3",
-      "timestamp": "2026-07-06T20:22:45.027Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-06T20:23Z] verification-gate → FAILED — seq 4",
-      "timestamp": "2026-07-06T20:23:50.935Z"
-    },
-    {
-      "timestamp": "2026-07-06T20:25:44.115Z",
-      "reason": "end",
-      "note": "Build passes locally; re-submitting after transient verification build failure"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-06T20:29Z] verification-gate → FAILED — seq 5",
-      "timestamp": "2026-07-06T20:29:24.251Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "kimi-k2.7-code",
-      "timestamp": "2026-07-06T20:29:24.355Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-06T20:31Z] verification-gate → FAILED — seq 6",
-      "timestamp": "2026-07-06T20:31:10.660Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-07T01:13:38.854Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-07T01:15Z] review-agent → CHANGES-REQUESTED — seq 2",
-      "timestamp": "2026-07-07T01:15:19.403Z"
-    }
-  ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-07T01:15:19Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2373\n\nVerification changes maxForks and flake-lane suppresses retry/failure reporter output\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2373 -m \"Fixed review issues\"`"
-    }
-  ],
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      ".pan/drafts/PAN-2373.md",
-      ".pan/records/pan-2373.json",
-      "scripts/run-flake-lane.sh",
-      "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.tsx",
-      "src/dashboard/frontend/tsconfig.json",
-      "tests/unit/lib/test-infra/quarantine.test.ts",
-      "tests/unit/scripts/lint-quarantine-audit.test.ts",
-      "tests/unit/vitest-config.test.ts"
-    ],
-    "declaredScopeUntouched": [
-      "src/lib/test-infra/__tests__/quarantine.test.ts",
-      "tests/unit/lib/cloister/verification-gate-env.test.ts"
-    ],
-    "declaredScope": [
-      ".github/workflows/ci.yml",
-      "package.json",
-      "scripts/flaky-quarantine.txt",
-      "scripts/lint-quarantine-audit.sh",
-      "src/lib/cloister/validation.ts",
-      "src/lib/test-infra/__tests__/quarantine.test.ts",
-      "src/lib/test-infra/quarantine.ts",
-      "tests/unit/lib/cloister/verification-gate-env.test.ts",
-      "vitest.config.ts"
-    ],
-    "actualChangedFiles": [
-      ".github/workflows/ci.yml",
-      ".pan/drafts/PAN-2373.md",
-      ".pan/records/pan-2373.json",
-      "package.json",
-      "scripts/flaky-quarantine.txt",
-      "scripts/lint-quarantine-audit.sh",
-      "scripts/run-flake-lane.sh",
-      "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.tsx",
-      "src/dashboard/frontend/tsconfig.json",
-      "src/lib/cloister/validation.ts",
-      "src/lib/test-infra/quarantine.ts",
-      "tests/unit/lib/test-infra/quarantine.test.ts",
-      "tests/unit/scripts/lint-quarantine-audit.test.ts",
-      "tests/unit/vitest-config.test.ts",
-      "vitest.config.ts"
-    ],
-    "recordedAt": "2026-07-06T20:25:09.374Z"
-  },
+  "feedback": [],
   "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
@@ -141,10 +31,11 @@
     "issueId": "PAN-2373",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T01:32:14.856Z",
+    "updatedAt": "2026-07-07T01:35:12.241Z",
+    "verificationNotes": "Verification FAILED at test (67062ms):\n\n repo artifacts.\nOffending staged paths:\n  src/foo.ts\n\nAllowed flywheel-orchestrator commit paths are:\n  docs/FLYWHEEL-STATE.md\n  .pan/records/\n  .pan/continues/\n  .pan/backlog/\n  .beads/\n✗ overdeck boundary gate: 1 site(s) across 1 file(s) still on the OLD panopticon.db\n\nsrc/dashboard/server/routes/issues.ts:1:import { Db } from '../../../lib/overdeck/infra.js';\n\nEach must go through an overdeck door (src/lib/overdeck/*) — not getDatabase() or a database/* store.\nguard-agent-main-push.sh invoked\n⚠ ratchet audit: no base for refs/heads/feature — skipping\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n(node:3969495) ExperimentalWarning: Some other experimental feature\n(Use `node --trace-warnings ...` to show where the warning was created)\n✖ quarantine audit: the following entries lack an issue reference\n  tests/foo.test.ts\nEach quarantine entry must reference an issue — add e.g. # PAN-XXXX.\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| tests/playwright/conversation-supervisor-uat.test.ts > conversation supervisor Playwright UAT > resumes Codex conversations through the real route with codex resume\nError: Hook timed out in 5000ms.\nIf this is a long-running hook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n ❯ tests/playwright/conversation-supervisor-uat.test.ts:337:1\n    335| }\n    336|\n    337| beforeEach(async () => {\n       | ^\n    338|   vi.resetModules();\n    339|   ensurePtySupervisorArtifact();\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2419",
     "reviewRequestedAt": "2026-07-06T20:25:44.117Z",
     "scopeDrift": {
@@ -291,7 +182,7 @@
       },
       "costAtCloseOut": {
         "usd": 28.83734425,
-        "pricingAsOf": "2026-07-07T01:32:14.892Z"
+        "pricingAsOf": "2026-07-07T01:35:12.269Z"
       }
     },
     "merges": [
@@ -302,6 +193,6 @@
   "swarm": {
     "finalizedAt": "2026-07-06T17:49:27.751Z"
   },
-  "created": "2026-07-06T20:06:54.624Z",
-  "updated": "2026-07-07T01:32:14.895Z"
+  "created": "2026-07-07T01:35:12.280Z",
+  "updated": "2026-07-07T01:35:12.280Z"
 }
