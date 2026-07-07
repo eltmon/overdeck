@@ -115,6 +115,7 @@ describe('reloadCommand', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.exitCode = undefined;
+    vi.spyOn(process, 'cwd').mockReturnValue('/repo');
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -136,6 +137,7 @@ describe('reloadCommand', () => {
     mocks.fsCp.mockResolvedValue(undefined);
     mocks.fsRename.mockResolvedValue(undefined);
     mockExecByCommand({
+      "git 'rev-parse' '--show-toplevel'": [{ stdout: '/repo\n' }],
       "git 'fetch' 'origin' 'main'": [{ stdout: '' }],
       "git 'merge-base' '--is-ancestor' 'origin/main' 'HEAD'": [{ stdout: '' }],
     });
@@ -215,11 +217,12 @@ describe('reloadCommand', () => {
 
     // Deps are installed before the build so a rebase-added runtime dep can't
     // produce a server bundle that boot-crashes (ERR_MODULE_NOT_FOUND).
-    expect(mocks.exec).toHaveBeenCalledWith("git 'fetch' 'origin' 'main'", expect.objectContaining({ cwd: process.cwd() }));
-    expect(mocks.exec).toHaveBeenCalledWith("git 'merge-base' '--is-ancestor' 'origin/main' 'HEAD'", expect.objectContaining({ cwd: process.cwd() }));
+    expect(mocks.exec).toHaveBeenCalledWith("git 'rev-parse' '--show-toplevel'", expect.objectContaining({ cwd: '/repo' }));
+    expect(mocks.exec).toHaveBeenCalledWith("git 'fetch' 'origin' 'main'", expect.objectContaining({ cwd: '/repo' }));
+    expect(mocks.exec).toHaveBeenCalledWith("git 'merge-base' '--is-ancestor' 'origin/main' 'HEAD'", expect.objectContaining({ cwd: '/repo' }));
     expect(mocks.exec).not.toHaveBeenCalledWith(expect.stringContaining("'worktree' 'add'"), expect.anything());
-    expect(mocks.spawn).toHaveBeenCalledWith('bun', ['install'], expect.objectContaining({ cwd: process.cwd(), stdio: 'inherit' }));
-    expect(mocks.spawn).toHaveBeenCalledWith('npm', ['run', 'build'], expect.objectContaining({ cwd: process.cwd(), stdio: 'inherit' }));
+    expect(mocks.spawn).toHaveBeenCalledWith('bun', ['install'], expect.objectContaining({ cwd: '/repo', stdio: 'inherit' }));
+    expect(mocks.spawn).toHaveBeenCalledWith('npm', ['run', 'build'], expect.objectContaining({ cwd: '/repo', stdio: 'inherit' }));
     const installOrder = mocks.spawn.mock.calls.findIndex(([c]) => c === 'bun');
     const buildOrder = mocks.spawn.mock.calls.findIndex(([c, a]) => c === 'npm' && a[1] === 'build');
     expect(installOrder).toBeLessThan(buildOrder);
@@ -253,12 +256,13 @@ describe('reloadCommand', () => {
   });
 
   it('builds from a detached origin/main worktree and swaps dist when primary HEAD is stale', async () => {
-    const repoRoot = process.cwd();
+    const repoRoot = '/repo';
     const buildWorktree = `${repoRoot.replace(/\/[^/]+$/, '')}/.pan-reload-build-${process.pid}`;
     mocks.statSync
       .mockReturnValueOnce({ mtimeMs: 1000 })
       .mockReturnValueOnce({ mtimeMs: 2000 });
     mockExecByCommand({
+      "git 'rev-parse' '--show-toplevel'": [{ stdout: `${repoRoot}\n` }],
       "git 'fetch' 'origin' 'main'": [{ stdout: '' }],
       "git 'merge-base' '--is-ancestor' 'origin/main' 'HEAD'": [{ code: 1 }],
       "git 'rev-parse' '--short' 'origin/main'": [{ stdout: '0973c8c\n' }],
@@ -284,10 +288,11 @@ describe('reloadCommand', () => {
   });
 
   it('cleans up the detached worktree and preserves the running server when worktree build fails', async () => {
-    const repoRoot = process.cwd();
+    const repoRoot = '/repo';
     const buildWorktree = `${repoRoot.replace(/\/[^/]+$/, '')}/.pan-reload-build-${process.pid}`;
     mocks.statSync.mockReturnValue({ mtimeMs: 1000 });
     mockExecByCommand({
+      "git 'rev-parse' '--show-toplevel'": [{ stdout: `${repoRoot}\n` }],
       "git 'fetch' 'origin' 'main'": [{ stdout: '' }],
       "git 'merge-base' '--is-ancestor' 'origin/main' 'HEAD'": [{ code: 1 }],
       "git 'rev-parse' '--short' 'origin/main'": [{ stdout: '0973c8c\n' }],
@@ -313,6 +318,7 @@ describe('reloadCommand', () => {
   it('does not restart the dashboard when git fetch fails', async () => {
     mocks.statSync.mockReturnValue({ mtimeMs: 1000 });
     mockExecByCommand({
+      "git 'rev-parse' '--show-toplevel'": [{ stdout: '/repo\n' }],
       "git 'fetch' 'origin' 'main'": [{ code: 128, stderr: 'fetch failed' }],
     });
 
@@ -324,5 +330,32 @@ describe('reloadCommand', () => {
       expect.objectContaining({ success: false, error: expect.stringContaining('fetch failed') }),
     );
     expect(process.exitCode).toBe(1);
+  });
+
+  it('resolves a workspace cwd to the primary repo root before building and restarting', async () => {
+    vi.mocked(process.cwd).mockReturnValue('/repo/workspaces/feature-pan-2095/subdir');
+    mocks.statSync
+      .mockReturnValueOnce({ mtimeMs: 1000 })
+      .mockReturnValueOnce({ mtimeMs: 2000 });
+    mockExecByCommand({
+      "git 'rev-parse' '--show-toplevel'": [{ stdout: '/repo/workspaces/feature-pan-2095\n' }],
+      "git 'fetch' 'origin' 'main'": [{ stdout: '' }],
+      "git 'merge-base' '--is-ancestor' 'origin/main' 'HEAD'": [{ stdout: '' }],
+    });
+    mockSpawnExits();
+
+    await reloadCommand({});
+
+    expect(mocks.exec).toHaveBeenCalledWith(
+      "git 'rev-parse' '--show-toplevel'",
+      expect.objectContaining({ cwd: '/repo/workspaces/feature-pan-2095/subdir' }),
+    );
+    expect(mocks.exec).toHaveBeenCalledWith("git 'fetch' 'origin' 'main'", expect.objectContaining({ cwd: '/repo' }));
+    expect(mocks.spawn).toHaveBeenCalledWith('bun', ['install'], expect.objectContaining({ cwd: '/repo' }));
+    expect(mocks.restartDashboard).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.any(Function),
+      expect.objectContaining({ expectedIdentity: { repoRoot: '/repo', mode: 'primary' } }),
+    );
   });
 });

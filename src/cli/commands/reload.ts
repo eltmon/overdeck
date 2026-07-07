@@ -59,6 +59,15 @@ async function runGitExit(args: string[], cwd: string): Promise<number> {
   }
 }
 
+async function resolvePrimaryRepoRoot(cwd: string): Promise<string> {
+  const repoRoot = (await runGitAsync(['rev-parse', '--show-toplevel'], cwd)).stdout.trim();
+  if (!repoRoot) {
+    throw new Error(`Could not resolve git repository root from ${cwd}`);
+  }
+  const workspaceMatch = repoRoot.match(/^(.+)\/workspaces\/feature-[^/]+$/);
+  return workspaceMatch?.[1] ?? repoRoot;
+}
+
 function runCommand(command: string, args: string[], cwd: string): Promise<number> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
@@ -227,10 +236,12 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
     }
 
     const config = readPlatformConfigSync();
+    let repoRoot = process.cwd();
     if (!options.skipBuild) {
       const beforeMtime = dashboardBundleMtimeMs();
       try {
-        await buildFromOriginMain(process.cwd());
+        repoRoot = await resolvePrimaryRepoRoot(process.cwd());
+        await buildFromOriginMain(repoRoot);
       } catch (error) {
         const message = (error as Error)?.message || String(error);
         const reloadError = message.includes('old dashboard left running')
@@ -254,7 +265,7 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
 
     await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, { deacon: options.deacon }), {
       healthTimeoutMs,
-      expectedIdentity: { repoRoot: process.cwd(), mode: 'primary' },
+      expectedIdentity: { repoRoot, mode: 'primary' },
     }));
     await recordReloadStatus(startedAt, true);
     console.log(chalk.green('✓ Dashboard reloaded and healthy'));
