@@ -123,10 +123,13 @@ Capture knowledge after implementation.
 
 Return compact prompt context.
 
+- Resolve the bundle, then run `python3 skills/okf/scripts/search.py "<query>" --bundle <bundle> --format prompt --budget <tokens>`.
 - Rank by hybrid BM25 + vector search when indexes and shards exist.
 - Fall back to BM25-only, then index-guided reading.
 - Respect the token budget.
-- Include concept IDs and citations in the output.
+- Surface the retrieval tier (`hybrid`, `bm25-only`, `index-guided`, or `mnemos`).
+- Include concept IDs as the citation anchors, and verify each cited ID exists in the bundle before using it as prompt context.
+- If no cited concept answers the query, say what is missing instead of inventing an answer.
 
 ## `/okf validate [--strict]`
 

@@ -342,6 +342,43 @@ vectors_dir: embeddings
 print("ok - build_index.py/search.py BM25, hybrid fallback, budget, rebuild, and mnemos paths")
 PY
 
+python3 - "$ROOT" <<'PY'
+from pathlib import Path
+import re
+import subprocess
+import sys
+import tempfile
+
+root = Path(sys.argv[1])
+search = root / "scripts" / "search.py"
+
+def write(path, content):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+with tempfile.TemporaryDirectory() as tmp:
+    bundle = Path(tmp)
+    write(bundle / "payroll.md", "---\ntype: Guide\ntitle: Payroll\ndescription: Payroll overtime policy.\n---\n\nOvertime payroll context.\n")
+    write(bundle / "benefits.md", "---\ntype: Guide\ntitle: Benefits\ndescription: Benefits policy.\n---\n\nBenefits context.\n")
+    proc = subprocess.run(
+        [sys.executable, str(search), "overtime payroll", "--bundle", str(bundle), "--format", "prompt", "--budget", "500"],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr
+    output = proc.stdout
+    assert output.startswith("tier: "), output
+    assert len(output.split()) <= 500
+    concept_ids = re.findall(r"^## ([A-Za-z0-9_./-]+)$", output, flags=re.MULTILINE)
+    assert concept_ids, output
+    for concept_id in concept_ids:
+        assert (bundle / f"{concept_id}.md").exists(), concept_id
+
+print("ok - extract prompt output states tier and cites existing concept IDs within budget")
+PY
+
 if grep -InE '^(from|import) ' "$ROOT/scripts/okf_common.py" | grep -Ev ' (annotations|dataclasses|hashlib|pathlib|re|typing|yaml)( |$)|^.*from __future__ import annotations$'; then
   printf 'not ok - okf_common.py imports only stdlib and yaml\n' >&2
   exit 1
