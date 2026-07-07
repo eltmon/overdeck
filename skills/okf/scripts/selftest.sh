@@ -88,6 +88,11 @@ require_grep 'Without Overdeck, use `git diff` plus current transcript/session c
 require_grep 'Concepts created from them must cite the recorded decision' "$ROOT/references/overdeck.md" "overdeck retro cites recorded decisions"
 require_grep 'The fallback path must still create validating concepts' "$ROOT/references/overdeck.md" "overdeck fallback validates without pan"
 require_grep 'opens a PR' "$ROOT/references/overdeck.md" "overdeck retro is PR-gated"
+require_grep 'tag produced concepts with it, for example `overtime-calculations`' "$SKILL" "study tags concepts with kebab focus"
+require_grep 'Enumerate relevant code, tests, and docs before writing' "$SKILL" "study enumerates codebase evidence"
+require_grep 'one concept per idea' "$SKILL" "study writes one concept per idea"
+require_grep 'updates existing matching concepts in place' "$SKILL" "study rerun avoids duplicates"
+require_grep 'open a knowledge-repo PR' "$SKILL" "study is PR-gated"
 
 python3 - "$ROOT" <<'PY'
 import importlib.util

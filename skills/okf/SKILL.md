@@ -112,10 +112,12 @@ Update the bundle from code or documentation diffs.
 
 Document what the current codebase does before a feature starts.
 
-- Search the codebase for the focus.
-- Create or refresh concepts that describe current behavior, invariants, and important decisions.
+- Kebab-case the focus and tag produced concepts with it, for example `overtime-calculations`.
+- Enumerate relevant code, tests, and docs before writing.
+- Create or refresh one concept per idea that describes current behavior, invariants, and important decisions.
+- Re-running study on unchanged evidence updates existing matching concepts in place; do not create duplicate concept files.
 - Cite files, tests, docs, or commands used as evidence.
-- Open or prepare a knowledge-repo PR rather than mutating protected branches directly.
+- Run `reindex.py`, append one dated `log.md` entry, run `validate.py --strict`, and open a knowledge-repo PR rather than mutating protected branches directly.
 
 ## `/okf retro`
 
