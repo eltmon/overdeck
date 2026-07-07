@@ -38,7 +38,10 @@
   "model": "gpt-5.5",
   "statusOverrides": {
     "codex-fixtures": "completed",
-    "reconcile-route-sources": "running",
+    "reconcile-route-sources": "completed",
+    "reconcile-route-sources.ac1": "completed",
+    "reconcile-route-sources.ac2": "completed",
+    "reconcile-route-sources.ac3": "completed",
     "ohmypi-fixtures": "completed",
     "ohmypi-fixtures.ohmypi-fixtures.ac1": "completed",
     "ohmypi-fixtures.ohmypi-fixtures.ac2": "completed",
