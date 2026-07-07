@@ -746,18 +746,16 @@ export const CostWriterLive = Layer.effect(
                 markSkipped(sessionFile, 'no-usage');
                 continue;
               }
-              if (parsed.unpricedModels?.length) {
-                markSkipped(sessionFile, 'unpriced-model');
-              }
+              const unpricedWarnings = parsed.unpricedModels ?? [];
+              if (unpricedWarnings.length) markSkipped(sessionFile, 'unpriced-model');
 
               for (const usage of events) {
-                for (const warning of usage.warnings ?? []) {
-                  markWarning({
-                    file:     sessionFile,
-                    reason:   warning.reason,
-                    provider: warning.provider,
-                    model:    warning.model,
-                  });
+                const derivedWarnings = unpricedWarnings
+                  .filter(warning => warning.model === usage.model && warning.provider === usage.provider)
+                  .map(warning => ({ type: 'unpriced-model' as const, ...warning }));
+                const eventWarnings = usage.warnings?.length ? usage.warnings : derivedWarnings;
+                for (const warning of eventWarnings) {
+                  markWarning({ file: sessionFile, reason: warning.reason, provider: warning.provider, model: warning.model });
                 }
                 const ts = new Date(usage.timestamp);
                 const event: CostEvent = {
@@ -775,7 +773,7 @@ export const CostWriterLive = Layer.effect(
                   cost:        usage.cost,
                   requestId:   usage.requestId,
                   sourceFile:  sessionFile,
-                  warnings:    usage.warnings,
+                  warnings:    eventWarnings.length > 0 ? eventWarnings : undefined,
                 };
 
                 if (yield* record(event, { dryRun: opts?.dryRun })) {

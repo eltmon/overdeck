@@ -138,7 +138,7 @@ async function deliverReviewVerdictFeedbackPromise(
         }
       } else {
         try {
-          surfaceIssueFeedbackNeedsYou(issueId, target.reason, {
+          await surfaceIssueFeedbackNeedsYou(issueId, target.reason, {
             specialist: 'review-agent',
             feedbackPath: fileResult.filePath,
             slotItemId: opts.slotItemId,

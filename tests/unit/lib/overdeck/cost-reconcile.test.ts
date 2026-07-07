@@ -291,6 +291,7 @@ describe('CostWriter.reconcile — ohmypi source', () => {
 
     vi.mocked(parseOhmypiSessionCostResultSync).mockReturnValue({
       ok: true,
+      unpricedModels: [{ provider: 'mystery', model: 'mystery-model', reason: 'unknown-provider' }],
       usageEvents: [{
         requestId:   'ohmypi:sess-abc:e1',
         timestamp:   '2026-06-17T10:00:01Z',
@@ -303,7 +304,6 @@ describe('CostWriter.reconcile — ohmypi source', () => {
         cacheRead:   0,
         cacheWrite:  0,
         cost:        0,
-        warnings:    [{ type: 'unpriced-model', provider: 'mystery', model: 'mystery-model', reason: 'unknown-provider' }],
       }],
     });
 
@@ -320,7 +320,7 @@ describe('CostWriter.reconcile — ohmypi source', () => {
       imported: 1,
       sessionsScanned: 1,
       eventsImported: 1,
-      skipped: [],
+      skipped: [{ file: sessionFile, reason: 'unpriced-model' }],
       warnings: [{ file: sessionFile, reason: 'unknown-provider', provider: 'mystery', model: 'mystery-model' }],
     });
     expect(warnSpy).toHaveBeenCalledWith(
