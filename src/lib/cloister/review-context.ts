@@ -16,6 +16,7 @@ import { Effect } from 'effect';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { findPlanSync, readPlan } from '../vbrief/io.js';
 import { scanStubUi, type StubUiFinding } from './lint-stub-ui.js';
+import { fetchCodeRabbitFindings, type CodeRabbitFinding } from './coderabbit-ingestion.js';
 import { findVBriefByIssueSync } from '../vbrief/lifecycle-io.js';
 import { getDevrootPathSync } from '../config.js';
 import { FsError } from '../errors.js';
@@ -88,6 +89,7 @@ export interface ReviewContextManifest {
   traces: ReviewItemTrace[];
   policyNotes: string[];
   stubUiFindings: StubUiFinding[];
+  codeRabbitFindings: CodeRabbitFinding[];
   manifestPath: string;
 }
 
@@ -339,7 +341,7 @@ export interface BuildReviewContextOpts {
 export function formatTier1Summary(
   manifest: Pick<
     ReviewContextManifest,
-    | 'issueId' | 'branch' | 'headSha' | 'changedFiles' | 'acceptanceCriteria' | 'nonGoals' | 'traces' | 'policyNotes' | 'stubUiFindings' | 'diff' | 'largeChangeset'
+    | 'issueId' | 'branch' | 'headSha' | 'changedFiles' | 'acceptanceCriteria' | 'nonGoals' | 'traces' | 'policyNotes' | 'stubUiFindings' | 'codeRabbitFindings' | 'diff' | 'largeChangeset'
   >,
 ): string {
   const lines: string[] = [];
@@ -430,6 +432,19 @@ export function formatTier1Summary(
     }
   }
 
+  if (manifest.codeRabbitFindings.length > 0) {
+    lines.push('');
+    lines.push('CodeRabbit findings (ADVISORY — non-gating; context, not acceptance criteria):');
+    for (const finding of manifest.codeRabbitFindings.slice(0, 10)) {
+      const location = finding.path ? `${finding.path}${typeof finding.line === 'number' ? `:${finding.line}` : ''}` : 'general';
+      const bodyPreview = finding.body.slice(0, 200);
+      lines.push(`  - ${location} ${bodyPreview}${finding.body.length > 200 ? '...' : ''}`);
+    }
+    if (manifest.codeRabbitFindings.length > 10) {
+      lines.push(`  ... and ${manifest.codeRabbitFindings.length - 10} more (see manifest)`);
+    }
+  }
+
   lines.push('');
   lines.push(`Diff stat: ${manifest.diff.stat}`);
 
@@ -452,12 +467,16 @@ export function formatTier1Summary(
     getDiffStat(workspace, diffBase),
   ]);
 
-  const [planRequirements, policyNotes, stubUiFindings] = await Promise.all([
+  const [planRequirements, policyNotes, stubUiFindings, codeRabbitFindings] = await Promise.all([
     extractPlanReviewRequirements(workspace, issueId),
     readPolicyNotes(workspace),
     scanStubUi(workspace, diffBase).catch((err) => {
       console.warn(`[buildReviewContext] scanStubUi failed: ${err instanceof Error ? err.message : String(err)}`);
       return [] as StubUiFinding[];
+    }),
+    fetchCodeRabbitFindings({ workspace, branch: currentBranch }).catch((err) => {
+      console.warn(`[buildReviewContext] CodeRabbit ingestion failed: ${err instanceof Error ? err.message : String(err)}`);
+      return [] as CodeRabbitFinding[];
     }),
   ]);
 
@@ -487,6 +506,7 @@ export function formatTier1Summary(
     traces: planRequirements.traces,
     policyNotes,
     stubUiFindings,
+    codeRabbitFindings,
     manifestPath,
   };
 

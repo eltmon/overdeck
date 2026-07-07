@@ -24,7 +24,7 @@
   },
   "scripts": {
     "dev": "tsdown --watch",
-    "build": "tsdown",
+    "build": "NODE_OPTIONS=--max-old-space-size=16384 tsdown",
     "test": "vitest run --configLoader runner --config vitest.config.ts",
     "run": "bun run",
     "typecheck": "tsc --noEmit"

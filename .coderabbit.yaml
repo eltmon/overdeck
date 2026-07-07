@@ -1,0 +1,24 @@
+# CodeRabbit configuration for Overdeck.
+#
+# Quota reality: CodeRabbit reviews PRs only sometimes (plan quota). This file
+# configures it to be strictly non-blocking. Absence of a CodeRabbit review MUST
+# be indistinguishable from a passed review — no gate, status, or merge path may
+# depend on CodeRabbit state.
+#
+# Schema reference: https://docs.coderabbit.ai/getting-started/configuring-coderabbit
+reviews:
+  # Never request changes / never block the PR.
+  request_changes_workflow: false
+
+  # Use the most lenient review profile.
+  profile: chill
+
+  # Skip generated, build, lockfile, and Overdeck-internal tracker artifacts.
+  path_filters:
+    - "!.pan/records/**"
+    - "!.beads/**"
+    - "!dist/**"
+    - "!*.map"
+    - "!.release/**"
+    - "!bun.lock"
+    - "!*.d.ts"
