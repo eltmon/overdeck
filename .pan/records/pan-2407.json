@@ -121,31 +121,49 @@
   ],
   "feedback": [],
   "created": "2026-07-06T14:55:36.922Z",
-  "updated": "2026-07-07T01:15:43.416Z",
+  "updated": "2026-07-07T01:16:44.249Z",
   "pipeline": {
     "issueId": "PAN-2407",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T18:49:02.217Z",
-    "reviewNotes": "Existing remote planned workspaces are treated as unplanned and rerouted to planning",
+    "updatedAt": "2026-07-07T01:16:44.186Z",
     "inspectNotes": "Bead route-unplanned-to-planning ack: fix 599f26fa12 corrects workspaceLocation in the start-planning POST body to use the already-resolved isRemote flag from findWorkspaceWithLocation() instead of raw options.remote, so an existing remote workspace is reported correctly even without --remote; regression test added and verified against findWorkspaceWithLocation/determineWorkspaceLocation source. No regression to the prior 5 ACs.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2415",
-    "lastVerifiedCommit": "258be7e8d61702efef3b908f87085feaffd6630c",
     "reviewRequestedAt": "2026-07-06T18:36:20.415Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "codex": {
+          "unknown": {
+            "input": 920848,
+            "output": 4782,
+            "cacheRead": 800896,
+            "cacheWrite": 0
+          }
+        },
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 287,
-            "output": 974,
-            "cacheRead": 1829861,
-            "cacheWrite": 3784
+            "input": 420,
+            "output": 4288,
+            "cacheRead": 2211812,
+            "cacheWrite": 9040
+          },
+          "anthropic/claude-sonnet-5": {
+            "input": 131,
+            "output": 222,
+            "cacheRead": 143076,
+            "cacheWrite": 1347
+          },
+          "custom/kimi-k2.7-code": {
+            "input": 51284,
+            "output": 213,
+            "cacheRead": 22272,
+            "cacheWrite": 0
           }
         },
         "memory-extraction": {
@@ -174,42 +192,48 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1710839,
-            "output": 271261,
-            "cacheRead": 179906560,
+            "input": 1801694,
+            "output": 283226,
+            "cacheRead": 192672512,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
+        "unknown": {
+          "input": 920848,
+          "output": 4782,
+          "cacheRead": 800896,
+          "cacheWrite": 0
+        },
         "anthropic/claude-fable-5": {
-          "input": 14833,
-          "output": 43265,
-          "cacheRead": 5577807,
-          "cacheWrite": 178052
+          "input": 14966,
+          "output": 46579,
+          "cacheRead": 5959758,
+          "cacheWrite": 183308
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 26169,
+          "output": 8360,
+          "cacheRead": 1837050,
+          "cacheWrite": 224260
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 1852978,
+          "output": 283439,
+          "cacheRead": 192694784,
+          "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
           "input": 41066,
           "output": 962,
           "cacheRead": 0,
           "cacheWrite": 0
-        },
-        "anthropic/claude-sonnet-5": {
-          "input": 26038,
-          "output": 8138,
-          "cacheRead": 1693974,
-          "cacheWrite": 222913
-        },
-        "custom/kimi-k2.7-code": {
-          "input": 1710839,
-          "output": 271261,
-          "cacheRead": 179906560,
-          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 48.037168,
-        "pricingAsOf": "2026-07-06T18:49:02.375Z"
+        "usd": 52.443481,
+        "pricingAsOf": "2026-07-07T01:16:44.246Z"
       }
     },
     "merges": [
@@ -217,8 +241,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "config-default-mode": "completed",
     "config-default-mode.ac1": "completed",
