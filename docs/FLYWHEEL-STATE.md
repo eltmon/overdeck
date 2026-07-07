@@ -207,6 +207,33 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-58 tick 85 (2026-07-07) — A7 main-GREEN → closing out (order book ~11 done); Overdeck lane DRAINED pending operator gates (B3/PAN-2167 + PAN-2388)
+
+**A7/PAN-2230 red-main verdict GREEN** (`27330395e3` CI success) → **close-out dispatched** (`pan close --force`, bg). **Order book ~11 landed** (Lane A A1-A7+A10, Lane B B0/B1/B2).
+- **Overdeck order-book lane is now DRAINED of all self-serviceable work** — everything remaining is operator-gated:
+  - **B3/PAN-2167** (Lane B next) — awaiting operator dispatch authorization (slot free; self-heals record/re-CI + A8 wedge).
+  - **A8/PAN-2297** — wedged on `pan-1847` record (unblocks when PAN-2167 lands / record reconciles).
+  - **A9/PAN-2229 + A13/PAN-2445** — HELD (don't fan out new in-flight branches while PAN-2167 unfixed — they'd re-wedge).
+  - **PAN-2388** — cost-capture pair done (slots ready-to-merge), assembly gated on PAN-2383 budget (operator).
+- **MIN report-only:** ready = MIN-857 (UAT-held). M2/MIN-861 + M7/MIN-729 in review. MIN-862 failed-verification (no retry).
+- No off-book planning (PAN-2445 clean). No PAN drain (nothing ready). **Natural pause point — the run has landed everything it can without operator decisions.**
+
+## RUN-58 tick 84 (2026-07-07) — ★ A7/PAN-2230 MERGED (#2462, order book ~11); main CI in_progress → close deferred; B3/PAN-2167 still unauthorized
+
+**A7/PAN-2230 MERGED** — `27330395e3 PAN-2230 (#2462)` at 13:09, clean (no re-CI loop). **Order book ~11 landed: B0/2318, A1/2373, A2/2371, A3/2336, A4/2095, A5/2375, A6/2374, A7/2230, A10/2420, B1/2207, B2/2341.** Lane A: A1-A7+A10 done (A8 dormant, A9/A13 unstarted). Lane B: B0/B1/B2 done (B3=PAN-2167 next).
+- **Main CI on `27330395e3` (A7 merge) IN_PROGRESS** → A7 close-out DEFERRED to next tick (main-green). A7 = circular-dep ratchet/madge (low red-main risk). NEXT: green → bg `pan close PAN-2230 --force`; red → P0 strike.
+- **B3/PAN-2167 NOT authorized** (no fix, no session). Lane B slot free; surfaced (recommend dispatch).
+- **MIN report-only:** ready = MIN-857 (UAT-held). M2/MIN-861 + M7/MIN-729 in review. MIN-862 failed-verification (no retry).
+- **A8/PAN-2297 STILL wedged** (`pan-1847`). Surfaced, no retry. Holding A9/A13. PAN-2388 operator-gated. No off-book planning (PAN-2445 clean).
+
+## RUN-58 tick 83 (2026-07-07) — A6 CLOSED; ★ A7/PAN-2230 ready+green → SCHEDULED (mergeAt ~13:05); B3/PAN-2167 still unauthorized
+
+**MAIN GREEN (`3346d6e300`).** A6/PAN-2374 confirmed CLOSED.
+- **★ A7/PAN-2230 (Lane A) SCHEDULED** — PR #2462 all green (test 8m15s) + mergeState CLEAN + record commit settled → auto-merge scheduled id 27, mergeAt 13:05:39Z. NEXT TICK: merged + main-green → bg `pan close PAN-2230 --force` (order book → ~11); watch red-main (A7 = circular-dep ratchet/madge, low risk). If a record commit re-CIs before 13:05 → wait settle + re-schedule.
+- **B3/PAN-2167 NOT authorized** (no fix, no session). Lane B slot free; surfaced (recommend dispatch — self-heals record/re-CI + A8 wedge).
+- **MIN report-only:** ready set = MIN-857 (UAT-held → report, not merge). M2/MIN-861 + M7/MIN-729 in review. MIN-862 failed-verification (no retry).
+- **A8/PAN-2297 STILL wedged** (`pan-1847`). Surfaced, no retry. Holding A9/A13. PAN-2388 slots `ready-to-merge` (operator-gated). No off-book planning (PAN-2445 clean).
+
 ## RUN-58 tick 82 (2026-07-07) — A6/PAN-2374 main-GREEN → closing out (order book ~10 done); MIN policy locked; B3/PAN-2167 still unauthorized
 
 **A6/PAN-2374 red-main verdict GREEN** (`3346d6e300` CI success) → **close-out dispatched** (`pan close --force`, bg). Order book ~10 landed, A6 closing.
