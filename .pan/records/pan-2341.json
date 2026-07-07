@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-07T05:02:22.342Z",
-  "updated": "2026-07-07T08:56:11.518Z",
+  "updated": "2026-07-07T09:50:25.919Z",
   "pipeline": {
     "issueId": "PAN-2341",
     "reviewStatus": "pending",
@@ -94,5 +94,35 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5"
+  "model": "claude-sonnet-5",
+  "statusOverrides": {
+    "acceptance-regression-test": "completed",
+    "acceptance-regression-test.ac1": "completed",
+    "acceptance-regression-test.ac2": "completed",
+    "acceptance-regression-test.ac3": "completed",
+    "boot-ceiling-selfheal": "completed",
+    "boot-ceiling-selfheal.ac1": "completed",
+    "boot-ceiling-selfheal.ac2": "completed",
+    "boot-ceiling-selfheal.ac3": "completed",
+    "idle-terminal-advancing-reaper": "completed",
+    "idle-terminal-advancing-reaper.ac1": "completed",
+    "idle-terminal-advancing-reaper.ac2": "completed",
+    "idle-terminal-advancing-reaper.ac3": "completed",
+    "idle-terminal-advancing-reaper.ac4": "completed",
+    "merged-advancing-reaper": "completed",
+    "merged-advancing-reaper.ac1": "completed",
+    "merged-advancing-reaper.ac2": "completed",
+    "merged-advancing-reaper.ac3": "completed",
+    "merged-advancing-reaper.ac4": "completed",
+    "journal-aware-orphan-redispatch": "completed",
+    "journal-aware-orphan-redispatch.ac1": "completed",
+    "journal-aware-orphan-redispatch.ac2": "completed",
+    "journal-aware-orphan-redispatch.ac3": "completed",
+    "journal-aware-orphan-redispatch.ac4": "completed",
+    "reconcile-journals-sweep": "completed",
+    "reconcile-journals-sweep.ac1": "completed",
+    "reconcile-journals-sweep.ac2": "completed",
+    "reconcile-journals-sweep.ac3": "completed",
+    "reconcile-journals-sweep.ac4": "completed"
+  }
 }
