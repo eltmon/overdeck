@@ -36,9 +36,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-07T18:04:40.911Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-07T18:05Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-07T18:05:46.531Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-07T18:05:46Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2388\n\nManual reconcile route still drops the existing Claude transcript reconciler in committed code\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2388 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".beads/export-state.json",
@@ -195,14 +208,14 @@
   },
   "pipeline": {
     "issueId": "PAN-2388",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T18:04:45.351Z",
-    "reviewNotes": "Manual reconcile route drops the existing Claude transcript reconciler",
+    "updatedAt": "2026-07-07T18:05:42.134Z",
+    "reviewNotes": "Manual reconcile route still drops the existing Claude transcript reconciler in committed code",
     "testNotes": "typecheck passed; npm test passed (896/900 test files, 8762/8821 tests, frontend 3/3); lint failed at lint:circular on cycle src/lib/agents.ts > src/lib/agents/resume.ts > src/lib/review-status.ts > src/lib/cloister/feedback-target.ts. Cycle files are outside PAN-2388 working set. Browser UAT not required per vBRIEF NonGoals.",
     "inspectNotes": "Bead ohmypi-fixtures ack: commit 9de8b447 touches only codex-parser.ts (revert of CodexCostEventUsage additions), a cost-reconcile integration test, and a runbook doc -- zero changes to ohmypi-parser.ts, ohmypi-parser.test.ts, or any ohmypi fixture file. Not this beads scope; AC1-4 remain satisfied unchanged from the prior verified state (c6b01bb3). No action needed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2470",
@@ -427,7 +440,7 @@
       },
       "costAtCloseOut": {
         "usd": 256.154714,
-        "pricingAsOf": "2026-07-07T18:04:45.434Z"
+        "pricingAsOf": "2026-07-07T18:05:42.185Z"
       }
     },
     "merges": [
@@ -461,5 +474,5 @@
     }
   },
   "created": "2026-07-07T17:32:25.282Z",
-  "updated": "2026-07-07T18:04:45.444Z"
+  "updated": "2026-07-07T18:05:46.531Z"
 }
