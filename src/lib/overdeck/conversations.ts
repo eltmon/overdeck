@@ -618,7 +618,7 @@ export const ConversationsApi = HttpApiGroup.make('conversations')
 // moving the storage boundary to overdeck.db. They must not call the legacy
 // panopticon.db conversation helpers.
 
-export type LegacyTitleSource = 'auto' | 'ai' | 'ai-refined' | 'manual' | 'default';
+export type LegacyTitleSource = 'auto' | 'ai' | 'ai-refined' | 'ai-explicit' | 'manual' | 'default';
 
 export interface ForkRequest {
   parentConversationName: string;
@@ -1416,6 +1416,13 @@ export function clearStuckForks(): number {
 export function canReplaceTitle(conv: LegacyConversation): boolean {
   if (conv.titleSource === 'manual') return false;
   return conv.titleSource === 'default' || conv.titleSource === 'auto';
+}
+
+export function canRefineTitle(conv: LegacyConversation): boolean {
+  return conv.titleSource === 'default'
+    || conv.titleSource === 'auto'
+    || conv.titleSource === 'ai'
+    || conv.titleSource === 'ai-refined';
 }
 
 export function listFavoritedIds(type: LegacyFavoriteType): string[] {
