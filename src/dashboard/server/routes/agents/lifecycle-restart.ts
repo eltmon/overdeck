@@ -1,10 +1,15 @@
 import { existsSync } from 'node:fs';
 import { readFile, rm, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, join, basename } from 'node:path';
 
 import { Effect } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 import type { RuntimeName } from '../../../../lib/runtimes/types.js';
+import { resolveStaffing } from '../../../../lib/agents/staffing.js';
+import { findPlanSync, readWorkspacePlanSync } from '../../../../lib/vbrief/io.js';
+import { resolveTieredExecutionEnabled, resolveTieredExecutionEnabledForIssue } from '../../../../lib/agents/tier-table.js';
+import { getDispatchableItems } from '../../../../lib/vbrief/dag.js';
+import { loadConfigSync } from '../../../../lib/config-yaml.js';
 
 import {
   getAgentState,
@@ -646,5 +651,245 @@ export const postAgentResetSessionRoute = HttpRouter.add(
     console.log(`[reset-session] Cleared session for ${id} (was: ${previousSessionId.slice(0, 8)}...)`);
     invalidateAgentsCache();
     return jsonResponse({ success: true, agentId: id, previousSessionId, lifecycle: yield* getWorkAgentLifecycleState(id) });
+  })),
+);
+
+// ─── Route: POST /api/agents/restart-with-current-config ────────────────────
+// List all agents with their current vs new staffing, allowing operator to
+// selectively restart with new config
+
+export interface RestartConfigChangeItem {
+  agentId: string;
+  issueId: string;
+  currentModel: string;
+  currentHarness: string;
+  newModel: string;
+  newHarness: string;
+  changed: boolean;
+  paused: boolean;
+  troubled: boolean;
+  status: string;
+}
+
+async function buildRestartConfigChangeList(): Promise<RestartConfigChangeItem[]> {
+  const agents = await Effect.runPromise(listRunningAgents());
+
+  const items: RestartConfigChangeItem[] = [];
+
+  for (const agent of agents) {
+    if (!agent.issueId) continue;
+
+    // Only include actually running agents with active tmux sessions
+    if (!((agent as any).tmuxActive === true)) {
+      continue;
+    }
+
+    // Skip paused/troubled agents (their gates stand)
+    if ((agent as any).paused || (agent as any).troubled) {
+      continue;
+    }
+
+    // Only work agents eligible for restart (skip conversations)
+    if (agent.role !== 'work' && agent.role !== undefined) {
+      continue;
+    }
+
+    // Compute new staffing from current config by reading the real vBRIEF work item
+    const staffingResult = await resolveCurrentStaffing(agent.id, agent, agent.issueId);
+
+    if (staffingResult.error) {
+      // Skip agents where staffing cannot be resolved
+      console.warn(`[restart-config] Skipping ${agent.id}: ${staffingResult.error}`);
+      continue;
+    }
+
+    const newModel = staffingResult.newModel;
+    const newHarness = staffingResult.newHarness;
+
+    items.push({
+      agentId: agent.id,
+      issueId: agent.issueId,
+      currentModel: agent.model,
+      currentHarness: agent.harness ?? 'claude-code',
+      newModel,
+      newHarness,
+      changed: agent.model !== newModel || (agent.harness ?? 'claude-code') !== newHarness,
+      paused: (agent as any).paused ?? false,
+      troubled: (agent as any).troubled ?? false,
+      status: agent.status,
+    });
+  }
+
+  return items;
+}
+
+export const getAgentsRestartConfigRoute = HttpRouter.add(
+  'GET',
+  '/api/agents/restart-with-current-config',
+  httpHandler(Effect.gen(function* () {
+    try {
+      const items = yield* Effect.promise(() => buildRestartConfigChangeList());
+      return jsonResponse({
+        success: true,
+        items,
+        totalAgents: items.length,
+        changedAgents: items.filter(i => i.changed).length,
+      });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      return jsonResponse({ error: `Failed to build restart config list: ${msg}` }, { status: 500 });
+    }
+  })),
+);
+
+// ─── Route: POST /api/agents/restart-with-current-config ────────────────────
+// Restart selected agents with current config
+
+async function resolveCurrentStaffing(agentId: string, agentState: any, issueId: string): Promise<{ newModel: string; newHarness: string; error?: string }> {
+  const workspacePath = agentState.workspace;
+  if (!workspacePath) {
+    return { newModel: agentState.model, newHarness: agentState.harness ?? 'claude-code', error: 'No workspace path available' };
+  }
+
+  try {
+    // Read the actual vBRIEF plan
+    const plan = readWorkspacePlanSync(workspacePath);
+    if (!plan || !plan.plan.items) {
+      return { newModel: agentState.model, newHarness: agentState.harness ?? 'claude-code', error: 'Invalid plan structure' };
+    }
+
+    // Find the work item using the same logic as spawn-prep:
+    // For slot agents, use slotItemId; for single-work agents, use first dispatchable item
+    let workItem = null;
+    if (agentState.slotItemId) {
+      // Slot agent: find the item by ID
+      workItem = plan.plan.items.find((item: any) => item.id === agentState.slotItemId);
+      if (!workItem) {
+        return { newModel: agentState.model, newHarness: agentState.harness ?? 'claude-code', error: `Scheduled item ${agentState.slotItemId} not found in plan` };
+      }
+    } else {
+      // Single-work agent: use first dispatchable item (same as spawn-prep)
+      const dispatchableItems = getDispatchableItems(plan, new Set());
+      workItem = dispatchableItems[0];
+      if (!workItem) {
+        return { newModel: agentState.model, newHarness: agentState.harness ?? 'claude-code', error: 'No dispatchable items in plan' };
+      }
+    }
+
+    // Use the real work item with plan metadata for staffing resolution
+    // This matches the logic in resolveSingleWorkTierSpawnParams
+    const config = loadConfigSync().config;
+    const tiered = config.tieredExecution;
+    const effectiveTieredEnabled = issueId
+      ? resolveTieredExecutionEnabledForIssue(tiered, issueId, plan.plan.metadata)
+      : resolveTieredExecutionEnabled(tiered, plan.plan.metadata);
+
+    const staffing = resolveStaffing(workItem, {
+      planMetadata: plan.plan.metadata,
+      spawnKey: `work:${issueId.toLowerCase()}`,
+      config: { ...config, tieredExecution: { ...tiered, enabled: effectiveTieredEnabled } },
+    });
+
+    return {
+      newModel: staffing.model,
+      newHarness: staffing.harness,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return {
+      newModel: agentState.model,
+      newHarness: agentState.harness ?? 'claude-code',
+      error: `Failed to resolve staffing: ${msg}`,
+    };
+  }
+}
+
+export const postAgentsRestartWithConfigRoute = HttpRouter.add(
+  'POST',
+  '/api/agents/restart-with-current-config',
+  httpHandler(Effect.gen(function* () {
+    const body = yield* readJsonBody;
+    const { agentIds } = body as { agentIds?: string[] };
+
+    if (!agentIds || !Array.isArray(agentIds) || agentIds.length === 0) {
+      return jsonResponse({ error: 'agentIds array is required and must not be empty' }, { status: 400 });
+    }
+
+    // Get eligible agents from the same predicate as the GET route
+    const eligibleAgents = yield* Effect.promise(() => buildRestartConfigChangeList());
+    const eligibleIds = new Set(eligibleAgents.map(a => a.agentId));
+
+    const results: { id: string; status: string; newModel?: string; newHarness?: string; error?: string }[] = [];
+
+    for (const agentId of agentIds) {
+      try {
+        // Check if agent is in the eligible set
+        if (!eligibleIds.has(agentId)) {
+          results.push({ id: agentId, status: 'ineligible', error: 'Agent is not eligible for restart (paused, troubled, stopped, or not a work agent)' });
+          continue;
+        }
+
+        const agentState = yield* getAgentState(agentId);
+        if (!agentState) {
+          results.push({ id: agentId, status: 'not_found', error: `Agent state not found` });
+          continue;
+        }
+
+        const issueId = agentState.issueId ?? agentId.replace(/^agent-/, '').toUpperCase();
+
+        // Resolve new staffing using the real work item
+        const staffingResult = yield* Effect.promise(() => resolveCurrentStaffing(agentId, agentState, issueId));
+
+        if (staffingResult.error) {
+          results.push({
+            id: agentId,
+            status: 'staffing_error',
+            error: staffingResult.error,
+          });
+          continue;
+        }
+
+        const newModel = staffingResult.newModel;
+        const newHarness = staffingResult.newHarness;
+
+        // Restart with new config
+        const restartResult = yield* Effect.promise(() => restartAgent(agentId, {
+          model: newModel,
+          harness: newHarness as any,
+          graceful: false,
+        }));
+
+        if (restartResult.success) {
+          results.push({
+            id: agentId,
+            status: 'restarted',
+            newModel,
+            newHarness,
+          });
+        } else {
+          results.push({
+            id: agentId,
+            status: 'failed',
+            error: restartResult.error,
+          });
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        results.push({
+          id: agentId,
+          status: 'error',
+          error: msg,
+        });
+      }
+    }
+
+    const succeeded = results.filter(r => r.status === 'restarted').length;
+    invalidateAgentsCache();
+    return jsonResponse({
+      success: true,
+      restarted: succeeded,
+      total: agentIds.length,
+      results,
+    });
   })),
 );
