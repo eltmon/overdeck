@@ -45,3 +45,30 @@ export async function isStatePlaneOnlyDiff(
 
   return changedPaths.every(isStatePlanePath);
 }
+
+export interface MainDivergence {
+  ahead: number;
+  behind: number;
+}
+
+export async function getMainDivergence(repoPath: string): Promise<MainDivergence> {
+  try {
+    const [ahead, behind] = await Promise.all([
+      countRevisionRange('origin/main..main', repoPath),
+      countRevisionRange('main..origin/main', repoPath),
+    ]);
+    return { ahead, behind };
+  } catch {
+    return { ahead: 0, behind: 0 };
+  }
+}
+
+async function countRevisionRange(range: string, repoPath: string): Promise<number> {
+  const { stdout } = await execFileAsync(
+    'git',
+    ['rev-list', '--count', range],
+    { cwd: repoPath, encoding: 'utf-8' },
+  );
+  const count = Number.parseInt(stdout.trim(), 10);
+  return Number.isFinite(count) ? count : 0;
+}
