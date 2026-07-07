@@ -17,7 +17,7 @@
 import { exec, execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { basename, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 
 import { Effect, Layer } from 'effect';
@@ -767,9 +767,24 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
       }
 
       setReviewStatus(issueId, { mergeStatus: 'verifying', mergeNotes: undefined });
+      // PAN-2461: gates must run with rendered placeholders and the workspace ROOT.
+      // The previous call passed the repo subdir (doubling gate.path → <ws>/fe/fe)
+      // and no placeholders (docker exec hit the literal "myn-{{FEATURE_FOLDER}}-fe-1").
+      const featureFolder = basename(workspacePath);
+      const gatePlaceholders = {
+        FEATURE_NAME: featureFolder.replace(/^feature-/, ''),
+        FEATURE_FOLDER: featureFolder,
+        BRANCH_NAME: `feature/${featureFolder.replace(/^feature-/, '')}`,
+        COMPOSE_PROJECT: `${basename(projectPath)}-${featureFolder}`,
+        DOMAIN: projectConfig?.workspace?.dns?.domain || 'localhost',
+        PROJECT_NAME: basename(projectPath),
+        PROJECT_PATH: projectPath,
+        PROJECTS_DIR: dirname(projectPath),
+        WORKSPACE_PATH: workspacePath,
+      };
+
       for (const repo of activeRepos) {
         const repoConfig = projectConfig.workspace.repos.find(configRepo => configRepo.name === repo.repoKey);
-        const repoWorkspacePath = join(workspacePath, repo.repoKey);
         const gateIdentifiers = new Set<string>([
           repo.repoKey,
           repoConfig?.path || '',
@@ -789,7 +804,9 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
           continue;
         }
 
-        const gateResults = await Effect.runPromise(runQualityGates(gates, repoWorkspacePath, 'pre_push'));
+        const gateResults = await Effect.runPromise(runQualityGates(gates, workspacePath, 'pre_push', {
+          placeholders: { ...gatePlaceholders, CHANGED_BASE: `origin/${repo.targetBranch}` },
+        }));
         const failedGate = gateResults.find(result => !result.passed && result.required !== false);
         if (failedGate) {
           const error = `Polyrepo post-rebase verification failed for ${repo.repoKey} at ${failedGate.name}`;
