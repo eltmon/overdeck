@@ -73,8 +73,10 @@ describe('CostWriter.reconcile fixture-backed readback', () => {
       }).pipe(Effect.provide(layer)),
     );
 
-    expect(result.firstCodex).toMatchObject({ imported: 2, skipped: [] });
-    expect(result.firstOhmypi).toMatchObject({ imported: 1, skipped: [] });
+    expect(result.firstCodex.imported).toBe(2);
+    expect(result.firstCodex.skipped).toHaveLength(0);
+    expect(result.firstOhmypi.imported).toBe(1);
+    expect(result.firstOhmypi.skipped).toHaveLength(0);
 
     expect(result.detail.issueId).toBe(ISSUE_ID);
     expect(result.detail.totalCost).toBeGreaterThan(0);
@@ -106,8 +108,10 @@ describe('CostWriter.reconcile fixture-backed readback', () => {
       event.cost > 0
     )).toBe(true);
 
-    expect(result.secondCodex).toMatchObject({ imported: 0, skipped: [] });
-    expect(result.secondOhmypi).toMatchObject({ imported: 0, skipped: [] });
+    expect(result.secondCodex.imported).toBe(0);
+    expect(result.secondCodex.skipped).toHaveLength(0);
+    expect(result.secondOhmypi.imported).toBe(0);
+    expect(result.secondOhmypi.skipped).toHaveLength(0);
     expect(result.afterSecond).toHaveLength(result.recent.length);
   });
 });
