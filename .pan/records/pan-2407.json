@@ -17,24 +17,125 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-06T18:34:05.488Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-06T18:35Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-06T18:35:27.512Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-06T18:36:20.588Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-06T18:36:20.669Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-06T18:49Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-06T18:49:02.435Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-06T18:49Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-06T18:49:06.437Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-06T19:08:33.266Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-06T19:13:04.264Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-06T19:22:29.612Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-06T19:25:26.546Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-06T19:30:29.920Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-06T19:38:50.511Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-06T19:42:25.800Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-06T19:49:37.725Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-06T19:52:22.355Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-07T00:15:40.484Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-07T00:19:08.876Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-07T00:26:41.901Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-07T00:30:08.483Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-07T00:55:44.251Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-07T00:57:03.574Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-06T14:55:36.922Z",
-  "updated": "2026-07-06T18:34:05.705Z",
+  "updated": "2026-07-07T00:57:03.574Z",
   "pipeline": {
     "issueId": "PAN-2407",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T18:34:05.096Z",
-    "reviewNotes": "Agent re-review request (1/25): Inspect passed on remote workspace location fix; please run test/merge pipeline",
+    "updatedAt": "2026-07-06T18:49:02.217Z",
+    "reviewNotes": "Existing remote planned workspaces are treated as unplanned and rerouted to planning",
     "inspectNotes": "Bead route-unplanned-to-planning ack: fix 599f26fa12 corrects workspaceLocation in the start-planning POST body to use the already-resolved isRemote flag from findWorkspaceWithLocation() instead of raw options.remote, so an existing remote workspace is reported correctly even without --remote; regression test added and verified against findWorkspaceWithLocation/determineWorkspaceLocation source. No regression to the prior 5 ACs.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2415",
-    "lastVerifiedCommit": "258be7e8d61702efef3b908f87085feaffd6630c"
+    "lastVerifiedCommit": "258be7e8d61702efef3b908f87085feaffd6630c",
+    "reviewRequestedAt": "2026-07-06T18:36:20.415Z"
   },
   "closeOut": {
     "usage": {
@@ -49,8 +150,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 38992,
-            "output": 815,
+            "input": 41066,
+            "output": 962,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -73,9 +174,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1673917,
-            "output": 256889,
-            "cacheRead": 164875264,
+            "input": 1710839,
+            "output": 271261,
+            "cacheRead": 179906560,
             "cacheWrite": 0
           }
         }
@@ -88,8 +189,8 @@
           "cacheWrite": 178052
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 38992,
-          "output": 815,
+          "input": 41066,
+          "output": 962,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -100,15 +201,15 @@
           "cacheWrite": 222913
         },
         "custom/kimi-k2.7-code": {
-          "input": 1673917,
-          "output": 256889,
-          "cacheRead": 164875264,
+          "input": 1710839,
+          "output": 271261,
+          "cacheRead": 179906560,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 45.088656,
-        "pricingAsOf": "2026-07-06T18:34:05.268Z"
+        "usd": 48.037168,
+        "pricingAsOf": "2026-07-06T18:49:02.375Z"
       }
     },
     "merges": [
@@ -116,8 +217,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "config-default-mode": "completed",
     "config-default-mode.ac1": "completed",
@@ -150,5 +251,8 @@
     "running-noop.ac1": "completed",
     "running-noop.ac2": "completed",
     "running-noop.ac3": "completed"
+  },
+  "swarm": {
+    "finalizedAt": "2026-07-06T18:36:24.888Z"
   }
 }

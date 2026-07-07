@@ -126,6 +126,7 @@ vi.mock('../../../lib/config.js', async (importActual) => ({
 
 describe('pan start planning-mode routing (PAN-2407)', () => {
   let tmpDir: string;
+  let stableCwd: string;
   let exitSpy: ReturnType<typeof vi.spyOn>;
   let consoleLogSpy: ReturnType<typeof vi.spyOn>;
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
@@ -143,6 +144,7 @@ describe('pan start planning-mode routing (PAN-2407)', () => {
   }
 
   beforeEach(() => {
+    stableCwd = process.cwd();
     tmpDir = mkdtempSync(join(tmpdir(), 'pan-2407-routing-'));
 
     fetchMock.mockReset();
@@ -206,6 +208,7 @@ describe('pan start planning-mode routing (PAN-2407)', () => {
   });
 
   afterEach(() => {
+    process.chdir(stableCwd);
     rmSync(tmpDir, { recursive: true, force: true });
     exitSpy.mockRestore();
     consoleLogSpy.mockRestore();
@@ -306,6 +309,29 @@ describe('pan start planning-mode routing (PAN-2407)', () => {
 
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body).toMatchObject({ auto: true, autoStart: true, workspaceLocation: 'remote' });
+  });
+
+  it('proceeds to spawn for an existing remote workspace that already has a plan on main', async () => {
+    findRemoteWorkspaceMetadataSyncMock.mockReturnValue({
+      id: 'pan-x',
+      issue: 'PAN-X',
+      provider: 'fly',
+      vmName: 'pan-x-vm',
+      urls: {},
+      created: new Date(),
+      location: 'remote',
+    });
+    findSpecByIssueMock.mockReturnValue(Effect.succeed({ path: '/tmp/.pan/specs/PAN-X.vbrief.json' }));
+
+    const originalCwd = process.cwd();
+    process.chdir(tmpDir);
+
+    const { issueCommand } = await import('../start.js');
+    await expect(issueCommand('PAN-X', { model: 'claude-sonnet-4-6', plan: 'auto' } as any)).rejects.toThrow(/__exit__:1/);
+
+    process.chdir(originalCwd);
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('synthesizes vBRIEF and beads in skip mode without calling start-planning', async () => {

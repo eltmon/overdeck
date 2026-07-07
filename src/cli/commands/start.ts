@@ -1026,7 +1026,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // PAN-2407: route unplanned issues to the start-planning endpoint before
     // any workspace creation or remote provisioning.
     const projectRoot = findProjectRoot(id);
-    const existingPlan = workspacePath
+    const existingPlan = workspacePath && !isRemote
       ? findPlanSync(workspacePath)
       : await Effect.runPromise(findSpecByIssue(projectRoot, id));
 
