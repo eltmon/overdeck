@@ -524,6 +524,92 @@ export function getBackgroundCostBySourceSync(hours = 24): Record<string, number
   return out;
 }
 
+export function queryCostEventsSync(opts: {
+  issueId?: string;
+  agentId?: string;
+  startTs?: string;
+  endTs?: string;
+  limit?: number;
+  offset?: number;
+} = {}): CostEvent[] {
+  const db = getOverdeckDatabaseSync();
+  const conditions: string[] = [];
+  const params: (string | number)[] = [];
+
+  if (opts.issueId) {
+    conditions.push('UPPER(issue_id) = UPPER(?)');
+    params.push(opts.issueId);
+  }
+  if (opts.agentId) {
+    conditions.push('agent_id = ?');
+    params.push(opts.agentId);
+  }
+  if (opts.startTs) {
+    conditions.push('ts >= ?');
+    params.push(new Date(opts.startTs).getTime());
+  }
+  if (opts.endTs) {
+    conditions.push('ts <= ?');
+    params.push(new Date(opts.endTs).getTime());
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  let limitClause = '';
+  if (opts.limit !== undefined) {
+    limitClause = 'LIMIT ?';
+    params.push(Math.max(0, Math.floor(opts.limit)));
+  } else if (opts.offset !== undefined) {
+    limitClause = 'LIMIT -1';
+  }
+  const offsetClause = opts.offset !== undefined ? 'OFFSET ?' : '';
+  if (opts.offset !== undefined) params.push(Math.max(0, Math.floor(opts.offset)));
+
+  const rows = db
+    .prepare(
+      `SELECT ts, agent_id, issue_id, session_type, provider, model,
+              input, output, cache_read, cache_write, cost, request_id,
+              session_id, source_file
+       FROM cost_events
+       ${where}
+       ORDER BY ts ASC
+       ${limitClause} ${offsetClause}`,
+    )
+    .all(...params) as Array<{
+    ts: number;
+    agent_id: string | null;
+    issue_id: string | null;
+    session_type: string | null;
+    provider: string | null;
+    model: string | null;
+    input: number | null;
+    output: number | null;
+    cache_read: number | null;
+    cache_write: number | null;
+    cost: number | null;
+    request_id: string | null;
+    session_id: string | null;
+    source_file: string | null;
+  }>;
+
+  return rows.map((row): CostEvent => ({
+    ts: new Date(row.ts).toISOString(),
+    type: 'cost',
+    agentId: row.agent_id ?? '',
+    issueId: row.issue_id ?? '',
+    sessionType: row.session_type ?? 'unknown',
+    source: row.source_file ?? undefined,
+    provider: row.provider ?? 'unknown',
+    model: row.model ?? 'unknown',
+    input: row.input ?? 0,
+    output: row.output ?? 0,
+    cacheRead: row.cache_read ?? 0,
+    cacheWrite: row.cache_write ?? 0,
+    cost: row.cost ?? 0,
+    requestId: row.request_id ?? undefined,
+    sessionId: row.session_id ?? undefined,
+  }));
+}
+
 /**
  * Get per-agent cost rollup. Mirrors getAgentRollup from cost-events-db.
  * Optional issueId narrows to events for that issue.

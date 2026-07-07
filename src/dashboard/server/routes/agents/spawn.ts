@@ -75,6 +75,11 @@ export function emitDirtyWorkspaceRefusalActivity(issueId: string, porcelain: st
   } catch { /* non-fatal — activity emit should not block the response */ }
 }
 
+export function spawnGuardrailResourcesHint(hint?: string): string {
+  const resourcesHint = 'Open /resources to inspect Machine Room pressure before retrying.';
+  return hint ? `${hint} ${resourcesHint}` : resourcesHint;
+}
+
 // ─── Route: POST /api/agents (start agent) ───────────────────────────────────
 
 export const postAgentsRoute = HttpRouter.add(
@@ -363,7 +368,7 @@ export const postAgentsRoute = HttpRouter.add(
         blocked: false,
         skipped: true,
         requiresAcknowledgement: true,
-        hint: spawnGuardrails.hint,
+        hint: spawnGuardrailResourcesHint(spawnGuardrails.hint),
         guardrails: spawnGuardrails,
       }, { status: spawnGuardrails.status });
     }
