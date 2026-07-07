@@ -21,6 +21,11 @@
       "reason": "feedback",
       "note": "[2026-07-07T04:46Z] verification-gate → FAILED — seq 2",
       "timestamp": "2026-07-07T04:46:01.357Z"
+    },
+    {
+      "timestamp": "2026-07-07T04:49:16.739Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [
@@ -40,20 +45,19 @@
     }
   ],
   "created": "2026-07-07T02:18:26.752Z",
-  "updated": "2026-07-07T04:46:01.379Z",
+  "updated": "2026-07-07T04:53:36.451Z",
   "pipeline": {
     "issueId": "PAN-2450",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T04:46:01.337Z",
+    "updatedAt": "2026-07-07T04:53:36.340Z",
     "reviewNotes": "Dispatch failed: [review-agent] Skipping review dispatch for PAN-2450 — GitHub PR #2455 is merged",
-    "verificationNotes": "Verification FAILED at test (52167ms):\n\n                                   ^\n    360|       projectId: 'test-project',\n    361|       scope: 'workspace',\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/12]⎯\n\n FAIL  |root| tests/unit/lib/pan-444-post-merge-step0.test.ts > postMergeLifecycle — step 0 deploy handoff > coalesces concurrent post-merge lifecycle calls before step 0 repeats\nAssertionError: expected \"vi.fn()\" to be called once, but got 0 times\n ❯ tests/unit/lib/pan-444-post-merge-step0.test.ts:388:27\n    386|     await Promise.all([first, second]);\n    387|\n    388|     expect(mockWriteFile).toHaveBeenCalledOnce();\n       |                           ^\n    389|     expect(mockSpawn).toHaveBeenCalledOnce();\n    390|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/12]⎯\n\n FAIL  |root| tests/unit/lib/pan-444-post-merge-step0.test.ts > postMergeLifecycle — repoRoot derivation > deploy script path ends with scripts/post-merge-deploy.sh\nTypeError: undefined is not iterable (cannot read property Symbol(Symbol.iterator))\n ❯ tests/unit/lib/pan-444-post-merge-step0.test.ts:405:26\n    403|     await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);\n    404|\n    405|     const [scriptPath] = mockSpawn.mock.calls[0];\n       |                          ^\n    406|     expect(scriptPath).toMatch(/scripts\\/post-merge-deploy\\.sh$/);\n    407|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/12]⎯\n\n FAIL  |root| tests/unit/lib/pan-444-post-merge-step0.test.ts > postMergeLifecycle — repoRoot derivation > deploy script path does not traverse through src/ (repoRoot is stripped above src/)\nTypeError: undefined is not iterable (cannot read property Symbol(Symbol.iterator))\n ❯ tests/unit/lib/pan-444-post-merge-step0.test.ts:412:26\n    410|     await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);\n    411|\n    412|     const [scriptPath] = mockSpawn.mock.calls[0];\n       |                          ^\n    413|     // scripts/post-merge-deploy.sh should be a direct child of repoRo…\n    414|     // not nested inside src/ or lib/\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/12]⎯\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2455",
     "lastVerifiedCommit": "86bb97dda94d6f0ef473618552105adbc888de8c",
-    "reviewRequestedAt": "2026-07-07T04:18:56.988Z"
+    "reviewRequestedAt": "2026-07-07T04:49:16.741Z"
   },
   "closeOut": {
     "usage": {
@@ -76,9 +80,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 906329,
-            "output": 176641,
-            "cacheRead": 80758906,
+            "input": 939255,
+            "output": 183807,
+            "cacheRead": 88670330,
             "cacheWrite": 0
           }
         }
@@ -97,15 +101,15 @@
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 906329,
-          "output": 176641,
-          "cacheRead": 80758906,
+          "input": 939255,
+          "output": 183807,
+          "cacheRead": 88670330,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 19.379852,
-        "pricingAsOf": "2026-07-07T04:46:01.378Z"
+        "usd": 20.942968,
+        "pricingAsOf": "2026-07-07T04:53:36.411Z"
       }
     },
     "merges": [
