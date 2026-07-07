@@ -243,14 +243,10 @@ async function startFakeSupervisor(agentId: string, fifoPath: string): Promise<v
     });
   });
 
-  await new Promise<void>((resolve, reject) => {
-    bridge.once('error', reject);
-    bridge.listen(socketPath, () => {
-      bridge.off('error', reject);
-      chmodSync(socketPath, 0o600);
-      resolve();
-    });
-  });
+  await new Promise<void>((resolve) => bridge.listen(socketPath, () => {
+    chmodSync(socketPath, 0o600);
+    resolve();
+  }));
   sessions.set(agentId, { bridge, fifoPath });
 }
 
@@ -330,13 +326,7 @@ async function startRealConversationRoutes(): Promise<void> {
     }
   });
   setupTerminalWebSocket(httpServer);
-  await new Promise<void>((resolve, reject) => {
-    httpServer.once('error', reject);
-    httpServer.listen(0, '127.0.0.1', () => {
-      httpServer.off('error', reject);
-      resolve();
-    });
-  });
+  await new Promise<void>((resolve) => httpServer.listen(0, '127.0.0.1', () => resolve()));
   const address = httpServer.address() as AddressInfo;
   baseUrl = `http://127.0.0.1:${address.port}`;
   process.env.OVERDECK_TRUSTED_ORIGINS = baseUrl;
@@ -412,7 +402,7 @@ beforeEach(async () => {
   browser = await chromium.launch();
   context = await browser.newContext();
   page = await context.newPage();
-}, 20_000);
+});
 
 afterEach(async () => {
   await page?.close().catch(() => undefined);
