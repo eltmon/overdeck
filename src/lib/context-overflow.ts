@@ -28,8 +28,9 @@ export function isContextOverflowError(err: unknown): boolean {
 }
 
 export function isContextOverflowTail(output: string): boolean {
-  const recentTail = output.split('\n').slice(-CONTEXT_OVERFLOW_TAIL_LINES).join('\n');
-  return CONTEXT_OVERFLOW_PATTERNS.some(pattern => recentTail.includes(pattern));
+  const recentTail = output.split('\n').slice(-CONTEXT_OVERFLOW_TAIL_LINES).join('\n').toLowerCase();
+  const patterns = [...CONTEXT_OVERFLOW_PATTERNS, 'prompt is too long'];
+  return patterns.some(pattern => recentTail.includes(pattern.toLowerCase()));
 }
 
 /**

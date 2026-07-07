@@ -207,16 +207,15 @@
     "recordedAt": "2026-07-03T12:29:10.111Z"
   },
   "created": "2026-07-03T02:32:35.471Z",
-  "updated": "2026-07-06T12:55:48.586Z",
+  "updated": "2026-07-07T03:05:56.194Z",
   "pipeline": {
     "issueId": "PAN-2148",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T14:00:27.169Z",
+    "updatedAt": "2026-07-07T03:05:56.194Z",
     "inspectNotes": "Spec fidelity passed: added issues no-loss audit test for the 29 route method/path pairs from the PAN-2148 PRD, and the live regex enumeration matches 29 routes. Constraint compliance passed: the test follows the sanctioned source-introspection pattern, no delay/retry fake-timer requirement applies, no destructive endpoint is invoked, routes/issues.ts is under 1000 lines, door modules are under 1000 lines, baseline no longer carries routes/issues.ts, and routes/issues.js remains referenced only by server.ts.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2299",
     "reviewRequestedAt": "2026-07-03T12:30:36.829Z",
@@ -280,7 +279,9 @@
         "tests/unit/lib/reconstruct/reconstruct-cache.test.ts"
       ],
       "recordedAt": "2026-07-03T12:29:10.111Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-07T03:05:56.194Z"
   },
   "closeOut": {
     "usage": {
@@ -362,8 +363,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-fable-5",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "wi-9-no-loss-audit": "completed",
     "wi-9-no-loss-audit.ac1": "completed",

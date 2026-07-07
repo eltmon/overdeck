@@ -48,13 +48,13 @@
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T14:04:00.925Z",
+    "updatedAt": "2026-07-07T03:06:30.588Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2182",
     "deaconIgnored": true,
     "deaconIgnoredAt": "2026-07-02T08:07:08.472Z",
     "deaconIgnoredReason": "operator directive: drain pipeline, focus PAN-1791 only",
     "closedOut": true,
-    "closedOutAt": "2026-07-06T14:04:00.925Z"
+    "closedOutAt": "2026-07-07T03:06:30.588Z"
   },
   "closeOut": {
     "usage": {
@@ -163,5 +163,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-29T22:09:34.377Z",
-  "updated": "2026-07-06T14:04:00.925Z"
+  "updated": "2026-07-07T03:06:30.588Z"
 }

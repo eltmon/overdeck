@@ -63,7 +63,7 @@
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T14:15:17.547Z",
+    "updatedAt": "2026-07-07T03:05:50.794Z",
     "reviewNotes": "No blocking findings; route split preserves route set/exports and focused gates passed",
     "testNotes": "Ran workspace gates from /home/eltmon/Projects/overdeck/workspaces/feature-pan-2147: bun install, npm run typecheck (passed), npm run lint (passed incl. file-size guard), npm run build (passed), and npx vitest run --configLoader runner. Full suite result: 1 failed | 8170 passed | 52 skipped. Failure: tests/unit/dashboard/routes/dashboard-continue-readers.test.ts:26 'AC1: appendSessionEntry is used in routes/agents.ts' expected a grep hit in src/dashboard/server/routes/agents.ts but got none, because appendSessionEntry is now used in src/dashboard/server/routes/agents/spawn.ts after decomposition. This test needs repointing to the new submodule (issue requirement: 'Repoint any test importing moved internals in the same commit'). No browser UAT required: PAN-2147 is a backend behavior-preserving refactor with no UI/dashboard acceptance criteria.",
     "inspectNotes": "INSPECTION PASSED for bead workspace-2ua1s. b10-spawn-helpers matches the plan: remote spawn and container orchestration moved into spawn-helpers.ts, postAgentsRoute calls the helpers, captured locals are threaded explicitly, statement order is preserved, spawn-helpers.ts is under 1000 lines, moved any usage is allowlisted, and no execSync/sendKeys violations were found.",
@@ -118,7 +118,7 @@
       "recordedAt": "2026-07-03T17:35:03.775Z"
     },
     "closedOut": true,
-    "closedOutAt": "2026-07-06T14:15:17.547Z"
+    "closedOutAt": "2026-07-07T03:05:50.794Z"
   },
   "closeOut": {
     "usage": {
@@ -193,5 +193,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T17:44:26.833Z",
-  "updated": "2026-07-06T14:15:17.547Z"
+  "updated": "2026-07-07T03:05:50.794Z"
 }
