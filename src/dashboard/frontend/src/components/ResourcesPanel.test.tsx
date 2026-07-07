@@ -65,7 +65,7 @@ describe('ResourcesPanel', () => {
 
     await waitFor(() => expect(screen.getByText('Machine Room')).toBeTruthy());
     expect(screen.getByText('feature-pan-100-api')).toBeTruthy();
-    expect(screen.getByText('agent-pan-100')).toBeTruthy();
+    expect(screen.getAllByText('agent-pan-100').length).toBeGreaterThan(0);
   });
 
   it('shows error message on fetch failure', async () => {

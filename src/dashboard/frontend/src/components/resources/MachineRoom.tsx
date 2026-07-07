@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Agent, ContainerStats, ResourcesSnapshot } from '../../types';
+import { AgentsSection } from './AgentsSection';
+import { CoreServicesSection } from './CoreServicesSection';
+import { HostProcessesSection } from './HostProcessesSection';
 import { MachineRoomTopbar, type MachineRoomGroupBy } from './MachineRoomTopbar';
 import { VitalsStrip } from './VitalsStrip';
 
@@ -23,6 +26,7 @@ export function MachineRoom({ snapshot, onNavigateToAgents, onStop, onPause, onL
   const rows = useMemo(() => buildRows(snapshot), [snapshot]);
   const filteredRows = rows.filter((row) => matchesFilter(row, filter));
   const focusedRow = filteredRows.find((row) => row.id === focusedRowId) ?? null;
+  const rowById = useMemo(() => new Map(rows.map((row) => [row.id, row])), [rows]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -57,6 +61,18 @@ export function MachineRoom({ snapshot, onNavigateToAgents, onStop, onPause, onL
       />
       <VitalsStrip hostVitals={snapshot.hostVitals} />
       <div className="flex-1 overflow-auto px-6 py-5">
+        <AgentsSection
+          agents={snapshot.agents}
+          filter={filter}
+          onFocusRow={setFocusedRowId}
+          onOpenTerminal={(agent) => onNavigateToAgents?.(agent.id)}
+          onPause={(agent) => {
+            const row = rowById.get(`agent:${agent.id}`);
+            if (row) onPause?.(row);
+          }}
+        />
+        <CoreServicesSection services={snapshot.coreServices ?? []} filter={filter} onFocusRow={setFocusedRowId} />
+        <HostProcessesSection processes={snapshot.hostProcesses ?? []} filter={filter} onFocusRow={setFocusedRowId} />
         {groups.map((group) => (
           <section key={group.key} className="mb-6">
             <h2 className="mb-2 font-['DM_Mono'] text-xs uppercase text-muted-foreground">

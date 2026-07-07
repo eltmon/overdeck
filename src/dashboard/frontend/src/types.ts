@@ -144,6 +144,23 @@ export interface Agent {
   runtimeState?: string;         // 'completed' when agent finished normally (not session lost)
   hasSession?: boolean;          // Whether a resumable Claude session exists
   lifecycle?: WorkAgentLifecycle;
+  resourceStats?: AgentResourceStats | null;
+}
+
+export interface AgentResourceStats {
+  id: string;
+  issueId: string;
+  role: string;
+  model: string;
+  status: string;
+  statusChip: { state: 'working' | 'idle'; idleMinutes: number; fanOut: boolean };
+  rootPid: number | null;
+  processCount: number;
+  cpuPercent: number;
+  memoryBytes: number;
+  burnUsdPerHour: number;
+  hypotheticalUsdPerHour?: number;
+  totalUsd: number;
 }
 
 export interface AgentHealth {
@@ -326,6 +343,34 @@ export interface ResourcesSnapshot {
   updatedAt: string;
   hostVitals?: HostVitalsSnapshot;
   stale?: boolean;
+  coreServices?: CoreServiceResource[];
+  hostProcesses?: HostProcessResource[];
+}
+
+export interface CoreServiceResource {
+  id: 'dashboard' | 'deacon' | 'support-fleet';
+  label: string;
+  status: string;
+  cpuPercent: number;
+  memoryBytes: number;
+  memberCount: number;
+  eventLoopP99Ms?: number;
+  lastTickAgeSeconds?: number | null;
+  members?: string[];
+}
+
+export interface HostProcessResource {
+  id: string;
+  family: string;
+  label: string;
+  owner: { label: string; agentId?: string; issueId?: string };
+  pidCount: number;
+  cpuPercent: number;
+  memoryBytes: number;
+  peakCpuPercent: number;
+  peakMemoryBytes: number;
+  note?: string;
+  retainedUntil?: string;
 }
 
 export interface SystemHealthAgentProcess {
