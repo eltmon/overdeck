@@ -10,8 +10,12 @@ import { spawnSync } from 'child_process';
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildReviewContextPromise, formatTier1Summary } from '../review-context.js';
+
+vi.mock('../coderabbit-ingestion.js', () => ({
+  fetchCodeRabbitFindings: vi.fn(() => Promise.resolve([])),
+}));
 
 function git(workspace: string, ...args: string[]) {
   const result = spawnSync(

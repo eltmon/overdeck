@@ -11,19 +11,29 @@
   ],
   "feedback": [],
   "created": "2026-07-07T04:23:03.777Z",
-  "updated": "2026-07-07T05:05:44.886Z",
+  "updated": "2026-07-07T05:20:12.398Z",
   "pipeline": {
     "issueId": "PAN-2374",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T05:05:44.858Z"
+    "updatedAt": "2026-07-07T05:20:12.292Z",
+    "inspectNotes": "Bead cr-ingest-module ack: fetchCodeRabbitFindings returns [] on absence/PR-resolution-failure/gh-api-error (verified via resolveOwnerRepo catch, prNumber null-check, and per-fetch .catch()), returns findings with body+path/line for coderabbitai[bot] reviews and inline comments, zero execSync matches, CodeRabbitFinding type exported cleanly, 115 lines, quota invariant documented inline."
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 271,
+            "output": 200,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
         "plan": {
           "anthropic/claude-opus-4-8": {
             "input": 31611,
@@ -31,24 +41,58 @@
             "cacheRead": 4910078,
             "cacheWrite": 173126
           }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 6560,
+            "output": 1293,
+            "cacheRead": 210060,
+            "cacheWrite": 76603
+          }
+        },
+        "work": {
+          "custom/kimi-k2.7-code": {
+            "input": 415280,
+            "output": 57189,
+            "cacheRead": 15169280,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
+        "anthropic/claude-haiku-4-5": {
+          "input": 271,
+          "output": 200,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
         "anthropic/claude-opus-4-8": {
           "input": 31611,
           "output": 42615,
           "cacheRead": 4910078,
           "cacheWrite": 173126
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 6560,
+          "output": 1293,
+          "cacheRead": 210060,
+          "cacheWrite": 76603
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 415280,
+          "output": 57189,
+          "cacheRead": 15169280,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 4.76051,
-        "pricingAsOf": "2026-07-07T05:05:44.885Z"
+        "usd": 8.526781,
+        "pricingAsOf": "2026-07-07T05:20:12.396Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "kimi-k2.7-code"
+  "model": "claude-sonnet-5"
 }
