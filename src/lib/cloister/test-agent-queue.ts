@@ -10,6 +10,7 @@ import { setReviewStatusSync } from '../review-status.js';
 import { spawnRun } from '../agents.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { clearTestVerdictArtifact } from './test-verdict.js';
+import { shouldSkipDispatchAsMerged } from './merge-verification.js';
 
 function dashboardApiUrl(): string {
   const apiPort = process.env.API_PORT || process.env.PORT || '3011';
@@ -82,6 +83,13 @@ Boundaries:
     if (workspace) clearTestVerdictArtifact(workspace);
 
     const prompt = buildTestRolePrompt({ issueId, workspace, branch });
+
+    const mergedGuard = await shouldSkipDispatchAsMerged(issueId);
+    if (mergedGuard.skip) {
+      console.log(`[test-dispatch] Skipping test dispatch for ${issueId} — ${mergedGuard.reason}`);
+      return;
+    }
+
     const run = await spawnRun(issueId, 'test', {
       workspace,
       prompt,
@@ -170,6 +178,12 @@ export const dispatchTestAgentAndNotify = (
     if (workspace) yield* Effect.sync(() => clearTestVerdictArtifact(workspace));
 
     const prompt = buildTestRolePrompt({ issueId, workspace, branch });
+
+    const mergedGuard = yield* Effect.promise(() => shouldSkipDispatchAsMerged(issueId));
+    if (mergedGuard.skip) {
+      console.log(`[test-dispatch] Skipping test dispatch for ${issueId} — ${mergedGuard.reason}`);
+      return { delivered: false, notified: false, reason: 'spawn-failed' };
+    }
 
     const spawnProgram: Effect.Effect<DispatchTestAgentResult, never> = Effect.tryPromise({
       try: () => spawnRun(issueId, 'test', { workspace, prompt }),
