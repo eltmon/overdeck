@@ -184,7 +184,7 @@ import { withConcurrencyLimit } from '../concurrency.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { checkStuckAgentRemediation } from './stuck-remediation.js';
-import { reconcileInFlightJournals } from './advancing-selfheal.js';
+import { markAdvancingSessionStopped, reconcileInFlightJournals } from './advancing-selfheal.js';
 import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { reconcileOrphanProposedSpecs } from './orphan-proposed-reconciler.js';
@@ -2619,6 +2619,44 @@ export async function checkMergedWorkSessions(): Promise<string[]> {
   return actions;
 }
 
+/**
+ * PAN-2341: Reap advancing-role sessions for already-merged issues.
+ *
+ * KEEP_SPECIALIST_SESSIONS_ALIVE can intentionally leave review/test/ship panes
+ * visible, but once the issue is merged those sessions have no remaining role in
+ * the pipeline and still occupy the advancing ceiling. Kill the tmux session and
+ * mark the agents-table row stopped so countRunningAgents() frees the slot.
+ */
+export async function checkMergedAdvancingSessions(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    const { selectMergedAdvancingSessions } = await import('./reap-terminal-sessions.js');
+    const statuses = loadReviewStatuses();
+    const aliveSessions = await Effect.runPromise(listSessionNames());
+    const toKill = selectMergedAdvancingSessions(statuses, [...aliveSessions]);
+
+    for (const session of toKill) {
+      try {
+        await Effect.runPromise(killSession(session));
+      } catch (err) {
+        console.warn(`[deacon] Failed to reap merged advancing session ${session}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      const markedStopped = markAdvancingSessionStopped(session);
+      actions.push(
+        markedStopped
+          ? `Reaped merged advancing session ${session} (issue merged, row stopped)`
+          : `Reaped merged advancing session ${session} (issue merged)`,
+      );
+      console.log(`[deacon] Reaped merged advancing session ${session} (PAN-2341)`);
+      logDeaconEventSync(`checkMergedAdvancingSessions: reaped ${session} — issue merged but advancing session alive (PAN-2341)`);
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error reaping merged advancing sessions:', msg);
+  }
+  return actions;
+}
+
 /** Pane must be idle at least this long before the awaiting-test reaper kills it. */
 const AWAITING_TEST_IDLE_REAP_MS = 10 * 60 * 1000;
 
@@ -2853,6 +2891,10 @@ export async function runPatrol(): Promise<PatrolResult> {
   const reapedWorkActions = await checkMergedWorkSessions();
   actions.push(...reapedWorkActions);
   for (const a of reapedWorkActions) addLog('action', a, state.patrolCycle);
+
+  const reapedMergedAdvancingActions = await checkMergedAdvancingSessions();
+  actions.push(...reapedMergedAdvancingActions);
+  for (const a of reapedMergedAdvancingActions) addLog('action', a, state.patrolCycle);
 
   // PAN-1778: proactively refresh Claude credentials on active remote agents
   // when the host credentials file changes, with a 15 min fallback cadence.

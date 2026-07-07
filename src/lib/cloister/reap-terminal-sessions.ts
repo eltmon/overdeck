@@ -142,6 +142,28 @@ export function selectMergedWorkSessions(
 }
 
 /**
+ * Across every merged issue, the alive advancing-role sessions whose issue has
+ * already reached merge terminal state. Unlike selectTerminalAdvancingSessions,
+ * this intentionally ignores KEEP_SPECIALIST_SESSIONS_ALIVE: after merge, these
+ * panes only occupy advancing ceiling slots.
+ */
+export function selectMergedAdvancingSessions(
+  statuses: Record<string, ReapableStatus>,
+  aliveSessions: readonly string[],
+): string[] {
+  const kill = new Set<string>();
+  for (const [issueId, status] of Object.entries(statuses)) {
+    if (status.mergeStatus !== 'merged') continue;
+    for (const role of ['review', 'test', 'ship'] as const) {
+      for (const session of sessionsToReapForRole(issueId, role, aliveSessions)) {
+        kill.add(session);
+      }
+    }
+  }
+  return [...kill];
+}
+
+/**
  * Whether an issue's WORK session is reapable because it's idle awaiting its
  * test verdict (PAN-1730).
  *
