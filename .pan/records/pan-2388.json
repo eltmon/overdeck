@@ -66,6 +66,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-07T18:10:06.432Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-07T18:13:55.723Z"
     }
   ],
   "feedback": [],
@@ -229,18 +234,20 @@
   },
   "pipeline": {
     "issueId": "PAN-2388",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
+    "reviewStatus": "reviewing",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T18:11:43.719Z",
-    "reviewNotes": "Reviewed 063284a2; no blocking findings",
+    "updatedAt": "2026-07-07T18:14:00.531Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "testNotes": "typecheck passed; npm test passed (896 test files passed, 4 skipped; 8762 tests passed, 52 skipped; frontend 3/3 passed); npm run lint failed at lint:circular — new cycle src/lib/agents.ts > src/lib/agents/resume.ts > src/lib/review-status.ts > src/lib/cloister/feedback-target.ts. The cycle files are outside the PAN-2388 cost-parser working set (no agents/resume/review-status/feedback-target changes in the branch diff). Browser UAT not required: vBRIEF NonGoals explicitly excludes dashboard UI changes and labels the live-server check as evidence, not a blocking gate.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Bead ohmypi-fixtures ack: commit 9de8b447 touches only codex-parser.ts (revert of CodexCostEventUsage additions), a cost-reconcile integration test, and a runbook doc -- zero changes to ohmypi-parser.ts, ohmypi-parser.test.ts, or any ohmypi fixture file. Not this beads scope; AC1-4 remain satisfied unchanged from the prior verified state (c6b01bb3). No action needed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2470",
-    "lastVerifiedCommit": "063284a2cbdcb2c6e91a9c4ef2103458a23fe656",
+    "reviewedAtCommit": "48a1f7e48cb5a82d1a5fb0fddb605cfa7378fb6b",
+    "lastVerifiedCommit": "4af9b16a0a54648efc1ca8beb9eac8a1e4122281",
     "reviewRequestedAt": "2026-07-07T18:06:47.307Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -349,9 +356,7 @@
         "tests/unit/lib/overdeck/cost.test.ts"
       ],
       "recordedAt": "2026-07-07T18:06:40.389Z"
-    },
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
-    "reviewedAtCommit": "48a1f7e48cb5a82d1a5fb0fddb605cfa7378fb6b"
+    }
   },
   "closeOut": {
     "usage": {
@@ -412,9 +417,9 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 1011448,
-            "output": 18997,
-            "cacheRead": 5757952,
+            "input": 1258985,
+            "output": 22048,
+            "cacheRead": 6651904,
             "cacheWrite": 0
           }
         },
@@ -459,15 +464,15 @@
           "cacheWrite": 259116
         },
         "custom/kimi-k2.7-code": {
-          "input": 1629042,
-          "output": 180442,
-          "cacheRead": 104708352,
+          "input": 1876579,
+          "output": 183493,
+          "cacheRead": 105602304,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 265.880012,
-        "pricingAsOf": "2026-07-07T18:11:43.741Z"
+        "usd": 266.297228,
+        "pricingAsOf": "2026-07-07T18:14:00.578Z"
       }
     },
     "merges": [
@@ -501,5 +506,5 @@
     }
   },
   "created": "2026-07-07T17:32:25.282Z",
-  "updated": "2026-07-07T18:11:43.742Z"
+  "updated": "2026-07-07T18:14:00.581Z"
 }
