@@ -13,7 +13,7 @@ const ROLLOUT_LINES = [
   // session_meta — ignored
   { type: 'session_meta', timestamp: '2026-06-09T00:10:50.132Z', payload: { id: 'thread-1', model_provider: 'openai' } },
   // turn_context — ignored
-  { type: 'turn_context', timestamp: '2026-06-09T00:10:50.140Z', payload: { turn_id: 't1' } },
+  { type: 'turn_context', timestamp: '2026-06-09T00:10:50.140Z', payload: { turn_id: 't1', model: 'gpt-5.5' } },
   // injected AGENTS.md context as a response_item message — must be skipped
   { type: 'response_item', timestamp: '2026-06-09T00:10:50.146Z', payload: { type: 'message', role: 'developer', content: [{ type: 'input_text', text: '<permissions instructions> ...' }] } },
   // the actual user prompt

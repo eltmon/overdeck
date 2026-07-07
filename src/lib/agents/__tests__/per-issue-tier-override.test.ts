@@ -24,4 +24,60 @@ describe('resolveTieredExecutionEnabled', () => {
       ).toThrow(TieredExecutionConfigError);
     }
   });
+
+  describe('record override precedence (PAN-2383)', () => {
+    it('record override "on" takes precedence over plan-metadata and global setting', () => {
+      expect(
+        resolveTieredExecutionEnabled(
+          { enabled: false }, // global off
+          { tiered_execution: 'off' }, // plan metadata off
+          'on', // record override on
+        ),
+      ).toBe(true);
+    });
+
+    it('record override "off" takes precedence over plan-metadata and global setting', () => {
+      expect(
+        resolveTieredExecutionEnabled(
+          { enabled: true }, // global on
+          { tiered_execution: 'on' }, // plan metadata on
+          'off', // record override off
+        ),
+      ).toBe(false);
+    });
+
+    it('plan-metadata takes precedence when record override is not set', () => {
+      expect(
+        resolveTieredExecutionEnabled(
+          { enabled: false }, // global off
+          { tiered_execution: 'on' }, // plan metadata on
+          null, // no record override
+        ),
+      ).toBe(true);
+      expect(
+        resolveTieredExecutionEnabled(
+          { enabled: true }, // global on
+          { tiered_execution: 'off' }, // plan metadata off
+          undefined, // no record override
+        ),
+      ).toBe(false);
+    });
+
+    it('global setting is used when both record and plan-metadata are absent', () => {
+      expect(
+        resolveTieredExecutionEnabled(
+          { enabled: true }, // global on
+          {}, // no plan metadata
+          null, // no record override
+        ),
+      ).toBe(true);
+      expect(
+        resolveTieredExecutionEnabled(
+          { enabled: false }, // global off
+          undefined, // no plan metadata
+          undefined, // no record override
+        ),
+      ).toBe(false);
+    });
+  });
 });

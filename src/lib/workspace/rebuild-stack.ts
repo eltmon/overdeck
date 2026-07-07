@@ -27,6 +27,7 @@ import { recordDockerContainerLifecycleSnapshot } from '../docker-stats.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { ensureDevcontainerSync } from './ensure-devcontainer.js';
 import { collectDockerContainerLifecycleSnapshot } from './stack-health.js';
+import { reconcileTraefikNetworks } from './traefik-connect.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -203,6 +204,11 @@ export const rebuildWorkspaceStack = (
     );
     const containers = yield* collectDockerContainerLifecycleSnapshot();
     recordDockerContainerLifecycleSnapshot(containers);
+
+    // PAN-2428: without this, routes to the fresh stack 504 until traefik is
+    // manually connected to the stack's network.
+    progress('Connecting traefik to workspace network...');
+    yield* Effect.promise(() => reconcileTraefikNetworks());
 
     return { success: true, workspacePath, composeFile, composeProjectName } satisfies RebuildWorkspaceStackResult;
   }).pipe(

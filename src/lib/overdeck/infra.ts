@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
@@ -334,11 +334,86 @@ export interface CostArchiveServiceShape {
 
 export class CostArchive extends Context.Service<CostArchive, CostArchiveServiceShape>()('overdeck/CostArchive') {}
 
+function costArchivePath(): string {
+  return join(getOverdeckHome(), 'costs', 'events.jsonl');
+}
+
+function archiveKey(event: { requestId?: unknown; sourceFile?: unknown; source?: unknown }): string | null {
+  if (typeof event.requestId === 'string' && event.requestId.length > 0) return `request:${event.requestId}`;
+  const source = typeof event.sourceFile === 'string'
+    ? event.sourceFile
+    : typeof event.source === 'string'
+      ? event.source
+      : null;
+  return source ? `source:${source}` : null;
+}
+
+function toCostArchiveEvent(event: Record<string, unknown>): Record<string, unknown> {
+  const ts = event.ts instanceof Date
+    ? event.ts.toISOString()
+    : typeof event.ts === 'string'
+      ? event.ts
+      : new Date().toISOString();
+
+  return {
+    ts,
+    type: 'cost',
+    agentId: typeof event.agentId === 'string' ? event.agentId : 'unknown',
+    issueId: typeof event.issueId === 'string' ? event.issueId : 'UNKNOWN',
+    sessionType: typeof event.sessionType === 'string' ? event.sessionType : 'unknown',
+    provider: typeof event.provider === 'string' ? event.provider : 'unknown',
+    model: typeof event.model === 'string' ? event.model : 'unknown',
+    input: typeof event.input === 'number' ? event.input : 0,
+    output: typeof event.output === 'number' ? event.output : 0,
+    cacheRead: typeof event.cacheRead === 'number' ? event.cacheRead : 0,
+    cacheWrite: typeof event.cacheWrite === 'number' ? event.cacheWrite : 0,
+    cost: typeof event.cost === 'number' ? event.cost : 0,
+    ...(typeof event.requestId === 'string' ? { requestId: event.requestId } : {}),
+    ...(typeof event.sessionId === 'string' ? { sessionId: event.sessionId } : {}),
+    ...(typeof event.sourceFile === 'string' ? { source: event.sourceFile } : {}),
+    ...(Array.isArray(event.warnings) ? { warnings: event.warnings } : {}),
+  };
+}
+
 export const CostArchiveLive = Layer.succeed(
   CostArchive,
-  CostArchive.of({
-    append: (_event) => Effect.void,
-  }),
+  CostArchive.of((() => {
+    let seen: Set<string> | null = null;
+
+    const loadSeen = () => {
+      if (seen) return seen;
+      seen = new Set<string>();
+      const path = costArchivePath();
+      if (!existsSync(path)) return seen;
+      const content = readFileSync(path, 'utf8');
+      for (const line of content.split('\n')) {
+        if (!line.trim()) continue;
+        try {
+          const parsed = JSON.parse(line) as Record<string, unknown>;
+          const key = archiveKey(parsed);
+          if (key) seen.add(key);
+        } catch {
+          // Ignore malformed historical lines; readers do the same.
+        }
+      }
+      return seen;
+    };
+
+    return {
+      append: (event) => Effect.sync(() => {
+        const normalized = toCostArchiveEvent(event as Record<string, unknown>);
+        const key = archiveKey(normalized);
+        const archiveSeen = loadSeen();
+        if (key && archiveSeen.has(key)) return;
+
+        const path = costArchivePath();
+        mkdirSync(dirname(path), { recursive: true });
+        if (!existsSync(path)) writeFileSync(path, '', 'utf8');
+        appendFileSync(path, `${JSON.stringify(normalized)}\n`, 'utf8');
+        if (key) archiveSeen.add(key);
+      }),
+    };
+  })()),
 );
 
 export type FtsStatement = Readonly<{

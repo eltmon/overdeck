@@ -26,7 +26,7 @@ vi.mock('child_process', () => {
 
   (exec as any)[kCustom] = execMock;
 
-  return { exec };
+  return { exec, execFile: vi.fn() };
 });
 
 import { runQualityGates, DEFAULT_GATES } from '../../src/lib/cloister/validation.js';

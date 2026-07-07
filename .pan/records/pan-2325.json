@@ -85,15 +85,14 @@
     "recordedAt": "2026-07-04T01:45:21.352Z"
   },
   "created": "2026-07-03T21:17:15.683Z",
-  "updated": "2026-07-04T14:35:48.153Z",
+  "updated": "2026-07-07T03:21:19.558Z",
   "pipeline": {
     "issueId": "PAN-2325",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
-    "mergeStatus": "merging",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T14:35:27.113Z",
+    "updatedAt": "2026-07-07T03:21:19.558Z",
     "reviewNotes": "Review passed; .pan/test artifact is untracked, ignored, and covered by reusable gitignore writer",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2328",
@@ -123,7 +122,9 @@
         "tests/lib/pan-artifacts.test.ts"
       ],
       "recordedAt": "2026-07-04T01:45:21.352Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-07T03:21:19.558Z"
   },
   "closeOut": {
     "usage": {

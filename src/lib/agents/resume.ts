@@ -7,6 +7,7 @@ import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { buildCompactRecoverySeedMessage } from '../context-overflow.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { normalizeModelOverrideSync, requireModelOverrideSync } from '../model-validation.js';
+import { getOverdeckDatabaseSync } from '../overdeck/infra.js';
 import { sessionFilePath } from '../paths.js';
 import { logAgentLifecycleSync } from '../persistent-logger.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
@@ -21,7 +22,6 @@ import {
   getAgentStateSync,
   markAgentRunning,
   saveAgentStateSync,
-  type AgentState,
 } from './agent-state.js';
 import { getLatestSessionIdSync, saveSessionId } from './activity.js';
 import {
@@ -116,7 +116,7 @@ export async function buildCompactRecoverySeed(agentId: string): Promise<{ seed:
   };
 }
 
-export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string; harness?: RuntimeName; allowHost?: boolean; compact?: boolean }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
+export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string; harness?: RuntimeName; allowHost?: boolean; compact?: boolean; recoverGated?: boolean }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
   const normalizedId = normalizeAgentId(agentId);
   const requestedModel = normalizeModelOverrideSync(opts?.model);
   logAgentLifecycleSync(normalizedId, `resumeAgent called (message=${message ? 'yes' : 'no'}, harness=${opts?.harness || 'unchanged'})`);
@@ -125,10 +125,14 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
   const runtimeState = getAgentRuntimeStateSync(normalizedId);
   const agentState = getAgentStateSync(normalizedId);
   const gateBlockReason = agentState ? getAgentResumeGateBlockReason(agentState) : undefined;
-  if (gateBlockReason) {
+  const bypassTroubledGate = opts?.compact === true && opts.recoverGated === true && agentState?.troubled === true && agentState.paused !== true;
+  if (gateBlockReason && !bypassTroubledGate) {
     const reason = `Cannot resume ${normalizedId}: ${gateBlockReason}. Clear the gate before resuming.`;
     logAgentLifecycleSync(normalizedId, `resumeAgent BLOCKED: ${reason}`);
     return { success: false, error: reason };
+  }
+  if (bypassTroubledGate) {
+    logAgentLifecycleSync(normalizedId, `resumeAgent: bypassing troubled gate for explicit compact recovery (${gateBlockReason})`);
   }
   const hasWorkspace = !!agentState?.workspace && existsSync(agentState.workspace);
   const isPlaceholder = !!agentState && agentState.status === 'starting' && typeof agentState.model === 'string' && agentState.model.startsWith('pending-');
@@ -332,7 +336,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     // PAN-1980: refuse to rotate to a new session. A resume that would need a
     // fresh session — compact/overflow recovery or model/harness drift — now
     // errors and stops instead of starting a new transcript.
-    if (sessionRotationRefused({ compactSeed: Boolean(compactSeed), driftReasons: resumeDriftReasons })) {
+    if (sessionRotationRefused({ compactSeed: Boolean(compactSeed), driftReasons: resumeDriftReasons, allowExplicitRecovery: opts?.compact === true && opts.recoverGated === true })) {
       const reason = compactSeed
         ? 'context-overflow compaction would respawn a fresh session'
         : `session drift (${resumeDriftReasons.join(', ')})`;
@@ -488,6 +492,15 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
 
     // Update agent state
     if (agentState) {
+      if (bypassTroubledGate) {
+        delete agentState.troubled;
+        delete agentState.troubledAt;
+        delete agentState.consecutiveFailures;
+        delete agentState.firstFailureInRunAt;
+        delete agentState.lastFailureAt;
+        delete agentState.lastFailureReason;
+        delete agentState.lastFailureNextRetryAt;
+      }
       agentState.lastResumeAt = resumeStartedAt;
       markAgentRunning(agentState, { preserveFailureTracking: true });
       saveAgentStateSync(agentState);
@@ -502,11 +515,15 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     // context_overflow (don't clobber an unrelated stuck state).
     if (opts?.compact && agentState?.issueId) {
       try {
-        const { getReviewStatusSync } = await import('../review-status.js');
-        const rs = getReviewStatusSync(agentState.issueId);
-        if (rs?.stuck && rs.stuckReason === 'context_overflow') {
-          const { clearWorkspaceStuck } = await import('../review-status.js');
-          clearWorkspaceStuck(agentState.issueId);
+        const db = getOverdeckDatabaseSync();
+        const row = db.prepare('SELECT stuck, stuck_reason FROM review_status WHERE issue_id = ?')
+          .get(agentState.issueId.toUpperCase()) as { stuck?: number; stuck_reason?: string | null } | undefined;
+        if (row?.stuck === 1 && row.stuck_reason === 'context_overflow') {
+          db.prepare(`
+            UPDATE review_status
+            SET stuck = 0, stuck_reason = NULL, stuck_at = NULL, stuck_details = NULL, updated_at = ?
+            WHERE issue_id = ?
+          `).run(Date.now(), agentState.issueId.toUpperCase());
           logAgentLifecycleSync(normalizedId, `cleared context_overflow stuck flag after compaction-resume for ${agentState.issueId}`);
         }
       } catch (clearErr) {

@@ -27,6 +27,17 @@ function topConsumerLabel(consumer: SystemHealthConsumer): string {
   return consumer.label;
 }
 
+function primaryHealthLabel(data: SystemHealthSnapshot): string {
+  const reasons = data.reasons.join(' ');
+  if (/Available RAM/i.test(reasons)) return `${formatBytes(data.summary.availableMemoryBytes)} avail`;
+  if (/Swap usage/i.test(reasons)) return `${Math.round(data.summary.swapUsedPercent)}% swap`;
+  if (/CPU load/i.test(reasons)) return `${data.summary.loadPerCore1m.toFixed(2)} load/core`;
+  if (/Committed memory/i.test(reasons)) return `${Math.round(data.summary.overcommitPercent)}% commit`;
+  if (/leaked specialist/i.test(reasons)) return `${data.summary.leakedSpecialistCount} leaked`;
+  if (/smee-client/i.test(reasons)) return 'relay down';
+  return `${Math.round(data.summary.memoryUsedPercent)}% mem`;
+}
+
 function KillButton({ consumer, onSelectLeaked }: { consumer: SystemHealthConsumer; onSelectLeaked: () => void }) {
   const confirm = useConfirm();
   const queryClient = useQueryClient();
@@ -173,7 +184,7 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
           {!compact && (
             <>
               <span className="font-semibold uppercase tracking-wide">{data.severity}</span>
-              <span className="text-muted-foreground">{Math.round(data.summary.memoryUsedPercent)}% mem</span>
+              <span className="text-muted-foreground">{primaryHealthLabel(data)}</span>
             </>
           )}
         </span>

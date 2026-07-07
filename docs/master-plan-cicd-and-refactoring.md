@@ -37,6 +37,10 @@ incidents (live bleeding); the refactors don't bleed.
 | A7 | [PAN-2230](https://github.com/eltmon/overdeck/issues/2230) | Circular-dep ratchet. Independent. |
 | A8 | [PAN-2297](https://github.com/eltmon/overdeck/issues/2297) | Baseline auto-lower in post-merge-deploy.sh. Independent of Lane A, **but must LAND before Lane B reaches [PAN-2233](https://github.com/eltmon/overdeck/issues/2233)** (merge-agent decomposition shifts its PRD's call-path context). |
 | A9 | [PAN-2229](https://github.com/eltmon/overdeck/issues/2229) | Prompt-regression evals. Pre-epic PRD — re-verify before dispatch. |
+| A11 | [PAN-2108](https://github.com/eltmon/overdeck/issues/2108) | Dead-recipient recovery audit (operator-priority 2026-07-06): verdicts delivered to dead/paused work agents must trigger needs-you or gated auto-resume — the silent hour-eater. STRUCK for immediate landing; order-book entry is the durable follow-through. Cloister-adjacent: coordinate with B-lane if diffs collide. |
+| A12 | [PAN-2436](https://github.com/eltmon/overdeck/issues/2436) | bd-lock contention successor (operator-priority): scope the global mutex, lock-free patrol reads, finalize hold-shrink. STRUCK for immediate landing. |
+| A13 | [PAN-2445](https://github.com/eltmon/overdeck/issues/2445) | Autonomous-dispatch hardening (operator-added): patrol/reconciler planning spawns respect pickup posture; no silent-Fable staffing on autonomous paths. Evidence corrected (min-206 was a misrouted operator command via PAN-2449) — this is preventive policy + tests. |
+| A10 | [PAN-2420](https://github.com/eltmon/overdeck/issues/2420) | GitHub App merge-door hardening (operator-added 2026-07-06): boot preflight verifying the App can merge (names missing scopes), permission-vs-transient error distinction, auto-reconcile when a PR merges out-of-band after a door failure. Permission itself already fixed; this is the durable guard. |
 | — | [PAN-2265](https://github.com/eltmon/overdeck/issues/2265) | Already in-review — shepherd to close, no dispatch. |
 | — | [PAN-2358](https://github.com/eltmon/overdeck/issues/2358) | Not part of either campaign; normal pipeline flow whenever convenient. |
 
@@ -61,6 +65,28 @@ draft) → `pan start <id>`. They do not consume the Lane B slot.
 | B11 | [PAN-2233](https://github.com/eltmon/overdeck/issues/2233) | Refactor P3 | cloister/merge-agent.ts — re-verify PRD; requires A8 landed; in-flight-guard test must stay green |
 | B12 | [PAN-2190](https://github.com/eltmon/overdeck/issues/2190) | Refactor P3 | routes/workspaces/merge-ops.ts — re-verify PRD |
 | B13 | [PAN-2189](https://github.com/eltmon/overdeck/issues/2189) | Refactor P3 | deacon.ts — **PRD deliberately not written yet**; author it fresh only after B1–B12 land (its seams shift with each) |
+
+## Lane M — Mind Your Now (parallel project lane, operator-added 2026-07-06)
+
+Different project ⇒ fully parallel with Lanes A/B; shares only the global agent-load
+governor. Source: operator conversation 501 (MIN backlog audit) + conv 485 (voice).
+**Operator holds UAT on this lane where flagged: work everything, assemble merge
+trains, but flagged items wait for operator review before merge.**
+
+| Order | Issue | Note |
+|---|---|---|
+| M0 | MIN-857 | Gemini voice UX overhaul — already in pipeline (gpt-5.5). **UAT-hold: operator reviews before merge.** |
+| M1 | MIN-860 | Push notification delivery fix (Urgent — no pushes reach iPhone/Android until landed). Dispatch first in this lane. |
+| M2 | MIN-861 | Smartwatch notifications — depends on M1. |
+| M3 | MIN-854 | Fizzy-style notification tray adoption (styling + primary notification system). |
+| M4 | MIN-858 | System comment authorship. |
+| M5 | MIN-859 | Zone entropy. |
+| M6 | MIN-862 | Reminders backend enablement (mostly one-line-ish change + verification) — the epic's point made real. **Slots after M1.** |
+| M7 | MIN-729 | Strikethrough animation remainder — **slots after M3** (the tray likely fixes its display half; re-verify remaining scope post-M3). |
+
+Related, NOT in the lane: MIN-75 carries a scope note (delivery-status tracking,
+per-category rate limiting) referencing the MIN-860 PRD — normal backlog flow.
+PRDs for M1–M5 are in the mind-your-now-docs repo (committed by conv 501, e0862b0).
 
 ## Rules for the drip orchestrator
 

@@ -127,8 +127,9 @@ export interface CoordinateSwarmSlotsDeps {
   tryReserveSwarmSlot: () => boolean;
   releaseSwarmSlot: () => void;
   spawnRun: (issueId: string, role: 'work', options: SpawnRunOptions) => Promise<unknown>;
-  /** Per-issue operator hold: stuck / deaconIgnored suppress all swarm coordination (PAN-2214). */
-  getIssueHold?: (issueId: string) => Pick<ReviewStatus, 'stuck' | 'deaconIgnored'> | null;
+  /** Per-issue hold: deaconIgnored (operator) suppresses all swarm coordination (PAN-2214);
+   *  system-set `stuck` is logged but no longer halts coordination (PAN-2469). */
+  getIssueHold?: (issueId: string) => Pick<ReviewStatus, 'stuck' | 'deaconIgnored' | 'stuckReason'> | null;
   /** Per-issue record statusOverrides — the durable item done-ness the merged plan view applies. */
   readStatusOverrides?: (workspacePath: string, issueId: string) => Record<string, string> | undefined;
   getFinalizedAt: (issueId: string, workspacePath: string) => string | undefined;
@@ -203,7 +204,7 @@ function defaultGetMaxSlotIndex(): number {
   return Math.max(1, getConcurrencyLimits().reservedSwarmSlots);
 }
 
-function defaultGetIssueHold(issueId: string): Pick<ReviewStatus, 'stuck' | 'deaconIgnored'> | null {
+function defaultGetIssueHold(issueId: string): Pick<ReviewStatus, 'stuck' | 'deaconIgnored' | 'stuckReason'> | null {
   try {
     return getReviewStatusSync(issueId);
   } catch {
@@ -270,9 +271,18 @@ export async function coordinateSwarmSlots(
     const issueId = workspace.issueId.toUpperCase();
     if (filterIssueId && issueId !== filterIssueId) continue;
     const hold = (deps.getIssueHold ?? defaultGetIssueHold)(issueId);
-    if (hold?.stuck || hold?.deaconIgnored) {
-      actions.push(`[swarm] skipped ${issueId}: ${hold.deaconIgnored ? 'deacon-ignored' : 'stuck'} — operator hold`);
+    if (hold?.deaconIgnored) {
+      actions.push(`[swarm] skipped ${issueId}: deacon-ignored — operator hold`);
       continue;
+    }
+    // PAN-2469: `stuck` is a SYSTEM-set failure marker (delivery/verification
+    // trouble), not an operator hold — skipping coordination on it froze the
+    // whole swarm forever: PAN-2388's slots sat ready-to-merge for hours while
+    // the coordinator skipped the issue because the verification-gate deadlock
+    // (PAN-2461) had marked it stuck. Coordination (merge/gc/endgame) continues
+    // through system-stuck; only operator deacon-ignore fully halts it.
+    if (hold?.stuck) {
+      actions.push(`[swarm] ${issueId} is system-stuck (${hold.stuckReason ?? 'unknown'}) — coordinating anyway (stuck no longer halts assembly, PAN-2469)`);
     }
     if (isSwarmAdvanceCoolingDown(issueId)) {
       actions.push(`[swarm] deferred ${issueId}: advance backoff active`);
@@ -479,7 +489,13 @@ export async function mergeReadySlots(
     if (slot.lifecycle !== 'ready-to-merge') continue;
 
     const item = itemsById.get(slot.itemId);
-    if (!item) continue;
+    if (!item) {
+      // PAN-2469: this skip was silent — a slot whose itemId drifted from the
+      // current spec (e.g. after a re-plan) sat ready-to-merge forever with no
+      // trace. Say so every pass.
+      actions.push(`[swarm] cannot merge slot ${slot.slotIndex} for ${issueId}: itemId "${slot.itemId}" not in the current plan (spec drift?) — needs operator attention`);
+      continue;
+    }
 
     const branchKey = slot.branch ?? `feature/${issueId.toLowerCase()}-slot-${slot.slotIndex}`;
     if (isSlotMergeCoolingDown(branchKey)) {

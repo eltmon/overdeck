@@ -1,0 +1,594 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-07T02:44:46.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2375: tame beads/records auto-commit churn on main — debounce, batch, and auto-push policy",
+    "updated": "2026-07-07T07:33:41.711Z"
+  },
+  "plan": {
+    "id": "pan-2375",
+    "title": "chore(state-plane): tame beads/records auto-commit churn on main — debounce, batch, and auto-push policy",
+    "status": "completed",
+    "uid": "e89ea3a7-191c-44d4-abc6-35ffb882bb54",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 5,
+    "created": "2026-07-07T02:44:46.000Z",
+    "updated": "2026-07-07T07:33:41.711Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2375",
+        "label": "PAN-2375",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/main/docs/STATE-PLANE-COMMIT-POLICY.md",
+        "label": "State-Plane Commit Policy",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "state-plane",
+      "auto-commit",
+      "git",
+      "deacon",
+      "ci-cd-epic"
+    ],
+    "narratives": {
+      "Problem": "src/lib/pan-dir/auto-commit.ts commits beads/records state to LOCAL main at high frequency (~64 commits/24h). Its 2s debounce resets on every write, and there is no push policy — so local main sits perpetually ahead of origin (ahead-10 observed twice on 2026-07-06). That makes pan reload deploy stale code (PAN-2095 root), misleads disk audits, forces humans to rebase noise commits, and pollutes history with ~60+ commits/day.",
+      "Proposal": "Land against docs/STATE-PLANE-COMMIT-POLICY.md. (1) Create the ONE canonical shared predicate src/lib/state-plane.ts (STATE_PLANE_PATHS + isStatePlaneOnlyDiff) with a CI single-source guard (rule 6). (2) Convert queueAutoCommit from reset-on-write debounce to fixed-window coalescing (default 10 min, env override) — one commit per window — and flush pending commits on process shutdown. (3) After each flush commit on main, push origin main ff-only; on non-ff rejection, rebase state-only commits onto origin/main and retry once ONLY when the tree is clean and the diff is state-plane-only, else surface loudly. (4) Add a getMainDivergence helper surfaced by both pan doctor and the deacon health surface so silent ahead/behind divergence is visible.",
+      "NonGoals": "- Moving state commits off the main working branch onto a dedicated state branch/worktree (evaluated and rejected; the pan_records infra-repo path already exists and debounce+push solve every stated symptom).\n- Gitignoring or otherwise removing any state-plane path from git (policy rule 1 forbids it).\n- Changing source-code review/merge/verdict behavior (policy rule 4 loosens nothing about code review).\n- Refactoring the other cluster gates (PAN-2417/2167/2406/2386) to consume the new predicate — this issue only creates it; siblings adopt it."
+    },
+    "autoDecisions": [
+      {
+        "summary": "PAN-2375 creates the canonical isStatePlaneOnlyDiff module rather than consuming a sibling's.",
+        "rationale": "The predicate does not exist yet (only a comment at deacon.ts:1522) and FR-5's rebase-safety needs it. Policy rule 6 mandates one path list in one place; creating it here and having siblings consume it prevents parallel copies."
+      },
+      {
+        "summary": "Flush window defaults to 10 minutes, overridable via OVERDECK_STATE_FLUSH_WINDOW_MS.",
+        "rationale": "Matches the issue's stated example, bounds history pollution, and the shutdown flush caps worst-case staleness."
+      },
+      {
+        "summary": "Divergence warn thresholds: ahead > 1, behind > 0.",
+        "rationale": "One in-flight window's commit is normal; two-plus signals push failure. Any behind on local main drives stale pan reload."
+      },
+      {
+        "summary": "Deliverable 4 (dedicated state branch/worktree) rejected and recorded as NonGoal.",
+        "rationale": "The two-door model already supports a dedicated infra repo via pan_records.repo + repoRoot (PAN-1908); debounce + push fix every symptom without a migration touching every state reader."
+      },
+      {
+        "summary": "Config via module constants + env overrides, not config-yaml plumbing.",
+        "rationale": "Mirrors the existing DEBOUNCE_MS constant style and keeps the change surgical."
+      }
+    ],
+    "items": [
+      {
+        "id": "state-plane-predicate",
+        "title": "Create canonical src/lib/state-plane.ts (STATE_PLANE_PATHS + isStatePlaneOnlyDiff)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-07T02:44:46.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2375",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "state-plane-single-source-guard",
+            "auto-push-policy"
+          ],
+          "files_scope": [
+            "src/lib/state-plane.ts",
+            "src/lib/__tests__/state-plane.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/state-plane.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "state-plane.test.ts passes with cases for state-only, mixed, and source-only diffs"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Before writing, git fetch origin/main and confirm no equivalent module already exists (hazard H1) — consume it if present. Otherwise create src/lib/state-plane.ts exporting: (a) STATE_PLANE_PATHS as the verbatim policy-glossary list — .pan/records/, .pan/continues/, .pan/continue.json, .pan/specs/, .beads/, .pan/test/, .pan/review/, .pan/feedback/; and (b) async isStatePlaneOnlyDiff(baseSha, tipSha, repoRoot) that runs `git diff --name-only baseSha tipSha` in repoRoot and returns true iff every changed path matches a STATE_PLANE_PATHS entry (empty diff => true). Add a comment noting .pan/specs/ is path-included though the policy scopes it to status-field flips (H5). This is the shared predicate for the whole state-plane cluster (rule 6); do not inline the path list anywhere else."
+        },
+        "items": [
+          {
+            "id": "state-plane-predicate.ac1",
+            "title": "isStatePlaneOnlyDiff returns true when the diff between two SHAs touches only state-plane paths (e.g. .pan/records/ and .beads/ files)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-plane-predicate.ac2",
+            "title": "isStatePlaneOnlyDiff returns false when the diff includes any non-state path (e.g. a src/ file), even if state paths also changed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-plane-predicate.ac3",
+            "title": "isStatePlaneOnlyDiff returns false for a diff that touches only a .pan/drafts/ file, confirming .pan/drafts/ is not treated as a state-plane path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-plane-predicate.ac4",
+            "title": "isStatePlaneOnlyDiff returns true for an empty (no-file) diff between identical SHAs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "state-plane-single-source-guard",
+        "title": "CI guard: fail build if the state-plane path list is duplicated outside the canonical module",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T02:44:46.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-2375",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/state-plane-single-source.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/state-plane-single-source.test.ts"
+          ],
+          "expected_outputs": [
+            "single-source test passes and would fail if a second '.pan/records/' path-list literal appeared outside src/lib/state-plane.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a vitest guard that greps src/ for a state-plane path-list literal (a source line containing both '.pan/records/' and '.pan/review/' or an array of the glossary paths) and asserts it appears ONLY in src/lib/state-plane.ts. This enforces policy rule 6 (one path list, one place) mechanically."
+        },
+        "items": [
+          {
+            "id": "state-plane-single-source-guard.ac1",
+            "title": "The guard test passes on the current tree with the path list only in src/lib/state-plane.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-plane-single-source-guard.ac2",
+            "title": "The guard test fails (red) if a duplicate state-plane path-list literal is introduced in any other src/ file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fixed-window-debounce",
+        "title": "Convert auto-commit from reset-on-write debounce to fixed-window coalescing (default 10 min)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-07T02:44:46.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2375",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pan-dir/auto-commit.ts",
+            "src/lib/pan-dir/__tests__/auto-commit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/pan-dir/__tests__/auto-commit.test.ts"
+          ],
+          "expected_outputs": [
+            "auto-commit.test.ts passes including a new fixed-window coalescing test using fake timers"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In queueAutoCommit (auto-commit.ts:181-186), for an existing pending batch add paths/subjects but DO NOT clearTimeout+reschedule — keep the window timer set at first-queue time so all writes inside the window coalesce into one commit. Replace DEBOUNCE_MS=2000 with FLUSH_WINDOW_MS defaulting to 600000 (10 min), overridable via process.env.OVERDECK_STATE_FLUSH_WINDOW_MS. Update the module doc comment. Tests MUST use vi.useFakeTimers()+vi.advanceTimersByTimeAsync() (H4/NFR-3)."
+        },
+        "items": [
+          {
+            "id": "fixed-window-debounce.ac1",
+            "title": "Given two queueAutoCommit calls within one window, When the window elapses, Then exactly one commit is produced (the window timer is not reset by the second call)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fixed-window-debounce.ac2",
+            "title": "The flush window defaults to 600000ms and is overridden by OVERDECK_STATE_FLUSH_WINDOW_MS when set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fixed-window-debounce.ac3",
+            "title": "A single queued write produces no commit before the flush window elapses and exactly one commit after it elapses (verified with fake timers)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "flush-on-shutdown",
+        "title": "Flush pending auto-commits on process shutdown",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-07T02:44:46.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2375",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pan-dir/auto-commit.ts",
+            "src/dashboard/server/main.ts",
+            "src/lib/pan-dir/__tests__/auto-commit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/pan-dir/__tests__/auto-commit.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck passes",
+            "test proving flushAllPendingAutoCommits commits every pending root"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Export flushAllPendingAutoCommits() from auto-commit.ts that flushes every projectRoot currently in the pending map (await all). Call it from handleShutdownSignal in src/dashboard/server/main.ts (:514-546), before process.exit(0). Required because the 10-min window (fixed-window-debounce) would otherwise strand up to 10 min of committable state as a dirty tree (D4/H3)."
+        },
+        "items": [
+          {
+            "id": "flush-on-shutdown.ac1",
+            "title": "flushAllPendingAutoCommits() commits every pending projectRoot and resolves after all commit attempts complete",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flush-on-shutdown.ac2",
+            "title": "handleShutdownSignal invokes flushAllPendingAutoCommits() before process.exit so a graceful SIGTERM/SIGINT leaves no pending state uncommitted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "auto-push-policy",
+        "title": "Push origin main ff-only after flush, with safe state-only rebase-retry-once",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-07T02:44:46.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2375",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pan-dir/auto-commit.ts",
+            "src/lib/pan-dir/__tests__/auto-commit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/pan-dir/__tests__/auto-commit.test.ts"
+          ],
+          "expected_outputs": [
+            "push-policy tests pass for ff-success, non-ff-with-clean-state-only-rebase-retry, and non-ff-with-dirty-tree-surface paths using a local bare remote fixture"
+          ],
+          "readiness": "sequential",
+          "readinessReason": "Deliberately serialized behind fixed-window-debounce and flush-on-shutdown: all three edit src/lib/pan-dir/auto-commit.ts and would conflict if worked in parallel. Also blocked by state-plane-predicate for the isStatePlaneOnlyDiff import.",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In doCommit, after a successful commit on main (and gated by OVERDECK_STATE_AUTOPUSH != '0'), attempt `git push origin main` ff-only. On non-ff rejection: git fetch origin main; if the working tree is clean AND isStatePlaneOnlyDiff(origin/main, main, gitRoot) is true, `git rebase origin/main` (state-only commits => content-neutral) and retry the push exactly once; otherwise log a loud warning and return without forcing (NFR-2, H2). All push/rebase steps are best-effort with the existing runGit failure-matching pattern and never throw back to the writer (NFR-1, H6). Consumes the state-plane-predicate module. Tests use fake timers and a temp bare remote."
+        },
+        "items": [
+          {
+            "id": "auto-push-policy.ac1",
+            "title": "After a flush commit on main, auto-commit runs `git push origin main` and the commit lands on origin when the push fast-forwards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-push-policy.ac2",
+            "title": "When the ff push is rejected and the tree is clean with a state-only ahead-diff, auto-commit rebases onto origin/main and retries the push exactly once, succeeding",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-push-policy.ac3",
+            "title": "When the ff push is rejected and the tree is dirty OR an ahead-commit touches a non-state path, auto-commit does NOT rebase and emits a loud divergence warning instead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-push-policy.ac4",
+            "title": "With OVERDECK_STATE_AUTOPUSH=0, auto-commit creates the commit but performs no push, leaving origin/main unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-push-policy.ac5",
+            "title": "A push/fetch/rebase failure is caught and logged and never throws back to the calling writer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "main-divergence-helper",
+        "title": "Add getMainDivergence(repoPath) -> {ahead, behind} git helper",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T02:44:46.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2375",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": [],
+          "files_scope": [
+            "src/lib/state-plane.ts",
+            "src/lib/__tests__/state-plane.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/state-plane.test.ts"
+          ],
+          "expected_outputs": [
+            "test proving getMainDivergence reports correct ahead/behind counts against a temp remote"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Add getMainDivergence(repoPath): Promise<{ahead: number; behind: number}> that returns `git rev-list --count origin/main..main` (ahead) and `git rev-list --count main..origin/main` (behind), defaulting to {0,0} on any error. Co-locate it in src/lib/state-plane.ts (the state-git module) so both pan doctor and the deacon consume one implementation (D6). It does NOT fetch — callers rely on the auto-commit fetch cadence / their own fetch."
+        },
+        "items": [
+          {
+            "id": "main-divergence-helper.ac1",
+            "title": "getMainDivergence returns {ahead: N, behind: 0} when local main has N unpushed commits over origin/main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-divergence-helper.ac2",
+            "title": "getMainDivergence returns {ahead: 0, behind: M} when origin/main is M commits ahead of local main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-divergence-helper.ac3",
+            "title": "getMainDivergence returns {ahead: 0, behind: 0} on a git error rather than throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-divergence-check",
+        "title": "pan doctor: report local-main vs origin/main divergence per project",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T02:44:46.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2375",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor.ts",
+            "src/cli/commands/__tests__/doctor-main-divergence.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/cli/commands/__tests__/doctor-main-divergence.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "doctor divergence test passes",
+            "lint (incl. lint-skills) passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a checkMainDivergence function producing one CheckResult per project (using the doctor CheckResult shape at doctor.ts:162 and getMainDivergence from main-divergence-helper). status 'ok' when ahead<=1 and behind===0; 'warn' when ahead>1 or behind>0, message stating the counts and fix 'run `git push origin main` / `pan reload` builds from origin'. Push results into the checks array in doctorCommand. If skills/pan-doctor/SKILL.md enumerates checks, update it in the same commit (lint-skills lockstep)."
+        },
+        "items": [
+          {
+            "id": "doctor-divergence-check.ac1",
+            "title": "pan doctor emits a warn CheckResult naming the ahead/behind counts when local main is >1 ahead or any commits behind origin/main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-divergence-check.ac2",
+            "title": "pan doctor emits an ok CheckResult when local main is 0-or-1 ahead and 0 behind origin/main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deacon-divergence-surface",
+        "title": "Surface main divergence on the deacon health surface",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T02:44:46.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2375",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon.ts",
+            "src/lib/cloister/__tests__/deacon-divergence.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/cloister/__tests__/deacon-divergence.test.ts"
+          ],
+          "expected_outputs": [
+            "deacon divergence test passes proving the patrol records ahead/behind into the health surface"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "In the deacon patrol (near the queueBeadsAutoCommit sweep at deacon.ts:3047-3051), call getMainDivergence for each project and record the result on the deacon health state (DeaconState at deacon.ts:250 / lastPatrolResult) and/or an addLog('warn', ...) when ahead>1 or behind>0, so the dashboard health surface shows silent divergence. Reuse the same thresholds as the doctor check (D6). Keep it best-effort — a git error must not break the patrol."
+        },
+        "items": [
+          {
+            "id": "deacon-divergence-surface.ac1",
+            "title": "The deacon patrol records local-main ahead/behind divergence onto its health surface each cycle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-divergence-surface.ac2",
+            "title": "The patrol emits a warn-level log entry when local main is >1 ahead or any commits behind origin/main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-divergence-surface.ac3",
+            "title": "The patrol cycle survives a git error thrown during divergence measurement and still emits its normal cycle-complete log",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "state-plane-predicate",
+        "to": "state-plane-single-source-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "state-plane-predicate",
+        "to": "main-divergence-helper",
+        "type": "blocks"
+      },
+      {
+        "from": "state-plane-predicate",
+        "to": "auto-push-policy",
+        "type": "blocks"
+      },
+      {
+        "from": "fixed-window-debounce",
+        "to": "flush-on-shutdown",
+        "type": "blocks"
+      },
+      {
+        "from": "flush-on-shutdown",
+        "to": "auto-push-policy",
+        "type": "blocks"
+      },
+      {
+        "from": "main-divergence-helper",
+        "to": "doctor-divergence-check",
+        "type": "blocks"
+      },
+      {
+        "from": "main-divergence-helper",
+        "to": "deacon-divergence-surface",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-07-PAN-2375-chore-state-plane-tame-beads-records-auto-commit-churn-on-main-debounce-batch-and-auto-push-policy.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

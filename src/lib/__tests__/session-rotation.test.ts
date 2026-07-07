@@ -11,6 +11,10 @@ describe('session rotation policy (PAN-1980)', () => {
     expect(sessionRotationRefused({ compactSeed: true, driftReasons: [] })).toBe(true);
   });
 
+  it('allows an explicit recovery surface to compact-respawn', () => {
+    expect(sessionRotationRefused({ compactSeed: true, driftReasons: [], allowExplicitRecovery: true })).toBe(false);
+  });
+
   it('refuses a model/harness-drift resume', () => {
     expect(sessionRotationRefused({ compactSeed: false, driftReasons: ['model a→b'] })).toBe(true);
   });

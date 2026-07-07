@@ -1,0 +1,144 @@
+{
+  "issueId": "PAN-2336",
+  "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-07-06T20:39Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-06T20:39:33.050Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-06T20:39:33Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2336\n\nGlobal frontend unused-code checks are disabled in tsconfig outside PAN-2336 scope\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2336 -m \"Fixed review issues\"`"
+    }
+  ],
+  "harness": "codex",
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "execfile-callback-mock": "completed",
+    "execfile-callback-mock.ac1": "completed",
+    "execfile-callback-mock.ac2": "completed",
+    "execfile-callback-mock.ac3": "completed",
+    "execfile-callback-mock.ac4": "completed"
+  },
+  "pipeline": {
+    "issueId": "PAN-2336",
+    "reviewStatus": "reviewing",
+    "testStatus": "passed",
+    "mergeStatus": "merged",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-07T03:12:10.142Z",
+    "reviewNotes": "Global frontend unused-code checks are disabled in tsconfig outside PAN-2336 scope",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2427",
+    "reviewedAtCommit": "2c0a915f25d36975e61b4e4e9fa7b86127b83971",
+    "lastVerifiedCommit": "452dff1d3069a7f1ad3b2f14d8d4da14556abcbb",
+    "reviewRequestedAt": "2026-07-06T19:29:39.653Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        ".pan/drafts/PAN-2336.md",
+        ".pan/records/pan-2336.json"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "src/lib/vbrief/__tests__/create-beads.test.ts"
+      ],
+      "actualChangedFiles": [
+        ".pan/drafts/PAN-2336.md",
+        ".pan/records/pan-2336.json",
+        "src/lib/vbrief/__tests__/create-beads.test.ts"
+      ],
+      "recordedAt": "2026-07-06T19:29:32.663Z"
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-07T03:12:10.142Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "codex": {
+          "unknown": {
+            "input": 2451444,
+            "output": 11338,
+            "cacheRead": 2042496,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 24693,
+            "output": 661,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 15967,
+            "output": 43690,
+            "cacheRead": 2763788,
+            "cacheWrite": 177353
+          }
+        },
+        "planning": {
+          "anthropic/claude-opus-4-8": {
+            "input": 4,
+            "output": 699,
+            "cacheRead": 387701,
+            "cacheWrite": 1834
+          }
+        },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 428104,
+            "output": 6187,
+            "cacheRead": 1964544,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "unknown": {
+          "input": 2451444,
+          "output": 11338,
+          "cacheRead": 2042496,
+          "cacheWrite": 0
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 24693,
+          "output": 661,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 15971,
+          "output": 44389,
+          "cacheRead": 3151489,
+          "cacheWrite": 179187
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 428104,
+          "output": 6187,
+          "cacheRead": 1964544,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 7.844447000000001,
+        "pricingAsOf": "2026-07-06T20:46:49.785Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2427"
+    ],
+    "ranOn": "eltmon-z790"
+  },
+  "created": "2026-07-06T20:32:19.057Z",
+  "updated": "2026-07-07T03:12:10.142Z"
+}

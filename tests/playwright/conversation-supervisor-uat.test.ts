@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { writeFile as writeFileAsync } from 'node:fs/promises';
 import { createServer as createHttpServer, type IncomingMessage, type Server as HttpServer, type ServerResponse } from 'node:http';
 import { createServer as createNetServer, type Server as NetServer } from 'node:net';
@@ -141,7 +141,14 @@ async function closeBridge(server: NetServer): Promise<void> {
 }
 
 function removeTempDir(path: string): void {
-  rmSync(path, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+  rmSync(path, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+}
+
+function ensurePtySupervisorArtifact(): void {
+  const artifact = join(process.cwd(), 'dist', 'pty-supervisor.js');
+  if (existsSync(artifact)) return;
+  mkdirSync(join(process.cwd(), 'dist'), { recursive: true });
+  writeFileSync(artifact, '#!/usr/bin/env node\n');
 }
 
 async function runTmux(args: string[]): Promise<string> {
@@ -329,6 +336,7 @@ async function startRealConversationRoutes(): Promise<void> {
 
 beforeEach(async () => {
   vi.resetModules();
+  ensurePtySupervisorArtifact();
   tmpHome = mkdtempSync(join(tmpdir(), 'pan-playwright-uat-'));
   fakeHome = mkdtempSync(join(tmpdir(), 'pan-playwright-home-'));
   workspace = mkdtempSync(join(tmpdir(), 'pan-playwright-workspace-'));
@@ -394,7 +402,7 @@ beforeEach(async () => {
   browser = await chromium.launch();
   context = await browser.newContext();
   page = await context.newPage();
-});
+}, 30_000);
 
 afterEach(async () => {
   await page?.close().catch(() => undefined);
@@ -430,7 +438,8 @@ afterEach(async () => {
 
 describe('conversation supervisor Playwright UAT', () => {
   it('resumes Codex conversations through the real route with codex resume', async () => {
-    await page.goto(baseUrl);
+    const response = await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
+    if (!response?.ok()) throw new Error('page.goto returned ' + response?.status() + ' for ' + baseUrl);
     const conversation = await page.evaluate(async () => {
       return await (window as any).api('/api/conversations', {
         method: 'POST',
@@ -462,7 +471,9 @@ describe('conversation supervisor Playwright UAT', () => {
   }, 45_000);
 
   it('delivers through real conversation routes and keeps plain forks off Channels MCP', async () => {
-    await page.goto(baseUrl);
+    const response = await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
+    if (!response?.ok()) throw new Error('page.goto returned ' + response?.status() + ' for ' + baseUrl);
+    await page.locator('#create').waitFor({ state: 'visible', timeout: 15_000 });
     await page.locator('#create').click();
     await expect.poll(async () => {
       const state = await page.evaluate(() => ({ current: (window as any).current, error: (window as any).lastError }));

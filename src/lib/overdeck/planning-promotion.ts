@@ -25,6 +25,7 @@ import { killSession, sessionExists } from '../tmux.js';
 import type { CreateBeadsResult } from '../vbrief/beads.js';
 import { findPlan, findWorkspaceDraftPlan, readPlan } from '../vbrief/io.js';
 import { assertPlanQuality, PlanQualityLintError } from '../vbrief/quality-lint.js';
+import { flushAutoCommits } from '../pan-dir/auto-commit.js';
 import { resolveIssueProjectPathSync } from './issue-reads.js';
 
 const execFileAsync = promisify(execFile);
@@ -225,7 +226,59 @@ export function completePlanningWorkspaceGitAddCommands(gitRoot: string): string
   if (existsSync(join(gitRoot, '.beads'))) {
     commands.push(['add', '.beads/']);
   }
+  // PAN-2386: the polyrepo scaffold .gitignore is created during workspace setup
+  // but the workspace may not be a git repo yet, leaving it untracked. Stage it
+  // as part of the planning commit so auto-start sees a clean tree.
+  if (existsSync(join(gitRoot, '.gitignore'))) {
+    commands.push(['add', '.gitignore']);
+  }
   return commands;
+}
+
+/**
+ * PAN-2386: complete-planning can leave `.pan/records/<issue>.json` modified after
+ * the main `chore(plan): complete planning` commit because record writes are
+ * queued for debounced auto-commit. If auto-start is requested, the subsequent
+ * start-agent dirty-workspace guard refuses to spawn the work agent. Flush any
+ * pending auto-commits and explicitly stage/commit the per-issue record so the
+ * tree handed to auto-start is clean.
+ */
+export async function commitWorkspaceRecordBeforeAutoSpawn(gitRoot: string, issueId: string): Promise<void> {
+  if (!existsSync(join(gitRoot, '.git'))) return;
+  const issueLower = issueId.toLowerCase();
+
+  try {
+    await Effect.runPromise(flushAutoCommits(gitRoot));
+  } catch {
+    // Non-fatal — explicit status check below will catch uncommitted changes.
+  }
+
+  const recordPath = join('.pan', 'records', `${issueLower}.json`);
+  try {
+    const { stdout: statusOut } = await execFileAsync('git', ['status', '--porcelain', '--', recordPath], {
+      cwd: gitRoot,
+      encoding: 'utf-8',
+    });
+    if (!statusOut.trim()) return;
+
+    await execFileAsync('git', ['add', '--', recordPath], { cwd: gitRoot, encoding: 'utf-8' });
+    try {
+      await execFileAsync('git', ['diff', '--cached', '--quiet', '--', recordPath], { cwd: gitRoot, encoding: 'utf-8' });
+      return;
+    } catch {
+      // There are staged changes — commit them.
+    }
+
+    await execFileAsync(
+      'git',
+      ['commit', '-m', `chore(records): update ${issueId.toUpperCase()} per-issue record before auto-start`, '--', recordPath],
+      { cwd: gitRoot, encoding: 'utf-8' },
+    );
+    console.log(`[complete-planning] Committed per-issue record for ${issueId.toUpperCase()} before auto-start`);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`[complete-planning] Could not commit per-issue record for ${issueId.toUpperCase()}: ${message}`);
+  }
 }
 
 function getInternalDashboardOrigin(): string {
@@ -636,6 +689,13 @@ export async function completePlanningForIssue(options: {
 
     // Suppress unused variable warning — remoteVmName used for remote session cleanup if added later
     void isRemotePlanning; void remoteVmName;
+
+    // PAN-2386: if auto-start is requested, make sure the workspace tree is clean
+    // before we ask start-agent to spawn. The per-issue record may have been
+    // modified by debounced auto-commit writes during finalize.
+    if (autoSpawn && workspacePath) {
+      await commitWorkspaceRecordBeforeAutoSpawn(workspacePath, id);
+    }
 
     const autoSpawnResult = await completePlanningAutoSpawnAndKill({
       issueId: id,

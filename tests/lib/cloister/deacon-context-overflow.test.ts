@@ -110,16 +110,17 @@ function pane(...lines: string[]): string {
   return lines.join('\n') + '\n' + PROMPT;
 }
 
+// Import once at module scope; vi.mock hoisting ensures mocks are wired.
+const deaconMod = await import('../../../src/lib/cloister/deacon.js');
+const checkApiErrorAgents = deaconMod.checkApiErrorAgents;
+const contextOverflowRecoveryState = deaconMod.contextOverflowRecoveryState;
+const contextProactiveCompactState = deaconMod.contextProactiveCompactState;
+const stuckOverflowNativeRecoveryState = deaconMod.stuckOverflowNativeRecoveryState;
+
 // ── Suite ──────────────────────────────────────────────────────────────────
 
 describe('checkApiErrorAgents — context-window overflow recovery', () => {
-  let checkApiErrorAgents: () => Promise<string[]>;
-  let contextOverflowRecoveryState: Map<string, { lastAttempt: number; compactAttempts: number; mechanism: 'respawn' | 'harness-compact' }>;
-  let contextProactiveCompactState: Map<string, { lastAttempt: number }>;
-  let stuckOverflowNativeRecoveryState: Map<string, { attempts: number; lastAttempt: number }>;
-
-  beforeEach(async () => {
-    vi.resetModules();
+  beforeEach(() => {
     mockSendKeys.mockReset().mockResolvedValue(undefined);
     mockCapturePane.mockReset();
     mockListSessionNames.mockReset().mockResolvedValue([SESSION]);
@@ -134,11 +135,6 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
     // PAN-1675: fresh agent-* overflow recovers via resumeAgent({compact:true}).
     mockResumeAgent.mockReset().mockResolvedValue({ success: true });
 
-    const mod = await import('../../../src/lib/cloister/deacon.js');
-    checkApiErrorAgents = mod.checkApiErrorAgents;
-    contextOverflowRecoveryState = mod.contextOverflowRecoveryState;
-    contextProactiveCompactState = mod.contextProactiveCompactState;
-    stuckOverflowNativeRecoveryState = mod.stuckOverflowNativeRecoveryState;
     contextOverflowRecoveryState.clear();
     contextProactiveCompactState.clear();
     stuckOverflowNativeRecoveryState.clear();

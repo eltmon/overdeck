@@ -1,0 +1,203 @@
+{
+  "issueId": "PAN-2374",
+  "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-07T12:02:57.347Z"
+    }
+  ],
+  "feedback": [],
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
+  "statusOverrides": {
+    "cr-guard": "completed",
+    "cr-guard.ac1": "completed",
+    "cr-guard.ac2": "completed",
+    "cr-guard.ac3": "completed",
+    "cr-guard.ac4": "completed",
+    "cr-reply": "completed",
+    "cr-reply.ac1": "completed",
+    "cr-reply.ac2": "completed",
+    "cr-reply.ac3": "completed",
+    "cr-reply.ac4": "completed",
+    "cr-wire-context": "completed",
+    "cr-wire-context.ac1": "completed",
+    "cr-wire-context.ac2": "completed",
+    "cr-wire-context.ac3": "completed",
+    "cr-wire-context.ac4": "completed",
+    "cr-ingest-module": "completed",
+    "cr-ingest-module.ac1": "completed",
+    "cr-ingest-module.ac2": "completed",
+    "cr-ingest-module.ac3": "completed",
+    "cr-ingest-module.ac4": "completed",
+    "cr-config": "completed",
+    "cr-config.ac1": "completed",
+    "cr-config.ac2": "completed",
+    "cr-config.ac3": "completed"
+  },
+  "pipeline": {
+    "issueId": "PAN-2374",
+    "reviewStatus": "passed",
+    "testStatus": "failed",
+    "verificationStatus": "passed",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-07T12:05:07.009Z",
+    "reviewNotes": "Main merge reviewed; no blockers",
+    "testNotes": "typecheck passed; lint passed (including lint:no-coderabbit-merge-gate); npm test failed with 5 unrelated timeout failures (conversation-supervisor-uat hook, deacon-context-overflow hook, deacon-test-signal hook, cloister-control-surface test, agents-switch-model test). PAN-2374-specific unit tests passed 44/44 (coderabbit-ingestion, no-coderabbit-merge-gate, review-context). No browser UAT required by PRD/vBRIEF/issue notes (backend/CLI feature). AC-5 unmet: full suite not green.",
+    "inspectNotes": "Bead cr-ingest-module ack: fetchCodeRabbitFindings returns [] on absence/PR-resolution-failure/gh-api-error (verified via resolveOwnerRepo catch, prNumber null-check, and per-fetch .catch()), returns findings with body+path/line for coderabbitai[bot] reviews and inline comments, zero execSync matches, CodeRabbitFinding type exported cleanly, 115 lines, quota invariant documented inline.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2459",
+    "reviewedAtCommit": "43ea4db0264a42d54fd8662969ecc817ec85de0f",
+    "lastVerifiedCommit": "43ea4db0264a42d54fd8662969ecc817ec85de0f",
+    "reviewRequestedAt": "2026-07-07T12:00:29.397Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        ".beads/issues.jsonl",
+        ".pan/drafts/PAN-2374.md",
+        ".pan/records/pan-2374.json",
+        "packages/contracts/package.json",
+        "scripts/source-introspection-baseline.txt",
+        "src/lib/cloister/__tests__/lint-stub-ui-audit-examples.test.ts",
+        "src/lib/cloister/__tests__/review-context-stub-ui.test.ts",
+        "src/lib/planning/__tests__/spawn-planning-session-harness.test.ts",
+        "tests/lib/cloister/deacon-context-overflow.test.ts",
+        "tests/lib/cloister/deacon-test-signal.test.ts",
+        "tests/unit/dashboard/cloister-control-surface.test.ts"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        ".coderabbit.yaml",
+        "package.json",
+        "scripts/lint-no-coderabbit-merge-gate.sh",
+        "src/lib/cloister/__tests__/review-context.test.ts",
+        "src/lib/cloister/coderabbit-ingestion.ts",
+        "src/lib/cloister/review-context.ts",
+        "src/lib/cloister/review-verdict-feedback.ts",
+        "tests/unit/lib/cloister/coderabbit-ingestion.test.ts",
+        "tests/unit/lib/cloister/no-coderabbit-merge-gate.test.ts"
+      ],
+      "actualChangedFiles": [
+        ".beads/issues.jsonl",
+        ".coderabbit.yaml",
+        ".pan/drafts/PAN-2374.md",
+        ".pan/records/pan-2374.json",
+        "package.json",
+        "packages/contracts/package.json",
+        "scripts/lint-no-coderabbit-merge-gate.sh",
+        "scripts/source-introspection-baseline.txt",
+        "src/lib/cloister/__tests__/lint-stub-ui-audit-examples.test.ts",
+        "src/lib/cloister/__tests__/review-context-stub-ui.test.ts",
+        "src/lib/cloister/__tests__/review-context.test.ts",
+        "src/lib/cloister/coderabbit-ingestion.ts",
+        "src/lib/cloister/review-context.ts",
+        "src/lib/cloister/review-verdict-feedback.ts",
+        "src/lib/planning/__tests__/spawn-planning-session-harness.test.ts",
+        "tests/lib/cloister/deacon-context-overflow.test.ts",
+        "tests/lib/cloister/deacon-test-signal.test.ts",
+        "tests/unit/dashboard/cloister-control-surface.test.ts",
+        "tests/unit/lib/cloister/coderabbit-ingestion.test.ts",
+        "tests/unit/lib/cloister/no-coderabbit-merge-gate.test.ts"
+      ],
+      "recordedAt": "2026-07-07T11:59:20.265Z"
+    }
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 4901,
+            "output": 2240,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 31611,
+            "output": 42615,
+            "cacheRead": 4910078,
+            "cacheWrite": 173126
+          }
+        },
+        "review": {
+          "unknown": {
+            "input": 11522279,
+            "output": 37327,
+            "cacheRead": 10395520,
+            "cacheWrite": 0
+          }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 6564,
+            "output": 2100,
+            "cacheRead": 411510,
+            "cacheWrite": 77553
+          }
+        },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 494577,
+            "output": 13347,
+            "cacheRead": 2013952,
+            "cacheWrite": 0
+          }
+        },
+        "work": {
+          "custom/kimi-k2.7-code": {
+            "input": 1541317,
+            "output": 252819,
+            "cacheRead": 67230208,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-haiku-4-5": {
+          "input": 4901,
+          "output": 2240,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 31611,
+          "output": 42615,
+          "cacheRead": 4910078,
+          "cacheWrite": 173126
+        },
+        "unknown": {
+          "input": 11522279,
+          "output": 37327,
+          "cacheRead": 10395520,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 6564,
+          "output": 2100,
+          "cacheRead": 411510,
+          "cacheWrite": 77553
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 2035894,
+          "output": 266166,
+          "cacheRead": 69244160,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 33.193419,
+        "pricingAsOf": "2026-07-07T12:05:07.046Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2459"
+    ],
+    "ranOn": "eltmon-z790"
+  },
+  "created": "2026-07-07T12:02:57.295Z",
+  "updated": "2026-07-07T12:05:07.048Z"
+}

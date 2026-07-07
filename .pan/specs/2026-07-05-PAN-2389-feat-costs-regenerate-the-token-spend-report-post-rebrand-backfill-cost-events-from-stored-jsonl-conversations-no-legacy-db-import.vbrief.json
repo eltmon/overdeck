@@ -4,17 +4,17 @@
     "created": "2026-07-05T21:59:55.237Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2389: feat(costs): regenerate the token spend report post-rebrand — backfill cost events from stored JSONL conversations, no legacy DB import",
-    "updated": "2026-07-05T22:09:45.191Z"
+    "updated": "2026-07-06T22:58:12.508Z"
   },
   "plan": {
     "id": "pan-2389",
     "title": "feat(costs): regenerate the token spend report post-rebrand — backfill cost events from stored JSONL conversations, no legacy DB import",
-    "status": "proposed",
+    "status": "completed",
     "uid": "909c028c-aecf-4b5b-b13d-40cd1cfe7226",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-07-05T21:59:55.237Z",
-    "updated": "2026-07-05T22:09:45.191Z",
+    "updated": "2026-07-06T22:58:12.508Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2389",
@@ -580,5 +580,5 @@
       "canonicalFilename": "2026-07-05-PAN-2389-feat-costs-regenerate-the-token-spend-report-post-rebrand-backfill-cost-events-from-stored-jsonl-conversations-no-legacy-db-import.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

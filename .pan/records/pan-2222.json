@@ -156,11 +156,10 @@
     "issueId": "PAN-2222",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T07:58:11.579Z",
+    "updatedAt": "2026-07-07T03:09:14.313Z",
     "testNotes": "npm run typecheck passed; npm run lint initially OOMed during build:cli, rerun passed; npm test under sandbox failed with EPERM for spawn/listen, rerun elevated completed with 1 failed test: src/lib/__tests__/agent-state-role.test.ts > AgentState role persistence > PAN-2017: fails and stops a strike spawn when kickoff delivery fails, ENOTEMPTY rmdir /tmp/pan-agent-role-lmi50p. UAT not required: acceptance is backend/library/config/docs with no UI/dashboard criterion.",
     "inspectNotes": "Bead workspace-eb49q passed inspection: implementation matches the feed-noise-filter spec (shared renderer, exclude pathspecs, subject skip, max_diff_bytes stat fallback, live/replay sharing) and no CLAUDE/PRD constraints are violated.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2249",
@@ -244,7 +243,9 @@
         "tests/unit/lib/overdeck/no-loss-matrix.ts"
       ],
       "recordedAt": "2026-07-03T03:03:41.361Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-07T03:09:14.313Z"
   },
   "closeOut": {
     "usage": {
@@ -324,5 +325,5 @@
     ]
   },
   "created": "2026-07-03T02:56:10.923Z",
-  "updated": "2026-07-03T07:58:11.983Z"
+  "updated": "2026-07-07T03:09:14.313Z"
 }

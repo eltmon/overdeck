@@ -8,7 +8,6 @@ import {
   getAgentStateSync,
   getAgentRuntimeStateSync,
   getAgentRuntimeState,
-  normalizeAgentId,
 } from '../agents.js';
 import { encodeClaudeProjectDir } from '../paths.js';
 import { findLatestRollout, extractThreadIdFromRollout } from '../runtimes/codex.js';

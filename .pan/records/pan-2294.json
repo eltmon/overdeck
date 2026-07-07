@@ -68,14 +68,14 @@
     "recordedAt": "2026-07-04T15:15:37.719Z"
   },
   "created": "2026-07-03T12:02:49.631Z",
-  "updated": "2026-07-06T14:16:06.984Z",
+  "updated": "2026-07-07T03:11:38.135Z",
   "pipeline": {
     "issueId": "PAN-2294",
     "reviewStatus": "reviewing",
     "testStatus": "passed",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T14:16:06.984Z",
+    "updatedAt": "2026-07-07T03:11:38.135Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-2294-review already running. Use 'pan tell' to message it.",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -105,7 +105,7 @@
       "recordedAt": "2026-07-04T15:15:37.719Z"
     },
     "closedOut": true,
-    "closedOutAt": "2026-07-06T14:16:06.984Z"
+    "closedOutAt": "2026-07-07T03:11:38.135Z"
   },
   "closeOut": {
     "usage": {

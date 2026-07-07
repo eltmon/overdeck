@@ -40,10 +40,12 @@ import {
   getIssueState,
   getIssueStatePromise,
   getMergeBackendStatus,
+  isIntegrationPermissionError,
   listOpenIssuesWithLabels,
   listOpenIssuesWithLabelsPromise,
   listPullRequestsForHead,
   listPullRequestsForHeadPromise,
+  verifyAppCanMerge,
 } from '../../../src/lib/github-app.js';
 
 describe('getMergeBackendStatus', () => {
@@ -309,5 +311,87 @@ describe('App REST shared helpers', () => {
       .resolves.toEqual({ state: 'open' });
     await expect(Effect.runPromise(listOpenIssuesWithLabels('eltmon', 'overdeck')))
       .resolves.toEqual([{ number: 5, labels: ['ready'] }]);
+  });
+});
+
+describe('verifyAppCanMerge', () => {
+  it('returns canMerge:true when the App has pull_requests:write and contents:write', async () => {
+    const result = await verifyAppCanMerge({
+      isConfigured: () => true,
+      generateToken: async () => ({
+        token: 'token',
+        expiresAt: '2026-07-07T00:00:00Z',
+        permissions: { pull_requests: 'write', contents: 'write' },
+      }),
+    });
+    expect(result).toMatchObject({ configured: true, canMerge: true, missing: [] });
+    expect(result.detail).toContain('merge permissions');
+  });
+
+  it('returns missing pull_requests:write when the permission is not write', async () => {
+    const result = await verifyAppCanMerge({
+      isConfigured: () => true,
+      generateToken: async () => ({
+        token: 'token',
+        expiresAt: '2026-07-07T00:00:00Z',
+        permissions: { contents: 'write' },
+      }),
+    });
+    expect(result).toMatchObject({ configured: true, canMerge: false, missing: ['pull_requests:write'] });
+    expect(result.detail).toContain('pull_requests:write');
+  });
+
+  it('returns missing contents:write when the permission is not write', async () => {
+    const result = await verifyAppCanMerge({
+      isConfigured: () => true,
+      generateToken: async () => ({
+        token: 'token',
+        expiresAt: '2026-07-07T00:00:00Z',
+        permissions: { pull_requests: 'write' },
+      }),
+    });
+    expect(result).toMatchObject({ configured: true, canMerge: false, missing: ['contents:write'] });
+    expect(result.detail).toContain('contents:write');
+  });
+
+  it('returns missing both permissions when neither is granted', async () => {
+    const result = await verifyAppCanMerge({
+      isConfigured: () => true,
+      generateToken: async () => ({
+        token: 'token',
+        expiresAt: '2026-07-07T00:00:00Z',
+        permissions: {},
+      }),
+    });
+    expect(result.missing).toEqual(['pull_requests:write', 'contents:write']);
+    expect(result.canMerge).toBe(false);
+  });
+
+  it('returns a neutral not-configured result and mints no token when the App is not configured', async () => {
+    const generateToken = vi.fn();
+    const result = await verifyAppCanMerge({
+      isConfigured: () => false,
+      generateToken,
+    });
+    expect(result.configured).toBe(false);
+    expect(generateToken).not.toHaveBeenCalled();
+  });
+});
+
+describe('isIntegrationPermissionError', () => {
+  it('returns true for a 403 "Resource not accessible by integration" message', () => {
+    expect(isIntegrationPermissionError('GitHub merge failed: 403 {"message":"Resource not accessible by integration"}')).toBe(true);
+  });
+
+  it('returns false for transient network errors', () => {
+    expect(isIntegrationPermissionError('fetch failed: ECONNRESET')).toBe(false);
+    expect(isIntegrationPermissionError('fetch failed: ETIMEDOUT')).toBe(false);
+  });
+
+  it('returns false for timeout and mergeable-state errors', () => {
+    expect(isIntegrationPermissionError('Timed out waiting for GitHub PR #123 to become mergeable')).toBe(false);
+    expect(isIntegrationPermissionError('GitHub merge failed: 409 {"message":"Head branch was modified"}')).toBe(false);
+    expect(isIntegrationPermissionError('GitHub merge failed: 422 {"message":"Required status check"}')).toBe(false);
+    expect(isIntegrationPermissionError('GitHub merge failed: 405 Method Not Allowed')).toBe(false);
   });
 });

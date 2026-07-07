@@ -6,7 +6,7 @@ import type { ModelId } from '../settings.js';
 import { BACKGROUND_AI_FEATURES } from '../background-ai/registry.js';
 import { DEFAULT_TIERED_EXECUTION_CONFIG, TieredExecutionConfigError, validateTieredExecutionConfig } from '../agents/tier-table.js';
 import { DEFAULT_CONFIG } from './defaults.js';
-import { cloneRoles, DEFAULT_MODEL_REFS, DEFAULT_ROLES, DEFAULT_WORKHORSES, mergeRoleConfig, validateRoleModelRefs } from './roles.js';
+import { cloneRoles, DEFAULT_ROLES, DEFAULT_WORKHORSES, mergeRoleConfig, validateRoleModelRefs } from './roles.js';
 import {
   cloneDocsConfig,
   isComplianceMode,
@@ -419,6 +419,13 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
         throw new Error(`config.yaml: compliance.mode must be ${COMPLIANCE_MODES.join(', ')}`);
       }
       result.compliance.mode = config.compliance.mode;
+    }
+
+    // Merge planning default mode (raw value; validation happens in pan start resolver)
+    if (config.planning?.default_mode !== undefined) {
+      result.planning = {
+        defaultMode: config.planning.default_mode,
+      };
     }
 
     if (config.registry?.classification) {

@@ -150,7 +150,7 @@ async function deliverVerificationFeedback(
     return;
   }
 
-  surfaceIssueFeedbackNeedsYou(issueId, target.reason, {
+  await surfaceIssueFeedbackNeedsYou(issueId, target.reason, {
     specialist: 'verification-gate',
     ...details,
   });
@@ -478,6 +478,28 @@ async function runVerificationForIssuePromise(
     }));
 
     const failedGate = gateResults.find(r => !r.passed && r.required !== false);
+
+    // PAN-2461: an infra-unavailable gate (container/docker missing) is NOT a code
+    // failure — it must not consume a verification attempt or pause the agent.
+    // Trigger stack recovery and leave verification pending for the next cycle.
+    if (failedGate?.infraUnavailable) {
+      console.warn(`[${logPrefix}] Gate "${failedGate.name}" could not run for ${issueId}: ${failedGate.error} — triggering workspace stack rebuild, attempt NOT counted (${currentCycles}/${VERIFICATION_MAX_CYCLES} used)`);
+      setReviewStatusSync(issueId, {
+        verificationStatus: 'pending',
+        verificationNotes: `Verification deferred: ${failedGate.error}. Workspace stack rebuild triggered; verification re-runs on the next cycle.`,
+      });
+      try {
+        const { rebuildWorkspaceStack } = await import('../workspace/rebuild-stack.js');
+        void Effect.runPromise(rebuildWorkspaceStack(issueId, {
+          onProgress: (m) => console.log(`[${logPrefix}] ${issueId} stack rebuild: ${m}`),
+        })).then((r) => {
+          if (!r.success) console.warn(`[${logPrefix}] Stack rebuild for ${issueId} failed: ${r.error}`);
+        });
+      } catch (err) {
+        console.warn(`[${logPrefix}] Could not trigger stack rebuild for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      return { outcome: 'failed', failedCheck: failedGate.name, cycleCount: currentCycles, maxCycles: VERIFICATION_MAX_CYCLES };
+    }
 
     if (failedGate) {
       const newCycleCount = currentCycles + 1;

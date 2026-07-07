@@ -35,9 +35,27 @@ pan start PAN-123 --remote --tier ephemeral  # Remote Fly.io workspace that wind
 
 ## What It Does
 
-Creates a git worktree at `workspaces/feature-<id>/`, installs dependencies, then spawns
-an autonomous Claude Code agent in a tmux session (`agent-<id>`). The agent loads the
-issue spec, creates a plan, and begins implementation.
+`pan start <id>` is the single paved-road entry point: it takes an issue from whatever
+state it is in to running work.
+
+- **No plan exists** — `pan start` auto-plans (non-interactive), materializes beads, and
+  starts the work agent when planning finalizes.
+- **Plan exists** — `pan start` creates the workspace if needed and spawns the work agent
+  from the existing vBRIEF and beads.
+- **Already running** — `pan start` exits 0 with a no-op message naming `pan tell <id>` for
+  messaging and the tmux attach command.
+
+Planning depth is controlled by `--plan`:
+
+```bash
+pan start PAN-1071 --plan interactive   # Q&A planning first, then work
+pan start PAN-1071 --plan auto          # non-interactive planning, then work (default)
+pan start PAN-1071 --plan skip          # synthesize a minimal vBRIEF and beads, then work
+```
+
+The default planning mode comes from `planning.default_mode` in `~/.overdeck/config.yaml`;
+the shipped default is `auto`. The legacy `--auto` flag is deprecated and is now an alias
+for `--plan skip`.
 
 If an agent is paused, `pan start <id>` refuses to spawn until you run `pan unpause <id>`.
 Use `--force` only when you intentionally want to clear that pause gate and start anyway.

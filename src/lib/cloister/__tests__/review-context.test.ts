@@ -58,6 +58,12 @@ vi.mock('../lint-stub-ui.js', () => ({
   scanStubUi: vi.fn(),
 }));
 
+// ── CodeRabbit ingestion mock ───────────────────────────────────────────────
+const mockFetchCodeRabbitFindings = vi.fn();
+vi.mock('../coderabbit-ingestion.js', () => ({
+  fetchCodeRabbitFindings: (...args: unknown[]) => mockFetchCodeRabbitFindings(...args),
+}));
+
 // ── import after mocks ─────────────────────────────────────────────────────
 import { buildReviewContext, formatTier1Summary, REVIEW_LARGE_CHANGESET_FILES, REVIEW_LARGE_CHANGESET_LINES } from '../review-context.js';
 import { findPlanSync } from '../../vbrief/io.js';
@@ -83,6 +89,7 @@ describe('buildReviewContext', () => {
     mockReadPlan.mockReturnValue(Effect.fail(new Error('no plan')));
     mockExistsSync.mockImplementation((p: string) => p === workspace);
     vi.mocked(scanStubUi).mockResolvedValue([]);
+    mockFetchCodeRabbitFindings.mockResolvedValue([]);
   });
 
   it('throws when workspace does not exist', async () => {
@@ -357,20 +364,22 @@ describe('riskScore (via buildReviewContext file ranking)', () => {
   }
 });
 
+const baseManifest = {
+  issueId: 'PAN-1059',
+  branch: 'feature-pan-1059',
+  headSha: 'abc123',
+  changedFiles: [],
+  largeChangeset: { fileCount: 0, changedLines: 0, isLarge: false },
+  acceptanceCriteria: [],
+  nonGoals: [],
+  traces: [],
+  policyNotes: [],
+  stubUiFindings: [],
+  codeRabbitFindings: [],
+  diff: { stat: '1 file changed, 1 insertion(+)', truncated: false },
+};
+
 describe('large changeset guardrail', () => {
-  const baseManifest = {
-    issueId: 'PAN-1059',
-    branch: 'feature-pan-1059',
-    headSha: 'abc123',
-    changedFiles: [],
-    largeChangeset: { fileCount: 0, changedLines: 0, isLarge: false },
-    acceptanceCriteria: [],
-    nonGoals: [],
-    traces: [],
-    policyNotes: [],
-    stubUiFindings: [],
-    diff: { stat: '1 file changed, 1 insertion(+)', truncated: false },
-  };
 
   it('flags a changeset with more than REVIEW_LARGE_CHANGESET_FILES files', () => {
     const files = Array.from({ length: REVIEW_LARGE_CHANGESET_FILES + 1 }, (_, i) => ({
@@ -411,5 +420,94 @@ describe('large changeset guardrail', () => {
     const summary = formatTier1Summary({ ...baseManifest, changedFiles: files, largeChangeset: { fileCount: files.length, changedLines, isLarge: false } });
     expect(summary).not.toContain('LARGE CHANGESET');
     expect(summary).not.toContain('BLOCKING coverage gap');
+  });
+});
+
+describe('CodeRabbit findings integration', () => {
+  const workspace = '/tmp/fake-workspace';
+  const runId = 'agent-pan-2374-review-abc12345';
+  const issueId = 'PAN-2374';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockReadPlan.mockReturnValue(Effect.fail(new Error('no plan')));
+    mockExistsSync.mockImplementation((p: string) => p === workspace);
+    vi.mocked(scanStubUi).mockResolvedValue([]);
+    mockFetchCodeRabbitFindings.mockResolvedValue([]);
+  });
+
+  it('persists codeRabbitFindings into the manifest and written context.json', async () => {
+    const findings = [{ body: 'Consider extracting this.', url: 'https://example.com/1' }];
+    mockFetchCodeRabbitFindings.mockResolvedValue(findings);
+    mockGitOutput({
+      'rev-parse HEAD': { stdout: 'abc12345\n' },
+      'branch --show-current': { stdout: 'feature-pan-2374\n' },
+      'merge-base origin/main HEAD': { stdout: 'base\n' },
+      '--name-status': { stdout: '' },
+      '--numstat': { stdout: '' },
+      'diff --stat': { stdout: '' },
+    });
+
+    const manifest = await Effect.runPromise(buildReviewContext({ runId, issueId, workspace }));
+
+    expect(manifest.codeRabbitFindings).toEqual(findings);
+    expect(mockFetchCodeRabbitFindings).toHaveBeenCalledWith({ workspace, branch: 'feature-pan-2374' });
+    const written = JSON.parse(String(mockWriteFile.mock.calls.at(-1)?.[1]));
+    expect(written.codeRabbitFindings).toEqual(findings);
+  });
+
+  it('catches CodeRabbit ingestion failures and stores an empty array', async () => {
+    mockFetchCodeRabbitFindings.mockRejectedValue(new Error('gh auth failed'));
+    mockGitOutput({
+      'rev-parse HEAD': { stdout: 'abc12345\n' },
+      'branch --show-current': { stdout: 'feature-pan-2374\n' },
+      'merge-base origin/main HEAD': { stdout: 'base\n' },
+      '--name-status': { stdout: '' },
+      '--numstat': { stdout: '' },
+      'diff --stat': { stdout: '' },
+    });
+
+    const manifest = await Effect.runPromise(buildReviewContext({ runId, issueId, workspace }));
+
+    expect(manifest.codeRabbitFindings).toEqual([]);
+  });
+
+  it('renders an advisory CodeRabbit section in formatTier1Summary when findings exist', () => {
+    const summary = formatTier1Summary({
+      ...baseManifest,
+      issueId,
+      codeRabbitFindings: [
+        { path: 'src/lib/foo.ts', line: 7, body: 'Unused import.', url: 'https://example.com/1' },
+        { body: 'Consider extracting this.', url: 'https://example.com/2' },
+      ],
+    });
+
+    expect(summary).toContain('CodeRabbit findings (ADVISORY — non-gating; context, not acceptance criteria):');
+    expect(summary).toContain('  - src/lib/foo.ts:7 Unused import.');
+    expect(summary).toContain('  - general Consider extracting this.');
+  });
+
+  it('produces byte-identical Tier-1 summary when CodeRabbit findings are empty', () => {
+    const withEmptyFindings = formatTier1Summary({
+      ...baseManifest,
+      issueId,
+      codeRabbitFindings: [],
+    });
+    const withoutFindings = formatTier1Summary({
+      issueId,
+      branch: baseManifest.branch,
+      headSha: baseManifest.headSha,
+      changedFiles: baseManifest.changedFiles,
+      largeChangeset: baseManifest.largeChangeset,
+      acceptanceCriteria: baseManifest.acceptanceCriteria,
+      nonGoals: baseManifest.nonGoals,
+      traces: baseManifest.traces,
+      policyNotes: baseManifest.policyNotes,
+      stubUiFindings: baseManifest.stubUiFindings,
+      codeRabbitFindings: [],
+      diff: baseManifest.diff,
+    });
+
+    expect(withEmptyFindings).toBe(withoutFindings);
   });
 });

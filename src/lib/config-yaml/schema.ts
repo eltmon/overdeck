@@ -92,6 +92,17 @@ export interface NormalizedComplianceConfig {
   mode: ComplianceMode;
 }
 
+export type PlanningMode = 'interactive' | 'auto' | 'skip';
+
+export interface PlanningConfig {
+  /** Default planning depth for pan start on an unplanned issue. */
+  default_mode?: PlanningMode;
+}
+
+export interface NormalizedPlanningConfig {
+  defaultMode: PlanningMode;
+}
+
 export type ResiliencyTier = 'ephemeral' | 'durable';
 
 export interface RemoteConfig {
@@ -415,6 +426,9 @@ export interface YamlConfig {
     favorites?: string[];
   };
 
+  /** Planning depth defaults for pan start on unplanned issues. */
+  planning?: PlanningConfig;
+
   /** Legacy API keys (for backward compatibility) */
   api_keys?: {
     openai?: string;
@@ -679,6 +693,9 @@ export interface NormalizedConfig {
 
   /** OpenRouter favorite model IDs (shown in ModelPicker) */
   openrouterFavorites: string[];
+
+  /** Default planning depth for pan start on unplanned issues. */
+  planning?: NormalizedPlanningConfig;
 
   /** Optional workhorse model slots used by role model references. */
   workhorses?: WorkhorsesConfig;

@@ -1,0 +1,134 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-06T16:54:07.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2371: stabilize conversation-supervisor-uat.test.ts flake (#create click timeout) that blocks the verification gate for unrelated PRs",
+    "updated": "2026-07-06T18:17:03.668Z"
+  },
+  "plan": {
+    "id": "pan-2371",
+    "title": "bug(test): conversation-supervisor-uat.test.ts flaky (#create click timeout) blocks verification gate for unrelated PRs",
+    "status": "completed",
+    "uid": "d0f2bd78-b29c-4160-b262-9709e07538a7",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 5,
+    "created": "2026-07-06T16:54:07.000Z",
+    "updated": "2026-07-06T18:17:03.668Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2371",
+        "label": "PAN-2371",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "test",
+      "flaky",
+      "playwright",
+      "verification-gate"
+    ],
+    "narratives": {
+      "Problem": "The second test in tests/playwright/conversation-supervisor-uat.test.ts ('delivers through real conversation routes and keeps plain forks off Channels MCP') intermittently times out at `page.locator('#create').click()` (30s) inside the on-host Cloister verification gate. It blocked PAN-2231 (an orthogonal lint-rule change) through 3/3 verification cycles into verification_stuck, while GitHub CI stays green — a classic environmental/timing flake, not a code regression. The `#create` button is static HTML served by the test's embedded HTTP server, so a 30s click timeout means either page.goto landed on an error document during heavy beforeEach init, or the Chromium process was resource-starved on the saturated on-host gate. The gate's `test` command runs `vitest run --changed`, which transitively pulls this heavy browser UAT into unrelated PRs.",
+      "Proposal": "Harden the test in place (single file) so navigation failures surface fast and the #create wait is explicit and diagnostic: (1) capture the Response returned by page.goto(baseUrl) and assert response.ok(), failing fast with the HTTP status if the embedded server returned an error document; (2) add an explicit `page.locator('#create').waitFor({ state: 'visible', timeout: 15_000 })` before every `#create` click, so an absent element surfaces a #create-specific failure within 15s (well inside the 45s per-test budget) instead of a generic 30s click timeout. Apply both guards to both it(...) cases. This matches the existing human-authored PRD's W1 and the issue's endorsed 'stabilize the locator wait' option. No source/production code changes.",
+      "NonGoals": "- Do NOT modify the on-host verification gate command in ~/.overdeck/projects.yaml (machine-local config, not repo-controlled; a repo PR cannot change it).\n- Do NOT edit the repo's .overdeck/projects.yaml to change gate behavior (it is not the runtime source of truth).\n- Do NOT inline-fix inside unrelated PRs (e.g. PAN-2231).\n- Do NOT remove this UAT from the default vitest suite or change CI/vitest test topology in this issue (that is the documented follow-up if hardening proves insufficient — file a new issue).\n- Do NOT create, edit, or depend on scripts/flaky-quarantine.txt or the PAN-2373 quarantine mechanism (absent from this repo).\n- Do NOT weaken, delete, or skip any existing assertion in the UAT; the fix is additive.\n- Do NOT apply vi.useFakeTimers() to this test (it drives real Playwright + HTTP + WebSocket I/O).\n- Do NOT raise global vitest timeouts or change maxForks/pool settings.\n- Do NOT modify beforeEach, afterEach, or the first it(...) block beyond adding the shared navigation guard.",
+      "Risk": "Low. Single test file, additive guards only. If the true trigger is browser resource starvation on the saturated gate host, the guards improve diagnosis and robustness but may not fully eliminate the flake — tracked as hazard H1 with a documented follow-up (move browser UATs out of the on-host --changed gate)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Adopt the existing PRD's W1 test-hardening (readiness wait before #create click) over the 'move it out of the suite' option.",
+        "rationale": "The issue explicitly endorses 'stabilize the locator wait'; the change is single-file and low-risk; and the on-host gate command lives in machine-local ~/.overdeck/projects.yaml (OVERDECK_HOME, src/lib/projects.ts:18), so a repo PR cannot exclude the test from the gate anyway."
+      },
+      {
+        "summary": "Drop the existing PRD's W2 (quarantine-entry removal) and any dependency on scripts/flaky-quarantine.txt.",
+        "rationale": "Verified this session: no scripts/flaky-quarantine.txt and no quarantine wiring in vitest.config.ts or scripts/. The PAN-2373 quarantine mechanism and PAN-2376 epic are not present/landed here. There is nothing to un-quarantine."
+      },
+      {
+        "summary": "Strengthen the navigation guard to assert page.goto(...)'s Response.ok(), not just page.url() equality.",
+        "rationale": "The draft's own Re-verify note flags page.url() compare as fragile (trailing-slash). Response.ok() directly detects the hypothesized 500 error-document and fails fast with the HTTP status."
+      },
+      {
+        "summary": "Track flake elimination over repeated CI runs as a hazard, not a single-run acceptance criterion.",
+        "rationale": "GitHub CI is green while the saturated host flakes, so the trigger is plausibly resource starvation; a single green run cannot prove the flake is gone. ACs cover the concrete, diff-checkable code guards instead."
+      }
+    ],
+    "items": [
+      {
+        "id": "harden-create-readiness",
+        "title": "Add navigation + #create readiness guards to the conversation-supervisor Playwright UAT",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-06T16:54:07.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-2371",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/playwright/conversation-supervisor-uat.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/playwright/conversation-supervisor-uat.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both it(...) cases in conversation-supervisor-uat.test.ts execute and each reports green (0 failures)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In tests/playwright/conversation-supervisor-uat.test.ts, make navigation and the #create wait explicit in BOTH it(...) cases. (1) Change `await page.goto(baseUrl)` to capture the response: `const response = await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });` then assert `if (!response?.ok()) throw new Error('page.goto returned ' + response?.status() + ' for ' + baseUrl);` — this catches an error-document served during heavy beforeEach init and fails fast with the HTTP status. (2) Before every `page.locator('#create').click()`, add `await page.locator('#create').waitFor({ state: 'visible', timeout: 15_000 });` so an absent #create surfaces a locator-specific timeout within 15s (inside the 45s per-test budget) instead of a generic 30s click timeout. The first it(...) case ('resumes Codex conversations...') also calls page.goto(baseUrl) — apply the same navigation guard there; it does not click #create so no waitFor is needed for it. Do NOT touch beforeEach/afterEach, do NOT add fake timers, do NOT add new `any`, do NOT change the 45s test timeouts, and do NOT weaken any existing assertion."
+        },
+        "items": [
+          {
+            "id": "harden-create-readiness.ac1",
+            "title": "Both it(...) cases capture page.goto(baseUrl)'s Response and throw an error naming the HTTP status when response.ok() is false, instead of proceeding when navigation returned an error document.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harden-create-readiness.ac2",
+            "title": "Given a `page.locator('#create').click()` call, then a `page.locator('#create').waitFor({ state: 'visible', timeout: 15_000 })` precedes it, so a missing #create fails within a 15s locator-specific timeout rather than the default 30s click timeout.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harden-create-readiness.ac3",
+            "title": "The change preserves beforeEach, afterEach, every existing assertion, and the `}, 45_000)` per-test timeouts unchanged, and introduces no vi.useFakeTimers() and no new explicit `any`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harden-create-readiness.ac4",
+            "title": "Given Playwright/Chromium installed, then `npx vitest run --configLoader runner tests/playwright/conversation-supervisor-uat.test.ts` completes with 0 failures across both UAT cases.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-07-06-PAN-2371-bug-test-conversation-supervisor-uat-test-ts-flaky-create-click-timeout-blocks-verification-gate-for-unrelated-prs.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

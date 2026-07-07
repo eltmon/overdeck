@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { X, DollarSign, Loader2, Cpu, Layers } from 'lucide-react';
+import { costBucketLabel } from '../lib/cost-bucket-labels';
 
 interface CostBreakdownModalProps {
   issueId: string;
@@ -65,6 +66,7 @@ function friendlyModelName(model: string): string {
 }
 
 export function CostBreakdownModal({ issueId, isOpen, onClose }: CostBreakdownModalProps) {
+  const displayIssueId = costBucketLabel(issueId);
   const { data, isLoading, error } = useQuery<CostBreakdownData>({
     queryKey: ['costBreakdown', issueId],
     queryFn: async () => {
@@ -97,7 +99,7 @@ export function CostBreakdownModal({ issueId, isOpen, onClose }: CostBreakdownMo
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-emerald-400" />
-            <h2 className="font-semibold text-foreground">Cost Breakdown: {issueId}</h2>
+            <h2 className="font-semibold text-foreground">Cost Breakdown: {displayIssueId}</h2>
           </div>
           <button
             onClick={onClose}

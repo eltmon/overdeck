@@ -18,6 +18,7 @@ import { isPaneDead, sessionExistsSync } from '../tmux.js';
 import { describeRunningAgents, releaseAdvancingSlot, tryReserveAdvancingSlot } from './concurrency.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { isIssueClosed } from './issue-closed.js';
+import { shouldSkipDispatchAsMerged } from './merge-verification.js';
 import { getAutoCloseOutCanonicalState } from './deacon-canonical-state.js';
 
 const execAsync = promisify(exec);
@@ -426,8 +427,10 @@ export async function handleWorkCompleted(issueId: string): Promise<string[]> {
  * PAN-1908: per-issue orphan reconciler for a single review-status row. Used by
  * the legacy checkOrphanedReviewStatuses safety net and by reactive handlers.
  */
-async function reconcileReviewStatusOrphan(issueId: string, status: ReviewStatusLike): Promise<string[]> {
+async function reconcileReviewStatusOrphan(issueId: string, rawStatus: ReviewStatusLike): Promise<string[]> {
   const actions: string[] = [];
+
+  const status = getReviewStatusSync(issueId) ?? rawStatus;
 
   if (status.stuck) return actions;
   if (status.deaconIgnored) return actions;
@@ -583,22 +586,27 @@ async function reconcileReviewStatusOrphan(issueId: string, status: ReviewStatus
       } else if (!tryReserveAdvancingSlot()) {
         actions.push(`Deferred test re-dispatch for ${issueId} — advancing-role concurrency ceiling reached`);
       } else {
-        try {
-          const run = await spawnRun(issueId, 'test', {
-            workspace,
-            prompt: buildTestRolePrompt({ issueId, workspace, branch }),
-          });
-          testStackRebuildState.delete(issueId.toUpperCase());
-          setReviewStatusSync(issueId, { testStatus: 'testing' });
-          actions.push(`Re-dispatched orphaned test for ${issueId} via test role ${run.id} (deacon-orphan-recovery)`);
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          if (msg.includes('already running')) {
+        const mergedGuard = await shouldSkipDispatchAsMerged(issueId);
+        if (mergedGuard.skip) {
+          actions.push(`Orphaned test for ${issueId}: ${mergedGuard.reason}; skipping re-dispatch`);
+        } else {
+          try {
+            const run = await spawnRun(issueId, 'test', {
+              workspace,
+              prompt: buildTestRolePrompt({ issueId, workspace, branch }),
+            });
+            testStackRebuildState.delete(issueId.toUpperCase());
             setReviewStatusSync(issueId, { testStatus: 'testing' });
-            actions.push(`Orphaned test for ${issueId}: test role already running`);
-          } else {
-            setReviewStatusSync(issueId, { testStatus: 'dispatch_failed' });
-            actions.push(`Orphaned test role dispatch failed for ${issueId}: ${msg}`);
+            actions.push(`Re-dispatched orphaned test for ${issueId} via test role ${run.id} (deacon-orphan-recovery)`);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            if (msg.includes('already running')) {
+              setReviewStatusSync(issueId, { testStatus: 'testing' });
+              actions.push(`Orphaned test for ${issueId}: test role already running`);
+            } else {
+              setReviewStatusSync(issueId, { testStatus: 'dispatch_failed' });
+              actions.push(`Orphaned test role dispatch failed for ${issueId}: ${msg}`);
+            }
           }
         }
       }
@@ -649,8 +657,9 @@ export async function recoverStalledReviewConvoys(
     return actions;
   }
 
-  for (const [issueId, status] of Object.entries(statuses)) {
+  for (const [issueId, rawStatus] of Object.entries(statuses)) {
     try {
+      const status = getReviewStatusSync(issueId) ?? rawStatus;
       if (status.reviewStatus !== 'reviewing' && status.reviewStatus !== 'pending') continue;
       if (status.stuck || status.deaconIgnored) continue;
 
@@ -855,4 +864,3 @@ export async function checkMissingReviewStatuses(): Promise<string[]> {
 
   return actions;
 }
-

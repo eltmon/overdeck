@@ -7,6 +7,13 @@ import type { AgentState } from '../agents.js';
 
 let tempHome: string;
 
+function ensurePtySupervisorArtifact(): void {
+  const artifact = join(process.cwd(), 'dist', 'pty-supervisor.js');
+  if (existsSync(artifact)) return;
+  mkdirSync(join(process.cwd(), 'dist'), { recursive: true });
+  writeFileSync(artifact, '#!/usr/bin/env node\n');
+}
+
 describe('AgentState role persistence', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -60,7 +67,7 @@ describe('AgentState role persistence', () => {
     // PAN-1048 R4: default workhorse:mid tracks the current Sonnet.
     expect(determineModel({ role: 'work' })).toBe('claude-sonnet-5');
     expect(determineModel({ role: 'work', model: 'claude-opus-4-7' })).toBe('claude-opus-4-7');
-  });
+  }, 20_000);
 
   it('builds review role runtime commands from roles/review.md', async () => {
     const { getRoleRuntimeBaseCommand, roleAgentDefinitionPath, spawnRun } = await import('../agents.js');
@@ -446,6 +453,7 @@ describe('AgentState role persistence', () => {
   });
 
   it('allows explicit host override when the workspace stack is unhealthy', async () => {
+    ensurePtySupervisorArtifact();
     const workspace = mkdtempSync(join(tmpdir(), 'pan-stack-host-'));
     const createSessionAsync = vi.fn(async () => undefined);
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);

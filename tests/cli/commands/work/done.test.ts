@@ -32,6 +32,7 @@ const mockGetDashboardApiUrl = vi.fn().mockReturnValue('http://localhost:3000');
 const mockGetVBriefACStatus = vi.fn().mockReturnValue(null);
 const mockResolveProjectFromIssue = vi.fn();
 const mockFindWorkspacePath = vi.fn();
+const mockGetWorkspaceGitInfo = vi.fn();
 
 // execFile mock delegates to mockExecFn so tests that only set up exec
 // implementations also cover the bd list calls done-preflight makes via execFile.
@@ -107,6 +108,10 @@ vi.mock('../../../../src/lib/lifecycle/archive-planning.js', () => ({
   findWorkspacePath: mockFindWorkspacePath,
 }));
 
+vi.mock('../../../../src/lib/git-utils.js', () => ({
+  getWorkspaceGitInfo: (...args: unknown[]) => Effect.succeed(mockGetWorkspaceGitInfo(...args)),
+}));
+
 vi.mock('../../../../src/lib/config.js', async (importActual) => ({
   ...(await importActual<typeof import('../../../../src/lib/config.js')>()),
   getDashboardApiUrl: mockGetDashboardApiUrl,
@@ -155,6 +160,8 @@ beforeEach(() => {
   mockResolveProjectFromIssue.mockReturnValue(null);
   mockFindWorkspacePath.mockReset();
   mockFindWorkspacePath.mockReturnValue(null);
+  mockGetWorkspaceGitInfo.mockReset();
+  mockGetWorkspaceGitInfo.mockReturnValue({ HEAD: 'headsha', branch: 'feature/pan-714' });
 });
 
 function makeAgentState(workspace: string) {
@@ -542,6 +549,71 @@ describe('doneCommand dashboard-unreachable graceful path', () => {
       testStatus: 'pending',
       mergeStatus: 'pending',
     }));
+  });
+
+  it('keeps passed verdicts when only pipeline state changed since review', async () => {
+    mockGetAgentState.mockReturnValue(makeAgentState(tempDir));
+    mockExecFn.mockImplementation((cmd: string, _opts: unknown, cb: Function) => {
+      if (cmd.includes('git diff --name-only')) {
+        cb(null, {
+          stdout: '.pan/records/pan-714.json\n.pan/specs/PAN-714.vbrief.json\n.beads/issues.jsonl\n',
+          stderr: '',
+        });
+      } else {
+        cb(null, '', '');
+      }
+    });
+    mockShouldSkipTrackerUpdate.mockResolvedValue(true);
+    mockUpdateShadowState.mockResolvedValue(undefined);
+    mockGetReviewStatus.mockReturnValue({
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      readyForMerge: true,
+      reviewedAtCommit: 'reviewedsha',
+    });
+    mockGetWorkspaceGitInfo.mockReturnValue({ HEAD: 'headsha', branch: 'feature/pan-714' });
+
+    const { doneCommand } = await import('../../../../src/cli/commands/done.js');
+    await doneCommand('PAN-714', { force: true });
+
+    expect(mockSetReviewStatus).not.toHaveBeenCalledWith('PAN-714', expect.objectContaining({
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      readyForMerge: false,
+    }));
+  });
+});
+
+describe('pipeline state change predicate', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    mockExecFn.mockReset();
+  });
+
+  it('classifies only pipeline state paths as verdict-preserving', async () => {
+    mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
+      cb(null, {
+        stdout: '.pan/records/pan-714.json\n.pan/continue.json\n.pan/specs/PAN-714.vbrief.json\n.pan/test/result.json\n.pan/review/reviewer.json\n.pan/feedback/PAN-714.md\n.beads/issues.jsonl\n',
+        stderr: '',
+      });
+    });
+
+    const { hasOnlyPipelineStateChangesSinceCommit } = await import('../../../../src/lib/pipeline-state-paths.js');
+
+    await expect(hasOnlyPipelineStateChangesSinceCommit('/tmp', 'reviewedsha', 'headsha')).resolves.toBe(true);
+  });
+
+  it('treats source changes as verdict-stale', async () => {
+    mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
+      cb(null, {
+        stdout: '.pan/records/pan-714.json\nsrc/cli/commands/done.ts\n',
+        stderr: '',
+      });
+    });
+
+    const { hasOnlyPipelineStateChangesSinceCommit } = await import('../../../../src/lib/pipeline-state-paths.js');
+
+    await expect(hasOnlyPipelineStateChangesSinceCommit('/tmp', 'reviewedsha', 'headsha')).resolves.toBe(false);
   });
 });
 

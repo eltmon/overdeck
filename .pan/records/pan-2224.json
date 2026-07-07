@@ -81,7 +81,7 @@
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T14:15:32.679Z",
+    "updatedAt": "2026-07-07T03:09:21.294Z",
     "blockerReasons": [
       {
         "type": "failing_checks",
@@ -93,7 +93,7 @@
     "reviewedAtCommit": "f737b5223ab0e3e729f07524ca8571d115c9fd83",
     "lastVerifiedCommit": "37c29e29f75f2a40d32956f7b3d80cf76df21c15",
     "closedOut": true,
-    "closedOutAt": "2026-07-06T14:15:32.679Z"
+    "closedOutAt": "2026-07-07T03:09:21.294Z"
   },
   "closeOut": {
     "usage": {
@@ -165,5 +165,5 @@
     "slotAssignments": []
   },
   "created": "2026-07-02T16:48:03.302Z",
-  "updated": "2026-07-06T14:15:32.679Z"
+  "updated": "2026-07-07T03:09:21.294Z"
 }

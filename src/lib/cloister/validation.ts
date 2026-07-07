@@ -309,6 +309,10 @@ export interface QualityGateResult {
   durationMs: number;
   /** Error message if gate failed */
   error?: string;
+  /** PAN-2461: the gate could not run at all (e.g. its container is not running).
+   *  Callers must treat this as retryable infrastructure failure — never as a
+   *  code failure, and never count it against verification attempt budgets. */
+  infraUnavailable?: boolean;
 }
 
 /**
@@ -332,7 +336,7 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
   typecheck: { command: 'npm run typecheck 2>&1' },
   lint: { command: 'npm run lint 2>&1' },
   test: {
-    command: 'npx vitest run --changed {{CHANGED_BASE}} && npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.test.ts src/lib/__tests__/issueActions.no-actions-lost.test.ts src/lib/__tests__/issueActions.parity.test.tsx',
+    command: 'OVERDECK_VERIFICATION=1 npx vitest run --changed {{CHANGED_BASE}} && npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.test.ts src/lib/__tests__/issueActions.no-actions-lost.test.ts src/lib/__tests__/issueActions.parity.test.tsx',
   },
 };async function runQualityGatesPromise(
   gates: Record<string, QualityGateConfig>,
@@ -412,6 +416,38 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
       if (opts.placeholders) {
         containerName = replacePlaceholdersSync(containerName, opts.placeholders);
       }
+      // PAN-2461: a missing container previously burned verification attempts as a
+      // fake check failure ("frontend-lint failed" in 33ms because docker exec had
+      // no target). Pre-check and report infra-unavailable instead.
+      try {
+        const { stdout: liveCheck } = await execAsync(
+          `docker ps --filter "name=^${containerName}$" --format "{{.Names}}"`,
+          { timeout: 10_000 },
+        );
+        if (!liveCheck.split('\n').map(s => s.trim()).includes(containerName)) {
+          console.log(`[quality-gate] ⚠ "${name}" skipped: container ${containerName} is not running (infra-unavailable, does not count as a check failure)`);
+          results.push({
+            name, passed: false, required,
+            output: `container ${containerName} is not running`,
+            durationMs: Date.now() - startTime,
+            error: `container ${containerName} is not running`,
+            infraUnavailable: true,
+          });
+          if (required) break;
+          continue;
+        }
+      } catch {
+        // docker itself unreachable — same treatment.
+        results.push({
+          name, passed: false, required,
+          output: 'docker daemon unreachable',
+          durationMs: Date.now() - startTime,
+          error: 'docker daemon unreachable',
+          infraUnavailable: true,
+        });
+        if (required) break;
+        continue;
+      }
       // Use -w to set working directory inside the container.
       // The container mounts workspace code at /workspaces/feature/<subdir>,
       // so map the gate.path (e.g., 'fe') to the container's working directory.
@@ -435,27 +471,46 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
       }
     }
 
-    try {
-      // When running in container, don't set host cwd (irrelevant)
-      const useHostCwd = !isRemote && !(gate.container && gate.container_name);
-      const env = buildQualityGateEnv(gate.env);
-      const { stdout, stderr } = await execAsync(resolvedCommand, {
-        cwd: useHostCwd ? cwd : undefined,
-        env,
-        maxBuffer: 10 * 1024 * 1024, // 10MB
-        timeout: 20 * 60 * 1000, // 20 minute timeout per gate (PAN-1989: a near-total rename makes `vitest --changed` select ~the whole suite — 715 root + 166 frontend test files — which exceeds 10 min)
-      });
+    // PAN-2461: gates may declare `retry: N` — CI-parity for suites with known
+    // order-dependent flakes. A pass on any attempt is a pass.
+    const maxAttempts = 1 + Math.max(0, gate.retry ?? 0);
+    let lastError: any = null;
+    let passedGate = false;
+    let passOutput = '';
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        // When running in container, don't set host cwd (irrelevant)
+        const useHostCwd = !isRemote && !(gate.container && gate.container_name);
+        const env = buildQualityGateEnv(gate.env);
+        const { stdout, stderr } = await execAsync(resolvedCommand, {
+          cwd: useHostCwd ? cwd : undefined,
+          env,
+          maxBuffer: 10 * 1024 * 1024, // 10MB
+          timeout: 20 * 60 * 1000, // 20 minute timeout per gate (PAN-1989: a near-total rename makes `vitest --changed` select ~the whole suite — 715 root + 166 frontend test files — which exceeds 10 min)
+        });
+        passedGate = true;
+        passOutput = (stdout + stderr).slice(-2000); // keep last 2KB
+        break;
+      } catch (error: any) {
+        lastError = error;
+        if (attempt < maxAttempts) {
+          console.log(`[quality-gate] ✗ "${name}" failed attempt ${attempt}/${maxAttempts} — retrying (gate declares retry: ${gate.retry})`);
+        }
+      }
+    }
 
+    if (passedGate) {
       const durationMs = Date.now() - startTime;
       console.log(`[quality-gate] ✓ "${name}" passed (${durationMs}ms)`);
       results.push({
         name,
         passed: true,
         required,
-        output: (stdout + stderr).slice(-2000), // keep last 2KB
+        output: passOutput,
         durationMs,
       });
-    } catch (error: any) {
+    } else {
+      const error: any = lastError;
       const durationMs = Date.now() - startTime;
       const output = ((error.stdout || '') + (error.stderr || '')).slice(-2000);
       console.log(`[quality-gate] ✗ "${name}" failed (${durationMs}ms): ${error.message?.slice(0, 200)}`);

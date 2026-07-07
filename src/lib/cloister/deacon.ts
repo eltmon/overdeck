@@ -33,6 +33,7 @@ import { checkApiErrorAgents } from './deacon-api-recovery.js';
 import { checkOrphanedReviewStatuses, recoverStalledReviewConvoys, checkMissingReviewStatuses, checkStuckReviewing, checkCompletedButUnsignaledReviews, monitorReviewConvoySignals, cleanupOrphanedReviewSessions } from './deacon-review.js';
 import { getAutoCloseOutCanonicalState } from './deacon-canonical-state.js';
 import { checkReadyForMergeStuck as checkReadyForMergeStuckWithDeps, reconcileStaleMergeStatus, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
+import { reconcileTraefikNetworks } from '../workspace/traefik-connect.js';
 import { coordinateSwarmSlots } from './deacon-swarm.js';
 import { recoverOrphanedAgents as recoverOrphanedAgentsWithDeps, handleAgentHeartbeatDeadEvent as handleAgentHeartbeatDeadEventWithDeps, handleAgentStoppedEvent as handleAgentStoppedEventWithDeps, autoResumeStoppedWorkAgents as autoResumeStoppedWorkAgentsWithDeps, applyBootReconciliationDecision as applyBootReconciliationDecisionWithDeps, reconcileAgentLiveness as reconcileAgentLivenessWithDeps, nudgeStalledResumeWorkAgents, redeliverUndeliveredKickoffs, nudgeIdleWorkAgentsWithOpenBeads, cleanupOrphanedPlanningSessions as cleanupOrphanedPlanningSessionsWithDeps, type BootReconciliationApplyResult } from './deacon-auto-resume.js';
 import { listFeatureWorkspaces } from './deacon-workspaces.js';
@@ -46,6 +47,7 @@ import { createInFlightGuard } from './in-flight-guard.js';
 import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
 import { isContextOverflowTail } from '../context-overflow.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
+import { hasOnlyPipelineStateChangesSinceCommit } from '../pipeline-state-paths.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -150,11 +152,16 @@ import { OVERDECK_HOME, AGENTS_DIR, sessionFilePath } from '../paths.js';
 import { loadCloisterConfigSync, loadCloisterConfig } from './config.js';
 import { workResumeSlotsAvailable, getConcurrencyLimits, countRunningAgents, resetPatrolDispatchBudget, tryReserveAdvancingSlot, releaseAdvancingSlot, describeRunningAgents } from './concurrency.js';
 import { setReviewStatusSync, loadReviewStatuses, getReviewStatusSync, type ReviewStatus } from '../review-status.js';
+import { needsReviewDispatch } from '../review-dispatch-decision.js';
+import { readIssueRecordSync, ensureIssueRecordSync, writeIssueRecordSync } from '../pan-dir/record.js';
+import { queryBeadsForIssue } from '../beads-query.js';
 import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
 import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync } from '../projects.js';
 import { queueBeadsAutoCommit } from '../pan-dir/auto-commit.js';
+import { withIssueRecordLock } from '../pan-dir/record-lock.js';
+import { recordMainDivergenceHealth, type ProjectMainDivergence } from './deacon-main-divergence.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { mapGitHubStateToCanonical } from '../../core/state-mapping.js';
 import { logDeaconEventSync, logAgentLifecycleSync } from '../persistent-logger.js';
@@ -255,6 +262,7 @@ export interface DeaconState {
   lastMassDeathAlert?: string;   // ISO 8601
   mergeStuckAttempts?: Record<string, number>;  // circuit-breaker attempt counts (PAN-344)
   containerRestarts?: Record<string, ContainerRestartRecord>;  // PAN-464: restart backoff tracking
+  mainDivergence?: ProjectMainDivergence[];
 }
 
 export type DeaconPatrolHealth = 'running' | 'starting' | 'stale' | 'stopped';
@@ -724,6 +732,7 @@ export interface PatrolResult {
   specialists: HealthCheckResult[];
   actionsToken: string[];
   massDeathDetected: boolean;
+  mainDivergence?: ProjectMainDivergence[];
 }
 
 /**
@@ -1132,6 +1141,77 @@ export {
   stalledReviewConvoyRecoveryState,
 } from './deacon-review.js';
 export type { ReviewConvoyLiveness } from './deacon-review.js';
+
+// ============================================================================
+// PAN-2207: Recover completions whose PR is open but review was never dispatched
+// ============================================================================
+
+/**
+ * Detect issues where `pan done` failed mid-flight: PR is open, all beads are
+ * closed, reviewStatus is pending, and reviewRequestedAt was never written.
+ * Verify all beads are closed before re-dispatching review; mark the record
+ * with a tombstone so the patrol does not loop.
+ */
+export async function checkOrphanedCompletions(): Promise<string[]> {
+  const actions: string[] = [];
+  const now = new Date().toISOString();
+
+  try {
+    const statuses = loadReviewStatuses();
+
+    for (const [issueId, status] of Object.entries(statuses)) {
+      try {
+        if (status.reviewStatus !== 'pending') continue;
+        if (status.mergeStatus === 'merged') continue;
+        if (needsReviewDispatch(status)) continue;
+
+        const resolved = resolveProjectFromIssueSync(issueId);
+        if (!resolved) continue;
+        const project = getProjectSync(resolved.projectKey);
+        if (!project) continue;
+
+        const record = readIssueRecordSync(project, issueId);
+        if (record?.pipeline?.panDoneRecoveredAt) continue;
+
+        const issueLower = issueId.toLowerCase();
+        const workspacePath = findWorkspacePath(resolved.projectPath, issueLower);
+        if (!workspacePath || !existsSync(workspacePath)) continue;
+
+        const beadResult = await Effect.runPromise(queryBeadsForIssue(workspacePath, issueId));
+        if (beadResult.transientFailure || beadResult.beads.length === 0) continue;
+        if (beadResult.beads.some((bead) => bead.status !== 'closed')) continue;
+
+        const { stdout } = await execAsync(
+          `gh pr list --head feature/${issueLower} --state open --json url --jq '.[0].url'`,
+          { encoding: 'utf-8', timeout: 15000 }
+        );
+        const prUrl = stdout.trim();
+        if (!prUrl) continue;
+
+        setReviewStatusSync(issueId, { reviewRequestedAt: now, prUrl });
+        // Serialize with setReviewStatusSync's fire-and-forget journal rebuild so
+        // the panDoneRecoveredAt tombstone is written after (and on top of) it.
+        await withIssueRecordLock(issueId, async () => {
+          const nextRecord = ensureIssueRecordSync(project, issueId);
+          nextRecord.pipeline.panDoneRecoveredAt = now;
+          writeIssueRecordSync(project, issueId, nextRecord);
+        });
+
+        const action = `checkOrphanedCompletions: recovered ${issueId} (PR open but review never dispatched)`;
+        logDeaconEventSync(action);
+        actions.push(action);
+        console.log(`[deacon] ${action}`);
+      } catch (issueErr: any) {
+        console.warn(`[deacon] checkOrphanedCompletions: error for ${issueId}: ${issueErr?.message ?? issueErr}`);
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[deacon] checkOrphanedCompletions: patrol error: ${err?.message ?? err}`);
+  }
+
+  return actions;
+}
+
 // ============================================================================
 // PAN-699: Pending test dispatch retry
 // ============================================================================
@@ -1518,31 +1598,31 @@ export async function checkPostReviewCommits(): Promise<string[]> {
 
       if (currentHead === status.reviewedAtCommit) continue;
 
-      // PAN-1213: A tree-identical rebase (ship agent rebasing onto fresh main
-      // for a clean merge, or any pure history rewrite) moves HEAD but leaves
-      // the reviewed tree unchanged. Resetting review/test in this case wipes
-      // a passed verification for no reason and strands the PR at pending forever
-      // (the deacon does not auto-redispatch). Compare tree SHAs — if equal,
-      // there is nothing new to review.
+      // Tree-identical rebases and state-plane-only commits move HEAD without
+      // invalidating review/test verdicts. Preserve the gates and advance the
+      // snapshot so this patrol does not repeatedly compare against old HEAD.
       try {
         const [oldTree, newTree] = await Promise.all([
           execAsync(`git rev-parse ${status.reviewedAtCommit}^{tree}`, { cwd: workspacePath }),
           execAsync(`git rev-parse ${currentHead}^{tree}`, { cwd: workspacePath }),
         ]);
         if (oldTree.stdout.trim() === newTree.stdout.trim()) {
-          // Tree-identical rebase: advance reviewedAtCommit to the new HEAD so
-          // we stop comparing against a SHA the workspace no longer carries,
-          // but preserve review/test/readyForMerge.
           setReviewStatusSync(issueId, { reviewedAtCommit: currentHead });
-          console.log(
-            `[deacon] Tree-identical rebase for ${issueId}: ` +
-            `${status.reviewedAtCommit.substring(0, 8)} → ${currentHead.substring(0, 8)} ` +
-            `(same tree) — review/test preserved`,
-          );
+          console.log(`[deacon] Tree-identical rebase for ${issueId}: ${status.reviewedAtCommit.substring(0, 8)} → ${currentHead.substring(0, 8)} (same tree) — review/test preserved`);
           continue;
         }
       } catch {
         // Fall through to reset if we can't read tree SHAs — safer than skipping
+      }
+
+      try {
+        if (await hasOnlyPipelineStateChangesSinceCommit(workspacePath, status.reviewedAtCommit, currentHead)) {
+          setReviewStatusSync(issueId, { reviewedAtCommit: currentHead });
+          console.log(`[deacon] State-only post-review commit for ${issueId}: ${status.reviewedAtCommit.substring(0, 8)} → ${currentHead.substring(0, 8)} — review/test preserved`);
+          continue;
+        }
+      } catch {
+        // Fall through to reset if the diff cannot be inspected.
       }
 
       // HEAD moved with a real tree change — new commits since review. Reset review pipeline.
@@ -1569,10 +1649,7 @@ export async function checkPostReviewCommits(): Promise<string[]> {
       // starts fresh. Without this, ciRetryMap retains count=6 from the previous
       // CI failure cycle, permanently blocking transient retries for this issue.
       ciRetryMap.delete(issueId);
-      actions.push(
-        `Reset review for ${issueId}: new commits after review passed ` +
-        `(${status.reviewedAtCommit.substring(0, 8)} → ${currentHead.substring(0, 8)})`,
-      );
+      actions.push(`Reset review for ${issueId}: new commits after review passed (${status.reviewedAtCommit.substring(0, 8)} → ${currentHead.substring(0, 8)})`);
 
       // Redispatch a fresh review convoy. Re-read status to guard against races
       // with other dispatch paths (HTTP request-review, manual CLI) that may have
@@ -2462,46 +2539,6 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
 }
 
 /**
- * PAN-1716: Defense-in-depth reaper for completed advancing-role sessions.
- *
- * Every review/test/ship session whose phase verdict is already terminal but is
- * still tmux-alive is a zombie: Claude sits idle at its prompt forever, yet
- * `countRunningAgents()` keeps counting it against the PAN-1665 advancing
- * ceiling. Enough of them starve every new dispatch and livelock the pipeline.
- *
- * The completion paths (`pan specialists done`, the HTTP route) kill the session
- * directly; this janitor catches any they miss so a single dropped kill can't
- * accumulate into a livelock. Runs early in the patrol so freed ceiling slots
- * benefit this same cycle's dispatchers.
- */
-export async function checkTerminalAdvancingSessions(): Promise<string[]> {
-  const actions: string[] = [];
-  try {
-    const { selectTerminalAdvancingSessions, KEEP_SPECIALIST_SESSIONS_ALIVE } = await import('./reap-terminal-sessions.js');
-    // PAN-2007: operator-requested temporary keep-alive — do not reap specialist
-    // sessions so they stay visible through the pipeline until close-out.
-    if (KEEP_SPECIALIST_SESSIONS_ALIVE) return actions;
-    const statuses = loadReviewStatuses();
-    const aliveSessions = await Effect.runPromise(listSessionNames());
-    const toKill = selectTerminalAdvancingSessions(statuses, [...aliveSessions]);
-    for (const session of toKill) {
-      try {
-        await Effect.runPromise(killSession(session));
-        actions.push(`Reaped terminal advancing session ${session} (verdict recorded, session idle)`);
-        console.log(`[deacon] Reaped terminal advancing session ${session} (PAN-1716)`);
-        logDeaconEventSync(`checkTerminalAdvancingSessions: reaped ${session} — phase verdict terminal but session alive (PAN-1716)`);
-      } catch (err) {
-        console.warn(`[deacon] Failed to reap terminal session ${session}: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    }
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error('[deacon] Error reaping terminal advancing sessions:', msg);
-  }
-  return actions;
-}
-
-/**
  * PAN-1726: Defense-in-depth reaper for the WORK session of a merged issue.
  *
  * `postMergeLifecycle` pauses + kills `agent-<id>` at merge time, but a server
@@ -2642,6 +2679,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...stuckRemediationActions);
   for (const a of stuckRemediationActions) addLog('action', a, state.patrolCycle);
 
+  const { reconcileInFlightJournals } = await import('./advancing-selfheal.js');
+  const reconciledJournalActions = await reconcileInFlightJournals();
+  actions.push(...reconciledJournalActions);
+  for (const a of reconciledJournalActions) addLog('action', a, state.patrolCycle);
+
   // Process any pending post-merge lifecycle that wasn't consumed on startup (PAN-626).
   // In dev mode, the deploy script may fail to restart cleanly, leaving the pending file.
   try {
@@ -2762,6 +2804,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   // PAN-1716: Reap completed advancing-role (review/test/ship) sessions that are
   // still tmux-alive before the dispatchers run, so freed ceiling slots are
   // available to this same cycle's review/test/ship re-dispatch below.
+  const { checkIdleTerminalAdvancingSessions, checkMergedAdvancingSessions, checkTerminalAdvancingSessions } = await import('./advancing-selfheal.js');
   const reapedTerminalActions = await checkTerminalAdvancingSessions();
   actions.push(...reapedTerminalActions);
   for (const a of reapedTerminalActions) addLog('action', a, state.patrolCycle);
@@ -2772,6 +2815,14 @@ export async function runPatrol(): Promise<PatrolResult> {
   const reapedWorkActions = await checkMergedWorkSessions();
   actions.push(...reapedWorkActions);
   for (const a of reapedWorkActions) addLog('action', a, state.patrolCycle);
+
+  const reapedMergedAdvancingActions = await checkMergedAdvancingSessions();
+  actions.push(...reapedMergedAdvancingActions);
+  for (const a of reapedMergedAdvancingActions) addLog('action', a, state.patrolCycle);
+
+  const reapedIdleTerminalAdvancingActions = await checkIdleTerminalAdvancingSessions();
+  actions.push(...reapedIdleTerminalAdvancingActions);
+  for (const a of reapedIdleTerminalAdvancingActions) addLog('action', a, state.patrolCycle);
 
   // PAN-1778: proactively refresh Claude credentials on active remote agents
   // when the host credentials file changes, with a 15 min fallback cadence.
@@ -2861,6 +2912,13 @@ export async function runPatrol(): Promise<PatrolResult> {
   const missingStatusActions = await checkMissingReviewStatuses();
   actions.push(...missingStatusActions);
   for (const a of missingStatusActions) addLog('action', a, state.patrolCycle);
+
+  // PAN-2207: recover issues where `pan done` failed mid-flight (PR open + review
+  // never dispatched). Runs after missing-status so we don't race reactive status
+  // creation, but before test/merge recovery so the review pipeline can proceed.
+  const orphanCompletionActions = await checkOrphanedCompletions();
+  actions.push(...orphanCompletionActions);
+  for (const a of orphanCompletionActions) addLog('action', a, state.patrolCycle);
 
   // PAN-1681: Recover test agents that wrote .pan/test/result.json but never
   // POSTed testStatus (nudge once → auto-complete). Runs BEFORE the dispatcher
@@ -3006,6 +3064,14 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...firstCompletionActions);
   for (const a of firstCompletionActions) addLog('action', a, state.patrolCycle);
 
+  // PAN-2428: workspace stacks can come up outside Overdeck (e.g. a project's own
+  // dev script), leaving traefik disconnected from their network — every route to
+  // that stack 504s until someone runs `docker network connect` by hand. Reconcile
+  // idempotently on the patrol tick.
+  const traefikActions = await reconcileTraefikNetworks();
+  actions.push(...traefikActions);
+  for (const a of traefikActions) addLog('action', a, state.patrolCycle);
+
   // Resolution patrol DISABLED — auto-completing and poking agents consumes
   // API credits and is unreliable. Human operator can take action via dashboard.
 
@@ -3043,14 +3109,10 @@ export async function runPatrol(): Promise<PatrolResult> {
     for (const a of playwrightActions) addLog('action', a, state.patrolCycle);
   }
 
-  // PAN-1441: sweep host-main beads drift into git. `.beads/{issues.jsonl,
-  // export-state.json}` re-export on `main` whenever the `bd` binary syncs the
-  // shared dolt remote, and there is no single Overdeck write site to hook —
-  // so commit any resulting drift here. queueBeadsAutoCommit is main-only,
-  // debounced, skips missing files, and no-ops when nothing changed.
-  for (const { config: projectConfig } of listProjectsSync()) {
-    if (projectConfig.path) queueBeadsAutoCommit(projectConfig.path);
-  }
+  const projectConfigs = listProjectsSync();
+  for (const { config: projectConfig } of projectConfigs) if (projectConfig.path) queueBeadsAutoCommit(projectConfig.path);
+  const divergenceWarnings = await recordMainDivergenceHealth(state, projectConfigs);
+  for (const warning of divergenceWarnings) addLog('warn', warning, state.patrolCycle);
 
   // Periodic agent state cleanup (PAN-154)
   if (Math.random() < 0.003) {
@@ -3193,6 +3255,7 @@ export async function runPatrol(): Promise<PatrolResult> {
     specialists: results,
     actionsToken: actions,
     massDeathDetected: massDeathCheck.isMassDeath,
+    mainDivergence: state.mainDivergence,
   };
 
   lastPatrolResult = result;
@@ -3384,6 +3447,8 @@ export function startDeacon(): void {
   // first patrol. PAN-1908: use the thin table-query reconcile instead of directory scans.
   void (async () => {
     await reconcileAgentLiveness();
+    const { runBootAdvancingSelfHeal } = await import('./advancing-selfheal.js');
+    await runBootAdvancingSelfHeal();
     runScheduledPatrol('startup');
   })().catch((err) => {
     const msg = err instanceof Error ? err.message : String(err);

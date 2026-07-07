@@ -19,7 +19,7 @@ const { defaultExecAsync, mockExecAsync } = vi.hoisted(() => {
     // PAN-1531: verifyMergedBeforeLifecycle is now PR-API-only. Tests rely on
     // postMergeLifecycle proceeding past verification, so the gh pr list mock
     // must report the PR as merged.
-    if (cmd.includes('gh pr list')) return { stdout: '[{"number":444,"mergedAt":"2026-04-27T00:00:00Z","mergeCommit":{"oid":"deadbeef"}}]', stderr: '' };
+    if (cmd.includes('gh pr list')) return { stdout: '[{"number":444,"state":"closed","mergedAt":"2026-04-27T00:00:00Z"}]', stderr: '' };
     return { stdout: '', stderr: '' };
   };
   return {
@@ -92,6 +92,7 @@ vi.mock('../../../src/lib/tmux.js', () => ({
 vi.mock('../../../src/lib/paths.js', () => ({
   OVERDECK_HOME: '/tmp/overdeck-test',
   AGENTS_DIR: '/tmp/overdeck-test/agents',
+  COSTS_DIR: '/tmp/overdeck-test/costs',
   getOverdeckHome: vi.fn(() => '/tmp/overdeck-test'),
   PROJECT_DOCS_SUBDIR: 'docs',
   PROJECT_PRDS_SUBDIR: 'prds',
@@ -202,6 +203,20 @@ describe('postMergeLifecycle — step 0 deploy handoff', () => {
     expect(mockListPullRequestsForHead).toHaveBeenCalledWith('test', 'test', SOURCE_BRANCH, 'all');
     expect(mockExecAsync).not.toHaveBeenCalledWith(expect.stringContaining('gh pr list'));
     expect(mockWriteFile).toHaveBeenCalledOnce();
+  });
+
+  it('recognizes a MERGED-state PR from the gh CLI fallback', async () => {
+    mockExecAsync.mockImplementation(async (cmd: string) => {
+      if (cmd.includes('gh pr list')) {
+        return { stdout: '[{"number":444,"state":"MERGED","mergedAt":"2026-04-27T00:00:00Z"}]', stderr: '' };
+      }
+      return defaultExecAsync(cmd);
+    });
+
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+
+    expect(mockWriteFile).toHaveBeenCalledOnce();
+    expect(mockSpawn).toHaveBeenCalledOnce();
   });
 
   it('defaults sourceBranch to empty string when not provided', async () => {

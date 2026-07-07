@@ -7,6 +7,7 @@ export type VBriefItemStatus = 'draft' | 'proposed' | 'approved' | 'pending' | '
 export type VBriefPriority = 'critical' | 'high' | 'medium' | 'low';
 export type VBriefDifficulty = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
 export type VBriefInspectionPolicy = 'auto' | 'never' | 'fast' | 'deep';
+export type TieredExecutionSource = 'global' | 'issue-override' | 'plan-metadata';
 
 export interface VBriefReference {
   uri: string;
@@ -47,6 +48,9 @@ export interface VBriefPlan {
   title: string;
   status: string;
   metadata?: { tiered_execution?: 'on' | 'off'; [key: string]: unknown };
+  /** PAN-2383: computed by the plan read door (effective tiered-execution
+   * state + where it came from). Optional until the read-door bead lands. */
+  tieredExecution?: { effective: boolean; source: TieredExecutionSource; override: 'on' | 'off' | null };
   author?: string;
   uid?: string;
   sequence?: number;

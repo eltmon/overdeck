@@ -14,6 +14,7 @@ import { createDeaconEventClient } from '../../lib/cloister/deacon-event-client.
 import { getReviewStatusSync } from '../../lib/review-status.js';
 import { enrichReviewStatus } from '../../lib/review-status-enrichment.js';
 import { ensureInternalTokenSync } from '../../lib/internal-token.js';
+import { flushAllPendingAutoCommits } from '../../lib/pan-dir/auto-commit.js';
 import type { DomainEvent } from '@overdeck/contracts';
 
 function internalDashboardUrl(): string {
@@ -131,6 +132,9 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
   } catch (err) {
     console.error('[deacon-child] Cloister stop failed:', err);
   }
+  await Effect.runPromise(flushAllPendingAutoCommits()).catch((err) => {
+    console.error('[deacon-child] auto-commit shutdown flush failed:', err);
+  });
   await eventClient.flushNow().catch(() => undefined);
   process.exit(0);
 }

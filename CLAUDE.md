@@ -138,25 +138,34 @@ See [docs/SKILLS-CONVENTION.md](docs/SKILLS-CONVENTION.md) for the full rules, s
 
 ## Planning Modes
 
-Overdeck supports two planning modes:
+`pan start <id>` is the single paved-road entry point: it takes an issue from whatever state it is in to running work.
 
-### Interactive (default)
-```bash
-pan plan <id>
-```
-Launches an interactive planning session where the agent asks Q&A questions before producing a vBRIEF.
+- **No plan exists** → `pan start` auto-plans (non-interactive), materializes beads, and starts the work agent when planning finalizes.
+- **Plan exists** → `pan start` spawns the work agent from the existing vBRIEF and beads.
+- **Already running** → `pan start` exits 0 with a no-op message and guidance on messaging/attaching the agent.
 
-### Auto (non-interactive)
-```bash
-pan plan <id> --auto
-```
-Runs the planning agent end-to-end without prompting. If it encounters a contradiction it can't resolve, it escalates to interactive mode. All inferred choices are recorded in `plan.autoDecisions[]` for audit.
+Planning depth is one optional dial:
 
-### Auto-Start (skip planning)
 ```bash
-pan start <id> --auto
+pan start PAN-1071                    # default: config planning.default_mode, or auto if unset
+pan start PAN-1071 --plan interactive # Q&A planning session first, then work on approval
+pan start PAN-1071 --plan auto        # non-interactive planning, then work (same as default)
+pan start PAN-1071 --plan skip        # synthesize a minimal vBRIEF and beads, then work
 ```
-Skips the planning agent entirely. Synthesizes a minimal vBRIEF from the issue title/body, creates beads, and spawns the work agent directly. For trivial issues (typos, version bumps) where full planning is overkill.
+
+`planning.default_mode` in `~/.overdeck/config.yaml` sets the default for unplanned issues:
+
+```yaml
+planning:
+  default_mode: auto   # interactive | auto | skip; unset = auto
+```
+
+`pan plan <id>` remains the plan-ONLY verb for producing or refreshing the PRD and vBRIEF without starting work.
+
+The legacy aliases below are deprecated but still functional through the deprecation window:
+
+- `pan start <id> --auto` is an alias for `pan start <id> --plan skip`.
+- `pan plan <id> --auto-start` is deprecated; use `pan start <id>` to plan and start work in one command.
 
 **Always verify available flags with `pan <verb> --help`** — the CLI is self-documenting and flags may change between versions.
 
@@ -467,9 +476,9 @@ When `agents.rtk.enabled` is true, Bash outputs the agent sees (git status, npm 
 
 Overdeck uses **vBRIEF v0.5** for machine-readable work plans. Key references:
 
-- **Canonical spec:** [github.com/deftai/vBRIEF](https://github.com/deftai/vBRIEF)
-- **Our fork:** [github.com/eltmon/vBRIEF](https://github.com/eltmon/vBRIEF)
-- **Extension proposal:** [deftai/vBRIEF#1](https://github.com/deftai/vBRIEF/issues/1)
+- **Canonical spec:** [github.com/deftai/xBRIEF](https://github.com/deftai/xBRIEF) (renamed from vBRIEF at v0.7.0; spec now v0.8)
+- **Our fork:** [github.com/eltmon/xBRIEF](https://github.com/eltmon/xBRIEF)
+- **Extension proposal:** [deftai/xBRIEF#40](https://github.com/deftai/xBRIEF/issues/40) (supersedes #1)
 - **Overdeck docs:** [docs/VBRIEF.md](docs/VBRIEF.md) — full schema, lifecycle, and migration notes
 
 ### The four-artifact model (PAN-1124: single-spec-on-main)

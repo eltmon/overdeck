@@ -25,8 +25,11 @@ import {
   migrateAllSessionsSync,
   rebuildCacheSync,
   deduplicateEventsSync,
-  reconcile,
 } from '../../../lib/costs/index.js';
+import {
+  reconcile as reconcileClaudeTranscripts,
+  type ReconcileResult as ClaudeReconcileResult,
+} from '../../../lib/costs/reconciler.js';
 import {
   getCostsByIssueSync,
   getCostForIssueAggregateSync,
@@ -39,7 +42,8 @@ import { syncWalFromAllProjects } from '../../../lib/costs/sync-wal.js';
 import { httpHandler } from './http-handler.js';
 // PAN-1938: overdeck read door — CostResolver replaces direct DB calls for read endpoints.
 // CostWriter is deferred until CostArchiveLive is wired (write endpoints stay on legacy path).
-import { CostResolver } from '../../../lib/overdeck/cost.js';
+import { CostDoorLive, CostResolver, CostWriter } from '../../../lib/overdeck/cost.js';
+import type { CostReconcileSummary } from '../../../lib/overdeck/cost.js';
 import type { IssueId } from '../../../lib/overdeck/cost.js';
 
 // ─── Route: GET /api/costs/summary ───────────────────────────────────────────
@@ -61,7 +65,15 @@ const getCostsSummaryRoute = HttpRouter.add(
         const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-        type Entry = { issueId?: string; cost?: number; input?: number; output?: number; model?: string };
+        type Entry = {
+          issueId?: string;
+          cost?: number;
+          input?: number;
+          output?: number;
+          cacheRead?: number;
+          cacheWrite?: number;
+          model?: string;
+        };
         const scope = (entries: Entry[]) =>
           projectPrefix
             ? entries.filter((e) => typeof e.issueId === 'string' && e.issueId.toUpperCase().startsWith(`${projectPrefix}-`))
@@ -73,7 +85,10 @@ const getCostsSummaryRoute = HttpRouter.add(
 
         const summarize = (entries: Entry[]) => ({
           totalCost: entries.reduce((sum, e) => sum + (e.cost || 0), 0),
-          totalTokens: entries.reduce((sum, e) => sum + ((e.input || 0) + (e.output || 0)), 0),
+          totalTokens: entries.reduce(
+            (sum, e) => sum + ((e.input || 0) + (e.output || 0) + (e.cacheRead || 0) + (e.cacheWrite || 0)),
+            0,
+          ),
           entryCount: entries.length,
           byModel: entries.reduce<Record<string, number>>((acc, e) => {
             if (e.model) acc[e.model] = (acc[e.model] || 0) + (e.cost || 0);
@@ -318,21 +333,66 @@ const postCostsSyncWalRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: POST /api/costs/reconcile ────────────────────────────────────────
-// TODO PAN-1938: migrate to CostWriter once CostArchiveLive is wired.
+type OverdeckReconcileSource = 'ohmypi' | 'codex';
+type ReconcileSourceRunner = (source: OverdeckReconcileSource) => Promise<CostReconcileSummary>;
+type ClaudeReconcileRunner = () => Promise<ClaudeReconcileResult>;
 
+const runOverdeckCostReconcileSource: ReconcileSourceRunner = (source) =>
+  Effect.runPromise(
+    CostWriter.use((writer) => writer.reconcile({ source })).pipe(
+      Effect.provide(CostDoorLive),
+    ),
+  );
+
+const runClaudeTranscriptReconcile: ClaudeReconcileRunner = () =>
+  Effect.runPromise(reconcileClaudeTranscripts());
+
+export async function runCostReconcileSources(
+  runSource: ReconcileSourceRunner = runOverdeckCostReconcileSource,
+  runClaude: ClaudeReconcileRunner = runClaudeTranscriptReconcile,
+): Promise<{ claude: ClaudeReconcileResult; ohmypi: CostReconcileSummary; codex: CostReconcileSummary }> {
+  const [claude, ohmypi, codex] = await Promise.all([
+    runClaude(),
+    runSource('ohmypi'),
+    runSource('codex'),
+  ]);
+  return { claude, ohmypi, codex };
+}
+
+type CostReconcileSourcesResult = Awaited<ReturnType<typeof runCostReconcileSources>>;
+
+export function buildCostReconcileResponse(overdeck: CostReconcileSourcesResult) {
+  return {
+    success: true,
+    ...overdeck.claude,
+    claude: overdeck.claude,
+    ohmypi: overdeck.ohmypi,
+    codex: overdeck.codex,
+    overdeck,
+    skipped: {
+      ohmypi: overdeck.ohmypi.skipped,
+      codex: overdeck.codex.skipped,
+    },
+    warnings: {
+      ohmypi: overdeck.ohmypi.warnings,
+      codex: overdeck.codex.warnings,
+    },
+  };
+}
+
+// ─── Route: POST /api/costs/reconcile ────────────────────────────────────────
 const postCostsReconcileRoute = HttpRouter.add(
   'POST',
   '/api/costs/reconcile',
   httpHandler(Effect.gen(function* () {
-    const result = yield* Effect.tryPromise({
-      try: () => Effect.runPromise(reconcile()),
+    const overdeck = yield* Effect.tryPromise({
+      try: () => runCostReconcileSources(),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     console.log(
-      `[reconciler] Sweep complete: ${(result as { eventsImported?: number }).eventsImported ?? 0} imported`
+      `[reconciler] Sweep complete: claude=${overdeck.claude.eventsImported} imported, ohmypi=${overdeck.ohmypi.eventsImported} imported, codex=${overdeck.codex.eventsImported} imported`,
     );
-    return jsonResponse({ success: true, ...result });
+    return jsonResponse(buildCostReconcileResponse(overdeck));
   })),
 );
 

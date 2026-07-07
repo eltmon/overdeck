@@ -1,5 +1,7 @@
 /** Cloister service: core monitoring for all running agents. */
+import { createHash } from 'crypto';
 import type { AgentRuntimeSync, HealthState } from '../runtimes/types.js';
+import { isContextOverflowTail, CONTEXT_OVERFLOW_TAIL_LINES } from '../context-overflow.js';
 import type { CloisterConfig } from './config.js';
 import type { AgentHealth, HealthSummary } from './health.js';
 import type { DomainEvent } from '@overdeck/contracts';
@@ -66,6 +68,7 @@ import { Effect } from 'effect';
 const execAsync = promisify(exec);
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { isIssueClosed } from './issue-closed.js';
+import { shouldSkipDispatchAsMerged } from './merge-verification.js';
 export { spawnFlywheel, pauseFlywheel, resumeFlywheel } from './flywheel.js';
 
 // State file for cross-process communication
@@ -304,6 +307,17 @@ async function resolveWorkspaceForIssue(issueId: string): Promise<string | null>
   const { getReviewStatusSync } = await import('../review-status.js');
   if (getReviewStatusSync(normalizedIssueId)?.mergeStatus === 'merged') {
     const message = `${normalizedIssueId}: skipping ${role} dispatch — merge already landed (merge_status='merged' is terminal)`;
+    console.log(`[cloister] ${message}`);
+    emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
+    return;
+  }
+
+  // PAN-2420: GitHub-authoritative guard. Even when merge_status is not yet
+  // 'merged' (e.g. a permission failure left it as 'failed'), do not respawn
+  // advancing roles against a PR that GitHub already reports merged.
+  const mergedGuard = await shouldSkipDispatchAsMerged(normalizedIssueId);
+  if (mergedGuard.skip) {
+    const message = `${normalizedIssueId}: skipping ${role} dispatch — ${mergedGuard.reason}`;
     console.log(`[cloister] ${message}`);
     emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
     return;
@@ -663,6 +677,10 @@ export class CloisterService {
   private processedCompletions: Map<string, number> = new Map(); // Track completion marker retry counts (Infinity = done)
   private healthCheckCount: number = 0;
   private lastPokeTimestamps: Map<string, number> = new Map(); // agentId → last poke timestamp (ms)
+  // PAN-2452 (idle-alive): progress fingerprint at last poke → consecutive
+  // ineffective-poke count. A poke that changes neither the workspace HEAD nor
+  // the pane content did nothing; escalating beats poking forever.
+  private pokeProgress: Map<string, { fingerprint: string; ineffective: number }> = new Map();
   private domainEventUnsubscribe: (() => void) | null = null;
   private eventStore: CloisterEventStore | null = null;
 
@@ -1295,27 +1313,90 @@ export class CloisterService {
    * dead agent (PAN-1189 wedge sweep #12-13).
    */
   private pokeAgent(agentId: string): void {
-    try {
-      const runtime = getRuntimeForAgent(agentId);
-      if (!runtime) {
-        throw new Error(`No runtime found for agent ${agentId}`);
-      }
-
-      const pokeMessage =
-        'Hey, I noticed you haven\'t made progress in a while. Are you stuck? ' +
-        'If you need help or clarification, please ask. Otherwise, please continue with your work.';
-
-      // Fire-and-forget: chain .catch() so async rejection cannot bubble out
-      // as an UnhandledPromiseRejection.
-      Promise.resolve(runtime.sendMessage(agentId, pokeMessage)).catch((sendErr) => {
-        console.error(`Failed to send poke to ${agentId}:`, sendErr);
-      });
-      this.emit({ type: 'poked_agent', agentId });
-
-      console.log(`🔔 Poked ${agentId}`);
-    } catch (error) {
+    // Fire-and-forget wrapper; the async body measures progress first.
+    void this.pokeAgentWithEscalation(agentId).catch((error) => {
       console.error(`Failed to poke ${agentId}:`, error);
+    });
+  }
+
+  /** PAN-2452: fingerprint of observable progress — workspace HEAD + pane tail.
+   * Unchanged fingerprint across pokes = the poke did nothing. */
+  private async progressFingerprint(agentId: string): Promise<string> {
+    const state = getAgentStateSync(agentId);
+    let head = '';
+    if (state?.workspace) {
+      try {
+        const { stdout } = await execAsync('git rev-parse HEAD', { cwd: state.workspace, encoding: 'utf-8' });
+        head = stdout.trim();
+      } catch { /* workspace may be gone; pane still fingerprints */ }
     }
+    let pane = '';
+    try {
+      const { stdout } = await execAsync(
+        `tmux -L overdeck capture-pane -t ${JSON.stringify(agentId)} -p -S -${CONTEXT_OVERFLOW_TAIL_LINES}`,
+        { encoding: 'utf-8' },
+      );
+      pane = stdout;
+    } catch { /* session may be gone */ }
+    const paneHash = createHash('sha1').update(pane).digest('hex').slice(0, 12);
+    return `${head}:${paneHash}`;
+  }
+
+  private async pokeAgentWithEscalation(agentId: string): Promise<void> {
+    const runtime = getRuntimeForAgent(agentId);
+    if (!runtime) {
+      throw new Error(`No runtime found for agent ${agentId}`);
+    }
+
+    const fingerprint = await this.progressFingerprint(agentId);
+    const prior = this.pokeProgress.get(agentId);
+    const ineffective = prior && prior.fingerprint === fingerprint ? prior.ineffective + 1 : 0;
+    this.pokeProgress.set(agentId, { fingerprint, ineffective });
+
+    // Tier 3 (5th no-progress poke): stop poking — surface to the operator.
+    if (ineffective >= 4) {
+      const { setAgentPausedSync } = await import('../agents/agent-state.js');
+      try {
+        setAgentPausedSync(agentId, `needs-you: idle-alive — no observable progress across ${ineffective + 1} pokes (idle-alive escalation)`);
+        this.emit({ type: 'agent_stuck', agentId, health: undefined as never });
+        console.log(`🛑 ${agentId} paused: idle-alive across ${ineffective + 1} pokes`);
+      } catch (pauseErr) {
+        console.error(`Failed to pause idle-alive ${agentId}:`, pauseErr);
+      }
+      return;
+    }
+
+    // Tier 2 (3rd no-progress poke): escalate — /compact on overflow, else a
+    // substantive reconstruct instruction instead of another "are you stuck?".
+    let pokeMessage =
+      'Hey, I noticed you haven\'t made progress in a while. Are you stuck? ' +
+      'If you need help or clarification, please ask. Otherwise, please continue with your work.';
+    if (ineffective >= 2) {
+      let tail = '';
+      try {
+        const { stdout } = await execAsync(
+          `tmux -L overdeck capture-pane -t ${JSON.stringify(agentId)} -p -S -${CONTEXT_OVERFLOW_TAIL_LINES}`,
+          { encoding: 'utf-8' },
+        );
+        tail = stdout;
+      } catch { /* fall through to reconstruct nudge */ }
+      if (isContextOverflowTail(tail)) {
+        pokeMessage = '/compact';
+        console.log(`🔔 ${agentId}: overflow tail detected — delivering /compact instead of a poke`);
+      } else {
+        pokeMessage =
+          'You appear active but have made no observable progress (no new commits, unchanged output) across multiple checks. '
+          + 'Do exactly one of: (1) work is done — commit, push, and run pan done; '
+          + '(2) blocked — state the blocker in one sentence and commit what you have as WIP; '
+          + '(3) lost context — re-read your bead (bd show), your latest .pan/feedback/ file, and git status, then resume. Act now.';
+      }
+    }
+
+    await Promise.resolve(runtime.sendMessage(agentId, pokeMessage)).catch((sendErr) => {
+      console.error(`Failed to send poke to ${agentId}:`, sendErr);
+    });
+    this.emit({ type: 'poked_agent', agentId });
+    console.log(`🔔 Poked ${agentId}${ineffective > 0 ? ` (ineffective streak: ${ineffective})` : ''}`);
   }
 
   /**
@@ -1628,14 +1709,17 @@ export class CloisterService {
       for (const alert of alerts) {
         this.emit({ type: 'cost_alert', alert });
 
+        // Resolve the entity label: for daily_total, use explicit "(unattributed)" bucket
+        const entityLabel = alert.agentId || alert.issueId || '(unattributed)';
+
         // Log the alert
         if (alert.level === 'limit_reached') {
           console.error(
-            `🔔 COST LIMIT REACHED: ${alert.type} for ${alert.agentId || alert.issueId} - $${alert.currentCost.toFixed(2)} / $${alert.limit.toFixed(2)}`
+            `🔔 COST LIMIT REACHED: ${alert.type} for ${entityLabel} - $${alert.currentCost.toFixed(2)} / $${alert.limit.toFixed(2)}`
           );
         } else {
           console.warn(
-            `🔔 Cost warning: ${alert.type} for ${alert.agentId || alert.issueId} at ${alert.percentUsed.toFixed(0)}% ($${alert.currentCost.toFixed(2)} / $${alert.limit.toFixed(2)})`
+            `🔔 Cost warning: ${alert.type} for ${entityLabel} at ${alert.percentUsed.toFixed(0)}% ($${alert.currentCost.toFixed(2)} / $${alert.limit.toFixed(2)})`
           );
         }
       }

@@ -28,8 +28,10 @@ import { changedFilesVsMain } from '../../lib/flywheel-merge-order.js';
 import {
   appendSessionEntrySync,
   getProjectConfigFromWorkspacePath,
+  readIssueRecordSync,
   readRecordContinueViewSync,
   resolveProjectForIssue,
+  writeIssueRecordSync,
   writeRecordDecisionsSync,
   writeRecordScopeDriftSync,
 } from '../../lib/pan-dir/record.js';
@@ -38,6 +40,7 @@ import { readWorkspacePlanSync } from '../../lib/vbrief/io.js';
 import { compileGlob } from '../../lib/vbrief/dag.js';
 import type { ScopeDriftRecord } from '../../lib/vbrief/continue-state.js';
 import type { VBriefDocument } from '../../lib/vbrief/types.js';
+import { hasOnlyPipelineStateChangesSinceCommit } from '../../lib/pipeline-state-paths.js';
 
 const childProcessLayer = NodeChildProcessSpawner.layer.pipe(
   Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
@@ -573,6 +576,18 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     }
   }
 
+  // PAN-2207: clear stale deacon recovery tombstone before pre-flight.
+  try {
+    const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(process.cwd());
+    const record = readIssueRecordSync(project, issueId);
+    if (record?.pipeline?.panDoneRecoveredAt) {
+      const { panDoneRecoveredAt: _, ...pipeline } = record.pipeline;
+      writeIssueRecordSync(project, issueId, { ...record, pipeline });
+    }
+  } catch (e: any) {
+    console.warn(`[pan done] Failed to clear recovery tombstone (non-fatal): ${e?.message ?? e}`);
+  }
+
   // Pre-flight completion checks (unless --force)
   if (!options.force) {
     const { workspacePath } = await resolveDoneWorkspace(issueId, agentId);
@@ -739,7 +754,33 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     spinner.text = 'Creating review artifacts...';
     const { createReviewArtifactsForIssue } = await import('../../lib/review-artifacts.js');
     const { setReviewStatusSync } = await import('../../lib/review-status.js');
-    const artifactResult = await Effect.runPromise(createReviewArtifactsForIssue(issueId, workspacePath));
+    let artifactResult;
+    try {
+      artifactResult = await Effect.runPromise(createReviewArtifactsForIssue(issueId, workspacePath));
+    } catch (artifactErr: any) {
+      // PAN-2207: GraphQL/App rate limit → REST-only PR lookup fallback.
+      // PAN-2465: the fallback runs `gh pr list` in the workspace ROOT, but a
+      // polyrepo workspace root has no git remotes (the real repos are the
+      // subdirectories, often not even on GitHub) — the gh call then crashes
+      // with "no git remotes found", masking the original artifact error and
+      // making agents loop `pan done` against a red herring. Guard the
+      // fallback: any failure rethrows the ORIGINAL artifact error.
+      let existingPrUrl = '';
+      try {
+        const { stdout } = await execAsync(
+          `gh pr list --head feature/${issueId.toLowerCase()} --state open --json url --jq '.[0].url'`,
+          { cwd: workspacePath, encoding: 'utf-8' }
+        );
+        existingPrUrl = stdout.trim();
+      } catch (fallbackErr: any) {
+        console.log(chalk.dim(`  (REST PR-lookup fallback unavailable here: ${String(fallbackErr?.message ?? fallbackErr).split('\n')[0]})`));
+        throw artifactErr;
+      }
+      if (!existingPrUrl) throw artifactErr;
+      console.log(chalk.yellow(`  ⚠ Review artifact creation failed, but found existing PR via REST fallback: ${existingPrUrl}`));
+      setReviewStatusSync(issueId, { prUrl: existingPrUrl });
+      artifactResult = { mergeSet: null, artifacts: [{ repoKey: 'primary', created: false, skipped: false, url: existingPrUrl }] };
+    }
     const primaryArtifact = artifactResult.mergeSet?.repos.find(repo => !!repo.artifactUrl);
     if (primaryArtifact?.artifactUrl) {
       setReviewStatusSync(issueId, { prUrl: primaryArtifact.artifactUrl });
@@ -822,6 +863,12 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         if (HEAD === currentStatus.reviewedAtCommit) {
           spinner.succeed(`Work complete: ${issueId} (review already passed at ${HEAD.slice(0, 8)} — no new commits, skipping re-review)`);
           console.log(chalk.green(`  ✓ Review already passed and no new commits detected. Pipeline continues normally.`));
+          console.log('');
+          return;
+        }
+        if (await hasOnlyPipelineStateChangesSinceCommit(workspacePath, currentStatus.reviewedAtCommit, HEAD)) {
+          spinner.succeed(`Work complete: ${issueId} (review still valid — only pipeline state changed since ${currentStatus.reviewedAtCommit.slice(0, 8)})`);
+          console.log(chalk.green(`  ✓ Review/test verdicts remain valid because post-verdict commits only touched pipeline state.`));
           console.log('');
           return;
         }

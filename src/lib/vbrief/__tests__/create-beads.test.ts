@@ -10,16 +10,36 @@ const { mockExecAsync } = vi.hoisted(() => ({
   mockExecAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
 }));
 
-vi.mock('child_process', () => ({
-  exec: vi.fn(),
-  execFile: vi.fn(),
-}));
+vi.mock('child_process', () => {
+  const execFile = vi.fn((...callArgs: unknown[]) => {
+    const cb = callArgs[callArgs.length - 1];
+    if (typeof cb !== 'function') return;
+    const file = callArgs[0] as string;
+    const args = Array.isArray(callArgs[1]) ? callArgs[1] as string[] : [];
+    const opts = Array.isArray(callArgs[1]) ? callArgs[2] : callArgs[1];
 
-vi.mock('util', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('util')>();
+    void mockExecAsync(file, args, opts).then(
+      (result) => cb(null, result.stdout, result.stderr),
+      (error) => cb(error, '', ''),
+    );
+  });
+
+  Object.defineProperty(execFile, Symbol.for('nodejs.util.promisify.custom'), {
+    value: (...callArgs: unknown[]) =>
+      new Promise((resolve, reject) => {
+        execFile(...callArgs, (error: unknown, stdout: string, stderr: string) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve({ stdout, stderr });
+        });
+      }),
+  });
+
   return {
-    ...actual,
-    promisify: () => mockExecAsync,
+    exec: vi.fn(),
+    execFile,
   };
 });
 

@@ -9,7 +9,6 @@
  */
 
 import { join } from 'path';
-import { existsSync } from 'fs';
 import { homedir } from 'os';
 import { openDatabase, type SqliteDatabase } from '../../../lib/database/driver.js';
 

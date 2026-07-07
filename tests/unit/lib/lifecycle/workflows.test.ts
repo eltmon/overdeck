@@ -134,6 +134,15 @@ function successfulTracker() {
   } as any;
 }
 
+function mockCurrentGitHubLabels(labels = ['verifying-on-main', 'needs-close-out', 'merged', 'ready']) {
+  mockExecAsync.mockImplementation(async (command: string) => {
+    if (command.includes('gh issue view') && command.includes('--json labels')) {
+      return { stdout: JSON.stringify(labels), stderr: '' };
+    }
+    return { stdout: '', stderr: '' };
+  });
+}
+
 describe('workflows', () => {
   let testDir: string;
 
@@ -146,7 +155,12 @@ describe('workflows', () => {
     vi.clearAllMocks();
     process.env.HOME = testDir;
     delete process.env.LINEAR_API_KEY;
-    mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
+    mockExecAsync.mockImplementation(async (command: string) => {
+      if (command.includes('gh issue view') && command.includes('--json labels')) {
+        return { stdout: JSON.stringify(['verifying-on-main', 'needs-close-out', 'merged', 'ready']), stderr: '' };
+      }
+      return { stdout: '', stderr: '' };
+    });
   });
 
   afterEach(() => {
@@ -297,6 +311,11 @@ describe('workflows', () => {
         if (command.startsWith('git rev-parse feature/pan-100')) {
           return { stdout: 'newer-branch-tip\n', stderr: '' };
         }
+        if (command.startsWith('git diff --name-only')) {
+          // PAN-2406 predicate: report a real source file so the state-plane
+          // exemption does NOT apply and the strict rejection is exercised.
+          return { stdout: 'src/example.ts\n', stderr: '' };
+        }
         if (command.startsWith('git log main..feature/pan-100')) {
           throw new Error('should fail immediately on mismatched merged PR head');
         }
@@ -343,6 +362,10 @@ describe('workflows', () => {
         }
         if (command.startsWith('git diff main...origin/feature/pan-100')) {
           return { stdout: 'diff --git a/src/remote.ts b/src/remote.ts\n', stderr: '' };
+        }
+        if (command.startsWith('git diff --name-only')) {
+          // PAN-2406 predicate: real source divergence keeps this a rejection.
+          return { stdout: 'src/example.ts\n', stderr: '' };
         }
         if (command.startsWith('git rev-parse origin/feature/pan-100')) {
           return { stdout: 'advanced-remote-head\n', stderr: '' };
@@ -406,6 +429,9 @@ describe('workflows', () => {
       mkdirSync(wsPath, { recursive: true });
       await writeSpecForIssue(testDir, makeVBrief('PAN-100'), 'active');
       mockExecAsync.mockImplementation(async (command: string) => {
+        if (command.includes('gh issue view') && command.includes('--json labels')) {
+          return { stdout: JSON.stringify(['verifying-on-main', 'needs-close-out', 'merged', 'ready']), stderr: '' };
+        }
         if (command.startsWith('git worktree remove')) {
           rmSync(wsPath, { recursive: true, force: true });
         }
@@ -526,6 +552,8 @@ describe('workflows', () => {
     });
 
     it('should remove verifying labels when applying the closed-out label', async () => {
+      mockCurrentGitHubLabels();
+
       const ctx = {
         issueId: 'PAN-100',
         projectPath: testDir,

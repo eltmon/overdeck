@@ -4,17 +4,17 @@
     "created": "2026-07-03T14:39:28.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-1739: Command Deck issue tree hides strike agents (already fixed on main — add regression lock) and renders dead sessions as 'working' (frontend presence-authoritative fix)",
-    "updated": "2026-07-03T14:43:45.536Z"
+    "updated": "2026-07-07T02:58:31.349Z"
   },
   "plan": {
     "id": "pan-1739",
     "title": "bug(dashboard): Command Deck tree — lock strike allowlist against a 5th regression, and stop rendering dead (presence=ended) sessions as 'working'",
-    "status": "proposed",
+    "status": "completed",
     "uid": "69dc87e8-dac0-44f0-b88f-40772341a8b0",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-03T14:39:28.000Z",
-    "updated": "2026-07-03T14:43:45.536Z",
+    "updated": "2026-07-07T02:58:31.349Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1739",
@@ -195,5 +195,5 @@
       "canonicalFilename": "2026-07-03-PAN-1739-bug-dashboard-command-deck-tree-lock-strike-allowlist-against-a-5th-regression-and-stop-rendering-dead-presence-ended-sessions-as-working.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

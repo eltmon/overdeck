@@ -2,13 +2,16 @@
   "issueId": "PAN-2093",
   "schemaVersion": 2,
   "created": "2026-06-27T05:15:54.077Z",
-  "updated": "2026-06-27T05:15:54.077Z",
+  "updated": "2026-07-07T03:05:22.934Z",
   "pipeline": {
     "issueId": "PAN-2093",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-27T05:15:54.077Z"
+    "updatedAt": "2026-07-07T03:05:22.934Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-07T03:05:22.934Z",
+    "mergeStatus": "merged"
   },
   "closeOut": {
     "usage": {
@@ -19,5 +22,5 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "model": "kimi-k2.7-code"
 }

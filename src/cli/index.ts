@@ -410,7 +410,7 @@ const planCmd = program
   .description('Planning lifecycle commands')
   .argument('[id]', 'Issue ID to plan')
   .option('--auto', 'Run non-interactive planning; inferred choices are recorded in plan.autoDecisions[]')
-  .option('--auto-start', 'After planning completes, automatically start the work agent — used by autonomous orchestrators')
+  .option('--auto-start', '[deprecated: use pan start <id>] After planning completes, automatically start the work agent — used by autonomous orchestrators')
   .option('--probe', 'Add an adversarial pre-finalize probe pass to the planning prompt')
   .option('--model <model>', 'Model to use for the planning role')
   .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex (defaults to role/provider settings)')
@@ -499,10 +499,10 @@ program
   .command('recover [id]')
   .description('Recover crashed or stopped agent')
   .option('--all', 'Auto-recover all crashed agents')
+  .option('--compact', 'Compact-respawn a context-wedged agent, including troubled/user-stopped work agents that automatic recovery will not resume')
   .option('--json', 'Output as JSON')
   .option('--model <model>', 'Override model on recovery (e.g. switch off Kimi when quota is exhausted)')
   .action(recoverCommand);
-
 program
   .command('sync-main <id>')
   .description('Merge latest main into workspace feature branch')
@@ -563,7 +563,8 @@ program
   .option('--no-shadow', 'Disable shadow mode')
   .option('--remote', 'Use remote workspace (Fly.io)')
   .option('--local', 'Use local workspace (explicit override)')
-  .option('--auto', 'Skip planning agent by synthesizing a minimal vBRIEF and beads from the issue title/body')
+  .option('--plan <mode>', "Planning depth when no plan exists yet: interactive | auto | skip (default: config planning.default_mode, shipped default auto)")
+  .option('--auto', '[deprecated: use --plan skip] Skip planning agent by synthesizing a minimal vBRIEF and beads from the issue title/body')
   .option('--force', 'Clear a paused agent gate and start anyway')
   .option('--fresh', 'Drop the saved Claude session (non-destructive) and start a new one — e.g. to switch a stopped agent\'s model')
   .option('--host', 'Bypass workspace docker stack-health gate and spawn on the host')

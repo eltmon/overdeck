@@ -6,16 +6,18 @@ import { dirname, join, sep } from "path";
 import { homedir } from "os";
 import { fileURLToPath } from "url";
 import * as NFS from "node:fs";
-import { existsSync as existsSync$1, mkdirSync as mkdirSync$1, readFileSync as readFileSync$1, writeFileSync as writeFileSync$1 } from "node:fs";
+import { appendFileSync as appendFileSync$1, existsSync as existsSync$1, mkdirSync as mkdirSync$1, readFileSync as readFileSync$1, writeFileSync as writeFileSync$1 } from "node:fs";
 import * as Path from "node:path";
 import { dirname as dirname$1, isAbsolute, join as join$1 } from "node:path";
 import { readFile } from "node:fs/promises";
 import * as OS from "node:os";
 import * as NodeChildProcess from "node:child_process";
+import { execFile as execFile$1 } from "node:child_process";
 import * as Crypto from "node:crypto";
 import * as NodeUrl from "node:url";
+import { promisify } from "node:util";
 import { mkdir, writeFile } from "fs/promises";
-import { promisify } from "util";
+import { promisify as promisify$1 } from "util";
 //#region \0rolldown/runtime.js
 var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod), cb = null), mod.exports);
 var __require = /* @__PURE__ */ createRequire(import.meta.url);
@@ -12772,6 +12774,14 @@ const DEFAULT_PRICING = [
 	},
 	{
 		provider: "openai",
+		model: "gpt-4.1-nano",
+		inputPer1k: 1e-4,
+		outputPer1k: 4e-4,
+		cacheReadPer1k: 25e-6,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
 		model: "gpt-5.3-codex",
 		inputPer1k: .00175,
 		outputPer1k: .014,
@@ -18660,7 +18670,16 @@ const layer = /* @__PURE__ */ succeed$1(Path$1)({
 	fromFileUrl,
 	toFileUrl
 });
+promisify(execFile$1);
 layer$4.pipe(provide(mergeAll(layer$2, layer)));
+const DEFAULT_STATE_FLUSH_WINDOW_MS = 600 * 1e3;
+parseStateFlushWindowMs(process.env.OVERDECK_STATE_FLUSH_WINDOW_MS);
+function parseStateFlushWindowMs(value) {
+	if (!value) return DEFAULT_STATE_FLUSH_WINDOW_MS;
+	const parsed = Number(value);
+	if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_STATE_FLUSH_WINDOW_MS;
+	return parsed;
+}
 Promise.resolve();
 //#endregion
 //#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/identity.js
@@ -25442,13 +25461,36 @@ function getIssueRecordBasePath(project, issueId) {
 * read-modify-write flows must take `withIssueRecordLock` before reading and
 * must not split this write behind an await.
 */
+/**
+* PAN-2466 no-loss guard: callers that fail to read the existing record fall
+* back to a fresh template with an EMPTY closeOut, and writing that template
+* destroys accumulated usage/cost history (observed on six records 2026-07-07).
+* At the write door, if the incoming closeOut carries no data but the on-disk
+* record's does, keep the on-disk closeOut. Genuine closeOut updates (any
+* usage/merges/totals content) always win.
+*/
+function preserveCloseOutSync(path, record) {
+	const incoming = record.closeOut;
+	if (!(!incoming || Object.keys(incoming.usage?.byStage ?? {}).length === 0 && Object.keys(incoming.usage?.totals ?? {}).length === 0 && (incoming.merges ?? []).length === 0) || !existsSync$1(path)) return record;
+	try {
+		const disk = JSON.parse(readFileSync$1(path, "utf-8")).closeOut;
+		if (disk && (Object.keys(disk.usage?.byStage ?? {}).length > 0 || Object.keys(disk.usage?.totals ?? {}).length > 0 || (disk.merges ?? []).length > 0)) {
+			console.warn(`[record] Preserving populated closeOut for ${record.issueId} — incoming write carried an empty closeOut (PAN-2466 guard)`);
+			return {
+				...record,
+				closeOut: disk
+			};
+		}
+	} catch {}
+	return record;
+}
 function writeIssueRecordSync(project, issueId, record) {
 	const path = getIssueRecordPath(project, issueId);
 	const dir = dirname$1(path);
 	if (!existsSync$1(dir)) mkdirSync$1(dir, { recursive: true });
 	const now = (/* @__PURE__ */ new Date()).toISOString();
 	const next = {
-		...record,
+		...preserveCloseOutSync(path, record),
 		issueId: issueId.toUpperCase(),
 		schemaVersion: 2,
 		created: record.created || now,
@@ -28033,6 +28075,7 @@ function mergeConfigs(...configs) {
 			if (!isComplianceMode(config.compliance.mode)) throw new Error(`config.yaml: compliance.mode must be ${COMPLIANCE_MODES.join(", ")}`);
 			result.compliance.mode = config.compliance.mode;
 		}
+		if (config.planning?.default_mode !== void 0) result.planning = { defaultMode: config.planning.default_mode };
 		if (config.registry?.classification) {
 			const classification = config.registry.classification;
 			if (classification.enabled !== void 0) result.registry.classification.enabled = classification.enabled;
@@ -30469,7 +30512,7 @@ function buildChildEnvSync(baseEnv = process.env, overrides) {
 Object.fromEntries([...PROVIDER_ENV_KEYS].map((k) => [k, ""]));
 //#endregion
 //#region ../../src/lib/tmux.ts
-const execFileAsync = promisify(execFile);
+const execFileAsync = promisify$1(execFile);
 const MANAGED_TMUX_SERVER_UNIT = "overdeck-tmux-server";
 const SERVER_ALIVE_POLL_MS = 50;
 const SERVER_ALIVE_TIMEOUT_MS = 5e3;
@@ -31017,7 +31060,63 @@ succeed$1(Tmux, Tmux.of({
 Service()("overdeck/Forge");
 Service()("overdeck/Projects");
 var CostArchive = class extends Service()("overdeck/CostArchive") {};
-succeed$1(CostArchive, CostArchive.of({ append: (_event) => void_ }));
+function costArchivePath() {
+	return join$1(getOverdeckHome(), "costs", "events.jsonl");
+}
+function archiveKey(event) {
+	if (typeof event.requestId === "string" && event.requestId.length > 0) return `request:${event.requestId}`;
+	const source = typeof event.sourceFile === "string" ? event.sourceFile : typeof event.source === "string" ? event.source : null;
+	return source ? `source:${source}` : null;
+}
+function toCostArchiveEvent(event) {
+	return {
+		ts: event.ts instanceof Date ? event.ts.toISOString() : typeof event.ts === "string" ? event.ts : (/* @__PURE__ */ new Date()).toISOString(),
+		type: "cost",
+		agentId: typeof event.agentId === "string" ? event.agentId : "unknown",
+		issueId: typeof event.issueId === "string" ? event.issueId : "UNKNOWN",
+		sessionType: typeof event.sessionType === "string" ? event.sessionType : "unknown",
+		provider: typeof event.provider === "string" ? event.provider : "unknown",
+		model: typeof event.model === "string" ? event.model : "unknown",
+		input: typeof event.input === "number" ? event.input : 0,
+		output: typeof event.output === "number" ? event.output : 0,
+		cacheRead: typeof event.cacheRead === "number" ? event.cacheRead : 0,
+		cacheWrite: typeof event.cacheWrite === "number" ? event.cacheWrite : 0,
+		cost: typeof event.cost === "number" ? event.cost : 0,
+		...typeof event.requestId === "string" ? { requestId: event.requestId } : {},
+		...typeof event.sessionId === "string" ? { sessionId: event.sessionId } : {},
+		...typeof event.sourceFile === "string" ? { source: event.sourceFile } : {},
+		...Array.isArray(event.warnings) ? { warnings: event.warnings } : {}
+	};
+}
+succeed$1(CostArchive, CostArchive.of((() => {
+	let seen = null;
+	const loadSeen = () => {
+		if (seen) return seen;
+		seen = /* @__PURE__ */ new Set();
+		const path = costArchivePath();
+		if (!existsSync$1(path)) return seen;
+		const content = readFileSync$1(path, "utf8");
+		for (const line of content.split("\n")) {
+			if (!line.trim()) continue;
+			try {
+				const key = archiveKey(JSON.parse(line));
+				if (key) seen.add(key);
+			} catch {}
+		}
+		return seen;
+	};
+	return { append: (event) => sync(() => {
+		const normalized = toCostArchiveEvent(event);
+		const key = archiveKey(normalized);
+		const archiveSeen = loadSeen();
+		if (key && archiveSeen.has(key)) return;
+		const path = costArchivePath();
+		mkdirSync$1(dirname$1(path), { recursive: true });
+		if (!existsSync$1(path)) writeFileSync$1(path, "", "utf8");
+		appendFileSync$1(path, `${JSON.stringify(normalized)}\n`, "utf8");
+		if (key) archiveSeen.add(key);
+	}) };
+})()));
 Service()("overdeck/MemorySearch");
 Service()("overdeck/MemoryFiles");
 //#endregion
@@ -31245,7 +31344,7 @@ function captureTldrMetricsSync(workspacePath) {
 	} catch {}
 	return metrics;
 }
-promisify(exec);
+promisify$1(exec);
 //#endregion
 //#region record-cost-event.ts
 /**

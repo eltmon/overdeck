@@ -9,7 +9,7 @@ import { mkdir, readFile, stat, writeFile } from 'fs/promises';
 import { join, resolve } from 'path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { Effect } from 'effect';
-import { ConfigError, ConfigParseError, FsError } from './errors.js';
+import { ConfigParseError, FsError } from './errors.js';
 import { OVERDECK_HOME } from './paths.js';
 import { extractPrefixSync, parseIssueIdSync } from './issue-id.js';
 import type { DatabaseConfig, QualityGateConfig, RepoConfig } from './workspace-config.js';

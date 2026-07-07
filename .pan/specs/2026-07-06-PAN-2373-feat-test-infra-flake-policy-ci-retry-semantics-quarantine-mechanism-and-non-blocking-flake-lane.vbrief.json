@@ -4,17 +4,17 @@
     "created": "2026-07-06T15:59:15.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2373: feat(test-infra): flake policy — CI retry semantics, quarantine mechanism, and non-blocking flake lane",
-    "updated": "2026-07-06T16:03:22.718Z"
+    "updated": "2026-07-07T06:15:53.315Z"
   },
   "plan": {
     "id": "pan-2373",
     "title": "feat(test-infra): flake policy — CI retry semantics, quarantine mechanism, and non-blocking flake lane",
-    "status": "proposed",
+    "status": "completed",
     "uid": "ba30d21e-beee-41e1-aff4-b99e2a41ba4a",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 7,
     "created": "2026-07-06T15:59:15.000Z",
-    "updated": "2026-07-06T16:03:22.718Z",
+    "updated": "2026-07-07T06:15:53.315Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2373",
@@ -383,5 +383,5 @@
       "canonicalFilename": "2026-07-06-PAN-2373-feat-test-infra-flake-policy-ci-retry-semantics-quarantine-mechanism-and-non-blocking-flake-lane.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

@@ -108,6 +108,8 @@ export interface PanIssuePipelineRecord {
   deaconIgnored?: boolean;
   deaconIgnoredAt?: string;
   deaconIgnoredReason?: string;
+  /** PAN-2207: durable tombstone set when deacon recovers a stuck-pending completion; cleared by re-run of `pan done`. */
+  panDoneRecoveredAt?: string;
   closedOut?: boolean;
   closedOutAt?: string;
   reviewerVerdicts?: unknown;
@@ -137,6 +139,8 @@ export interface PanIssueRecord {
   model?: string;
   /** Per-issue review mode override; beats project/global config. */
   reviewMode?: ReviewMode;
+  /** Per-issue tiered execution override; beats plan-metadata and global config. */
+  tieredExecutionOverride?: 'on' | 'off';
 
   decisions?: ContinueDecision[];
   hazards?: ContinueHazard[];
@@ -193,6 +197,40 @@ export function getIssueRecordBasePath(project: ProjectConfig, issueId: string):
  * read-modify-write flows must take `withIssueRecordLock` before reading and
  * must not split this write behind an await.
  */
+/**
+ * PAN-2466 no-loss guard: callers that fail to read the existing record fall
+ * back to a fresh template with an EMPTY closeOut, and writing that template
+ * destroys accumulated usage/cost history (observed on six records 2026-07-07).
+ * At the write door, if the incoming closeOut carries no data but the on-disk
+ * record's does, keep the on-disk closeOut. Genuine closeOut updates (any
+ * usage/merges/totals content) always win.
+ */
+function preserveCloseOutSync(path: string, record: PanIssueRecord): PanIssueRecord {
+  const incoming = record.closeOut;
+  const incomingEmpty =
+    !incoming ||
+    (Object.keys(incoming.usage?.byStage ?? {}).length === 0 &&
+      Object.keys(incoming.usage?.totals ?? {}).length === 0 &&
+      (incoming.merges ?? []).length === 0);
+  if (!incomingEmpty || !existsSync(path)) return record;
+  try {
+    const onDisk = JSON.parse(readFileSync(path, 'utf-8')) as PanIssueRecord;
+    const disk = onDisk.closeOut;
+    const diskHasData =
+      disk &&
+      (Object.keys(disk.usage?.byStage ?? {}).length > 0 ||
+        Object.keys(disk.usage?.totals ?? {}).length > 0 ||
+        (disk.merges ?? []).length > 0);
+    if (diskHasData) {
+      console.warn(`[record] Preserving populated closeOut for ${record.issueId} — incoming write carried an empty closeOut (PAN-2466 guard)`);
+      return { ...record, closeOut: disk };
+    }
+  } catch {
+    // Unreadable on-disk record — nothing to preserve.
+  }
+  return record;
+}
+
 export function writeIssueRecordSync(
   project: ProjectConfig,
   issueId: string,
@@ -205,7 +243,7 @@ export function writeIssueRecordSync(
   }
   const now = new Date().toISOString();
   const next: PanIssueRecord = {
-    ...record,
+    ...preserveCloseOutSync(path, record),
     issueId: issueId.toUpperCase(),
     schemaVersion: RECORD_SCHEMA_VERSION,
     created: record.created || now,
@@ -232,7 +270,7 @@ export function writeIssueRecordForWorkspaceSync(
   }
   const now = new Date().toISOString();
   const next: PanIssueRecord = {
-    ...record,
+    ...preserveCloseOutSync(path, record),
     issueId: issueId.toUpperCase(),
     schemaVersion: RECORD_SCHEMA_VERSION,
     created: record.created || now,
@@ -611,6 +649,38 @@ export function writeRecordScopeDriftSync(
 ): void {
   const record = ensureIssueRecordSync(project, issueId);
   record.scopeDrift = scopeDrift;
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
+/** Write tiered execution override into the per-issue record (sync). Passing null clears the override. */
+export function writeRecordTieredExecutionOverrideSync(
+  project: ProjectConfig,
+  issueId: string,
+  override: 'on' | 'off' | null,
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  if (override === null) {
+    delete record.tieredExecutionOverride;
+  } else {
+    record.tieredExecutionOverride = override;
+  }
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
+/** Write tiered execution override into the per-issue record (async). Passing null clears the override. */
+export async function writeRecordTieredExecutionOverride(
+  project: ProjectConfig,
+  issueId: string,
+  override: 'on' | 'off' | null,
+): Promise<void> {
+  const record = await ensureIssueRecord(project, issueId);
+  if (override === null) {
+    delete record.tieredExecutionOverride;
+  } else {
+    record.tieredExecutionOverride = override;
+  }
   const recordPath = writeIssueRecordSync(project, issueId, record);
   queueIssueRecordCommit(project, issueId, recordPath);
 }

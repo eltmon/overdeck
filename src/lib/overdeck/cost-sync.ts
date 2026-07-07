@@ -195,6 +195,7 @@ export interface IssueAggregate {
   lastUpdated: string;
   budgetWarning: boolean;
   models: Record<string, ModelBreakdown>;
+  providers: Record<string, number>;
   stages: Record<string, StageBreakdown>;
   budget?: number;
 }
@@ -239,6 +240,24 @@ function getStageBreakdownForIssueSync(issueId: string): Record<string, StageBre
   return result;
 }
 
+function getProviderBreakdownForIssueSync(issueId: string): Record<string, number> {
+  const db = getOverdeckDatabaseSync();
+  const rows = db
+    .prepare(
+      `SELECT COALESCE(provider, 'unknown') AS provider,
+              SUM(cost) AS cost
+       FROM cost_events
+       WHERE UPPER(issue_id) = UPPER(?)
+       GROUP BY COALESCE(provider, 'unknown')`,
+    )
+    .all(issueId) as Array<{ provider: string; cost: number }>;
+  const result: Record<string, number> = {};
+  for (const r of rows) {
+    result[r.provider] = r.cost ?? 0;
+  }
+  return result;
+}
+
 /**
  * Get aggregated costs by issue. Mirrors getCostsByIssueFromDb from cost-events-db.
  * overdeck stores ts as epoch milliseconds — MAX(ts) is converted to ISO string for lastUpdated.
@@ -268,9 +287,9 @@ export function getCostsByIssueSync(): Record<string, IssueAggregate> {
     last_updated: number;
   }>;
 
-  // PAN-472: fetch the per-model and per-stage breakdowns for ALL issues in two
-  // grouped queries instead of two full-table scans per issue. The old N+1 shape
-  // ran 1 + 2×308 sync queries (~3.7s of event-loop blocking) per call — and the
+  // PAN-472: fetch per-model, per-stage, and per-provider breakdowns for ALL issues
+  // in grouped queries instead of full-table scans per issue. The old N+1 shape
+  // ran 1 + 2x308 sync queries (~3.7s of event-loop blocking) per call — and the
   // Command Deck polls this every 15s.
   const modelRows = db
     .prepare(
@@ -294,6 +313,15 @@ export function getCostsByIssueSync(): Record<string, IssueAggregate> {
        GROUP BY UPPER(issue_id), session_type`,
     )
     .all() as Array<{ issue_id: string; stage: string | null; cost: number; calls: number; tokens: number }>;
+  const providerRows = db
+    .prepare(
+      `SELECT UPPER(issue_id) AS issue_id,
+              COALESCE(provider, 'unknown') AS provider,
+              SUM(cost) AS cost
+       FROM cost_events
+       GROUP BY UPPER(issue_id), COALESCE(provider, 'unknown')`,
+    )
+    .all() as Array<{ issue_id: string; provider: string; cost: number }>;
 
   const modelsByIssue: Record<string, Record<string, ModelBreakdown>> = {};
   for (const r of modelRows) {
@@ -311,6 +339,10 @@ export function getCostsByIssueSync(): Record<string, IssueAggregate> {
       tokens: r.tokens ?? 0,
     };
   }
+  const providersByIssue: Record<string, Record<string, number>> = {};
+  for (const r of providerRows) {
+    (providersByIssue[r.issue_id] ??= {})[r.provider] = r.cost ?? 0;
+  }
 
   const result: Record<string, IssueAggregate> = {};
   for (const row of rows) {
@@ -324,6 +356,7 @@ export function getCostsByIssueSync(): Record<string, IssueAggregate> {
       lastUpdated: row.last_updated != null ? new Date(row.last_updated).toISOString() : new Date().toISOString(),
       budgetWarning: false,
       models: modelsByIssue[row.issue_id] ?? {},
+      providers: providersByIssue[row.issue_id] ?? {},
       stages: stagesByIssue[row.issue_id] ?? {},
     };
   }
@@ -370,6 +403,7 @@ export function getCostForIssueAggregateSync(issueId: string): IssueAggregate | 
     lastUpdated: row.last_updated != null ? new Date(row.last_updated).toISOString() : new Date().toISOString(),
     budgetWarning: false,
     models: getModelBreakdownForIssueSync(row.issue_id),
+    providers: getProviderBreakdownForIssueSync(row.issue_id),
     stages: getStageBreakdownForIssueSync(row.issue_id),
   };
 }
@@ -413,6 +447,22 @@ export function getDailyTrendsSync(opts: { days?: number; issueId?: string } = {
     eventCount: r.event_count ?? 0,
     totalTokens: r.total_tokens ?? 0,
   }));
+}
+
+/**
+ * Get today's (last 24 hours) cost for a specific agent.
+ * Used for per-agent cost limit checks to match the cap's daily window.
+ */
+export function getAgentDailyCostSync(agentId: string): number {
+  const db = getOverdeckDatabaseSync();
+  const sinceMillis = Date.now() - 24 * 60 * 60 * 1000; // Last 24 hours
+  const row = db
+    .prepare(
+      `SELECT COALESCE(SUM(cost), 0) AS total_cost FROM cost_events
+       WHERE agent_id = ? AND ts >= ?`,
+    )
+    .get(agentId, sinceMillis) as { total_cost: number } | undefined;
+  return row?.total_cost ?? 0;
 }
 
 export interface ModelRollup {
