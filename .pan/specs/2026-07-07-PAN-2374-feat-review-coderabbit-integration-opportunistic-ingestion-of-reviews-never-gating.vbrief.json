@@ -4,17 +4,17 @@
     "created": "2026-07-07T04:28:25Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2374: feat(review): CodeRabbit integration — opportunistic ingestion of reviews, never gating",
-    "updated": "2026-07-07T05:05:48.945Z"
+    "updated": "2026-07-07T12:45:04.982Z"
   },
   "plan": {
     "id": "pan-2374",
     "title": "feat(review): CodeRabbit integration — opportunistic ingestion of reviews, never gating",
-    "status": "running",
+    "status": "completed",
     "uid": "f99699f2-275b-48a2-9a58-2edbd4075e0f",
     "author": "agent:claude-opus-4-8",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-07T04:28:25Z",
-    "updated": "2026-07-07T05:05:48.945Z",
+    "updated": "2026-07-07T12:45:04.982Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2374",
@@ -421,5 +421,5 @@
       "canonicalFilename": "2026-07-07-PAN-2374-feat-review-coderabbit-integration-opportunistic-ingestion-of-reviews-never-gating.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }

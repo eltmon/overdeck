@@ -4,17 +4,17 @@
     "created": "2026-07-07T05:10:45.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2341: Advancing ceiling permanently jams when review/test agents can't POST verdicts (self-heal via boot+patrol journal reconcile, zombie reap, orphan re-dispatch)",
-    "updated": "2026-07-07T08:42:54.702Z"
+    "updated": "2026-07-07T12:09:34.968Z"
   },
   "plan": {
     "id": "pan-2341",
     "title": "Advancing ceiling permanently jams when review/test agents can't POST verdicts (no journal reconcile / zombie reap on boot)",
-    "status": "running",
+    "status": "completed",
     "uid": "b3112603-bf47-4f42-a08e-a575e6a6f353",
     "author": "agent:claude-opus-4-8",
-    "sequence": 4,
+    "sequence": 7,
     "created": "2026-07-07T05:10:45.000Z",
-    "updated": "2026-07-07T08:42:54.702Z",
+    "updated": "2026-07-07T12:09:34.968Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2341",
@@ -538,5 +538,5 @@
       "canonicalFilename": "2026-07-07-PAN-2341-advancing-ceiling-permanently-jams-when-review-test-agents-can-t-post-verdicts-no-journal-reconcile-zombie-reap-on-boot.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }

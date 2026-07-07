@@ -4,17 +4,17 @@
     "created": "2026-07-07T06:40:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2230: circular-dependency ratchet (madge --circular baseline) wired into lint",
-    "updated": "2026-07-07T08:43:15.875Z"
+    "updated": "2026-07-07T12:32:08.425Z"
   },
   "plan": {
     "id": "pan-2230",
     "title": "chore(ratchets): circular-dependency ratchet (madge --circular baseline) wired into lint",
-    "status": "running",
+    "status": "approved",
     "uid": "216255d1-9912-4c1d-b116-b345ceca514a",
     "author": "agent:claude-opus-4-8",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-07T06:40:00.000Z",
-    "updated": "2026-07-07T08:43:15.875Z",
+    "updated": "2026-07-07T12:32:08.425Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2230",
