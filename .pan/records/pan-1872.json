@@ -84,7 +84,7 @@
     "recordedAt": "2026-07-07T18:50:25.599Z"
   },
   "created": "2026-07-06T16:22:21.638Z",
-  "updated": "2026-07-07T19:48:25.527Z",
+  "updated": "2026-07-07T19:54:32.466Z",
   "pipeline": {
     "issueId": "PAN-1872",
     "reviewStatus": "passed",
@@ -92,12 +92,12 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": true,
-    "updatedAt": "2026-07-07T19:48:25.451Z",
+    "updatedAt": "2026-07-07T19:54:32.437Z",
     "reviewNotes": "Prior stack-health regression-test blocker fixed; no blocking findings",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2474",
-    "reviewedAtCommit": "4436b5297de45fe19cc043a399ae53e5f7950355",
+    "reviewedAtCommit": "0775d7742eab8c3ab4b3f788972a13cfd1293172",
     "lastVerifiedCommit": "4436b5297de45fe19cc043a399ae53e5f7950355",
     "reviewRequestedAt": "2026-07-07T18:51:21.330Z",
     "scopeDrift": {
@@ -175,9 +175,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 812171,
-            "output": 74013,
-            "cacheRead": 33214464,
+            "input": 818699,
+            "output": 75829,
+            "cacheRead": 34717184,
             "cacheWrite": 0
           }
         }
@@ -202,15 +202,15 @@
           "cacheWrite": 129964
         },
         "custom/kimi-k2.7-code": {
-          "input": 1284498,
-          "output": 81979,
-          "cacheRead": 35809536,
+          "input": 1291026,
+          "output": 83795,
+          "cacheRead": 37312256,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 12.46899,
-        "pricingAsOf": "2026-07-07T19:48:25.489Z"
+        "usd": 12.767972,
+        "pricingAsOf": "2026-07-07T19:54:32.462Z"
       }
     },
     "merges": [
