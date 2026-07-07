@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { Effect } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 import type { RuntimeName } from '../../../../lib/runtimes/types.js';
+import { resolveStaffing } from '../../../../lib/agents/staffing.js';
 
 import {
   getAgentState,
@@ -646,5 +647,177 @@ export const postAgentResetSessionRoute = HttpRouter.add(
     console.log(`[reset-session] Cleared session for ${id} (was: ${previousSessionId.slice(0, 8)}...)`);
     invalidateAgentsCache();
     return jsonResponse({ success: true, agentId: id, previousSessionId, lifecycle: yield* getWorkAgentLifecycleState(id) });
+  })),
+);
+
+// ─── Route: POST /api/agents/restart-with-current-config ────────────────────
+// List all agents with their current vs new staffing, allowing operator to
+// selectively restart with new config
+
+export interface RestartConfigChangeItem {
+  agentId: string;
+  issueId: string;
+  currentModel: string;
+  currentHarness: string;
+  newModel: string;
+  newHarness: string;
+  changed: boolean;
+  paused: boolean;
+  troubled: boolean;
+  status: string;
+}
+
+async function buildRestartConfigChangeList(): Promise<RestartConfigChangeItem[]> {
+  const agents = await Effect.runPromise(listRunningAgents());
+
+  const items: RestartConfigChangeItem[] = [];
+
+  for (const agent of agents) {
+    if (!agent.issueId) continue;
+
+    const lifecycle = await Effect.runPromise(getWorkAgentLifecycleState(agent.id));
+
+    // Skip paused/troubled agents
+    if (lifecycle.isPaused || lifecycle.isTroubled) {
+      continue;
+    }
+
+    // Skip conversations (only work agents)
+    if (agent.role !== 'work' && agent.role !== undefined) {
+      continue;
+    }
+
+    // Compute new staffing from current config
+    let newModel = agent.model;
+    let newHarness = agent.harness ?? 'claude-code';
+
+    try {
+      const staffing = resolveStaffing(
+        { id: 'work', title: 'work', metadata: {} },
+        { spawnKey: `work:${agent.issueId.toLowerCase()}` }
+      );
+      newModel = staffing.model;
+      newHarness = staffing.harness;
+    } catch (err) {
+      // If staffing resolution fails, keep the current values
+      console.warn(`[restart-config] Failed to resolve staffing for ${agent.id}: ${err}`);
+    }
+
+    items.push({
+      agentId: agent.id,
+      issueId: agent.issueId,
+      currentModel: agent.model,
+      currentHarness: agent.harness ?? 'claude-code',
+      newModel,
+      newHarness,
+      changed: agent.model !== newModel || (agent.harness ?? 'claude-code') !== newHarness,
+      paused: lifecycle.isPaused,
+      troubled: lifecycle.isTroubled,
+      status: agent.status,
+    });
+  }
+
+  return items;
+}
+
+export const getAgentsRestartConfigRoute = HttpRouter.add(
+  'GET',
+  '/api/agents/restart-with-current-config',
+  httpHandler(Effect.gen(function* () {
+    try {
+      const items = yield* Effect.promise(() => buildRestartConfigChangeList());
+      return jsonResponse({
+        success: true,
+        items,
+        totalAgents: items.length,
+        changedAgents: items.filter(i => i.changed).length,
+      });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      return jsonResponse({ error: `Failed to build restart config list: ${msg}` }, { status: 500 });
+    }
+  })),
+);
+
+// ─── Route: POST /api/agents/restart-with-current-config ────────────────────
+// Restart selected agents with current config
+
+export const postAgentsRestartWithConfigRoute = HttpRouter.add(
+  'POST',
+  '/api/agents/restart-with-current-config',
+  httpHandler(Effect.gen(function* () {
+    const body = yield* readJsonBody;
+    const { agentIds } = body as { agentIds?: string[] };
+
+    if (!agentIds || !Array.isArray(agentIds) || agentIds.length === 0) {
+      return jsonResponse({ error: 'agentIds array is required and must not be empty' }, { status: 400 });
+    }
+
+    const results: { id: string; status: string; newModel?: string; newHarness?: string; error?: string }[] = [];
+
+    for (const agentId of agentIds) {
+      try {
+        const agentState = yield* getAgentState(agentId);
+        if (!agentState) {
+          results.push({ id: agentId, status: 'not_found', error: `Agent ${agentId} not found` });
+          continue;
+        }
+
+        const issueId = agentState.issueId ?? agentId.replace(/^agent-/, '').toUpperCase();
+
+        // Resolve new staffing
+        let newModel = agentState.model;
+        let newHarness = agentState.harness ?? 'claude-code';
+
+        try {
+          const staffing = resolveStaffing(
+            { id: 'work', title: 'work', metadata: {} },
+            { spawnKey: `work:${issueId.toLowerCase()}` }
+          );
+          newModel = staffing.model;
+          newHarness = staffing.harness;
+        } catch (err) {
+          console.warn(`[restart-config] Failed to resolve staffing for ${agentId}: ${err}`);
+        }
+
+        // Restart with new config
+        const restartResult = yield* Effect.promise(() => restartAgent(agentId, {
+          model: newModel,
+          harness: newHarness as any,
+          graceful: false,
+        }));
+
+        if (restartResult.success) {
+          results.push({
+            id: agentId,
+            status: 'restarted',
+            newModel,
+            newHarness,
+          });
+        } else {
+          results.push({
+            id: agentId,
+            status: 'failed',
+            error: restartResult.error,
+          });
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        results.push({
+          id: agentId,
+          status: 'error',
+          error: msg,
+        });
+      }
+    }
+
+    const succeeded = results.filter(r => r.status === 'restarted').length;
+    invalidateAgentsCache();
+    return jsonResponse({
+      success: true,
+      restarted: succeeded,
+      total: agentIds.length,
+      results,
+    });
   })),
 );
