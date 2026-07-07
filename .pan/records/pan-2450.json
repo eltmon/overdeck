@@ -46,15 +46,15 @@
   },
   "pipeline": {
     "issueId": "PAN-2450",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T05:30:41.747Z",
-    "reviewNotes": "gh fallback merge verification no longer recognizes state MERGED",
+    "updatedAt": "2026-07-07T05:36:39.563Z",
+    "reviewNotes": "Dispatch failed: [review-agent] Skipping review dispatch for PAN-2450 — GitHub PR #2455 is merged",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2455",
-    "lastVerifiedCommit": "9caa7567500b48ba4372d6abc33bf1a8736e6bdb",
+    "lastVerifiedCommit": "843300d2530def69b7a19c26e7744bab14cd3b69",
     "reviewRequestedAt": "2026-07-07T05:09:25.065Z"
   },
   "closeOut": {
@@ -78,9 +78,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1224148,
-            "output": 251620,
-            "cacheRead": 125103994,
+            "input": 1229340,
+            "output": 253252,
+            "cacheRead": 127025018,
             "cacheWrite": 0
           }
         }
@@ -99,15 +99,15 @@
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 1224148,
-          "output": 251620,
-          "cacheRead": 125103994,
+          "input": 1229340,
+          "output": 253252,
+          "cacheRead": 127025018,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 29.917113,
-        "pricingAsOf": "2026-07-07T05:30:41.816Z"
+        "usd": 30.293571,
+        "pricingAsOf": "2026-07-07T05:36:39.608Z"
       }
     },
     "merges": [
@@ -119,5 +119,5 @@
     "finalizedAt": "2026-07-07T04:18:45.208Z"
   },
   "created": "2026-07-07T04:55:35.112Z",
-  "updated": "2026-07-07T05:30:41.863Z"
+  "updated": "2026-07-07T05:36:39.609Z"
 }
