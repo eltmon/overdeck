@@ -40,8 +40,11 @@ const EXPECTED_RESOURCE_ROUTES = [
   'GET /api/resources/:containerId/history',
   'GET /api/resources/:containerId/details',
   'GET /api/resources/docker/container/:id/logs',
+  'POST /api/resources/docker/container/:id/pause',
   'POST /api/resources/docker/container/:id/restart',
   'POST /api/resources/docker/container/:id/start',
+  'POST /api/resources/docker/container/:id/stop',
+  'POST /api/resources/docker/container/:id/unpause',
   'POST /api/resources/docker/prune-containers',
   'POST /api/resources/docker/prune-volumes',
   'DELETE /api/resources/docker/container/:id',
@@ -75,7 +78,7 @@ describe('PAN-2464 resources route no-loss audit', () => {
     expect(resourcesRouteLayer).toBeDefined();
   });
 
-  it('keeps all 12 resources method/path registrations', () => {
+  it('keeps all 15 resources method/path registrations', () => {
     const liveRoutes = enumerateResourceRoutes();
     const expectedRoutes = new Set(EXPECTED_RESOURCE_ROUTES);
 
@@ -96,7 +99,7 @@ describe('PAN-2464 resources route no-loss audit', () => {
       ...unexpected.map((route) => `  unexpected: ${route}`),
     ].join('\n')).toEqual([]);
 
-    expect(liveRoutes).toHaveLength(12);
+    expect(liveRoutes).toHaveLength(15);
   });
 
   it('keeps the GET /api/resources payload field set stable', async () => {

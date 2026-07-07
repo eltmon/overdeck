@@ -4,8 +4,11 @@ import {
   getContainerHistoryRoute,
   getContainerDetailsRoute,
   deleteDockerContainerRoute,
+  postPauseContainerRoute,
   postRestartContainerRoute,
   postStartContainerRoute,
+  postStopContainerRoute,
+  postUnpauseContainerRoute,
   getContainerLogsRoute,
 } from './containers.js';
 import {
@@ -29,6 +32,9 @@ export const resourcesRouteLayer = Layer.mergeAll(
   postPruneVolumesRoute,
   postRestartContainerRoute,
   postStartContainerRoute,
+  postStopContainerRoute,
+  postPauseContainerRoute,
+  postUnpauseContainerRoute,
   getContainerLogsRoute,
 );
 

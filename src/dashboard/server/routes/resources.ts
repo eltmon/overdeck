@@ -16,9 +16,16 @@ export {
   getContainerHistoryRoute,
   getContainerDetailsRoute,
   deleteDockerContainerRoute,
+  postPauseContainerRoute,
   postRestartContainerRoute,
   postStartContainerRoute,
+  postStopContainerRoute,
+  postUnpauseContainerRoute,
   getContainerLogsRoute,
+  dockerActionErrorPayload,
+  dockerContainerActionEffect,
+  resetDockerContainerExecForTests,
+  setDockerContainerExecForTests,
 } from './resources/containers.js';
 export {
   postPruneContainersRoute,
