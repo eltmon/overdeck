@@ -70,10 +70,13 @@ For `/okf study`, `/okf retro`, `/okf sync`, and `/okf author`, honor `--model <
 
 Create a knowledge bundle and pointer file.
 
-- Default target: a peer repo named `<project>-knowledge`.
-- Overrides: `--dir <path>` for any external directory, or `--local <subdir>` for an in-repo bundle.
-- Seed `index.md`, `log.md`, starter concepts, CI conformance workflow, and the default embedding manifest.
-- Add one discovery line to local agent instructions so future agents can find the bundle.
+- Default target: a peer directory named `../<project>-knowledge`; initialize it as a git repo and create the remote with `gh repo create` when requested.
+- Overrides: `--dir <path>` for any external directory, or `--local <subdir>` for an in-repo bundle with no companion repo.
+- Copy `templates/repo/` into the bundle, including README, CONTRIBUTING, CODEOWNERS, `.github/workflows/conformance.yml`, `index.md`, `log.md`, `.gitignore`, Overview, and the first Decision concept.
+- Copy `templates/okf-embeddings.yaml` to the bundle root. The default profile is keyless Ollama: `ollama` / `nomic-embed-text` / `768` / `share: true`.
+- Write `.okf.yml` at the code repo root with `bundle: ../<project>-knowledge` and `remote: <created remote>`; for `--local`, point `bundle:` at the local subdirectory and omit companion repo creation.
+- Add exactly one discovery line to `CLAUDE.md` or `AGENTS.md`, preserving it without duplication on repeated init.
+- Future resolution order is host project config `knowledge_repo`, then `.okf.yml`, then a clear error telling the user to run `/okf init`.
 
 ## `/okf author "<topic>"`
 

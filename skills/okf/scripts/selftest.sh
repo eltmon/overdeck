@@ -93,6 +93,10 @@ require_grep 'Enumerate relevant code, tests, and docs before writing' "$SKILL" 
 require_grep 'one concept per idea' "$SKILL" "study writes one concept per idea"
 require_grep 'updates existing matching concepts in place' "$SKILL" "study rerun avoids duplicates"
 require_grep 'open a knowledge-repo PR' "$SKILL" "study is PR-gated"
+require_grep 'Default target: a peer directory named `../<project>-knowledge`' "$SKILL" "init defaults to peer directory"
+require_grep 'Write `.okf.yml` at the code repo root' "$SKILL" "init writes pointer file"
+require_grep 'Add exactly one discovery line' "$SKILL" "init de-duplicates discovery line"
+require_grep 'validate.py --strict` and `diff_lint.py' "$ROOT/references/workflow.md" "init CI runs conformance commands"
 
 python3 - "$ROOT" <<'PY'
 import importlib.util
@@ -513,6 +517,66 @@ with tempfile.TemporaryDirectory() as tmp:
     assert clean.returncode == 0, clean.stdout + clean.stderr
 
 print("ok - validate.py and diff_lint.py enforce deterministic two-tier conformance")
+PY
+
+python3 - "$ROOT" <<'PY'
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+import yaml
+
+root = Path(sys.argv[1])
+validate = root / "scripts" / "validate.py"
+
+def append_discovery(path, line):
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
+    if line not in existing.splitlines():
+        if existing and not existing.endswith("\n"):
+            existing += "\n"
+        existing += line + "\n"
+    path.write_text(existing, encoding="utf-8")
+
+with tempfile.TemporaryDirectory() as tmp:
+    parent = Path(tmp)
+    code_repo = parent / "acme"
+    code_repo.mkdir()
+    knowledge = parent / "acme-knowledge"
+    shutil.copytree(root / "templates" / "repo", knowledge)
+    shutil.copy2(root / "templates" / "okf-embeddings.yaml", knowledge / "okf-embeddings.yaml")
+    (code_repo / ".okf.yml").write_text("bundle: ../acme-knowledge\nremote: git@github.com:example/acme-knowledge.git\n", encoding="utf-8")
+
+    valid = subprocess.run([sys.executable, str(validate), "--bundle", str(knowledge), "--strict"], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    assert valid.returncode == 0, valid.stdout + valid.stderr
+
+    workflow = yaml.safe_load((knowledge / ".github" / "workflows" / "conformance.yml").read_text(encoding="utf-8"))
+    workflow_text = str(workflow)
+    assert "validate.py --bundle . --strict" in workflow_text
+    assert "diff_lint.py --base . --head ." in workflow_text
+
+    manifest = yaml.safe_load((knowledge / "okf-embeddings.yaml").read_text(encoding="utf-8"))
+    profile = manifest["profiles"][manifest["default_profile"]]
+    assert profile["provider"] == "ollama"
+    assert profile["model"] == "nomic-embed-text"
+    assert profile["dim"] == 768
+    assert profile["share"] is True
+    assert ".okf-index/" in (knowledge / ".gitignore").read_text(encoding="utf-8")
+    assert "bundle: ../acme-knowledge" in (code_repo / ".okf.yml").read_text(encoding="utf-8")
+
+    line = "Knowledge bundle: see .okf.yml and run /okf extract before answering project-specific questions."
+    append_discovery(code_repo / "AGENTS.md", line)
+    append_discovery(code_repo / "AGENTS.md", line)
+    assert (code_repo / "AGENTS.md").read_text(encoding="utf-8").splitlines().count(line) == 1
+
+    local_repo = parent / "local-code"
+    local_repo.mkdir()
+    local_bundle = local_repo / "knowledge"
+    shutil.copytree(root / "templates" / "repo", local_bundle)
+    (local_repo / ".okf.yml").write_text("bundle: ./knowledge\n", encoding="utf-8")
+    assert "bundle: ./knowledge" in (local_repo / ".okf.yml").read_text(encoding="utf-8")
+
+print("ok - init templates scaffold peer/local bundles, validate, parse CI YAML, and de-dupe discovery")
 PY
 
 if grep -InE '^(from|import) ' "$ROOT/scripts/okf_common.py" | grep -Ev ' (annotations|dataclasses|hashlib|pathlib|re|typing|yaml)( |$)|^.*from __future__ import annotations$'; then

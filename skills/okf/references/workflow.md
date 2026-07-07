@@ -17,6 +17,18 @@ bundle: ../example-knowledge
 remote: git@github.com:example/example-knowledge.git
 ```
 
+## Init Defaults
+
+`/okf init` creates a PR-gated bundle from `templates/repo/`.
+
+- Default target: `../<project>-knowledge`, a peer directory beside the code repo.
+- `--dir <path>`: use a specific external bundle path.
+- `--local <subdir>`: create an in-repo bundle and skip companion-repo creation.
+- Pointer file: `.okf.yml` at the code repo root with `bundle:` and, when available, `remote:`.
+- Discovery line: exactly one line in `CLAUDE.md` or `AGENTS.md` telling agents where the bundle lives.
+- CI: `.github/workflows/conformance.yml` runs `validate.py --strict` and `diff_lint.py`.
+- Cache policy: `.gitignore` excludes `.okf-index/`; shared shards remain commit-eligible by profile.
+
 ## Branches And Gates
 
 - Keep the knowledge bundle in its own repo by default.
