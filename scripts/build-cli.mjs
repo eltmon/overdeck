@@ -85,6 +85,17 @@ const copyCloisterPrompts = () => {
   copyMatching(cloisterPromptsSrc, cliPromptsDir, (name) => name.endsWith('.md'));
 };
 
+const runNpmScript = (scriptName) => {
+  const result = spawnSync('npm', ['run', scriptName], {
+    cwd: projectRoot,
+    stdio: 'inherit',
+    shell: process.platform === 'win32',
+  });
+  if (result.status !== 0) {
+    throw new Error(`[build-cli] ${scriptName} failed with exit code ${result.status ?? 'null'}`);
+  }
+};
+
 // PAN-1989: ship the vendored pi/ohmypi extension bundles inside dist/ so
 // packed installs (npm pack) include them — package.json's `files` array ships
 // dist/ but NOT packages/. Runtime resolution (src/lib/paths.ts) looks for these
@@ -93,14 +104,17 @@ const copyExtensionBundles = () => {
   const extDstDir = join(distDir, 'extensions');
   mkdirSync(extDstDir, { recursive: true });
   const bundles = [
-    ['ohmypi-extension/dist/index.js', 'ohmypi.js'],
-    ['pi-extension/dist/index.js', 'pi.js'],
+    ['ohmypi-extension/dist/index.js', 'ohmypi.js', 'build:ohmypi-extension'],
+    ['pi-extension/dist/index.js', 'pi.js', 'build:pi-extension'],
   ];
-  for (const [src, dst] of bundles) {
+  for (const [src, dst, buildScript] of bundles) {
     const srcPath = join(projectRoot, 'packages', src);
     if (!existsSync(srcPath)) {
+      runNpmScript(buildScript);
+    }
+    if (!existsSync(srcPath)) {
       throw new Error(
-        `[build-cli] extension bundle missing: ${srcPath} (run npm run build:ohmypi-extension && npm run build:pi-extension first)`,
+        `[build-cli] extension bundle missing after ${buildScript}: ${srcPath}`,
       );
     }
     cpSync(srcPath, join(extDstDir, dst));
