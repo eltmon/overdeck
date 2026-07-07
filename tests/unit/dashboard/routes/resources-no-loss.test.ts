@@ -28,12 +28,14 @@ const RESOURCE_ROUTE_SURFACE_FILES = [
   join(WORKSPACE_ROOT, 'src', 'dashboard', 'server', 'routes', 'resources.ts'),
   join(WORKSPACE_ROOT, 'src', 'dashboard', 'server', 'routes', 'resources', 'index.ts'),
   join(WORKSPACE_ROOT, 'src', 'dashboard', 'server', 'routes', 'resources', 'snapshot.ts'),
+  join(WORKSPACE_ROOT, 'src', 'dashboard', 'server', 'routes', 'resources', 'history.ts'),
   join(WORKSPACE_ROOT, 'src', 'dashboard', 'server', 'routes', 'resources', 'containers.ts'),
   join(WORKSPACE_ROOT, 'src', 'dashboard', 'server', 'routes', 'resources', 'prune.ts'),
 ] as const;
 
 const EXPECTED_RESOURCE_ROUTES = [
   'GET /api/resources',
+  'GET /api/resources/history/24h',
   'GET /api/resources/:containerId/history',
   'GET /api/resources/:containerId/details',
   'GET /api/resources/docker/container/:id/logs',
@@ -72,7 +74,7 @@ describe('PAN-2464 resources route no-loss audit', () => {
     expect(resourcesRouteLayer).toBeDefined();
   });
 
-  it('keeps all 11 legacy resources method/path registrations', () => {
+  it('keeps all 12 resources method/path registrations', () => {
     const liveRoutes = enumerateResourceRoutes();
     const expectedRoutes = new Set(EXPECTED_RESOURCE_ROUTES);
 
@@ -82,7 +84,7 @@ describe('PAN-2464 resources route no-loss audit', () => {
       .filter((route) => !expectedRoutes.has(route));
 
     expect(missing, [
-      'PAN-2464 decomposes routes/resources.ts without dropping endpoints.',
+      'PAN-2464 extends routes/resources without dropping endpoints.',
       'The following expected method/path registrations are missing:',
       ...missing.map((route) => `  missing: ${route}`),
     ].join('\n')).toEqual([]);
@@ -93,7 +95,7 @@ describe('PAN-2464 resources route no-loss audit', () => {
       ...unexpected.map((route) => `  unexpected: ${route}`),
     ].join('\n')).toEqual([]);
 
-    expect(liveRoutes).toHaveLength(11);
+    expect(liveRoutes).toHaveLength(12);
   });
 
   it('keeps the GET /api/resources payload field set stable', async () => {

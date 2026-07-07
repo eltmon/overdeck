@@ -27,6 +27,13 @@ export {
   postPruneVolumesRoute,
 } from './resources/prune.js';
 export {
+  buildResourceHistoryResponse,
+  getResourceHistoryEffect,
+  getResourceHistoryRoute,
+  recordResourceHistorySample,
+  resetResourceHistorySamples,
+} from './resources/history.js';
+export {
   resourcesRouteLayer,
   default,
 } from './resources/index.js';

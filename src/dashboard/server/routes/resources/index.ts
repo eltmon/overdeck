@@ -14,10 +14,12 @@ import {
   deleteDockerVolumeRoute,
   postPruneVolumesRoute,
 } from './prune.js';
+import { getResourceHistoryRoute } from './history.js';
 import { getResourcesRoute } from './snapshot.js';
 
 export const resourcesRouteLayer = Layer.mergeAll(
   getResourcesRoute,
+  getResourceHistoryRoute,
   getContainerHistoryRoute,
   getContainerDetailsRoute,
   deleteDockerContainerRoute,
