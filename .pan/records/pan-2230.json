@@ -1,7 +1,86 @@
 {
   "issueId": "PAN-2230",
   "schemaVersion": 2,
-  "feedback": [],
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-07T09:17:29.133Z",
+      "reason": "end",
+      "note": "Added --regen mode to circular-dep ratchet. All review feedback addressed. typecheck, lint, and npm test pass locally."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-07T09:17:30.268Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-07T09:19Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-07T09:19:17.061Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-07T09:19:17.184Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-07T09:21Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-07-07T09:21:13.371Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-07T09:19:17Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2230\n\nlint:circular is still ordered after lint:ratchet-audit, violating FR-5\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2230 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 3,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-07-07T09:21:13Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-2230 (attempt 1/3):\n\nFailed check: test\n\nVerification FAILED at test (81057ms):\n\noject');\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/9]⎯\n\n FAIL  |root| tests/unit/lib/cloister/deacon-swarm-enumerate.test.ts > coordinateSwarmSlots enumerate-swarms > excludes single-item and non-swarm feature workspaces, and ignores slot workspaces\nAssertionError: expected [ Array(1) ] to deeply equal []\n\n- Expected\n+ Received\n\n- []\n+ [\n+   \"[swarm] considered PAN-100: swarm eligible\",\n+ ]\n\n ❯ tests/unit/lib/cloister/deacon-swarm-enumerate.test.ts:106:41\n    104|     mocks.listProjectsSync.mockReturnValue([{ config: { path: projectP…\n    105|\n    106|     await expect(coordinateSwarmSlots()).resolves.toEqual([]);\n       |                                         ^\n    107|   });\n    108|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/9]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/agents-switch-model.test.ts > POST /api/agents/:id/switch-model > rejects model switching for pipeline agents\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/routes/__tests__/agents-switch-model.test.ts:29:3\n     27|\n     28| describe('POST /api/agents/:id/switch-model', () => {\n     29|   it('rejects model switching for pipeline agents', async () => {\n       |   ^\n     30|     const response = await postAgentSwitchModel('agent-pan-1928', { mo…\n     31|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/9]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/cloister-config.test.ts > cloister config route > reloads the live child Cloister after saving config updates\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/routes/__tests__/cloister-config.test.ts:47:3\n     45|   });\n     46|\n     47|   it('reloads the live child Cloister after saving config updates', as…\n       |   ^\n     48|     const updates = { monitoring: { check_interval: 17 } };\n     49|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/9]⎯\n\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-2230 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-2230 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
+    }
+  ],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/drafts/PAN-2230.md",
+      ".pan/drafts/pan-2230.md",
+      ".pan/records/pan-2230.json",
+      "docs/ci-cd/CICD-QUEUE.md",
+      "docs/codebase-health/REFACTOR-QUEUE.md",
+      "scripts/canonicalize-circular-deps.js"
+    ],
+    "declaredScopeUntouched": [
+      "docs/CODEBASE-HEALTH-ROADMAP.md",
+      "docs/codebase-health/A4-circular-dep-guard.md"
+    ],
+    "declaredScope": [
+      "bun.lock",
+      "docs/CODEBASE-HEALTH-ROADMAP.md",
+      "docs/codebase-health/A4-circular-dep-guard.md",
+      "package.json",
+      "scripts/circular-deps-baseline.txt",
+      "scripts/lint-circular-deps.sh",
+      "scripts/lint-ratchet-audit.sh"
+    ],
+    "actualChangedFiles": [
+      ".pan/drafts/PAN-2230.md",
+      ".pan/drafts/pan-2230.md",
+      ".pan/records/pan-2230.json",
+      "bun.lock",
+      "docs/ci-cd/CICD-QUEUE.md",
+      "docs/codebase-health/REFACTOR-QUEUE.md",
+      "package.json",
+      "scripts/canonicalize-circular-deps.js",
+      "scripts/circular-deps-baseline.txt",
+      "scripts/lint-circular-deps.sh",
+      "scripts/lint-ratchet-audit.sh"
+    ],
+    "recordedAt": "2026-07-07T09:17:17.961Z"
+  },
   "harness": "claude-code",
   "model": "kimi-k2.7-code",
   "statusOverrides": {
@@ -31,11 +110,11 @@
     "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T09:13:48.366Z",
+    "updatedAt": "2026-07-07T09:21:22.469Z",
     "reviewNotes": "Verification failed at test",
-    "verificationNotes": "Verification FAILED at test (79026ms):\n\nb/cloister/failure-tracking.test.ts > agent failure tracking and auto-resume backoff > increments the counter when resumeAgent fails during auto-resume\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ tests/lib/cloister/failure-tracking.test.ts:197:3\n    195|   }\n    196|\n    197|   it('increments the counter when resumeAgent fails during auto-resume…\n       |   ^\n    198|     const agentId = 'agent-pan-1141-resume-fails';\n    199|     resumeAgentMock.mockResolvedValue({ success: false, error: 'tmux c…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯\n\n FAIL  |root| src/cli/commands/__tests__/start-plan-routing.test.ts > pan start planning-mode routing (PAN-2407) > POSTs start-planning with auto:true/autoStart:true when no plan exists and mode is auto\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/cli/commands/__tests__/start-plan-routing.test.ts:244:3\n    242|   }\n    243|\n    244|   it('POSTs start-planning with auto:true/autoStart:true when no plan …\n       |   ^\n    245|     mockFetchStream();\n    246|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯\n\n FAIL  |root| src/cli/commands/__tests__/start-plan-routing.test.ts > pan start planning-mode routing (PAN-2407) > POSTs start-planning with auto:false/autoStart:true when mode is interactive\nAssertionError: expected { auto: true, autoStart: true, …(3) } to match object { auto: false, autoStart: true }\n(3 matching properties omitted from actual)\n\n- Expected\n+ Received\n\n  {\n-   \"auto\": false,\n+   \"auto\": true,\n    \"autoStart\": true,\n  }\n\n ❯ src/cli/commands/__tests__/start-plan-routing.test.ts:269:18\n    267|\n    268|     const body = JSON.parse(fetchMock.mock.calls[0][1].body);\n    269|     expect(body).toMatchObject({ auto: false, autoStart: true });\n       |                  ^\n    270|   });\n    271|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯\n\n",
+    "verificationNotes": "Verification FAILED at test (81057ms):\n\noject');\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/9]⎯\n\n FAIL  |root| tests/unit/lib/cloister/deacon-swarm-enumerate.test.ts > coordinateSwarmSlots enumerate-swarms > excludes single-item and non-swarm feature workspaces, and ignores slot workspaces\nAssertionError: expected [ Array(1) ] to deeply equal []\n\n- Expected\n+ Received\n\n- []\n+ [\n+   \"[swarm] considered PAN-100: swarm eligible\",\n+ ]\n\n ❯ tests/unit/lib/cloister/deacon-swarm-enumerate.test.ts:106:41\n    104|     mocks.listProjectsSync.mockReturnValue([{ config: { path: projectP…\n    105|\n    106|     await expect(coordinateSwarmSlots()).resolves.toEqual([]);\n       |                                         ^\n    107|   });\n    108|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/9]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/agents-switch-model.test.ts > POST /api/agents/:id/switch-model > rejects model switching for pipeline agents\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/routes/__tests__/agents-switch-model.test.ts:29:3\n     27|\n     28| describe('POST /api/agents/:id/switch-model', () => {\n     29|   it('rejects model switching for pipeline agents', async () => {\n       |   ^\n     30|     const response = await postAgentSwitchModel('agent-pan-1928', { mo…\n     31|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/9]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/cloister-config.test.ts > cloister config route > reloads the live child Cloister after saving config updates\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/routes/__tests__/cloister-config.test.ts:47:3\n     45|   });\n     46|\n     47|   it('reloads the live child Cloister after saving config updates', as…\n       |   ^\n     48|     const updates = { monitoring: { check_interval: 17 } };\n     49|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/9]⎯\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2462",
-    "reviewRequestedAt": "2026-07-07T09:10:02.678Z",
+    "reviewRequestedAt": "2026-07-07T09:21:15.613Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/drafts/PAN-2230.md",
@@ -71,8 +150,9 @@
         "scripts/lint-circular-deps.sh",
         "scripts/lint-ratchet-audit.sh"
       ],
-      "recordedAt": "2026-07-07T09:09:40.777Z"
-    }
+      "recordedAt": "2026-07-07T09:17:17.961Z"
+    },
+    "panDoneRecoveredAt": "2026-07-07T09:21:15.613Z"
   },
   "closeOut": {
     "usage": {
@@ -95,17 +175,17 @@
         },
         "review": {
           "unknown": {
-            "input": 387859,
-            "output": 4411,
-            "cacheRead": 246400,
+            "input": 741324,
+            "output": 5161,
+            "cacheRead": 557568,
             "cacheWrite": 0
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 402474,
-            "output": 45384,
-            "cacheRead": 23563264,
+            "input": 821262,
+            "output": 57285,
+            "cacheRead": 28715520,
             "cacheWrite": 0
           }
         }
@@ -124,21 +204,21 @@
           "cacheWrite": 160632
         },
         "unknown": {
-          "input": 387859,
-          "output": 4411,
-          "cacheRead": 246400,
+          "input": 741324,
+          "output": 5161,
+          "cacheRead": 557568,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 402474,
-          "output": 45384,
-          "cacheRead": 23563264,
+          "input": 821262,
+          "output": 57285,
+          "cacheRead": 28715520,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 10.40845,
-        "pricingAsOf": "2026-07-07T09:13:48.418Z"
+        "usd": 12.222404,
+        "pricingAsOf": "2026-07-07T09:21:22.503Z"
       }
     },
     "merges": [
@@ -147,5 +227,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-07T09:13:42.758Z",
-  "updated": "2026-07-07T09:13:48.420Z"
+  "updated": "2026-07-07T09:21:22.505Z"
 }
