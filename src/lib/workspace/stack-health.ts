@@ -57,7 +57,8 @@ function normalizeIssue(issueId: string): string {
   // PAN-1872: tolerate an undefined issueId defensively so callers that forward
   // an optional value do not crash with `Cannot read properties of undefined
   // (reading 'toLowerCase')`.
-  return parseIssueIdSync(issueId)?.normalized ?? (issueId ?? '').toLowerCase();
+  if (!issueId) return '';
+  return parseIssueIdSync(issueId)?.normalized ?? issueId.toLowerCase();
 }
 
 function resolveStackProject(issueId: string): WorkspaceStackProject | null {
