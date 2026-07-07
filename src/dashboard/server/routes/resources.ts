@@ -7,6 +7,8 @@
 
 export {
   getDockerStatsCollector,
+  resetCurrentDockerStatsReaderForTests,
+  setCurrentDockerStatsReaderForTests,
 } from './resources/shared.js';
 export {
   getResourcesEffect,
@@ -94,6 +96,15 @@ export {
   type SpawnGatePayload,
   type SpawnGateState,
 } from './resources/spawn-gate.js';
+export {
+  buildResourceStacks,
+  getResourceStacks,
+  resetResourceStackReviewStatusReaderForTests,
+  setResourceStackReviewStatusReaderForTests,
+  type ResourceStack,
+  type ResourceStackPhase,
+  type StackContainerResource,
+} from './resources/stacks.js';
 export {
   resourcesRouteLayer,
   default,

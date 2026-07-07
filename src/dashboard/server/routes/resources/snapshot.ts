@@ -12,6 +12,7 @@ import { buildHostVitalsSnapshot } from './host-vitals.js';
 import { enrichContainersWithLimits } from './limits.js';
 import { getCurrentDockerStats } from './shared.js';
 import { getSpawnGatePayloadEffect } from './spawn-gate.js';
+import { getResourceStacks } from './stacks.js';
 
 /** Build the GET /api/resources response from the SQLite agents table. */
 export function getResourcesEffect(): Effect.Effect<ReturnType<typeof jsonResponse>, never, never> {
@@ -55,6 +56,7 @@ export function getResourcesEffect(): Effect.Effect<ReturnType<typeof jsonRespon
       stoppedContainers,
       networks: [],
       spawnGate,
+      stacks: getResourceStacks(containers),
       volumes: [],
       updatedAt: new Date().toISOString(),
     });

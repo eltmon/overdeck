@@ -117,6 +117,7 @@ describe('PAN-2464 resources route no-loss audit', () => {
       'hostVitals',
       'networks',
       'spawnGate',
+      'stacks',
       'stoppedContainers',
       'updatedAt',
       'volumes',

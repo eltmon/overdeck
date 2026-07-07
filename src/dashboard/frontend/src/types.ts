@@ -349,6 +349,23 @@ export interface SpawnGateSnapshot {
   }>;
 }
 
+export type ResourceStackPhase = 'merged' | 'ship' | 'review' | 'work' | 'plan' | 'ready' | 'todo' | 'verifying';
+
+export interface ResourceStack {
+  id: string;
+  issueId: string | null;
+  issueTitle: string;
+  composeProject: string;
+  serviceCount: number;
+  services: ContainerStats[];
+  aggregates: {
+    cpuPercent: number;
+    memoryBytes: number;
+    diskBytes: number;
+  };
+  phase: ResourceStackPhase;
+}
+
 export interface ResourcesSnapshot {
   containers: ContainerStats[];
   agents: Agent[];
@@ -356,6 +373,7 @@ export interface ResourcesSnapshot {
   hostVitals?: HostVitalsSnapshot;
   spawnGate?: SpawnGateSnapshot;
   stale?: boolean;
+  stacks?: ResourceStack[];
   coreServices?: CoreServiceResource[];
   hostProcesses?: HostProcessResource[];
 }

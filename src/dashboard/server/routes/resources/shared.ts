@@ -4,6 +4,7 @@ import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 import { DockerStatsCollector } from '../../../../lib/docker-stats.js';
 
 let dockerStatsCollector: DockerStatsCollector | null = null;
+let currentDockerStatsReader: (() => unknown[]) | null = null;
 
 export function getDockerStatsCollector(): DockerStatsCollector {
   if (!dockerStatsCollector) {
@@ -16,7 +17,16 @@ export function getDockerStatsCollector(): DockerStatsCollector {
 }
 
 export function getCurrentDockerStats(): unknown[] {
+  if (currentDockerStatsReader) return currentDockerStatsReader();
   return dockerStatsCollector ? dockerStatsCollector.getStats() : [];
+}
+
+export function setCurrentDockerStatsReaderForTests(reader: () => unknown[]): void {
+  currentDockerStatsReader = reader;
+}
+
+export function resetCurrentDockerStatsReaderForTests(): void {
+  currentDockerStatsReader = null;
 }
 
 export function getContainerHistory(containerId: string): unknown {
