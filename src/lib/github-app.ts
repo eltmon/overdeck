@@ -35,6 +35,18 @@ export interface InstallationToken {
   permissions?: Record<string, string>;
 }
 
+/**
+ * Detects the GitHub App 403 "Resource not accessible by integration" error
+ * thrown when the installation lacks a required permission (e.g.
+ * contents:write or pull_requests:write) for the merge endpoint.
+ */
+export function isIntegrationPermissionError(message: string): boolean {
+  return (
+    message.includes('403') &&
+    message.includes('Resource not accessible by integration')
+  );
+}
+
 export interface GitHubPullRequestRef {
   owner: string;
   repo: string;

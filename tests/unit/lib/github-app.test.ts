@@ -40,6 +40,7 @@ import {
   getIssueState,
   getIssueStatePromise,
   getMergeBackendStatus,
+  isIntegrationPermissionError,
   listOpenIssuesWithLabels,
   listOpenIssuesWithLabelsPromise,
   listPullRequestsForHead,
@@ -309,5 +310,23 @@ describe('App REST shared helpers', () => {
       .resolves.toEqual({ state: 'open' });
     await expect(Effect.runPromise(listOpenIssuesWithLabels('eltmon', 'overdeck')))
       .resolves.toEqual([{ number: 5, labels: ['ready'] }]);
+  });
+});
+
+describe('isIntegrationPermissionError', () => {
+  it('returns true for a 403 "Resource not accessible by integration" message', () => {
+    expect(isIntegrationPermissionError('GitHub merge failed: 403 {"message":"Resource not accessible by integration"}')).toBe(true);
+  });
+
+  it('returns false for transient network errors', () => {
+    expect(isIntegrationPermissionError('fetch failed: ECONNRESET')).toBe(false);
+    expect(isIntegrationPermissionError('fetch failed: ETIMEDOUT')).toBe(false);
+  });
+
+  it('returns false for timeout and mergeable-state errors', () => {
+    expect(isIntegrationPermissionError('Timed out waiting for GitHub PR #123 to become mergeable')).toBe(false);
+    expect(isIntegrationPermissionError('GitHub merge failed: 409 {"message":"Head branch was modified"}')).toBe(false);
+    expect(isIntegrationPermissionError('GitHub merge failed: 422 {"message":"Required status check"}')).toBe(false);
+    expect(isIntegrationPermissionError('GitHub merge failed: 405 Method Not Allowed')).toBe(false);
   });
 });
