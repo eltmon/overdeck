@@ -31,12 +31,12 @@
     "issueId": "PAN-2373",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T01:35:12.241Z",
-    "verificationNotes": "Verification FAILED at test (67062ms):\n\n repo artifacts.\nOffending staged paths:\n  src/foo.ts\n\nAllowed flywheel-orchestrator commit paths are:\n  docs/FLYWHEEL-STATE.md\n  .pan/records/\n  .pan/continues/\n  .pan/backlog/\n  .beads/\n✗ overdeck boundary gate: 1 site(s) across 1 file(s) still on the OLD panopticon.db\n\nsrc/dashboard/server/routes/issues.ts:1:import { Db } from '../../../lib/overdeck/infra.js';\n\nEach must go through an overdeck door (src/lib/overdeck/*) — not getDatabase() or a database/* store.\nguard-agent-main-push.sh invoked\n⚠ ratchet audit: no base for refs/heads/feature — skipping\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n(node:3969495) ExperimentalWarning: Some other experimental feature\n(Use `node --trace-warnings ...` to show where the warning was created)\n✖ quarantine audit: the following entries lack an issue reference\n  tests/foo.test.ts\nEach quarantine entry must reference an issue — add e.g. # PAN-XXXX.\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| tests/playwright/conversation-supervisor-uat.test.ts > conversation supervisor Playwright UAT > resumes Codex conversations through the real route with codex resume\nError: Hook timed out in 5000ms.\nIf this is a long-running hook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n ❯ tests/playwright/conversation-supervisor-uat.test.ts:337:1\n    335| }\n    336|\n    337| beforeEach(async () => {\n       | ^\n    338|   vi.resetModules();\n    339|   ensurePtySupervisorArtifact();\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n",
+    "updatedAt": "2026-07-07T01:43:40.992Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2419",
+    "lastVerifiedCommit": "0b462104234bbe78d64e87e72d31026ee028f3ac",
     "reviewRequestedAt": "2026-07-06T20:25:44.117Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -182,7 +182,7 @@
       },
       "costAtCloseOut": {
         "usd": 28.83734425,
-        "pricingAsOf": "2026-07-07T01:35:12.269Z"
+        "pricingAsOf": "2026-07-07T01:43:41.039Z"
       }
     },
     "merges": [
@@ -194,5 +194,5 @@
     "finalizedAt": "2026-07-06T17:49:27.751Z"
   },
   "created": "2026-07-07T01:35:12.280Z",
-  "updated": "2026-07-07T01:35:12.280Z"
+  "updated": "2026-07-07T01:43:41.039Z"
 }
