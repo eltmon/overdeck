@@ -162,7 +162,8 @@ describe('computeSubstrateBugWeight', () => {
     expect(red.weight).toBeGreaterThan(green.weight);
     expect(red.weight).toBe(5.25);
   });
-  it('returns zero when affected criteria have insufficient data', () => {
+
+  it('returns zero and an insufficient telemetry reason when every affected criterion has insufficient data', () => {
     const result = computeSubstrateBugWeight([1, 3], stats({
       c1_bugRate: criterion({
         label: 'Substrate-bug discovery rate',
