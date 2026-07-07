@@ -4,23 +4,8 @@
   "sessionHistory": [
     {
       "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-07T06:10:22.566Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-07T06:16Z] verification-gate → FAILED — seq 1",
-      "timestamp": "2026-07-07T06:16:17.106Z"
-    },
-    {
-      "timestamp": "2026-07-07T06:19:05.084Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-07T06:19:06.344Z"
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-07T06:46:32.414Z"
     }
   ],
   "feedback": [],
@@ -38,14 +23,14 @@
   },
   "pipeline": {
     "issueId": "PAN-2450",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
-    "verificationStatus": "passed",
+    "reviewStatus": "failed",
+    "testStatus": "passed",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T06:21:21.813Z",
-    "reviewNotes": "Approved; focused UI and merge-verification checks passed",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-07-07T06:46:58.278Z",
+    "reviewNotes": "Verification failed at test",
+    "verificationNotes": "Verification FAILED at test (88524ms):\n\n route > reloads the live child Cloister after saving config updates\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/routes/__tests__/cloister-config.test.ts:47:3\n     45|   });\n     46|\n     47|   it('reloads the live child Cloister after saving config updates', as…\n       |   ^\n     48|     const updates = { monitoring: { check_interval: 17 } };\n     49|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/25]⎯\n\n FAIL  |root| src/dashboard/server/services/__tests__/conversation-compaction.test.ts > conversation native compaction > writes the compact boundary to a forked file without mutating the source\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/services/__tests__/conversation-compaction.test.ts:63:3\n     61|\n     62| describe('conversation native compaction', () => {\n     63|   it('writes the compact boundary to a forked file without mutating th…\n       |   ^\n     64|     const file = await writeJsonl('session.jsonl', [\n     65|       { type: 'user', message: { role: 'user', content: [{ type: 'text…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/25]⎯\n\n FAIL  |root| src/dashboard/server/services/__tests__/issue-lifecycle.test.ts > IssueLifecycle Effect service > transitionTo — Linear > transitions to \"in_progress\" on Linear\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/services/__tests__/issue-lifecycle.test.ts:122:5\n    120|\n    121|   describe('transitionTo — Linear', () => {\n    122|     it('transitions to \"in_progress\" on Linear', async () => {\n       |     ^\n    123|       const { IssueLifecycle } = await import('../issue-lifecycle.js');\n    124|       const layer = await makeTestLayer();\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/25]⎯\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2455",
     "reviewedAtCommit": "0747f526b9ccf00646d7522936620cc39a25bf03",
     "lastVerifiedCommit": "133b10f3e8abec0027c3ff53ef503e70e8b70e3a",
@@ -56,8 +41,8 @@
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 732,
-            "output": 400,
+            "input": 3860,
+            "output": 1162,
             "cacheRead": 732,
             "cacheWrite": 0
           },
@@ -78,25 +63,25 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 427668,
-            "output": 4157,
-            "cacheRead": 1368064,
+            "input": 910090,
+            "output": 41239,
+            "cacheRead": 25856078,
             "cacheWrite": 0
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1452913,
-            "output": 293950,
-            "cacheRead": 160649082,
+            "input": 1475067,
+            "output": 299900,
+            "cacheRead": 165827962,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 732,
-          "output": 400,
+          "input": 3860,
+          "output": 1162,
           "cacheRead": 732,
           "cacheWrite": 0
         },
@@ -113,15 +98,15 @@
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 1880581,
-          "output": 298107,
-          "cacheRead": 162017146,
+          "input": 2385157,
+          "output": 341139,
+          "cacheRead": 191684040,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 41.9252902,
-        "pricingAsOf": "2026-07-07T06:21:21.874Z"
+        "usd": 48.2204062,
+        "pricingAsOf": "2026-07-07T06:46:58.445Z"
       }
     },
     "merges": [
@@ -132,6 +117,6 @@
   "swarm": {
     "finalizedAt": "2026-07-07T04:18:45.208Z"
   },
-  "created": "2026-07-07T05:55:33.132Z",
-  "updated": "2026-07-07T06:21:21.876Z"
+  "created": "2026-07-07T06:28:28.585Z",
+  "updated": "2026-07-07T06:46:58.446Z"
 }
