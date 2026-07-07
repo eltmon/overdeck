@@ -291,6 +291,10 @@ export interface ContainerStats {
   networkIn: number;      // bytes
   networkOut: number;     // bytes
   status: 'running' | 'stopped' | 'unhealthy' | 'restarting';
+  memLimitBytes?: number | null;
+  memPercentOfLimit?: number;
+  oomKills24h?: number;
+  composeFile?: string;
 }
 
 export interface ContainerHistory {
@@ -364,6 +368,8 @@ export interface ResourceStack {
     diskBytes: number;
   };
   phase: ResourceStackPhase;
+  idleMinutes?: number;
+  uatUrl?: string;
 }
 
 export interface ResourcesSnapshot {

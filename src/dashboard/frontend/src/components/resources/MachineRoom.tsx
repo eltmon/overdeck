@@ -4,6 +4,7 @@ import { AgentsSection } from './AgentsSection';
 import { CoreServicesSection } from './CoreServicesSection';
 import { HostProcessesSection } from './HostProcessesSection';
 import { MachineRoomTopbar, type MachineRoomGroupBy } from './MachineRoomTopbar';
+import { StacksSection } from './StacksSection';
 import { VitalsStrip } from './VitalsStrip';
 
 type MachineRoomRow =
@@ -71,6 +72,7 @@ export function MachineRoom({ snapshot, onNavigateToAgents, onStop, onPause, onL
             if (row) onPause?.(row);
           }}
         />
+        <StacksSection stacks={snapshot.stacks ?? []} filter={filter} groupBy={groupBy} />
         <CoreServicesSection services={snapshot.coreServices ?? []} filter={filter} onFocusRow={setFocusedRowId} />
         <HostProcessesSection processes={snapshot.hostProcesses ?? []} filter={filter} onFocusRow={setFocusedRowId} />
         {groups.map((group) => (
