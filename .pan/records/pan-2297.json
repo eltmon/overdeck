@@ -2,8 +2,8 @@
   "issueId": "PAN-2297",
   "schemaVersion": 2,
   "feedback": [],
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "reconcile-helper": "completed",
     "reconcile-helper.ac1": "completed",
@@ -147,5 +147,5 @@
     "slotAssignments": []
   },
   "created": "2026-07-07T23:25:44.874Z",
-  "updated": "2026-07-07T23:47:15.281Z"
+  "updated": "2026-07-07T23:47:41.376Z"
 }
