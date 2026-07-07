@@ -475,7 +475,6 @@ async function runVerificationForIssuePromise(
       isRemote: workspaceInfo.isRemote,
       vmName: workspaceInfo.vmName,
       placeholders,
-      env: { OVERDECK_VERIFICATION: '1' },
     }));
 
     const failedGate = gateResults.find(r => !r.passed && r.required !== false);

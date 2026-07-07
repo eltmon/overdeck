@@ -64,9 +64,7 @@ export default defineConfig({
     // 5s is enough for unit/integration tests; tests that legitimately need
     // more time should opt in via `test('...', { timeout: 20_000 }, ...)`.
     // Pre-PAN-1062: 10s blanket timeout masked slow tests.
-    // Verification runs execute under higher contention (fewer forks, shared
-    // runners), so raise the ceiling there to avoid unrelated flaky timeouts.
-    testTimeout: isVerification ? 15_000 : 5_000,
-    hookTimeout: isVerification ? 15_000 : 5_000,
+    testTimeout: 5000,
+    hookTimeout: 5000,
   },
 });

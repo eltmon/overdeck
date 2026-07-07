@@ -20,10 +20,10 @@ import { GitError } from '../errors.js';
 const execAsync = promisify(exec);
 const DASHBOARD_RUNTIME_ENV_KEYS = ['API_PORT', 'PORT', 'DASHBOARD_URL'] as const;
 
-function buildQualityGateEnv(gateEnv: Record<string, string> | undefined, runEnv: Record<string, string> | undefined): NodeJS.ProcessEnv {
+function buildQualityGateEnv(gateEnv: Record<string, string> | undefined): NodeJS.ProcessEnv {
   const env = { ...process.env };
   for (const key of DASHBOARD_RUNTIME_ENV_KEYS) {
-    if (!Object.prototype.hasOwnProperty.call(gateEnv ?? {}, key) && !Object.prototype.hasOwnProperty.call(runEnv ?? {}, key)) {
+    if (!Object.prototype.hasOwnProperty.call(gateEnv ?? {}, key)) {
       delete env[key];
     }
   }
@@ -35,7 +35,7 @@ function buildQualityGateEnv(gateEnv: Record<string, string> | undefined, runEnv
   // gate may still opt back in via gate.env. The skip mechanism lives in
   // scripts/build-post-cli.mjs (PAN-1659). Release/publish builds the index
   // through a separate path (build-for-publish.mjs) that never sets this.
-  return { SKIP_DOCS_INDEX: '1', ...env, ...runEnv, ...gateEnv };
+  return { SKIP_DOCS_INDEX: '1', ...env, ...gateEnv };
 }
 
 /**
@@ -321,8 +321,6 @@ export interface QualityGateRunOptions {
   vmName?: string;
   /** Template placeholders for resolving container names (e.g., {{FEATURE_FOLDER}}) */
   placeholders?: TemplatePlaceholders;
-  /** Extra environment variables injected into every gate command. */
-  env?: Record<string, string>;
 }
 
 /**
@@ -440,7 +438,7 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
     try {
       // When running in container, don't set host cwd (irrelevant)
       const useHostCwd = !isRemote && !(gate.container && gate.container_name);
-      const env = buildQualityGateEnv(gate.env, opts.env);
+      const env = buildQualityGateEnv(gate.env);
       const { stdout, stderr } = await execAsync(resolvedCommand, {
         cwd: useHostCwd ? cwd : undefined,
         env,
