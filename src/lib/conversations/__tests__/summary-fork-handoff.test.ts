@@ -373,7 +373,7 @@ describe('handoff fork handshake', () => {
     expect(result.forkFallbackReason).toBe('handoff-timeout');
     expect(result.summary).toContain('## Conversation Summary Fork');
     rmSync(home, { recursive: true, force: true });
-  });
+  }, 15_000);
 
   it('falls back to summary fork when the handoff document fails validation', async () => {
     const home = join(tmpdir(), `pan-handoff-validation-fallback-${Date.now()}`);

@@ -160,6 +160,7 @@ import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync } from '../projects.js';
 import { queueBeadsAutoCommit } from '../pan-dir/auto-commit.js';
 import { withIssueRecordLock } from '../pan-dir/record-lock.js';
+import { recordMainDivergenceHealth, type ProjectMainDivergence } from './deacon-main-divergence.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { mapGitHubStateToCanonical } from '../../core/state-mapping.js';
 import { logDeaconEventSync, logAgentLifecycleSync } from '../persistent-logger.js';
@@ -260,6 +261,7 @@ export interface DeaconState {
   lastMassDeathAlert?: string;   // ISO 8601
   mergeStuckAttempts?: Record<string, number>;  // circuit-breaker attempt counts (PAN-344)
   containerRestarts?: Record<string, ContainerRestartRecord>;  // PAN-464: restart backoff tracking
+  mainDivergence?: ProjectMainDivergence[];
 }
 
 export type DeaconPatrolHealth = 'running' | 'starting' | 'stale' | 'stopped';
@@ -729,6 +731,7 @@ export interface PatrolResult {
   specialists: HealthCheckResult[];
   actionsToken: string[];
   massDeathDetected: boolean;
+  mainDivergence?: ProjectMainDivergence[];
 }
 
 /**
@@ -3123,14 +3126,10 @@ export async function runPatrol(): Promise<PatrolResult> {
     for (const a of playwrightActions) addLog('action', a, state.patrolCycle);
   }
 
-  // PAN-1441: sweep host-main beads drift into git. `.beads/{issues.jsonl,
-  // export-state.json}` re-export on `main` whenever the `bd` binary syncs the
-  // shared dolt remote, and there is no single Overdeck write site to hook —
-  // so commit any resulting drift here. queueBeadsAutoCommit is main-only,
-  // debounced, skips missing files, and no-ops when nothing changed.
-  for (const { config: projectConfig } of listProjectsSync()) {
-    if (projectConfig.path) queueBeadsAutoCommit(projectConfig.path);
-  }
+  const projectConfigs = listProjectsSync();
+  for (const { config: projectConfig } of projectConfigs) if (projectConfig.path) queueBeadsAutoCommit(projectConfig.path);
+  const divergenceWarnings = await recordMainDivergenceHealth(state, projectConfigs);
+  for (const warning of divergenceWarnings) addLog('warn', warning, state.patrolCycle);
 
   // Periodic agent state cleanup (PAN-154)
   if (Math.random() < 0.003) {
@@ -3273,6 +3272,7 @@ export async function runPatrol(): Promise<PatrolResult> {
     specialists: results,
     actionsToken: actions,
     massDeathDetected: massDeathCheck.isMassDeath,
+    mainDivergence: state.mainDivergence,
   };
 
   lastPatrolResult = result;

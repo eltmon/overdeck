@@ -12,10 +12,12 @@ import { dirname as dirname$1, isAbsolute, join as join$1 } from "node:path";
 import { readFile } from "node:fs/promises";
 import * as OS from "node:os";
 import * as NodeChildProcess from "node:child_process";
+import { execFile as execFile$1 } from "node:child_process";
 import * as Crypto from "node:crypto";
 import * as NodeUrl from "node:url";
+import { promisify } from "node:util";
 import { mkdir, writeFile } from "fs/promises";
-import { promisify } from "util";
+import { promisify as promisify$1 } from "util";
 //#region \0rolldown/runtime.js
 var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod), cb = null), mod.exports);
 var __require = /* @__PURE__ */ createRequire(import.meta.url);
@@ -18668,7 +18670,16 @@ const layer = /* @__PURE__ */ succeed$1(Path$1)({
 	fromFileUrl,
 	toFileUrl
 });
+promisify(execFile$1);
 layer$4.pipe(provide(mergeAll(layer$2, layer)));
+const DEFAULT_STATE_FLUSH_WINDOW_MS = 600 * 1e3;
+parseStateFlushWindowMs(process.env.OVERDECK_STATE_FLUSH_WINDOW_MS);
+function parseStateFlushWindowMs(value) {
+	if (!value) return DEFAULT_STATE_FLUSH_WINDOW_MS;
+	const parsed = Number(value);
+	if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_STATE_FLUSH_WINDOW_MS;
+	return parsed;
+}
 Promise.resolve();
 //#endregion
 //#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/identity.js
@@ -30478,7 +30489,7 @@ function buildChildEnvSync(baseEnv = process.env, overrides) {
 Object.fromEntries([...PROVIDER_ENV_KEYS].map((k) => [k, ""]));
 //#endregion
 //#region ../../src/lib/tmux.ts
-const execFileAsync = promisify(execFile);
+const execFileAsync = promisify$1(execFile);
 const MANAGED_TMUX_SERVER_UNIT = "overdeck-tmux-server";
 const SERVER_ALIVE_POLL_MS = 50;
 const SERVER_ALIVE_TIMEOUT_MS = 5e3;
@@ -31309,7 +31320,7 @@ function captureTldrMetricsSync(workspacePath) {
 	} catch {}
 	return metrics;
 }
-promisify(exec);
+promisify$1(exec);
 //#endregion
 //#region record-cost-event.ts
 /**

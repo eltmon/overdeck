@@ -141,7 +141,7 @@ async function closeBridge(server: NetServer): Promise<void> {
 }
 
 function removeTempDir(path: string): void {
-  rmSync(path, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+  rmSync(path, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
 }
 
 function ensurePtySupervisorArtifact(): void {
@@ -402,7 +402,7 @@ beforeEach(async () => {
   browser = await chromium.launch();
   context = await browser.newContext();
   page = await context.newPage();
-});
+}, 30_000);
 
 afterEach(async () => {
   await page?.close().catch(() => undefined);

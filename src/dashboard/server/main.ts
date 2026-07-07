@@ -65,6 +65,7 @@ import { ProjectsLive } from '../../lib/overdeck/config.js';
 import { RecordsLive, TmuxLive } from '../../lib/overdeck/infra.js';
 import { getAgentSessionsSync } from '../../lib/tmux.js';
 import { isSmeeConfiguredSync, startSmeeProcessSync } from '../../lib/smee.js';
+import { flushAllPendingAutoCommits } from '../../lib/pan-dir/auto-commit.js';
 
 declare const Bun: unknown;
 
@@ -541,6 +542,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopCostReconcileService();
   stopRestartAnnouncer();
   await stopDeaconChild().catch((err) => console.warn('[deacon-supervisor] child shutdown failed:', err));
+  await Effect.runPromise(flushAllPendingAutoCommits()).catch((err) => console.warn('[pan-dir/auto-commit] shutdown flush failed:', err));
   await stopConversationSearchWatcher().catch((err) => console.warn('[conversation-search] watcher shutdown failed:', err));
   closeConversationSearchService();
   closeMemoryFtsDatabases();
