@@ -160,7 +160,7 @@ import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync } from '../projects.js';
 import { queueBeadsAutoCommit } from '../pan-dir/auto-commit.js';
 import { withIssueRecordLock } from '../pan-dir/record-lock.js';
-import { getMainDivergence, type MainDivergence } from '../state-plane.js';
+import { recordMainDivergenceHealth, type ProjectMainDivergence } from './deacon-main-divergence.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { mapGitHubStateToCanonical } from '../../core/state-mapping.js';
 import { logDeaconEventSync, logAgentLifecycleSync } from '../persistent-logger.js';
@@ -247,12 +247,6 @@ export interface ContainerRestartRecord {
   firstRestart: string;   // ISO 8601 — when the first restart in the current burst happened
   lastRestart: string;    // ISO 8601 — when the most recent restart happened
   gaveUp?: boolean;       // True when max restarts exceeded — skip future auto-restarts
-}
-
-export interface ProjectMainDivergence extends MainDivergence {
-  projectKey: string;
-  projectPath: string;
-  checkedAt: string;
 }
 
 /**
@@ -738,47 +732,6 @@ export interface PatrolResult {
   actionsToken: string[];
   massDeathDetected: boolean;
   mainDivergence?: ProjectMainDivergence[];
-}
-
-type ProjectConfigEntry = ReturnType<typeof listProjectsSync>[number];
-
-export async function recordMainDivergenceHealth(
-  state: DeaconState,
-  projects: ProjectConfigEntry[] = listProjectsSync(),
-  measure: (repoPath: string) => Promise<MainDivergence> = getMainDivergence,
-): Promise<string[]> {
-  const checkedAt = new Date().toISOString();
-  const records: ProjectMainDivergence[] = [];
-  const warnings: string[] = [];
-
-  for (const project of projects) {
-    const projectPath = project.config.path;
-    if (!projectPath) continue;
-
-    let divergence: MainDivergence;
-    try {
-      divergence = await measure(projectPath);
-    } catch {
-      divergence = { ahead: 0, behind: 0 };
-    }
-    const projectKey = project.key ?? project.config.name ?? projectPath;
-    const record: ProjectMainDivergence = {
-      projectKey,
-      projectPath,
-      checkedAt,
-      ...divergence,
-    };
-    records.push(record);
-
-    if (record.ahead > 1 || record.behind > 0) {
-      warnings.push(
-        `Main divergence for ${projectKey}: local main ahead ${record.ahead}, behind ${record.behind} relative to origin/main`,
-      );
-    }
-  }
-
-  state.mainDivergence = records;
-  return warnings;
 }
 
 /**
@@ -3173,15 +3126,8 @@ export async function runPatrol(): Promise<PatrolResult> {
     for (const a of playwrightActions) addLog('action', a, state.patrolCycle);
   }
 
-  // PAN-1441: sweep host-main beads drift into git. `.beads/{issues.jsonl,
-  // export-state.json}` re-export on `main` whenever the `bd` binary syncs the
-  // shared dolt remote, and there is no single Overdeck write site to hook —
-  // so commit any resulting drift here. queueBeadsAutoCommit is main-only,
-  // fixed-window coalesced, skips missing files, and no-ops when nothing changed.
   const projectConfigs = listProjectsSync();
-  for (const { config: projectConfig } of projectConfigs) {
-    if (projectConfig.path) queueBeadsAutoCommit(projectConfig.path);
-  }
+  for (const { config: projectConfig } of projectConfigs) if (projectConfig.path) queueBeadsAutoCommit(projectConfig.path);
   const divergenceWarnings = await recordMainDivergenceHealth(state, projectConfigs);
   for (const warning of divergenceWarnings) addLog('warn', warning, state.patrolCycle);
 

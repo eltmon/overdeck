@@ -22,6 +22,7 @@ import { readOhmypiCodexCredential } from '../../lib/ohmypi-codex-auth.js';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { CacheService } from '../../dashboard/server/services/cache-service.js';
 import { classifyDashboardAgent } from '../../dashboard/frontend/src/lib/agent-classifier.js';
+import { getMainDivergence, type MainDivergence } from '../../lib/state-plane.js';
 
 // Minimum supported omp version for the ohmypi harness (PAN-1989).
 // omp uses a different version lineage from pi. Baselined at 16.1.16 (verified).
@@ -616,6 +617,30 @@ export function checkOrphanProposedSpecs(options: {
   };
 }
 
+export async function checkMainDivergence(
+  projects: DoctorProjectEntry[] = listProjectsSync(),
+  measure: (repoPath: string) => Promise<MainDivergence> = getMainDivergence,
+): Promise<CheckResult[]> {
+  const checks: CheckResult[] = [];
+
+  for (const project of projects) {
+    const projectPath = project.config.path;
+    const projectLabel = `${project.key} (${project.config.name})`;
+    const divergence = await measure(projectPath);
+    const status = divergence.ahead > 1 || divergence.behind > 0 ? 'warn' : 'ok';
+    checks.push({
+      name: `Main Divergence: ${projectLabel}`,
+      status,
+      message: `local main ahead ${divergence.ahead}, behind ${divergence.behind} relative to origin/main`,
+      fix: status === 'warn'
+        ? 'Push state commits with `git push origin main`; pan reload builds from origin/main, so stale origin/main can deploy stale code.'
+        : undefined,
+    });
+  }
+
+  return checks;
+}
+
 export interface DoctorOptions {
   strict?: boolean;
 }
@@ -766,6 +791,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
     dashboardAgents: await getDashboardAgentRowsForDoctor(),
   }));
   checks.push(checkOrphanProposedSpecs());
+  checks.push(...await checkMainDivergence());
 
   // Check smee-client webhook relay
   try {

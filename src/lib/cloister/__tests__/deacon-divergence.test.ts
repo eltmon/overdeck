@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { recordMainDivergenceHealth, type DeaconState } from '../deacon.js';
+import { type DeaconState } from '../deacon.js';
+import { recordMainDivergenceHealth } from '../deacon-main-divergence.js';
 
 function emptyState(): DeaconState {
   return {
