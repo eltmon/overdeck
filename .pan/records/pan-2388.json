@@ -16,24 +16,136 @@
       "reason": "feedback",
       "note": "[2026-07-07T17:34Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-07T17:34:45.639Z"
+    },
+    {
+      "timestamp": "2026-07-07T18:01:33.670Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-07T18:01:35.868Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-07T18:02Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-07T18:02:46.553Z"
     }
   ],
   "feedback": [
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-07T17:34:39Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2388\n\nOhMyPi unpriced-token metadata is dropped before warning/archive/route surfacing\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2388 -m \"Fixed review issues\"`"
-    },
-    {
       "seq": 2,
       "specialist": "review-agent",
       "outcome": "changes-requested",
-      "timestamp": "2026-07-07T17:34:45Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2388\n\nOhMyPi unpriced-token metadata is dropped before warning/archive/route surfacing\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2388 -m \"Fixed review issues\"`"
+      "timestamp": "2026-07-07T18:02:46Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2388\n\nManual reconcile route drops the existing Claude transcript reconciler\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2388 -m \"Fixed review issues\"`"
     }
   ],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".beads/export-state.json",
+      ".beads/issues.jsonl",
+      ".pan/context/codebase/architecture.md",
+      ".pan/drafts/pan-2388.md",
+      ".pan/records/pan-2388.json",
+      ".pan/specs/2026-07-05-PAN-2389-feat-costs-regenerate-the-token-spend-report-post-rebrand-backfill-cost-events-from-stored-jsonl-conversations-no-legacy-db-import.vbrief.json",
+      "docs/PAN-2388-live-cost-reconcile-runbook.md",
+      "docs/flywheel-briefs/pan-2388-cost-reconcile-runbook.md",
+      "scripts/circular-deps-baseline.txt",
+      "src/dashboard/server/routes/__tests__/costs-reconcile-route.test.ts",
+      "src/dashboard/server/services/__tests__/codex-conversation-parser.test.ts",
+      "src/lib/__tests__/session-format-converter.test.ts",
+      "src/lib/agents/resume.ts",
+      "src/lib/cloister/__tests__/pi-cost-reconciler.test.ts",
+      "src/lib/cloister/feedback-target.ts",
+      "src/lib/cloister/review-verdict-feedback.ts",
+      "src/lib/cloister/verification-runner.ts",
+      "src/lib/cost-parsers/__tests__/fixtures/codex/README.md",
+      "src/lib/cost-parsers/jsonl-parser.ts",
+      "src/lib/overdeck/__tests__/cost-backfill-roots.test.ts",
+      "src/lib/overdeck/__tests__/cost-codex-reconcile.test.ts",
+      "src/lib/overdeck/agent-state-sync.ts",
+      "src/lib/overdeck/infra.ts",
+      "src/lib/review-status.ts",
+      "tests/unit/lib/cloister/feedback-target.test.ts",
+      "tests/unit/lib/overdeck/cost-reconcile-fixtures.integration.test.ts",
+      "tests/unit/lib/overdeck/cost-reconcile.test.ts",
+      "tests/unit/lib/overdeck/cost.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/lib/cloister/service.ts"
+    ],
+    "declaredScope": [
+      "src/dashboard/server/routes/costs.ts",
+      "src/lib/cloister/pi-cost-reconciler.ts",
+      "src/lib/cloister/service.ts",
+      "src/lib/cost-parsers/__tests__/codex-parser.test.ts",
+      "src/lib/cost-parsers/__tests__/fixtures/claude/*.jsonl",
+      "src/lib/cost-parsers/__tests__/fixtures/codex/*.jsonl",
+      "src/lib/cost-parsers/__tests__/fixtures/ohmypi/*.jsonl",
+      "src/lib/cost-parsers/__tests__/ohmypi-parser.test.ts",
+      "src/lib/cost-parsers/codex-parser.ts",
+      "src/lib/cost-parsers/ohmypi-parser.ts",
+      "src/lib/overdeck/__tests__/cost-reconcile-harnesses.integration.test.ts",
+      "src/lib/overdeck/cost.ts",
+      "tests/lib/cost-parsers/jsonl-parser.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".beads/export-state.json",
+      ".beads/issues.jsonl",
+      ".pan/context/codebase/architecture.md",
+      ".pan/drafts/pan-2388.md",
+      ".pan/records/pan-2388.json",
+      ".pan/specs/2026-07-05-PAN-2389-feat-costs-regenerate-the-token-spend-report-post-rebrand-backfill-cost-events-from-stored-jsonl-conversations-no-legacy-db-import.vbrief.json",
+      "docs/PAN-2388-live-cost-reconcile-runbook.md",
+      "docs/flywheel-briefs/pan-2388-cost-reconcile-runbook.md",
+      "scripts/circular-deps-baseline.txt",
+      "src/dashboard/server/routes/__tests__/costs-reconcile-route.test.ts",
+      "src/dashboard/server/routes/costs.ts",
+      "src/dashboard/server/services/__tests__/codex-conversation-parser.test.ts",
+      "src/lib/__tests__/session-format-converter.test.ts",
+      "src/lib/agents/resume.ts",
+      "src/lib/cloister/__tests__/pi-cost-reconciler.test.ts",
+      "src/lib/cloister/feedback-target.ts",
+      "src/lib/cloister/pi-cost-reconciler.ts",
+      "src/lib/cloister/review-verdict-feedback.ts",
+      "src/lib/cloister/verification-runner.ts",
+      "src/lib/cost-parsers/__tests__/codex-parser.test.ts",
+      "src/lib/cost-parsers/__tests__/fixtures/claude/real-cache-session.jsonl",
+      "src/lib/cost-parsers/__tests__/fixtures/claude/real-session.jsonl",
+      "src/lib/cost-parsers/__tests__/fixtures/codex/README.md",
+      "src/lib/cost-parsers/__tests__/fixtures/codex/rollout-nested-multi-turn.jsonl",
+      "src/lib/cost-parsers/__tests__/fixtures/codex/rollout-nested-single-turn.jsonl",
+      "src/lib/cost-parsers/__tests__/fixtures/codex/rollout.jsonl",
+      "src/lib/cost-parsers/__tests__/fixtures/ohmypi/gemini-3-flash-preview.jsonl",
+      "src/lib/cost-parsers/__tests__/fixtures/ohmypi/gemini.jsonl",
+      "src/lib/cost-parsers/__tests__/fixtures/ohmypi/kimi-k2.7-code.jsonl",
+      "src/lib/cost-parsers/__tests__/fixtures/ohmypi/kimi.jsonl",
+      "src/lib/cost-parsers/__tests__/fixtures/ohmypi/minimax-m2.7-highspeed.jsonl",
+      "src/lib/cost-parsers/__tests__/fixtures/ohmypi/minimax.jsonl",
+      "src/lib/cost-parsers/__tests__/fixtures/ohmypi/openai-codex-gpt-5.5.jsonl",
+      "src/lib/cost-parsers/__tests__/fixtures/ohmypi/openai-codex.jsonl",
+      "src/lib/cost-parsers/__tests__/fixtures/ohmypi/rpc-toolcall.jsonl",
+      "src/lib/cost-parsers/__tests__/ohmypi-parser.test.ts",
+      "src/lib/cost-parsers/codex-parser.ts",
+      "src/lib/cost-parsers/jsonl-parser.ts",
+      "src/lib/cost-parsers/ohmypi-parser.ts",
+      "src/lib/overdeck/__tests__/cost-backfill-roots.test.ts",
+      "src/lib/overdeck/__tests__/cost-codex-reconcile.test.ts",
+      "src/lib/overdeck/__tests__/cost-reconcile-harnesses.integration.test.ts",
+      "src/lib/overdeck/agent-state-sync.ts",
+      "src/lib/overdeck/cost.ts",
+      "src/lib/overdeck/infra.ts",
+      "src/lib/review-status.ts",
+      "tests/lib/cost-parsers/jsonl-parser.test.ts",
+      "tests/unit/lib/cloister/feedback-target.test.ts",
+      "tests/unit/lib/overdeck/cost-reconcile-fixtures.integration.test.ts",
+      "tests/unit/lib/overdeck/cost-reconcile.test.ts",
+      "tests/unit/lib/overdeck/cost.test.ts"
+    ],
+    "recordedAt": "2026-07-07T18:01:25.747Z"
+  },
   "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
@@ -87,17 +199,121 @@
   "pipeline": {
     "issueId": "PAN-2388",
     "reviewStatus": "blocked",
-    "testStatus": "failed",
-    "verificationStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T17:34:39.333Z",
-    "reviewNotes": "OhMyPi unpriced-token metadata is dropped before warning/archive/route surfacing",
+    "updatedAt": "2026-07-07T18:02:45.660Z",
+    "reviewNotes": "Manual reconcile route drops the existing Claude transcript reconciler",
     "testNotes": "typecheck passed; npm test passed (896/900 test files, 8762/8821 tests, frontend 3/3); lint failed at lint:circular on cycle src/lib/agents.ts > src/lib/agents/resume.ts > src/lib/review-status.ts > src/lib/cloister/feedback-target.ts. Cycle files are outside PAN-2388 working set. Browser UAT not required per vBRIEF NonGoals.",
     "inspectNotes": "Bead ohmypi-fixtures ack: commit 9de8b447 touches only codex-parser.ts (revert of CodexCostEventUsage additions), a cost-reconcile integration test, and a runbook doc -- zero changes to ohmypi-parser.ts, ohmypi-parser.test.ts, or any ohmypi fixture file. Not this beads scope; AC1-4 remain satisfied unchanged from the prior verified state (c6b01bb3). No action needed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2470",
-    "reviewRequestedAt": "2026-07-07T17:33:17.857Z"
+    "reviewRequestedAt": "2026-07-07T18:01:33.672Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        ".beads/export-state.json",
+        ".beads/issues.jsonl",
+        ".pan/context/codebase/architecture.md",
+        ".pan/drafts/pan-2388.md",
+        ".pan/records/pan-2388.json",
+        ".pan/specs/2026-07-05-PAN-2389-feat-costs-regenerate-the-token-spend-report-post-rebrand-backfill-cost-events-from-stored-jsonl-conversations-no-legacy-db-import.vbrief.json",
+        "docs/PAN-2388-live-cost-reconcile-runbook.md",
+        "docs/flywheel-briefs/pan-2388-cost-reconcile-runbook.md",
+        "scripts/circular-deps-baseline.txt",
+        "src/dashboard/server/routes/__tests__/costs-reconcile-route.test.ts",
+        "src/dashboard/server/services/__tests__/codex-conversation-parser.test.ts",
+        "src/lib/__tests__/session-format-converter.test.ts",
+        "src/lib/agents/resume.ts",
+        "src/lib/cloister/__tests__/pi-cost-reconciler.test.ts",
+        "src/lib/cloister/feedback-target.ts",
+        "src/lib/cloister/review-verdict-feedback.ts",
+        "src/lib/cloister/verification-runner.ts",
+        "src/lib/cost-parsers/__tests__/fixtures/codex/README.md",
+        "src/lib/cost-parsers/jsonl-parser.ts",
+        "src/lib/overdeck/__tests__/cost-backfill-roots.test.ts",
+        "src/lib/overdeck/__tests__/cost-codex-reconcile.test.ts",
+        "src/lib/overdeck/agent-state-sync.ts",
+        "src/lib/overdeck/infra.ts",
+        "src/lib/review-status.ts",
+        "tests/unit/lib/cloister/feedback-target.test.ts",
+        "tests/unit/lib/overdeck/cost-reconcile-fixtures.integration.test.ts",
+        "tests/unit/lib/overdeck/cost-reconcile.test.ts",
+        "tests/unit/lib/overdeck/cost.test.ts"
+      ],
+      "declaredScopeUntouched": [
+        "src/lib/cloister/service.ts"
+      ],
+      "declaredScope": [
+        "src/dashboard/server/routes/costs.ts",
+        "src/lib/cloister/pi-cost-reconciler.ts",
+        "src/lib/cloister/service.ts",
+        "src/lib/cost-parsers/__tests__/codex-parser.test.ts",
+        "src/lib/cost-parsers/__tests__/fixtures/claude/*.jsonl",
+        "src/lib/cost-parsers/__tests__/fixtures/codex/*.jsonl",
+        "src/lib/cost-parsers/__tests__/fixtures/ohmypi/*.jsonl",
+        "src/lib/cost-parsers/__tests__/ohmypi-parser.test.ts",
+        "src/lib/cost-parsers/codex-parser.ts",
+        "src/lib/cost-parsers/ohmypi-parser.ts",
+        "src/lib/overdeck/__tests__/cost-reconcile-harnesses.integration.test.ts",
+        "src/lib/overdeck/cost.ts",
+        "tests/lib/cost-parsers/jsonl-parser.test.ts"
+      ],
+      "actualChangedFiles": [
+        ".beads/export-state.json",
+        ".beads/issues.jsonl",
+        ".pan/context/codebase/architecture.md",
+        ".pan/drafts/pan-2388.md",
+        ".pan/records/pan-2388.json",
+        ".pan/specs/2026-07-05-PAN-2389-feat-costs-regenerate-the-token-spend-report-post-rebrand-backfill-cost-events-from-stored-jsonl-conversations-no-legacy-db-import.vbrief.json",
+        "docs/PAN-2388-live-cost-reconcile-runbook.md",
+        "docs/flywheel-briefs/pan-2388-cost-reconcile-runbook.md",
+        "scripts/circular-deps-baseline.txt",
+        "src/dashboard/server/routes/__tests__/costs-reconcile-route.test.ts",
+        "src/dashboard/server/routes/costs.ts",
+        "src/dashboard/server/services/__tests__/codex-conversation-parser.test.ts",
+        "src/lib/__tests__/session-format-converter.test.ts",
+        "src/lib/agents/resume.ts",
+        "src/lib/cloister/__tests__/pi-cost-reconciler.test.ts",
+        "src/lib/cloister/feedback-target.ts",
+        "src/lib/cloister/pi-cost-reconciler.ts",
+        "src/lib/cloister/review-verdict-feedback.ts",
+        "src/lib/cloister/verification-runner.ts",
+        "src/lib/cost-parsers/__tests__/codex-parser.test.ts",
+        "src/lib/cost-parsers/__tests__/fixtures/claude/real-cache-session.jsonl",
+        "src/lib/cost-parsers/__tests__/fixtures/claude/real-session.jsonl",
+        "src/lib/cost-parsers/__tests__/fixtures/codex/README.md",
+        "src/lib/cost-parsers/__tests__/fixtures/codex/rollout-nested-multi-turn.jsonl",
+        "src/lib/cost-parsers/__tests__/fixtures/codex/rollout-nested-single-turn.jsonl",
+        "src/lib/cost-parsers/__tests__/fixtures/codex/rollout.jsonl",
+        "src/lib/cost-parsers/__tests__/fixtures/ohmypi/gemini-3-flash-preview.jsonl",
+        "src/lib/cost-parsers/__tests__/fixtures/ohmypi/gemini.jsonl",
+        "src/lib/cost-parsers/__tests__/fixtures/ohmypi/kimi-k2.7-code.jsonl",
+        "src/lib/cost-parsers/__tests__/fixtures/ohmypi/kimi.jsonl",
+        "src/lib/cost-parsers/__tests__/fixtures/ohmypi/minimax-m2.7-highspeed.jsonl",
+        "src/lib/cost-parsers/__tests__/fixtures/ohmypi/minimax.jsonl",
+        "src/lib/cost-parsers/__tests__/fixtures/ohmypi/openai-codex-gpt-5.5.jsonl",
+        "src/lib/cost-parsers/__tests__/fixtures/ohmypi/openai-codex.jsonl",
+        "src/lib/cost-parsers/__tests__/fixtures/ohmypi/rpc-toolcall.jsonl",
+        "src/lib/cost-parsers/__tests__/ohmypi-parser.test.ts",
+        "src/lib/cost-parsers/codex-parser.ts",
+        "src/lib/cost-parsers/jsonl-parser.ts",
+        "src/lib/cost-parsers/ohmypi-parser.ts",
+        "src/lib/overdeck/__tests__/cost-backfill-roots.test.ts",
+        "src/lib/overdeck/__tests__/cost-codex-reconcile.test.ts",
+        "src/lib/overdeck/__tests__/cost-reconcile-harnesses.integration.test.ts",
+        "src/lib/overdeck/agent-state-sync.ts",
+        "src/lib/overdeck/cost.ts",
+        "src/lib/overdeck/infra.ts",
+        "src/lib/review-status.ts",
+        "tests/lib/cost-parsers/jsonl-parser.test.ts",
+        "tests/unit/lib/cloister/feedback-target.test.ts",
+        "tests/unit/lib/overdeck/cost-reconcile-fixtures.integration.test.ts",
+        "tests/unit/lib/overdeck/cost-reconcile.test.ts",
+        "tests/unit/lib/overdeck/cost.test.ts"
+      ],
+      "recordedAt": "2026-07-07T18:01:25.747Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -142,9 +358,9 @@
             "cacheWrite": 971
           },
           "unknown": {
-            "input": 8633055,
-            "output": 24329,
-            "cacheRead": 7928192,
+            "input": 9611356,
+            "output": 27448,
+            "cacheRead": 8778624,
             "cacheWrite": 0
           }
         },
@@ -172,18 +388,18 @@
             "cacheWrite": 0
           },
           "unknown": {
-            "input": 238026952,
-            "output": 362585,
-            "cacheRead": 215956224,
+            "input": 265205309,
+            "output": 403547,
+            "cacheRead": 242500480,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "unknown": {
-          "input": 246789793,
-          "output": 387489,
-          "cacheRead": 223972864,
+          "input": 274946451,
+          "output": 431570,
+          "cacheRead": 251367552,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -212,11 +428,13 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 239.473587,
-        "pricingAsOf": "2026-07-07T17:34:39.372Z"
+        "usd": 256.154714,
+        "pricingAsOf": "2026-07-07T18:02:45.698Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2470"
+    ],
     "ranOn": "eltmon-z790"
   },
   "swarm": {
@@ -245,5 +463,5 @@
     }
   },
   "created": "2026-07-07T17:32:25.282Z",
-  "updated": "2026-07-07T17:54:43.845Z"
+  "updated": "2026-07-07T18:02:46.553Z"
 }
