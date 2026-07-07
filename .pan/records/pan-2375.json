@@ -11,21 +11,20 @@
   ],
   "feedback": [],
   "created": "2026-07-07T02:41:17.313Z",
-  "updated": "2026-07-07T06:33:54.072Z",
+  "updated": "2026-07-07T06:34:23.665Z",
   "pipeline": {
     "issueId": "PAN-2375",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T06:33:54.037Z",
+    "updatedAt": "2026-07-07T06:34:23.502Z",
     "inspectNotes": "Bead state-plane-predicate ack: commit 2fe848f6 is a pure test-colocation move (tests/unit/lib/state-plane.test.ts -> src/lib/__tests__/state-plane.test.ts, import path fixed), no logic changes; verified all 4 acceptance criteria still pass against current src/lib/state-plane.ts (state-only=true, mixed src+state=false, drafts-only=false, empty-diff=true).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2457",
     "lastVerifiedCommit": "f05af90eaff2a9ef14df5e57b299186ba961b8d5",
-    "reviewRequestedAt": "2026-07-07T06:33:45.658Z",
-    "panDoneRecoveredAt": "2026-07-07T06:33:45.658Z"
+    "reviewRequestedAt": "2026-07-07T06:33:45.658Z"
   },
   "closeOut": {
     "usage": {
@@ -111,7 +110,7 @@
       },
       "costAtCloseOut": {
         "usd": 51.6162134,
-        "pricingAsOf": "2026-07-07T06:33:54.069Z"
+        "pricingAsOf": "2026-07-07T06:34:23.643Z"
       }
     },
     "merges": [
