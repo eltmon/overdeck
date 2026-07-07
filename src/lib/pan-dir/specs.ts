@@ -3,7 +3,7 @@ import { Effect, FileSystem } from 'effect'
 import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem'
 import { FsError } from '../errors.js'
 
-import { normalizeVBriefEnvelope, VBriefMergeConflictError } from '../vbrief/io.js'
+import { normalizeVBriefEnvelope, serializeVBriefDocument, VBriefMergeConflictError } from '../vbrief/io.js'
 import { generateVBriefFilename, parseVBriefFilename, slugify } from '../vbrief/lifecycle.js'
 import { invalidateVBriefIndex } from '../vbrief/vbrief-index.js'
 import type { VBriefDocument } from '../vbrief/types.js'
@@ -140,7 +140,7 @@ export function writeSpec(
     }
     const fs = yield* FileSystem.FileSystem
     const tmp = `${path}.tmp`
-    yield* fs.writeFileString(tmp, JSON.stringify(doc, null, 2)).pipe(
+    yield* fs.writeFileString(tmp, serializeVBriefDocument(doc)).pipe(
       Effect.mapError((cause) => new FsError({ path: tmp, operation: 'writeFileString', cause })),
     )
     yield* fs.rename(tmp, path).pipe(

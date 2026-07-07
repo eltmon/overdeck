@@ -193,6 +193,16 @@ export function normalizeVBriefEnvelope<T>(parsed: T): T {
   return parsed;
 }
 
+export function serializeVBriefDocument(doc: { vBRIEFInfo: { version: string } }): string {
+  const version = Number.parseFloat(doc.vBRIEFInfo.version);
+  if (Number.isFinite(version) && version >= 0.7) {
+    const { vBRIEFInfo, ...rest } = doc;
+    return JSON.stringify({ xBRIEFInfo: vBRIEFInfo, ...rest }, null, 2);
+  }
+  const legacyDocument = doc;
+  return JSON.stringify(legacyDocument, null, 2);
+}
+
 export function readPlanSync(planPath: string): VBriefDocument {
   const raw = readFileSync(planPath, 'utf-8');
   if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {

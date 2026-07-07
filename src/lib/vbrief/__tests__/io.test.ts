@@ -5,7 +5,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { applyEffectiveDifficulty } from '../../agents/tier-escalation.js';
 import { resolveTier } from '../../agents/resolve-tier.js';
-import { findPlanSync, isPlanningCompleteSync, isPlanningProposed, normalizeVBriefEnvelope, readPlanSync, readTierOverrides, readWorkspacePlanSync, recordTierPromotion, updateItemStatus, updateSubItemStatus } from '../io.js';
+import { findPlanSync, isPlanningCompleteSync, isPlanningProposed, normalizeVBriefEnvelope, readPlanSync, readTierOverrides, readWorkspacePlanSync, recordTierPromotion, serializeVBriefDocument, updateItemStatus, updateSubItemStatus } from '../io.js';
 import { subItemsOf, type VBriefDocument, type VBriefSubItem } from '../types.js';
 
 let PROJECT_ROOT: string;
@@ -63,7 +63,7 @@ function writeWorkspaceDraft(doc: VBriefDocument): string {
   const panDir = join(WORKSPACE_PATH, '.pan');
   mkdirSync(panDir, { recursive: true });
   const planPath = join(panDir, 'spec.vbrief.json');
-  writeFileSync(planPath, JSON.stringify(doc, null, 2));
+  writeFileSync(planPath, JSON.stringify(doc, undefined, 2));
   return planPath;
 }
 
@@ -232,6 +232,63 @@ describe('readPlan', () => {
     writeFileSync(badPath, JSON.stringify({ plan: makePlanDoc().plan }, null, 2));
 
     expect(() => readPlanSync(badPath)).toThrow(/vBRIEFInfo.*xBRIEFInfo|xBRIEFInfo.*vBRIEFInfo/);
+  });
+
+  it('serializes v0.8 documents with xBRIEFInfo', () => {
+    const doc = makePlanDoc();
+    doc.vBRIEFInfo.version = '0.8';
+
+    const serialized = JSON.parse(serializeVBriefDocument(doc));
+
+    expect(serialized.xBRIEFInfo).toEqual(doc.vBRIEFInfo);
+    expect(serialized.vBRIEFInfo).toBeUndefined();
+  });
+
+  it('serializes v0.6 documents with vBRIEFInfo', () => {
+    const doc = makePlanDoc();
+    doc.vBRIEFInfo.version = '0.6';
+
+    const serialized = JSON.parse(serializeVBriefDocument(doc));
+
+    expect(serialized.vBRIEFInfo).toEqual(doc.vBRIEFInfo);
+    expect(serialized.xBRIEFInfo).toBeUndefined();
+  });
+
+  it('round-trips v0.8 files with xBRIEFInfo', () => {
+    const doc = makePlanDoc([{ id: 'item-1' }]);
+    const planPath = writePlanDoc({
+      ...doc,
+      vBRIEFInfo: undefined,
+      xBRIEFInfo: { version: '0.8', created: '2026-01-01T00:00:00Z' },
+    } as unknown as VBriefDocument);
+
+    const serialized = JSON.parse(serializeVBriefDocument(readPlanSync(planPath)));
+
+    expect(serialized.xBRIEFInfo.version).toBe('0.8');
+    expect(serialized.vBRIEFInfo).toBeUndefined();
+    expect(serialized.plan.items[0].id).toBe('item-1');
+  });
+
+  it('round-trips v0.6 files with vBRIEFInfo', () => {
+    const doc = makePlanDoc([{ id: 'item-1' }]);
+    doc.vBRIEFInfo.version = '0.6';
+    const planPath = writePlanDoc(doc);
+
+    const serialized = JSON.parse(serializeVBriefDocument(readPlanSync(planPath)));
+
+    expect(serialized.vBRIEFInfo.version).toBe('0.6');
+    expect(serialized.xBRIEFInfo).toBeUndefined();
+    expect(serialized.plan.items[0].id).toBe('item-1');
+  });
+
+  it('preserves extra top-level keys when serializing pan spec documents', () => {
+    const doc = { ...makePlanDoc(), status: 'active' };
+    doc.vBRIEFInfo.version = '0.8';
+
+    const serialized = JSON.parse(serializeVBriefDocument(doc));
+
+    expect(serialized.status).toBe('active');
+    expect(serialized.xBRIEFInfo.version).toBe('0.8');
   });
 
   it('throws for nonexistent file', () => {

@@ -12,7 +12,7 @@ import {
   resolveProjectForIssue,
   writeStatusOverridesSync,
 } from '../pan-dir/record.js';
-import { normalizeVBriefEnvelope } from './io.js';
+import { normalizeVBriefEnvelope, serializeVBriefDocument } from './io.js';
 
 export interface WaveItem {
   id: string;
@@ -854,7 +854,7 @@ export function validatePlanIssue(doc: VBriefDocument, issueId: string): void {
 async function writePlanFileAtomically(planPath: string, doc: VBriefDocument): Promise<void> {
   await mkdir(dirname(planPath), { recursive: true });
   const tmp = `${planPath}.${process.pid}.${Date.now()}.tmp`;
-  await writeFile(tmp, JSON.stringify(doc, null, 2), 'utf-8');
+  await writeFile(tmp, serializeVBriefDocument(doc), 'utf-8');
   await rename(tmp, planPath);
 }
 

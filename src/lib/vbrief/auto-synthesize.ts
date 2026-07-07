@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import { Effect } from 'effect';
 
 import { generateVBriefFilename } from './lifecycle.js';
+import { serializeVBriefDocument } from './io.js';
 import { FsError } from '../errors.js';
 import type { VBriefDocument, VBriefSubItem } from './types.js';
 
@@ -144,7 +145,7 @@ export function synthesizeMinimalVBrief(issue: AutoSynthesizeIssueInput): VBrief
   };
 
   await mkdir(projectSpecsDir, { recursive: true });
-  await writeFile(projectSpecPath, JSON.stringify(projectDocument, null, 2), 'utf-8');
+  await writeFile(projectSpecPath, serializeVBriefDocument(projectDocument), 'utf-8');
 
   return {
     document,
