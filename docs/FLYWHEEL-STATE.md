@@ -207,6 +207,40 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-58 tick 38 (2026-07-06) — A4(PAN-2095) merge SCHEDULED (id 21); PAN-2445 RECURRED (planning-lex-1, off-book Lexerra, surfaced); B1 still frozen; 2388 cycling
+
+**Order book: 4/19 landed. Main GREEN (772923ff8f).**
+- **A4 (PAN-2095) READY → merge SCHEDULED** (id 21, PR #2448, fires ~02:20Z). Order-book Lane A item (stale-worktree deploy bug). Close out on merge.
+- **★ PAN-2445 RECURRED: `planning-lex-1` = OFF-BOOK deacon lifecycle spawn.** Fable 5 planning agent for **LEX-1 (Lexerra project, `~/Projects/lexerra/workspaces/feature-lex-1`)** — the exact PAN-2445 pattern (deacon patrol auto-dispatches fable planning for an off-book stuck-in-'planning' issue, bypassing auto-pickup gating + defaulting staffing to roles.plan=fable). **SURFACED to operator (per burn-guard directive); NOT managed — flywheel can't `pan kill` (forbidden). Operator dispositions (kill+pause like MIN-206).** This confirms PAN-2445 fires across PROJECTS (MIN-206 MYN, now LEX-1 Lexerra) — the durable fix (gate patrol re-dispatch on auto-pickup + non-fable staffing) is warranted.
+- **B1 (PAN-2207, Lane B) STILL FROZEN** (3rd tick, "11m 01s" timer unchanged) — escalated; operator lever needed (ratchet-commit re-message).
+- **PAN-2388 (PRIORITY): slots cycled back to `running`** — working next beads (progressing but the ready-slot merge never completes = the recurring assembly stall; operator-gated).
+- **A1/M1 in review** (iterating). Deacon healthy.
+
+## RUN-58 tick 37 (2026-07-06) — deacon HEALTHY (patrolling); B1 CONFIRMED FROZEN (escalated); pipeline slow-but-alive; 2388 assembly-stalled; 2445 clean
+
+**Order book: 4/19 landed. Main GREEN (772923ff8f — no merges ~40min).**
+- **Deacon ALIVE + patrolling** (pid 3838195, cycle 19281 @ 02:01Z). Pipeline is NOT systemically stalled — A1 (PAN-2373) review running (agent-pan-2373-review), A4/M1 reviews advancing. Just slow (feedback iterations) + no new-ready this window. (Deacon "skipped reap … branch unmerged" for merged PAN-2387/2389/2336 = cosmetic squash-merge non-ancestor artifact, harmless.)
+- **B1 (PAN-2207, Lane B) CONFIRMED FROZEN — ESCALATED.** Pane timer stuck at "Worked for 11m 01s" across 2 ticks (~20min+), unchanged: "clean and ready ONCE that local commit message is fixed / reconstructed with an issue-referenced ratchet commit." Work agent idle pre-submit; deacon did NOT re-engage it (deacon nudges review convoys, not a work agent frozen pre-`pan done`). **Did NOT `pan start` it — re-engaging a LIVE agent risks a duplicate-in-workspace (the pan-handoff hazard).** **OPERATOR: B1 needs its ratchet commit re-messaged with the PAN-2207 reference (or history reconstructed) to submit — Lane B blocked.** Root-cause candidate (surfaced): a file-size ratchet commit emits a non-issue-referenced message that fails the commit-msg gate (gh-issue-trailer-hook/commitlint), and the agent stalls pre-submit → substrate gap (ratchet-commit-message + deacon-doesn't-re-engage-frozen-work-agent).
+- **PAN-2388 (PRIORITY): slots 1+3 `ready-to-merge`/unmerged** — assembly stall (operator lever). Not thrashing recover (slot-3 not in failed state now; it's the mergeReadySlots-doesn't-complete gap).
+- **PAN-2445 watch: CLEAN.** A10 (PAN-2420) running.
+
+## RUN-58 tick 36 (2026-07-06) — root-caused empty-ready-set: items ITERATING (not wedged) except B1 stuck on commit-msg/ratchet; PAN-2388 slots back to ready-to-merge (assembly stall recurs)
+
+**Order book: 4/19 landed. Main GREEN (772923ff8f). merge-blockers EMPTY (nothing hard-stuck). Ceiling relaxed (no recent block).**
+- **Empty ready set root-caused = review-feedback ITERATIONS, not a wedge:** A1 (PAN-2373) pushed a fix `0b46210423` → idle, awaiting re-review (normal iteration). A4 (PAN-2095) review-supervising. M1 (MIN-860) past review. A10 (PAN-2420) running.
+- **B1 (PAN-2207, Lane B) STUCK (surfaced):** work agent idle 11m, pane: "clean and ready ONCE that local commit message is fixed OR the branch history is reconstructed with an issue-referenced ratchet commit." So a NON-issue-referenced commit (likely a file-size RATCHET commit from rebasing over the strike-2417/others' done.ts changes) fails the commit-msg gate; the agent EXPLAINED the fix but did not execute it → stuck pre-submit. Flywheel levers limited (no pan tell; `pan start --force` risks disrupting a live agent). **SURFACED to operator: B1 needs its ratchet commit re-messaged with the issue reference (PAN-2207) to submit — Lane B critical path blocked.** Watching for deacon re-engage; escalate if still stuck next tick. (Root cause candidate: ratchet-commit flow produces non-issue-referenced messages that fail commitlint → substrate gap.)
+- **PAN-2388 (PRIORITY): slots 1+3 back to `ready-to-merge`/unmerged** (cycled running→ready-to-merge; assembly stall persists — slot-3 merge into integration still not completing). Operator assembly still the lever.
+- **PAN-2445 watch: CLEAN.** A10 (PAN-2420) spawned (agent-pan-2420).
+
+## RUN-58 tick 35 (2026-07-06) — A10(PAN-2420) planned→starting (bg); 2388 running; ready set empty (items in review/test); 2445 clean
+
+**Order book: 4/19 landed. Main GREEN (772923ff8f).**
+- **A10 (PAN-2420) PLANNED** (spec: pipeline merge robustness vs GitHub App 403) → **starting (bg, start-2420.log).** Lane A: A1 + A4 (in review/test) + A10 (starting) = 3 (top of 1-3 band).
+- **PAN-2388 (PRIORITY, remaining): slots 1+3 `running`** — progressing (unchanged several ticks; watch for convergence to ready-to-merge → integration).
+- Ready set EMPTY — A1/B1/M1/A4 in review/test, ripening (normal latency post-review; verified advancing tick 34).
+- **PAN-2445 watch: CLEAN** (planning-pan-2420 finished; no off-book spawns).
+- Priority pair 1/2 landed (2387); 2388 in-progress.
+
 ## RUN-58 tick 34 (2026-07-06) — steady; in-flight reviews ADVANCING (A1 review done, B1→test, M1/A4 review); 2388 running; A10 planning; 2445 clean
 
 **Order book: 4/19 landed. Main GREEN (772923ff8f).**
