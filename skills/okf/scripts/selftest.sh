@@ -379,6 +379,59 @@ with tempfile.TemporaryDirectory() as tmp:
 print("ok - extract prompt output states tier and cites existing concept IDs within budget")
 PY
 
+python3 - "$ROOT" <<'PY'
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+root = Path(sys.argv[1])
+reindex = root / "scripts" / "reindex.py"
+
+def write(path, content):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+with tempfile.TemporaryDirectory() as tmp:
+    bundle = Path(tmp)
+    handwritten = "# Knowledge\n\nHand-written prose stays here.\n\n"
+    write(bundle / "index.md", handwritten + "<!-- OKF:INDEX:BEGIN -->\nold\n<!-- OKF:INDEX:END -->\n\nFooter stays.\n")
+    write(bundle / "alpha.md", "---\ntype: Guide\ntitle: Alpha\ndescription: Alpha desc.\n---\n\nAlpha body.\n")
+    first = subprocess.run([sys.executable, str(reindex), "--bundle", str(bundle)], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    assert first.returncode == 0, first.stderr
+    after_first = (bundle / "index.md").read_text(encoding="utf-8")
+    assert after_first.startswith(handwritten)
+    assert "Footer stays." in after_first
+    assert "* [Alpha](alpha.md) - Alpha desc." in after_first
+
+    write(bundle / "beta.md", "---\ntype: Guide\ntitle: Beta\ndescription: Beta desc.\n---\n\nBeta body.\n")
+    second = subprocess.run([sys.executable, str(reindex), "--bundle", str(bundle)], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    assert second.returncode == 0, second.stderr
+    after_second = (bundle / "index.md").read_text(encoding="utf-8")
+    assert after_second.startswith(handwritten)
+    assert "* [Beta](beta.md) - Beta desc." in after_second
+
+    (bundle / "alpha.md").unlink()
+    third = subprocess.run([sys.executable, str(reindex), "--bundle", str(bundle)], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    assert third.returncode == 0, third.stderr
+    after_third = (bundle / "index.md").read_text(encoding="utf-8")
+    assert "* [Alpha](alpha.md)" not in after_third
+    assert "* [Beta](beta.md) - Beta desc." in after_third
+
+    log = subprocess.run(
+        [sys.executable, str(reindex), "--bundle", str(bundle), "--date", "2026-07-07", "--log-entry", "**Update**: Added [Beta](/beta.md)."],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    assert log.returncode == 0, log.stderr
+    log_text = (bundle / "log.md").read_text(encoding="utf-8")
+    assert log_text.splitlines()[2] == "## 2026-07-07"
+    assert "* **Update**: Added [Beta](/beta.md)." in log_text
+
+print("ok - reindex.py preserves prose, refreshes marker entries, and appends newest log entries")
+PY
+
 if grep -InE '^(from|import) ' "$ROOT/scripts/okf_common.py" | grep -Ev ' (annotations|dataclasses|hashlib|pathlib|re|typing|yaml)( |$)|^.*from __future__ import annotations$'; then
   printf 'not ok - okf_common.py imports only stdlib and yaml\n' >&2
   exit 1
