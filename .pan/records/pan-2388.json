@@ -229,15 +229,15 @@
   },
   "pipeline": {
     "issueId": "PAN-2388",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
-    "verificationStatus": "running",
+    "reviewStatus": "passed",
+    "testStatus": "testing",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T18:10:48.897Z",
-    "reviewNotes": "Reconcile route still removes legacy top-level response fields",
-    "testNotes": "typecheck passed; npm test passed (896/900 test files, 8762/8821 tests, frontend 3/3); lint failed at lint:circular on cycle src/lib/agents.ts > src/lib/agents/resume.ts > src/lib/review-status.ts > src/lib/cloister/feedback-target.ts. Cycle files are outside PAN-2388 working set. Browser UAT not required per vBRIEF NonGoals.",
+    "updatedAt": "2026-07-07T18:11:43.719Z",
+    "reviewNotes": "Reviewed 063284a2; no blocking findings",
+    "testNotes": "typecheck passed; npm test passed (896 test files passed, 4 skipped; 8762 tests passed, 52 skipped; frontend 3/3 passed); npm run lint failed at lint:circular — new cycle src/lib/agents.ts > src/lib/agents/resume.ts > src/lib/review-status.ts > src/lib/cloister/feedback-target.ts. The cycle files are outside the PAN-2388 cost-parser working set (no agents/resume/review-status/feedback-target changes in the branch diff). Browser UAT not required: vBRIEF NonGoals explicitly excludes dashboard UI changes and labels the live-server check as evidence, not a blocking gate.",
     "inspectNotes": "Bead ohmypi-fixtures ack: commit 9de8b447 touches only codex-parser.ts (revert of CodexCostEventUsage additions), a cost-reconcile integration test, and a runbook doc -- zero changes to ohmypi-parser.ts, ohmypi-parser.test.ts, or any ohmypi fixture file. Not this beads scope; AC1-4 remain satisfied unchanged from the prior verified state (c6b01bb3). No action needed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2470",
     "lastVerifiedCommit": "063284a2cbdcb2c6e91a9c4ef2103458a23fe656",
@@ -349,7 +349,9 @@
         "tests/unit/lib/overdeck/cost.test.ts"
       ],
       "recordedAt": "2026-07-07T18:06:40.389Z"
-    }
+    },
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "reviewedAtCommit": "48a1f7e48cb5a82d1a5fb0fddb605cfa7378fb6b"
   },
   "closeOut": {
     "usage": {
@@ -394,9 +396,9 @@
             "cacheWrite": 971
           },
           "unknown": {
-            "input": 11642496,
-            "output": 33049,
-            "cacheRead": 10712320,
+            "input": 13867615,
+            "output": 38029,
+            "cacheRead": 12871936,
             "cacheWrite": 0
           }
         },
@@ -424,18 +426,18 @@
             "cacheWrite": 0
           },
           "unknown": {
-            "input": 271694992,
-            "output": 412117,
-            "cacheRead": 248479360,
+            "input": 278080441,
+            "output": 422430,
+            "cacheRead": 254544768,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "unknown": {
-          "input": 283467274,
-          "output": 445741,
-          "cacheRead": 259280128,
+          "input": 292077842,
+          "output": 461034,
+          "cacheRead": 267505152,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -464,8 +466,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 261.765742,
-        "pricingAsOf": "2026-07-07T18:10:48.946Z"
+        "usd": 265.880012,
+        "pricingAsOf": "2026-07-07T18:11:43.741Z"
       }
     },
     "merges": [
@@ -499,5 +501,5 @@
     }
   },
   "created": "2026-07-07T17:32:25.282Z",
-  "updated": "2026-07-07T18:10:48.954Z"
+  "updated": "2026-07-07T18:11:43.742Z"
 }
