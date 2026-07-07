@@ -191,6 +191,42 @@ jobs:
           DASHBOARD_URL: http://localhost:3011
         run: cd src/dashboard/frontend && npm run test:playwright
 
+  flake-lane:
+    runs-on: ubuntu-latest
+    name: Non-blocking flake lane
+    # PAN-2373: run quarantined flaky tests separately so they cannot block the
+    # merge gate, while still observing whether they pass with retry enabled.
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build
+        run: npm run build
+
+      - name: Install Playwright browsers for quarantined tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Run quarantined tests (non-blocking)
+        # Non-blocking: failures are logged but do not fail the job or block the PR.
+        # Each quarantined file is run individually so the job summary can record
+        # per-file pass/fail as an always-current ledger.
+        continue-on-error: true
+        run: bash scripts/run-flake-lane.sh
+
   clean-install:
     runs-on: ubuntu-latest
     name: Clean install + server smoke test
