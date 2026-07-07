@@ -6,7 +6,7 @@ import { dirname, join, sep } from "path";
 import { homedir } from "os";
 import { fileURLToPath } from "url";
 import * as NFS from "node:fs";
-import { existsSync as existsSync$1, mkdirSync as mkdirSync$1, readFileSync as readFileSync$1, writeFileSync as writeFileSync$1 } from "node:fs";
+import { appendFileSync as appendFileSync$1, existsSync as existsSync$1, mkdirSync as mkdirSync$1, readFileSync as readFileSync$1, writeFileSync as writeFileSync$1 } from "node:fs";
 import * as Path from "node:path";
 import { dirname as dirname$1, isAbsolute, join as join$1 } from "node:path";
 import { readFile } from "node:fs/promises";
@@ -12768,6 +12768,14 @@ const DEFAULT_PRICING = [
 		model: "gpt-5.4-pro",
 		inputPer1k: .03,
 		outputPer1k: .18,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
+		model: "gpt-4.1-nano",
+		inputPer1k: 1e-4,
+		outputPer1k: 4e-4,
+		cacheReadPer1k: 25e-6,
 		currency: "USD"
 	},
 	{
@@ -31017,7 +31025,62 @@ succeed$1(Tmux, Tmux.of({
 Service()("overdeck/Forge");
 Service()("overdeck/Projects");
 var CostArchive = class extends Service()("overdeck/CostArchive") {};
-succeed$1(CostArchive, CostArchive.of({ append: (_event) => void_ }));
+function costArchivePath() {
+	return join$1(getOverdeckHome(), "costs", "events.jsonl");
+}
+function archiveKey(event) {
+	if (typeof event.requestId === "string" && event.requestId.length > 0) return `request:${event.requestId}`;
+	const source = typeof event.sourceFile === "string" ? event.sourceFile : typeof event.source === "string" ? event.source : null;
+	return source ? `source:${source}` : null;
+}
+function toCostArchiveEvent(event) {
+	return {
+		ts: event.ts instanceof Date ? event.ts.toISOString() : typeof event.ts === "string" ? event.ts : (/* @__PURE__ */ new Date()).toISOString(),
+		type: "cost",
+		agentId: typeof event.agentId === "string" ? event.agentId : "unknown",
+		issueId: typeof event.issueId === "string" ? event.issueId : "UNKNOWN",
+		sessionType: typeof event.sessionType === "string" ? event.sessionType : "unknown",
+		provider: typeof event.provider === "string" ? event.provider : "unknown",
+		model: typeof event.model === "string" ? event.model : "unknown",
+		input: typeof event.input === "number" ? event.input : 0,
+		output: typeof event.output === "number" ? event.output : 0,
+		cacheRead: typeof event.cacheRead === "number" ? event.cacheRead : 0,
+		cacheWrite: typeof event.cacheWrite === "number" ? event.cacheWrite : 0,
+		cost: typeof event.cost === "number" ? event.cost : 0,
+		...typeof event.requestId === "string" ? { requestId: event.requestId } : {},
+		...typeof event.sessionId === "string" ? { sessionId: event.sessionId } : {},
+		...typeof event.sourceFile === "string" ? { source: event.sourceFile } : {}
+	};
+}
+succeed$1(CostArchive, CostArchive.of((() => {
+	let seen = null;
+	const loadSeen = () => {
+		if (seen) return seen;
+		seen = /* @__PURE__ */ new Set();
+		const path = costArchivePath();
+		if (!existsSync$1(path)) return seen;
+		const content = readFileSync$1(path, "utf8");
+		for (const line of content.split("\n")) {
+			if (!line.trim()) continue;
+			try {
+				const key = archiveKey(JSON.parse(line));
+				if (key) seen.add(key);
+			} catch {}
+		}
+		return seen;
+	};
+	return { append: (event) => sync(() => {
+		const normalized = toCostArchiveEvent(event);
+		const key = archiveKey(normalized);
+		const archiveSeen = loadSeen();
+		if (key && archiveSeen.has(key)) return;
+		const path = costArchivePath();
+		mkdirSync$1(dirname$1(path), { recursive: true });
+		if (!existsSync$1(path)) writeFileSync$1(path, "", "utf8");
+		appendFileSync$1(path, `${JSON.stringify(normalized)}\n`, "utf8");
+		if (key) archiveSeen.add(key);
+	}) };
+})()));
 Service()("overdeck/MemorySearch");
 Service()("overdeck/MemoryFiles");
 //#endregion

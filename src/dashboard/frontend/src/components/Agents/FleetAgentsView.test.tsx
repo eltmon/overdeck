@@ -45,12 +45,11 @@ function renderFleetView(props: { onNavigateToIssues?: () => void } = {}) {
       mutations: { retry: false },
     },
   });
-  client.setQueryData(['cost-stream', undefined, 500], {
-    events: [],
-    byIssue: {
-      'pan-1': [{ ts: '2026-05-18T00:00:00.000Z', model: 'opus', provider: 'anthropic', cost: 12.34, tokens: 456_000 }],
+  client.setQueryData(['agents-fleet-cost-summary'], {
+    today: {
+      totalCost: 12.34,
+      totalTokens: 456_000,
     },
-    count: 1,
   });
 
   return render(
@@ -99,6 +98,14 @@ describe('FleetAgentsView', () => {
           count: 1,
         }), { status: 200 });
       }
+      if (url.startsWith('/api/costs/summary')) {
+        return new Response(JSON.stringify({
+          today: {
+            totalCost: 12.34,
+            totalTokens: 456_000,
+          },
+        }), { status: 200 });
+      }
       return new Response(JSON.stringify({}), { status: 200 });
     }));
   });
@@ -140,6 +147,38 @@ describe('FleetAgentsView', () => {
     expect(tiles[2]).toHaveAttribute('title', 'Open /costs for canonical 24h spend numbers');
   });
 
+  it('uses canonical cost summary totals instead of issue-attributed stream buckets', () => {
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, staleTime: Infinity },
+        mutations: { retry: false },
+      },
+    });
+    client.setQueryData(['agents-fleet-cost-summary'], {
+      today: {
+        totalCost: 27.89,
+        totalTokens: 789_000,
+      },
+    });
+    client.setQueryData(['cost-stream', undefined, 500], {
+      events: [{ ts: '2026-05-18T00:00:00.000Z', model: 'opus', provider: 'anthropic', cost: 0, tokens: 0 }],
+      byIssue: {},
+      count: 1,
+    });
+
+    render(
+      <QueryClientProvider client={client}>
+        <DialogProvider>
+          <FleetAgentsView />
+        </DialogProvider>
+      </QueryClientProvider>,
+    );
+
+    const tiles = Array.from(document.querySelectorAll('[data-component="metric-tile"]'));
+    expect(within(tiles[2] as HTMLElement).getByText('$27.9')).toBeInTheDocument();
+    expect(within(tiles[3] as HTMLElement).getByText('789K')).toBeInTheDocument();
+  });
+
   it('renders stuck agents with the destructive override and stuck verb badge', () => {
     renderFleetView();
 
@@ -165,6 +204,33 @@ describe('FleetAgentsView', () => {
     expect(screen.queryByText('REVIEW RUNNING')).not.toBeInTheDocument();
     expect(within(screen.getByText('Running').closest('[data-component="metric-tile"]') as HTMLElement).getByText('0')).toBeInTheDocument();
     expect(within(screen.getByText('Stuck').closest('[data-component="metric-tile"]') as HTMLElement).getByText('2')).toBeInTheDocument();
+  });
+
+  it('renders a local strike with no live tmux session as unreachable instead of running', () => {
+    useDashboardStore.setState({
+      agentsById: {
+        'strike-pan-1996': agent({
+          id: 'strike-pan-1996',
+          issueId: 'PAN-1996',
+          status: 'unknown',
+          role: 'strike',
+          startedAt: '2026-05-01T00:00:00.000Z',
+          hasLiveTmuxSession: false,
+          lastFailureReason: 'No live tmux session found for registered agent',
+        }),
+      },
+      agentOutputById: {
+        'strike-pan-1996': [],
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderFleetView();
+
+    expect(screen.getByText('UNREACHABLE')).toBeInTheDocument();
+    expect(screen.queryByText('STRIKE RUNNING')).not.toBeInTheDocument();
+    expect(screen.getByText('No live tmux session found for registered agent')).toBeInTheDocument();
+    expect(within(screen.getByText('Running').closest('[data-component="metric-tile"]') as HTMLElement).getByText('0')).toBeInTheDocument();
+    expect(within(screen.getByText('Stuck').closest('[data-component="metric-tile"]') as HTMLElement).getByText('1')).toBeInTheDocument();
   });
 
   it('opens an agent-scoped action menu from the fleet card overflow trigger', () => {
@@ -224,10 +290,14 @@ describe('FleetAgentsView', () => {
     });
     client.setQueryData(['cost-stream', undefined, 500], {
       events: [],
-      byIssue: {
-        'pan-1': [{ ts: '2026-05-18T00:00:00.000Z', model: 'opus', provider: 'anthropic', cost: 12.34, tokens: 456_000 }],
+      byIssue: {},
+      count: 0,
+    });
+    client.setQueryData(['agents-fleet-cost-summary'], {
+      today: {
+        totalCost: 12.34,
+        totalTokens: 456_000,
       },
-      count: 1,
     });
 
     render(

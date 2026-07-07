@@ -51,16 +51,6 @@ import { closeIssue as closeIssueProgram, POST_MERGE_RESIDUE_LABELS, WORKFLOW_LA
 const closeIssue = (...args: Parameters<typeof closeIssueProgram>) =>
   Effect.runPromise(closeIssueProgram(...args));
 
-function mockCurrentGitHubLabels(labels = ['verifying-on-main', 'needs-close-out', 'merged', 'ready']) {
-  mockExecAsync.mockImplementation(async (...args: any[]) => {
-    const command = String(args[0] ?? '');
-    if (command.includes('gh issue view') && command.includes('--json labels')) {
-      return { stdout: JSON.stringify(labels), stderr: '' };
-    }
-    return { stdout: '', stderr: '' };
-  });
-}
-
 describe('close-issue', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -153,7 +143,12 @@ describe('close-issue', () => {
     });
 
     it('adds closed-out and removes workflow labels in one GitHub edit', async () => {
-      mockCurrentGitHubLabels();
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command.includes('gh issue view') && command.includes('--json labels')) {
+          return { stdout: JSON.stringify(['verifying-on-main', 'needs-close-out', 'merged', 'ready']), stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
 
       const ctx = {
         issueId: 'PAN-100',

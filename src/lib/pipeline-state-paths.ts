@@ -9,6 +9,9 @@ export function isPipelineStatePath(relativePath: string): boolean {
     || normalized === '.pan/continue.json'
     || normalized.startsWith('.pan/continue')
     || normalized.startsWith('.pan/specs/')
+    || normalized.startsWith('.pan/test/')
+    || normalized.startsWith('.pan/review/')
+    || normalized.startsWith('.pan/feedback/')
     || normalized === '.beads'
     || normalized.startsWith('.beads/');
 }

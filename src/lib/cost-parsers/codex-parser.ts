@@ -62,6 +62,7 @@ export function parseCodexSessionSync(sessionFile: string): SessionUsage | null 
   let threadId = '';
   let startTime = '';
   let endTime = '';
+  let cwd: string | undefined;
   let totalInput = 0;
   let totalCachedInput = 0;
   let totalOutput = 0;
@@ -92,6 +93,7 @@ export function parseCodexSessionSync(sessionFile: string): SessionUsage | null 
     if (type === 'session_meta') {
       // Nested schema: the thread/session id lives here, not in task_started.
       if (!threadId && typeof data['id'] === 'string') threadId = data['id'];
+      if (typeof data['cwd'] === 'string' && data['cwd']) cwd = data['cwd'];
       if (!startTime && ts) startTime = ts;
     } else if (type === 'turn_context') {
       // The nested schema carries the resolved model here, not in task_started.
@@ -143,6 +145,7 @@ export function parseCodexSessionSync(sessionFile: string): SessionUsage | null 
     },
     cost: totalCost,
     cost_v2: totalCost,
+    cwd,
     messageCount,
     modelBreakdown: {
       [model]: {

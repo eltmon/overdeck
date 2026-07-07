@@ -59,7 +59,7 @@ import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { validateOrigin } from './origin-validation.js';
 import { reopenWorkspaceState } from '../../../lib/reopen.js';
 import { getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
-import { syncCacheSync, getCostsForIssueSync } from '../../../lib/costs/index.js';
+import { getCostForIssueAggregateSync } from '../../../lib/overdeck/cost-sync.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { getSharedIssueService } from '../services/issue-service-singleton.js';
 import { CacheService } from '../services/cache-service.js';
@@ -699,7 +699,7 @@ const getIssueCostsRoute = HttpRouter.add(
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
-    const issueData = getCostsForIssueSync(id);
+    const issueData = getCostForIssueAggregateSync(id);
     const agents = yield* Effect.promise(() => getCachedRunningAgents());
     const resolvedCost = resolveIssueHeadlineCost({
       issueId: id,
@@ -755,7 +755,7 @@ const getIssueCostsRoute = HttpRouter.add(
           { cost: stats.cost, tokens: stats.tokens },
         ])
       ),
-      budget: issueData.budget,
+      budget: undefined,
       budgetWarning: issueData.budgetWarning,
       lastUpdated: issueData.lastUpdated,
     });

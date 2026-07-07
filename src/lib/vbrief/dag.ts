@@ -322,9 +322,6 @@ function pathMatchesAnyCompiled(filePath: string, patterns: CompiledGlob[]): boo
   return patterns.some(pattern => pattern.regex.test(filePath) || pattern.exactDirectory === filePath);
 }
 
-function pathMatchesAny(filePath: string, patterns: string[]): boolean {
-  return pathMatchesAnyCompiled(filePath, patterns.map(compileGlob));
-}
 
 /**
  * Returns true if the candidate item's `files_scope` overlaps with any running

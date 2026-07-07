@@ -499,10 +499,10 @@ program
   .command('recover [id]')
   .description('Recover crashed or stopped agent')
   .option('--all', 'Auto-recover all crashed agents')
+  .option('--compact', 'Compact-respawn a context-wedged agent, including troubled/user-stopped work agents that automatic recovery will not resume')
   .option('--json', 'Output as JSON')
   .option('--model <model>', 'Override model on recovery (e.g. switch off Kimi when quota is exhausted)')
   .action(recoverCommand);
-
 program
   .command('sync-main <id>')
   .description('Merge latest main into workspace feature branch')

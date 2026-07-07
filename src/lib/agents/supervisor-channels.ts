@@ -200,7 +200,7 @@ function resolvePtySupervisorScriptPath(): string {
  */
 export function decideChannelsForWorkAgent(
   agentId: string,
-  options: SupervisorChannelsSpawnOptions,
+  _options: SupervisorChannelsSpawnOptions,
   state: AgentState,
 ): ChannelsDecision {
   const log = (eligible: boolean, reason?: string): void => {

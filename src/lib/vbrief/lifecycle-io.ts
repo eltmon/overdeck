@@ -8,11 +8,11 @@
  */
 
 import { exec, spawn } from 'child_process';
-import { basename, dirname, join } from 'path';
+import { basename, join } from 'path';
 import { promisify } from 'util';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from 'fs';
 import { Effect } from 'effect';
-import { PAN_CONTINUE_FILENAME, PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/index.js';
+import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/index.js';
 
 import type { ContinueFeedbackEntry, ContinueSessionEntry, ContinueState } from './continue-state.js';
 import {
@@ -27,7 +27,7 @@ import {
 import { readPlanSync } from './io.js';
 import { invalidateVBriefIndex } from './vbrief-index.js';
 import type { VBriefDocument } from './types.js';
-import { findSpecByIssue, getProjectPanPaths, updateSpecStatus, writeSpecForIssue } from '../pan-dir/specs.js';
+import { getProjectPanPaths, updateSpecStatus } from '../pan-dir/specs.js';
 import type { PanSpecDocument, PanSpecEntry, PanSpecStatus } from '../pan-dir/types.js';
 import {
   appendFeedbackEntrySync as appendFeedbackEntryToRecord,

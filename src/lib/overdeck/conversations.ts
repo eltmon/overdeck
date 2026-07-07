@@ -1003,7 +1003,7 @@ export function getConversationByClaudeSessionId(claudeSessionId: string): Legac
     .get(claudeSessionId) as LegacyConversationRow | undefined;
   return row ? rowToLegacyConversation(row) : null;
 }
-
+export { findConversationForCostSessionSync } from './conversation-cost-session.js';
 export function getConversationByTmuxSession(tmuxSession: string): LegacyConversation | null {
   const name = tmuxSession.startsWith('conv-') ? tmuxSession.slice(5) : tmuxSession;
   const row = overdeckDb()

@@ -51,6 +51,7 @@ vi.mock('../../src/lib/cliproxy.js', () => ({
   startCliproxy: vi.fn(),
 }));
 
+import { generateLauncherScriptSync } from '../../src/lib/launcher-generator.js';
 import { getProviderEnvForModel, getAgentRuntimeBaseCommand, getProviderExportsForModel } from '../../src/lib/agents.js';
 
 describe('agents auth routing', () => {
@@ -227,6 +228,7 @@ describe('agents auth routing', () => {
         'unset ANTHROPIC_DEFAULT_SONNET_MODEL',
         'unset ANTHROPIC_SMALL_FAST_MODEL',
         'unset CLAUDE_CODE_SUBAGENT_MODEL',
+        'unset CLAUDE_CODE_AUTO_COMPACT_WINDOW',
         'unset OPENAI_API_KEY',
         'unset GEMINI_API_KEY',
         'unset API_TIMEOUT_MS',
@@ -250,5 +252,28 @@ describe('agents auth routing', () => {
     expect(result).toContain('unset ANTHROPIC_API_KEY');
     expect(result).toContain('export ANTHROPIC_BASE_URL="http://127.0.0.1:8317"');
     expect(result).toContain('export ANTHROPIC_AUTH_TOKEN="overdeck-local-cliproxy-key"');
+  });
+
+  it('exports the registry context window as Claude Code auto-compact window for Kimi launches', async () => {
+    mockLoadYamlConfig.mockReturnValue({
+      config: {
+        apiKeys: { kimi: 'kimi-test-key' },
+        providerAuth: {},
+      },
+    });
+
+    const providerExports = await getProviderExportsForModel('kimi-k2.7-code');
+    expect(providerExports).toContain('unset CLAUDE_CODE_AUTO_COMPACT_WINDOW');
+    expect(providerExports).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="262144"');
+
+    const launcher = generateLauncherScriptSync({
+      role: 'work',
+      workingDir: '/workspace/project',
+      providerExports,
+      baseCommand: "claude --agent pan-work-agent --model 'kimi-k2.7-code'",
+    });
+
+    expect(launcher).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="262144"');
+    expect(launcher).toContain("exec claude --agent pan-work-agent --model 'kimi-k2.7-code'");
   });
 });

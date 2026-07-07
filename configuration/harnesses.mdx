@@ -30,6 +30,11 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
   `claude` and run.
 - Works with both subscription auth (Claude Code OAuth) and API-key auth.
 - All role runs (`plan`, `work`, `review`, `test`, `ship`) default here.
+- When Claude Code launches a non-Anthropic model, Overdeck also exports
+  `CLAUDE_CODE_AUTO_COMPACT_WINDOW` from the model registry's context window
+  (for example, Kimi K2.7 Code uses `262144`) so Claude Code compacts before the
+  proxied provider's real token limit is exceeded. Anthropic models keep Claude
+  Code's native default.
 
 ### oh-my-pi / ohmypi (alternative)
 

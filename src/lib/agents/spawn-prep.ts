@@ -23,7 +23,7 @@ import { getDispatchableItems } from '../vbrief/dag.js';
 import { type Role } from './agent-state.js';
 import type { TierAssignment } from './dispatch-tier.js';
 import { resolveStaffing } from './staffing.js';
-import { resolveTieredExecutionEnabled } from './tier-table.js';
+import { resolveTieredExecutionEnabled, resolveTieredExecutionEnabledForIssue } from './tier-table.js';
 import {
   buildCavemanExports,
   getProviderEnvForModel,
@@ -37,7 +37,6 @@ import {
   inferMemoryProjectId,
   roleAgentDefinitionPath,
   roleSystemPromptInjectionSync,
-  getRoleRuntimeBaseCommand,
 } from './runtime-command.js';
 
 export type FlywheelSpawnEnv = {
@@ -226,9 +225,17 @@ export function resolveSlotTierSpawnParams(
   if (!doc) return {};
   const planMetadata = doc?.plan?.metadata;
 
+  // Extract issueId from workspace path: feature-<issueId>
+  const workspaceName = basename(baseWorkspace);
+  const issueIdMatch = workspaceName.match(/^feature-(.+)$/i);
+  const issueId = issueIdMatch ? issueIdMatch[1].toUpperCase() : null;
+
   const config = loadYamlConfig().config;
   const tiered = config.tieredExecution;
-  const explicitTableActive = Boolean(tiered && resolveTieredExecutionEnabled(tiered, planMetadata));
+  // Use issue-aware resolver to honor record override (PAN-2383)
+  const explicitTableActive = Boolean(
+    tiered && (issueId ? resolveTieredExecutionEnabledForIssue(tiered, issueId, planMetadata) : resolveTieredExecutionEnabled(tiered, planMetadata))
+  );
 
   const item = doc.plan.items.find((candidate) => candidate.id === slotItemId);
   if (!item) {
@@ -276,10 +283,25 @@ export function resolveSingleWorkTierSpawnParams(
   const item = getDispatchableItems(doc, new Set())[0];
   if (!item) return {};
 
+  // Extract issueId from workspace path: feature-<issueId>
+  const workspaceName = basename(workspace);
+  const issueIdMatch = workspaceName.match(/^feature-(.+)$/i);
+  const issueId = issueIdMatch ? issueIdMatch[1].toUpperCase() : null;
+
   // PAN-2397 (Always Tiered): the single-work path staffs through the same
   // resolver as slots — explicit table when enabled, implicit roles.work
-  // tier otherwise.
-  const staffing = resolveStaffing(item, { planMetadata, spawnKey, config: loadYamlConfig().config });
+  // tier otherwise. Use issue-aware resolver to honor record override (PAN-2383).
+  const config = loadYamlConfig().config;
+  const tiered = config.tieredExecution;
+  const effectiveTieredEnabled = issueId
+    ? resolveTieredExecutionEnabledForIssue(tiered, issueId, planMetadata)
+    : resolveTieredExecutionEnabled(tiered, planMetadata);
+
+  const staffing = resolveStaffing(item, {
+    planMetadata,
+    spawnKey,
+    config: { ...config, tieredExecution: { ...tiered, enabled: effectiveTieredEnabled } },
+  });
   return {
     model: staffing.model,
     harness: staffing.implicit ? undefined : staffing.harness,

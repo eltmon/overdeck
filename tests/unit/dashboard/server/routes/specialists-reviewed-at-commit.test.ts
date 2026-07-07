@@ -53,11 +53,17 @@ vi.mock('child_process', async (importActual) => {
       callback(null, { stdout: `${stdout}\n`, stderr: '' });
       return {} as ReturnType<typeof actual.exec>;
     },
+    execFile: (...args: unknown[]) => {
+      const callback = args[args.length - 1] as (err: null, result: { stdout: string; stderr: string }) => void;
+      callback(null, { stdout: mockDiffNameOnlyStdout, stderr: '' });
+      return {} as ReturnType<typeof actual.execFile>;
+    },
   };
 });
 
 let mockExecHeadSha = 'defaultsha';
 const mockTreeShaByCommit = new Map<string, string>();
+let mockDiffNameOnlyStdout = '';
 
 // ─── Stub modules that deacon imports ────────────────────────────────────────
 
@@ -171,6 +177,7 @@ beforeEach(async () => {
   });
   mockExecHeadSha = 'defaultsha';
   mockTreeShaByCommit.clear();
+  mockDiffNameOnlyStdout = '';
   mockResolveProject.mockReturnValue({ projectPath: '/fake/project' });
 }, 30_000);
 
@@ -266,6 +273,30 @@ describe('checkPostReviewCommits — deacon detects new commits via reviewedAtCo
     expect(actions.filter((a) => a.includes('PAN-904'))).toHaveLength(0);
 
     const after = getReviewStatusSync('PAN-904');
+    expect(after?.reviewStatus).toBe('passed');
+    expect(after?.testStatus).toBe('passed');
+    expect(after?.readyForMerge).toBe(true);
+    expect(after?.reviewedAtCommit).toBe('newsha99');
+  });
+
+  it('preserves review and test verdicts when only pipeline state changed since review', async () => {
+    setReviewStatusSync('PAN-905', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      readyForMerge: true,
+      reviewedAtCommit: 'oldsha1',
+    });
+
+    mockExecHeadSha = 'newsha99';
+    mockTreeShaByCommit.set('oldsha1', 'oldtree');
+    mockTreeShaByCommit.set('newsha99', 'newtree');
+    mockDiffNameOnlyStdout = '.pan/records/pan-905.json\n.pan/test/result.json\n.beads/issues.jsonl\n';
+
+    const actions = await checkPostReviewCommits();
+
+    expect(actions.filter((a) => a.includes('PAN-905'))).toHaveLength(0);
+
+    const after = getReviewStatusSync('PAN-905');
     expect(after?.reviewStatus).toBe('passed');
     expect(after?.testStatus).toBe('passed');
     expect(after?.readyForMerge).toBe(true);

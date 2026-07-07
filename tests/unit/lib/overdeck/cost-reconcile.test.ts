@@ -190,7 +190,15 @@ describe('CostWriter.reconcile — ohmypi source', () => {
       CostWriter.use((w) => w.reconcile({ source: 'ohmypi' })).pipe(Effect.provide(layer)),
     );
 
-    expect(result).toEqual({ imported: 0 });
+    expect(result).toMatchObject({
+      imported: 0,
+      sessionsScanned: 0,
+      eventsImported: 0,
+      duplicatesSkipped: 0,
+      errors: [],
+      earliestEventTs: null,
+      latestEventTs: null,
+    });
   });
 
   it('imports ohmypi assistant usage events and returns the inserted count', async () => {
@@ -216,7 +224,15 @@ describe('CostWriter.reconcile — ohmypi source', () => {
       CostWriter.use((w) => w.reconcile({ source: 'ohmypi' })).pipe(Effect.provide(layer)),
     );
 
-    expect(result).toEqual({ imported: 2 });
+    expect(result).toMatchObject({
+      imported: 2,
+      sessionsScanned: 1,
+      eventsImported: 2,
+      duplicatesSkipped: 0,
+      errors: [],
+      earliestEventTs: '2026-06-17T10:00:01.000Z',
+      latestEventTs: '2026-06-17T10:00:02.000Z',
+    });
     expect(insertedValues).toHaveLength(2);
     const row = insertedValues[0] as Record<string, unknown>;
     expect(row.agentId).toBe('agent-pan-1');
@@ -266,11 +282,19 @@ describe('CostWriter.reconcile — codex source', () => {
       CostWriter.use((w) => w.reconcile({ source: 'codex' })).pipe(Effect.provide(layer)),
     );
 
-    expect(result).toEqual({ imported: 1 });
+    expect(result).toMatchObject({
+      imported: 1,
+      sessionsScanned: 1,
+      eventsImported: 1,
+      duplicatesSkipped: 0,
+      errors: [],
+      earliestEventTs: '2026-06-17T10:00:00.000Z',
+      latestEventTs: '2026-06-17T10:00:00.000Z',
+    });
     expect(insertedValues).toHaveLength(1);
     const row = insertedValues[0] as Record<string, unknown>;
     expect(row.agentId).toBe('agent-2');
-    expect(row.sessionType).toBe('codex');
+    expect(row.sessionType).toBe('work');
     expect(row.model).toBe('gpt-4o');
     expect(row.sourceFile).toBe(rolloutFile);
   });
@@ -287,7 +311,15 @@ describe('CostWriter.reconcile — non-pi/codex source', () => {
       CostWriter.use((w) => w.reconcile({ source: 'claude' })).pipe(Effect.provide(layer)),
     );
 
-    expect(result).toEqual({ imported: 0 });
+    expect(result).toMatchObject({
+      imported: 0,
+      sessionsScanned: 0,
+      eventsImported: 0,
+      duplicatesSkipped: 0,
+      errors: [],
+      earliestEventTs: null,
+      latestEventTs: null,
+    });
     // Filesystem mocks must not have been called for a non-pi/codex source
     expect(vi.mocked(existsSync)).not.toHaveBeenCalled();
   });
