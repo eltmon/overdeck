@@ -1,51 +1,9 @@
 {
   "issueId": "PAN-2450",
   "schemaVersion": 2,
-  "sessionHistory": [
-    {
-      "reason": "feedback",
-      "note": "[2026-07-07T04:58Z] verification-gate → FAILED — seq 4",
-      "timestamp": "2026-07-07T04:58:58.168Z"
-    },
-    {
-      "timestamp": "2026-07-07T05:09:25.063Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-07T05:22:39.751Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-07T05:24Z] review-agent → CHANGES-REQUESTED — seq 1",
-      "timestamp": "2026-07-07T05:24:38.563Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-07T05:48Z] verification-gate → FAILED — seq 2",
-      "timestamp": "2026-07-07T05:48:50.201Z"
-    }
-  ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-07T05:24:38Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2450\n\ngh fallback merge verification no longer recognizes state MERGED\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2450 -m \"Fixed review issues\"`"
-    },
-    {
-      "seq": 2,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-07-07T05:48:50Z",
-      "markdownBody": "VERIFICATION FAILED for PAN-2450 (attempt 1/3):\n\nFailed check: test\n\nVerification FAILED at test (63847ms):\n\n/Projects/overdeck/workspaces/feature-pan-2450/dist/chunk-ruWRV7i3.js' imported from /home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/dist/cli/index.js\n    at finalizeResolution (node:internal/modules/esm/resolve:274:11)\n    at moduleResolve (node:internal/modules/esm/resolve:859:10)\n    at defaultResolve (node:internal/modules/esm/resolve:983:11)\n    at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)\n    at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)\n    at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)\n    at ModuleJob._link (node:internal/modules/esm/module_job:182:49) {\n  code: 'ERR_MODULE_NOT_FOUND',\n  url: 'file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/dist/chunk-ruWRV7i3.js'\n}\n\nNode.js v22.22.0\n\"\n\n ❯ src/cli/commands/__tests__/done.test.ts:51:84\n     49|\n     50|   it('rejects --test-waived without a reason (AC4)', () => {\n     51|     expect(() => execFileSync('node', [CLI, 'done', 'PAN-1501', '--tes…\n       |                                                                                    ^\n     52|       /error: option '--test-waived <reason>' argument missing/i,\n     53|     );\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts > spawnConversationSession PTY supervisor wiring > wraps Claude Code conversations with the PTY supervisor and waits for its socket\nError: pty-supervisor build artifact missing — run `npm run build`.\n ❯ spawnConversationSession src/lib/overdeck/conversation-runtime.ts:596:13\n    594|     supervisorScriptPath = resolvePtySupervisorScriptPath();\n    595|     if (!existsSync(supervisorScriptPath)) {\n    596|       throw new Error('pty-supervisor build artifact missing — run `np…\n       |             ^\n    597|     }\n    598|     await writePtyToken(tmuxSession);\n ❯ src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts:126:5\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-2450 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-2450 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
-    }
-  ],
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "feedback": [],
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "auto-start": "completed",
     "auto-start.ac1": "completed",
@@ -60,11 +18,12 @@
     "issueId": "PAN-2450",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T05:54:55.890Z",
+    "updatedAt": "2026-07-07T05:55:33.022Z",
     "reviewNotes": "Dispatch failed: [review-agent] Skipping review dispatch for PAN-2450 — GitHub PR #2455 is merged",
+    "verificationNotes": "Verification FAILED at lint (68060ms):\n\ns/overdeck/workspaces/feature-pan-2450/sync-sources/skills/pan-show/SKILL.md: pan show exists in top-level help but --help failed\n  /home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/sync-sources/skills/pan-reload/SKILL.md: pan reload exists in top-level help but --help failed\n  /home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/sync-sources/skills/pan-resources/SKILL.md: pan resources exists in top-level help but --help failed\n  /home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/sync-sources/skills/pan-reopen/SKILL.md: pan reopen exists in top-level help but --help failed\n  /home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/sync-sources/skills/pan-review/SKILL.md: pan review exists in top-level help but --help failed\n  /home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/sync-sources/skills/pan-start/SKILL.md: pan start exists in top-level help but --help failed\n  /home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/sync-sources/skills/pan-tts/SKILL.md: pan tts exists in top-level help but --help failed\n  /home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/sync-sources/skills/pan-tell/SKILL.md: pan tell exists in top-level help but --help failed\n  /home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/sync-sources/skills/pan-unpause/SKILL.md: pan unpause exists in top-level help but --help failed\n  /home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/sync-sources/skills/pan-sync-main/SKILL.md: pan sync-main exists in top-level help but --help failed\n  /home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/sync-sources/skills/pan-untroubled/SKILL.md: pan untroubled exists in top-level help but --help failed\n  /home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/sync-sources/skills/pan-up/SKILL.md: pan up exists in top-level help but --help failed\n  /home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/sync-sources/skills/pan-wipe/SKILL.md: pan wipe exists in top-level help but --help failed\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2455",
     "lastVerifiedCommit": "af9fd682a86329d56b630d598b4b001281ab0a9f",
     "reviewRequestedAt": "2026-07-07T05:09:25.065Z"
@@ -119,7 +78,7 @@
       },
       "costAtCloseOut": {
         "usd": 33.268121,
-        "pricingAsOf": "2026-07-07T05:54:56.017Z"
+        "pricingAsOf": "2026-07-07T05:55:33.122Z"
       }
     },
     "merges": [
@@ -130,6 +89,6 @@
   "swarm": {
     "finalizedAt": "2026-07-07T04:18:45.208Z"
   },
-  "created": "2026-07-07T04:55:35.112Z",
-  "updated": "2026-07-07T05:54:56.021Z"
+  "created": "2026-07-07T05:55:33.132Z",
+  "updated": "2026-07-07T05:55:33.132Z"
 }
