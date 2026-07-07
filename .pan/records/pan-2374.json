@@ -32,20 +32,20 @@
   },
   "pipeline": {
     "issueId": "PAN-2374",
-    "reviewStatus": "failed",
+    "reviewStatus": "passed",
     "testStatus": "failed",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T11:47:00.221Z",
-    "reviewNotes": "Verification failed at test",
+    "updatedAt": "2026-07-07T11:56:14.779Z",
+    "reviewNotes": "Planning harness timeout fix reviewed; no blockers",
     "testNotes": "typecheck passed; lint passed (including lint:no-coderabbit-merge-gate); npm test failed with 5 unrelated timeout failures (conversation-supervisor-uat hook, deacon-context-overflow hook, deacon-test-signal hook, cloister-control-surface test, agents-switch-model test). PAN-2374-specific unit tests passed 44/44 (coderabbit-ingestion, no-coderabbit-merge-gate, review-context). No browser UAT required by PRD/vBRIEF/issue notes (backend/CLI feature). AC-5 unmet: full suite not green.",
-    "verificationNotes": "Verification FAILED at test (74798ms):\n\n'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n✖ quarantine audit: the following entries lack an issue reference\n  tests/foo.test.ts\nEach quarantine entry must reference an issue — add e.g. # PAN-XXXX.\n(node:1756742) ExperimentalWarning: Some other experimental feature\n(Use `node --trace-warnings ...` to show where the warning was created)\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| src/lib/planning/__tests__/spawn-planning-session-harness.test.ts > resolvePlanningSessionHarness > uses resolveHarness for provider defaults and explicit overrides\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/lib/planning/__tests__/spawn-planning-session-harness.test.ts:12:3\n     10|\n     11| describe('resolvePlanningSessionHarness', () => {\n     12|   it('uses resolveHarness for provider defaults and explicit overrides…\n       |   ^\n     13|     mocks.resolveHarness.mockImplementation(async ({ explicit, model }…\n     14|       if (explicit) return explicit;\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  |root| src/lib/planning/__tests__/spawn-planning-session-harness.test.ts > resolvePlanningSessionHarness > uses resolveHarness for provider defaults and explicit overrides\nAssertionError: expected 2nd \"vi.fn()\" call to have been called with [ { explicit: 'pi', …(2) } ]\n\n- Expected\n+ Received\n\n  [\n    {\n-     \"explicit\": \"pi\",\n+     \"explicit\": undefined,\n      \"model\": \"gpt-5.5\",\n      \"role\": \"plan\",\n    },\n  ]\n\n ❯ src/lib/planning/__tests__/spawn-planning-session-harness.test.ts:28:34\n     26|       model: 'gpt-5.5',\n     27|     });\n     28|     expect(mocks.resolveHarness).toHaveBeenNthCalledWith(2, {\n       |                                  ^\n     29|       explicit: 'pi',\n     30|       role: 'plan',\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Bead cr-ingest-module ack: fetchCodeRabbitFindings returns [] on absence/PR-resolution-failure/gh-api-error (verified via resolveOwnerRepo catch, prNumber null-check, and per-fetch .catch()), returns findings with body+path/line for coderabbitai[bot] reviews and inline comments, zero execSync matches, CodeRabbitFinding type exported cleanly, 115 lines, quota invariant documented inline.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2459",
-    "reviewedAtCommit": "e3e26a8ef8879e695e53d96bafeeb4111989acf3",
-    "reviewRequestedAt": "2026-07-07T11:42:56.225Z",
+    "reviewedAtCommit": "37f1058adf972c1f06614cfe91b342e69924b6ef",
+    "reviewRequestedAt": "2026-07-07T11:54:17.159Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".beads/issues.jsonl",
@@ -55,6 +55,7 @@
         "scripts/source-introspection-baseline.txt",
         "src/lib/cloister/__tests__/lint-stub-ui-audit-examples.test.ts",
         "src/lib/cloister/__tests__/review-context-stub-ui.test.ts",
+        "src/lib/planning/__tests__/spawn-planning-session-harness.test.ts",
         "tests/lib/cloister/deacon-context-overflow.test.ts",
         "tests/lib/cloister/deacon-test-signal.test.ts",
         "tests/unit/dashboard/cloister-control-surface.test.ts"
@@ -86,13 +87,14 @@
         "src/lib/cloister/coderabbit-ingestion.ts",
         "src/lib/cloister/review-context.ts",
         "src/lib/cloister/review-verdict-feedback.ts",
+        "src/lib/planning/__tests__/spawn-planning-session-harness.test.ts",
         "tests/lib/cloister/deacon-context-overflow.test.ts",
         "tests/lib/cloister/deacon-test-signal.test.ts",
         "tests/unit/dashboard/cloister-control-surface.test.ts",
         "tests/unit/lib/cloister/coderabbit-ingestion.test.ts",
         "tests/unit/lib/cloister/no-coderabbit-merge-gate.test.ts"
       ],
-      "recordedAt": "2026-07-07T11:41:58.903Z"
+      "recordedAt": "2026-07-07T11:53:49.462Z"
     }
   },
   "closeOut": {
@@ -116,9 +118,9 @@
         },
         "review": {
           "unknown": {
-            "input": 8661598,
-            "output": 29157,
-            "cacheRead": 7657984,
+            "input": 10781259,
+            "output": 35570,
+            "cacheRead": 9676288,
             "cacheWrite": 0
           }
         },
@@ -140,9 +142,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1120821,
-            "output": 240773,
-            "cacheRead": 61348096,
+            "input": 1139709,
+            "output": 246023,
+            "cacheRead": 63802368,
             "cacheWrite": 0
           }
         }
@@ -161,9 +163,9 @@
           "cacheWrite": 173126
         },
         "unknown": {
-          "input": 8661598,
-          "output": 29157,
-          "cacheRead": 7657984,
+          "input": 10781259,
+          "output": 35570,
+          "cacheRead": 9676288,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -173,15 +175,15 @@
           "cacheWrite": 77553
         },
         "custom/kimi-k2.7-code": {
-          "input": 1615398,
-          "output": 254120,
-          "cacheRead": 63362048,
+          "input": 1634286,
+          "output": 259370,
+          "cacheRead": 65816320,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 29.398572,
-        "pricingAsOf": "2026-07-07T11:47:00.265Z"
+        "usd": 31.612153000000003,
+        "pricingAsOf": "2026-07-07T11:56:14.883Z"
       }
     },
     "merges": [
@@ -189,6 +191,13 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "created": "2026-07-07T11:46:54.626Z",
-  "updated": "2026-07-07T11:47:00.266Z"
+  "created": "2026-07-07T11:56:14.857Z",
+  "updated": "2026-07-07T11:56:16.187Z",
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-07T11:56:16.187Z"
+    }
+  ]
 }
