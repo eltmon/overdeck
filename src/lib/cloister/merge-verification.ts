@@ -2,6 +2,7 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
+import { resolveProjectFromIssueSync } from '../projects.js';
 import { isGitHubAppConfigured, listPullRequestsForHead } from '../github-app.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 
@@ -92,5 +93,41 @@ export async function verifyMergedBeforeLifecycle(
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message.slice(0, 200) : 'unknown';
     return { merged: false, reason: `Unable to verify merge state for ${branchName} via GitHub PR API: ${message}` };
+  }
+}
+
+export interface SkipDispatchAsMergedDeps {
+  resolveProject?: (issueId: string) => { projectPath: string } | null;
+  verifyMerged?: (
+    issueId: string,
+    projectPath: string,
+    sourceBranch?: string,
+  ) => Promise<{ merged: boolean; reason: string }>;
+}
+
+/**
+ * GitHub-authoritative pre-dispatch guard. Returns `skip: true` only when we can
+ * positively confirm the PR is already merged. Any failure to resolve the project
+ * or read PR state fails open (`skip: false`) so a transient GitHub hiccup never
+ * blocks a legitimate dispatch.
+ */
+export async function shouldSkipDispatchAsMerged(
+  issueId: string,
+  deps: SkipDispatchAsMergedDeps = {},
+): Promise<{ skip: boolean; reason: string }> {
+  try {
+    const resolveProject = deps.resolveProject ?? resolveProjectFromIssueSync;
+    const project = resolveProject(issueId);
+    if (!project) {
+      return { skip: false, reason: `Project unresolved for ${issueId}` };
+    }
+
+    const branch = `feature/${issueId.toLowerCase()}`;
+    const verifyMerged = deps.verifyMerged ?? verifyMergedBeforeLifecycle;
+    const result = await verifyMerged(issueId, project.projectPath, branch);
+    return { skip: result.merged, reason: result.reason };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { skip: false, reason: `Merged-PR guard error: ${message}` };
   }
 }
