@@ -23,7 +23,7 @@ export function ResourcesPanel({ onNavigateToAgents }: ResourcesPanelProps) {
   // Socket.io real-time updates + 5s polling fallback
   useResourceStats();
 
-  const { data, isLoading, error } = useQuery<ResourcesSnapshot>({
+  const { data, isLoading, error, refetch } = useQuery<ResourcesSnapshot>({
     queryKey: ['resources'],
     queryFn: fetchResources,
     refetchInterval: 30000,
@@ -45,6 +45,7 @@ export function ResourcesPanel({ onNavigateToAgents }: ResourcesPanelProps) {
     <MachineRoom
       snapshot={data ?? { containers: [], agents: [], updatedAt: new Date().toISOString() }}
       onNavigateToAgents={onNavigateToAgents}
+      onRefresh={() => { void refetch(); }}
     />
   );
 }

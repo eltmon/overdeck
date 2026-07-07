@@ -2,14 +2,31 @@ import { useState } from 'react';
 import type { ResourceStack } from '../../types';
 import type { MachineRoomGroupBy } from './MachineRoomTopbar';
 import { StackCard } from './StackCard';
+import type { ServiceAction, StackAction } from './StackActions';
 
 interface StacksSectionProps {
   stacks: ResourceStack[];
   filter: string;
   groupBy: MachineRoomGroupBy;
+  busyKeys?: ReadonlySet<string>;
+  onStackAction?: (stack: ResourceStack, action: StackAction) => void;
+  onServiceAction?: (service: ResourceStack['services'][number], action: ServiceAction) => void;
+  onServiceLogs?: (service: ResourceStack['services'][number]) => void;
+  onServiceTerminal?: (service: ResourceStack['services'][number]) => void;
+  onTeardown?: (stack: ResourceStack) => void;
 }
 
-export function StacksSection({ stacks, filter, groupBy }: StacksSectionProps) {
+export function StacksSection({
+  stacks,
+  filter,
+  groupBy,
+  busyKeys,
+  onStackAction,
+  onServiceAction,
+  onServiceLogs,
+  onServiceTerminal,
+  onTeardown,
+}: StacksSectionProps) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const filtered = stacks.filter((stack) => matchesStack(stack, filter));
   const groups = groupStacks(filtered, groupBy);
@@ -27,6 +44,12 @@ export function StacksSection({ stacks, filter, groupBy }: StacksSectionProps) {
                 key={stack.id}
                 stack={stack}
                 expanded={expanded.has(stack.id)}
+                busyKeys={busyKeys}
+                onStackAction={onStackAction}
+                onServiceAction={onServiceAction}
+                onServiceLogs={onServiceLogs}
+                onServiceTerminal={onServiceTerminal}
+                onTeardown={onTeardown}
                 onToggle={(stackId) => {
                   setExpanded((current) => {
                     const next = new Set(current);

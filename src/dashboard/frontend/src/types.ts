@@ -290,7 +290,7 @@ export interface ContainerStats {
   memoryPercent: number;
   networkIn: number;      // bytes
   networkOut: number;     // bytes
-  status: 'running' | 'stopped' | 'unhealthy' | 'restarting';
+  status: 'running' | 'stopped' | 'paused' | 'unhealthy' | 'restarting';
   memLimitBytes?: number | null;
   memPercentOfLimit?: number;
   oomKills24h?: number;

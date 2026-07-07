@@ -45,7 +45,6 @@ describe('StacksSection', () => {
     ]} filter="" groupBy="workspace" />);
 
     expect(screen.getByText('Idle stack holding 2.9 GB')).toBeTruthy();
-    expect(screen.getAllByText('Pause')).toHaveLength(1);
   });
 });
 

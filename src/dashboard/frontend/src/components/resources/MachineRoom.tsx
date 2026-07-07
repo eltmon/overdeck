@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Agent, ContainerStats, ResourcesSnapshot } from '../../types';
+import type { Agent, ContainerStats, ResourceStack, ResourcesSnapshot } from '../../types';
 import { AgentsSection } from './AgentsSection';
 import { CoreServicesSection } from './CoreServicesSection';
 import { HistorySection } from './HistorySection';
@@ -7,6 +7,9 @@ import { HostProcessesSection } from './HostProcessesSection';
 import { MachineRoomTopbar, type MachineRoomGroupBy } from './MachineRoomTopbar';
 import { ReclaimAdvisor } from './ReclaimAdvisor';
 import { StacksSection } from './StacksSection';
+import { serviceBusyKey, stackBusyKey } from './StackCard';
+import type { ServiceAction, StackAction } from './StackActions';
+import { TeardownModal } from './TeardownModal';
 import { VitalsStrip } from './VitalsStrip';
 
 type MachineRoomRow =
@@ -19,13 +22,26 @@ interface MachineRoomProps {
   onStop?: (row: MachineRoomRow) => void;
   onPause?: (row: MachineRoomRow) => void;
   onLogs?: (row: MachineRoomRow) => void;
+  onRefresh?: () => void | Promise<void>;
+  onContainerTerminal?: (container: ContainerStats) => void;
 }
 
-export function MachineRoom({ snapshot, onNavigateToAgents, onStop, onPause, onLogs }: MachineRoomProps) {
+export function MachineRoom({
+  snapshot,
+  onNavigateToAgents,
+  onStop,
+  onPause,
+  onLogs,
+  onRefresh,
+  onContainerTerminal,
+}: MachineRoomProps) {
   const [filter, setFilter] = useState('');
   const [groupBy, setGroupBy] = useState<MachineRoomGroupBy>('workspace');
   const [focusedRowId, setFocusedRowId] = useState<string | null>(null);
   const [highlightedTarget, setHighlightedTarget] = useState<string | null>(null);
+  const [busyKeys, setBusyKeys] = useState<Set<string>>(() => new Set());
+  const [logsPanel, setLogsPanel] = useState<{ title: string; logs: string } | null>(null);
+  const [teardownStack, setTeardownStack] = useState<ResourceStack | null>(null);
   const filterRef = useRef<HTMLInputElement | null>(null);
   const rows = useMemo(() => buildRows(snapshot), [snapshot]);
   const filteredRows = rows.filter((row) => matchesFilter(row, filter));
@@ -42,13 +58,69 @@ export function MachineRoom({ snapshot, onNavigateToAgents, onStop, onPause, onL
       }
       if (!focusedRow) return;
       const key = event.key.toLowerCase();
-      if (key === 's') onStop?.(focusedRow);
-      if (key === 'p') onPause?.(focusedRow);
-      if (key === 'l') onLogs?.(focusedRow);
+      if (key === 's') handleRowStop(focusedRow);
+      if (key === 'p') handleRowPause(focusedRow);
+      if (key === 'l') handleRowLogs(focusedRow);
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [focusedRow, onLogs, onPause, onStop]);
+
+  async function runMutation(key: string, url: string) {
+    setBusyKeys((current) => new Set(current).add(key));
+    try {
+      const response = await fetch(url, { method: 'POST' });
+      if (!response.ok) throw new Error(await response.text() || `Request failed with ${response.status}`);
+      await onRefresh?.();
+    } finally {
+      setBusyKeys((current) => {
+        const next = new Set(current);
+        next.delete(key);
+        return next;
+      });
+    }
+  }
+
+  function runStackAction(stack: ResourceStack, action: StackAction) {
+    const issueId = stack.issueId ?? stack.id;
+    void runMutation(stackBusyKey(stack, action), `/api/resources/stacks/${encodeURIComponent(issueId)}/${action}`);
+  }
+
+  function runServiceAction(service: ContainerStats, action: ServiceAction) {
+    void runMutation(serviceBusyKey(service, action), `/api/resources/docker/container/${encodeURIComponent(service.id)}/${action}`);
+  }
+
+  async function openServiceLogs(service: ContainerStats) {
+    const key = serviceBusyKey(service, 'logs');
+    setBusyKeys((current) => new Set(current).add(key));
+    try {
+      const response = await fetch(`/api/resources/docker/container/${encodeURIComponent(service.id)}/logs`);
+      if (!response.ok) throw new Error(await response.text() || `Request failed with ${response.status}`);
+      const body = await response.json() as { logs?: string };
+      setLogsPanel({ title: service.name, logs: body.logs ?? '' });
+    } finally {
+      setBusyKeys((current) => {
+        const next = new Set(current);
+        next.delete(key);
+        return next;
+      });
+    }
+  }
+
+  function handleRowStop(row: MachineRoomRow) {
+    if (onStop) return onStop(row);
+    if (row.kind === 'container') runServiceAction(row.container, 'stop');
+  }
+
+  function handleRowPause(row: MachineRoomRow) {
+    if (onPause) return onPause(row);
+    if (row.kind === 'container') runServiceAction(row.container, row.container.status === 'paused' ? 'unpause' : 'pause');
+  }
+
+  function handleRowLogs(row: MachineRoomRow) {
+    if (onLogs) return onLogs(row);
+    if (row.kind === 'container') void openServiceLogs(row.container);
+  }
 
   const groups = groupRows(filteredRows, groupBy);
 
@@ -81,7 +153,26 @@ export function MachineRoom({ snapshot, onNavigateToAgents, onStop, onPause, onL
           totals={snapshot.reclaimTotals}
           thresholdBytes={snapshot.reclaimThresholdBytes}
         />
-        <StacksSection stacks={snapshot.stacks ?? []} filter={filter} groupBy={groupBy} />
+        <StacksSection
+          stacks={snapshot.stacks ?? []}
+          filter={filter}
+          groupBy={groupBy}
+          busyKeys={busyKeys}
+          onStackAction={runStackAction}
+          onServiceAction={runServiceAction}
+          onServiceLogs={(service) => { void openServiceLogs(service); }}
+          onServiceTerminal={onContainerTerminal}
+          onTeardown={setTeardownStack}
+        />
+        {logsPanel && (
+          <section className="mb-6 border border-border bg-background" aria-label="Container logs">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <h2 className="font-['Space_Grotesk'] text-lg font-semibold text-foreground">Logs · {logsPanel.title}</h2>
+              <button type="button" className="border border-border px-2 py-1 text-xs uppercase" onClick={() => setLogsPanel(null)}>Close</button>
+            </div>
+            <pre className="max-h-64 overflow-auto p-4 font-['DM_Mono'] text-xs text-foreground">{logsPanel.logs}</pre>
+          </section>
+        )}
         <HistorySection forecast={snapshot.forecast} onHighlightTarget={setHighlightedTarget} />
         <CoreServicesSection services={snapshot.coreServices ?? []} filter={filter} onFocusRow={setFocusedRowId} />
         <HostProcessesSection processes={snapshot.hostProcesses ?? []} filter={filter} onFocusRow={setFocusedRowId} />
@@ -112,6 +203,13 @@ export function MachineRoom({ snapshot, onNavigateToAgents, onStop, onPause, onL
           <div className="border border-border p-8 text-sm text-muted-foreground">No resources match the filter.</div>
         )}
       </div>
+      {teardownStack && (
+        <TeardownModal
+          stack={teardownStack}
+          onClose={() => setTeardownStack(null)}
+          onComplete={onRefresh}
+        />
+      )}
     </div>
   );
 }
