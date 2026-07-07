@@ -46,7 +46,7 @@
   ],
   "feedback": [],
   "created": "2026-06-29T14:58:24.745Z",
-  "updated": "2026-07-06T12:54:54.941Z",
+  "updated": "2026-07-07T03:01:15.985Z",
   "pipeline": {
     "issueId": "PAN-1894",
     "reviewStatus": "passed",
@@ -54,7 +54,7 @@
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T11:15:21.317Z",
+    "updatedAt": "2026-07-07T03:01:15.985Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "testNotes": "Skipped: issue is already merged",
     "inspectNotes": "Spec fidelity and constraint compliance passed for bead workspace-hfuig. resolveUatActions covers the documented UAT states/lifecycles, inline actions render visibly in the UAT tree row, and no PRD/CLAUDE constraints were violated.",
@@ -62,7 +62,7 @@
     "lastVerifiedCommit": "d714a87bff52c4a2e28852f9c7e1b7fad0bef267",
     "reviewRequestedAt": "2026-06-29T17:21:16.076Z",
     "closedOut": true,
-    "closedOutAt": "2026-07-03T11:15:21.317Z"
+    "closedOutAt": "2026-07-07T03:01:15.985Z"
   },
   "closeOut": {
     "usage": {
@@ -136,6 +136,6 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "harness": "codex",
+  "model": "gpt-5.5"
 }

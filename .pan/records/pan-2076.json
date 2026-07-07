@@ -36,18 +36,19 @@
   ],
   "feedback": [],
   "created": "2026-06-29T14:57:37.612Z",
-  "updated": "2026-07-06T12:56:37.501Z",
+  "updated": "2026-07-07T03:05:06.367Z",
   "pipeline": {
     "issueId": "PAN-2076",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T07:58:14.621Z",
+    "updatedAt": "2026-07-07T03:05:06.367Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2175",
-    "lastVerifiedCommit": "24afe063e482e4ecc4ff8c222862c91568788a02"
+    "lastVerifiedCommit": "24afe063e482e4ecc4ff8c222862c91568788a02",
+    "closedOut": true,
+    "closedOutAt": "2026-07-07T03:05:06.367Z"
   },
   "closeOut": {
     "usage": {
@@ -107,8 +108,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "durable-decision": "completed",
     "durable-decision.ac1": "completed",

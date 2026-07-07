@@ -106,11 +106,10 @@
     "issueId": "PAN-2378",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-05T06:21:25.886Z",
+    "mergeStatus": "merged",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-07T03:17:01.058Z",
     "reviewNotes": "No blocking findings; no code changes since prior passed review",
     "testNotes": "Gates passed: npm run typecheck; npm run lint; npm run test (8434 passed, 52 skipped); TieredExecutionSection tests (10 passed); cockpit tests (11 passed); tests/lib/settings-api.test.ts (47 passed); npm run build:dashboard. Browser UAT not required; acceptance criteria covered by automated tests. UAT paths exercised: none.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -171,7 +170,9 @@
     },
     "deaconIgnored": true,
     "deaconIgnoredAt": "2026-07-05T04:59:38.468Z",
-    "deaconIgnoredReason": "swarm freeze via pan swarm freeze"
+    "deaconIgnoredReason": "swarm freeze via pan swarm freeze",
+    "closedOut": true,
+    "closedOutAt": "2026-07-07T03:17:01.058Z"
   },
   "closeOut": {
     "usage": {
@@ -256,5 +257,5 @@
     ]
   },
   "created": "2026-07-05T06:00:58.665Z",
-  "updated": "2026-07-05T06:21:25.938Z"
+  "updated": "2026-07-07T03:17:01.058Z"
 }

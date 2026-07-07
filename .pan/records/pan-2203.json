@@ -2,17 +2,16 @@
   "issueId": "PAN-2203",
   "schemaVersion": 2,
   "feedback": [],
-  "harness": "claude-code",
-  "model": "claude-opus-4-8",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-2203",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T07:53:20.507Z",
+    "updatedAt": "2026-07-07T03:09:07.268Z",
     "reviewNotes": "pan swarm recover still reads Deacon failed-slot blocks from a CLI-local in-memory map",
     "testNotes": "Skipped: issue is already merged",
     "verificationNotes": "Verification FAILED at lint (21787ms):\n\n.72 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mpty-supervisor.d.ts\u001b[22m\u001b[39m                            \u001b[2m  0.80 kB\u001b[22m \u001b[2m│ gzip:   0.37 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mcli/index.d.ts\u001b[22m\u001b[39m                                 \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mlib/memory/fts-worker.d.ts\u001b[22m\u001b[39m                     \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1msupervisor/server.d.ts\u001b[22m\u001b[39m                         \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m 432 files, total: 13.16 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m3854ms\u001b[39m\n\n> @overdeck/core@0.41.1 lint:skills\n> bash scripts/lint-skills.sh\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/agents.ts is dynamically imported by src/cli/commands/done.ts, src/cli/commands/reopen.ts, src/cli/commands/start.ts, src/lib/agents/messaging.ts, src/lib/cloister/deacon-api-recovery.ts, ... but also statically imported by src/cli/commands/admin/fpp-handler.ts, src/cli/commands/cv.ts, src/cli/commands/doctor.ts, src/cli/commands/done.ts, src/cli/commands/flywheel.ts, ..., dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/memory/rollup.ts is dynamically imported by src/lib/memory/pending.ts but also statically imported by src/lib/memory/cli.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (53%)\n  - tsdown:deps (43%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\nTraceback (most recent call last):\n  File \"<stdin>\", line 255, in <module>\n  File \"<stdin>\", line 204, in main\n  File \"<stdin>\", line 49, in run_pan\nsubprocess.CalledProcessError: Command '['node', '/home/eltmon/Projects/overdeck/workspaces/feature-pan-2203/dist/cli/index.js', '--help']' returned non-zero exit status 1.\n",
@@ -134,7 +133,9 @@
         "tests/unit/lib/cloister/service-swarm-fastpath.test.ts"
       ],
       "recordedAt": "2026-07-01T15:48:27.172Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-07T03:09:07.268Z"
   },
   "closeOut": {
     "usage": {
@@ -231,5 +232,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-01T16:34:27.639Z",
-  "updated": "2026-07-03T07:53:25.711Z"
+  "updated": "2026-07-07T03:09:07.268Z"
 }

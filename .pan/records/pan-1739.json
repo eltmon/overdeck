@@ -53,15 +53,14 @@
     "recordedAt": "2026-07-04T20:17:53.311Z"
   },
   "created": "2026-07-03T14:31:02.879Z",
-  "updated": "2026-07-04T20:18:13.881Z",
+  "updated": "2026-07-07T03:00:29.663Z",
   "pipeline": {
     "issueId": "PAN-1739",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T20:18:13.824Z",
+    "updatedAt": "2026-07-07T03:00:29.663Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2366",
     "reviewRequestedAt": "2026-07-04T20:18:02.170Z",
     "scopeDrift": {
@@ -85,7 +84,9 @@
         "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.tsx"
       ],
       "recordedAt": "2026-07-04T20:17:53.311Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-07T03:00:29.663Z"
   },
   "closeOut": {
     "usage": {
