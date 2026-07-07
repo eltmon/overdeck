@@ -18,6 +18,7 @@ import { isPaneDead, sessionExistsSync } from '../tmux.js';
 import { describeRunningAgents, releaseAdvancingSlot, tryReserveAdvancingSlot } from './concurrency.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { isIssueClosed } from './issue-closed.js';
+import { shouldSkipDispatchAsMerged } from './merge-verification.js';
 import { getAutoCloseOutCanonicalState } from './deacon-canonical-state.js';
 
 const execAsync = promisify(exec);
@@ -583,22 +584,27 @@ async function reconcileReviewStatusOrphan(issueId: string, status: ReviewStatus
       } else if (!tryReserveAdvancingSlot()) {
         actions.push(`Deferred test re-dispatch for ${issueId} — advancing-role concurrency ceiling reached`);
       } else {
-        try {
-          const run = await spawnRun(issueId, 'test', {
-            workspace,
-            prompt: buildTestRolePrompt({ issueId, workspace, branch }),
-          });
-          testStackRebuildState.delete(issueId.toUpperCase());
-          setReviewStatusSync(issueId, { testStatus: 'testing' });
-          actions.push(`Re-dispatched orphaned test for ${issueId} via test role ${run.id} (deacon-orphan-recovery)`);
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          if (msg.includes('already running')) {
+        const mergedGuard = await shouldSkipDispatchAsMerged(issueId);
+        if (mergedGuard.skip) {
+          actions.push(`Orphaned test for ${issueId}: ${mergedGuard.reason}; skipping re-dispatch`);
+        } else {
+          try {
+            const run = await spawnRun(issueId, 'test', {
+              workspace,
+              prompt: buildTestRolePrompt({ issueId, workspace, branch }),
+            });
+            testStackRebuildState.delete(issueId.toUpperCase());
             setReviewStatusSync(issueId, { testStatus: 'testing' });
-            actions.push(`Orphaned test for ${issueId}: test role already running`);
-          } else {
-            setReviewStatusSync(issueId, { testStatus: 'dispatch_failed' });
-            actions.push(`Orphaned test role dispatch failed for ${issueId}: ${msg}`);
+            actions.push(`Re-dispatched orphaned test for ${issueId} via test role ${run.id} (deacon-orphan-recovery)`);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            if (msg.includes('already running')) {
+              setReviewStatusSync(issueId, { testStatus: 'testing' });
+              actions.push(`Orphaned test for ${issueId}: test role already running`);
+            } else {
+              setReviewStatusSync(issueId, { testStatus: 'dispatch_failed' });
+              actions.push(`Orphaned test role dispatch failed for ${issueId}: ${msg}`);
+            }
           }
         }
       }

@@ -34,6 +34,7 @@ import { findProjectByTeamSync } from '../../../../lib/projects.js';
 import { getReviewStatusSync, markWorkspaceStuck, setReviewStatusSync as setReviewStatusBase, type ReviewStatus } from '../../../../lib/review-status.js';
 import { getWorkAgentLifecycleStateSync } from '../../../../lib/work-agent-lifecycle.js';
 import { findPlan } from '../../../../lib/vbrief/io.js';
+import { isIntegrationPermissionError, verifyAppCanMerge } from '../../../../lib/github-app.js';
 import { resolveGitHubIssueSync as resolveGitHubIssueShared } from '../../../../lib/tracker-utils.js';
 import { sessionExists } from '../../../../lib/tmux.js';
 import { jsonResponse } from '../../http-helpers.js';
@@ -1164,6 +1165,23 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
       if (!artifactMerged) {
         const error = `${primaryForge} merge failed: ${prMergeErr.message}`;
         console.error(`[merge] ${error}`);
+
+        if (isIntegrationPermissionError(prMergeErr.message)) {
+          let scopes = 'pull_requests:write, contents:write';
+          try {
+            const cap = await verifyAppCanMerge();
+            if (cap.missing && cap.missing.length > 0) {
+              scopes = cap.missing.join(', ');
+            }
+          } catch (permCheckErr: any) {
+            console.warn(`[merge] verifyAppCanMerge failed for ${issueId}: ${permCheckErr.message}`);
+          }
+          const note = `GitHub App cannot merge — installation is missing ${scopes}. Grant these scopes to the overdeck-agent installation, then re-merge.`;
+          setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: note });
+          completePendingOperation(issueId, note);
+          return { success: false, statusCode: 403, error: note };
+        }
+
         const isTransient =
           prMergeErr.message?.includes('Timed out waiting for GitHub PR') ||
           prMergeErr.message?.includes('ECONNRESET') ||

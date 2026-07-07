@@ -68,6 +68,7 @@ import { Effect } from 'effect';
 const execAsync = promisify(exec);
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { isIssueClosed } from './issue-closed.js';
+import { shouldSkipDispatchAsMerged } from './merge-verification.js';
 export { spawnFlywheel, pauseFlywheel, resumeFlywheel } from './flywheel.js';
 
 // State file for cross-process communication
@@ -306,6 +307,17 @@ async function resolveWorkspaceForIssue(issueId: string): Promise<string | null>
   const { getReviewStatusSync } = await import('../review-status.js');
   if (getReviewStatusSync(normalizedIssueId)?.mergeStatus === 'merged') {
     const message = `${normalizedIssueId}: skipping ${role} dispatch — merge already landed (merge_status='merged' is terminal)`;
+    console.log(`[cloister] ${message}`);
+    emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
+    return;
+  }
+
+  // PAN-2420: GitHub-authoritative guard. Even when merge_status is not yet
+  // 'merged' (e.g. a permission failure left it as 'failed'), do not respawn
+  // advancing roles against a PR that GitHub already reports merged.
+  const mergedGuard = await shouldSkipDispatchAsMerged(normalizedIssueId);
+  if (mergedGuard.skip) {
+    const message = `${normalizedIssueId}: skipping ${role} dispatch — ${mergedGuard.reason}`;
     console.log(`[cloister] ${message}`);
     emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
     return;

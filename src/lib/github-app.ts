@@ -32,6 +32,19 @@ export interface GitHubAppConfig {
 export interface InstallationToken {
   token: string;
   expiresAt: string; // ISO timestamp
+  permissions?: Record<string, string>;
+}
+
+/**
+ * Detects the GitHub App 403 "Resource not accessible by integration" error
+ * thrown when the installation lacks a required permission (e.g.
+ * contents:write or pull_requests:write) for the merge endpoint.
+ */
+export function isIntegrationPermissionError(message: string): boolean {
+  return (
+    message.includes('403') &&
+    message.includes('Resource not accessible by integration')
+  );
 }
 
 export interface GitHubPullRequestRef {
@@ -112,6 +125,60 @@ export type MergeBackendStatus = {
 export interface MergeBackendStatusDeps {
   isConfigured?: () => boolean;
   checkGhAuth?: () => Promise<boolean>;
+}
+
+export type AppCanMergeResult = {
+  configured: boolean;
+  canMerge?: boolean;
+  missing?: string[];
+  detail: string;
+};
+
+export interface VerifyAppCanMergeDeps {
+  isConfigured?: () => boolean;
+  generateToken?: () => Promise<InstallationToken>;
+}
+
+/**
+ * Verify the configured GitHub App installation has the permissions required
+ * to merge pull requests via the API.
+ */
+export async function verifyAppCanMerge(
+  deps: VerifyAppCanMergeDeps = {}
+): Promise<AppCanMergeResult> {
+  const isConfigured = deps.isConfigured ?? isGitHubAppConfigured;
+  if (!isConfigured()) {
+    return { configured: false, detail: 'GitHub App is not configured' };
+  }
+
+  const generateToken = deps.generateToken ?? (async () =>
+    Effect.runPromise(generateInstallationToken()));
+
+  const token = await generateToken();
+  const permissions = token.permissions ?? {};
+  const missing: string[] = [];
+  if (permissions.pull_requests !== 'write') {
+    missing.push('pull_requests:write');
+  }
+  if (permissions.contents !== 'write') {
+    missing.push('contents:write');
+  }
+
+  if (missing.length === 0) {
+    return {
+      configured: true,
+      canMerge: true,
+      missing: [],
+      detail: 'GitHub App installation has merge permissions',
+    };
+  }
+
+  return {
+    configured: true,
+    canMerge: false,
+    missing,
+    detail: `GitHub App installation is missing required permissions: ${missing.join(', ')}`,
+  };
 }
 
 type GitHubCheckRunApiResponse = {
@@ -230,10 +297,15 @@ function generateJWT(appId: string, privateKey: string): string {
     throw new Error(`Failed to generate installation token: ${response.status} ${text}`);
   }
 
-  const data = await response.json() as { token: string; expires_at: string };
+  const data = await response.json() as {
+    token: string;
+    expires_at: string;
+    permissions?: Record<string, string>;
+  };
   return {
     token: data.token,
     expiresAt: data.expires_at,
+    permissions: data.permissions,
   };
 }
 
