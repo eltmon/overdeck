@@ -33,7 +33,7 @@ The bundle is the source of truth. Keep changes small, cited, and PR-gated. Dete
 | `/okf retro` | Post-implementation pass that captures what would have helped. | `references/workflow.md`, `references/model-bridges.md` |
 | `/okf extract "<query>" [--budget <tokens>]` | Return ranked, token-budgeted, cited concepts for prompt use. | `references/spec.md` |
 | `/okf validate [--strict]` | Run the deterministic conformance gate. | `references/conformance.md` |
-| `/okf lint` | Run advisory semantic patrol for stale or weak knowledge. | `references/conformance.md` |
+| `/okf lint` | Run advisory semantic patrol for stale or weak knowledge. | `references/lint-prompt.md`, `references/conformance.md` |
 | `/okf embed [--profile <name>]` | Update shareable embedding shards and rebuild the local index. | `references/workflow.md` |
 
 ## Guardrails
@@ -161,8 +161,9 @@ Run deterministic checks.
 
 Run advisory semantic patrol.
 
-- Look for contradictions, stale concepts, orphaned links, missing citations, and oversized concepts.
-- Report suggestions; do not block merges or CI solely on LLM judgment.
+- Use `references/lint-prompt.md` as the prompt fixture.
+- Surface contradictions, staleness, orphans, and oversized-concept split candidates from embedding `max_tokens`.
+- Report advisory findings only; lint never gates merges and writes nothing without explicit confirmation.
 
 ## `/okf embed [--profile <name>]`
 

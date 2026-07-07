@@ -7,6 +7,7 @@ SPEC="$ROOT/references/spec.md"
 README="$ROOT/README.md"
 OKFE="$ROOT/references/okf-embeddings.md"
 MODEL_BRIDGES="$ROOT/references/model-bridges.md"
+LINT_PROMPT="$ROOT/references/lint-prompt.md"
 
 require_grep() {
   local pattern="$1"
@@ -68,6 +69,14 @@ require_grep 'Lines are sorted by `id`' "$OKFE" "okf-embeddings doc includes sor
 require_grep 'okf_embeddings_version` controls compatibility' "$OKFE" "okf-embeddings doc includes succession clause"
 require_grep 'provider: ollama' "$ROOT/templates/okf-embeddings.yaml" "embedding manifest template uses ollama default"
 require_grep 'model: nomic-embed-text' "$ROOT/templates/okf-embeddings.yaml" "embedding manifest template uses nomic-embed-text"
+test -f "$LINT_PROMPT"
+printf 'ok - lint prompt fixture exists\n'
+require_grep 'Contradictions' "$LINT_PROMPT" "lint prompt patrols contradictions"
+require_grep 'Staleness' "$LINT_PROMPT" "lint prompt patrols staleness"
+require_grep 'Orphans' "$LINT_PROMPT" "lint prompt patrols orphans"
+require_grep 'Oversized concepts' "$LINT_PROMPT" "lint prompt patrols oversized concepts"
+require_grep 'never blocks merges' "$LINT_PROMPT" "lint prompt is advisory only"
+require_grep 'writes nothing without explicit confirmation' "$SKILL" "SKILL.md says lint writes nothing without confirmation"
 require_grep 'codex login status' "$MODEL_BRIDGES" "model bridges require codex auth check"
 require_grep 'codex exec -m <model> --sandbox workspace-write --output-last-message <output-file> "<prompt>"' "$MODEL_BRIDGES" "model bridges document codex exec invocation shape"
 require_grep 'gemini -p "<prompt>" -m <model>' "$MODEL_BRIDGES" "model bridges document gemini invocation shape"
