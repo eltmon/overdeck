@@ -28,7 +28,7 @@
     }
   ],
   "created": "2026-07-07T02:18:26.752Z",
-  "updated": "2026-07-07T04:25:50.198Z",
+  "updated": "2026-07-07T04:32:25.443Z",
   "pipeline": {
     "issueId": "PAN-2450",
     "reviewStatus": "pending",
@@ -36,10 +36,10 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T04:25:50.111Z",
-    "reviewNotes": "[review-agent] Skipping review dispatch for PAN-2450 — GitHub PR #2455 is merged",
+    "updatedAt": "2026-07-07T04:32:25.408Z",
+    "reviewNotes": "Dispatch failed: [review-agent] Skipping review dispatch for PAN-2450 — GitHub PR #2455 is merged",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2455",
-    "lastVerifiedCommit": "effeba373aedbe07c055b8f5d22c0de6912026a9",
+    "lastVerifiedCommit": "3470e38f4b34381b66a049c1afffd0e56673a3de",
     "reviewRequestedAt": "2026-07-07T04:18:56.988Z"
   },
   "closeOut": {
@@ -55,17 +55,17 @@
         },
         "review": {
           "unknown": {
-            "input": 2286064,
-            "output": 8944,
-            "cacheRead": 2077184,
+            "input": 2699476,
+            "output": 9467,
+            "cacheRead": 2489472,
             "cacheWrite": 0
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 817325,
-            "output": 152583,
-            "cacheRead": 63296122,
+            "input": 841787,
+            "output": 158787,
+            "cacheRead": 67566970,
             "cacheWrite": 0
           }
         }
@@ -78,21 +78,21 @@
           "cacheWrite": 0
         },
         "unknown": {
-          "input": 2286064,
-          "output": 8944,
-          "cacheRead": 2077184,
+          "input": 2699476,
+          "output": 9467,
+          "cacheRead": 2489472,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 817325,
-          "output": 152583,
-          "cacheRead": 63296122,
+          "input": 841787,
+          "output": 158787,
+          "cacheRead": 67566970,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 15.653687,
-        "pricingAsOf": "2026-07-07T04:25:50.187Z"
+        "usd": 16.740656,
+        "pricingAsOf": "2026-07-07T04:32:25.442Z"
       }
     },
     "merges": [
