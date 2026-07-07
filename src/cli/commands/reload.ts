@@ -1,7 +1,9 @@
 import { Effect } from 'effect';
 import chalk from 'chalk';
-import { spawn } from 'child_process';
-import { statSync } from 'fs';
+import { exec, spawn } from 'child_process';
+import { dirname, join } from 'path';
+import { promisify } from 'util';
+import { promises as fs, statSync } from 'fs';
 import { acquireRestartLock, readRestartLockHolder } from '../../lib/restart-lock.js';
 import { readPlatformConfigSync, restartDashboard, StageError } from '../../lib/platform-lifecycle.js';
 import { writeRestartStatus } from '../../lib/restart-status.js';
@@ -14,6 +16,8 @@ export interface ReloadOptions {
 }
 
 class UsageError extends Error {}
+
+const execAsync = promisify(exec);
 
 function parseHealthTimeout(value: string | undefined): number {
   if (!value) return 30_000;
@@ -33,11 +37,43 @@ function dashboardBundleMtimeMs(): number {
   }
 }
 
-function runCommand(command: string, args: string[]): Promise<number> {
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+async function runGitAsync(args: string[], cwd: string): Promise<{ stdout: string; stderr: string }> {
+  return execAsync(`git ${args.map(shellQuote).join(' ')}`, {
+    cwd,
+    encoding: 'utf8',
+  });
+}
+
+async function runGitExit(args: string[], cwd: string): Promise<number> {
+  try {
+    await runGitAsync(args, cwd);
+    return 0;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException & { code?: unknown }).code;
+    if (typeof code === 'number') return code;
+    throw error;
+  }
+}
+
+async function resolvePrimaryRepoRoot(cwd: string): Promise<string> {
+  const repoRoot = (await runGitAsync(['rev-parse', '--show-toplevel'], cwd)).stdout.trim();
+  if (!repoRoot) {
+    throw new Error(`Could not resolve git repository root from ${cwd}`);
+  }
+  const workspaceMatch = repoRoot.match(/^(.+)\/workspaces\/feature-[^/]+$/);
+  return workspaceMatch?.[1] ?? repoRoot;
+}
+
+function runCommand(command: string, args: string[], cwd: string): Promise<number> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       stdio: 'inherit',
       env: process.env,
+      cwd,
     });
     child.once('error', reject);
     child.once('close', (code) => resolve(code ?? 1));
@@ -52,12 +88,81 @@ function runCommand(command: string, args: string[]): Promise<number> {
  * `bun install` is idempotent and ~instant on a warm cache, so running it
  * unconditionally before every reload makes "apply my merged changes" safe.
  */
-function runBunInstall(): Promise<number> {
-  return runCommand('bun', ['install']);
+function runBunInstall(cwd: string): Promise<number> {
+  return runCommand('bun', ['install'], cwd);
 }
 
-function runBuild(): Promise<number> {
-  return runCommand('npm', ['run', 'build']);
+function runBuild(cwd: string): Promise<number> {
+  return runCommand('npm', ['run', 'build'], cwd);
+}
+
+async function runInstallAndBuild(cwd: string): Promise<void> {
+  const installExit = await runBunInstall(cwd);
+  if (installExit !== 0) {
+    throw new Error(`bun install failed in ${cwd} — old dashboard left running`);
+  }
+
+  const exitCode = await runBuild(cwd);
+  if (exitCode !== 0) {
+    throw new Error(`Build failed in ${cwd} — old dashboard left running`);
+  }
+}
+
+async function swapBuiltDist(repoRoot: string, buildWorktree: string): Promise<void> {
+  const incomingDist = join(repoRoot, 'dist.incoming');
+  const currentDist = join(repoRoot, 'dist');
+  const oldDist = join(repoRoot, `dist.old.${process.pid}`);
+
+  await fs.rm(incomingDist, { recursive: true, force: true });
+  await fs.cp(join(buildWorktree, 'dist'), incomingDist, { recursive: true });
+  await fs.rm(oldDist, { recursive: true, force: true });
+
+  let movedOldDist = false;
+  try {
+    await fs.rename(currentDist, oldDist);
+    movedOldDist = true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+
+  try {
+    await fs.rename(incomingDist, currentDist);
+  } catch (error) {
+    if (movedOldDist) {
+      await fs.rename(oldDist, currentDist).catch(() => undefined);
+    }
+    throw error;
+  }
+
+  await fs.rm(oldDist, { recursive: true, force: true });
+}
+
+async function buildFromOriginMain(repoRoot: string): Promise<void> {
+  await runGitAsync(['fetch', 'origin', 'main'], repoRoot);
+
+  const ancestorExit = await runGitExit(['merge-base', '--is-ancestor', 'origin/main', 'HEAD'], repoRoot);
+  if (ancestorExit === 0) {
+    await runInstallAndBuild(repoRoot);
+    return;
+  }
+  if (ancestorExit !== 1) {
+    throw new Error(`git merge-base --is-ancestor origin/main HEAD exited ${ancestorExit}`);
+  }
+
+  const originMainSha = (await runGitAsync(['rev-parse', '--short', 'origin/main'], repoRoot)).stdout.trim();
+  const buildWorktree = join(dirname(repoRoot), `.pan-reload-build-${process.pid}`);
+
+  console.warn(chalk.yellow(`origin/main (${originMainSha}) is not contained in this worktree HEAD; building from a detached origin/main worktree.`));
+  try {
+    await runGitAsync(['worktree', 'add', '--detach', buildWorktree, 'origin/main'], repoRoot);
+    await runInstallAndBuild(buildWorktree);
+    await swapBuiltDist(repoRoot, buildWorktree);
+    console.log(chalk.green(`✓ Built dashboard from origin/main ${originMainSha}`));
+  } finally {
+    await runGitAsync(['worktree', 'remove', '--force', buildWorktree], repoRoot).catch(() => undefined);
+    await fs.rm(buildWorktree, { recursive: true, force: true }).catch(() => undefined);
+    await fs.rm(join(repoRoot, 'dist.incoming'), { recursive: true, force: true }).catch(() => undefined);
+  }
 }
 
 async function recordReloadStatus(startedAt: number, success: boolean, error?: string): Promise<void> {
@@ -131,24 +236,19 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
     }
 
     const config = readPlatformConfigSync();
+    let repoRoot = process.cwd();
     if (!options.skipBuild) {
-      // Install first so a merge/rebase that added a runtime dep can't produce a
-      // server bundle that boot-crashes on a missing package (see runBunInstall).
-      const installExit = await runBunInstall();
-      if (installExit !== 0) {
-        const error = 'bun install failed — old dashboard left running';
-        console.error(chalk.red(error));
-        await recordReloadStatus(startedAt, false, error);
-        process.exitCode = 1;
-        return;
-      }
-
       const beforeMtime = dashboardBundleMtimeMs();
-      const exitCode = await runBuild();
-      if (exitCode !== 0) {
-        const error = 'Build failed — old dashboard left running';
-        console.error(chalk.red(error));
-        await recordReloadStatus(startedAt, false, error);
+      try {
+        repoRoot = await resolvePrimaryRepoRoot(process.cwd());
+        await buildFromOriginMain(repoRoot);
+      } catch (error) {
+        const message = (error as Error)?.message || String(error);
+        const reloadError = message.includes('old dashboard left running')
+          ? message
+          : `${message} — old dashboard left running`;
+        console.error(chalk.red(reloadError));
+        await recordReloadStatus(startedAt, false, reloadError);
         process.exitCode = 1;
         return;
       }
@@ -165,7 +265,7 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
 
     await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, { deacon: options.deacon }), {
       healthTimeoutMs,
-      expectedIdentity: { repoRoot: process.cwd(), mode: 'primary' },
+      expectedIdentity: { repoRoot, mode: 'primary' },
     }));
     await recordReloadStatus(startedAt, true);
     console.log(chalk.green('✓ Dashboard reloaded and healthy'));

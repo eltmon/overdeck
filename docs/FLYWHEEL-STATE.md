@@ -207,6 +207,101 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-58 tick 38 (2026-07-06) — A4(PAN-2095) merge SCHEDULED (id 21); PAN-2445 RECURRED (planning-lex-1, off-book Lexerra, surfaced); B1 still frozen; 2388 cycling
+
+**Order book: 4/19 landed. Main GREEN (772923ff8f).**
+- **A4 (PAN-2095) READY → merge SCHEDULED** (id 21, PR #2448, fires ~02:20Z). Order-book Lane A item (stale-worktree deploy bug). Close out on merge.
+- **★ PAN-2445 RECURRED: `planning-lex-1` = OFF-BOOK deacon lifecycle spawn.** Fable 5 planning agent for **LEX-1 (Lexerra project, `~/Projects/lexerra/workspaces/feature-lex-1`)** — the exact PAN-2445 pattern (deacon patrol auto-dispatches fable planning for an off-book stuck-in-'planning' issue, bypassing auto-pickup gating + defaulting staffing to roles.plan=fable). **SURFACED to operator (per burn-guard directive); NOT managed — flywheel can't `pan kill` (forbidden). Operator dispositions (kill+pause like MIN-206).** This confirms PAN-2445 fires across PROJECTS (MIN-206 MYN, now LEX-1 Lexerra) — the durable fix (gate patrol re-dispatch on auto-pickup + non-fable staffing) is warranted.
+- **B1 (PAN-2207, Lane B) STILL FROZEN** (3rd tick, "11m 01s" timer unchanged) — escalated; operator lever needed (ratchet-commit re-message).
+- **PAN-2388 (PRIORITY): slots cycled back to `running`** — working next beads (progressing but the ready-slot merge never completes = the recurring assembly stall; operator-gated).
+- **A1/M1 in review** (iterating). Deacon healthy.
+
+## RUN-58 tick 37 (2026-07-06) — deacon HEALTHY (patrolling); B1 CONFIRMED FROZEN (escalated); pipeline slow-but-alive; 2388 assembly-stalled; 2445 clean
+
+**Order book: 4/19 landed. Main GREEN (772923ff8f — no merges ~40min).**
+- **Deacon ALIVE + patrolling** (pid 3838195, cycle 19281 @ 02:01Z). Pipeline is NOT systemically stalled — A1 (PAN-2373) review running (agent-pan-2373-review), A4/M1 reviews advancing. Just slow (feedback iterations) + no new-ready this window. (Deacon "skipped reap … branch unmerged" for merged PAN-2387/2389/2336 = cosmetic squash-merge non-ancestor artifact, harmless.)
+- **B1 (PAN-2207, Lane B) CONFIRMED FROZEN — ESCALATED.** Pane timer stuck at "Worked for 11m 01s" across 2 ticks (~20min+), unchanged: "clean and ready ONCE that local commit message is fixed / reconstructed with an issue-referenced ratchet commit." Work agent idle pre-submit; deacon did NOT re-engage it (deacon nudges review convoys, not a work agent frozen pre-`pan done`). **Did NOT `pan start` it — re-engaging a LIVE agent risks a duplicate-in-workspace (the pan-handoff hazard).** **OPERATOR: B1 needs its ratchet commit re-messaged with the PAN-2207 reference (or history reconstructed) to submit — Lane B blocked.** Root-cause candidate (surfaced): a file-size ratchet commit emits a non-issue-referenced message that fails the commit-msg gate (gh-issue-trailer-hook/commitlint), and the agent stalls pre-submit → substrate gap (ratchet-commit-message + deacon-doesn't-re-engage-frozen-work-agent).
+- **PAN-2388 (PRIORITY): slots 1+3 `ready-to-merge`/unmerged** — assembly stall (operator lever). Not thrashing recover (slot-3 not in failed state now; it's the mergeReadySlots-doesn't-complete gap).
+- **PAN-2445 watch: CLEAN.** A10 (PAN-2420) running.
+
+## RUN-58 tick 36 (2026-07-06) — root-caused empty-ready-set: items ITERATING (not wedged) except B1 stuck on commit-msg/ratchet; PAN-2388 slots back to ready-to-merge (assembly stall recurs)
+
+**Order book: 4/19 landed. Main GREEN (772923ff8f). merge-blockers EMPTY (nothing hard-stuck). Ceiling relaxed (no recent block).**
+- **Empty ready set root-caused = review-feedback ITERATIONS, not a wedge:** A1 (PAN-2373) pushed a fix `0b46210423` → idle, awaiting re-review (normal iteration). A4 (PAN-2095) review-supervising. M1 (MIN-860) past review. A10 (PAN-2420) running.
+- **B1 (PAN-2207, Lane B) STUCK (surfaced):** work agent idle 11m, pane: "clean and ready ONCE that local commit message is fixed OR the branch history is reconstructed with an issue-referenced ratchet commit." So a NON-issue-referenced commit (likely a file-size RATCHET commit from rebasing over the strike-2417/others' done.ts changes) fails the commit-msg gate; the agent EXPLAINED the fix but did not execute it → stuck pre-submit. Flywheel levers limited (no pan tell; `pan start --force` risks disrupting a live agent). **SURFACED to operator: B1 needs its ratchet commit re-messaged with the issue reference (PAN-2207) to submit — Lane B critical path blocked.** Watching for deacon re-engage; escalate if still stuck next tick. (Root cause candidate: ratchet-commit flow produces non-issue-referenced messages that fail commitlint → substrate gap.)
+- **PAN-2388 (PRIORITY): slots 1+3 back to `ready-to-merge`/unmerged** (cycled running→ready-to-merge; assembly stall persists — slot-3 merge into integration still not completing). Operator assembly still the lever.
+- **PAN-2445 watch: CLEAN.** A10 (PAN-2420) spawned (agent-pan-2420).
+
+## RUN-58 tick 35 (2026-07-06) — A10(PAN-2420) planned→starting (bg); 2388 running; ready set empty (items in review/test); 2445 clean
+
+**Order book: 4/19 landed. Main GREEN (772923ff8f).**
+- **A10 (PAN-2420) PLANNED** (spec: pipeline merge robustness vs GitHub App 403) → **starting (bg, start-2420.log).** Lane A: A1 + A4 (in review/test) + A10 (starting) = 3 (top of 1-3 band).
+- **PAN-2388 (PRIORITY, remaining): slots 1+3 `running`** — progressing (unchanged several ticks; watch for convergence to ready-to-merge → integration).
+- Ready set EMPTY — A1/B1/M1/A4 in review/test, ripening (normal latency post-review; verified advancing tick 34).
+- **PAN-2445 watch: CLEAN** (planning-pan-2420 finished; no off-book spawns).
+- Priority pair 1/2 landed (2387); 2388 in-progress.
+
+## RUN-58 tick 34 (2026-07-06) — steady; in-flight reviews ADVANCING (A1 review done, B1→test, M1/A4 review); 2388 running; A10 planning; 2445 clean
+
+**Order book: 4/19 landed. Main GREEN (772923ff8f).**
+- **Verified in-flight NOT stalled (progress check):** A1 (PAN-2373) review DONE (review.md written, agent idle→advancing to test); B1 (PAN-2207) review agent reaped → advancing (still in `pan review pending`); M1 (MIN-860) + A4 (PAN-2095) in review. Ready set empty = items between phases (review→test→ready), normal — will ripen.
+- **PAN-2388 (PRIORITY, remaining): slots 1+3 `running`** — progressing. Watch convergence.
+- **A10 (PAN-2420) planning** (`planning-pan-2420` live, authoring PRD).
+- **PAN-2445 watch: CLEAN** — only planning-pan-2420 (my order-book dispatch), no off-book deacon spawns.
+- Operator PRs flowing (#2446/#2447 merged). Priority pair 1/2 landed (2387); 2388 in-progress.
+
+## RUN-58 tick 33 (2026-07-06) — PAN-2387 CLOSED (priority pair 1/2 done); PAN-2388 running; A10 planning dispatched; PAN-2445 clean
+
+**Order book: 4/19 landed. Main GREEN (greening on 772923ff8f).** Operator PRs landing: #2446 (health-pill cause), #2447 (canonical fleet cost summary).
+- **PAN-2387 (PRIORITY) CLOSED OUT** (CLOSED) — codex parser fix fully done. Priority pair: **1/2 landed (2387); 2388 remaining (swarm running).**
+- **PAN-2388 (PRIORITY): slots 1+3 `running`** — progressing. Watch convergence.
+- **A10 (PAN-2420, merge-door hardening) planning DISPATCHED** (bg, plan-2420.log; no PRD → planning authors it). Lane A filler for when A1/A4 free.
+- **PAN-2445 watch: CLEAN** (no off-book planning-*).
+- Ready set EMPTY (A1/B1/M1/A4 in review, ripening). Drain as they reach ready.
+
+## RUN-58 tick 32 (2026-07-06) — ★ PAN-2387 (PRIORITY pair) MERGED (892e52917c) — codex parser fix LANDED; closing out. PAN-2388 running; drain empty.
+
+**Order book: 4/19 landed. Main GREEN (greening on 892e52917c).**
+- **★ PAN-2387 (cost-visibility PAIR) MERGED** `892e52917c PAN-2387 (#2432)` @ 00:50Z (id 20 landed on 2nd schedule). The codex parser $0/model-id + UNKNOWN bucket + rollup fix is DONE. **Close-out bg (close2387.log).** One of the operator's 2 priority items LANDED.
+- **PAN-2388 (cost-visibility PAIR): slots 1+3 `running`** — actively working the remaining beads (un-stuck). Watch convergence into integration.
+- **PAN-2445 watch: CLEAN** (no off-book planning-* sessions).
+- Ready set EMPTY (A1/B1/M1/A4 in review, ripening). Drain as they reach ready.
+- **PRIORITY-PAIR STATUS: 1 of 2 landed (2387); 2388 in-progress (swarm running).**
+
+## RUN-58 tick 31 (2026-07-06) — PAN-2387 merge id 19 blocked (PR HEAD re-CI'd) → PR now CLEAN → re-scheduled id 20 (fires ~00:47); PAN-2388 running; PAN-2445 clean
+
+**Order book: 4/19 landed. Main GREEN.**
+- **PAN-2387 (PRIORITY) — re-scheduled (id 20, PR #2432, fires ~00:47Z).** id 19 blocked: "CI checks still pending on PR HEAD b86da77b4f" (a new commit pushed to 2387's branch re-ran CI at fire time). PR now **CLEAN/MERGEABLE** → id 20 should land. **REUSABLE: a scheduled auto-merge blocks if a new commit re-runs the PR HEAD CI between schedule and fire; re-schedule once mergeStateStatus=CLEAN.** (2387's branch keeps getting commits — review-feedback fixes; watch it doesn't churn indefinitely.)
+- **PAN-2388 (PRIORITY): slots 1+3 `running`** — progressing.
+- **PAN-2445 watch: CLEAN** (no off-book planning-* sessions).
+- Ready set = PAN-2387 (being scheduled). A1/B1/M1/A4 in review, not ready yet.
+
+## RUN-58 tick 30 (2026-07-06) — PAN-2387 (PRIORITY) merge SCHEDULED (id 19, PR #2432); PAN-2388 progressing (slots running); no off-book planning spawns
+
+**Order book: 4/19 landed. Main GREEN (459d01a379).**
+- **PAN-2387 (PRIORITY pair) — merge SCHEDULED** (id 19, PR #2432, fires ~00:36:23Z). CI fully green (test 8m3s/lint/build/smoke/CodeRabbit). The codex-parser-fix half of the cost-visibility pair is LANDING. Close it out on merge next tick.
+- **PAN-2388 (PRIORITY pair) — progressing:** swarm slots 1+3 `running` (un-stuck; deferred beads dispatched). Watch convergence.
+- **PAN-2445 watch: CLEAN** — no off-book `planning-*` sessions live this tick (no deacon lifecycle-momentum spawns to surface).
+- A1 (PAN-2373), B1 (PAN-2207), M1 (MIN-860), A4 (PAN-2095) all in review — not ready yet; drain as they ripen. M3 (MIN-854) left (2× pre-finalize stall, surfaced).
+
+## RUN-58 tick 29 (2026-07-06) — PAN-2387 READY (PR #2432, CI pending on HEAD); PAN-2388 swarm UN-STUCK (slots running); A4 spawned; M3 stalled 2nd time; PAN-2445 watch
+
+**Order book: 4/19 landed. Main GREEN (459d01a379).**
+- **PAN-2387 (PRIORITY) READY FOR MERGE** — review=passed test=passed, PR #2432. Schedule FAILED: `CI checks still pending on PR HEAD e0627b17ff` (a new commit pushed → CI re-running). **Schedule its merge next tick when PR HEAD CI is green.** (auto-merge/schedule requires PR HEAD checks green, not just the review-status ready flag.)
+- **PAN-2388 (PRIORITY) UN-STUCK — swarm slots 1+3 now `running` (were ready-to-merge/unmerged).** The deferred beads dispatched → the swarm is actively progressing again (budget freed / patrol advanced / operator acted). No longer stalled at the assembly wall. Watch for convergence.
+- **A4 (PAN-2095) SPAWNED** (agent-pan-2095 + review-supervisor; the waiter caught a clean bd window). Lane A now A1 + A4.
+- **M3 (MIN-854) planning STALLED AGAIN (2nd pre-finalize stall, no spec).** Recurring planning-agent-stops-pre-finalize gap — re-dispatch doesn't fix it. **Stopping re-dispatch (trio filler, not priority); surfaced as the recurring planning-stall gap** (affects MYN planning specifically? 2387 recovered but MIN-854 keeps stalling).
+- **OPERATOR BURN-GUARD (PAN-2445, FYI):** operator killed+paused `planning-min-206` — the deacon lifecycle patrol auto-dispatched FABLE planning for off-book MYN MIN-206 (stuck-in-'planning' tracker state), bypassing auto-pickup gating + resolving staffing to roles.plan=fable. **DIRECTIVE: watch for further lifecycle-momentum planning spawns on non-order-book issues → SURFACE, don't let them run.** (Same class as the earlier deacon auto-spawns of planning-pan-1491/1872.) Currently NO off-book planning-* sessions live (clean). MIN-206 awaits operator disposition.
+
+## RUN-58 tick 28 (2026-07-06) — A4(PAN-2095) planned→started (bg); M3(MIN-854) re-planned (stalled pre-finalize); ready set empty; PAN-2388 unchanged
+
+**Order book: 4/19 landed. Main GREEN (459d01a379).** Operator prep visible on main: PRD docs for pan-2443 (otel genai semconv) + pan-2444 (sageox re-integration).
+- **Ready set EMPTY** (all mid-review). A1 (PAN-2373 review), B1 (PAN-2207 review+test), 2387 (review+test+supervisor), M1 (MIN-860 review) all advancing → will reach ready → drain.
+- **A4 (PAN-2095) PLANNED** (spec `2026-07-07-PAN-2095-...vbrief.json`; it's the pan-reload-builds-stale-worktree bug) → **started (bg, start-2095.log)**. Lane A filler for when A1 merges.
+- **M3 (MIN-854) planning STALLED pre-finalize** (planning-min-854 gone, no spec — same class as 2387's earlier stall) → **re-dispatched `pan plan MIN-854 --auto` (bg, replan-854.log).** Verify it produces a spec next tick; if it stalls again, it's the planning-agent-stops-pre-finalize gap recurring.
+- **PAN-2388 (priority): UNCHANGED** — swarm slots 1+3 ready-but-unmerged; operator assembly still pending. **PAN-2387 (priority): review-feedback iteration** (agent + review + supervisor + test live).
+- REUSABLE (recurring this run): planning agents stall pre-finalize (produce no spec) — 2387 (recovered), M3/MIN-854 (re-dispatched). Watch for the spec file; re-`pan plan --auto` if absent after the session ends.
+
 ## RUN-58 tick 27 (2026-07-06) — steady; M1(MIN-860)→review; A4(PAN-2095) planning dispatched (Lane A filler); PAN-2388 unchanged (operator assembly pending)
 
 **Order book: 4/19 landed. Main GREEN (churning: 1713853cb0 etc. — operator fixes landing: compact-window-for-proxied-models, bd-lock budget, strike-badge).**

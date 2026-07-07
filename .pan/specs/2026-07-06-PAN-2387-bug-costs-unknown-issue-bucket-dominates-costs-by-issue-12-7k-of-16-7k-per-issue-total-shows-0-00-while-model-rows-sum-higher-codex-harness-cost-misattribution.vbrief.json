@@ -4,17 +4,17 @@
     "created": "2026-07-05T22:01:01Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2387: bug(costs): 'UNKNOWN' issue bucket dominates Costs by Issue + per-issue total shows $0.00 while model rows sum higher + codex-harness cost misattribution",
-    "updated": "2026-07-06T19:58:06.188Z"
+    "updated": "2026-07-07T00:53:31.060Z"
   },
   "plan": {
     "id": "pan-2387",
     "title": "bug(costs): 'UNKNOWN' issue bucket dominates Costs by Issue ($12.7k of $16.7k) + per-issue total shows $0.00 while model rows sum higher + codex-harness cost misattribution",
-    "status": "running",
+    "status": "completed",
     "uid": "421ad1b8-062a-4c75-a2f2-f6efcb4a56a7",
     "author": "agent:claude-fable-5",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-05T22:01:01Z",
-    "updated": "2026-07-06T19:58:06.188Z",
+    "updated": "2026-07-07T00:53:31.060Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2387",
@@ -644,5 +644,5 @@
       "canonicalFilename": "2026-07-06-PAN-2387-bug-costs-unknown-issue-bucket-dominates-costs-by-issue-12-7k-of-16-7k-per-issue-total-shows-0-00-while-model-rows-sum-higher-codex-harness-cost-misattribution.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
