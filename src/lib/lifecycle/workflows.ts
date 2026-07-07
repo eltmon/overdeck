@@ -625,6 +625,25 @@ async function verifySquashMergedPrByBranch(
       return stepOk(step, [`${prLabel} is squash-merged and ${branchRef} matches the merged PR head`]);
     }
 
+    // PAN-2406 / state-plane policy rule 3: commits after the merged head that
+    // touch ONLY state-plane paths (.pan/, .beads/) are pipeline exhaust —
+    // e.g. 'chore: record merge status' — and must not block close-out.
+    try {
+      const { stdout: deltaRaw } = await execAsync(
+        `git diff --name-only ${mergedPr.headRefOid}..${tipSha}`,
+        { cwd: ctx.projectPath, encoding: 'utf-8' },
+      );
+      const deltaFiles = deltaRaw.split('\n').map((f) => f.trim()).filter(Boolean);
+      const statePlaneOnly = deltaFiles.length > 0 && deltaFiles.every((f) =>
+        f.startsWith('.pan/') || f.startsWith('.beads/'));
+      if (statePlaneOnly) {
+        const prLabel = typeof mergedPr.number === 'number' ? `PR #${mergedPr.number}` : 'GitHub PR';
+        return stepOk(step, [
+          `${prLabel} is squash-merged; ${branchRef} is ahead only by state-plane commits (${deltaFiles.length} file(s): .pan/.beads) — accepted per state-plane policy`,
+        ]);
+      }
+    } catch { /* diff failure falls through to the strict rejection below */ }
+
     const prLabel = typeof mergedPr.number === 'number' ? `PR #${mergedPr.number}` : 'merged GitHub PR';
     return stepFailed(step, `${branchRef} does not match the head commit of merged ${prLabel}; inspect before closing out.`);
   } catch {
