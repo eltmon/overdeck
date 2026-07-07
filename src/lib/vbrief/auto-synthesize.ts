@@ -86,7 +86,7 @@ export function synthesizeMinimalVBrief(issue: AutoSynthesizeIssueInput): VBrief
 
   return {
     vBRIEFInfo: {
-      version: '0.6',
+      version: '0.8',
       created: now,
       updated: now,
       author: 'overdeck/auto-start',

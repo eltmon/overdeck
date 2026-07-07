@@ -6,6 +6,7 @@ import { tmpdir } from 'os';
 import { applyEffectiveDifficulty } from '../../agents/tier-escalation.js';
 import { resolveTier } from '../../agents/resolve-tier.js';
 import { findPlanSync, isPlanningCompleteSync, isPlanningProposed, normalizeVBriefEnvelope, readPlanSync, readTierOverrides, readWorkspacePlanSync, recordTierPromotion, serializeVBriefDocument, updateItemStatus, updateSubItemStatus } from '../io.js';
+import { planBuilder } from '../builder.js';
 import { subItemsOf, type VBriefDocument, type VBriefSubItem } from '../types.js';
 
 let PROJECT_ROOT: string;
@@ -289,6 +290,16 @@ describe('readPlan', () => {
 
     expect(serialized.status).toBe('active');
     expect(serialized.xBRIEFInfo.version).toBe('0.8');
+  });
+
+  it('serializes planBuilder output with xBRIEFInfo', () => {
+    const doc = planBuilder('PAN-2426', 'xBRIEF writer bump').build();
+
+    const serialized = JSON.parse(serializeVBriefDocument(doc));
+
+    expect(doc.vBRIEFInfo.version).toBe('0.8');
+    expect(serialized.xBRIEFInfo.version).toBe('0.8');
+    expect(serialized.vBRIEFInfo).toBeUndefined();
   });
 
   it('throws for nonexistent file', () => {
