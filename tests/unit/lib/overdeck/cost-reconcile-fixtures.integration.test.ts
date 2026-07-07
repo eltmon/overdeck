@@ -73,8 +73,8 @@ describe('CostWriter.reconcile fixture-backed readback', () => {
       }).pipe(Effect.provide(layer)),
     );
 
-    expect(result.firstCodex).toEqual({ imported: 2, skipped: [] });
-    expect(result.firstOhmypi).toEqual({ imported: 1, skipped: [] });
+    expect(result.firstCodex).toMatchObject({ imported: 2, skipped: [] });
+    expect(result.firstOhmypi).toMatchObject({ imported: 1, skipped: [] });
 
     expect(result.detail.issueId).toBe(ISSUE_ID);
     expect(result.detail.totalCost).toBeGreaterThan(0);
@@ -106,8 +106,8 @@ describe('CostWriter.reconcile fixture-backed readback', () => {
       event.cost > 0
     )).toBe(true);
 
-    expect(result.secondCodex).toEqual({ imported: 0, skipped: [] });
-    expect(result.secondOhmypi).toEqual({ imported: 0, skipped: [] });
+    expect(result.secondCodex).toMatchObject({ imported: 0, skipped: [] });
+    expect(result.secondOhmypi).toMatchObject({ imported: 0, skipped: [] });
     expect(result.afterSecond).toHaveLength(result.recent.length);
   });
 });

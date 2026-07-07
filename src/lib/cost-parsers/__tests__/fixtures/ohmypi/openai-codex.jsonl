@@ -1,7 +1,7 @@
 # Derived from ~/.omp/agent/sessions/-Projects-overdeck/2026-06-27T14-43-13-805Z_019f0988-e30d-7000-b11c-23c3826c54ab.jsonl
 # Usage fields (provider, model id, input/output/cacheRead/cacheWrite tokens, cost) are preserved verbatim.
 # Conversation content, signatures, and provider payload have been replaced with sanitized placeholders.
-{"type":"session","version":3,"id":"019f0988-e30d-7000-b11c-23c3826c54ab","timestamp":"2026-06-27T14:43:13.805Z","cwd":"/home/eltmon/Projects/overdeck","title":"Identify AI Model","titleSource":"auto"}
+{"type":"session","version":3,"id":"019f0988-e30d-7000-b11c-23c3826c54ab","timestamp":"2026-06-27T14:43:13.805Z","cwd":"[redacted cwd]","title":"Identify AI Model","titleSource":"auto"}
 {"type":"model_change","id":"c63eab9a","parentId":null,"timestamp":"2026-06-27T14:43:13.870Z","model":"openai-codex/gpt-5.5"}
 {"type":"thinking_level_change","id":"412c5fd0","parentId":"c63eab9a","timestamp":"2026-06-27T14:43:13.870Z","thinkingLevel":"high","configured":null}
 {"type":"message","id":"0b0c2d3f","parentId":"412c5fd0","timestamp":"2026-06-27T14:44:53.912Z","message":{"role":"user","content":[{"type":"text","text":"[sanitized]"}],"attribution":"user","timestamp":1782571493893}}

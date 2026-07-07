@@ -158,6 +158,7 @@ describe('parseOhmypiSession (PAN-1989)', () => {
       expect(content).not.toContain('Use the read tool')
       expect(content).not.toContain('pi version is')
       expect(content).not.toContain('I’m `openai-codex/gpt-5.5`')
+      expect(content).not.toMatch(/\/home\/|\/Users\/|\/tmp\//)
     }
   })
 

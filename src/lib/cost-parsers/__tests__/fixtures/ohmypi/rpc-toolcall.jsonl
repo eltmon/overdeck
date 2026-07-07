@@ -1,4 +1,4 @@
-{"type":"session","version":3,"id":"019ef4f8-6317-7000-9277-81d3e9dd941e","timestamp":"2026-06-23T14:52:59.543Z","cwd":"/tmp/omp-rpc/proj"}
+{"type":"session","version":3,"id":"019ef4f8-6317-7000-9277-81d3e9dd941e","timestamp":"2026-06-23T14:52:59.543Z","cwd":"[redacted cwd]"}
 {"type":"model_change","id":"773570b8","parentId":null,"timestamp":"2026-06-23T14:53:00.170Z","model":"zai/glm-4.5-flash"}
 {"type":"thinking_level_change","id":"0ca533d2","parentId":"773570b8","timestamp":"2026-06-23T14:53:00.170Z","thinkingLevel":"high","configured":null}
 {"type":"message","id":"373dab53","parentId":"0ca533d2","timestamp":"2026-06-23T14:53:00.269Z","message":{"role":"user","content":[{"type":"text","text":"[redacted user prompt]"}],"attribution":"user","timestamp":1782226380252}}
