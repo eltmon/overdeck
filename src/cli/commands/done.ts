@@ -759,11 +759,23 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       artifactResult = await Effect.runPromise(createReviewArtifactsForIssue(issueId, workspacePath));
     } catch (artifactErr: any) {
       // PAN-2207: GraphQL/App rate limit → REST-only PR lookup fallback.
-      const { stdout } = await execAsync(
-        `gh pr list --head feature/${issueId.toLowerCase()} --state open --json url --jq '.[0].url'`,
-        { cwd: workspacePath, encoding: 'utf-8' }
-      );
-      const existingPrUrl = stdout.trim();
+      // PAN-2465: the fallback runs `gh pr list` in the workspace ROOT, but a
+      // polyrepo workspace root has no git remotes (the real repos are the
+      // subdirectories, often not even on GitHub) — the gh call then crashes
+      // with "no git remotes found", masking the original artifact error and
+      // making agents loop `pan done` against a red herring. Guard the
+      // fallback: any failure rethrows the ORIGINAL artifact error.
+      let existingPrUrl = '';
+      try {
+        const { stdout } = await execAsync(
+          `gh pr list --head feature/${issueId.toLowerCase()} --state open --json url --jq '.[0].url'`,
+          { cwd: workspacePath, encoding: 'utf-8' }
+        );
+        existingPrUrl = stdout.trim();
+      } catch (fallbackErr: any) {
+        console.log(chalk.dim(`  (REST PR-lookup fallback unavailable here: ${String(fallbackErr?.message ?? fallbackErr).split('\n')[0]})`));
+        throw artifactErr;
+      }
       if (!existingPrUrl) throw artifactErr;
       console.log(chalk.yellow(`  ⚠ Review artifact creation failed, but found existing PR via REST fallback: ${existingPrUrl}`));
       setReviewStatusSync(issueId, { prUrl: existingPrUrl });
