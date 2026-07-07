@@ -11,6 +11,7 @@ export type IssueFeedbackTarget =
 
 export interface ResolveIssueFeedbackTargetOptions {
   itemId?: string;
+  revivePipelinePausedAgent?: (agentId: string, issueId: string) => Promise<boolean>;
 }
 
 async function isLiveSession(agentId: string): Promise<boolean> {
@@ -105,7 +106,7 @@ export async function resolveIssueFeedbackTarget(
   // pipeline's to clear when it has actionable feedback to deliver: unpause and
   // resume the whole-issue agent so the feedback lands. Operator pauses (pan pause,
   // any non-"needs-you:" reason) are never touched.
-  const revived = await revivePipelinePausedAgent(wholeIssueAgentId, normalizedIssue);
+  const revived = await opts.revivePipelinePausedAgent?.(wholeIssueAgentId, normalizedIssue);
   if (revived) return { agentId: wholeIssueAgentId };
 
   const suffix = requestedItemId ? ` for item ${requestedItemId}` : '';
@@ -113,33 +114,6 @@ export async function resolveIssueFeedbackTarget(
     needsYou: true,
     reason: `No live feedback target for ${normalizedIssue}${suffix}: ${wholeIssueAgentId} is not running and no assigned swarm slot has a live tmux session.`,
   };
-}
-
-/**
- * PAN-2461: unpause + resume an agent that the PIPELINE paused (pausedReason
- * starts with "needs-you:") so feedback can be delivered to it. Returns true
- * when the agent is live again. Operator pauses are left untouched.
- */
-async function revivePipelinePausedAgent(agentId: string, issueId: string): Promise<boolean> {
-  try {
-    const { getAgentStateSync, clearAgentPausedSync } = await import('../agents/agent-state.js');
-    const state = getAgentStateSync(agentId);
-    if (!state) return false;
-    if (state.paused !== true || !state.pausedReason?.startsWith('needs-you:')) return false;
-
-    console.log(`[feedback-target] ${agentId} is pipeline-paused (${state.pausedReason}) — unpausing to deliver feedback for ${issueId}`);
-    clearAgentPausedSync(agentId);
-    const { resumeAgent } = await import('../agents.js');
-    const result = await resumeAgent(agentId);
-    if (!result.success) {
-      console.warn(`[feedback-target] Failed to revive ${agentId}: ${result.error}`);
-      return false;
-    }
-    return isLiveSession(agentId);
-  } catch (err) {
-    console.warn(`[feedback-target] revivePipelinePausedAgent(${agentId}) failed: ${err instanceof Error ? err.message : String(err)}`);
-    return false;
-  }
 }
 
 export function surfaceIssueFeedbackNeedsYou(
