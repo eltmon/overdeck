@@ -25,7 +25,6 @@ import {
   migrateAllSessionsSync,
   rebuildCacheSync,
   deduplicateEventsSync,
-  reconcile,
 } from '../../../lib/costs/index.js';
 import {
   getCostsByIssueSync,
@@ -40,6 +39,7 @@ import { httpHandler } from './http-handler.js';
 // PAN-1938: overdeck read door — CostResolver replaces direct DB calls for read endpoints.
 // CostWriter is deferred until CostArchiveLive is wired (write endpoints stay on legacy path).
 import { CostDoorLive, CostResolver, CostWriter } from '../../../lib/overdeck/cost.js';
+import type { CostReconcileSummary } from '../../../lib/overdeck/cost.js';
 import type { IssueId } from '../../../lib/overdeck/cost.js';
 
 // ─── Route: GET /api/costs/summary ───────────────────────────────────────────
@@ -329,34 +329,40 @@ const postCostsSyncWalRoute = HttpRouter.add(
   })),
 );
 
+type OverdeckReconcileSource = 'ohmypi' | 'codex';
+type ReconcileSourceRunner = (source: OverdeckReconcileSource) => Promise<CostReconcileSummary>;
+
+const runOverdeckCostReconcileSource: ReconcileSourceRunner = (source) =>
+  Effect.runPromise(
+    CostWriter.use((writer) => writer.reconcile({ source })).pipe(
+      Effect.provide(CostDoorLive),
+    ),
+  );
+
+export async function runCostReconcileSources(
+  runSource: ReconcileSourceRunner = runOverdeckCostReconcileSource,
+): Promise<{ ohmypi: CostReconcileSummary; codex: CostReconcileSummary }> {
+  const [ohmypi, codex] = await Promise.all([
+    runSource('ohmypi'),
+    runSource('codex'),
+  ]);
+  return { ohmypi, codex };
+}
+
 // ─── Route: POST /api/costs/reconcile ────────────────────────────────────────
 const postCostsReconcileRoute = HttpRouter.add(
   'POST',
   '/api/costs/reconcile',
   httpHandler(Effect.gen(function* () {
-    const { result, overdeck } = yield* Effect.tryPromise({
-      try: async () => {
-        const runOverdeck = (source: 'ohmypi' | 'codex') =>
-          Effect.runPromise(
-            CostWriter.use((writer) => writer.reconcile({ source })).pipe(
-              Effect.provide(CostDoorLive),
-            ),
-          );
-        const [result, ohmypi, codex] = await Promise.all([
-          Effect.runPromise(reconcile()),
-          runOverdeck('ohmypi'),
-          runOverdeck('codex'),
-        ]);
-        return { result, overdeck: { ohmypi, codex } };
-      },
+    const overdeck = yield* Effect.tryPromise({
+      try: () => runCostReconcileSources(),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     console.log(
-      `[reconciler] Sweep complete: ${result.eventsImported} imported, ohmypi=${overdeck.ohmypi.eventsImported} imported, codex=${overdeck.codex.eventsImported} imported`,
+      `[reconciler] Sweep complete: ohmypi=${overdeck.ohmypi.eventsImported} imported, codex=${overdeck.codex.eventsImported} imported`,
     );
     return jsonResponse({
       success: true,
-      ...result,
       ohmypi: overdeck.ohmypi,
       codex: overdeck.codex,
       overdeck,

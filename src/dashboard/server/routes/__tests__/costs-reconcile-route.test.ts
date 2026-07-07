@@ -1,18 +1,34 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { describe, expect, it, vi } from 'vitest';
 
-import { describe, expect, it } from 'vitest';
+import { runCostReconcileSources } from '../costs.js';
+import type { CostReconcileSummary } from '../../../../lib/overdeck/cost.js';
+
+function summary(imported: number): CostReconcileSummary {
+  return {
+    imported,
+    sessionsScanned: imported,
+    eventsImported: imported,
+    duplicatesSkipped: 0,
+    errors: [],
+    earliestEventTs: null,
+    latestEventTs: null,
+    skipped: [],
+    warnings: [],
+  };
+}
 
 describe('POST /api/costs/reconcile route wiring', () => {
-  it('runs the legacy Claude transcript reconciler alongside ohmypi and codex sweeps', () => {
-    const source = readFileSync(join(__dirname, '../costs.ts'), 'utf-8');
-    const start = source.indexOf("'/api/costs/reconcile'");
-    const end = source.indexOf('// ─── Route: GET /api/costs/experiments', start);
-    const route = source.slice(start, end);
+  it('runs explicit ohmypi and codex sweeps without the legacy no-source sweep', async () => {
+    const runSource = vi.fn(async (source: 'ohmypi' | 'codex') =>
+      source === 'ohmypi' ? summary(1) : summary(2),
+    );
 
-    expect(route).toContain('Effect.runPromise(reconcile())');
-    expect(route).toContain("runOverdeck('ohmypi')");
-    expect(route).toContain("runOverdeck('codex')");
-    expect(route).toContain('...result');
+    const result = await runCostReconcileSources(runSource);
+
+    expect(runSource).toHaveBeenCalledTimes(2);
+    expect(runSource).toHaveBeenNthCalledWith(1, 'ohmypi');
+    expect(runSource).toHaveBeenNthCalledWith(2, 'codex');
+    expect(result.ohmypi.imported).toBe(1);
+    expect(result.codex.imported).toBe(2);
   });
 });
