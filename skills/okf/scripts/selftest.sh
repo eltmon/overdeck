@@ -135,6 +135,7 @@ python3 - "$ROOT" <<'PY'
 from pathlib import Path
 import json
 import math
+import os
 import subprocess
 import sys
 import tempfile
@@ -251,6 +252,94 @@ vectors_dir: embeddings
     assert "missing model" in missing.stderr
 
 print("ok - embed.py fake-provider incremental shards, exclusions, ollama guard, and manifest errors")
+PY
+
+python3 - "$ROOT" <<'PY'
+from pathlib import Path
+import json
+import os
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+
+root = Path(sys.argv[1])
+embed = root / "scripts" / "embed.py"
+build_index = root / "scripts" / "build_index.py"
+search = root / "scripts" / "search.py"
+
+def write(path, content):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+def run_json(*args, env=None):
+    proc = subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, check=False)
+    assert proc.returncode == 0, proc.stderr
+    return json.loads(proc.stdout)
+
+with tempfile.TemporaryDirectory() as tmp:
+    bundle = Path(tmp)
+    write(
+        bundle / "okf-embeddings.yaml",
+        """okf_embeddings_version: "0.1"
+default_profile: test
+profiles:
+  test:
+    provider: fake
+    model: fake-embed
+    dim: 4
+    share: true
+chunking:
+  strategy: concept
+  max_tokens: 512
+hash: sha256
+vectors_dir: embeddings
+""",
+    )
+    write(bundle / "lexical.md", "---\ntype: Guide\ntitle: Lexical\ndescription: Alpha payroll words.\n---\n\nalpha alpha alpha payroll overtime ledger words\n")
+    write(bundle / "semantic.md", "---\ntype: Guide\ntitle: Semantic\ndescription: Related policy.\n---\n\nzeta theta kappa benefits accrual policy\n")
+    write(bundle / "tiny.md", "---\ntype: Guide\ntitle: Tiny\n---\n\nshort\n")
+
+    bm25 = run_json(sys.executable, str(search), "alpha payroll", "--bundle", str(bundle), "--backend", "builtin", "--format", "json", "--limit", "3")
+    assert bm25["tier"] == "bm25-only"
+    assert bm25["results"][0]["id"] == "lexical"
+
+    subprocess.run([sys.executable, str(embed), "--bundle", str(bundle), "--profile", "test"], text=True, check=True, stdout=subprocess.PIPE)
+    subprocess.run([sys.executable, str(build_index), "--bundle", str(bundle), "--rebuild"], text=True, check=True, stdout=subprocess.PIPE)
+    hybrid = run_json(sys.executable, str(search), "zeta theta", "--bundle", str(bundle), "--backend", "builtin", "--profile", "test", "--format", "json", "--limit", "3")
+    assert hybrid["tier"] == "hybrid"
+    assert hybrid["results"][0]["source"] in {"bm25+vector", "vector"}
+
+    budgeted = run_json(sys.executable, str(search), "Guide", "--bundle", str(bundle), "--backend", "builtin", "--format", "json", "--budget", "2")
+    assert sum(item["tokens"] for item in budgeted["results"]) <= 2
+
+    shutil.rmtree(bundle / ".okf-index")
+    rebuilt = run_json(sys.executable, str(search), "alpha payroll", "--bundle", str(bundle), "--backend", "builtin", "--format", "json")
+    assert rebuilt["results"]
+    assert (bundle / ".okf-index" / "okf.db").exists()
+
+    no_mnemos_env = dict(os.environ)
+    no_mnemos_env["PATH"] = tempfile.mkdtemp()
+    builtin = run_json(sys.executable, str(search), "alpha payroll", "--bundle", str(bundle), "--format", "json", env=no_mnemos_env)
+    assert builtin["tier"] in {"hybrid", "bm25-only"}
+
+    stub_dir = Path(tempfile.mkdtemp())
+    stub = stub_dir / "mnemos"
+    stub.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json\n"
+        "print(json.dumps([{'citation':'semantic.md#Summary','title':'Semantic','description':'Stubbed','text':'stub result'}]))\n",
+        encoding="utf-8",
+    )
+    stub.chmod(stub.stat().st_mode | stat.S_IXUSR)
+    stub_env = dict(os.environ)
+    stub_env["PATH"] = f"{stub_dir}{os.pathsep}{stub_env.get('PATH', '')}"
+    mnemos = run_json(sys.executable, str(search), "anything", "--bundle", str(bundle), "--format", "json", env=stub_env)
+    assert mnemos["tier"] == "mnemos"
+    assert mnemos["results"][0]["id"] == "semantic"
+
+print("ok - build_index.py/search.py BM25, hybrid fallback, budget, rebuild, and mnemos paths")
 PY
 
 if grep -InE '^(from|import) ' "$ROOT/scripts/okf_common.py" | grep -Ev ' (annotations|dataclasses|hashlib|pathlib|re|typing|yaml)( |$)|^.*from __future__ import annotations$'; then
