@@ -47,8 +47,9 @@ Install mechanical ratchets so the debt can only shrink. Pure-gain, low blast ra
 | **A1** | ESLint `no-explicit-any` ratchet (plugin + `.eslintrc.cjs` + generated baseline allowlist) | GPT-5.5 | #2113 | ✅ merged 2026-06-28 |
 | **A2** | Adopt `ts-reset` (safe granular rules: `filter-boolean` + `array-includes`) | GLM-5.2 | #2114 | ✅ merged 2026-06-28 |
 | **A3** | File-size ceiling guard (`scripts/lint-file-size.sh` + 45-file baseline) | Kimi-2.7 | #2115 | ✅ merged 2026-06-28 |
+| **A4** | Circular-dependency ratchet (`scripts/lint-circular-deps.sh` + 77-cycle production-source baseline) | — | #2230 | 🟡 implemented, in review |
 
-PRDs: [`docs/codebase-health/`](./codebase-health/). **Epic A complete** — combined `main` CI green.
+PRDs: [`docs/codebase-health/`](./codebase-health/) (A1–A4). Epic A ratchets are complete once A4 merges.
 
 ### Epic B — Carve deep modules + unify the harness abstraction
 
