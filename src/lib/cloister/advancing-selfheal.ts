@@ -1,11 +1,6 @@
 import { Effect } from 'effect';
-import {
-  getAgentStateSync,
-  getAgentRuntimeStateSync,
-  markAgentStoppedState,
-  saveAgentStateSync,
-  type AgentState,
-} from '../agents.js';
+import * as agents from '../agents.js';
+import type { AgentState } from '../agents.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import {
   getReviewStatusSync,
@@ -28,6 +23,7 @@ const JOURNAL_RECONCILE_STATES = new Set([
   'failed',
   'blocked',
   'testing',
+  'skipped',
   'dispatch_failed',
 ]);
 
@@ -45,9 +41,9 @@ const defaultDeps: AdvancingSelfHealDeps = {
   loadReviewStatuses,
   getReviewStatusSync,
   listSessionNames: () => Effect.runPromise(listSessionNames()),
-  getAgentStateSync,
-  saveAgentStateSync,
-  markAgentStoppedState,
+  getAgentStateSync: (session) => agents.getAgentStateSync(session),
+  saveAgentStateSync: (state) => agents.saveAgentStateSync(state),
+  markAgentStoppedState: (state) => agents.markAgentStoppedState(state),
   warn: (message) => console.warn(message),
 };
 
@@ -207,7 +203,7 @@ export async function checkIdleTerminalAdvancingSessions(): Promise<string[]> {
     const now = Date.now();
 
     for (const session of candidates) {
-      const runtime = getAgentRuntimeStateSync(session);
+      const runtime = agents.getAgentRuntimeStateSync(session);
       if (!isIdlePastThreshold(runtime, TERMINAL_ADVANCING_IDLE_REAP_MS, now)) continue;
 
       try {

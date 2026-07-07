@@ -60,6 +60,28 @@ describe('reconcileInFlightJournals', () => {
     expect(d.getReviewStatusSync).toHaveBeenCalledWith('PAN-2341');
   });
 
+  it('reconciles in-flight review rows when tests are skipped', async () => {
+    const before = status({
+      reviewStatus: 'reviewing',
+      testStatus: 'skipped',
+      updatedAt: '2026-07-07T00:00:00.000Z',
+    });
+    const after = status({
+      reviewStatus: 'passed',
+      testStatus: 'skipped',
+      updatedAt: '2026-07-07T00:01:00.000Z',
+    });
+    const d = deps({
+      loadReviewStatuses: vi.fn(() => ({ 'PAN-2341': before })),
+      getReviewStatusSync: vi.fn(() => after),
+    });
+
+    await expect(reconcileInFlightJournals(d)).resolves.toEqual([
+      'Reconciled journaled advancing verdict for PAN-2341',
+    ]);
+    expect(d.getReviewStatusSync).toHaveBeenCalledWith('PAN-2341');
+  });
+
   it('enumerates tmux-alive advancing sessions with no DB row and skips merged issues', async () => {
     const d = deps({
       loadReviewStatuses: vi.fn(() => ({
