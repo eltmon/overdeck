@@ -5,12 +5,14 @@
  *  - Recover pending issues whose PR is open, all beads are closed, and review
  *    was never dispatched.
  *  - Skip issues with open beads (review cannot be dispatched yet).
+ *  - Skip issues where the live bead query failed transiently (do not treat the
+ *    JSONL fallback as authoritative).
  *  - Skip already-recovered issues (tombstone present).
  *  - Skip issues in 'reviewing' or already merged.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../helpers/overdeck-test-db.js';
@@ -19,19 +21,19 @@ let odb: OverdeckTestDb;
 
 const {
   mockExecFn,
-  mockExecFileFn,
   mockResolveProjectFromIssueSync,
   mockGetProjectSync,
+  mockQueryBeadsForIssue,
 } = vi.hoisted(() => ({
   mockExecFn: vi.fn(),
-  mockExecFileFn: vi.fn(),
   mockResolveProjectFromIssueSync: vi.fn(),
   mockGetProjectSync: vi.fn(),
+  mockQueryBeadsForIssue: vi.fn(),
 }));
 
 vi.mock('child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('child_process')>();
-  return { ...actual, exec: mockExecFn, execFile: mockExecFileFn };
+  return { ...actual, exec: mockExecFn };
 });
 
 vi.mock('../../../../src/lib/projects.js', () => ({
@@ -39,6 +41,17 @@ vi.mock('../../../../src/lib/projects.js', () => ({
   getProjectSync: mockGetProjectSync,
   listProjectsSync: vi.fn().mockReturnValue([]),
 }));
+
+vi.mock('../../../../src/lib/beads-query.js', async () => {
+  const actual = await vi.importActual<typeof import('../../../../src/lib/beads-query.js')>('../../../../src/lib/beads-query.js');
+  const { Effect } = await import('effect');
+  return {
+    ...actual,
+    queryBeadsForIssue: vi.fn((workspacePath: string, issueId: string) =>
+      Effect.succeed(mockQueryBeadsForIssue(workspacePath, issueId))
+    ),
+  };
+});
 
 vi.mock('../../../../src/lib/pipeline-notifier.js', () => ({
   notifyPipeline: vi.fn(),
@@ -71,38 +84,8 @@ const seed = (cols: Record<string, string | number | null>) => {
     .run(...keys.map((k) => cols[k]));
 };
 
-function getWorkspacePath(projectPath: string, issueId: string) {
-  const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
-  mkdirSync(workspacePath, { recursive: true });
-  return workspacePath;
-}
-
-function writeClosedBeads(projectPath: string, issueId: string) {
-  const workspacePath = getWorkspacePath(projectPath, issueId);
-  const beadsDir = join(workspacePath, '.beads');
-  mkdirSync(beadsDir, { recursive: true });
-  const label = issueId.toLowerCase();
-  writeFileSync(
-    join(beadsDir, 'issues.jsonl'),
-    [
-      JSON.stringify({ _type: 'issue', id: 'bead-1', title: 'First bead', status: 'closed', labels: [label], priority: 1 }),
-      JSON.stringify({ _type: 'issue', id: 'bead-2', title: 'Second bead', status: 'closed', labels: [label], priority: 1 }),
-    ].join('\n') + '\n'
-  );
-}
-
-function writeOpenBeads(projectPath: string, issueId: string) {
-  const workspacePath = getWorkspacePath(projectPath, issueId);
-  const beadsDir = join(workspacePath, '.beads');
-  mkdirSync(beadsDir, { recursive: true });
-  const label = issueId.toLowerCase();
-  writeFileSync(
-    join(beadsDir, 'issues.jsonl'),
-    [
-      JSON.stringify({ _type: 'issue', id: 'bead-1', title: 'First bead', status: 'closed', labels: [label], priority: 1 }),
-      JSON.stringify({ _type: 'issue', id: 'bead-2', title: 'Second bead', status: 'open', labels: [label], priority: 1 }),
-    ].join('\n') + '\n'
-  );
+function makeBead(status: string) {
+  return { id: 'bead-1', title: 'Bead', status, labels: ['pan-2207'], priority: 1 };
 }
 
 describe('checkOrphanedCompletions (PAN-2207)', () => {
@@ -111,6 +94,7 @@ describe('checkOrphanedCompletions (PAN-2207)', () => {
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'pan-deacon-orphan-'));
+    mkdirSync(join(tempDir, 'workspaces', 'feature-pan-2207'), { recursive: true });
     mkdirSync(join(tempDir, '.pan', 'records'), { recursive: true });
     projectConfig.path = tempDir;
 
@@ -123,18 +107,14 @@ describe('checkOrphanedCompletions (PAN-2207)', () => {
     mockGetProjectSync.mockReset();
     mockGetProjectSync.mockReturnValue(projectConfig);
     mockExecFn.mockReset();
-    mockExecFileFn.mockReset();
-    // Force queryBeadsForIssue to fall back to .beads/issues.jsonl.
-    mockExecFileFn.mockImplementation((_file: string, _args: string[], _opts: any, cb: Function) => {
-      cb(new Error('bd not available in test'), '', '');
-    });
+    mockQueryBeadsForIssue.mockReset();
   });
 
   afterEach(() => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it('recovers a pending issue with an open PR, all beads closed, and writes a tombstone', async () => {
+  it('recovers a pending issue with an open PR and all beads closed', async () => {
     const prUrl = 'https://github.com/org/repo/pull/2207';
     mockExecFn.mockImplementation((cmd: string, _opts: any, cb: Function) => {
       if (cmd.includes('gh pr list --head feature/pan-2207')) {
@@ -143,6 +123,7 @@ describe('checkOrphanedCompletions (PAN-2207)', () => {
         cb(null, { stdout: '', stderr: '' });
       }
     });
+    mockQueryBeadsForIssue.mockReturnValue({ beads: [makeBead('closed'), makeBead('closed')] });
 
     seed({
       issue_id: 'PAN-2207',
@@ -152,7 +133,6 @@ describe('checkOrphanedCompletions (PAN-2207)', () => {
       ready_for_merge: 0,
       updated_at: '2026-07-01T00:00:00Z',
     });
-    writeClosedBeads(tempDir, 'PAN-2207');
 
     const actions = await checkOrphanedCompletions();
 
@@ -173,6 +153,7 @@ describe('checkOrphanedCompletions (PAN-2207)', () => {
     mockExecFn.mockImplementation((_cmd: string, _opts: any, cb: Function) => {
       cb(null, { stdout: 'https://github.com/org/repo/pull/2207\n', stderr: '' });
     });
+    mockQueryBeadsForIssue.mockReturnValue({ beads: [makeBead('closed'), makeBead('open')] });
 
     seed({
       issue_id: 'PAN-OPEN',
@@ -182,7 +163,27 @@ describe('checkOrphanedCompletions (PAN-2207)', () => {
       ready_for_merge: 0,
       updated_at: '2026-07-01T00:00:00Z',
     });
-    writeOpenBeads(tempDir, 'PAN-OPEN');
+
+    const actions = await checkOrphanedCompletions();
+
+    expect(actions).toHaveLength(0);
+    expect(mockExecFn).not.toHaveBeenCalled();
+  });
+
+  it('skips when the live bead query failed transiently', async () => {
+    mockExecFn.mockImplementation((_cmd: string, _opts: any, cb: Function) => {
+      cb(null, { stdout: 'https://github.com/org/repo/pull/2207\n', stderr: '' });
+    });
+    mockQueryBeadsForIssue.mockReturnValue({ beads: [makeBead('closed')], transientFailure: new Error('bd locked') });
+
+    seed({
+      issue_id: 'PAN-TRANSIENT',
+      review_status: 'pending',
+      test_status: 'pending',
+      merge_status: 'pending',
+      ready_for_merge: 0,
+      updated_at: '2026-07-01T00:00:00Z',
+    });
 
     const actions = await checkOrphanedCompletions();
 
@@ -199,6 +200,7 @@ describe('checkOrphanedCompletions (PAN-2207)', () => {
         cb(null, { stdout: '', stderr: '' });
       }
     });
+    mockQueryBeadsForIssue.mockReturnValue({ beads: [makeBead('closed'), makeBead('closed')] });
 
     seed({
       issue_id: 'PAN-2207',
@@ -208,7 +210,6 @@ describe('checkOrphanedCompletions (PAN-2207)', () => {
       ready_for_merge: 0,
       updated_at: '2026-07-01T00:00:00Z',
     });
-    writeClosedBeads(tempDir, 'PAN-2207');
 
     writeIssueRecordSync(projectConfig, 'PAN-2207', {
       issueId: 'PAN-2207',
@@ -233,6 +234,7 @@ describe('checkOrphanedCompletions (PAN-2207)', () => {
     mockExecFn.mockImplementation((_cmd: string, _opts: any, cb: Function) => {
       cb(null, { stdout: 'https://github.com/org/repo/pull/2207\n', stderr: '' });
     });
+    mockQueryBeadsForIssue.mockReturnValue({ beads: [makeBead('closed')] });
 
     seed({
       issue_id: 'PAN-REVIEWING',
@@ -242,7 +244,6 @@ describe('checkOrphanedCompletions (PAN-2207)', () => {
       ready_for_merge: 0,
       updated_at: '2026-07-01T00:00:00Z',
     });
-    writeClosedBeads(tempDir, 'PAN-REVIEWING');
 
     const actions = await checkOrphanedCompletions();
 
@@ -254,6 +255,7 @@ describe('checkOrphanedCompletions (PAN-2207)', () => {
     mockExecFn.mockImplementation((_cmd: string, _opts: any, cb: Function) => {
       cb(null, { stdout: 'https://github.com/org/repo/pull/2207\n', stderr: '' });
     });
+    mockQueryBeadsForIssue.mockReturnValue({ beads: [makeBead('closed')] });
 
     seed({
       issue_id: 'PAN-MERGED',
@@ -263,7 +265,6 @@ describe('checkOrphanedCompletions (PAN-2207)', () => {
       ready_for_merge: 0,
       updated_at: '2026-07-01T00:00:00Z',
     });
-    writeClosedBeads(tempDir, 'PAN-MERGED');
 
     const actions = await checkOrphanedCompletions();
 
@@ -279,6 +280,7 @@ describe('checkOrphanedCompletions (PAN-2207)', () => {
         cb(null, { stdout: '', stderr: '' });
       }
     });
+    mockQueryBeadsForIssue.mockReturnValue({ beads: [makeBead('closed')] });
 
     seed({
       issue_id: 'PAN-2207',
@@ -288,7 +290,6 @@ describe('checkOrphanedCompletions (PAN-2207)', () => {
       ready_for_merge: 0,
       updated_at: '2026-07-01T00:00:00Z',
     });
-    writeClosedBeads(tempDir, 'PAN-2207');
 
     await expect(checkOrphanedCompletions()).resolves.toEqual([]);
   });

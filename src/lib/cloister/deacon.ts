@@ -1172,9 +1172,13 @@ export async function checkOrphanedCompletions(): Promise<string[]> {
         const workspacePath = findWorkspacePath(resolved.projectPath, issueLower);
         if (!workspacePath || !existsSync(workspacePath)) continue;
 
-        const { beads } = await Effect.runPromise(queryBeadsForIssue(workspacePath, issueId));
-        if (beads.length === 0) continue;
-        if (beads.some((bead) => bead.status !== 'closed')) continue;
+        const beadResult = await Effect.runPromise(queryBeadsForIssue(workspacePath, issueId));
+        // Do not treat the JSONL fallback as authoritative when the live `bd`
+        // query failed transiently — skipping this cycle is safer than recovering
+        // on potentially stale/empty bead state.
+        if (beadResult.transientFailure) continue;
+        if (beadResult.beads.length === 0) continue;
+        if (beadResult.beads.some((bead) => bead.status !== 'closed')) continue;
 
         const { stdout } = await execAsync(
           `gh pr list --head feature/${issueLower} --state open --json url --jq '.[0].url'`,
