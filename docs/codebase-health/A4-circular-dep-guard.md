@@ -41,7 +41,7 @@ The codebase has 77 import cycles under `src/` (production source only; test and
 
 **NFR-2** — Deterministic output: cycles are canonicalized (paths prefixed with `src/`, cycle members sorted, cycles sorted) so madge's rotation/order differences do not create noise.
 
-**NFR-3** — Test files (`*.test.ts`, `*.test.tsx`, `*.spec.ts`, `*.spec.tsx`) and TypeScript declaration files (`*.d.ts`) are excluded from the scan. The ratchet guards production source cycles only.
+**NFR-3** — Test files (`*.test.ts`, `*.test.tsx`, `*.spec.ts`, `*.spec.tsx`), test/mock directories (`__tests__`, `__mocks__`), and TypeScript declaration files (`*.d.ts`) are excluded from the scan. The ratchet guards production source cycles only.
 
 ---
 
