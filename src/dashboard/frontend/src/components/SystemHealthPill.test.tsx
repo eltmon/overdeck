@@ -233,4 +233,28 @@ describe('SystemHealthPill', () => {
 
     expect(screen.getByTestId('system-health-pill').className).toContain('animate-pulse');
   });
+
+  it('summarizes the critical health cause instead of always showing memory usage', () => {
+    const critical = createSnapshot('critical');
+    hookState.current = {
+      data: {
+        ...critical,
+        summary: {
+          ...critical.summary,
+          availableMemoryBytes: 42 * GIB,
+          memoryUsedPercent: 31,
+          swapUsedPercent: 90,
+        },
+        reasons: ['Swap usage is high (90%).'],
+      },
+      isLoading: false,
+      error: null,
+    };
+
+    renderPill();
+
+    expect(screen.getByTestId('system-health-pill')).toHaveTextContent('critical');
+    expect(screen.getByTestId('system-health-pill')).toHaveTextContent('90% swap');
+    expect(screen.getByTestId('system-health-pill')).not.toHaveTextContent('31% mem');
+  });
 });
