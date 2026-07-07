@@ -91,7 +91,7 @@
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T14:06:43.887Z",
+    "updatedAt": "2026-07-07T03:11:24.293Z",
     "reviewNotes": "Approved: shared classifier now filters candidates and delegates resume-path terminal skips while preserving live-tmux reconciliation",
     "testNotes": "typecheck passed; lint passed; unit tests 219 files/1750 passed; frontend tests 177 files/1682 passed; targeted boot-reconciliation tests 4 files/59 passed. Browser UAT not exercised: git diff main...HEAD shows zero frontend changes, and the modal-breakdown bead acceptance criteria are unimplemented. BootReconciliationModal.tsx still uses outcomes[] (reasons: no-resumable-session, deferred-concurrency, deferred-load) and does not render skipped category breakdown (workspace_missing, merged, completed) or deferred count required by modal-breakdown.ac1/ac2/ac3. POST /api/boot-reconciliation/decision returns outcomes, not skipped/deferred maps. No frontend test asserts category breakdown. Core backend candidate filtering verified; modal-breakdown (FR-6) missing.",
     "inspectNotes": "workspace-vawme passes: current code returns resumed/skipped/deferred, boot-reconciliation endpoints pass skipped/deferred, and pan-871 tests read result.resumed with candidate-filtered mocks.",
@@ -145,7 +145,7 @@
       "recordedAt": "2026-07-04T20:30:42.675Z"
     },
     "closedOut": true,
-    "closedOutAt": "2026-07-06T14:06:43.887Z"
+    "closedOutAt": "2026-07-07T03:11:24.293Z"
   },
   "closeOut": {
     "usage": {
@@ -231,5 +231,5 @@
     "slotAssignments": []
   },
   "created": "2026-07-04T20:23:31.287Z",
-  "updated": "2026-07-06T14:06:43.887Z"
+  "updated": "2026-07-07T03:11:24.293Z"
 }

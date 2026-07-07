@@ -207,6 +207,65 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-58 tick 43 (2026-07-06) — throughput root-caused = GATE-FRICTION loops (A1 verification-gate 3× fail; B1 commit-msg) not ceiling/wedge; held dispatches (Lane A full)
+
+**Order book: 5/19 landed. Main GREEN (074e0d9379).** No overdeck merge since A4 (tick 39) — root-caused this window:
+- **NOT the advancing ceiling** (no recent PAN-1665 block) and **NOT a systemic wedge** (deacon patrolling, agents working). It's **per-item GATE FRICTION:**
+  - **A1 (PAN-2373, flake-policy) stuck in a VERIFICATION-GATE-FAILURE loop:** feedback files 001/002 (review changes) → **003/004/005 verification-gate-failed** (3× consecutive). Likely its own test-config/vitest changes interact with the verification run. The **3-consecutive-fail verification BYPASS (per CLAUDE.md/PAN-174) should trigger next attempt** → let it advance. Watch; if still looping next tick, read its actual verification failure.
+  - **B1 (PAN-2207) commit-msg/ratchet freeze** (PAN-2451, operator-gated).
+- **Held dispatches this tick** — Lane A FULL (A1 verification-loop + A5 review + A10 running = 3). Adding A6 wouldn't help (throughput is gate-limited, not dispatch-limited). Don't over-dispatch into gate friction.
+- **MIN-865 (M9) running.** M1 (MIN-860) in review. **PAN-2388 (PRIORITY): slots back to `ready-to-merge`/unmerged** (assembly stall cycles, operator-gated).
+- **Ready set = MIN-857 (held, skip).** PAN-2445 watch CLEAN. Operator merges flowing (PAN-2406 verify-merged fix).
+
+## RUN-58 tick 42 (2026-07-06) — A5 spawned; MIN-865 (M9) STARTED; MYN specs live in MYN project (not overdeck); MIN-857 held; 2388 running
+
+**Order book: 5/19 landed. Main GREEN (b326b22221).** Operator added A13 = PAN-2445 (autonomous-dispatch hardening) to the book (docs commit).
+- **A5 (PAN-2375) SPAWNED** (agent-pan-2375 + review-supervisor). Lane A: A1 (review) + A10 (running) + A5 (running) = 3.
+- **★ MIN-865 (M9, day-view toggle) STARTED** — `agent-min-865`, continue.json + 5 beads. Independent, in flight.
+- **REUSABLE / CORRECTION: MYN (MIN-*) planning specs land in the MYN PROJECT's `.pan/specs`, NOT overdeck's — checking overdeck's `.pan/specs | grep MIN-*` FALSELY reads "no spec / stalled."** To test a MYN plan-finalize, `pan start MIN-<n>` (it loads continue+beads if planned) — that's how I confirmed MIN-865 finalized (I'd wrongly flagged 864/865/854 as pre-finalize-stalled by checking the wrong dir). **MIN-854 (M3) may actually be planned too — re-check via pan start next tick before assuming stall.**
+- **MIN-864 (M8, voice navigate) likely planned** — HOLD its work start until MIN-857 (M0) MERGES (builds on 857 voice stack).
+- **MIN-857 (M0): HELD** (UAT-hold + stale review from d11d93886/8c804d2c0) — ready-set shows it but DON'T schedule; Ed reviews+merges.
+- **PAN-2388 (PRIORITY): slots `running`** (assembly stall, operator-gated). B1 frozen (PAN-2451). PAN-2445 watch CLEAN (LEX excluded).
+
+## RUN-58 tick 41 (2026-07-06) — A1 progressing (fresh review round after feedback fix); A5(2375) planned→starting; A10 spec'd; 2388 running; 2445 clean (LEX ok)
+
+**Order book: 5/19 landed. Main GREEN (fc0eb8dff2).**
+- **A1 (PAN-2373) NOT wedged — progressing:** re-did the done flow (pushed, In Review, auto-started review+test) after its feedback fix → fresh review round. The slow ready-set is genuine review-feedback ITERATION (rounds of review→changes→fix→re-review), not a stall. Normal quality-gating latency.
+- **A5 (PAN-2375, auto-commit debounce+push) PLANNED → starting (bg).** A10 (PAN-2420) has spec + running. Lane A: A1 (review) + A10 (running) + A5 (starting) = 3 (top of band). Lane B stalled on B1.
+- **Ready set = MIN-857 only** (M0 UAT-hold + GitLab, held — leave). No overdeck items ready this window.
+- **PAN-2388 (PRIORITY): slots `running`** (cycling; assembly stall, operator-gated).
+- **PAN-2445 watch: CLEAN** (no planning-* live; LEX-* is operator-authorized, excluded).
+- Operator-gated / on operator: B1 (PAN-2451 branch reconstruction), PAN-2388 assembly, MIN-857 UAT.
+
+**OPERATOR ORDER-BOOK AMENDMENT (Ed via conv, 2026-07-06) — Lane M gains M8+M9:**
+- **M8 = MIN-864** (voice navigate_to_screen client tool; PRD mind-your-now-docs prds/planned/MIN-864-voice-navigate-tool-spec.md). **SEQUENCING: builds on the MIN-857 voice stack → its WORK agent must branch AFTER M0 (MIN-857) MERGES.** Auto-planning now (planning-min-864, Fable-5).
+- **M9 = MIN-865** (desktop home Upcoming Events day-view toggle; PRD MIN-865-upcoming-events-day-view-spec.md). Independent — work can run any time. Auto-planning now (planning-min-865, Fable-5).
+- **Both: dispatch WORK only AFTER each plan finalizes** (spec produced). planning-min-864/865 are LEGIT order-book Lane M planning (Fable-5) — **NOT PAN-2445 off-book; do NOT surface.** Add MIN-864/865 to the order-book list.
+- **MIN-857 (M0): recorded review is STALE** — two new UAT-fix commits (d11d93886, 8c804d2c0) pushed to feature/min-857 (GitLab, not on overdeck origin). Needs re-review; **UAT hold STILL applies — merge ONLY after Ed's review. Do NOT schedule MIN-857 merge** even if the ready-set shows it review=passed (stale).
+- Lane M order now: M0(857 held) · M1(860) · M2(861) · M3(854) · M4(858) · M5(859) · M6(862) · M7(729) · M8(864 dep M0-merge) · M9(865 indep).
+
+## RUN-58 tick 40 (2026-07-06) — A4 closed (5/19); MIN-857 ready-but-HELD (M0 UAT-hold); planning-lex-1 gone (operator handled); A5 planning dispatched; 2388 running
+
+## RUN-58 tick 40 (2026-07-06) — A4 closed (5/19); MIN-857 ready-but-HELD (M0 UAT-hold); planning-lex-1 gone (operator handled); A5 planning dispatched; 2388 running
+
+**Order book: 5/19 landed. Main GREEN (fc0eb8dff2).** Operator fixes flowing (#2449 env/projects.yaml, cost-hook rebuild).
+- **A4 (PAN-2095) CLOSED** — 5/19 confirmed.
+- **Ready set = MIN-857 only** — but it's **M0 UAT-HOLD** (operator reviews before merge) + a MYN GitLab MR → NOT scheduled (operator's held item). Leave it.
+- **PAN-2445 CLARIFIED (operator 2026-07-06): LEXERRA (LEX-*) planning is OPERATOR-AUTHORIZED** — operator is working Lexerra with an agent, using overdeck for planning only. **Do NOT surface LEX-* planning spawns as off-book/burn-guard** (planning-lex-1 was legit). Keep watching for OTHER off-book lifecycle spawns (e.g. the MYN MIN-206 stuck-planning class) → surface those.
+- **PAN-2388 (PRIORITY): slots `running`** (cycling; assembly stall persists, operator-gated).
+- **B1 (PAN-2207): frozen, PAN-2451 filed + escalated** (Lane B stalled until operator reconstructs its 108-commit branch). NOT touching.
+- **A5 (PAN-2375, auto-commit debounce+push) planning DISPATCHED** (bg) — Lane A filler (Lane B stalled on B1, so Lane A is where progress is; A1+A10 in flight + A5 planning).
+- A1 (PAN-2373) + M1 (MIN-860) in review, iterating; A10 (PAN-2420) running.
+
+## RUN-58 tick 39 (2026-07-06) — A4 MERGED (order book 5/19); B1 root-caused (108 commits ahead, non-issue-ref) → filed PAN-2451; planning-lex-1 still off-book; 2388 running
+
+**Order book: 5/19 landed (B0/2318 + A2/2371 + PAN-2389 + A3/2336 + A4/2095).** Main GREEN (greening on fc0eb8dff2).
+- **A4 (PAN-2095) MERGED** (PR #2448 @ 02:23) → close-out bg. Order book 4/19 → **5/19.**
+- **B1 (PAN-2207) FROZEN root-caused + FILED PAN-2451 (substrate-improvement):** branch is **108 commits AHEAD of origin** (from overflow-class fresh-restart + auto-commit-before-sync + merge-main) with non-issue-referenced commit messages (`Merge remote-tracking…`, `chore: auto-commit before sync`, `chore(workspace): checkpoint…`) that fail the commit-msg gate (gh-issue-trailer-hook/commitlint) → agent can't push/submit, stalls pre-`pan done`; deacon doesn't re-engage a frozen work agent. **DONE investing in B1 — documented (PAN-2451) + escalated. Operator unblock: reconstruct/squash the branch to a clean issue-ref commit + push.** Lane B blocked on B1 until then.
+- **PAN-2445: planning-lex-1 STILL live** (off-book Lexerra LEX-1, fable, deacon lifecycle spawn) — operator hasn't killed it; surfaced (flywheel can't pan kill).
+- **PAN-2388 (PRIORITY): slots `running`** (cycling; assembly stall persists, operator-gated).
+- A1/M1 in review (iterating). A10 running.
+
 ## RUN-58 tick 38 (2026-07-06) — A4(PAN-2095) merge SCHEDULED (id 21); PAN-2445 RECURRED (planning-lex-1, off-book Lexerra, surfaced); B1 still frozen; 2388 cycling
 
 **Order book: 4/19 landed. Main GREEN (772923ff8f).**

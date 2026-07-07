@@ -85,23 +85,24 @@
     }
   ],
   "created": "2026-06-29T17:48:06.928Z",
-  "updated": "2026-07-06T18:13:15.679Z",
+  "updated": "2026-07-07T03:05:43.791Z",
   "pipeline": {
     "issueId": "PAN-2146",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
     "inspectStatus": "passed",
-    "mergeStatus": "verifying",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T21:26:41.588Z",
+    "updatedAt": "2026-07-07T03:05:43.791Z",
     "reviewNotes": "Workspace is detached and has unresolved conflict in .pan/records/pan-2146.json",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Bead workspace-ic7qo (commit bb0c18c7ce): 2-line surgical fix removing modelSpawnKey + flywheelRunId from cleanAgentState preservation. Both fields are ephemeral spawn-time inputs (computed/provided in src/lib/agents.ts spawn paths), not persistent runtime state. Their persistence through the disk-read cleaner was a leak that would have re-introduced stale values across restarts. Fields remain in AgentState interface and are still set correctly at spawn sites. Foundation-only edit, no barrel back-import, file-size guard satisfied. PASS.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2180",
     "lastVerifiedCommit": "60bd1bb83f0dfe14bb52caf123e8dc5039201cb7",
-    "reviewRequestedAt": "2026-06-29T21:00:07.851Z"
+    "reviewRequestedAt": "2026-06-29T21:00:07.851Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-07T03:05:43.791Z"
   },
   "closeOut": {
     "usage": {

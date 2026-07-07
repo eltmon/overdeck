@@ -1,16 +1,16 @@
 {
-  "issueId": "PAN-2387",
+  "issueId": "PAN-1849",
   "schemaVersion": 2,
-  "created": "2026-07-07T00:55:07.513Z",
-  "updated": "2026-07-07T03:17:15.976Z",
+  "created": "2026-07-07T03:00:56.941Z",
+  "updated": "2026-07-07T03:00:56.941Z",
   "pipeline": {
-    "issueId": "PAN-2387",
+    "issueId": "PAN-1849",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T03:17:15.976Z",
+    "updatedAt": "2026-07-07T03:00:56.941Z",
     "closedOut": true,
-    "closedOutAt": "2026-07-07T03:17:15.976Z",
+    "closedOutAt": "2026-07-07T03:00:56.941Z",
     "mergeStatus": "merged"
   },
   "closeOut": {
@@ -20,7 +20,5 @@
     },
     "merges": [],
     "ranOn": "eltmon-z790"
-  },
-  "harness": "codex",
-  "model": "gpt-5.5"
+  }
 }
