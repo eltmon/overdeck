@@ -137,6 +137,11 @@
       "reason": "feedback",
       "note": "[2026-07-07T03:44Z] verification-gate → FAILED — seq 1",
       "timestamp": "2026-07-07T03:44:42.281Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-07T03:52:03.325Z"
     }
   ],
   "feedback": [
@@ -175,17 +180,17 @@
     "recordedAt": "2026-07-06T18:49:52.519Z"
   },
   "created": "2026-07-06T16:43:28.780Z",
-  "updated": "2026-07-07T03:44:42.545Z",
+  "updated": "2026-07-07T03:52:08.441Z",
   "pipeline": {
     "issueId": "PAN-2207",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T03:44:42.269Z",
-    "verificationNotes": "Verification FAILED at test (54920ms):\n\n                    ║\n║ <3 Playwright Team                                         ║\n╚════════════════════════════════════════════════════════════╝\n ❯ openFlywheelStatsPage tests/integration/flywheel-substrate-smoke.test.ts:250:28\n    248|   if (!address || typeof address === 'string') throw new Error('Vite s…\n    249|\n    250|   browser = await chromium.launch({ headless: true });\n       |                            ^\n    251|   context = await browser.newContext();\n    252|   page = await context.newPage();\n ❯ tests/integration/flywheel-substrate-smoke.test.ts:381:5\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯\n\n FAIL  |root| tests/playwright/conversation-supervisor-uat.test.ts > conversation supervisor Playwright UAT > resumes Codex conversations through the real route with codex resume\n FAIL  |root| tests/playwright/conversation-supervisor-uat.test.ts > conversation supervisor Playwright UAT > delivers through real conversation routes and keeps plain forks off Channels MCP\nError: browserType.launch: Executable doesn't exist at /home/eltmon/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell\n╔════════════════════════════════════════════════════════════╗\n║ Looks like Playwright was just installed or updated.       ║\n║ Please run the following command to download new browsers: ║\n║                                                            ║\n║     npx playwright install                                 ║\n║                                                            ║\n║ <3 Playwright Team                                         ║\n╚════════════════════════════════════════════════════════════╝\n ❯ tests/playwright/conversation-supervisor-uat.test.ts:402:28\n    400|   resetDatabase();\n    401|   await startRealConversationRoutes();\n    402|   browser = await chromium.launch();\n       |                            ^\n    403|   context = await browser.newContext();\n    404|   page = await context.newPage();\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯\n\n",
+    "updatedAt": "2026-07-07T03:52:08.040Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2425",
+    "lastVerifiedCommit": "a503ddcd26d36251ac9ff67e32d3c03ee6e00572",
     "reviewRequestedAt": "2026-07-06T18:51:15.117Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -265,18 +270,18 @@
             "cacheWrite": 0
           },
           "unknown": {
-            "input": 7455572,
-            "output": 16323,
-            "cacheRead": 6643712,
+            "input": 11271742,
+            "output": 21612,
+            "cacheRead": 10146816,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "unknown": {
-          "input": 11405629,
-          "output": 30283,
-          "cacheRead": 10158976,
+          "input": 15221799,
+          "output": 35572,
+          "cacheRead": 13662080,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -299,8 +304,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 36.103827,
-        "pricingAsOf": "2026-07-07T03:44:42.440Z"
+        "usd": 39.213694000000004,
+        "pricingAsOf": "2026-07-07T03:52:08.387Z"
       }
     },
     "merges": [
