@@ -27,6 +27,15 @@ export {
   postPruneVolumesRoute,
 } from './resources/prune.js';
 export {
+  buildHostProcesses,
+  getHostProcessesSnapshot,
+  resetHostProcessRetention,
+  type AgentSessionProcess,
+  type HostProcessRecord,
+  type HostProcessRow,
+  type SpikeAnnotation,
+} from './resources/host-processes.js';
+export {
   buildResourceHistoryResponse,
   getResourceHistoryEffect,
   getResourceHistoryRoute,

@@ -5,6 +5,7 @@ import { listAgentStates, type AgentState } from '../../../../lib/agents.js';
 import { listSessions } from '../../../../lib/tmux.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
+import { getHostProcessesSnapshot } from './host-processes.js';
 import { getCurrentDockerStats } from './shared.js';
 
 /** Build the GET /api/resources response from the SQLite agents table. */
@@ -28,6 +29,7 @@ export function getResourcesEffect(): Effect.Effect<ReturnType<typeof jsonRespon
 
     return jsonResponse({
       containers,
+      hostProcesses: getHostProcessesSnapshot(),
       stoppedContainers,
       networks: [],
       volumes: [],
