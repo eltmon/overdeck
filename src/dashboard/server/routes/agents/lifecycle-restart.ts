@@ -1,13 +1,15 @@
 import { existsSync } from 'node:fs';
 import { readFile, rm, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, join, basename } from 'node:path';
 
 import { Effect } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 import type { RuntimeName } from '../../../../lib/runtimes/types.js';
 import { resolveStaffing } from '../../../../lib/agents/staffing.js';
 import { findPlanSync, readWorkspacePlanSync } from '../../../../lib/vbrief/io.js';
-import { resolveTieredExecutionEnabled } from '../../../../lib/agents/tier-table.js';
+import { resolveTieredExecutionEnabled, resolveTieredExecutionEnabledForIssue } from '../../../../lib/agents/tier-table.js';
+import { getDispatchableItems } from '../../../../lib/vbrief/dag.js';
+import { loadConfigSync } from '../../../../lib/config-yaml.js';
 
 import {
   getAgentState,
@@ -677,62 +679,32 @@ async function buildRestartConfigChangeList(): Promise<RestartConfigChangeItem[]
   for (const agent of agents) {
     if (!agent.issueId) continue;
 
-    // Skip paused/troubled agents
+    // Only include actually running agents with active tmux sessions
+    if (!((agent as any).tmuxActive === true)) {
+      continue;
+    }
+
+    // Skip paused/troubled agents (their gates stand)
     if ((agent as any).paused || (agent as any).troubled) {
       continue;
     }
 
-    // Skip conversations (only work agents)
+    // Only work agents eligible for restart (skip conversations)
     if (agent.role !== 'work' && agent.role !== undefined) {
       continue;
     }
 
     // Compute new staffing from current config by reading the real vBRIEF work item
-    let newModel = agent.model;
-    let newHarness = agent.harness ?? 'claude-code';
-    let staffingError: string | undefined;
+    const staffingResult = await resolveCurrentStaffing(agent.id, agent, agent.issueId);
 
-    try {
-      const workspacePath = agent.workspace;
-      if (!workspacePath) {
-        staffingError = 'No workspace path available';
-      } else {
-        // Read the actual vBRIEF plan to get the real work item
-        const planPath = findPlanSync(workspacePath);
-        if (!planPath) {
-          staffingError = 'No plan found in workspace';
-        } else {
-          const plan = readWorkspacePlanSync(workspacePath);
-          if (!plan || !plan.plan.items) {
-            staffingError = 'Invalid plan structure';
-          } else {
-            // Find the work item in the plan (id='work' or first work-role item)
-            const workItem = plan.plan.items.find((item: any) => item.id === 'work') ||
-                           plan.plan.items.find((item: any) => item.metadata?.role === 'work');
-
-            if (!workItem) {
-              staffingError = 'No work item found in plan';
-            } else {
-              // Use the real work item with plan metadata for staffing resolution
-              const staffing = resolveStaffing(workItem, {
-                planMetadata: plan.plan.metadata,
-                spawnKey: `work:${agent.issueId.toLowerCase()}`,
-              });
-              newModel = staffing.model;
-              newHarness = staffing.harness;
-            }
-          }
-        }
-      }
-    } catch (err) {
-      staffingError = err instanceof Error ? err.message : String(err);
-      console.warn(`[restart-config] Failed to resolve staffing for ${agent.id}: ${staffingError}`);
-    }
-
-    // If there was an error resolving current config, skip this agent
-    if (staffingError) {
+    if (staffingResult.error) {
+      // Skip agents where staffing cannot be resolved
+      console.warn(`[restart-config] Skipping ${agent.id}: ${staffingResult.error}`);
       continue;
     }
+
+    const newModel = staffingResult.newModel;
+    const newHarness = staffingResult.newHarness;
 
     items.push({
       agentId: agent.id,
@@ -780,29 +752,42 @@ async function resolveCurrentStaffing(agentId: string, agentState: any, issueId:
   }
 
   try {
-    // Read the actual vBRIEF plan to get the real work item
-    const planPath = findPlanSync(workspacePath);
-    if (!planPath) {
-      return { newModel: agentState.model, newHarness: agentState.harness ?? 'claude-code', error: 'No plan found in workspace' };
-    }
-
+    // Read the actual vBRIEF plan
     const plan = readWorkspacePlanSync(workspacePath);
     if (!plan || !plan.plan.items) {
       return { newModel: agentState.model, newHarness: agentState.harness ?? 'claude-code', error: 'Invalid plan structure' };
     }
 
-    // Find the work item in the plan (id='work' or first work-role item)
-    const workItem = plan.plan.items.find((item: any) => item.id === 'work') ||
-                     plan.plan.items.find((item: any) => item.metadata?.role === 'work');
-
-    if (!workItem) {
-      return { newModel: agentState.model, newHarness: agentState.harness ?? 'claude-code', error: 'No work item found in plan' };
+    // Find the work item using the same logic as spawn-prep:
+    // For slot agents, use slotItemId; for single-work agents, use first dispatchable item
+    let workItem = null;
+    if (agentState.slotItemId) {
+      // Slot agent: find the item by ID
+      workItem = plan.plan.items.find((item: any) => item.id === agentState.slotItemId);
+      if (!workItem) {
+        return { newModel: agentState.model, newHarness: agentState.harness ?? 'claude-code', error: `Scheduled item ${agentState.slotItemId} not found in plan` };
+      }
+    } else {
+      // Single-work agent: use first dispatchable item (same as spawn-prep)
+      const dispatchableItems = getDispatchableItems(plan, new Set());
+      workItem = dispatchableItems[0];
+      if (!workItem) {
+        return { newModel: agentState.model, newHarness: agentState.harness ?? 'claude-code', error: 'No dispatchable items in plan' };
+      }
     }
 
     // Use the real work item with plan metadata for staffing resolution
+    // This matches the logic in resolveSingleWorkTierSpawnParams
+    const config = loadConfigSync().config;
+    const tiered = config.tieredExecution;
+    const effectiveTieredEnabled = issueId
+      ? resolveTieredExecutionEnabledForIssue(tiered, issueId, plan.plan.metadata)
+      : resolveTieredExecutionEnabled(tiered, plan.plan.metadata);
+
     const staffing = resolveStaffing(workItem, {
       planMetadata: plan.plan.metadata,
       spawnKey: `work:${issueId.toLowerCase()}`,
+      config: { ...config, tieredExecution: { ...tiered, enabled: effectiveTieredEnabled } },
     });
 
     return {

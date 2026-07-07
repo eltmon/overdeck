@@ -11,19 +11,51 @@
       "reason": "feedback",
       "note": "[2026-07-07T18:59Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-07T18:59:08.025Z"
+    },
+    {
+      "timestamp": "2026-07-07T19:07:15.299Z",
+      "reason": "end",
+      "note": "Fixed blocking review finding: now uses real vBRIEF work item for staffing resolution instead of fake item. This ensures tier resolution, distributions, and metadata are correctly applied. POST route now enforces eligibility checks."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-07T19:07:19.778Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-07T19:08Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-07T19:08:32.326Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-07T19:08Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-07T19:08:40.122Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-haiku-4-5",
+      "timestamp": "2026-07-07T19:08:40.217Z"
     }
   ],
   "feedback": [
     {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-07T19:08:32Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2405\n\nrestart config lookup still ignores the agent's scheduled item\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2405 -m \"Fixed review issues\"`"
+    },
+    {
       "seq": 2,
       "specialist": "review-agent",
       "outcome": "changes-requested",
-      "timestamp": "2026-07-07T18:59:08Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2405\n\nrestart-with-current-config resolves staffing from a fake work item\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2405 -m \"Fixed review issues\"`"
+      "timestamp": "2026-07-07T19:08:40Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2405\n\nrestart config lookup still ignores the agent's scheduled item\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2405 -m \"Fixed review issues\"`"
     }
   ],
   "created": "2026-07-06T14:48:34.495Z",
-  "updated": "2026-07-07T19:05:43.254Z",
+  "updated": "2026-07-07T19:10:11.235Z",
   "pipeline": {
     "issueId": "PAN-2405",
     "reviewStatus": "reviewing",
@@ -31,49 +63,49 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T19:05:43.208Z",
-    "reviewNotes": "restart-with-current-config resolves staffing from a fake work item",
+    "updatedAt": "2026-07-07T19:10:11.154Z",
+    "reviewNotes": "restart config lookup still ignores the agent's scheduled item",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2476",
-    "lastVerifiedCommit": "6c9186821fa3a1bba8fea9c58dc3cab785febbc6",
-    "reviewRequestedAt": "2026-07-07T18:57:13.275Z"
+    "lastVerifiedCommit": "3700855ad23baa04fde5cccabb44e0018e31c7b5",
+    "reviewRequestedAt": "2026-07-07T19:07:15.300Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/gpt-5.5": {
-            "input": 973531,
-            "output": 5214,
-            "cacheRead": 883456,
+            "input": 1819775,
+            "output": 9038,
+            "cacheRead": 1643264,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 189,
-            "output": 39855,
-            "cacheRead": 19147570,
-            "cacheWrite": 730296
+            "input": 246,
+            "output": 44894,
+            "cacheRead": 20717013,
+            "cacheWrite": 1230759
           }
         }
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 973531,
-          "output": 5214,
-          "cacheRead": 883456,
+          "input": 1819775,
+          "output": 9038,
+          "cacheRead": 1643264,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 189,
-          "output": 39855,
-          "cacheRead": 19147570,
-          "cacheWrite": 730296
+          "input": 246,
+          "output": 44894,
+          "cacheRead": 20717013,
+          "cacheWrite": 1230759
         }
       },
       "costAtCloseOut": {
-        "usd": 4.075613,
-        "pricingAsOf": "2026-07-07T19:05:43.254Z"
+        "usd": 5.810191,
+        "pricingAsOf": "2026-07-07T19:10:11.234Z"
       }
     },
     "merges": [
