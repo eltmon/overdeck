@@ -120,8 +120,8 @@
     ],
     "recordedAt": "2026-07-06T23:08:37.455Z"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-sonnet-5",
   "statusOverrides": {
     "unknown-backfill": "completed",
     "unknown-backfill.ac1": "completed",
@@ -170,11 +170,11 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T23:39:29.442Z",
+    "updatedAt": "2026-07-06T23:58:59.013Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed verification failure",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
-    "inspectNotes": "Bead attribution-classifier ack: delivered commit 27b56a2f is an unrelated beads-close chore (codex sweep bead) touching no relevant files. Verified the actual implementation at commit 1548526f3a (already in history) satisfies all 4 ACs: classifySessionBucket returns FLYWHEEL for flywheel-orchestrator, CONVERSATIONS for other matches, UNATTRIBUTED (never UNKNOWN) on no match; findConversationForCostSessionSync in conversations.ts matches conversation_files.locator and conv-* tmux_session, returns null when absent. Tests in attribution.test.ts cover all cases.",
+    "inspectNotes": "Bead attribution-classifier ack: all 4 ACs verified in working tree (classifySessionBucket FLYWHEEL/CONVERSATIONS/UNATTRIBUTED logic + findConversationForCostSessionSync locator/tmux_session lookup, both covered by attribution.test.ts). Note: commit f713b8ea43d itself is beads-bookkeeping only (closes unrelated bead workspace-uloh8, not workspace-oic6o) — the actual implementation landed earlier in 1548526f3a327deb824dcc95de8af6e568b07dc4.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2432",
     "reviewedAtCommit": "4dc456c9627272a6fb90acc3c6b7ee8ccb11878b",
     "lastVerifiedCommit": "4dc456c9627272a6fb90acc3c6b7ee8ccb11878b",
@@ -266,8 +266,8 @@
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 108674,
-            "output": 15216,
+            "input": 110670,
+            "output": 15757,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -296,25 +296,25 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 13273,
-            "output": 13067,
-            "cacheRead": 1734997,
-            "cacheWrite": 183359
+            "input": 19831,
+            "output": 14038,
+            "cacheRead": 1846920,
+            "cacheWrite": 265858
           }
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 1463618,
-            "output": 33506,
-            "cacheRead": 8847616,
+            "input": 1465210,
+            "output": 33674,
+            "cacheRead": 9027840,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 108674,
-          "output": 15216,
+          "input": 110670,
+          "output": 15757,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -331,21 +331,21 @@
           "cacheWrite": 649636
         },
         "anthropic/claude-sonnet-5": {
-          "input": 13273,
-          "output": 13067,
-          "cacheRead": 1734997,
-          "cacheWrite": 183359
+          "input": 19831,
+          "output": 14038,
+          "cacheRead": 1846920,
+          "cacheWrite": 265858
         },
         "custom/kimi-k2.7-code": {
-          "input": 1463618,
-          "output": 33506,
-          "cacheRead": 8847616,
+          "input": 1465210,
+          "output": 33674,
+          "cacheRead": 9027840,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 40.494597,
-        "pricingAsOf": "2026-07-06T23:39:30.496Z"
+        "usd": 40.782481,
+        "pricingAsOf": "2026-07-06T23:58:59.065Z"
       }
     },
     "merges": [
@@ -354,5 +354,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-06T22:14:47.667Z",
-  "updated": "2026-07-06T23:39:30.550Z"
+  "updated": "2026-07-06T23:58:59.065Z"
 }
