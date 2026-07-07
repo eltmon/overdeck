@@ -8,15 +8,38 @@ import { rmSync as unlink } from 'fs';
 import { vi } from 'vitest';
 import { deriveProjectRoot, flushAllPendingAutoCommits, flushAutoCommits, queueAutoCommit, queueBeadsAutoCommit } from '../auto-commit.js';
 
+function exec(root: string, command: string): string {
+  return execSync(command, { cwd: root, encoding: 'utf-8' }).trim();
+}
+
+function configureGit(root: string): void {
+  execSync('git config user.email t@e.t', { cwd: root });
+  execSync('git config user.name "Test"', { cwd: root });
+  execSync('git config commit.gpgsign false', { cwd: root });
+}
+
+function setBareOrigin(root: string): string {
+  const remoteTmp = mkdtempSync(join(tmpdir(), 'pan-autocommit-bare-'));
+  execSync('git init --bare -q', { cwd: remoteTmp });
+  execSync(`git remote set-url origin ${remoteTmp}`, { cwd: root });
+  execSync('git push -q -u origin main', { cwd: root });
+  return remoteTmp;
+}
+
+function makeOtherClone(remoteTmp: string): string {
+  const otherTmp = mkdtempSync(join(tmpdir(), 'pan-autocommit-other-'));
+  execSync(`git clone -q -b main ${remoteTmp} ${otherTmp}`);
+  configureGit(otherTmp);
+  return otherTmp;
+}
+
 describe('auto-commit', () => {
   let tmp: string;
 
   beforeEach(() => {
     tmp = mkdtempSync(join(tmpdir(), 'pan-autocommit-'));
     execSync('git init -q', { cwd: tmp });
-    execSync('git config user.email t@e.t', { cwd: tmp });
-    execSync('git config user.name "Test"', { cwd: tmp });
-    execSync('git config commit.gpgsign false', { cwd: tmp });
+    configureGit(tmp);
     // Seed an initial commit so HEAD has a valid ref before any auto-commit
     // attempts to add files to the index.
     writeFileSync(join(tmp, 'README.md'), 'seed');
@@ -125,6 +148,172 @@ describe('auto-commit', () => {
 
       expect(result.committed).toBe(false);
       expect(result.reason).toBe('no diff');
+    }),
+  );
+
+  it.effect('pushes a flush commit to origin/main when the push fast-forwards', () =>
+    Effect.gen(function* () {
+      const remoteTmp = setBareOrigin(tmp);
+      try {
+        mkdirSync(join(tmp, '.pan', 'records'), { recursive: true });
+        const path = join(tmp, '.pan', 'records', 'pan-2375.json');
+        writeFileSync(path, '{"issue":"PAN-2375"}');
+
+        queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): push state commit' });
+        const result = yield* flushAutoCommits(tmp);
+
+        expect(result.committed).toBe(true);
+        const remoteLog = execSync('git log --oneline origin/main -1', { cwd: tmp, encoding: 'utf-8' });
+        expect(remoteLog).toContain('chore(state): push state commit');
+      } finally {
+        rmSync(remoteTmp, { recursive: true, force: true });
+      }
+    }),
+  );
+
+  it.effect('rebases state-only local commits after a rejected push and retries once', () =>
+    Effect.gen(function* () {
+      const remoteTmp = setBareOrigin(tmp);
+      const otherTmp = makeOtherClone(remoteTmp);
+      try {
+        mkdirSync(join(otherTmp, '.pan', 'records'), { recursive: true });
+        writeFileSync(join(otherTmp, '.pan', 'records', 'pan-remote.json'), '{"remote":true}\n');
+        execSync('git add .pan/records/pan-remote.json', { cwd: otherTmp });
+        execSync('git commit -q -m "chore(state): remote state"', { cwd: otherTmp });
+        execSync('git push -q origin main', { cwd: otherTmp });
+
+        mkdirSync(join(tmp, '.pan', 'records'), { recursive: true });
+        const path = join(tmp, '.pan', 'records', 'pan-local.json');
+        writeFileSync(path, '{"local":true}\n');
+
+        queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): local state' });
+        const result = yield* flushAutoCommits(tmp);
+
+        expect(result.committed).toBe(true);
+        expect(exec(tmp, 'git rev-parse HEAD')).toBe(exec(tmp, 'git rev-parse origin/main'));
+        const remoteLog = execSync('git log --oneline origin/main -2', { cwd: tmp, encoding: 'utf-8' });
+        expect(remoteLog).toContain('chore(state): local state');
+        expect(remoteLog).toContain('chore(state): remote state');
+      } finally {
+        rmSync(remoteTmp, { recursive: true, force: true });
+        rmSync(otherTmp, { recursive: true, force: true });
+      }
+    }),
+  );
+
+  it.effect('does not rebase a rejected push when the working tree is dirty', () =>
+    Effect.gen(function* () {
+      const remoteTmp = setBareOrigin(tmp);
+      const otherTmp = makeOtherClone(remoteTmp);
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      try {
+        mkdirSync(join(otherTmp, '.pan', 'records'), { recursive: true });
+        writeFileSync(join(otherTmp, '.pan', 'records', 'pan-remote.json'), '{"remote":true}\n');
+        execSync('git add .pan/records/pan-remote.json', { cwd: otherTmp });
+        execSync('git commit -q -m "chore(state): remote state"', { cwd: otherTmp });
+        execSync('git push -q origin main', { cwd: otherTmp });
+
+        writeFileSync(join(tmp, 'README.md'), 'dirty\n');
+        mkdirSync(join(tmp, '.pan', 'records'), { recursive: true });
+        const path = join(tmp, '.pan', 'records', 'pan-local.json');
+        writeFileSync(path, '{"local":true}\n');
+
+        queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): local state' });
+        const result = yield* flushAutoCommits(tmp);
+
+        expect(result.committed).toBe(true);
+        expect(exec(tmp, 'git rev-parse HEAD')).not.toBe(exec(tmp, 'git rev-parse origin/main'));
+        expect(warn.mock.calls.some((call) => String(call[0]).includes('working tree is dirty'))).toBe(true);
+      } finally {
+        warn.mockRestore();
+        rmSync(remoteTmp, { recursive: true, force: true });
+        rmSync(otherTmp, { recursive: true, force: true });
+      }
+    }),
+  );
+
+  it.effect('does not rebase a rejected push when local ahead commits include source changes', () =>
+    Effect.gen(function* () {
+      const remoteTmp = setBareOrigin(tmp);
+      const otherTmp = makeOtherClone(remoteTmp);
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      try {
+        mkdirSync(join(tmp, 'src'), { recursive: true });
+        writeFileSync(join(tmp, 'src', 'local.ts'), 'export const local = true;\n');
+        execSync('git add src/local.ts', { cwd: tmp });
+        execSync('git commit -q -m "feat: local source"', { cwd: tmp });
+
+        mkdirSync(join(otherTmp, '.pan', 'records'), { recursive: true });
+        writeFileSync(join(otherTmp, '.pan', 'records', 'pan-remote.json'), '{"remote":true}\n');
+        execSync('git add .pan/records/pan-remote.json', { cwd: otherTmp });
+        execSync('git commit -q -m "chore(state): remote state"', { cwd: otherTmp });
+        execSync('git push -q origin main', { cwd: otherTmp });
+
+        mkdirSync(join(tmp, '.pan', 'records'), { recursive: true });
+        const path = join(tmp, '.pan', 'records', 'pan-local.json');
+        writeFileSync(path, '{"local":true}\n');
+
+        queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): local state' });
+        const result = yield* flushAutoCommits(tmp);
+
+        expect(result.committed).toBe(true);
+        expect(exec(tmp, 'git rev-parse HEAD')).not.toBe(exec(tmp, 'git rev-parse origin/main'));
+        expect(warn.mock.calls.some((call) => String(call[0]).includes('not state-plane-only'))).toBe(true);
+      } finally {
+        warn.mockRestore();
+        rmSync(remoteTmp, { recursive: true, force: true });
+        rmSync(otherTmp, { recursive: true, force: true });
+      }
+    }),
+  );
+
+  it.effect('skips push when OVERDECK_STATE_AUTOPUSH is disabled', () =>
+    Effect.gen(function* () {
+      const remoteTmp = setBareOrigin(tmp);
+      const previous = process.env.OVERDECK_STATE_AUTOPUSH;
+      try {
+        process.env.OVERDECK_STATE_AUTOPUSH = '0';
+        mkdirSync(join(tmp, '.pan', 'records'), { recursive: true });
+        const path = join(tmp, '.pan', 'records', 'pan-2375.json');
+        writeFileSync(path, '{"issue":"PAN-2375"}');
+        const beforeRemote = exec(tmp, 'git rev-parse origin/main');
+
+        queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): local only' });
+        const result = yield* flushAutoCommits(tmp);
+
+        expect(result.committed).toBe(true);
+        expect(exec(tmp, 'git rev-parse origin/main')).toBe(beforeRemote);
+        expect(exec(tmp, 'git rev-parse HEAD')).not.toBe(beforeRemote);
+      } finally {
+        if (previous === undefined) {
+          delete process.env.OVERDECK_STATE_AUTOPUSH;
+        } else {
+          process.env.OVERDECK_STATE_AUTOPUSH = previous;
+        }
+        rmSync(remoteTmp, { recursive: true, force: true });
+      }
+    }),
+  );
+
+  it.effect('catches and logs push failures without failing the writer', () =>
+    Effect.gen(function* () {
+      const remoteTmp = setBareOrigin(tmp);
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      try {
+        execSync('git remote set-url origin /tmp/overdeck-missing-auto-push-remote', { cwd: tmp });
+        mkdirSync(join(tmp, '.pan', 'records'), { recursive: true });
+        const path = join(tmp, '.pan', 'records', 'pan-2375.json');
+        writeFileSync(path, '{"issue":"PAN-2375"}');
+
+        queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): push failure' });
+        const result = yield* flushAutoCommits(tmp);
+
+        expect(result.committed).toBe(true);
+        expect(warn.mock.calls.some((call) => String(call[0]).includes('push failed'))).toBe(true);
+      } finally {
+        warn.mockRestore();
+        rmSync(remoteTmp, { recursive: true, force: true });
+      }
     }),
   );
 

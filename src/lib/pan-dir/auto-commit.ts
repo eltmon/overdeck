@@ -21,12 +21,13 @@
 
 import { existsSync } from 'fs';
 import { dirname, join, sep } from 'path';
-import { Effect, Layer, Stream } from 'effect';
+import { Cause, Duration, Effect, Layer, Stream } from 'effect';
 import { ChildProcess } from 'effect/unstable/process';
 import * as NodeChildProcessSpawner from '@effect/platform-node/NodeChildProcessSpawner';
 import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem';
 import * as NodePath from '@effect/platform-node/NodePath';
 import { GitError } from '../errors.js';
+import { isStatePlaneOnlyDiff } from '../state-plane.js';
 
 const spawnerLayer = NodeChildProcessSpawner.layer.pipe(
   Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer))
@@ -34,11 +35,19 @@ const spawnerLayer = NodeChildProcessSpawner.layer.pipe(
 
 const DEFAULT_STATE_FLUSH_WINDOW_MS = 10 * 60 * 1_000;
 const STATE_FLUSH_WINDOW_MS = parseStateFlushWindowMs(process.env.OVERDECK_STATE_FLUSH_WINDOW_MS);
+const DEFAULT_STATE_PUSH_TIMEOUT_MS = 30_000;
 
 function parseStateFlushWindowMs(value: string | undefined): number {
   if (!value) return DEFAULT_STATE_FLUSH_WINDOW_MS;
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_STATE_FLUSH_WINDOW_MS;
+  return parsed;
+}
+
+function parsePositiveInteger(value: string | undefined, fallback: number): number {
+  if (!value) return fallback;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
   return parsed;
 }
 
@@ -132,16 +141,40 @@ function runGit(
     Effect.scoped,
     Effect.provide(spawnerLayer),
     Effect.catchCause((cause) =>
-      Effect.fail(
-        new GitError({
-          command: ['git', ...args],
-          stderr: String(cause),
-          exitCode: -1,
-          cause,
-        }),
-      ),
+      Effect.fail(causeToGitError(cause, args)),
     ),
   );
+}
+
+function runGitWithTimeout(
+  args: readonly string[],
+  cwd: string,
+  timeoutMs: number,
+): Effect.Effect<GitResult, GitError> {
+  return runGit(args, cwd).pipe(
+    Effect.timeout(Duration.millis(timeoutMs)),
+    Effect.catchCause((cause) =>
+      Effect.fail(causeToGitError(cause, args)),
+    ),
+  );
+}
+
+function causeToGitError(cause: Cause.Cause<unknown>, args: readonly string[]): GitError {
+  const squashed = Cause.squash(cause);
+  if (isGitError(squashed)) return squashed;
+  return new GitError({
+    command: ['git', ...args],
+    stderr: String(squashed),
+    exitCode: -1,
+    cause,
+  });
+}
+
+function isGitError(value: unknown): value is GitError {
+  return typeof value === 'object'
+    && value !== null
+    && '_tag' in value
+    && value._tag === 'GitError';
 }
 
 /**
@@ -349,8 +382,127 @@ function doCommit(
     );
     if (typeof commitOk !== 'boolean') return commitOk;
 
+    yield* maybePushStateCommit(gitRoot, branch);
+
     return { committed: true };
   });
+}
+
+function maybePushStateCommit(
+  gitRoot: string,
+  branch: string,
+): Effect.Effect<void, never> {
+  if (process.env.OVERDECK_STATE_AUTOPUSH === '0') {
+    return Effect.void;
+  }
+
+  return pushOriginMain(gitRoot, branch, false);
+}
+
+function pushOriginMain(
+  gitRoot: string,
+  branch: string,
+  retry: boolean,
+): Effect.Effect<void, never> {
+  const timeoutMs = parsePositiveInteger(
+    process.env.OVERDECK_STATE_PUSH_TIMEOUT_MS,
+    DEFAULT_STATE_PUSH_TIMEOUT_MS,
+  );
+
+  return runGitWithTimeout(['push', 'origin', 'main'], gitRoot, timeoutMs).pipe(
+    Effect.matchEffect({
+      onSuccess: () => Effect.void,
+      onFailure: (err) => {
+        const message = err.stderr || err._tag;
+        if (!retry && isNonFastForwardPushError(message)) {
+          return rebaseStateOnlyAndRetryPush(gitRoot, branch);
+        }
+        warnAutoPush(branch, `push failed: ${message}`);
+        return Effect.void;
+      },
+    }),
+  );
+}
+
+function rebaseStateOnlyAndRetryPush(
+  gitRoot: string,
+  branch: string,
+): Effect.Effect<void, never> {
+  const timeoutMs = parsePositiveInteger(
+    process.env.OVERDECK_STATE_PUSH_TIMEOUT_MS,
+    DEFAULT_STATE_PUSH_TIMEOUT_MS,
+  );
+
+  return Effect.gen(function* () {
+    const fetched = yield* runGitWithTimeout(['fetch', 'origin', 'main'], gitRoot, timeoutMs).pipe(
+      Effect.matchEffect({
+        onSuccess: () => Effect.succeed(true),
+        onFailure: (err) => {
+          warnAutoPush(branch, `fetch before rebase failed: ${err.stderr || err._tag}`);
+          return Effect.succeed(false);
+        },
+      }),
+    );
+    if (!fetched) return;
+
+    const clean = yield* isWorkingTreeClean(gitRoot, branch);
+    if (!clean) return;
+
+    const stateOnly = yield* Effect.promise(() =>
+      isStatePlaneOnlyDiff('origin/main', 'main', gitRoot),
+    ).pipe(
+      Effect.catchCause((cause) => {
+        warnAutoPush(branch, `state-plane diff check failed: ${String(Cause.squash(cause))}`);
+        return Effect.succeed(false);
+      }),
+    );
+    if (!stateOnly) {
+      warnAutoPush(branch, 'non-fast-forward push rejected and local ahead diff is not state-plane-only; leaving local main ahead of origin/main');
+      return;
+    }
+
+    const rebased = yield* runGitWithTimeout(['rebase', 'origin/main'], gitRoot, timeoutMs).pipe(
+      Effect.matchEffect({
+        onSuccess: () => Effect.succeed(true),
+        onFailure: (err) => {
+          warnAutoPush(branch, `state-only rebase failed: ${err.stderr || err._tag}`);
+          return Effect.succeed(false);
+        },
+      }),
+    );
+    if (!rebased) return;
+
+    yield* pushOriginMain(gitRoot, branch, true);
+  });
+}
+
+function isWorkingTreeClean(
+  gitRoot: string,
+  branch: string,
+): Effect.Effect<boolean, never> {
+  return runGit(['status', '--porcelain'], gitRoot).pipe(
+    Effect.matchEffect({
+      onSuccess: (result) => {
+        const clean = result.stdout.trim().length === 0;
+        if (!clean) {
+          warnAutoPush(branch, 'non-fast-forward push rejected and working tree is dirty; leaving local main ahead of origin/main');
+        }
+        return Effect.succeed(clean);
+      },
+      onFailure: (err) => {
+        warnAutoPush(branch, `working-tree cleanliness check failed: ${err.stderr || err._tag}`);
+        return Effect.succeed(false);
+      },
+    }),
+  );
+}
+
+function isNonFastForwardPushError(message: string): boolean {
+  return /non-fast-forward|fetch first|failed to push some refs|rejected/i.test(message);
+}
+
+function warnAutoPush(branch: string, message: string): void {
+  console.warn(`[pan-dir/auto-commit] auto-push warning for ${branch}: ${message}`);
 }
 
 /**
