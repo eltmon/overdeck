@@ -1034,6 +1034,20 @@ export const ConversationCreatedEvent = Schema.Struct({
 })
 export type ConversationCreatedEvent = typeof ConversationCreatedEvent.Type
 
+/** Emitted (in-memory only) when a conversation title changes, so the sidebar
+ * list can refresh immediately instead of waiting for its poll tick. */
+export const ConversationTitleChangedEvent = Schema.Struct({
+  type: Schema.Literal("conversation.title_changed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    conversationName: Schema.String,
+    title: Schema.String,
+    titleSource: Schema.String,
+  }),
+})
+export type ConversationTitleChangedEvent = typeof ConversationTitleChangedEvent.Type
+
 /** Emitted (in-memory only) when a PermissionRequest hook fires or resolves for a conversation. */
 export const ConversationPermissionChangedEvent = Schema.Struct({
   type: Schema.Literal("conversation.permission_changed"),
@@ -1218,6 +1232,7 @@ export const DomainEvent = Schema.Union([
   DashboardLifecycleFailedEvent,
   ConversationCompactingChangedEvent,
   ConversationCreatedEvent,
+  ConversationTitleChangedEvent,
   ConversationPermissionChangedEvent,
   ScanStartedEvent,
   ScanProgressEvent,
