@@ -1,19 +1,11 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { isStatePlanePath } from './state-plane.js';
 
 const execFileAsync = promisify(execFile);
 
 export function isPipelineStatePath(relativePath: string): boolean {
-  const normalized = relativePath.trim().replace(/\\/g, '/');
-  return normalized.startsWith('.pan/records/')
-    || normalized === '.pan/continue.json'
-    || normalized.startsWith('.pan/continue')
-    || normalized.startsWith('.pan/specs/')
-    || normalized.startsWith('.pan/test/')
-    || normalized.startsWith('.pan/review/')
-    || normalized.startsWith('.pan/feedback/')
-    || normalized === '.beads'
-    || normalized.startsWith('.beads/');
+  return isStatePlanePath(relativePath);
 }
 
 export async function hasOnlyPipelineStateChangesSinceCommit(
