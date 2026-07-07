@@ -184,13 +184,13 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": true,
-    "updatedAt": "2026-07-07T00:09:39.847Z",
+    "updatedAt": "2026-07-07T00:17:41.225Z",
     "reviewNotes": "Approved; reviewed 6c1521cc with no blocking findings",
     "testNotes": "npm run typecheck passed (contracts built, tsc --noEmit clean for main/hooks/evals). npm run lint passed all subcommands: eslint, effect pinning, permissions, state-writes, overdeck-boundaries, skills, prompts, file-size, source-introspection, ratchet-audit. npm test passed: 861 test files passed (4 skipped), 8542 tests passed (52 skipped); frontend tests 3 files/32 tests passed. No browser UAT required: acceptance criteria are data/aggregation-level (cost classification, endpoint plane unification, pricing table, codex sweep, fixture parsing) with frontend bucket labels covered by unit tests.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Bead attribution-classifier ack: all 4 ACs verified in working tree (classifySessionBucket FLYWHEEL/CONVERSATIONS/UNATTRIBUTED logic + findConversationForCostSessionSync locator/tmux_session lookup, both covered by attribution.test.ts). Note: commit f713b8ea43d itself is beads-bookkeeping only (closes unrelated bead workspace-uloh8, not workspace-oic6o) — the actual implementation landed earlier in 1548526f3a327deb824dcc95de8af6e568b07dc4.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2432",
-    "reviewedAtCommit": "4783826f1968ea7c542cec67c21b628569b503ad",
+    "reviewedAtCommit": "e0627b17ff71a7399789ddead3ac430dab4e0fe1",
     "lastVerifiedCommit": "4dc456c9627272a6fb90acc3c6b7ee8ccb11878b",
     "reviewRequestedAt": "2026-07-07T00:07:46.682Z",
     "scopeDrift": {
@@ -284,8 +284,8 @@
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 112474,
-            "output": 16647,
+            "input": 113513,
+            "output": 16806,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -331,8 +331,8 @@
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 112474,
-          "output": 16647,
+          "input": 113513,
+          "output": 16806,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -363,7 +363,7 @@
       },
       "costAtCloseOut": {
         "usd": 40.851944,
-        "pricingAsOf": "2026-07-07T00:09:39.936Z"
+        "pricingAsOf": "2026-07-07T00:17:41.252Z"
       }
     },
     "merges": [
@@ -372,5 +372,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-06T22:14:47.667Z",
-  "updated": "2026-07-07T00:09:39.952Z"
+  "updated": "2026-07-07T00:17:41.254Z"
 }
