@@ -26,24 +26,14 @@
       "reason": "feedback",
       "note": "[2026-07-07T10:46Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-07T10:46:03.131Z"
-    }
-  ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-07T10:45:54Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2374\n\nBranch no longer merges cleanly with origin/main\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2374 -m \"Fixed review issues\"`"
     },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-07T10:46:03Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2374\n\nBranch no longer merges cleanly with origin/main\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2374 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-07T11:16:21.451Z"
     }
   ],
+  "feedback": [],
   "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
@@ -74,14 +64,14 @@
   },
   "pipeline": {
     "issueId": "PAN-2374",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "skipped",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T10:45:54.257Z",
-    "reviewNotes": "Branch no longer merges cleanly with origin/main",
+    "updatedAt": "2026-07-07T11:16:26.374Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Bead cr-ingest-module ack: fetchCodeRabbitFindings returns [] on absence/PR-resolution-failure/gh-api-error (verified via resolveOwnerRepo catch, prNumber null-check, and per-fetch .catch()), returns findings with body+path/line for coderabbitai[bot] reviews and inline comments, zero execSync matches, CodeRabbitFinding type exported cleanly, 115 lines, quota invariant documented inline.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2459",
@@ -150,9 +140,9 @@
         },
         "review": {
           "unknown": {
-            "input": 6438651,
-            "output": 18009,
-            "cacheRead": 5655040,
+            "input": 7731312,
+            "output": 24980,
+            "cacheRead": 6810368,
             "cacheWrite": 0
           }
         },
@@ -174,9 +164,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 812472,
-            "output": 121263,
-            "cacheRead": 46459648,
+            "input": 843785,
+            "output": 153033,
+            "cacheRead": 48075520,
             "cacheWrite": 0
           }
         }
@@ -195,9 +185,9 @@
           "cacheWrite": 173126
         },
         "unknown": {
-          "input": 6438651,
-          "output": 18009,
-          "cacheRead": 5655040,
+          "input": 7731312,
+          "output": 24980,
+          "cacheRead": 6810368,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -207,15 +197,15 @@
           "cacheWrite": 77553
         },
         "custom/kimi-k2.7-code": {
-          "input": 1307049,
-          "output": 134610,
-          "cacheRead": 48473600,
+          "input": 1338362,
+          "output": 166380,
+          "cacheRead": 50089472,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 23.362877,
-        "pricingAsOf": "2026-07-07T10:45:54.347Z"
+        "usd": 25.300178,
+        "pricingAsOf": "2026-07-07T11:16:26.749Z"
       }
     },
     "merges": [
@@ -224,5 +214,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-07T06:27:43.066Z",
-  "updated": "2026-07-07T10:46:03.132Z"
+  "updated": "2026-07-07T11:16:26.758Z"
 }
