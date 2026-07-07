@@ -19,6 +19,7 @@ elif [[ $# -ne 0 ]]; then
 fi
 
 BASELINE="scripts/file-size-baseline.txt"
+CIRCULAR_BASELINE="scripts/circular-deps-baseline.txt"
 ALLOWLIST="eslint-any-allowlist.json"
 ISSUE_REF_RE='([A-Z]+-[0-9]+|#[0-9]+)'
 
@@ -34,6 +35,17 @@ allowlist_at() {
   { git show "$rev:$ALLOWLIST" 2>/dev/null || true; } |
     node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{if(!d.trim())return;JSON.parse(d).forEach(p=>console.log(p))})" |
     sort -u
+}
+
+circular_baseline_at() {
+  local rev="$1"
+  { git show "$rev:$CIRCULAR_BASELINE" 2>/dev/null || true; } | grep -v '^[[:space:]]*$' | sort -u
+}
+
+parent_circular_baseline_at() {
+  for parent in "$@"; do
+    circular_baseline_at "$parent"
+  done | sort -u
 }
 
 parent_baseline_at() {
@@ -79,6 +91,18 @@ allowlist_increases_for_commit() {
   rm -f "$old_file" "$new_file"
 }
 
+circular_baseline_increases_for_commit() {
+  local commit="$1"
+  shift
+  local old_file new_file
+  old_file=$(mktemp)
+  new_file=$(mktemp)
+  parent_circular_baseline_at "$@" > "$old_file"
+  circular_baseline_at "$commit" > "$new_file"
+  comm -13 "$old_file" "$new_file" | sed 's/^/circular baseline added: /'
+  rm -f "$old_file" "$new_file"
+}
+
 commit_has_issue_ref() {
   local commit="$1"
   git log -1 --format=%B "$commit" | grep -Eq "$ISSUE_REF_RE"
@@ -104,6 +128,7 @@ audit_commit() {
   increases=$(
     baseline_increases_for_commit "$commit" "${parents[@]}"
     allowlist_increases_for_commit "$commit" "${parents[@]}"
+    circular_baseline_increases_for_commit "$commit" "${parents[@]}"
   )
 
   if [[ -z "$increases" ]]; then
@@ -131,11 +156,11 @@ commits_for_file() {
   fi
 }
 
-for file in "$BASELINE" "$ALLOWLIST"; do
+for file in "$BASELINE" "$ALLOWLIST" "$CIRCULAR_BASELINE"; do
   while IFS= read -r commit; do
     [[ -z "$commit" ]] && continue
     audit_commit "$commit"
   done < <(commits_for_file "$file")
 done
 
-echo "✓ ratchet audit passed (no unaudited baseline/allowlist increases)"
+echo "✓ ratchet audit passed (no unaudited baseline/allowlist/circular-baseline increases)"
