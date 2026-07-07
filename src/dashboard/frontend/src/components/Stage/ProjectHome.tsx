@@ -167,8 +167,12 @@ export function ProjectHome({
                 features={features}
                 issueCosts={issueCosts ?? {}}
                 issueCostDetails={issueCostDetails}
-                collapsePipelineSections={false}
                 onSelectFeature={onSelectFeature}
+                onOpenCosts={openCosts}
+                onOpenAgents={() => {
+                  window.history.pushState({ tab: 'agents' }, '', '/agents')
+                  window.dispatchEvent(new PopStateEvent('popstate'))
+                }}
               />
             </div>
             <aside className={styles.projectHomeConversations} aria-label="Project conversations">
