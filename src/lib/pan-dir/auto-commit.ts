@@ -9,7 +9,7 @@
  *
  * This module exposes a fire-and-forget commit primitive that the pan-dir
  * writers call after they update a file. Commits are:
- *   - debounced (default 2s) so a burst of writes coalesces into one commit
+ *   - fixed-window coalesced (default 10m) so a burst of writes becomes one commit
  *   - serialized within a process so the git index is never contested
  *   - best-effort: failures are logged and never thrown back to the caller
  *   - main-only: feature branches have their own commit cadence owned by agents
@@ -32,7 +32,15 @@ const spawnerLayer = NodeChildProcessSpawner.layer.pipe(
   Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer))
 );
 
-const DEBOUNCE_MS = 2_000;
+const DEFAULT_STATE_FLUSH_WINDOW_MS = 10 * 60 * 1_000;
+const STATE_FLUSH_WINDOW_MS = parseStateFlushWindowMs(process.env.OVERDECK_STATE_FLUSH_WINDOW_MS);
+
+function parseStateFlushWindowMs(value: string | undefined): number {
+  if (!value) return DEFAULT_STATE_FLUSH_WINDOW_MS;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_STATE_FLUSH_WINDOW_MS;
+  return parsed;
+}
 
 interface QueuedCommit {
   paths: Set<string>;
@@ -138,8 +146,8 @@ function runGit(
 
 /**
  * Queue an auto-commit for one or more files. Returns immediately; the actual
- * git commit happens after the debounce window. Multiple calls for the same
- * project root inside the window coalesce.
+ * git commit happens at the end of the fixed flush window. Multiple calls for
+ * the same project root inside the window coalesce without extending it.
  *
  * PAN-1908: `repoRoot` allows committing files to a different git checkout
  * than the project root (e.g., a declared infra repo for per-issue permanent
@@ -158,14 +166,13 @@ export function queueAutoCommit(opts: {
   if (existing) {
     paths.forEach((p) => existing.paths.add(p));
     existing.subjects.push(subject);
-    clearTimeout(existing.timer);
-    existing.timer = setTimeout(() => void flushInner(projectRoot), DEBOUNCE_MS);
+    existing.repoRoot ??= repoRoot;
     return;
   }
   pending.set(projectRoot, {
     paths: new Set(paths),
     subjects: [subject],
-    timer: setTimeout(() => void flushInner(projectRoot), DEBOUNCE_MS),
+    timer: setTimeout(() => void flushInner(projectRoot), STATE_FLUSH_WINDOW_MS),
     repoRoot,
   });
 }
@@ -181,7 +188,7 @@ export function queueAutoCommit(opts: {
  *
  * Only existing files are queued: a missing/deleted `issues.jsonl` is skipped so
  * the janitor never stages — and propagates — a transient empty-DB deletion (the
- * PAN-1158 hazard). queueAutoCommit is main-only, debounced, and a no-op when
+ * PAN-1158 hazard). queueAutoCommit is main-only, coalesced, and a no-op when
  * nothing changed.
  */
 export function queueBeadsAutoCommit(projectRoot: string): void {
