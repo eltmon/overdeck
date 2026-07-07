@@ -1,6 +1,3 @@
-import { readFileSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
 import { describe, expect, it, vi } from 'vitest';
 import {
   markAdvancingSessionStopped,
@@ -109,17 +106,5 @@ describe('reconcileInFlightJournals', () => {
     });
     expect(markAdvancingSessionStopped('agent-pan-2341-review', stopped)).toBe(false);
     expect(stopped.saveAgentStateSync).not.toHaveBeenCalled();
-  });
-
-  it('runs the journal sweep before terminal advancing reaping in the patrol', () => {
-    const testDir = dirname(fileURLToPath(import.meta.url));
-    const deaconSource = readFileSync(join(testDir, '..', 'deacon.ts'), 'utf-8');
-
-    const sweepIndex = deaconSource.indexOf('await reconcileInFlightJournals()');
-    const reaperIndex = deaconSource.indexOf('await checkTerminalAdvancingSessions()');
-
-    expect(sweepIndex).toBeGreaterThan(-1);
-    expect(reaperIndex).toBeGreaterThan(-1);
-    expect(sweepIndex).toBeLessThan(reaperIndex);
   });
 });

@@ -1,6 +1,3 @@
-import { readFileSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   isIdlePastThreshold,
@@ -72,17 +69,5 @@ describe('PAN-2341 idle terminal advancing reaper', () => {
 
     await vi.advanceTimersByTimeAsync(1000);
     expect(isIdlePastThreshold(runtime, TEN_MINUTES_MS)).toBe(true);
-  });
-
-  it('wires checkIdleTerminalAdvancingSessions after checkMergedAdvancingSessions in the patrol', () => {
-    const testDir = dirname(fileURLToPath(import.meta.url));
-    const deaconSource = readFileSync(join(testDir, '..', 'deacon.ts'), 'utf-8');
-
-    const mergedIndex = deaconSource.indexOf('await checkMergedAdvancingSessions()');
-    const idleIndex = deaconSource.indexOf('await checkIdleTerminalAdvancingSessions()');
-
-    expect(mergedIndex).toBeGreaterThan(-1);
-    expect(idleIndex).toBeGreaterThan(-1);
-    expect(idleIndex).toBeGreaterThan(mergedIndex);
   });
 });

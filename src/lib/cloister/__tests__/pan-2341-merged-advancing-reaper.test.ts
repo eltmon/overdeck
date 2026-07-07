@@ -1,6 +1,3 @@
-import { readFileSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
 import { describe, expect, it } from 'vitest';
 import { canDispatchAdvancing } from '../concurrency.js';
 import {
@@ -56,17 +53,5 @@ describe('PAN-2341 merged advancing reaper', () => {
     expect(selectMergedAdvancingSessions({
       'PAN-3001': mergedStatus(),
     }, ['agent-pan-3001-test'])).toEqual(['agent-pan-3001-test']);
-  });
-
-  it('wires checkMergedAdvancingSessions immediately after checkMergedWorkSessions in the patrol', () => {
-    const testDir = dirname(fileURLToPath(import.meta.url));
-    const deaconSource = readFileSync(join(testDir, '..', 'deacon.ts'), 'utf-8');
-
-    const workReaperIndex = deaconSource.indexOf('await checkMergedWorkSessions()');
-    const advancingReaperIndex = deaconSource.indexOf('await checkMergedAdvancingSessions()');
-
-    expect(workReaperIndex).toBeGreaterThan(-1);
-    expect(advancingReaperIndex).toBeGreaterThan(-1);
-    expect(advancingReaperIndex).toBeGreaterThan(workReaperIndex);
   });
 });

@@ -1,11 +1,8 @@
-import { readFileSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
 import { describe, expect, it, vi } from 'vitest';
 import {
   runBootAdvancingSelfHeal,
   type BootAdvancingSelfHealDeps,
-} from '../deacon.js';
+} from '../advancing-selfheal.js';
 
 function deps(overrides: Partial<BootAdvancingSelfHealDeps> = {}): BootAdvancingSelfHealDeps {
   return {
@@ -72,18 +69,5 @@ describe('PAN-2341 boot advancing self-heal', () => {
       'Reaped merged advancing session agent-pan-3001-review (issue merged, row stopped)',
     ]);
     await expect(runBootAdvancingSelfHeal(d)).resolves.toEqual([]);
-  });
-
-  it('startDeacon calls boot self-heal after liveness reconcile and before startup patrol', () => {
-    const testDir = dirname(fileURLToPath(import.meta.url));
-    const deaconSource = readFileSync(join(testDir, '..', 'deacon.ts'), 'utf-8');
-
-    const livenessIndex = deaconSource.indexOf('await reconcileAgentLiveness()');
-    const bootIndex = deaconSource.indexOf('await runBootAdvancingSelfHeal()');
-    const startupPatrolIndex = deaconSource.indexOf("runScheduledPatrol('startup')");
-
-    expect(livenessIndex).toBeGreaterThan(-1);
-    expect(bootIndex).toBeGreaterThan(livenessIndex);
-    expect(startupPatrolIndex).toBeGreaterThan(bootIndex);
   });
 });

@@ -1,16 +1,25 @@
 import { Effect } from 'effect';
 import {
   getAgentStateSync,
+  getAgentRuntimeStateSync,
   markAgentStoppedState,
   saveAgentStateSync,
   type AgentState,
 } from '../agents.js';
+import { logDeaconEventSync } from '../persistent-logger.js';
 import {
   getReviewStatusSync,
   loadReviewStatuses,
   type ReviewStatus,
 } from '../review-status.js';
-import { listSessionNames } from '../tmux.js';
+import { killSession, listSessionNames } from '../tmux.js';
+import {
+  KEEP_SPECIALIST_SESSIONS_ALIVE,
+  isIdlePastThreshold,
+  selectMergedAdvancingSessions,
+  selectNonMergedTerminalAdvancingSessions,
+  selectTerminalAdvancingSessions,
+} from './reap-terminal-sessions.js';
 
 const JOURNAL_RECONCILE_STATES = new Set([
   'pending',
@@ -114,4 +123,150 @@ export function markAdvancingSessionStopped(
   const stopped = deps.markAgentStoppedState(state);
   deps.saveAgentStateSync(stopped);
   return true;
+}
+
+/**
+ * PAN-1716: Reap completed advancing-role sessions that have a recorded
+ * terminal verdict but are still tmux-alive.
+ */
+export async function checkTerminalAdvancingSessions(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    if (KEEP_SPECIALIST_SESSIONS_ALIVE) return actions;
+    const statuses = loadReviewStatuses();
+    const aliveSessions = await Effect.runPromise(listSessionNames());
+    const toKill = selectTerminalAdvancingSessions(statuses, [...aliveSessions]);
+    for (const session of toKill) {
+      try {
+        await Effect.runPromise(killSession(session));
+        actions.push(`Reaped terminal advancing session ${session} (verdict recorded, session idle)`);
+        console.log(`[deacon] Reaped terminal advancing session ${session} (PAN-1716)`);
+        logDeaconEventSync(`checkTerminalAdvancingSessions: reaped ${session} — phase verdict terminal but session alive (PAN-1716)`);
+      } catch (err) {
+        console.warn(`[deacon] Failed to reap terminal session ${session}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error reaping terminal advancing sessions:', msg);
+  }
+  return actions;
+}
+
+/**
+ * PAN-2341: Reap advancing-role sessions for already-merged issues.
+ *
+ * KEEP_SPECIALIST_SESSIONS_ALIVE can intentionally leave review/test/ship panes
+ * visible, but once the issue is merged those sessions have no remaining role in
+ * the pipeline and still occupy the advancing ceiling. Kill the tmux session and
+ * mark the agents-table row stopped so countRunningAgents() frees the slot.
+ */
+export async function checkMergedAdvancingSessions(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    const statuses = loadReviewStatuses();
+    const aliveSessions = await Effect.runPromise(listSessionNames());
+    const toKill = selectMergedAdvancingSessions(statuses, [...aliveSessions]);
+
+    for (const session of toKill) {
+      try {
+        await Effect.runPromise(killSession(session));
+      } catch (err) {
+        console.warn(`[deacon] Failed to reap merged advancing session ${session}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      const markedStopped = markAdvancingSessionStopped(session);
+      actions.push(
+        markedStopped
+          ? `Reaped merged advancing session ${session} (issue merged, row stopped)`
+          : `Reaped merged advancing session ${session} (issue merged)`,
+      );
+      console.log(`[deacon] Reaped merged advancing session ${session} (PAN-2341)`);
+      logDeaconEventSync(`checkMergedAdvancingSessions: reaped ${session} — issue merged but advancing session alive (PAN-2341)`);
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error reaping merged advancing sessions:', msg);
+  }
+  return actions;
+}
+
+export const TERMINAL_ADVANCING_IDLE_REAP_MS = 10 * 60 * 1000;
+
+/**
+ * PAN-2341: Reap non-merged terminal advancing sessions after a short idle
+ * window. This bypasses specialist keep-alive only after the pane has sat idle
+ * long enough for operator inspection, then marks the agents row stopped so the
+ * advancing ceiling frees in the same patrol.
+ */
+export async function checkIdleTerminalAdvancingSessions(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    const statuses = loadReviewStatuses();
+    const aliveSessions = await Effect.runPromise(listSessionNames());
+    const candidates = selectNonMergedTerminalAdvancingSessions(statuses, [...aliveSessions]);
+    const now = Date.now();
+
+    for (const session of candidates) {
+      const runtime = getAgentRuntimeStateSync(session);
+      if (!isIdlePastThreshold(runtime, TERMINAL_ADVANCING_IDLE_REAP_MS, now)) continue;
+
+      try {
+        await Effect.runPromise(killSession(session));
+      } catch (err) {
+        console.warn(`[deacon] Failed to reap idle terminal advancing session ${session}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      const markedStopped = markAdvancingSessionStopped(session);
+      actions.push(
+        markedStopped
+          ? `Reaped idle terminal advancing session ${session} (verdict recorded, idle >=10m, row stopped)`
+          : `Reaped idle terminal advancing session ${session} (verdict recorded, idle >=10m)`,
+      );
+      console.log(`[deacon] Reaped idle terminal advancing session ${session} (PAN-2341)`);
+      logDeaconEventSync(`checkIdleTerminalAdvancingSessions: reaped ${session} — terminal verdict idle >=10m (PAN-2341)`);
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error reaping idle terminal advancing sessions:', msg);
+  }
+  return actions;
+}
+
+export interface BootAdvancingSelfHealDeps {
+  reconcileInFlightJournals(): Promise<string[]>;
+  checkMergedAdvancingSessions(): Promise<string[]>;
+  checkIdleTerminalAdvancingSessions(): Promise<string[]>;
+  log(message: string): void;
+}
+
+const defaultBootAdvancingSelfHealDeps: BootAdvancingSelfHealDeps = {
+  reconcileInFlightJournals,
+  checkMergedAdvancingSessions,
+  checkIdleTerminalAdvancingSessions,
+  log: logDeaconEventSync,
+};
+
+export async function runBootAdvancingSelfHeal(
+  deps: BootAdvancingSelfHealDeps = defaultBootAdvancingSelfHealDeps,
+): Promise<string[]> {
+  const actions: string[] = [];
+  const steps: Array<[string, () => Promise<string[]>]> = [
+    ['reconcileInFlightJournals', deps.reconcileInFlightJournals],
+    ['checkMergedAdvancingSessions', deps.checkMergedAdvancingSessions],
+    ['checkIdleTerminalAdvancingSessions', deps.checkIdleTerminalAdvancingSessions],
+  ];
+
+  for (const [name, step] of steps) {
+    try {
+      const stepActions = await step();
+      actions.push(...stepActions);
+      if (stepActions.length > 0) {
+        deps.log(`startDeacon: ${name} boot self-heal actions: ${stepActions.join('; ')}`);
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      deps.log(`startDeacon: ${name} boot self-heal failed: ${msg}`);
+    }
+  }
+
+  return actions;
 }
