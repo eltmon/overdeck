@@ -29,20 +29,20 @@
     }
   ],
   "created": "2026-07-07T02:41:17.313Z",
-  "updated": "2026-07-07T06:36:43.834Z",
+  "updated": "2026-07-07T06:44:50.822Z",
   "pipeline": {
     "issueId": "PAN-2375",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T06:36:35.119Z",
+    "updatedAt": "2026-07-07T06:44:50.778Z",
     "reviewNotes": "FR-5 retry still checks full origin/main..main tree diff, blocking remote-source/local-state recovery",
     "inspectNotes": "Bead state-plane-predicate ack: commit 2fe848f6 is a pure test-colocation move (tests/unit/lib/state-plane.test.ts -> src/lib/__tests__/state-plane.test.ts, import path fixed), no logic changes; verified all 4 acceptance criteria still pass against current src/lib/state-plane.ts (state-only=true, mixed src+state=false, drafts-only=false, empty-diff=true).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2457",
-    "lastVerifiedCommit": "f05af90eaff2a9ef14df5e57b299186ba961b8d5",
+    "lastVerifiedCommit": "15193f81a33b5147dc18fd8837cb09f31343ee82",
     "reviewRequestedAt": "2026-07-07T06:33:45.658Z"
   },
   "closeOut": {
@@ -72,9 +72,9 @@
         },
         "review": {
           "unknown": {
-            "input": 4912870,
-            "output": 17467,
-            "cacheRead": 4525952,
+            "input": 5882997,
+            "output": 19891,
+            "cacheRead": 5447168,
             "cacheWrite": 0
           }
         },
@@ -88,9 +88,9 @@
         },
         "work": {
           "unknown": {
-            "input": 80441721,
-            "output": 126877,
-            "cacheRead": 77028736,
+            "input": 87571108,
+            "output": 139694,
+            "cacheRead": 83831424,
             "cacheWrite": 0
           }
         }
@@ -115,9 +115,9 @@
           "cacheWrite": 149428
         },
         "unknown": {
-          "input": 85354591,
-          "output": 144344,
-          "cacheRead": 81554688,
+          "input": 93454105,
+          "output": 159585,
+          "cacheRead": 89278592,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -128,8 +128,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 51.6162134,
-        "pricingAsOf": "2026-07-07T06:36:35.163Z"
+        "usd": 55.0055934,
+        "pricingAsOf": "2026-07-07T06:44:50.821Z"
       }
     },
     "merges": [
