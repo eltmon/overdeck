@@ -1,9 +1,57 @@
 {
   "issueId": "PAN-2341",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-07T10:58:06.627Z",
+      "reason": "end",
+      "note": "Full npm test still reported unrelated full-suite timeout/resource-contention failures per test-agent notes; no plan deviations. Fixed the PAN-2341 deterministic regression by removing deacon's static advancing-selfheal import, verified the affected files pass, committed and pushed."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-07T10:58:26.000Z"
+    }
+  ],
   "feedback": [],
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/drafts/PAN-2341.md",
+      ".pan/records/pan-2341.json",
+      "scripts/file-size-baseline.txt"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "src/lib/cloister/__tests__/pan-2341-boot-selfheal.test.ts",
+      "src/lib/cloister/__tests__/pan-2341-ceiling-selfheal.test.ts",
+      "src/lib/cloister/__tests__/pan-2341-idle-terminal-reaper.test.ts",
+      "src/lib/cloister/__tests__/pan-2341-merged-advancing-reaper.test.ts",
+      "src/lib/cloister/__tests__/pan-2341-orphan-redispatch.test.ts",
+      "src/lib/cloister/__tests__/pan-2341-reconcile-sweep.test.ts",
+      "src/lib/cloister/advancing-selfheal.ts",
+      "src/lib/cloister/deacon-review-status.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/reap-terminal-sessions.ts"
+    ],
+    "actualChangedFiles": [
+      ".pan/drafts/PAN-2341.md",
+      ".pan/records/pan-2341.json",
+      "scripts/file-size-baseline.txt",
+      "src/lib/cloister/__tests__/pan-2341-boot-selfheal.test.ts",
+      "src/lib/cloister/__tests__/pan-2341-ceiling-selfheal.test.ts",
+      "src/lib/cloister/__tests__/pan-2341-idle-terminal-reaper.test.ts",
+      "src/lib/cloister/__tests__/pan-2341-merged-advancing-reaper.test.ts",
+      "src/lib/cloister/__tests__/pan-2341-orphan-redispatch.test.ts",
+      "src/lib/cloister/__tests__/pan-2341-reconcile-sweep.test.ts",
+      "src/lib/cloister/advancing-selfheal.ts",
+      "src/lib/cloister/deacon-review-status.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/reap-terminal-sessions.ts"
+    ],
+    "recordedAt": "2026-07-07T10:57:30.667Z"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "acceptance-regression-test": "completed",
     "acceptance-regression-test.ac1": "completed",
@@ -37,12 +85,12 @@
   "pipeline": {
     "issueId": "PAN-2341",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-07T10:56:57.234Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-07T10:58:25.151Z",
     "reviewNotes": "review passed; committed dynamic import fix verified",
     "testNotes": "typecheck PASSED, lint PASSED, focused PAN-2341 tests PASSED (6 files, 24 tests). Full npm test FAILED: 12 test files failed / 8 tests failed. Four failures are deterministic regressions introduced by PAN-2341: src/lib/cloister/advancing-selfheal.ts imports loadReviewStatuses from ../review-status.js and logDeaconEventSync from ../persistent-logger.js at the top level, and src/lib/cloister/deacon.ts imports advancing-selfheal.ts at the top level. Existing tests that partially mock those modules now fail to load with 'No <export> export is defined on the ... mock'. Affected files: src/lib/cloister/__tests__/deacon-auto-closeout.test.ts, tests/unit/lib/cloister/guard-advancing-dispatch.test.ts, tests/unit/dashboard/server/routes/merge-reconciliation.test.ts. Eight additional tests timed out under full-suite parallel load but pass in isolation, indicating resource contention rather than code defects. UAT not required: PRD explicitly states 'Browser/Playwright verification — backend-only change.' Fix: either update the partial mocks to include loadReviewStatuses/logDeaconEventSync, or make advancing-selfheal.ts imports lazy inside the patrol/boot call sites.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -109,9 +157,9 @@
         },
         "review": {
           "unknown": {
-            "input": 6679570,
-            "output": 16024,
-            "cacheRead": 6160256,
+            "input": 7762759,
+            "output": 17337,
+            "cacheRead": 7234816,
             "cacheWrite": 0
           }
         },
@@ -125,17 +173,17 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 983150,
-            "output": 20890,
-            "cacheRead": 3810816,
+            "input": 992236,
+            "output": 22040,
+            "cacheRead": 4604928,
             "cacheWrite": 0
           }
         },
         "work": {
           "unknown": {
-            "input": 39896420,
-            "output": 79945,
-            "cacheRead": 38070272,
+            "input": 41063288,
+            "output": 82939,
+            "cacheRead": 39191808,
             "cacheWrite": 0
           }
         }
@@ -154,9 +202,9 @@
           "cacheWrite": 544156
         },
         "unknown": {
-          "input": 46575990,
-          "output": 95969,
-          "cacheRead": 44230528,
+          "input": 48826047,
+          "output": 100276,
+          "cacheRead": 46426624,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -166,15 +214,15 @@
           "cacheWrite": 95697
         },
         "custom/kimi-k2.7-code": {
-          "input": 983150,
-          "output": 20890,
-          "cacheRead": 3810816,
+          "input": 992236,
+          "output": 22040,
+          "cacheRead": 4604928,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 46.135216,
-        "pricingAsOf": "2026-07-07T10:56:57.353Z"
+        "usd": 47.666971000000004,
+        "pricingAsOf": "2026-07-07T10:58:25.280Z"
       }
     },
     "merges": [
@@ -183,5 +231,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-07T10:53:20.710Z",
-  "updated": "2026-07-07T10:56:57.362Z"
+  "updated": "2026-07-07T10:58:26.001Z"
 }
