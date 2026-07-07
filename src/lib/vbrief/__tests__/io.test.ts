@@ -293,13 +293,21 @@ describe('readPlan', () => {
   });
 
   it('serializes planBuilder output with xBRIEFInfo', () => {
-    const doc = planBuilder('PAN-2426', 'xBRIEF writer bump').build();
+    const doc = planBuilder('PAN-2426', 'xBRIEF writer bump')
+      .addTask('workspace-pn35q', 'Schema checkpoint', {
+        items: [{ id: 'validate-schema', title: 'Validate schema', status: 'pending' }],
+      })
+      .build();
 
     const serialized = JSON.parse(serializeVBriefDocument(doc));
 
     expect(doc.vBRIEFInfo.version).toBe('0.8');
     expect(serialized.xBRIEFInfo.version).toBe('0.8');
     expect(serialized.vBRIEFInfo).toBeUndefined();
+    expect(serialized.plan).toEqual(expect.objectContaining({ id: 'PAN-2426', title: 'xBRIEF writer bump' }));
+    expect(serialized.plan.items).toHaveLength(1);
+    expect(serialized.plan.items[0].items).toHaveLength(1);
+    expect(serialized.plan.items.some((item: Record<string, unknown>) => 'subItems' in item)).toBe(false);
   });
 
   it('throws for nonexistent file', () => {
