@@ -284,10 +284,48 @@ export interface ContainerHistory {
 
 export type ResourceGroupBy = 'issue' | 'type' | 'status';
 
+export interface HostVitalsSnapshot {
+  stale: boolean;
+  cpu: {
+    percent: number;
+    load: [number, number, number];
+    spark: number[];
+  };
+  mem: {
+    usedBytes: number;
+    availableBytes: number;
+    swapUsedBytes: number;
+    swapTotalBytes: number;
+  };
+  disk: {
+    usedBytes: number;
+    freeBytes: number;
+    reclaimableBytes: number;
+  };
+  docker: {
+    containers: number;
+    running: number;
+    stacks: number;
+    networks: number;
+    networkPool: { used: number; total: number };
+    stale: boolean;
+  };
+  agents: {
+    sessions: number;
+    active: number;
+    idleOver15m: number;
+    burnUsdPerHour: number;
+    hypotheticalUsdPerHour: number;
+    totalUsd: number;
+  };
+}
+
 export interface ResourcesSnapshot {
   containers: ContainerStats[];
   agents: Agent[];
   updatedAt: string;
+  hostVitals?: HostVitalsSnapshot;
+  stale?: boolean;
 }
 
 export interface SystemHealthAgentProcess {
