@@ -4,17 +4,17 @@
     "created": "2026-07-05T03:36:12Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2378: tiered-execution configuration UI — edit tier table, global enable, per-issue override visibility",
-    "updated": "2026-07-05T03:41:44.713Z"
+    "updated": "2026-07-07T03:14:47.966Z"
   },
   "plan": {
     "id": "pan-2378",
     "title": "feat(settings): tiered-execution configuration UI — edit tier table, global/project enable, per-issue override visibility",
-    "status": "proposed",
+    "status": "completed",
     "uid": "66e2fca1-2af0-424c-b477-da072ac40b72",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-05T03:36:12Z",
-    "updated": "2026-07-05T03:41:44.713Z",
+    "updated": "2026-07-07T03:14:47.966Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2378",
@@ -499,5 +499,5 @@
       "canonicalFilename": "2026-07-05-PAN-2378-feat-settings-tiered-execution-configuration-ui-edit-tier-table-global-project-enable-per-issue-override-visibility.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
