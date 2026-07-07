@@ -89,6 +89,7 @@ describe('parseCodexSessionSync', () => {
       expect(raw).toContain('[redacted content]');
       expect(raw).not.toContain('developer_instructions":"#');
       expect(raw).not.toContain('encrypted_content":"gAAAA');
+      expect(raw).not.toMatch(/\/home\/|\/Users\/|\/tmp\//);
     }
   });
 
