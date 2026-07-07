@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('child_process', () => ({
   exec: mocks.exec,
+  execFile: vi.fn(),
 }));
 
 vi.mock('../../agents.js', () => ({
