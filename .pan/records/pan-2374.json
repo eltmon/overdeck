@@ -1,9 +1,34 @@
 {
   "issueId": "PAN-2374",
   "schemaVersion": 2,
-  "feedback": [],
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-07T06:00:24.045Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-07T06:00:41.835Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-07T06:02Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-07T06:02:30.893Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-07T06:02:30Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2374\n\npackage.json:104 globally raises prelint:skills to a 16GB heap instead of fixing the verification OOM root cause\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2374 -m \"Fixed review issues\"`"
+    }
+  ],
   "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "model": "claude-sonnet-5",
   "statusOverrides": {
     "cr-guard": "completed",
     "cr-guard.ac1": "completed",
@@ -32,18 +57,18 @@
   },
   "pipeline": {
     "issueId": "PAN-2374",
-    "reviewStatus": "failed",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T05:49:23.233Z",
-    "reviewNotes": "Verification failed at lint",
-    "verificationNotes": "Verification FAILED at lint (109927ms):\n\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (77%)\n  - rolldown-plugin-dts:fake-js (16%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n\n<--- Last few GCs --->\n\n[807940:0x381d7000]    82557 ms: Mark-Compact 8067.5 (8230.7) -> 8057.4 (8237.2) MB, pooled: 0 MB, 1166.61 / 0.00 ms  (average mu = 0.598, current mu = 0.169) allocation failure; scavenge might not succeed\n[807940:0x381d7000]    84917 ms: Mark-Compact 8073.2 (8237.2) -> 8063.5 (8243.4) MB, pooled: 0 MB, 2338.98 / 0.00 ms  (average mu = 0.323, current mu = 0.009) allocation failure; scavenge might not succeed\n\n\n<--- JS stacktrace --->\n\nFATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory\n----- Native stack trace -----\n\n 1: 0xe40d24 node::OOMErrorHandler(char const*, v8::OOMDetails const&) [node]\n 2: 0x1216be0 v8::Utils::ReportOOMFailure(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [node]\n 3: 0x1216eb7 v8::internal::V8::FatalProcessOutOfMemory(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [node]\n 4: 0x1444875  [node]\n 5: 0x145e109 v8::internal::Heap::CollectGarbage(v8::internal::AllocationSpace, v8::internal::GarbageCollectionReason, v8::GCCallbackFlags) [node]\n 6: 0x14327b8 v8::internal::HeapAllocator::AllocateRawWithLightRetrySlowPath(int, v8::internal::AllocationType, v8::internal::AllocationOrigin, v8::internal::AllocationAlignment) [node]\n 7: 0x14336e5 v8::internal::HeapAllocator::AllocateRawWithRetryOrFailSlowPath(int, v8::internal::AllocationType, v8::internal::AllocationOrigin, v8::internal::AllocationAlignment) [node]\n 8: 0x140c3be v8::internal::Factory::NewFillerObject(int, v8::internal::AllocationAlignment, v8::internal::AllocationType, v8::internal::AllocationOrigin) [node]\n 9: 0x186da1c v8::internal::Runtime_AllocateInYoungGeneration(int, unsigned long*, v8::internal::Isolate*) [node]\n10: 0x75fd1beac476 \nAborted (core dumped)\n",
+    "updatedAt": "2026-07-07T06:02:19.998Z",
+    "reviewNotes": "package.json:104 globally raises prelint:skills to a 16GB heap instead of fixing the verification OOM root cause",
+    "verificationNotes": "Verification FAILED at test (75997ms):\n\nntinues/\n  .pan/backlog/\n  .beads/\n✗ overdeck boundary gate: 1 site(s) across 1 file(s) still on the OLD panopticon.db\n\nsrc/dashboard/server/routes/issues.ts:1:import { Db } from '../../../lib/overdeck/infra.js';\n\nEach must go through an overdeck door (src/lib/overdeck/*) — not getDatabase() or a database/* store.\n(node:1055396) ExperimentalWarning: Some other experimental feature\n(Use `node --trace-warnings ...` to show where the warning was created)\nguard-agent-main-push.sh invoked\n⚠ ratchet audit: no base for refs/heads/feature — skipping\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| tests/playwright/conversation-supervisor-uat.test.ts > conversation supervisor Playwright UAT > resumes Codex conversations through the real route with codex resume\nError: Hook timed out in 5000ms.\nIf this is a long-running hook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n ❯ tests/playwright/conversation-supervisor-uat.test.ts:337:1\n    335| }\n    336|\n    337| beforeEach(async () => {\n       | ^\n    338|   vi.resetModules();\n    339|   ensurePtySupervisorArtifact();\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  |root| tests/playwright/conversation-supervisor-uat.test.ts > conversation supervisor Playwright UAT > resumes Codex conversations through the real route with codex resume\nError: ENOTEMPTY: directory not empty, rmdir '/tmp/pan-playwright-home-P7cZca/.cache/fontconfig'\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n",
     "inspectNotes": "Bead cr-ingest-module ack: fetchCodeRabbitFindings returns [] on absence/PR-resolution-failure/gh-api-error (verified via resolveOwnerRepo catch, prNumber null-check, and per-fetch .catch()), returns findings with body+path/line for coderabbitai[bot] reviews and inline comments, zero execSync matches, CodeRabbitFinding type exported cleanly, 115 lines, quota invariant documented inline.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2459",
-    "reviewRequestedAt": "2026-07-07T05:45:45.393Z",
+    "reviewRequestedAt": "2026-07-07T05:57:40.485Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".beads/export-state.json",
@@ -84,7 +109,7 @@
         "tests/unit/lib/cloister/coderabbit-ingestion.test.ts",
         "tests/unit/lib/cloister/no-coderabbit-merge-gate.test.ts"
       ],
-      "recordedAt": "2026-07-07T05:44:48.021Z"
+      "recordedAt": "2026-07-07T05:55:19.967Z"
     }
   },
   "closeOut": {
@@ -108,9 +133,9 @@
         },
         "review": {
           "unknown": {
-            "input": 62217,
-            "output": 910,
-            "cacheRead": 33024,
+            "input": 1257361,
+            "output": 6318,
+            "cacheRead": 1145984,
             "cacheWrite": 0
           }
         },
@@ -124,9 +149,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 581684,
-            "output": 97733,
-            "cacheRead": 35129344,
+            "input": 602132,
+            "output": 105913,
+            "cacheRead": 37958656,
             "cacheWrite": 0
           }
         }
@@ -145,9 +170,9 @@
           "cacheWrite": 173126
         },
         "unknown": {
-          "input": 62217,
-          "output": 910,
-          "cacheRead": 33024,
+          "input": 1257361,
+          "output": 6318,
+          "cacheRead": 1145984,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -157,15 +182,15 @@
           "cacheWrite": 77553
         },
         "custom/kimi-k2.7-code": {
-          "input": 581684,
-          "output": 97733,
-          "cacheRead": 35129344,
+          "input": 602132,
+          "output": 105913,
+          "cacheRead": 37958656,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 12.888478,
-        "pricingAsOf": "2026-07-07T05:49:23.267Z"
+        "usd": 14.607834,
+        "pricingAsOf": "2026-07-07T06:02:20.038Z"
       }
     },
     "merges": [
@@ -173,6 +198,6 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "created": "2026-07-07T05:49:17.743Z",
-  "updated": "2026-07-07T05:49:23.268Z"
+  "created": "2026-07-07T06:00:23.960Z",
+  "updated": "2026-07-07T06:02:30.893Z"
 }

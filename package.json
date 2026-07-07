@@ -101,7 +101,7 @@
     "lint:permissions": "bash scripts/lint-permissions.sh",
     "lint:state-writes": "bash scripts/lint-state-writes.sh",
     "lint:overdeck-boundaries": "PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh",
-    "prelint:skills": "NODE_OPTIONS=--max-old-space-size=16384 npm run build:contracts && NODE_OPTIONS=--max-old-space-size=16384 npm run build:pi-extension && NODE_OPTIONS=--max-old-space-size=16384 npm run build:ohmypi-extension && NODE_OPTIONS=--max-old-space-size=16384 npm run build:cli",
+    "prelint:skills": "npm run build:contracts && npm run build:pi-extension && npm run build:ohmypi-extension && npm run build:cli",
     "lint:skills": "bash scripts/lint-skills.sh",
     "lint:prompts": "bash scripts/lint-prompts.sh",
     "lint:file-size": "bash scripts/lint-file-size.sh",
