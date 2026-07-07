@@ -11,23 +11,23 @@
   ],
   "feedback": [],
   "created": "2026-07-07T01:06:13.356Z",
-  "updated": "2026-07-07T03:56:36.411Z",
+  "updated": "2026-07-07T03:56:58.349Z",
   "pipeline": {
     "issueId": "PAN-2420",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T01:35:28.211Z"
+    "updatedAt": "2026-07-07T03:56:53.452Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 7862,
-            "output": 258,
+            "input": 22261,
+            "output": 426,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -39,12 +39,20 @@
             "cacheRead": 13233382,
             "cacheWrite": 576864
           }
+        },
+        "work": {
+          "custom/kimi-k2.7-code": {
+            "input": 1014323,
+            "output": 200105,
+            "cacheRead": 92278272,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 7862,
-          "output": 258,
+          "input": 22261,
+          "output": 426,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -53,18 +61,24 @@
           "output": 66449,
           "cacheRead": 13233382,
           "cacheWrite": 576864
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 1014323,
+          "output": 200105,
+          "cacheRead": 92278272,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 12.1198825,
-        "pricingAsOf": "2026-07-07T01:35:28.234Z"
+        "usd": 31.4167895,
+        "pricingAsOf": "2026-07-07T03:56:53.478Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "integration-test": "completed",
     "integration-test.ac1": "completed",
@@ -99,5 +113,8 @@
     "token-permissions": "completed",
     "token-permissions.ac1": "completed",
     "token-permissions.ac2": "completed"
+  },
+  "swarm": {
+    "finalizedAt": "2026-07-07T03:56:58.348Z"
   }
 }
