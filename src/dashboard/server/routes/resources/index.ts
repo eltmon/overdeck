@@ -18,6 +18,7 @@ import {
   postPruneVolumesRoute,
 } from './prune.js';
 import { getResourceHistoryRoute } from './history.js';
+import { deleteResourceVenvRoute } from './reclaim.js';
 import { getResourcesRoute } from './snapshot.js';
 
 export const resourcesRouteLayer = Layer.mergeAll(
@@ -36,6 +37,7 @@ export const resourcesRouteLayer = Layer.mergeAll(
   postPauseContainerRoute,
   postUnpauseContainerRoute,
   getContainerLogsRoute,
+  deleteResourceVenvRoute,
 );
 
 export default resourcesRouteLayer;

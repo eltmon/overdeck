@@ -11,6 +11,7 @@ import { buildCapacityForecast } from './forecast.js';
 import { getHostProcessesSnapshot } from './host-processes.js';
 import { buildHostVitalsSnapshot } from './host-vitals.js';
 import { enrichContainersWithLimits } from './limits.js';
+import { buildReclaimPayload } from './reclaim.js';
 import { getCurrentDockerStats } from './shared.js';
 import { getSpawnGatePayloadEffect } from './spawn-gate.js';
 import { getResourceStacks } from './stacks.js';
@@ -36,7 +37,7 @@ export function getResourcesEffect(): Effect.Effect<ReturnType<typeof jsonRespon
         hasLiveTmuxSession: tmuxSessionNames.has(state.id),
       }));
     const agentStatsById = new Map(agentStats.agents.map((agent) => [agent.id, agent]));
-    const hostVitals = buildHostVitalsSnapshot({
+    const baseHostVitals = buildHostVitalsSnapshot({
       containers,
       agents: agents.map((agent) => ({
         id: String(agent.id),
@@ -46,6 +47,14 @@ export function getResourcesEffect(): Effect.Effect<ReturnType<typeof jsonRespon
       agentFleet: agentStats.hostVitals.agents,
     });
     const stacks = getResourceStacks(containers);
+    const reclaim = buildReclaimPayload(stacks, agents);
+    const hostVitals = {
+      ...baseHostVitals,
+      disk: {
+        ...baseHostVitals.disk,
+        reclaimableBytes: reclaim.reclaimTotals.diskBytes,
+      },
+    };
 
     return jsonResponse({
       agents: agents.map((agent) => ({
@@ -59,6 +68,9 @@ export function getResourcesEffect(): Effect.Effect<ReturnType<typeof jsonRespon
       hostProcesses: getHostProcessesSnapshot(),
       stoppedContainers,
       networks: [],
+      reclaimCandidates: reclaim.reclaimCandidates,
+      reclaimThresholdBytes: reclaim.reclaimThresholdBytes,
+      reclaimTotals: reclaim.reclaimTotals,
       spawnGate,
       stacks,
       volumes: [],

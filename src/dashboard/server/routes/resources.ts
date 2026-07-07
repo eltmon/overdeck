@@ -99,6 +99,20 @@ export {
   resetResourceHistorySamples,
 } from './resources/history.js';
 export {
+  buildReclaimPayload,
+  deleteResourceVenvEffect,
+  deleteResourceVenvRoute,
+  resetReclaimForTests,
+  setReclaimIssueClosedReaderForTests,
+  setReclaimProjectRootForTests,
+  setReclaimVenvCandidatesForTests,
+  setReclaimVenvDeleteForTests,
+  type ReclaimAgentLike,
+  type ReclaimCandidate,
+  type ReclaimPayload,
+  type ReclaimVenvCandidate,
+} from './resources/reclaim.js';
+export {
   getSpawnGatePayloadEffect,
   mapSpawnGateDecision,
   resetSpawnGateHealthSnapshotReaderForTests,

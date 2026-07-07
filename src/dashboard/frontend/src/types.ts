@@ -407,6 +407,16 @@ export interface ResourceHistorySnapshot {
   annotations: ResourceHistoryAnnotation[];
 }
 
+export interface ReclaimCandidate {
+  kind: 'stack' | 'venv' | 'docker-prune' | 'exited-container';
+  label: string;
+  why: string;
+  ramBytes: number;
+  diskBytes: number;
+  action: string;
+  issueId?: string;
+}
+
 export interface ResourcesSnapshot {
   containers: ContainerStats[];
   agents: Agent[];
@@ -414,6 +424,9 @@ export interface ResourcesSnapshot {
   hostVitals?: HostVitalsSnapshot;
   spawnGate?: SpawnGateSnapshot;
   forecast?: CapacityForecastSnapshot;
+  reclaimCandidates?: ReclaimCandidate[];
+  reclaimTotals?: { ramBytes: number; diskBytes: number };
+  reclaimThresholdBytes?: number;
   stale?: boolean;
   stacks?: ResourceStack[];
   coreServices?: CoreServiceResource[];
