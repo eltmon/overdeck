@@ -12,20 +12,34 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-07T06:34:53.198Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-07T06:36Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-07T06:36:43.834Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-07T06:36:43Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2375\n\nFR-5 retry still checks full origin/main..main tree diff, blocking remote-source/local-state recovery\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2375 -m \"Fixed review issues\"`"
+    }
+  ],
   "created": "2026-07-07T02:41:17.313Z",
-  "updated": "2026-07-07T06:34:53.221Z",
+  "updated": "2026-07-07T06:36:43.834Z",
   "pipeline": {
     "issueId": "PAN-2375",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T06:34:23.502Z",
+    "updatedAt": "2026-07-07T06:36:35.119Z",
+    "reviewNotes": "FR-5 retry still checks full origin/main..main tree diff, blocking remote-source/local-state recovery",
     "inspectNotes": "Bead state-plane-predicate ack: commit 2fe848f6 is a pure test-colocation move (tests/unit/lib/state-plane.test.ts -> src/lib/__tests__/state-plane.test.ts, import path fixed), no logic changes; verified all 4 acceptance criteria still pass against current src/lib/state-plane.ts (state-only=true, mixed src+state=false, drafts-only=false, empty-diff=true).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2457",
     "lastVerifiedCommit": "f05af90eaff2a9ef14df5e57b299186ba961b8d5",
@@ -115,7 +129,7 @@
       },
       "costAtCloseOut": {
         "usd": 51.6162134,
-        "pricingAsOf": "2026-07-07T06:34:23.643Z"
+        "pricingAsOf": "2026-07-07T06:36:35.163Z"
       }
     },
     "merges": [
