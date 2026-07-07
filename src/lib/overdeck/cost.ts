@@ -89,6 +89,12 @@ export const CostEvent = Schema.Struct({
   cost:        Schema.Number,
   requestId:   Schema.NullOr(Schema.String),
   sourceFile:  Schema.NullOr(Schema.String),
+  warnings:    Schema.optional(Schema.Array(Schema.Struct({
+    type:     Schema.String,
+    provider: Schema.NullOr(Schema.String),
+    model:    Schema.String,
+    reason:   Schema.String,
+  }))),
 });
 export type CostEvent = typeof CostEvent.Type;
 
@@ -745,6 +751,7 @@ export const CostWriterLive = Layer.effect(
                   cost:        usage.cost,
                   requestId:   usage.requestId,
                   sourceFile:  sessionFile,
+                  warnings:    usage.warnings,
                 };
 
                 if (yield* record(event, { dryRun: opts?.dryRun })) {

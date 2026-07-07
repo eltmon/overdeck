@@ -116,12 +116,13 @@ function makeTestLayer() {
       stream:            undefined as never,
     }),
   );
+  const appendedEvents: unknown[] = [];
   const archiveLayer = Layer.succeed(
     CostArchive,
-    CostArchive.of({ append: () => Effect.sync(() => undefined) }),
+    CostArchive.of({ append: (event) => Effect.sync(() => { appendedEvents.push(event); }) }),
   );
 
-  return { dbLayer, busLayer, archiveLayer, insertedValues, rows };
+  return { dbLayer, busLayer, archiveLayer, insertedValues, appendedEvents, rows };
 }
 
 function makePiCostEvents(sessionFile: string) {
@@ -304,6 +305,53 @@ describe('CostWriter.reconcile — ohmypi source', () => {
     expect(insertedValues).toHaveLength(2);
     expect(warnSpy).toHaveBeenCalledTimes(1);
     expect(warnSpy).toHaveBeenCalledWith(`[cost-reconcile] skipped ${sessionFile}: unpriced-model`);
+  });
+
+  it('preserves ohmypi unpriced-token warning metadata during reconcile', async () => {
+    const agentDir = '/fake/pan/agents';
+    const sessionFile = '/fake/pan/agents/agent-pan-1/sessions/sess.jsonl';
+
+    vi.mocked(readdirSync).mockImplementation((dir, _opts) => {
+      if (String(dir) === agentDir)
+        return [makeDirent('agent-pan-1', true)];
+      if (String(dir) === '/fake/pan/agents/agent-pan-1/sessions')
+        return [makeDirent('sess.jsonl', false)];
+      return [];
+    });
+
+    vi.mocked(parseOhmypiSessionCostResultSync).mockReturnValue({
+      ok: true,
+      usageEvents: [{
+        requestId:   'ohmypi:sess-abc:e1',
+        timestamp:   '2026-06-17T10:00:01Z',
+        sessionId:   'sess-abc',
+        sessionFile,
+        provider:    'mystery',
+        model:       'mystery-model',
+        input:       100,
+        output:      10,
+        cacheRead:   0,
+        cacheWrite:  0,
+        cost:        0,
+        warnings:    [{ type: 'unpriced-model', provider: 'mystery', model: 'mystery-model', reason: 'unknown-provider' }],
+      }],
+    });
+
+    const { dbLayer, busLayer, archiveLayer, appendedEvents } = makeTestLayer();
+    const layer = CostWriterLive.pipe(
+      Layer.provide(dbLayer), Layer.provide(busLayer), Layer.provide(archiveLayer),
+    );
+
+    const result = await Effect.runPromise(
+      CostWriter.use((w) => w.reconcile({ source: 'ohmypi' })).pipe(Effect.provide(layer)),
+    );
+
+    expect(result).toMatchObject({ imported: 1, sessionsScanned: 1, eventsImported: 1, skipped: [] });
+    expect(appendedEvents).toHaveLength(1);
+    expect(appendedEvents[0]).toMatchObject({
+      requestId: 'ohmypi:sess-abc:e1',
+      warnings: [{ type: 'unpriced-model', provider: 'mystery', model: 'mystery-model', reason: 'unknown-provider' }],
+    });
   });
 
 });

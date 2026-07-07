@@ -371,6 +371,7 @@ function toCostArchiveEvent(event: Record<string, unknown>): Record<string, unkn
     ...(typeof event.requestId === 'string' ? { requestId: event.requestId } : {}),
     ...(typeof event.sessionId === 'string' ? { sessionId: event.sessionId } : {}),
     ...(typeof event.sourceFile === 'string' ? { source: event.sourceFile } : {}),
+    ...(Array.isArray(event.warnings) ? { warnings: event.warnings } : {}),
   };
 }
 

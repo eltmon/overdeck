@@ -76,6 +76,7 @@ export interface OhmypiCostEventUsage {
   cacheRead: number;
   cacheWrite: number;
   cost: number;
+  warnings?: Array<{ type: 'unpriced-model'; provider: string | null; model: string; reason: string }>;
 }
 
 interface PiGenericEntry {
@@ -332,11 +333,13 @@ export function parseOhmypiSessionContent(content: string, filePath = '<inline>'
     };
     const hasInlineCost = usage.cost?.total !== undefined;
     let cost = usage.cost?.total ?? 0;
+    let warning: OhmypiCostEventUsage['warnings'] | undefined;
     if (!hasInlineCost && input + output + cacheRead + cacheWrite > 0) {
       const computed = computeCostFromPricing(provider, model, tokenUsage);
       cost = computed.cost;
       if (computed.reason) {
         unpricedModels.push({ provider, model, reason: computed.reason });
+        warning = [{ type: 'unpriced-model', provider, model, reason: computed.reason }];
       }
     }
     const localComputed = hasInlineCost
@@ -378,6 +381,7 @@ export function parseOhmypiSessionContent(content: string, filePath = '<inline>'
       cacheRead,
       cacheWrite,
       cost,
+      ...(warning ? { warnings: warning } : {}),
     });
   }
 

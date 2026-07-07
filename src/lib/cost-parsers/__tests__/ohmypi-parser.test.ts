@@ -232,6 +232,9 @@ describe('parseOhmypiSession (PAN-1989)', () => {
     expect(result.ok).toBe(true)
     expect(result.usageEvents).toHaveLength(1)
     expect(result.usageEvents![0]!.cost).toBe(0)
+    expect(result.usageEvents![0]!.warnings).toEqual([
+      { type: 'unpriced-model', provider: 'mystery', model: 'mystery-model', reason: 'unknown-provider' },
+    ])
     expect(result.usage!.cost_v2).toBe(0)
     expect(result.unpricedModels).toEqual([
       { provider: 'mystery', model: 'mystery-model', reason: 'unknown-provider' },
