@@ -9,7 +9,7 @@ const promptsDir = join(distDir, 'prompts');
 const cliPromptsDir = join(distDir, 'cli', 'prompts');
 const preservedRoot = join(projectRoot, '.tmp', `overdeck-dashboard-${process.pid}-${Date.now()}`);
 const preservedDashboardDir = join(preservedRoot, 'dashboard');
-const cliBuildHeapFlag = '--max-old-space-size=8192';
+const cliBuildHeapFlag = '--max-old-space-size=12288';
 
 const nodeOptionsForCliBuild = (nodeOptions = '') => (
   nodeOptions.includes('--max-old-space-size=')
