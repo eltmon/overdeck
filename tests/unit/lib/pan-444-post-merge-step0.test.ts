@@ -205,6 +205,20 @@ describe('postMergeLifecycle — step 0 deploy handoff', () => {
     expect(mockWriteFile).toHaveBeenCalledOnce();
   });
 
+  it('recognizes a MERGED-state PR from the gh CLI fallback', async () => {
+    mockExecAsync.mockImplementation(async (cmd: string) => {
+      if (cmd.includes('gh pr list')) {
+        return { stdout: '[{"number":444,"state":"MERGED","mergedAt":"2026-04-27T00:00:00Z"}]', stderr: '' };
+      }
+      return defaultExecAsync(cmd);
+    });
+
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+
+    expect(mockWriteFile).toHaveBeenCalledOnce();
+    expect(mockSpawn).toHaveBeenCalledOnce();
+  });
+
   it('defaults sourceBranch to empty string when not provided', async () => {
     await postMergeLifecycle(ISSUE_ID, PROJECT_PATH);
 

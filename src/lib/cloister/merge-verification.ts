@@ -67,8 +67,8 @@ export async function verifyMergedBeforeLifecycle(
       `gh pr list --repo ${shellQuote(`${owner}/${repo}`)} --state all --head ${quotedBranch} --json number,state,mergedAt --limit 5`,
       { cwd: projectPath },
     );
-    const prs = JSON.parse(stdout || '[]') as Array<{ number: number; state: 'open' | 'closed'; mergedAt: string | null }>;
-    const mergedPr = prs.find((pr) => pr.state === 'closed' && pr.mergedAt != null);
+    const prs = JSON.parse(stdout || '[]') as Array<{ number: number; state: 'open' | 'closed' | 'MERGED'; mergedAt: string | null }>;
+    const mergedPr = prs.find((pr) => (pr.state === 'closed' || pr.state === 'MERGED') && pr.mergedAt != null);
     if (mergedPr) {
       return { merged: true, reason: `GitHub PR #${mergedPr.number} is merged` };
     }
