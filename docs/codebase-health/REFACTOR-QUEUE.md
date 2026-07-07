@@ -46,7 +46,7 @@ peripheral, safe for autonomous pipeline flow once planned.
 |---|---|---|---|
 | 5 | PAN-2227 | Ratchets enforced at write point: pre-push guard, auto-lowering baselines, audited bumps | **MERGED — PR #2268** (2026-07-03; delivered PAN-2204's main-push guard too) |
 | 6 | PAN-2231 | Lint ban on source-introspection tests (red-main #2124 class) | **PLANNING 2026-07-03 (planning-pan-2231, --auto)** — banked ahead of PAN-2145 finishing |
-| 7 | PAN-2230 | Circular-dependency ratchet (madge baseline in lint) | **IMPLEMENTED** — `lint:circular` wired into `npm run lint`; 76-cycle baseline at `scripts/circular-deps-baseline.txt`; A4 PRD added at `docs/codebase-health/A4-circular-dep-guard.md` |
+| 7 | PAN-2230 | Circular-dependency ratchet (madge baseline in lint) | **IMPLEMENTED** — `lint:circular` wired into `npm run lint`; 77-cycle production-source baseline at `scripts/circular-deps-baseline.txt` (excludes tests/`.d.ts`); A4 PRD added at `docs/codebase-health/A4-circular-dep-guard.md` |
 | 8 | PAN-2234 | Mechanical PRD-first gate in `pan plan finalize` / complete-planning | **DONE — landed 1e82badc32, issue closed** |
 | 8b | PAN-2204 | Agent direct-push-to-main guard | **DONE — delivered inside PAN-2227 (PR #2268): `scripts/guard-agent-main-push.sh` wired into `.husky/pre-push`; issue closed** |
 

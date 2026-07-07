@@ -62,6 +62,7 @@ src/lib/conversations/smart-compaction.ts
 src/lib/costs/events.ts > src/lib/costs/wal.ts
 src/lib/costs/events.ts > src/lib/overdeck/cost-sync.ts
 src/lib/database/agent-backfill.ts > src/lib/database/agent-mappers.ts > src/lib/database/agents-db.ts > src/lib/database/index.ts > src/lib/database/schema.ts
+src/lib/database/agent-backfill.ts > src/lib/database/index.ts > src/lib/database/schema.ts
 src/lib/issue-id.ts > src/lib/projects.ts
 src/lib/memory/pending.ts > src/lib/memory/rollup.ts
 src/lib/merge-set.ts > src/lib/overdeck/merge-sync.ts

@@ -17,7 +17,7 @@
 
 ## Problem
 
-The codebase has 76 import cycles under `src/`. The dashboard server's circular ESM imports force a dist-only run posture: `tsx` / source-mode fails under Node strict ESM, so every dashboard server edit requires a rebuild, and stale `dist/` is a recurring "why doesn't my fix work" incident. Nothing stops new cycles from appearing. This sub-issue installs a ratchet: **no new directed import cycle in `src/`**. It does NOT break any existing cycle (that is Epic B work).
+The codebase has 77 import cycles under `src/` (production source only; test and `.d.ts` files excluded). The dashboard server's circular ESM imports force a dist-only run posture: `tsx` / source-mode fails under Node strict ESM, so every dashboard server edit requires a rebuild, and stale `dist/` is a recurring "why doesn't my fix work" incident. Nothing stops new cycles from appearing. This sub-issue installs a ratchet: **no new directed import cycle in `src/`**. It does NOT break any existing cycle (that is Epic B work).
 
 ---
 
@@ -40,6 +40,8 @@ The codebase has 76 import cycles under `src/`. The dashboard server's circular 
 **NFR-1** — Pure addition: the only changes are the new script, a small Node canonicalization helper, the new baseline file, the `package.json` `scripts` block, the ratchet-audit integration, and this PRD doc. No production `src/**` code is modified.
 
 **NFR-2** — Deterministic output: cycles are canonicalized (paths prefixed with `src/`, cycle members sorted, cycles sorted) so madge's rotation/order differences do not create noise.
+
+**NFR-3** — Test files (`*.test.ts`, `*.test.tsx`, `*.spec.ts`, `*.spec.tsx`) and TypeScript declaration files (`*.d.ts`) are excluded from the scan. The ratchet guards production source cycles only.
 
 ---
 
@@ -106,7 +108,7 @@ npm run lint ; echo "lint_exit:$? (expect 0)"
 
 - **AC-1 (FR-1):** a new import cycle under `src/` makes `bash scripts/lint-circular-deps.sh` exit 1.
 - **AC-2 (FR-2):** removing a baselined cycle without running `--update` makes the guard exit 1 with a stale-baseline message.
-- **AC-3 (FR-3):** on the committed branch, `bash scripts/lint-circular-deps.sh` exits 0, and `scripts/circular-deps-baseline.txt` has 76 canonical cycle entries.
+- **AC-3 (FR-3):** on the committed branch, `bash scripts/lint-circular-deps.sh` exits 0, and `scripts/circular-deps-baseline.txt` has 77 canonical cycle entries (production source only).
 - **AC-4 (FR-4):** `bash scripts/lint-circular-deps.sh --update` exits 0 and drops only removed cycles.
 - **AC-5 (FR-5):** `bash scripts/lint-circular-deps.sh --regen` exits 0 and reproduces the current baseline.
 - **AC-6 (FR-6):** `npm run lint` exits 0 and its chain includes `lint:circular` before `lint:ratchet-audit`.
@@ -124,6 +126,6 @@ npm run lint ; echo "lint_exit:$? (expect 0)"
 
 ## Out of scope
 
-- Breaking any of the 76 existing cycles (that is Epic B extraction work).
+- Breaking any of the 77 existing cycles (that is Epic B extraction work).
 - Running madge against `packages/`, `apps/`, or `scripts/`.
 - Replacing madge with `dependency-cruiser`.

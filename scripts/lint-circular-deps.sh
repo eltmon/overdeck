@@ -44,9 +44,12 @@ if [[ ! -f "$CANON" ]]; then
 fi
 
 # Current cycles, one canonical line per cycle.
+# Exclude test files and .d.ts declarations — we only ratchet production source cycles.
 current_raw=$(mktemp)
 current=$(mktemp)
-"$MADGE" --circular --json --extensions ts,tsx src/ 2>/dev/null > "$current_raw" || true
+"$MADGE" --circular --json --extensions ts,tsx \
+  --exclude '\.(test|spec)\.(ts|tsx)$|\.d\.ts$' \
+  src/ 2>/dev/null > "$current_raw" || true
 node "$CANON" < "$current_raw" > "$current"
 rm -f "$current_raw"
 
