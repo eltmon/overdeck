@@ -31,6 +31,11 @@
       "timestamp": "2026-07-07T18:51:21.327Z",
       "reason": "end",
       "note": "Test gate waived: Verification-only retroactive issue; fix already covered by existing regression tests added in 7297d2469c (start-sync-main-conflict.test.ts and work-agent-prompt-pan-1872.test.ts), which pass on current main."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-07T18:57:33.518Z"
     }
   ],
   "feedback": [],
@@ -64,17 +69,17 @@
     "recordedAt": "2026-07-07T18:50:25.599Z"
   },
   "created": "2026-07-06T16:22:21.638Z",
-  "updated": "2026-07-07T18:53:17.924Z",
+  "updated": "2026-07-07T18:58:08.417Z",
   "pipeline": {
     "issueId": "PAN-1872",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
-    "verificationStatus": "passed",
+    "reviewStatus": "failed",
+    "testStatus": "passed",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T18:53:17.860Z",
-    "reviewNotes": "No blocking findings in scoped record-only verification update",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-07-07T18:58:08.269Z",
+    "reviewNotes": "Verification failed at empty-changeset",
+    "verificationNotes": "Branch has no implementation — only pipeline artifacts (.pan/vbrief/beads) changed vs origin/main. The work agent produced no code (likely a kickoff-delivery zombie — PAN-2179).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2474",
     "reviewedAtCommit": "cbede7dbc680cb95e5d7247aaf68d6d7fbdf9cc2",
     "reviewRequestedAt": "2026-07-07T18:51:21.330Z",
@@ -113,9 +118,9 @@
       "byStage": {
         "codex": {
           "openai/gpt-5.5": {
-            "input": 302400,
-            "output": 2988,
-            "cacheRead": 209792,
+            "input": 787681,
+            "output": 3913,
+            "cacheRead": 692480,
             "cacheWrite": 0
           }
         },
@@ -143,20 +148,28 @@
             "cacheWrite": 46897
           }
         },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 471649,
+            "output": 7804,
+            "cacheRead": 2394880,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 525275,
-            "output": 29534,
-            "cacheRead": 10617088,
+            "input": 530667,
+            "output": 31176,
+            "cacheRead": 11710208,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 302400,
-          "output": 2988,
-          "cacheRead": 209792,
+          "input": 787681,
+          "output": 3913,
+          "cacheRead": 692480,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -172,15 +185,15 @@
           "cacheWrite": 129964
         },
         "custom/kimi-k2.7-code": {
-          "input": 525275,
-          "output": 29534,
-          "cacheRead": 10617088,
+          "input": 1002316,
+          "output": 38980,
+          "cacheRead": 14105088,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 4.234253,
-        "pricingAsOf": "2026-07-07T18:53:17.921Z"
+        "usd": 5.670001,
+        "pricingAsOf": "2026-07-07T18:58:08.416Z"
       }
     },
     "merges": [
