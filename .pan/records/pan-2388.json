@@ -41,17 +41,19 @@
       "reason": "feedback",
       "note": "[2026-07-07T18:05Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-07T18:05:46.531Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-07T18:05:46Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2388\n\nManual reconcile route still drops the existing Claude transcript reconciler in committed code\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2388 -m \"Fixed review issues\"`"
+      "timestamp": "2026-07-07T18:06:47.306Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-07T18:06:50.383Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".beads/export-state.json",
@@ -78,6 +80,8 @@
       "src/lib/overdeck/agent-state-sync.ts",
       "src/lib/overdeck/infra.ts",
       "src/lib/review-status.ts",
+      "sync-sources/hooks/record-cost-event.js",
+      "sync-sources/hooks/record-cost-event.js.map",
       "tests/unit/lib/cloister/feedback-target.test.ts",
       "tests/unit/lib/overdeck/cost-reconcile-fixtures.integration.test.ts",
       "tests/unit/lib/overdeck/cost-reconcile.test.ts",
@@ -148,13 +152,15 @@
       "src/lib/overdeck/cost.ts",
       "src/lib/overdeck/infra.ts",
       "src/lib/review-status.ts",
+      "sync-sources/hooks/record-cost-event.js",
+      "sync-sources/hooks/record-cost-event.js.map",
       "tests/lib/cost-parsers/jsonl-parser.test.ts",
       "tests/unit/lib/cloister/feedback-target.test.ts",
       "tests/unit/lib/overdeck/cost-reconcile-fixtures.integration.test.ts",
       "tests/unit/lib/overdeck/cost-reconcile.test.ts",
       "tests/unit/lib/overdeck/cost.test.ts"
     ],
-    "recordedAt": "2026-07-07T18:01:25.747Z"
+    "recordedAt": "2026-07-07T18:06:40.389Z"
   },
   "harness": "codex",
   "model": "gpt-5.5",
@@ -208,19 +214,19 @@
   },
   "pipeline": {
     "issueId": "PAN-2388",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T18:05:42.134Z",
+    "updatedAt": "2026-07-07T18:06:55.230Z",
     "reviewNotes": "Manual reconcile route still drops the existing Claude transcript reconciler in committed code",
     "testNotes": "typecheck passed; npm test passed (896/900 test files, 8762/8821 tests, frontend 3/3); lint failed at lint:circular on cycle src/lib/agents.ts > src/lib/agents/resume.ts > src/lib/review-status.ts > src/lib/cloister/feedback-target.ts. Cycle files are outside PAN-2388 working set. Browser UAT not required per vBRIEF NonGoals.",
     "inspectNotes": "Bead ohmypi-fixtures ack: commit 9de8b447 touches only codex-parser.ts (revert of CodexCostEventUsage additions), a cost-reconcile integration test, and a runbook doc -- zero changes to ohmypi-parser.ts, ohmypi-parser.test.ts, or any ohmypi fixture file. Not this beads scope; AC1-4 remain satisfied unchanged from the prior verified state (c6b01bb3). No action needed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2470",
     "lastVerifiedCommit": "39d770364c889004aa39af26d8d1a18d8c116a9d",
-    "reviewRequestedAt": "2026-07-07T18:01:33.672Z",
+    "reviewRequestedAt": "2026-07-07T18:06:47.307Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".beads/export-state.json",
@@ -247,6 +253,8 @@
         "src/lib/overdeck/agent-state-sync.ts",
         "src/lib/overdeck/infra.ts",
         "src/lib/review-status.ts",
+        "sync-sources/hooks/record-cost-event.js",
+        "sync-sources/hooks/record-cost-event.js.map",
         "tests/unit/lib/cloister/feedback-target.test.ts",
         "tests/unit/lib/overdeck/cost-reconcile-fixtures.integration.test.ts",
         "tests/unit/lib/overdeck/cost-reconcile.test.ts",
@@ -317,13 +325,15 @@
         "src/lib/overdeck/cost.ts",
         "src/lib/overdeck/infra.ts",
         "src/lib/review-status.ts",
+        "sync-sources/hooks/record-cost-event.js",
+        "sync-sources/hooks/record-cost-event.js.map",
         "tests/lib/cost-parsers/jsonl-parser.test.ts",
         "tests/unit/lib/cloister/feedback-target.test.ts",
         "tests/unit/lib/overdeck/cost-reconcile-fixtures.integration.test.ts",
         "tests/unit/lib/overdeck/cost-reconcile.test.ts",
         "tests/unit/lib/overdeck/cost.test.ts"
       ],
-      "recordedAt": "2026-07-07T18:01:25.747Z"
+      "recordedAt": "2026-07-07T18:06:40.389Z"
     }
   },
   "closeOut": {
@@ -369,9 +379,9 @@
             "cacheWrite": 971
           },
           "unknown": {
-            "input": 9611356,
-            "output": 27448,
-            "cacheRead": 8778624,
+            "input": 11642496,
+            "output": 33049,
+            "cacheRead": 10712320,
             "cacheWrite": 0
           }
         },
@@ -399,18 +409,18 @@
             "cacheWrite": 0
           },
           "unknown": {
-            "input": 265205309,
-            "output": 403547,
-            "cacheRead": 242500480,
+            "input": 271694992,
+            "output": 412117,
+            "cacheRead": 248479360,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "unknown": {
-          "input": 274946451,
-          "output": 431570,
-          "cacheRead": 251367552,
+          "input": 283467274,
+          "output": 445741,
+          "cacheRead": 259280128,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -439,8 +449,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 256.154714,
-        "pricingAsOf": "2026-07-07T18:05:42.185Z"
+        "usd": 261.765742,
+        "pricingAsOf": "2026-07-07T18:06:55.461Z"
       }
     },
     "merges": [
@@ -474,5 +484,5 @@
     }
   },
   "created": "2026-07-07T17:32:25.282Z",
-  "updated": "2026-07-07T18:05:46.531Z"
+  "updated": "2026-07-07T18:06:55.463Z"
 }
