@@ -5,6 +5,7 @@ import { CoreServicesSection } from './CoreServicesSection';
 import { HistorySection } from './HistorySection';
 import { HostProcessesSection } from './HostProcessesSection';
 import { MachineRoomTopbar, type MachineRoomGroupBy } from './MachineRoomTopbar';
+import { ReclaimAdvisor } from './ReclaimAdvisor';
 import { StacksSection } from './StacksSection';
 import { VitalsStrip } from './VitalsStrip';
 
@@ -74,6 +75,11 @@ export function MachineRoom({ snapshot, onNavigateToAgents, onStop, onPause, onL
             const row = rowById.get(`agent:${agent.id}`);
             if (row) onPause?.(row);
           }}
+        />
+        <ReclaimAdvisor
+          candidates={snapshot.reclaimCandidates}
+          totals={snapshot.reclaimTotals}
+          thresholdBytes={snapshot.reclaimThresholdBytes}
         />
         <StacksSection stacks={snapshot.stacks ?? []} filter={filter} groupBy={groupBy} />
         <HistorySection forecast={snapshot.forecast} onHighlightTarget={setHighlightedTarget} />
