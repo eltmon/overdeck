@@ -57,7 +57,7 @@ export type AgentId = typeof AgentId.Type;
 // Must match VALID_ROLES_SYNC (and the roles actually written to the agents
 // table). PAN-1979: a too-narrow Role enum crashed the AgentsResolver list
 // decode on real `strike`/`flywheel` rows, taking down dashboard boot.
-export const Role = Schema.Literals(['work', 'review', 'plan', 'ship', 'test', 'flywheel', 'strike', 'sequencer']);
+export const Role = Schema.Literals(['work', 'review', 'plan', 'ship', 'test', 'flywheel', 'strike', 'sequencer', 'knowledge']);
 export type Role = typeof Role.Type;
 
 // PAN-1979: a too-narrow Role enum crashed the AgentsResolver list decode
@@ -796,7 +796,7 @@ function listLiveTmuxSessionNamesSync(): Set<string> {
   }
 }
 
-const VALID_ROLES_SYNC = new Set<string>(['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer']);
+const VALID_ROLES_SYNC = new Set<string>(['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer', 'knowledge']);
 
 function parseAgentStateJsonSync(content: string, fallbackId: string): AgentState | null {
   let parsed: Partial<AgentState>;

@@ -76,7 +76,7 @@ export interface SpawnOptions {
    * skips plan/review/test/ship and lands directly on main — see roles/strike.md.
    * Strike sessions are named `strike-<issue-id>` instead of `agent-<issue-id>`.
    */
-  role?: 'work' | 'strike';
+  role?: 'work' | 'strike' | 'knowledge';
   difficulty?: ComplexityLevel;
   agentType?: 'review-agent' | 'test-agent' | 'merge-agent' | 'work-agent';
 
@@ -650,7 +650,7 @@ export async function assertWorkspaceStackHealthyForSpawn(
   allowHost = false,
   workspacePath?: string,
 ): Promise<void> {
-  if (role === 'plan') return;
+  if (role === 'plan' || role === 'knowledge') return;
 
   // PAN-1872: guard against an undefined issueId so workspace health checks do
   // not crash with `Cannot read properties of undefined (reading 'toUpperCase')`

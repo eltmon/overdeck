@@ -152,6 +152,24 @@ describe('role definitions', () => {
     expect(body).toContain('TESTS FAILED');
   });
 
+  it('defines the knowledge role as OKF maintenance with no merge or pan done authority', () => {
+    const { frontmatter, body } = splitFrontmatter(readRepoFile('roles/knowledge.md'));
+
+    expect(frontmatter).toMatchObject({
+      name: 'knowledge',
+      permissionMode: 'default',
+      effort: 'high',
+    });
+    expect(frontmatter.model).toBeUndefined();
+    expect(body).toContain('/okf study');
+    expect(body).toContain('/okf retro');
+    expect(body).toContain('/okf sync');
+    expect(body).toContain('Open PRs to the knowledge repository only');
+    expect(body).toContain('Never run `pan done`');
+    expect(body).toContain('Never merge code or knowledge PRs yourself');
+    expect(body).toContain('Cite concept IDs');
+  });
+
   // PAN-1531: ship role removed. Rebase is performed server-side by
   // rebaseFeatureBranch() in src/lib/cloister/merge-rebase.ts. See
   // docs/MERGE-WORKFLOW.md for the new two-actor design.

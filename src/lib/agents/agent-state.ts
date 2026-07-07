@@ -13,7 +13,7 @@ import { logAgentLifecycleSync } from '../persistent-logger.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
 import { normalizeAgentId } from './identity.js';
 
-export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer';
+export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer' | 'knowledge';
 
 export const SESSION_EXITED_BEFORE_KICKOFF = 'session-exited-before-kickoff';
 
@@ -199,7 +199,7 @@ export async function wipeAgentStateDirs(
 }
 
 export function isRole(value: unknown): value is Role {
-  return value === 'plan' || value === 'work' || value === 'review' || value === 'test' || value === 'ship' || value === 'flywheel' || value === 'strike' || value === 'sequencer';
+  return value === 'plan' || value === 'work' || value === 'review' || value === 'test' || value === 'ship' || value === 'flywheel' || value === 'strike' || value === 'sequencer' || value === 'knowledge';
 }
 
 function cleanAgentState(raw: AgentState): AgentState {
