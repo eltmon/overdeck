@@ -19,7 +19,7 @@ const { defaultExecAsync, mockExecAsync } = vi.hoisted(() => {
     // PAN-1531: verifyMergedBeforeLifecycle is now PR-API-only. Tests rely on
     // postMergeLifecycle proceeding past verification, so the gh pr list mock
     // must report the PR as merged.
-    if (cmd.includes('gh pr list')) return { stdout: '[{"number":444,"mergedAt":"2026-04-27T00:00:00Z","mergeCommit":{"oid":"deadbeef"}}]', stderr: '' };
+    if (cmd.includes('gh pr list')) return { stdout: '[{"number":444,"state":"closed","mergedAt":"2026-04-27T00:00:00Z"}]', stderr: '' };
     return { stdout: '', stderr: '' };
   };
   return {
