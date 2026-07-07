@@ -36,12 +36,11 @@
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-07T08:40:26.506Z",
+    "mergeStatus": "merged",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-07T08:40:37.856Z",
     "reviewNotes": "Approved; UI pipeline and merge-verification checks passed",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
-    "mergeNotes": "Work agent agent-pan-2450 stopped before completing the rebase onto main",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2455",
     "reviewedAtCommit": "73a179d1f3255692b50ade003709bac6bf573a83",
     "lastVerifiedCommit": "b38b154a25571c95ae8bfcff69ece7de96c257bc",
@@ -117,7 +116,7 @@
       },
       "costAtCloseOut": {
         "usd": 50.4271632,
-        "pricingAsOf": "2026-07-07T08:40:26.529Z"
+        "pricingAsOf": "2026-07-07T08:40:37.923Z"
       }
     },
     "merges": [
@@ -129,5 +128,5 @@
     "finalizedAt": "2026-07-07T04:18:45.208Z"
   },
   "created": "2026-07-07T06:28:28.585Z",
-  "updated": "2026-07-07T08:40:26.530Z"
+  "updated": "2026-07-07T08:40:37.923Z"
 }
