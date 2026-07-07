@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-2341",
   "schemaVersion": 2,
-  "created": "2026-07-07T05:02:22.342Z",
-  "updated": "2026-07-07T05:02:22.833Z",
-  "pipeline": {
-    "issueId": "PAN-2341",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-07T05:02:22.342Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -26,6 +9,90 @@
       "timestamp": "2026-07-07T05:02:22.342Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-07T05:02:22.342Z",
+  "updated": "2026-07-07T08:56:11.518Z",
+  "pipeline": {
+    "issueId": "PAN-2341",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "inspectStatus": "failed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-07T08:56:11.441Z",
+    "inspectNotes": "Bead reconcile-journals-sweep BLOCKED: src/lib/cloister/advancing-selfheal.ts:45-48 isReconciliableStatus() requires BOTH status.reviewStatus AND status.testStatus to be in JOURNAL_RECONCILE_STATES (line 15: pending/reviewing/passed/failed/blocked/testing/dispatch_failed). That set omits the legitimate testStatus value \"skipped\" (a real, commonly-set value per src/lib/review-status.ts:45, treated on par with passed for merge-gating at lines 144/173/873/901/937). Any issue with reviewStatus: reviewing|pending (clearly in-flight) and testStatus: skipped (tests not required/applicable) is silently excluded from both the DB-row loop (line 74) and the tmux-alive session loop (line 89) — reconcileInFlightJournals never calls getReviewStatusSync for it, so a journaled advancing verdict on such an issue is never reconciled. This violates FR-1 (must call getReviewStatusSync for every in-flight issue) and is not caught by the shipped tests, which only ever construct status() with testStatus: pending (default) and never exercise skipped. Fix: change isReconciliableStatus to gate on reviewStatus alone (or on either field independently, with skipped treated as a valid non-excluding testStatus), then add a test case with testStatus: skipped + reviewStatus: reviewing to prove the fix. Everything else in the commit checks out: getReviewStatusSync already owns journal->DB reconcile (review-status.ts:757, PAN-1988), the sweep call at deacon.ts:2722 genuinely precedes checkTerminalAdvancingSessions at deacon.ts:2846 (confirmed live, not just the ordering test), and startDeacon triggers runScheduledPatrol(startup) before the interval loop so FR-1s on-boot language is satisfied via the patrol path. markAdvancingSessionStopped is correctly unwired per the beads own scope (wire sweep into the patrol — singular), so that is not a blocker."
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 7634,
+            "output": 200,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 36115,
+            "output": 109700,
+            "cacheRead": 9612612,
+            "cacheWrite": 544156
+          }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 7410,
+            "output": 11930,
+            "cacheRead": 1101277,
+            "cacheWrite": 94734
+          }
+        },
+        "work": {
+          "unknown": {
+            "input": 3726477,
+            "output": 13053,
+            "cacheRead": 3240320,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-haiku-4-5": {
+          "input": 7634,
+          "output": 200,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 36115,
+          "output": 109700,
+          "cacheRead": 9612612,
+          "cacheWrite": 544156
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 7410,
+          "output": 11930,
+          "cacheRead": 1101277,
+          "cacheWrite": 94734
+        },
+        "unknown": {
+          "input": 3726477,
+          "output": 13053,
+          "cacheRead": 3240320,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 15.584536,
+        "pricingAsOf": "2026-07-07T08:56:11.498Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "model": "claude-sonnet-5"
 }
