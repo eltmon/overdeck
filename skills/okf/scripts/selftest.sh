@@ -65,10 +65,15 @@ require_grep 'okf_embeddings_version: "0.1"' "$OKFE" "okf-embeddings doc include
 require_grep '"id":"tables/orders#0"' "$OKFE" "okf-embeddings doc includes shard line format"
 require_grep 'Lines are sorted by `id`' "$OKFE" "okf-embeddings doc includes sorting rule"
 require_grep 'okf_embeddings_version` controls compatibility' "$OKFE" "okf-embeddings doc includes succession clause"
+require_grep 'provider: ollama' "$ROOT/templates/okf-embeddings.yaml" "embedding manifest template uses ollama default"
+require_grep 'model: nomic-embed-text' "$ROOT/templates/okf-embeddings.yaml" "embedding manifest template uses nomic-embed-text"
 
 python3 - "$ROOT" <<'PY'
 import importlib.util
 from pathlib import Path
+import json
+import math
+import subprocess
 import sys
 import tempfile
 
@@ -124,6 +129,128 @@ See [overtime](/policies/overtime.md).
     assert okf_common.markdown_links(fenced_only) == []
 
 print("ok - okf_common.py fixture round-trip, timestamp-stable hash, and fenced-link behavior")
+PY
+
+python3 - "$ROOT" <<'PY'
+from pathlib import Path
+import json
+import math
+import subprocess
+import sys
+import tempfile
+
+root = Path(sys.argv[1])
+embed = root / "scripts" / "embed.py"
+
+def write(path, content):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+def run_embed(bundle):
+    return subprocess.run(
+        [sys.executable, str(embed), "--bundle", str(bundle), "--profile", "test"],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+with tempfile.TemporaryDirectory() as tmp:
+    bundle = Path(tmp)
+    write(
+        bundle / "okf-embeddings.yaml",
+        """okf_embeddings_version: "0.1"
+default_profile: test
+profiles:
+  test:
+    provider: fake
+    model: fake-embed
+    dim: 4
+    share: true
+chunking:
+  strategy: concept
+  max_tokens: 512
+hash: sha256
+vectors_dir: embeddings
+""",
+    )
+    write(bundle / "a.md", "---\ntype: Guide\ntitle: A\n---\n\nAlpha body.\n")
+    write(bundle / "b.md", "---\ntype: Guide\ntitle: B\n---\n\nBeta body.\n")
+    write(bundle / "skip.md", "---\ntype: Guide\ntitle: Skip\nx_embed: exclude\n---\n\nSkip body.\n")
+
+    first = run_embed(bundle)
+    assert first.returncode == 0, first.stderr
+    shard = bundle / "embeddings" / "test.okfe.jsonl"
+    first_lines = shard.read_text(encoding="utf-8").splitlines()
+    first_records = [json.loads(line) for line in first_lines]
+    assert [record["id"] for record in first_records] == ["a#0", "b#0"]
+    for record in first_records:
+        assert all(round(value, 6) == value for value in record["v"])
+        assert math.isclose(sum(value * value for value in record["v"]), 1.0, rel_tol=0, abs_tol=0.000002)
+
+    write(bundle / "b.md", "---\ntype: Guide\ntitle: B\n---\n\nBeta body changed.\n")
+    second = run_embed(bundle)
+    assert second.returncode == 0, second.stderr
+    second_lines = shard.read_text(encoding="utf-8").splitlines()
+    assert first_lines[0] == second_lines[0], "unchanged concept line changed"
+    assert first_lines[1] != second_lines[1], "edited concept line did not change"
+
+    roundtrip = [json.dumps(json.loads(line), sort_keys=True, separators=(",", ":")) for line in second_lines]
+    assert roundtrip == second_lines
+
+    write(bundle / "skip.md", "---\ntype: Guide\ntitle: Skip\n---\n\nSkip body.\n")
+    third = run_embed(bundle)
+    assert third.returncode == 0, third.stderr
+    third_records = [json.loads(line) for line in shard.read_text(encoding="utf-8").splitlines()]
+    assert [record["id"] for record in third_records] == ["a#0", "b#0", "skip#0"]
+
+with tempfile.TemporaryDirectory() as tmp:
+    bundle = Path(tmp)
+    write(
+        bundle / "okf-embeddings.yaml",
+        """okf_embeddings_version: "0.1"
+default_profile: bad
+profiles:
+  bad:
+    provider: ollama
+    model: nomic-embed-text
+    dim: 768
+    endpoint: http://example.com:11434
+chunking:
+  strategy: concept
+  max_tokens: 512
+hash: sha256
+vectors_dir: embeddings
+""",
+    )
+    write(bundle / "a.md", "---\ntype: Guide\n---\n\nAlpha body.\n")
+    bad = subprocess.run([sys.executable, str(embed), "--bundle", str(bundle)], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    assert bad.returncode == 2
+    assert "ollama endpoint must be localhost" in bad.stderr
+    assert not (bundle / "embeddings").exists()
+
+with tempfile.TemporaryDirectory() as tmp:
+    bundle = Path(tmp)
+    write(
+        bundle / "okf-embeddings.yaml",
+        """okf_embeddings_version: "0.1"
+default_profile: bad
+profiles:
+  bad:
+    provider: fake
+    dim: 4
+chunking:
+  strategy: concept
+  max_tokens: 512
+hash: sha256
+vectors_dir: embeddings
+""",
+    )
+    missing = subprocess.run([sys.executable, str(embed), "--bundle", str(bundle)], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    assert missing.returncode == 2
+    assert "missing model" in missing.stderr
+
+print("ok - embed.py fake-provider incremental shards, exclusions, ollama guard, and manifest errors")
 PY
 
 if grep -InE '^(from|import) ' "$ROOT/scripts/okf_common.py" | grep -Ev ' (annotations|dataclasses|hashlib|pathlib|re|typing|yaml)( |$)|^.*from __future__ import annotations$'; then
