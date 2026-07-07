@@ -23,18 +23,18 @@
     }
   ],
   "created": "2026-07-06T14:48:34.495Z",
-  "updated": "2026-07-07T19:03:15.494Z",
+  "updated": "2026-07-07T19:05:43.254Z",
   "pipeline": {
     "issueId": "PAN-2405",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T19:03:15.417Z",
+    "updatedAt": "2026-07-07T19:05:43.208Z",
     "reviewNotes": "restart-with-current-config resolves staffing from a fake work item",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2476",
-    "lastVerifiedCommit": "d2e667095012bba7847ae533493ec5855456b1cd",
+    "lastVerifiedCommit": "6c9186821fa3a1bba8fea9c58dc3cab785febbc6",
     "reviewRequestedAt": "2026-07-07T18:57:13.275Z"
   },
   "closeOut": {
@@ -50,10 +50,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 186,
-            "output": 39164,
-            "cacheRead": 17850852,
-            "cacheWrite": 728480
+            "input": 189,
+            "output": 39855,
+            "cacheRead": 19147570,
+            "cacheWrite": 730296
           }
         }
       },
@@ -65,15 +65,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 186,
-          "output": 39164,
-          "cacheRead": 17850852,
-          "cacheWrite": 728480
+          "input": 189,
+          "output": 39855,
+          "cacheRead": 19147570,
+          "cacheWrite": 730296
         }
       },
       "costAtCloseOut": {
-        "usd": 3.940213,
-        "pricingAsOf": "2026-07-07T19:03:15.493Z"
+        "usd": 4.075613,
+        "pricingAsOf": "2026-07-07T19:05:43.254Z"
       }
     },
     "merges": [
