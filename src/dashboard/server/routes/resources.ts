@@ -27,6 +27,16 @@ export {
   postPruneVolumesRoute,
 } from './resources/prune.js';
 export {
+  enrichContainersWithLimits,
+  getMemoryLimitLevel,
+  recordContainerOomEventsForTests,
+  resetContainerOomEventsForTests,
+  type ContainerLimitFields,
+  type ContainerLimitInput,
+  type ContainerOomEvent,
+  type MemoryLimitLevel,
+} from './resources/limits.js';
+export {
   buildAgentStatsSnapshot,
   getAgentStatsSnapshotEffect,
   parseProcessTable,

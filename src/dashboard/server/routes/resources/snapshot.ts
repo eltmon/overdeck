@@ -8,12 +8,13 @@ import { httpHandler } from '../http-handler.js';
 import { getAgentStatsSnapshotEffect } from './agents-stats.js';
 import { getCoreServicesSnapshot } from './core-services.js';
 import { getHostProcessesSnapshot } from './host-processes.js';
+import { enrichContainersWithLimits } from './limits.js';
 import { getCurrentDockerStats } from './shared.js';
 
 /** Build the GET /api/resources response from the SQLite agents table. */
 export function getResourcesEffect(): Effect.Effect<ReturnType<typeof jsonResponse>, never, never> {
   return Effect.gen(function* () {
-    const containers = getCurrentDockerStats();
+    const containers = enrichContainersWithLimits(getCurrentDockerStats());
     const agentStats = yield* getAgentStatsSnapshotEffect();
     const stoppedContainers: unknown[] = [];
 
