@@ -27,6 +27,13 @@ export {
   postPruneVolumesRoute,
 } from './resources/prune.js';
 export {
+  buildCoreServices,
+  getCoreServicesSnapshot,
+  type CoreServiceRow,
+  type CoreServicesDeaconStatus,
+  type CoreServicesProcess,
+} from './resources/core-services.js';
+export {
   buildHostProcesses,
   getHostProcessesSnapshot,
   resetHostProcessRetention,

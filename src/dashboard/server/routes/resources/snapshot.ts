@@ -5,6 +5,7 @@ import { listAgentStates, type AgentState } from '../../../../lib/agents.js';
 import { listSessions } from '../../../../lib/tmux.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
+import { getCoreServicesSnapshot } from './core-services.js';
 import { getHostProcessesSnapshot } from './host-processes.js';
 import { getCurrentDockerStats } from './shared.js';
 
@@ -28,6 +29,7 @@ export function getResourcesEffect(): Effect.Effect<ReturnType<typeof jsonRespon
       }));
 
     return jsonResponse({
+      coreServices: getCoreServicesSnapshot(),
       containers,
       hostProcesses: getHostProcessesSnapshot(),
       stoppedContainers,

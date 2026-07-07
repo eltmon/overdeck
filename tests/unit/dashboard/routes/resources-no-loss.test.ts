@@ -108,6 +108,7 @@ describe('PAN-2464 resources route no-loss audit', () => {
     expect(Object.keys(body).sort()).toEqual([
       'agents',
       'containers',
+      'coreServices',
       'hostProcesses',
       'networks',
       'stoppedContainers',
