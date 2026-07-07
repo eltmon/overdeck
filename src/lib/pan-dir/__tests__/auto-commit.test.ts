@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from '@effect/vitest';
 import { Effect } from 'effect';
 import { execSync } from 'child_process';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs';
+import { chmodSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { rmSync as unlink } from 'fs';
@@ -299,6 +299,55 @@ describe('auto-commit', () => {
         expect(warn.mock.calls.some((call) => String(call[0]).includes('not state-plane-only'))).toBe(true);
       } finally {
         warn.mockRestore();
+        rmSync(remoteTmp, { recursive: true, force: true });
+        rmSync(otherTmp, { recursive: true, force: true });
+      }
+    }),
+  );
+
+  it.effect('does not rebase when local-ahead commit listing fails', () =>
+    Effect.gen(function* () {
+      const remoteTmp = setBareOrigin(tmp);
+      const otherTmp = makeOtherClone(remoteTmp);
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const previousPath = process.env.PATH;
+      const realGit = execSync('command -v git', { encoding: 'utf-8' }).trim();
+      const wrapperDir = mkdtempSync(join(tmpdir(), 'pan-autocommit-git-wrapper-'));
+      try {
+        mkdirSync(join(otherTmp, '.pan', 'records'), { recursive: true });
+        writeFileSync(join(otherTmp, '.pan', 'records', 'pan-remote.json'), '{"remote":true}\n');
+        execSync('git add .pan/records/pan-remote.json', { cwd: otherTmp });
+        execSync('git commit -q -m "chore(state): remote state"', { cwd: otherTmp });
+        execSync('git push -q origin main', { cwd: otherTmp });
+
+        const wrapperPath = join(wrapperDir, 'git');
+        writeFileSync(wrapperPath, [
+          '#!/bin/sh',
+          'if [ "$1" = "rev-list" ] && [ "$2" = "--reverse" ]; then',
+          '  echo "simulated rev-list failure" >&2',
+          '  exit 128',
+          'fi',
+          `exec ${realGit} "$@"`,
+          '',
+        ].join('\n'));
+        chmodSync(wrapperPath, 0o755);
+        process.env.PATH = `${wrapperDir}:${previousPath ?? ''}`;
+
+        mkdirSync(join(tmp, '.pan', 'records'), { recursive: true });
+        const path = join(tmp, '.pan', 'records', 'pan-local.json');
+        writeFileSync(path, '{"local":true}\n');
+
+        queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): local state' });
+        const result = yield* flushAutoCommits(tmp);
+
+        expect(result.committed).toBe(true);
+        expect(exec(tmp, 'git rev-parse HEAD')).not.toBe(exec(tmp, 'git rev-parse origin/main'));
+        expect(warn.mock.calls.some((call) => String(call[0]).includes('local-ahead commit list failed'))).toBe(true);
+        expect(warn.mock.calls.some((call) => String(call[0]).includes('not state-plane-only'))).toBe(true);
+      } finally {
+        process.env.PATH = previousPath;
+        warn.mockRestore();
+        rmSync(wrapperDir, { recursive: true, force: true });
         rmSync(remoteTmp, { recursive: true, force: true });
         rmSync(otherTmp, { recursive: true, force: true });
       }

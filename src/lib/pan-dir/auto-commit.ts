@@ -488,10 +488,11 @@ function areLocalAheadCommitsStatePlaneOnly(
         onSuccess: (result) => result.stdout.split('\n').map((line) => line.trim()).filter(Boolean),
         onFailure: (err) => {
           warnAutoPush(branch, `local-ahead commit list failed: ${err.stderr || err._tag}`);
-          return [];
+          return null;
         },
       }),
     );
+    if (commits === null) return false;
     if (commits.length === 0) return true;
 
     for (const commit of commits) {
