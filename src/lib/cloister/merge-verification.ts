@@ -39,7 +39,7 @@ export async function verifyMergedBeforeLifecycle(
   try {
     if (isGitHubAppConfigured()) {
       const prs = await Effect.runPromise(listPullRequestsForHead(owner, repo, branchName, 'all'));
-      const mergedPr = prs.find((pr) => pr.merged || pr.mergedAt || pr.mergeCommit);
+      const mergedPr = prs.find((pr) => pr.merged === true || pr.mergedAt != null);
       if (mergedPr) {
         return { merged: true, reason: `GitHub PR #${mergedPr.number} is merged` };
       }
@@ -64,11 +64,11 @@ export async function verifyMergedBeforeLifecycle(
     }
 
     const { stdout } = await execAsync(
-      `gh pr list --repo ${shellQuote(`${owner}/${repo}`)} --state all --head ${quotedBranch} --json number,mergedAt,mergeCommit --limit 5`,
+      `gh pr list --repo ${shellQuote(`${owner}/${repo}`)} --state all --head ${quotedBranch} --json number,state,mergedAt --limit 5`,
       { cwd: projectPath },
     );
-    const prs = JSON.parse(stdout || '[]') as Array<{ number: number; mergedAt: string | null; mergeCommit: unknown | null }>;
-    const mergedPr = prs.find((pr) => pr.mergedAt || pr.mergeCommit);
+    const prs = JSON.parse(stdout || '[]') as Array<{ number: number; state: 'open' | 'closed'; mergedAt: string | null }>;
+    const mergedPr = prs.find((pr) => pr.state === 'closed' && pr.mergedAt != null);
     if (mergedPr) {
       return { merged: true, reason: `GitHub PR #${mergedPr.number} is merged` };
     }
