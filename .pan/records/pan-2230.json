@@ -1,78 +1,9 @@
 {
   "issueId": "PAN-2230",
   "schemaVersion": 2,
-  "sessionHistory": [
-    {
-      "timestamp": "2026-07-07T09:17:29.133Z",
-      "reason": "end",
-      "note": "Added --regen mode to circular-dep ratchet. All review feedback addressed. typecheck, lint, and npm test pass locally."
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-07T09:17:30.268Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-07T09:19Z] review-agent → CHANGES-REQUESTED — seq 2",
-      "timestamp": "2026-07-07T09:19:17.061Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "kimi-k2.7-code",
-      "timestamp": "2026-07-07T09:19:17.184Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-07T09:21Z] verification-gate → FAILED — seq 3",
-      "timestamp": "2026-07-07T09:21:13.371Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-07T09:22:34.237Z"
-    }
-  ],
   "feedback": [],
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      ".pan/drafts/PAN-2230.md",
-      ".pan/drafts/pan-2230.md",
-      ".pan/records/pan-2230.json",
-      "docs/ci-cd/CICD-QUEUE.md",
-      "docs/codebase-health/REFACTOR-QUEUE.md",
-      "scripts/canonicalize-circular-deps.js"
-    ],
-    "declaredScopeUntouched": [
-      "docs/CODEBASE-HEALTH-ROADMAP.md",
-      "docs/codebase-health/A4-circular-dep-guard.md"
-    ],
-    "declaredScope": [
-      "bun.lock",
-      "docs/CODEBASE-HEALTH-ROADMAP.md",
-      "docs/codebase-health/A4-circular-dep-guard.md",
-      "package.json",
-      "scripts/circular-deps-baseline.txt",
-      "scripts/lint-circular-deps.sh",
-      "scripts/lint-ratchet-audit.sh"
-    ],
-    "actualChangedFiles": [
-      ".pan/drafts/PAN-2230.md",
-      ".pan/drafts/pan-2230.md",
-      ".pan/records/pan-2230.json",
-      "bun.lock",
-      "docs/ci-cd/CICD-QUEUE.md",
-      "docs/codebase-health/REFACTOR-QUEUE.md",
-      "package.json",
-      "scripts/canonicalize-circular-deps.js",
-      "scripts/circular-deps-baseline.txt",
-      "scripts/lint-circular-deps.sh",
-      "scripts/lint-ratchet-audit.sh"
-    ],
-    "recordedAt": "2026-07-07T09:17:17.961Z"
-  },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "ratchet-audit-integration": "completed",
     "ratchet-audit-integration.ac1": "completed",
@@ -95,16 +26,16 @@
   },
   "pipeline": {
     "issueId": "PAN-2230",
-    "reviewStatus": "blocked",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T09:24:03.129Z",
-    "reviewNotes": "A4 guard documentation is still missing",
-    "verificationNotes": "Verification FAILED at test (81057ms):\n\noject');\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/9]⎯\n\n FAIL  |root| tests/unit/lib/cloister/deacon-swarm-enumerate.test.ts > coordinateSwarmSlots enumerate-swarms > excludes single-item and non-swarm feature workspaces, and ignores slot workspaces\nAssertionError: expected [ Array(1) ] to deeply equal []\n\n- Expected\n+ Received\n\n- []\n+ [\n+   \"[swarm] considered PAN-100: swarm eligible\",\n+ ]\n\n ❯ tests/unit/lib/cloister/deacon-swarm-enumerate.test.ts:106:41\n    104|     mocks.listProjectsSync.mockReturnValue([{ config: { path: projectP…\n    105|\n    106|     await expect(coordinateSwarmSlots()).resolves.toEqual([]);\n       |                                         ^\n    107|   });\n    108|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/9]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/agents-switch-model.test.ts > POST /api/agents/:id/switch-model > rejects model switching for pipeline agents\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/routes/__tests__/agents-switch-model.test.ts:29:3\n     27|\n     28| describe('POST /api/agents/:id/switch-model', () => {\n     29|   it('rejects model switching for pipeline agents', async () => {\n       |   ^\n     30|     const response = await postAgentSwitchModel('agent-pan-1928', { mo…\n     31|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/9]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/cloister-config.test.ts > cloister config route > reloads the live child Cloister after saving config updates\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/routes/__tests__/cloister-config.test.ts:47:3\n     45|   });\n     46|\n     47|   it('reloads the live child Cloister after saving config updates', as…\n       |   ^\n     48|     const updates = { monitoring: { check_interval: 17 } };\n     49|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/9]⎯\n\n",
+    "updatedAt": "2026-07-07T09:28:11.702Z",
+    "reviewNotes": "Verification failed at test",
+    "verificationNotes": "Verification FAILED at test (77179ms):\n\nsrc/dashboard/server/routes/issues.ts:1:import { Db } from '../../../lib/overdeck/infra.js';\n\nEach must go through an overdeck door (src/lib/overdeck/*) — not getDatabase() or a database/* store.\nRefusing flywheel-orchestrator commit: orchestrators dispatch work; they do not author repo artifacts.\nOffending staged paths:\n  .pan/drafts/PAN-1791.md\n  .pan/specs/PAN-1791.vbrief.json\n\nAllowed flywheel-orchestrator commit paths are:\n  docs/FLYWHEEL-STATE.md\n  .pan/records/\n  .pan/continues/\n  .pan/backlog/\n  .beads/\nRefusing flywheel-orchestrator commit: orchestrators dispatch work; they do not author repo artifacts.\nOffending staged paths:\n  src/foo.ts\n\nAllowed flywheel-orchestrator commit paths are:\n  docs/FLYWHEEL-STATE.md\n  .pan/records/\n  .pan/continues/\n  .pan/backlog/\n  .beads/\nRefusing flywheel-orchestrator commit: orchestrators dispatch work; they do not author repo artifacts.\nOffending staged paths:\n  src/foo.ts\n\nAllowed flywheel-orchestrator commit paths are:\n  docs/FLYWHEEL-STATE.md\n  .pan/records/\n  .pan/continues/\n  .pan/backlog/\n  .beads/\nguard-agent-main-push.sh invoked\n⚠ ratchet audit: no base for refs/heads/feature — skipping\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n✖ quarantine audit: the following entries lack an issue reference\n  tests/foo.test.ts\nEach quarantine entry must reference an issue — add e.g. # PAN-XXXX.\n(node:3869694) ExperimentalWarning: Some other experimental feature\n(Use `node --trace-warnings ...` to show where the warning was created)\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2462",
-    "reviewRequestedAt": "2026-07-07T09:21:15.613Z",
+    "reviewRequestedAt": "2026-07-07T09:24:18.336Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/drafts/PAN-2230.md",
@@ -140,7 +71,7 @@
         "scripts/lint-circular-deps.sh",
         "scripts/lint-ratchet-audit.sh"
       ],
-      "recordedAt": "2026-07-07T09:17:17.961Z"
+      "recordedAt": "2026-07-07T09:24:11.784Z"
     }
   },
   "closeOut": {
@@ -164,17 +95,17 @@
         },
         "review": {
           "unknown": {
-            "input": 1331776,
-            "output": 8139,
-            "cacheRead": 1047680,
+            "input": 2566914,
+            "output": 12456,
+            "cacheRead": 2145024,
             "cacheWrite": 0
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 826918,
-            "output": 58569,
-            "cacheRead": 30277120,
+            "input": 1116252,
+            "output": 64223,
+            "cacheRead": 31927808,
             "cacheWrite": 0
           }
         }
@@ -193,21 +124,21 @@
           "cacheWrite": 160632
         },
         "unknown": {
-          "input": 1331776,
-          "output": 8139,
-          "cacheRead": 1047680,
+          "input": 2566914,
+          "output": 12456,
+          "cacheRead": 2145024,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 826918,
-          "output": 58569,
-          "cacheRead": 30277120,
+          "input": 1116252,
+          "output": 64223,
+          "cacheRead": 31927808,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 13.365712,
-        "pricingAsOf": "2026-07-07T09:24:03.176Z"
+        "usd": 15.343978,
+        "pricingAsOf": "2026-07-07T09:28:11.762Z"
       }
     },
     "merges": [
@@ -215,6 +146,6 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "created": "2026-07-07T09:13:42.758Z",
-  "updated": "2026-07-07T09:24:03.181Z"
+  "created": "2026-07-07T09:28:06.004Z",
+  "updated": "2026-07-07T09:28:11.764Z"
 }
