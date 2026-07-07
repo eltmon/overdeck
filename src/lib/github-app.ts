@@ -32,6 +32,7 @@ export interface GitHubAppConfig {
 export interface InstallationToken {
   token: string;
   expiresAt: string; // ISO timestamp
+  permissions?: Record<string, string>;
 }
 
 export interface GitHubPullRequestRef {
@@ -230,10 +231,15 @@ function generateJWT(appId: string, privateKey: string): string {
     throw new Error(`Failed to generate installation token: ${response.status} ${text}`);
   }
 
-  const data = await response.json() as { token: string; expires_at: string };
+  const data = await response.json() as {
+    token: string;
+    expires_at: string;
+    permissions?: Record<string, string>;
+  };
   return {
     token: data.token,
     expiresAt: data.expires_at,
+    permissions: data.permissions,
   };
 }
 
