@@ -134,8 +134,8 @@
     ],
     "recordedAt": "2026-07-07T00:07:09.510Z"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-opus-4-8",
   "statusOverrides": {
     "unknown-backfill": "completed",
     "unknown-backfill.ac1": "completed",
@@ -182,16 +182,16 @@
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-07T00:17:41.225Z",
+    "mergeStatus": "merged",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-07T00:51:02.723Z",
     "reviewNotes": "Approved; reviewed 6c1521cc with no blocking findings",
     "testNotes": "npm run typecheck passed (contracts built, tsc --noEmit clean for main/hooks/evals). npm run lint passed all subcommands: eslint, effect pinning, permissions, state-writes, overdeck-boundaries, skills, prompts, file-size, source-introspection, ratchet-audit. npm test passed: 861 test files passed (4 skipped), 8542 tests passed (52 skipped); frontend tests 3 files/32 tests passed. No browser UAT required: acceptance criteria are data/aggregation-level (cost classification, endpoint plane unification, pricing table, codex sweep, fixture parsing) with frontend bucket labels covered by unit tests.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Bead attribution-classifier ack: all 4 ACs verified in working tree (classifySessionBucket FLYWHEEL/CONVERSATIONS/UNATTRIBUTED logic + findConversationForCostSessionSync locator/tmux_session lookup, both covered by attribution.test.ts). Note: commit f713b8ea43d itself is beads-bookkeeping only (closes unrelated bead workspace-uloh8, not workspace-oic6o) — the actual implementation landed earlier in 1548526f3a327deb824dcc95de8af6e568b07dc4.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2432",
-    "reviewedAtCommit": "e0627b17ff71a7399789ddead3ac430dab4e0fe1",
-    "lastVerifiedCommit": "4dc456c9627272a6fb90acc3c6b7ee8ccb11878b",
+    "reviewedAtCommit": "b86da77b4f6cb995717938be3aa877f4b317b209",
+    "lastVerifiedCommit": "b86da77b4f6cb995717938be3aa877f4b317b209",
     "reviewRequestedAt": "2026-07-07T00:07:46.682Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -312,6 +312,14 @@
             "cacheWrite": 2821
           }
         },
+        "review": {
+          "unknown": {
+            "input": 16432696,
+            "output": 51758,
+            "cacheRead": 14607232,
+            "cacheWrite": 0
+          }
+        },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
             "input": 19835,
@@ -325,6 +333,14 @@
             "input": 1465210,
             "output": 33674,
             "cacheRead": 9027840,
+            "cacheWrite": 0
+          }
+        },
+        "work": {
+          "unknown": {
+            "input": 133590596,
+            "output": 184970,
+            "cacheRead": 128981376,
             "cacheWrite": 0
           }
         }
@@ -348,6 +364,12 @@
           "cacheRead": 20590034,
           "cacheWrite": 649636
         },
+        "unknown": {
+          "input": 150023292,
+          "output": 236728,
+          "cacheRead": 143588608,
+          "cacheWrite": 0
+        },
         "anthropic/claude-sonnet-5": {
           "input": 19835,
           "output": 15647,
@@ -362,8 +384,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 40.851944,
-        "pricingAsOf": "2026-07-07T00:17:41.252Z"
+        "usd": 123.215056,
+        "pricingAsOf": "2026-07-07T00:51:02.748Z"
       }
     },
     "merges": [
@@ -372,5 +394,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-06T22:14:47.667Z",
-  "updated": "2026-07-07T00:17:41.254Z"
+  "updated": "2026-07-07T00:51:26.931Z"
 }
