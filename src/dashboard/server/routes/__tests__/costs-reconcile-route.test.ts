@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { runCostReconcileSources } from '../costs.js';
+import { buildCostReconcileResponse, runCostReconcileSources } from '../costs.js';
 import type { ReconcileResult } from '../../../../lib/costs/reconciler.js';
 import type { CostReconcileSummary } from '../../../../lib/overdeck/cost.js';
 
@@ -46,5 +46,20 @@ describe('POST /api/costs/reconcile route wiring', () => {
     expect(result.claude.eventsImported).toBe(3);
     expect(result.ohmypi.imported).toBe(1);
     expect(result.codex.imported).toBe(2);
+
+    const response = buildCostReconcileResponse(result);
+    expect(response).toMatchObject({
+      success: true,
+      sessionsScanned: 3,
+      sessionsWithNewData: 3,
+      eventsImported: 3,
+      duplicatesSkipped: 0,
+      errors: [],
+      earliestEventTs: null,
+      latestEventTs: null,
+    });
+    expect(response.claude.eventsImported).toBe(3);
+    expect(response.ohmypi.eventsImported).toBe(1);
+    expect(response.codex.eventsImported).toBe(2);
   });
 });

@@ -359,6 +359,27 @@ export async function runCostReconcileSources(
   return { claude, ohmypi, codex };
 }
 
+type CostReconcileSourcesResult = Awaited<ReturnType<typeof runCostReconcileSources>>;
+
+export function buildCostReconcileResponse(overdeck: CostReconcileSourcesResult) {
+  return {
+    success: true,
+    ...overdeck.claude,
+    claude: overdeck.claude,
+    ohmypi: overdeck.ohmypi,
+    codex: overdeck.codex,
+    overdeck,
+    skipped: {
+      ohmypi: overdeck.ohmypi.skipped,
+      codex: overdeck.codex.skipped,
+    },
+    warnings: {
+      ohmypi: overdeck.ohmypi.warnings,
+      codex: overdeck.codex.warnings,
+    },
+  };
+}
+
 // ─── Route: POST /api/costs/reconcile ────────────────────────────────────────
 const postCostsReconcileRoute = HttpRouter.add(
   'POST',
@@ -371,21 +392,7 @@ const postCostsReconcileRoute = HttpRouter.add(
     console.log(
       `[reconciler] Sweep complete: claude=${overdeck.claude.eventsImported} imported, ohmypi=${overdeck.ohmypi.eventsImported} imported, codex=${overdeck.codex.eventsImported} imported`,
     );
-    return jsonResponse({
-      success: true,
-      claude: overdeck.claude,
-      ohmypi: overdeck.ohmypi,
-      codex: overdeck.codex,
-      overdeck,
-      skipped: {
-        ohmypi: overdeck.ohmypi.skipped,
-        codex: overdeck.codex.skipped,
-      },
-      warnings: {
-        ohmypi: overdeck.ohmypi.warnings,
-        codex: overdeck.codex.warnings,
-      },
-    });
+    return jsonResponse(buildCostReconcileResponse(overdeck));
   })),
 );
 

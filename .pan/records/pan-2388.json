@@ -51,9 +51,34 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-07T18:06:50.383Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-07T18:07Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-07T18:07:39.994Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-07T18:07Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-07T18:07:46.740Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-07T18:07:39Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2388\n\nReconcile route still removes legacy top-level response fields\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2388 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-07T18:07:46Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2388\n\nReconcile route still removes legacy top-level response fields\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2388 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".beads/export-state.json",
@@ -214,14 +239,14 @@
   },
   "pipeline": {
     "issueId": "PAN-2388",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T18:06:55.230Z",
-    "reviewNotes": "Manual reconcile route still drops the existing Claude transcript reconciler in committed code",
+    "updatedAt": "2026-07-07T18:07:39.942Z",
+    "reviewNotes": "Reconcile route still removes legacy top-level response fields",
     "testNotes": "typecheck passed; npm test passed (896/900 test files, 8762/8821 tests, frontend 3/3); lint failed at lint:circular on cycle src/lib/agents.ts > src/lib/agents/resume.ts > src/lib/review-status.ts > src/lib/cloister/feedback-target.ts. Cycle files are outside PAN-2388 working set. Browser UAT not required per vBRIEF NonGoals.",
     "inspectNotes": "Bead ohmypi-fixtures ack: commit 9de8b447 touches only codex-parser.ts (revert of CodexCostEventUsage additions), a cost-reconcile integration test, and a runbook doc -- zero changes to ohmypi-parser.ts, ohmypi-parser.test.ts, or any ohmypi fixture file. Not this beads scope; AC1-4 remain satisfied unchanged from the prior verified state (c6b01bb3). No action needed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2470",
@@ -450,7 +475,7 @@
       },
       "costAtCloseOut": {
         "usd": 261.765742,
-        "pricingAsOf": "2026-07-07T18:06:55.461Z"
+        "pricingAsOf": "2026-07-07T18:07:39.986Z"
       }
     },
     "merges": [
@@ -484,5 +509,5 @@
     }
   },
   "created": "2026-07-07T17:32:25.282Z",
-  "updated": "2026-07-07T18:06:55.463Z"
+  "updated": "2026-07-07T18:07:46.740Z"
 }
