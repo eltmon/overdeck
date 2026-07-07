@@ -118,10 +118,10 @@
     "issueId": "PAN-2373",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T02:57:00.570Z",
+    "updatedAt": "2026-07-07T03:15:04.493Z",
     "reviewNotes": "Current cycle edits the quarantined PAN-2371 test itself and still weakens frontend typechecking",
     "verificationNotes": "Verification FAILED at test (80944ms):\n\n branch for a clean standalone workspace on main\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/cli/commands/__tests__/start-workspace-branch-repair.test.ts:18:3\n     16|   });\n     17|\n     18|   it('creates the feature branch for a clean standalone workspace on m…\n       |   ^\n     19|     const workspace = '/tmp/overdeck/workspaces/feature-pan-2044';\n     20|     execFileMock.mockImplementation((cmd: string, args: string[], opts…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯\n\n FAIL  |root| tests/cli/commands/work/issue-beads-check.test.ts > hasBeadsTasks > returns false when .beads directory does not exist\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ tests/cli/commands/work/issue-beads-check.test.ts:41:3\n     39|\n     40| describe('hasBeadsTasks', () => {\n     41|   it('returns false when .beads directory does not exist', async () =>…\n       |   ^\n     42|     const { hasBeadsTasks } = await import('../../../../src/cli/comman…\n     43|     expect(hasBeadsTasks(tmpDir, 'PAN-1094')).toBe(false);\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯\n\n FAIL  |root| tests/unit/lib/cloister/deacon-swarm-hold.test.ts > coordinateSwarmSlots per-issue operator hold (PAN-2214) > skips a deacon-ignored issue before any reconcile/dispatch work\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ tests/unit/lib/cloister/deacon-swarm-hold.test.ts:95:3\n     93|\n     94| describe('coordinateSwarmSlots per-issue operator hold (PAN-2214)', ()…\n     95|   it('skips a deacon-ignored issue before any reconcile/dispatch work'…\n       |   ^\n     96|     const { coordinateSwarmSlots } = await import('../../../../src/lib…\n     97|     setupWorkspace('pan-100', 'PAN-100');\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2419",
@@ -216,9 +216,9 @@
         },
         "review": {
           "unknown": {
-            "input": 1305135,
-            "output": 10528,
-            "cacheRead": 1112448,
+            "input": 2201167,
+            "output": 14120,
+            "cacheRead": 1870336,
             "cacheWrite": 0
           }
         },
@@ -230,9 +230,9 @@
             "cacheWrite": 0
           },
           "unknown": {
-            "input": 13552387,
-            "output": 23719,
-            "cacheRead": 12832896,
+            "input": 15892682,
+            "output": 29203,
+            "cacheRead": 14993024,
             "cacheWrite": 0
           }
         }
@@ -257,9 +257,9 @@
           "cacheWrite": 150895
         },
         "unknown": {
-          "input": 14857522,
-          "output": 34247,
-          "cacheRead": 13945344,
+          "input": 18093849,
+          "output": 43323,
+          "cacheRead": 16863360,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
@@ -270,8 +270,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 37.44795325,
-        "pricingAsOf": "2026-07-07T02:57:00.597Z"
+        "usd": 40.379048250000004,
+        "pricingAsOf": "2026-07-07T03:15:04.562Z"
       }
     },
     "merges": [
@@ -283,5 +283,5 @@
     "finalizedAt": "2026-07-06T17:49:27.751Z"
   },
   "created": "2026-07-07T01:35:12.280Z",
-  "updated": "2026-07-07T02:57:00.599Z"
+  "updated": "2026-07-07T03:15:04.564Z"
 }
