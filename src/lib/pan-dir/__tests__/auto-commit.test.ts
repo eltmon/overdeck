@@ -6,7 +6,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { rmSync as unlink } from 'fs';
 import { vi } from 'vitest';
-import { deriveProjectRoot, flushAutoCommits, queueAutoCommit, queueBeadsAutoCommit } from '../auto-commit.js';
+import { deriveProjectRoot, flushAllPendingAutoCommits, flushAutoCommits, queueAutoCommit, queueBeadsAutoCommit } from '../auto-commit.js';
 
 describe('auto-commit', () => {
   let tmp: string;
@@ -219,6 +219,43 @@ describe('auto-commit', () => {
         expect(result.reason).toBe('not a git repo');
       } finally {
         rmSync(noGitTmp, { recursive: true, force: true });
+      }
+    }),
+  );
+
+  it.effect('flushes every pending project root for shutdown', () =>
+    Effect.gen(function* () {
+      const otherTmp = mkdtempSync(join(tmpdir(), 'pan-autocommit-other-root-'));
+      try {
+        execSync('git init -q', { cwd: otherTmp });
+        execSync('git config user.email t@e.t', { cwd: otherTmp });
+        execSync('git config user.name "Test"', { cwd: otherTmp });
+        execSync('git config commit.gpgsign false', { cwd: otherTmp });
+        writeFileSync(join(otherTmp, 'README.md'), 'seed');
+        execSync('git add README.md', { cwd: otherTmp });
+        execSync('git commit -q -m "init"', { cwd: otherTmp });
+        execSync('git branch -M main', { cwd: otherTmp });
+        execSync('git remote add origin .', { cwd: otherTmp });
+
+        mkdirSync(join(tmp, '.pan', 'continues'), { recursive: true });
+        mkdirSync(join(otherTmp, '.pan', 'continues'), { recursive: true });
+        const firstPath = join(tmp, '.pan', 'continues', 'pan-2375-first.vbrief.json');
+        const secondPath = join(otherTmp, '.pan', 'continues', 'pan-2375-second.vbrief.json');
+        writeFileSync(firstPath, '{"issue":"PAN-2375-FIRST"}');
+        writeFileSync(secondPath, '{"issue":"PAN-2375-SECOND"}');
+
+        queueAutoCommit({ projectRoot: tmp, paths: [firstPath], subject: 'chore(state): first root' });
+        queueAutoCommit({ projectRoot: otherTmp, paths: [secondPath], subject: 'chore(state): second root' });
+
+        const results = yield* flushAllPendingAutoCommits();
+        expect(results).toEqual([{ committed: true }, { committed: true }]);
+
+        const firstLog = execSync('git log --oneline -1', { cwd: tmp, encoding: 'utf-8' });
+        const secondLog = execSync('git log --oneline -1', { cwd: otherTmp, encoding: 'utf-8' });
+        expect(firstLog).toContain('chore(state): first root');
+        expect(secondLog).toContain('chore(state): second root');
+      } finally {
+        rmSync(otherTmp, { recursive: true, force: true });
       }
     }),
   );

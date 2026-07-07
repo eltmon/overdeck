@@ -211,6 +211,18 @@ export function flushAutoCommits(
   return Effect.promise(() => flushPromise(projectRoot));
 }
 
+/**
+ * Force a flush of every project root with a pending auto-commit. Used during
+ * graceful process shutdown so the fixed window does not strand committable
+ * state as a dirty tree.
+ */
+export function flushAllPendingAutoCommits(): Effect.Effect<FlushResult[], never> {
+  return Effect.promise(() => {
+    const projectRoots = Array.from(pending.keys());
+    return Promise.all(projectRoots.map((projectRoot) => flushPromise(projectRoot)));
+  });
+}
+
 function flushPromise(projectRoot: string): Promise<FlushResult> {
   const batch = pending.get(projectRoot);
   if (!batch) return Promise.resolve({ committed: false, reason: 'no pending' });
