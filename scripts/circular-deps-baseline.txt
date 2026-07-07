@@ -39,10 +39,10 @@ src/lib/agents.ts > src/lib/agents/queries.ts
 src/lib/agents.ts > src/lib/agents/queries.ts > src/lib/overdeck/agent-state-sync.ts
 src/lib/agents.ts > src/lib/agents/recovery.ts > src/lib/agents/termination.ts
 src/lib/agents.ts > src/lib/agents/recovery.ts > src/lib/harness-resolve.ts
+src/lib/agents.ts > src/lib/agents/resume.ts > src/lib/cloister/coderabbit-ingestion.ts > src/lib/cloister/review-agent.ts > src/lib/cloister/review-context.ts > src/lib/cloister/review-verdict-feedback.ts > src/lib/review-status.ts
 src/lib/agents.ts > src/lib/agents/resume.ts > src/lib/cloister/conflict-gate.ts > src/lib/cloister/review-agent.ts > src/lib/review-status.ts
 src/lib/agents.ts > src/lib/agents/resume.ts > src/lib/cloister/review-agent.ts > src/lib/overdeck/agents.ts > src/lib/review-status.ts
 src/lib/agents.ts > src/lib/agents/resume.ts > src/lib/cloister/review-agent.ts > src/lib/review-status.ts
-src/lib/agents.ts > src/lib/agents/resume.ts > src/lib/cloister/review-verdict-feedback.ts > src/lib/review-status.ts
 src/lib/agents.ts > src/lib/agents/resume.ts > src/lib/overdeck/agent-state-sync.ts > src/lib/overdeck/review-status-record-sync.ts > src/lib/pan-dir/records.ts > src/lib/review-status.ts
 src/lib/agents.ts > src/lib/agents/resume.ts > src/lib/review-status.ts
 src/lib/agents.ts > src/lib/agents/spawn.ts > src/lib/cloister/concurrency.ts
@@ -50,6 +50,7 @@ src/lib/agents.ts > src/lib/agents/spawn.ts > src/lib/cloister/merge-agent.ts
 src/lib/agents.ts > src/lib/agents/spawn.ts > src/lib/cloister/merge-agent.ts > src/lib/memory/cli.ts
 src/lib/agents/tier-table.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts > src/lib/pan-dir/record.ts
 src/lib/cloister/auto-resume-config.ts > src/lib/projects.ts
+src/lib/cloister/coderabbit-ingestion.ts > src/lib/cloister/review-agent.ts > src/lib/cloister/review-context.ts > src/lib/cloister/review-verdict-feedback.ts > src/lib/review-status.ts
 src/lib/cloister/conflict-gate.ts > src/lib/cloister/review-agent.ts > src/lib/review-status.ts
 src/lib/cloister/deacon-swarm-completion.ts > src/lib/cloister/deacon-swarm.ts
 src/lib/cloister/deacon-swarm-gc.ts > src/lib/cloister/deacon-swarm.ts
@@ -57,7 +58,6 @@ src/lib/cloister/deacon-swarm-orphan-gc.ts > src/lib/cloister/deacon-swarm.ts
 src/lib/cloister/feedback-target.ts > src/lib/review-status.ts
 src/lib/cloister/review-agent.ts > src/lib/pipeline-notifier.ts > src/lib/review-status.ts
 src/lib/cloister/review-agent.ts > src/lib/review-status.ts
-src/lib/cloister/review-verdict-feedback.ts > src/lib/review-status.ts
 src/lib/conversations/smart-compaction.ts
 src/lib/costs/events.ts > src/lib/costs/wal.ts
 src/lib/costs/events.ts > src/lib/overdeck/cost-sync.ts
