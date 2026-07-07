@@ -9,6 +9,12 @@ interface ReclaimAdvisorProps {
 
 type RowState = 'pending' | 'running' | 'done' | 'error';
 
+interface StackTeardownEstimate {
+  issueId: string;
+  composeProject: string;
+  confirmToken: string;
+}
+
 export function ReclaimAdvisor({ candidates = [], totals, thresholdBytes = 0 }: ReclaimAdvisorProps) {
   const [rowStates, setRowStates] = useState<Record<number, RowState>>({});
   const [rowErrors, setRowErrors] = useState<Record<number, string>>({});
@@ -17,6 +23,23 @@ export function ReclaimAdvisor({ candidates = [], totals, thresholdBytes = 0 }: 
 
   async function runCandidate(candidate: ReclaimCandidate) {
     const { method, path } = parseAction(candidate.action);
+    if (candidate.kind === 'stack') {
+      const estimateResponse = await fetch(path, { method });
+      if (!estimateResponse.ok) throw new Error(await estimateResponse.text() || `Request failed with ${estimateResponse.status}`);
+      const estimate = await estimateResponse.json() as StackTeardownEstimate;
+      const teardownPath = path.replace(/\/teardown-estimate$/, '/teardown');
+      const teardownResponse = await fetch(teardownPath, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          confirmToken: estimate.confirmToken,
+          typedText: estimate.composeProject,
+        }),
+      });
+      if (!teardownResponse.ok) throw new Error(await teardownResponse.text() || `Request failed with ${teardownResponse.status}`);
+      return;
+    }
+
     const response = await fetch(path, { method });
     if (!response.ok) throw new Error(await response.text() || `Request failed with ${response.status}`);
   }
