@@ -58,6 +58,7 @@ export interface MemoryConfig {
   features?: {
     observations?: boolean;
     prompt_time_injection?: boolean;
+    knowledge_index?: boolean;
   };
   rollup_pending_threshold?: number;
   sidebar_refresh_interval_ms?: number;
@@ -777,6 +778,7 @@ export interface NormalizedConfig {
     };
     observationsEnabled: boolean;
     promptTimeInjectionEnabled: boolean;
+    knowledgeIndexEnabled: boolean;
     rollupPendingThreshold: number;
     sidebarRefreshIntervalMs: number;
     workerConcurrency: number;

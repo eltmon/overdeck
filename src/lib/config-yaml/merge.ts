@@ -123,6 +123,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       },
       observationsEnabled: DEFAULT_CONFIG.memory.observationsEnabled,
       promptTimeInjectionEnabled: DEFAULT_CONFIG.memory.promptTimeInjectionEnabled,
+      knowledgeIndexEnabled: DEFAULT_CONFIG.memory.knowledgeIndexEnabled,
       rollupPendingThreshold: DEFAULT_CONFIG.memory.rollupPendingThreshold,
       sidebarRefreshIntervalMs: DEFAULT_CONFIG.memory.sidebarRefreshIntervalMs,
       workerConcurrency: DEFAULT_CONFIG.memory.workerConcurrency,
@@ -408,6 +409,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       }
       if (config.memory.features?.prompt_time_injection !== undefined) {
         result.memory.promptTimeInjectionEnabled = config.memory.features.prompt_time_injection;
+      }
+      if (config.memory.features?.knowledge_index !== undefined) {
+        result.memory.knowledgeIndexEnabled = config.memory.features.knowledge_index;
       }
       if (config.memory.rollup_pending_threshold !== undefined) {
         result.memory.rollupPendingThreshold = config.memory.rollup_pending_threshold;

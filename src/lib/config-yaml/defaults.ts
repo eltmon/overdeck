@@ -119,6 +119,7 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     },
     observationsEnabled: true,
     promptTimeInjectionEnabled: true,
+    knowledgeIndexEnabled: true,
     rollupPendingThreshold: 4,
     sidebarRefreshIntervalMs: 10_000,
     workerConcurrency: 4,

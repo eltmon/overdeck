@@ -304,7 +304,7 @@ describe('prompt-time memory injection', () => {
       surface: 'user-prompt',
       outcome: 'injected',
       expandedTerms: ['prompt injection', 'memory retrieval', 'summary'],
-      hitCounts: { status: 1, observations: 1, summaries: 1, sibling: 1 },
+      hitCounts: { status: 1, observations: 1, summaries: 1, sibling: 1, knowledgeIndex: 0 },
       budgets: PROMPT_TIME_MEMORY_BUDGETS,
     });
     expect(decision.allocationBytes.observations).toBeGreaterThan(0);
@@ -424,8 +424,107 @@ describe('prompt-time memory injection', () => {
       id: 'disabled-1',
       outcome: 'skipped',
       reason: 'prompt-time-injection-disabled',
-      hitCounts: { status: 0, observations: 0, summaries: 0, sibling: 0 },
+      hitCounts: { status: 0, observations: 0, summaries: 0, sibling: 0, knowledgeIndex: 0 },
     });
+  });
+
+  it('injects a resolved knowledge concept index within the knowledgeIndex budget', async () => {
+    const { result, decision } = await injectWithLog({
+      prompt: 'payroll policy context',
+      identity,
+      now: new Date('2026-05-16T22:30:00.000Z'),
+      id: 'knowledge-index-1',
+      budgets: { knowledgeIndex: 24 },
+      loadKnowledgeIndex: async () => [
+        'Knowledge bundle concept index:',
+        '- payroll.overtime (rule): Overtime is calculated after approved weekly hours.',
+        '- payroll.audit (workflow): Payroll changes require audit entries.',
+        'Recent knowledge log:',
+        '- 2026-05-16 captured payroll overtime rule.',
+      ].join('\n'),
+      expansion: async () => ({
+        status: 'extracted',
+        provider: 'stub',
+        result: {
+          data: { terms: ['payroll policy context', 'memory', 'rag'] },
+          usage: { input: 1, output: 1 },
+          cost: { usd: 0 },
+          model: 'stub-model',
+          provider: 'stub',
+        },
+      }),
+    });
+
+    expect(result.status).toBe('budget-truncated');
+    expect(result.context).toContain('Knowledge bundle concept index');
+    expect(result.context).toContain('payroll.overtime');
+    expect(result.decision.allocations.knowledgeIndex).toBeLessThanOrEqual(24);
+    expect(decision).toMatchObject({
+      id: 'knowledge-index-1',
+      hitCounts: { knowledgeIndex: 1 },
+    });
+    expect(decision.sources.map((source: { docType: string }) => source.docType)).toContain('knowledge');
+  });
+
+  it('keeps an absent knowledge bundle a zero-token fast no-op', async () => {
+    const started = performance.now();
+    const { result, decision } = await injectWithLog({
+      prompt: 'no bundle prompt',
+      identity,
+      now: new Date('2026-05-16T22:30:00.000Z'),
+      id: 'knowledge-absent-1',
+      loadStatus: async () => null,
+      loadKnowledgeIndex: async () => null,
+      search: async () => [],
+      expansion: async () => ({
+        status: 'extracted',
+        provider: 'stub',
+        result: {
+          data: { terms: ['no bundle prompt', 'memory', 'rag'] },
+          usage: { input: 1, output: 1 },
+          cost: { usd: 0 },
+          model: 'stub-model',
+          provider: 'stub',
+        },
+      }),
+    });
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeLessThan(5);
+    expect(result).toMatchObject({ status: 'no-hits', context: '' });
+    expect(decision.allocations.knowledgeIndex).toBe(0);
+    expect(decision.allocationBytes.knowledgeIndex).toBe(0);
+    expect(decision.hitCounts.knowledgeIndex).toBe(0);
+  });
+
+  it('skips the knowledge concept index when the knowledge gate is disabled', async () => {
+    const { result, decision } = await injectWithLog({
+      prompt: 'disabled knowledge prompt',
+      identity,
+      now: new Date('2026-05-16T22:30:00.000Z'),
+      id: 'knowledge-disabled-1',
+      loadKnowledgeIndexEnabled: async () => false,
+      loadKnowledgeIndex: async () => {
+        throw new Error('knowledge index should not load when disabled');
+      },
+      loadStatus: async () => null,
+      search: async () => [],
+      expansion: async () => ({
+        status: 'extracted',
+        provider: 'stub',
+        result: {
+          data: { terms: ['disabled knowledge prompt', 'memory', 'rag'] },
+          usage: { input: 1, output: 1 },
+          cost: { usd: 0 },
+          model: 'stub-model',
+          provider: 'stub',
+        },
+      }),
+    });
+
+    expect(result.context).toBe('');
+    expect(decision.allocations.knowledgeIndex).toBe(0);
+    expect(decision.hitCounts.knowledgeIndex).toBe(0);
   });
 
   it('expands prompt-time cache misses and logs no-hits when retrieval finds no candidates', async () => {
@@ -484,7 +583,7 @@ describe('prompt-time memory injection', () => {
       identity,
       now: new Date('2026-05-16T22:30:00.000Z'),
       id: 'too-large-1',
-      budgets: { status: 0, observations: 0, summaries: 0, sibling: 0 },
+      budgets: { status: 0, observations: 0, summaries: 0, sibling: 0, knowledgeIndex: 0 },
       expansion: async () => ({
         status: 'extracted',
         provider: 'stub',
@@ -502,8 +601,8 @@ describe('prompt-time memory injection', () => {
     expect(decision).toMatchObject({
       id: 'too-large-1',
       outcome: 'context-too-large',
-      allocations: { status: 0, observations: 0, summaries: 0, sibling: 0 },
-      hitCounts: { status: 1, observations: 0, summaries: 0, sibling: 0 },
+      allocations: { status: 0, observations: 0, summaries: 0, sibling: 0, knowledgeIndex: 0 },
+      hitCounts: { status: 1, observations: 0, summaries: 0, sibling: 0, knowledgeIndex: 0 },
     });
   });
 

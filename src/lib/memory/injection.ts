@@ -1,16 +1,20 @@
 import { randomUUID } from 'crypto';
-import { appendFile, readFile } from 'fs/promises';
+import { appendFile, readFile, readdir } from 'fs/promises';
+import { extname, isAbsolute, join, relative, resolve } from 'path';
+import { parse as parseYaml } from 'yaml';
 import type { MemoryIdentity, MemoryStatus, RagDecision, RagDecisionSource } from '@overdeck/contracts';
 import { ensureParentDir, resolveRagRunsFile, resolveStatusFile } from './paths.js';
 import { expandMemoryQuery, type QueryExpansionCall, type QueryExpansionResult } from './query-expansion.js';
 import { searchMemory, type MemorySearchHit } from './search.js';
-import { isMemoryPromptTimeInjectionEnabled } from './settings.js';
+import { isMemoryKnowledgeIndexEnabled, isMemoryPromptTimeInjectionEnabled } from './settings.js';
+import { loadProjectsConfigSync, resolveProjectFromIssueSync } from '../projects.js';
 
 export const PROMPT_TIME_MEMORY_BUDGETS = {
   status: 2000,
   observations: 5000,
   summaries: 500,
   sibling: 1500,
+  knowledgeIndex: 1500,
 } as const;
 
 const PROMPT_TIME_EXPANSION_TIMEOUT_MS = 750;
@@ -25,6 +29,8 @@ export interface PromptTimeMemoryInjectionInput {
   budgets?: Partial<MemoryBudgets>;
   expansion?: QueryExpansionCall;
   loadPromptTimeEnabled?: () => boolean | Promise<boolean>;
+  loadKnowledgeIndexEnabled?: () => boolean | Promise<boolean>;
+  loadKnowledgeIndex?: (identity: MemoryIdentity) => Promise<string | null>;
   loadStatus?: (projectId: string, issueId: string) => Promise<MemoryStatus | null>;
   search?: typeof searchMemory;
   logDecision?: (entry: PromptTimeRagDecisionLogEntry) => Promise<void>;
@@ -37,6 +43,7 @@ export interface PromptTimeRagDecisionLogEntry extends RagDecision {
     observations: number;
     summaries: number;
     sibling: number;
+    knowledgeIndex: number;
   };
   budgets: MemoryBudgets;
   allocationBytes: MemoryAllocations;
@@ -50,7 +57,7 @@ export interface PromptTimeMemoryInjectionResult {
   decision: PromptTimeRagDecisionLogEntry;
 }
 
-type BudgetKey = 'status' | 'observations' | 'summaries' | 'sibling';
+type BudgetKey = 'status' | 'observations' | 'summaries' | 'sibling' | 'knowledgeIndex';
 type MemoryBudgets = Record<BudgetKey, number>;
 type MemoryAllocations = Record<BudgetKey, number>;
 
@@ -86,8 +93,12 @@ export async function injectPromptTimeMemory(input: PromptTimeMemoryInjectionInp
   const expansion = await resolveQueryExpansion(input, now, surface);
 
   const search = input.search ?? searchMemory;
-  const [status, sameProjectHits, siblingHits] = await Promise.all([
+  const knowledgeEnabled = await (input.loadKnowledgeIndexEnabled ?? isMemoryKnowledgeIndexEnabled)();
+  const [status, knowledgeIndex, sameProjectHits, siblingHits] = await Promise.all([
     (input.loadStatus ?? readStatus)(input.identity.projectId, input.identity.issueId).catch(() => null),
+    knowledgeEnabled
+      ? (input.loadKnowledgeIndex ?? readKnowledgeIndex)(input.identity).catch(() => null)
+      : Promise.resolve(null),
     search({
       query: expansion.query,
       projectId: input.identity.projectId,
@@ -108,10 +119,11 @@ export async function injectPromptTimeMemory(input: PromptTimeMemoryInjectionInp
 
   const candidates = [
     ...status ? [statusCandidate(status, input.identity)] : [],
+    ...knowledgeIndex ? [knowledgeIndexCandidate(knowledgeIndex, input.identity)] : [],
     ...sameProjectHits.map(hitCandidate),
     ...siblingHits.map(siblingCandidate),
   ];
-  const hitCounts = countHits(status, sameProjectHits, siblingHits);
+  const hitCounts = countHits(status, knowledgeIndex, sameProjectHits, siblingHits);
 
   if (candidates.length === 0) {
     return finalize(input, now, budgets, {
@@ -264,6 +276,21 @@ function siblingCandidate(hit: MemorySearchHit): CandidateContext {
   };
 }
 
+function knowledgeIndexCandidate(text: string, identity: MemoryIdentity): CandidateContext {
+  return {
+    key: 'knowledgeIndex',
+    title: 'Knowledge index',
+    text,
+    source: {
+      id: `knowledge:${identity.projectId}`,
+      docType: 'knowledge',
+      scope: 'project',
+      score: 1,
+      tokens: estimateTokens(text),
+    },
+  };
+}
+
 function selectWithinBudgets(candidates: CandidateContext[], budgets: MemoryBudgets): {
   selected: CandidateContext[];
   allocationBytes: PromptTimeRagDecisionLogEntry['allocationBytes'];
@@ -408,9 +435,122 @@ async function readStatus(projectId: string, issueId: string): Promise<MemorySta
   }
 }
 
-function countHits(status: MemoryStatus | null, sameProjectHits: MemorySearchHit[], siblingHits: MemorySearchHit[]): PromptTimeRagDecisionLogEntry['hitCounts'] {
+async function readKnowledgeIndex(identity: MemoryIdentity): Promise<string | null> {
+  const bundleRoot = await resolveKnowledgeBundleRoot(identity);
+  if (!bundleRoot) return null;
+
+  const conceptFiles = await listMarkdownFiles(bundleRoot);
+  const concepts: Array<{ id: string; type: string; description: string }> = [];
+  for (const filePath of conceptFiles) {
+    const name = relative(bundleRoot, filePath).replace(/\\/g, '/');
+    if (name === 'index.md' || name === 'log.md' || name.startsWith('.okf-index/')) continue;
+    const concept = parseConcept(filePath, await readFile(filePath, 'utf8'));
+    if (concept) concepts.push(concept);
+  }
+
+  const logEntries = await readRecentLogEntries(join(bundleRoot, 'log.md'));
+  if (concepts.length === 0 && logEntries.length === 0) return null;
+
+  const lines = ['Knowledge bundle concept index:'];
+  for (const concept of concepts.sort((a, b) => a.id.localeCompare(b.id)).slice(0, 40)) {
+    lines.push(`- ${concept.id} (${concept.type}): ${concept.description}`);
+  }
+  if (logEntries.length > 0) {
+    lines.push('Recent knowledge log:');
+    lines.push(...logEntries.map((entry) => `- ${entry}`));
+  }
+  return lines.join('\n');
+}
+
+async function resolveKnowledgeBundleRoot(identity: MemoryIdentity): Promise<string | null> {
+  const resolved = resolveProjectFromIssueSync(identity.issueId);
+  if (!resolved) return null;
+
+  const config = loadProjectsConfigSync().projects[resolved.projectKey];
+  const projectPath = resolved.projectPath;
+  if (typeof config?.knowledge_repo === 'string' && config.knowledge_repo.trim()) {
+    return resolvePath(projectPath, config.knowledge_repo);
+  }
+
+  try {
+    const pointer = parseYaml(await readFile(join(projectPath, '.okf.yml'), 'utf8'));
+    if (isRecord(pointer) && typeof pointer.bundle === 'string' && pointer.bundle.trim()) {
+      return resolvePath(projectPath, pointer.bundle);
+    }
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT') return null;
+    throw error;
+  }
+
+  return null;
+}
+
+function resolvePath(base: string, value: string): string {
+  return isAbsolute(value) ? value : resolve(base, value);
+}
+
+async function listMarkdownFiles(root: string): Promise<string[]> {
+  const files: string[] = [];
+  async function visit(dir: string): Promise<void> {
+    const entries = await readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.name === '.git' || entry.name === '.okf-index' || entry.name === 'node_modules') continue;
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await visit(path);
+      } else if (entry.isFile() && extname(entry.name) === '.md') {
+        files.push(path);
+      }
+    }
+  }
+  try {
+    await visit(root);
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT') return [];
+    throw error;
+  }
+  return files;
+}
+
+function parseConcept(filePath: string, raw: string): { id: string; type: string; description: string } | null {
+  const match = raw.match(/^---\n([\s\S]*?)\n---\n?/);
+  if (!match) return null;
+  const frontmatter = parseYaml(match[1]);
+  if (!isRecord(frontmatter)) return null;
+
+  const fallbackId = filePath.replace(/\.md$/, '').split('/').slice(-1)[0];
+  const id = stringField(frontmatter.id) ?? fallbackId;
+  const type = stringField(frontmatter.type) ?? 'concept';
+  const description = stringField(frontmatter.description) ?? stringField(frontmatter.title);
+  if (!description) return null;
+  return { id, type, description };
+}
+
+async function readRecentLogEntries(path: string): Promise<string[]> {
+  try {
+    return (await readFile(path, 'utf8'))
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('#'))
+      .slice(0, 5);
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT') return [];
+    throw error;
+  }
+}
+
+function stringField(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function countHits(status: MemoryStatus | null, knowledgeIndex: string | null, sameProjectHits: MemorySearchHit[], siblingHits: MemorySearchHit[]): PromptTimeRagDecisionLogEntry['hitCounts'] {
   return {
     status: status ? 1 : 0,
+    knowledgeIndex: knowledgeIndex ? 1 : 0,
     observations: sameProjectHits.filter((hit) => hit.docType !== 'summary').length,
     summaries: sameProjectHits.filter((hit) => hit.docType === 'summary').length,
     sibling: siblingHits.length,
@@ -418,11 +558,11 @@ function countHits(status: MemoryStatus | null, sameProjectHits: MemorySearchHit
 }
 
 function emptyAllocations(): MemoryAllocations {
-  return { status: 0, observations: 0, summaries: 0, sibling: 0 };
+  return { status: 0, observations: 0, summaries: 0, sibling: 0, knowledgeIndex: 0 };
 }
 
 function emptyHitCounts(): PromptTimeRagDecisionLogEntry['hitCounts'] {
-  return { status: 0, observations: 0, summaries: 0, sibling: 0 };
+  return { status: 0, observations: 0, summaries: 0, sibling: 0, knowledgeIndex: 0 };
 }
 
 function estimateTokens(text: string): number {

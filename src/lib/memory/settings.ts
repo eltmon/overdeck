@@ -15,6 +15,7 @@ export interface MemorySettings {
   extraction: MemoryProviderSettings;
   observationsEnabled: boolean;
   promptTimeInjectionEnabled: boolean;
+  knowledgeIndexEnabled: boolean;
   rollupPendingThreshold: number;
   sidebarRefreshIntervalMs: number;
   workerConcurrency: number;
@@ -51,6 +52,7 @@ export async function loadMemorySettings(configPath = getGlobalConfigPath()): Pr
     },
     observationsEnabled: booleanOrDefault(features.observations, true),
     promptTimeInjectionEnabled: booleanOrDefault(features.prompt_time_injection, true),
+    knowledgeIndexEnabled: booleanOrDefault(features.knowledge_index, true),
     rollupPendingThreshold: positiveIntegerOrDefault(memory.rollup_pending_threshold, DEFAULT_MEMORY_ROLLUP_PENDING_THRESHOLD),
     sidebarRefreshIntervalMs: positiveIntegerOrDefault(memory.sidebar_refresh_interval_ms, DEFAULT_MEMORY_SIDEBAR_REFRESH_INTERVAL_MS),
     workerConcurrency: positiveIntegerOrDefault(memory.worker_concurrency, DEFAULT_MEMORY_WORKER_CONCURRENCY),
@@ -79,6 +81,10 @@ export async function isMemoryPromptTimeInjectionEnabled(): Promise<boolean> {
   return (await loadMemorySettings()).promptTimeInjectionEnabled;
 }
 
+export async function isMemoryKnowledgeIndexEnabled(): Promise<boolean> {
+  return (await loadMemorySettings()).knowledgeIndexEnabled;
+}
+
 /** Clear the in-memory settings cache. Used by tests that mutate config files. */
 export function clearMemorySettingsCache(): void {
   cachedSettings = null;
@@ -89,6 +95,7 @@ function defaultMemorySettings(): MemorySettings {
     extraction: {},
     observationsEnabled: true,
     promptTimeInjectionEnabled: true,
+    knowledgeIndexEnabled: true,
     rollupPendingThreshold: DEFAULT_MEMORY_ROLLUP_PENDING_THRESHOLD,
     sidebarRefreshIntervalMs: DEFAULT_MEMORY_SIDEBAR_REFRESH_INTERVAL_MS,
     workerConcurrency: DEFAULT_MEMORY_WORKER_CONCURRENCY,
