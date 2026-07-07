@@ -84,7 +84,7 @@
     "recordedAt": "2026-07-07T04:07:12.535Z"
   },
   "created": "2026-07-07T01:06:13.356Z",
-  "updated": "2026-07-07T04:08:01.851Z",
+  "updated": "2026-07-07T04:08:08.097Z",
   "pipeline": {
     "issueId": "PAN-2420",
     "reviewStatus": "reviewing",
@@ -241,8 +241,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "integration-test": "completed",
     "integration-test.ac1": "completed",
