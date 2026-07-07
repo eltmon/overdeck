@@ -27,6 +27,10 @@ import {
   deduplicateEventsSync,
 } from '../../../lib/costs/index.js';
 import {
+  reconcile as reconcileClaudeTranscripts,
+  type ReconcileResult as ClaudeReconcileResult,
+} from '../../../lib/costs/reconciler.js';
+import {
   getCostsByIssueSync,
   getCostForIssueAggregateSync,
   getDailyTrendsSync,
@@ -331,6 +335,7 @@ const postCostsSyncWalRoute = HttpRouter.add(
 
 type OverdeckReconcileSource = 'ohmypi' | 'codex';
 type ReconcileSourceRunner = (source: OverdeckReconcileSource) => Promise<CostReconcileSummary>;
+type ClaudeReconcileRunner = () => Promise<ClaudeReconcileResult>;
 
 const runOverdeckCostReconcileSource: ReconcileSourceRunner = (source) =>
   Effect.runPromise(
@@ -339,14 +344,19 @@ const runOverdeckCostReconcileSource: ReconcileSourceRunner = (source) =>
     ),
   );
 
+const runClaudeTranscriptReconcile: ClaudeReconcileRunner = () =>
+  Effect.runPromise(reconcileClaudeTranscripts());
+
 export async function runCostReconcileSources(
   runSource: ReconcileSourceRunner = runOverdeckCostReconcileSource,
-): Promise<{ ohmypi: CostReconcileSummary; codex: CostReconcileSummary }> {
-  const [ohmypi, codex] = await Promise.all([
+  runClaude: ClaudeReconcileRunner = runClaudeTranscriptReconcile,
+): Promise<{ claude: ClaudeReconcileResult; ohmypi: CostReconcileSummary; codex: CostReconcileSummary }> {
+  const [claude, ohmypi, codex] = await Promise.all([
+    runClaude(),
     runSource('ohmypi'),
     runSource('codex'),
   ]);
-  return { ohmypi, codex };
+  return { claude, ohmypi, codex };
 }
 
 // ─── Route: POST /api/costs/reconcile ────────────────────────────────────────
@@ -359,10 +369,11 @@ const postCostsReconcileRoute = HttpRouter.add(
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     console.log(
-      `[reconciler] Sweep complete: ohmypi=${overdeck.ohmypi.eventsImported} imported, codex=${overdeck.codex.eventsImported} imported`,
+      `[reconciler] Sweep complete: claude=${overdeck.claude.eventsImported} imported, ohmypi=${overdeck.ohmypi.eventsImported} imported, codex=${overdeck.codex.eventsImported} imported`,
     );
     return jsonResponse({
       success: true,
+      claude: overdeck.claude,
       ohmypi: overdeck.ohmypi,
       codex: overdeck.codex,
       overdeck,
