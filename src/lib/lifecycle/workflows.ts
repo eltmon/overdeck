@@ -633,9 +633,22 @@ async function verifySquashMergedPrByBranch(
         `git diff --name-only ${mergedPr.headRefOid}..${tipSha}`,
         { cwd: ctx.projectPath, encoding: 'utf-8' },
       );
-      const deltaFiles = deltaRaw.split('\n').map((f) => f.trim()).filter(Boolean);
-      const statePlaneOnly = deltaFiles.length > 0 && deltaFiles.every((f) =>
+      let deltaFiles = deltaRaw.split('\n').map((f) => f.trim()).filter(Boolean);
+      let statePlaneOnly = deltaFiles.length > 0 && deltaFiles.every((f) =>
         f.startsWith('.pan/') || f.startsWith('.beads/'));
+      if (!statePlaneOnly) {
+        // Branch may have merged main INTO itself after the PR merged — the
+        // two-dot delta then contains main's own files. Judge only changes
+        // UNIQUE to the branch (three-dot vs origin/main): if those are
+        // state-plane-only, everything real is already on main.
+        const { stdout: uniqueRaw } = await execAsync(
+          `git diff --name-only origin/main...${tipSha}`,
+          { cwd: ctx.projectPath, encoding: 'utf-8' },
+        );
+        deltaFiles = uniqueRaw.split('\n').map((f) => f.trim()).filter(Boolean);
+        statePlaneOnly = deltaFiles.every((f) =>
+          f.startsWith('.pan/') || f.startsWith('.beads/'));
+      }
       if (statePlaneOnly) {
         const prLabel = typeof mergedPr.number === 'number' ? `PR #${mergedPr.number}` : 'GitHub PR';
         return stepOk(step, [

@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.6",
     "created": "2026-07-03T03:28:14.773Z",
-    "updated": "2026-07-03T04:02:59.164Z",
+    "updated": "2026-07-07T03:09:31.554Z",
     "author": "overdeck/auto-start",
     "description": "Auto-synthesized minimal plan for PAN-2254: unstick endpoint prescribes 'git reset --hard origin/main' when local main is merely ahead — destructive advice for a recoverable state",
     "inspectionPolicy": "never"
@@ -10,12 +10,12 @@
   "plan": {
     "id": "pan-2254",
     "title": "unstick endpoint prescribes 'git reset --hard origin/main' when local main is merely ahead — destructive advice for a recoverable state",
-    "status": "running",
+    "status": "completed",
     "uid": "0c84d3fa-2fea-46dc-be10-33b3441c73d2",
     "author": "overdeck/auto-start",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-07-03T03:28:14.773Z",
-    "updated": "2026-07-03T04:02:59.164Z",
+    "updated": "2026-07-07T03:09:31.554Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2254",
@@ -64,5 +64,5 @@
     ],
     "edges": []
   },
-  "status": "active"
+  "status": "completed"
 }
