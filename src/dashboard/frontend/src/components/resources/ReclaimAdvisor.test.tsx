@@ -74,6 +74,40 @@ describe('ReclaimAdvisor', () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it('runs an individual non-stack candidate from its row action', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 200 }));
+
+    render(<ReclaimAdvisor candidates={candidates()} totals={{ ramBytes: 9 * gb, diskBytes: 52 * gb }} thresholdBytes={1} />);
+    fireEvent.click(screen.getByText('Delete venvs'));
+
+    await waitFor(() => expect(screen.getByText('done')).toBeTruthy());
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith('/api/resources/venvs/MIN-857', { method: 'DELETE' });
+  });
+
+  it('runs an individual stack candidate through teardown before marking done', async () => {
+    const estimate = deferredResponse();
+    const teardown = deferredResponse();
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(() => estimate.promise)
+      .mockImplementationOnce(() => teardown.promise);
+
+    render(<ReclaimAdvisor candidates={candidates()} totals={{ ramBytes: 9 * gb, diskBytes: 52 * gb }} thresholdBytes={1} />);
+    fireEvent.click(screen.getByText('Stop stack'));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await act(async () => estimate.resolve(new Response(JSON.stringify({ composeProject: 'feature-min-857', confirmToken: 'confirm-1' }), { status: 200 })));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText('done')).toBeNull();
+    await act(async () => teardown.resolve(new Response('{}', { status: 200 })));
+    await waitFor(() => expect(screen.getByText('done')).toBeTruthy());
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/resources/stacks/MIN-857/teardown', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirmToken: 'confirm-1', typedText: 'feature-min-857' }),
+    });
+  });
 });
 
 const gb = 1024 ** 3;

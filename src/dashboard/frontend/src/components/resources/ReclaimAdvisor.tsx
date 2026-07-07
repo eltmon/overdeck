@@ -48,15 +48,28 @@ export function ReclaimAdvisor({ candidates = [], totals, thresholdBytes = 0 }: 
     if (!window.confirm('Reclaim all safe resources?')) return;
     setRowErrors({});
     for (let index = 0; index < candidates.length; index += 1) {
-      setRowStates((current) => ({ ...current, [index]: 'running' }));
-      try {
-        await runCandidate(candidates[index]!);
-        setRowStates((current) => ({ ...current, [index]: 'done' }));
-      } catch (error) {
-        setRowStates((current) => ({ ...current, [index]: 'error' }));
-        setRowErrors((current) => ({ ...current, [index]: error instanceof Error ? error.message : String(error) }));
-        return;
-      }
+      const ok = await runCandidateAt(index);
+      if (!ok) return;
+    }
+  }
+
+  async function runCandidateAt(index: number) {
+    const candidate = candidates[index];
+    if (!candidate) return false;
+    setRowErrors((current) => {
+      const next = { ...current };
+      delete next[index];
+      return next;
+    });
+    setRowStates((current) => ({ ...current, [index]: 'running' }));
+    try {
+      await runCandidate(candidate);
+      setRowStates((current) => ({ ...current, [index]: 'done' }));
+      return true;
+    } catch (error) {
+      setRowStates((current) => ({ ...current, [index]: 'error' }));
+      setRowErrors((current) => ({ ...current, [index]: error instanceof Error ? error.message : String(error) }));
+      return false;
     }
   }
 
@@ -86,7 +99,12 @@ export function ReclaimAdvisor({ candidates = [], totals, thresholdBytes = 0 }: 
               <div className="font-['DM_Mono'] text-xs text-muted-foreground">
                 {formatBytes(candidate.ramBytes)} RAM · {formatBytes(candidate.diskBytes)} disk
               </div>
-              <button type="button" className="justify-self-end border border-border px-2 py-1 font-['DM_Mono'] text-xs uppercase">
+              <button
+                type="button"
+                className="justify-self-end border border-border px-2 py-1 font-['DM_Mono'] text-xs uppercase disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={state === 'running' || state === 'done'}
+                onClick={() => void runCandidateAt(index)}
+              >
                 {state === 'pending' ? actionLabel(candidate) : state}
               </button>
             </div>
