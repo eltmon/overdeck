@@ -1,7 +1,79 @@
 {
   "issueId": "PAN-2230",
   "schemaVersion": 2,
-  "feedback": [],
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-07T11:03:31.210Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-07T11:03:32.468Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-07T11:04Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-07T11:04:45.130Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-07T11:04:45.193Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-07T11:04:45Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2230\n\nlint-circular-deps still does not exclude __tests__ directories\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2230 -m \"Fixed review issues\"`"
+    }
+  ],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/drafts/PAN-2230.md",
+      ".pan/drafts/pan-2230.md",
+      ".pan/records/pan-2230.json",
+      "docs/ci-cd/CICD-QUEUE.md",
+      "docs/codebase-health/REFACTOR-QUEUE.md",
+      "scripts/canonicalize-circular-deps.js",
+      "src/lib/cloister/validation.ts",
+      "src/lib/cloister/verification-runner.ts",
+      "vitest.config.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "bun.lock",
+      "docs/CODEBASE-HEALTH-ROADMAP.md",
+      "docs/codebase-health/A4-circular-dep-guard.md",
+      "package.json",
+      "scripts/circular-deps-baseline.txt",
+      "scripts/lint-circular-deps.sh",
+      "scripts/lint-ratchet-audit.sh"
+    ],
+    "actualChangedFiles": [
+      ".pan/drafts/PAN-2230.md",
+      ".pan/drafts/pan-2230.md",
+      ".pan/records/pan-2230.json",
+      "bun.lock",
+      "docs/CODEBASE-HEALTH-ROADMAP.md",
+      "docs/ci-cd/CICD-QUEUE.md",
+      "docs/codebase-health/A4-circular-dep-guard.md",
+      "docs/codebase-health/REFACTOR-QUEUE.md",
+      "package.json",
+      "scripts/canonicalize-circular-deps.js",
+      "scripts/circular-deps-baseline.txt",
+      "scripts/lint-circular-deps.sh",
+      "scripts/lint-ratchet-audit.sh",
+      "src/lib/cloister/validation.ts",
+      "src/lib/cloister/verification-runner.ts",
+      "vitest.config.ts"
+    ],
+    "recordedAt": "2026-07-07T11:03:23.729Z"
+  },
   "harness": "claude-code",
   "model": "kimi-k2.7-code",
   "statusOverrides": {
@@ -26,16 +98,16 @@
   },
   "pipeline": {
     "issueId": "PAN-2230",
-    "reviewStatus": "failed",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T10:38:10.482Z",
-    "reviewNotes": "Verification failed at test",
-    "verificationNotes": "Verification FAILED at test (77082ms):\n\ncon-swarm-enumerate.test.ts > coordinateSwarmSlots enumerate-swarms > enumerates feature workspaces whose main-side vBRIEF is swarm eligible\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ tests/unit/lib/cloister/deacon-swarm-enumerate.test.ts:85:3\n     83|   });\n     84|\n     85|   it('enumerates feature workspaces whose main-side vBRIEF is swarm el…\n       |   ^\n     86|     const { coordinateSwarmSlots } = await import('../../../../src/lib…\n     87|     const projectPath = join(tempRoot, 'project');\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/10]⎯\n\n FAIL  |root| tests/unit/lib/cloister/deacon-swarm-enumerate.test.ts > coordinateSwarmSlots enumerate-swarms > excludes single-item and non-swarm feature workspaces, and ignores slot workspaces\nAssertionError: expected [ Array(1) ] to deeply equal []\n\n- Expected\n+ Received\n\n- []\n+ [\n+   \"[swarm] considered PAN-100: swarm eligible\",\n+ ]\n\n ❯ tests/unit/lib/cloister/deacon-swarm-enumerate.test.ts:106:41\n    104|     mocks.listProjectsSync.mockReturnValue([{ config: { path: projectP…\n    105|\n    106|     await expect(coordinateSwarmSlots()).resolves.toEqual([]);\n       |                                         ^\n    107|   });\n    108|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/10]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/agents-switch-model.test.ts > POST /api/agents/:id/switch-model > rejects model switching for pipeline agents\nError: Test timed out in 20000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/routes/__tests__/agents-switch-model.test.ts:29:3\n     27|\n     28| describe('POST /api/agents/:id/switch-model', () => {\n     29|   it('rejects model switching for pipeline agents', { timeout: 20_000 …\n       |   ^\n     30|     const response = await postAgentSwitchModel('agent-pan-1928', { mo…\n     31|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/10]⎯\n\n",
+    "updatedAt": "2026-07-07T11:07:30.222Z",
+    "reviewNotes": "lint-circular-deps still does not exclude __tests__ directories",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2462",
-    "reviewRequestedAt": "2026-07-07T10:34:29.813Z",
+    "lastVerifiedCommit": "5932a0c51d92a8c60ea25c0f3dde167aec02800d",
+    "reviewRequestedAt": "2026-07-07T11:03:31.211Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/drafts/PAN-2230.md",
@@ -44,9 +116,8 @@
         "docs/ci-cd/CICD-QUEUE.md",
         "docs/codebase-health/REFACTOR-QUEUE.md",
         "scripts/canonicalize-circular-deps.js",
-        "src/dashboard/server/routes/__tests__/agents-switch-model.test.ts",
-        "src/dashboard/server/routes/__tests__/cloister-config.test.ts",
-        "src/dashboard/server/services/__tests__/conversation-compaction.test.ts",
+        "src/lib/cloister/validation.ts",
+        "src/lib/cloister/verification-runner.ts",
         "vitest.config.ts"
       ],
       "declaredScopeUntouched": [],
@@ -73,12 +144,11 @@
         "scripts/circular-deps-baseline.txt",
         "scripts/lint-circular-deps.sh",
         "scripts/lint-ratchet-audit.sh",
-        "src/dashboard/server/routes/__tests__/agents-switch-model.test.ts",
-        "src/dashboard/server/routes/__tests__/cloister-config.test.ts",
-        "src/dashboard/server/services/__tests__/conversation-compaction.test.ts",
+        "src/lib/cloister/validation.ts",
+        "src/lib/cloister/verification-runner.ts",
         "vitest.config.ts"
       ],
-      "recordedAt": "2026-07-07T10:34:04.885Z"
+      "recordedAt": "2026-07-07T11:03:23.729Z"
     }
   },
   "closeOut": {
@@ -110,9 +180,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1457414,
-            "output": 93533,
-            "cacheRead": 45531648,
+            "input": 2032780,
+            "output": 124220,
+            "cacheRead": 62717440,
             "cacheWrite": 0
           }
         }
@@ -137,15 +207,15 @@
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 1457414,
-          "output": 93533,
-          "cacheRead": 45531648,
+          "input": 2032780,
+          "output": 124220,
+          "cacheRead": 62717440,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 21.962272000000002,
-        "pricingAsOf": "2026-07-07T10:38:10.514Z"
+        "usd": 25.896921,
+        "pricingAsOf": "2026-07-07T11:07:30.250Z"
       }
     },
     "merges": [
@@ -154,5 +224,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-07T10:38:09.988Z",
-  "updated": "2026-07-07T10:38:10.516Z"
+  "updated": "2026-07-07T11:07:30.273Z"
 }
