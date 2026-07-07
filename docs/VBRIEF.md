@@ -1,12 +1,18 @@
 # vBRIEF Plan Format & Lifecycle
 
-Overdeck uses [vBRIEF v0.6](https://github.com/deftai/vBRIEF) for machine-readable work plans with a unified `.pan/` directory model (PAN-967).
+Overdeck uses [xBRIEF](https://github.com/deftai/xBRIEF) for machine-readable work plans with a unified `.pan/` directory model (PAN-967).
+
+## xBRIEF v0.8
+
+Upstream renamed the specification repository to `deftai/xBRIEF` on 2026-06-26, then released xBRIEF v0.8 on 2026-06-30. Overdeck keeps this file name and internal `vBRIEFInfo` TypeScript field for compatibility, but supports the renamed on-disk envelope.
+
+Overdeck reads documents from v0.5 through v0.8. New writers emit v0.8 documents. On disk, version `0.7` and newer documents use `xBRIEFInfo`; older documents use `vBRIEFInfo`. Serialization is round-trip preserving: an old `vBRIEFInfo` document stays `vBRIEFInfo` when rewritten, and Overdeck does not silently up-convert older specs.
 
 ## Specification
 
-The canonical vBRIEF specification is maintained at **[github.com/deftai/vBRIEF](https://github.com/deftai/vBRIEF)**.
+The canonical xBRIEF specification is maintained at **[github.com/deftai/xBRIEF](https://github.com/deftai/xBRIEF)**.
 
-Overdeck emits vBRIEF v0.6 files with metadata extensions for issue tracking and difficulty estimation. Readers remain compatible with v0.5 documents. We also maintain a [fork of the spec](https://github.com/eltmon/vBRIEF) and have an open [extension proposal](https://github.com/deftai/vBRIEF/issues/1).
+Overdeck emits xBRIEF v0.8 files with metadata extensions for issue tracking and difficulty estimation. Readers remain compatible with v0.5 through v0.8 documents. We also maintain a [fork of the spec](https://github.com/eltmon/xBRIEF) and have an open [extension proposal](https://github.com/deftai/xBRIEF/issues/40), superseding the original #1 proposal with draft PR deftai/xBRIEF#41.
 
 ## v0.6 Compatibility
 
@@ -371,7 +377,7 @@ The vBRIEF spec supports arbitrary `metadata` on items and child items. Overdeck
 | `metadata.kind` | child items | `"acceptance_criterion"` — marks a child item as an AC for the verification gate |
 | `metadata.canonicalFilename` | plan | Preserves the immutable filename across re-finalizations |
 
-These extensions are NOT part of the vBRIEF core spec. We've opened a feature request to standardize them: **[deftai/vBRIEF#1](https://github.com/deftai/vBRIEF/issues/1)**.
+These extensions are NOT part of the xBRIEF core spec. We've opened a feature request to standardize them: **[deftai/xBRIEF#40](https://github.com/deftai/xBRIEF/issues/40)**, superseding the original #1 request with draft PR deftai/xBRIEF#41.
 
 ---
 
