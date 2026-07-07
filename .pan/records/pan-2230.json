@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-07T06:16:55.749Z",
-  "updated": "2026-07-07T08:43:11.997Z",
+  "updated": "2026-07-07T09:09:33.881Z",
   "pipeline": {
     "issueId": "PAN-2230",
     "reviewStatus": "pending",
@@ -64,5 +64,25 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "kimi-k2.7-code"
+  "model": "kimi-k2.7-code",
+  "statusOverrides": {
+    "ratchet-audit-integration": "completed",
+    "ratchet-audit-integration.ac1": "completed",
+    "ratchet-audit-integration.ac2": "completed",
+    "ratchet-audit-integration.ac3": "completed",
+    "wire-lint-circular": "completed",
+    "wire-lint-circular.ac1": "completed",
+    "wire-lint-circular.ac2": "completed",
+    "guard-script-and-baseline": "completed",
+    "guard-script-and-baseline.ac1": "completed",
+    "guard-script-and-baseline.ac2": "completed",
+    "guard-script-and-baseline.ac3": "completed",
+    "guard-script-and-baseline.ac4": "completed",
+    "docs": "completed",
+    "docs.ac1": "completed",
+    "docs.ac2": "completed",
+    "add-madge-dep": "completed",
+    "add-madge-dep.ac1": "completed",
+    "add-madge-dep.ac2": "completed"
+  }
 }
