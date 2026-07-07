@@ -46,11 +46,16 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-07T19:39:50.384Z"
+    },
+    {
+      "timestamp": "2026-07-07T19:52:18.274Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
   "created": "2026-07-06T14:48:34.495Z",
-  "updated": "2026-07-07T19:50:42.005Z",
+  "updated": "2026-07-07T19:52:18.307Z",
   "pipeline": {
     "issueId": "PAN-2405",
     "reviewStatus": "passed",
@@ -58,7 +63,7 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": true,
-    "updatedAt": "2026-07-07T19:50:41.917Z",
+    "updatedAt": "2026-07-07T19:52:18.271Z",
     "reviewNotes": "backend restart config now uses scheduled item staffing",
     "testNotes": "Gates passed: npm run typecheck; npm test -- tests/unit/dashboard/routes/agents-no-loss.test.ts (full backend suite 896 files, frontend issueActions tests 3 files).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2476",
@@ -116,7 +121,7 @@
       },
       "costAtCloseOut": {
         "usd": 9.888619,
-        "pricingAsOf": "2026-07-07T19:50:41.967Z"
+        "pricingAsOf": "2026-07-07T19:52:18.306Z"
       }
     },
     "merges": [
