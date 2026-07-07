@@ -123,10 +123,6 @@ vi.mock('../../../../../src/lib/github-app.js', async (importOriginal) => {
   };
 });
 
-vi.mock('../../../../../src/lib/tracker-utils.js', () => ({
-  resolveGitHubIssueSync: vi.fn(),
-}));
-
 vi.mock('../../../../../src/lib/tmux.js', () => ({
   sessionExists: vi.fn(() => Effect.succeed(false)),
   sessionExistsSync: vi.fn(() => false),
