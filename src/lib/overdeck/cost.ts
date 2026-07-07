@@ -16,7 +16,7 @@ import {
 } from '../cost.js';
 import type { CostBudget } from '../cost.js';
 import { parseOhmypiSessionCostResultSync } from '../cost-parsers/ohmypi-parser.js';
-import { parseCodexSessionCostEventsSync } from '../cost-parsers/codex-parser.js';
+import { parseCodexSessionCostEventsSync, parseCodexSessionSync } from '../cost-parsers/codex-parser.js';
 import { getOverdeckHome } from '../paths.js';
 import { deriveTieredAgentCostRole } from '../agents/tier-metrics.js';
 
@@ -772,11 +772,17 @@ export const CostWriterLive = Layer.effect(
             if (events.some((event) => event.model === 'unknown')) {
               markSkipped(sessionFile, 'unknown-model');
             }
+            const codexSession = root.inferIssueFromCwd
+              ? yield* Effect.sync(() => parseCodexSessionSync(sessionFile))
+              : null;
+            const issueId = root.inferIssueFromCwd
+              ? (inferIssueFromPath(codexSession?.cwd) ?? 'UNKNOWN' as IssueIdType)
+              : root.issueId;
             for (const usage of events) {
               const ts = new Date(usage.timestamp);
               const event: CostEvent = {
                 ts,
-                issueId:     root.issueId,
+                issueId,
                 agentId:     root.agentName,
                 sessionId:   usage.sessionId,
                 sessionType: root.sessionType,
