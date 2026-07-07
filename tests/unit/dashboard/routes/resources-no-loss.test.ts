@@ -33,6 +33,7 @@ const RESOURCE_ROUTE_SURFACE_FILES = [
   join(WORKSPACE_ROOT, 'src', 'dashboard', 'server', 'routes', 'resources', 'containers.ts'),
   join(WORKSPACE_ROOT, 'src', 'dashboard', 'server', 'routes', 'resources', 'prune.ts'),
   join(WORKSPACE_ROOT, 'src', 'dashboard', 'server', 'routes', 'resources', 'reclaim.ts'),
+  join(WORKSPACE_ROOT, 'src', 'dashboard', 'server', 'routes', 'resources', 'teardown.ts'),
 ] as const;
 
 const EXPECTED_RESOURCE_ROUTES = [
@@ -41,12 +42,14 @@ const EXPECTED_RESOURCE_ROUTES = [
   'GET /api/resources/:containerId/history',
   'GET /api/resources/:containerId/details',
   'GET /api/resources/docker/container/:id/logs',
+  'GET /api/resources/stacks/:issueId/teardown-estimate',
   'DELETE /api/resources/venvs/:issue',
   'POST /api/resources/docker/container/:id/pause',
   'POST /api/resources/docker/container/:id/restart',
   'POST /api/resources/docker/container/:id/start',
   'POST /api/resources/docker/container/:id/stop',
   'POST /api/resources/docker/container/:id/unpause',
+  'POST /api/resources/stacks/:issueId/teardown',
   'POST /api/resources/docker/prune-containers',
   'POST /api/resources/docker/prune-volumes',
   'DELETE /api/resources/docker/container/:id',
@@ -80,7 +83,7 @@ describe('PAN-2464 resources route no-loss audit', () => {
     expect(resourcesRouteLayer).toBeDefined();
   });
 
-  it('keeps all 15 resources method/path registrations', () => {
+  it('keeps all 18 resources method/path registrations', () => {
     const liveRoutes = enumerateResourceRoutes();
     const expectedRoutes = new Set(EXPECTED_RESOURCE_ROUTES);
 
@@ -101,7 +104,7 @@ describe('PAN-2464 resources route no-loss audit', () => {
       ...unexpected.map((route) => `  unexpected: ${route}`),
     ].join('\n')).toEqual([]);
 
-    expect(liveRoutes).toHaveLength(16);
+    expect(liveRoutes).toHaveLength(18);
   });
 
   it('keeps the GET /api/resources payload field set stable', async () => {

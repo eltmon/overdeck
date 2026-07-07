@@ -8,6 +8,7 @@ export interface StackContainerResource {
   cpuPercent?: number;
   memoryUsage?: number;
   memoryLimit?: number;
+  diskUsage?: number;
   status?: string;
   labels?: Record<string, string>;
 }
@@ -57,7 +58,7 @@ export function buildResourceStacks(
       aggregates: {
         cpuPercent: roundOne(services.reduce((sum, service) => sum + (service.cpuPercent ?? 0), 0)),
         memoryBytes: services.reduce((sum, service) => sum + (service.memoryUsage ?? 0), 0),
-        diskBytes: 0,
+        diskBytes: services.reduce((sum, service) => sum + (service.diskUsage ?? 0), 0),
       },
       phase: phaseFor(reviewStatus),
     };

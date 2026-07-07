@@ -5,7 +5,7 @@ import { Effect } from 'effect';
 
 import { listAgentStates, type AgentState } from '../../../../lib/agents.js';
 import type { CostEvent } from '../../../../lib/costs/events.js';
-import { queryCostEvents } from '../../../../lib/database/cost-events-db.js';
+import { queryCostEventsSync } from '../../../../lib/overdeck/cost-sync.js';
 import { listPaneValues, listSessions } from '../../../../lib/tmux.js';
 
 const execFileAsync = promisify(execFile);
@@ -162,7 +162,7 @@ export function getAgentStatsSnapshotEffect(
         )
       : [];
     const costEventsByAgent = new Map<string, AgentCostEvent[]>();
-    const costQuery = deps.queryCostEvents ?? queryCostEvents;
+    const costQuery = deps.queryCostEvents ?? queryCostEventsSync;
 
     for (const agent of agents) {
       const recentStartTs = new Date(nowMs - BURN_WINDOW_MS).toISOString();

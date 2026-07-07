@@ -72,7 +72,7 @@ export function buildReclaimPayload(
         why: 'Issue is merged or closed and no live agent references it.',
         ramBytes: stack.aggregates.memoryBytes,
         diskBytes: stack.aggregates.diskBytes,
-        action: `POST /api/resources/stacks/${stack.issueId}/stop`,
+        action: `GET /api/resources/stacks/${stack.issueId}/teardown-estimate`,
         issueId: stack.issueId ?? undefined,
       })),
     ...(options.venvs ?? cachedVenvCandidates)

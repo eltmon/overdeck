@@ -20,6 +20,10 @@ import {
 import { getResourceHistoryRoute } from './history.js';
 import { deleteResourceVenvRoute } from './reclaim.js';
 import { getResourcesRoute } from './snapshot.js';
+import {
+  getStackTeardownEstimateRoute,
+  postStackTeardownRoute,
+} from './teardown.js';
 
 export const resourcesRouteLayer = Layer.mergeAll(
   getResourcesRoute,
@@ -38,6 +42,8 @@ export const resourcesRouteLayer = Layer.mergeAll(
   postUnpauseContainerRoute,
   getContainerLogsRoute,
   deleteResourceVenvRoute,
+  getStackTeardownEstimateRoute,
+  postStackTeardownRoute,
 );
 
 export default resourcesRouteLayer;

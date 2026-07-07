@@ -1,5 +1,5 @@
 import type { ResourceStack } from '../../types';
-import { pipelineChipFor } from '../CommandDeck/pipeline-helpers';
+import { pipelineChipFor, type BucketedFeature } from '../CommandDeck/pipeline-helpers';
 
 interface StackCardProps {
   stack: ResourceStack;
@@ -8,15 +8,26 @@ interface StackCardProps {
 }
 
 export function StackCard({ stack, expanded = false, onToggle }: StackCardProps) {
+  const feature: BucketedFeature['feature'] = {
+    issueId: stack.issueId ?? stack.id,
+    title: stack.issueTitle,
+    projectName: '',
+    branch: '',
+    status: stack.phase === 'merged' ? 'closed' : stack.phase,
+    stateLabel: stack.phase,
+    agentStatus: null,
+    hasPlanning: false,
+    hasPrd: false,
+    hasState: false,
+    isShadow: false,
+  };
+  const reviewStatus: BucketedFeature['reviewStatus'] = stack.phase === 'merged'
+    ? { mergeStatus: 'merged' }
+    : undefined;
   const chip = pipelineChipFor({
     phase: stack.phase === 'merged' ? 'ship' : stack.phase,
-    feature: {
-      id: stack.issueId ?? stack.id,
-      title: stack.issueTitle,
-      state: stack.phase === 'merged' ? 'closed' : undefined,
-      status: stack.phase === 'merged' ? 'closed' : undefined,
-    } as any,
-    reviewStatus: stack.phase === 'merged' ? { mergeStatus: 'merged' } as any : undefined,
+    feature,
+    reviewStatus,
   });
   const idleHint = shouldShowIdleHint(stack);
   const atLimit = stack.services.some((service) => (service.memPercentOfLimit ?? 0) >= 95);

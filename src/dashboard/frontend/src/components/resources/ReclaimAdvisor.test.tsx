@@ -66,7 +66,7 @@ const gb = 1024 ** 3;
 
 function candidates(): ReclaimCandidate[] {
   return [
-    { kind: 'stack', label: 'MIN-857', why: 'merged', ramBytes: 9 * gb, diskBytes: 0, action: 'POST /api/resources/stacks/MIN-857/stop', issueId: 'MIN-857' },
+    { kind: 'stack', label: 'MIN-857', why: 'merged', ramBytes: 9 * gb, diskBytes: 0, action: 'GET /api/resources/stacks/MIN-857/teardown-estimate', issueId: 'MIN-857' },
     { kind: 'venv', label: 'venv cache', why: 'closed issue', ramBytes: 0, diskBytes: 52 * gb, action: 'DELETE /api/resources/venvs/MIN-857', issueId: 'MIN-857' },
   ];
 }

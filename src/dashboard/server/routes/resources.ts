@@ -130,6 +130,18 @@ export {
   type StackContainerResource,
 } from './resources/stacks.js';
 export {
+  getStackTeardownEstimateEffect,
+  getStackTeardownEstimateRoute,
+  postStackTeardownEffect,
+  postStackTeardownRoute,
+  resetStackTeardownForTests,
+  setStackTeardownActivityEmitterForTests,
+  setStackTeardownDockerExecForTests,
+  setStackTeardownTokenGeneratorForTests,
+  type StackTeardownEstimate,
+  type StackTeardownInput,
+} from './resources/teardown.js';
+export {
   resourcesRouteLayer,
   default,
 } from './resources/index.js';
