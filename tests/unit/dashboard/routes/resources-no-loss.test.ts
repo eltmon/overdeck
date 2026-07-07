@@ -14,6 +14,7 @@ vi.mock('../../../../src/lib/agents.js', () => ({
 
 vi.mock('../../../../src/lib/tmux.js', () => ({
   listSessions: () => Effect.succeed(mockListSessions()),
+  listPaneValues: () => Effect.succeed([]),
 }));
 
 import {
@@ -110,6 +111,7 @@ describe('PAN-2464 resources route no-loss audit', () => {
       'containers',
       'coreServices',
       'hostProcesses',
+      'hostVitals',
       'networks',
       'stoppedContainers',
       'updatedAt',

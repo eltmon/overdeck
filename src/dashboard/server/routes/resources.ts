@@ -27,6 +27,17 @@ export {
   postPruneVolumesRoute,
 } from './resources/prune.js';
 export {
+  buildAgentStatsSnapshot,
+  getAgentStatsSnapshotEffect,
+  parseProcessTable,
+  type AgentCostEvent,
+  type AgentProcessRecord,
+  type AgentResourceRow,
+  type AgentSessionRoot,
+  type AgentStatsSnapshot,
+  type MinimalAgentState,
+} from './resources/agents-stats.js';
+export {
   buildCoreServices,
   getCoreServicesSnapshot,
   type CoreServiceRow,

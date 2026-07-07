@@ -5,6 +5,7 @@ import { listAgentStates, type AgentState } from '../../../../lib/agents.js';
 import { listSessions } from '../../../../lib/tmux.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
+import { getAgentStatsSnapshotEffect } from './agents-stats.js';
 import { getCoreServicesSnapshot } from './core-services.js';
 import { getHostProcessesSnapshot } from './host-processes.js';
 import { getCurrentDockerStats } from './shared.js';
@@ -13,6 +14,7 @@ import { getCurrentDockerStats } from './shared.js';
 export function getResourcesEffect(): Effect.Effect<ReturnType<typeof jsonResponse>, never, never> {
   return Effect.gen(function* () {
     const containers = getCurrentDockerStats();
+    const agentStats = yield* getAgentStatsSnapshotEffect();
     const stoppedContainers: unknown[] = [];
 
     // PAN-1908: authoritative agent registry is the SQLite agents table.
@@ -27,15 +29,20 @@ export function getResourcesEffect(): Effect.Effect<ReturnType<typeof jsonRespon
         ...state,
         hasLiveTmuxSession: tmuxSessionNames.has(state.id),
       }));
+    const agentStatsById = new Map(agentStats.agents.map((agent) => [agent.id, agent]));
 
     return jsonResponse({
+      agents: agents.map((agent) => ({
+        ...agent,
+        resourceStats: agentStatsById.get(String(agent.id)) ?? null,
+      })),
       coreServices: getCoreServicesSnapshot(),
       containers,
+      hostVitals: agentStats.hostVitals,
       hostProcesses: getHostProcessesSnapshot(),
       stoppedContainers,
       networks: [],
       volumes: [],
-      agents,
       updatedAt: new Date().toISOString(),
     });
   });
