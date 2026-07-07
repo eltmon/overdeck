@@ -1,7 +1,6 @@
 /**
  * vBRIEF DAG utilities — critical path, graph analysis, wave scheduling, per-item dispatch
  */
-
 import { existsSync } from 'fs';
 import { mkdir, readdir, readFile, rename, rm, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
