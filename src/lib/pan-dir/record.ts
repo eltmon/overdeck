@@ -197,6 +197,40 @@ export function getIssueRecordBasePath(project: ProjectConfig, issueId: string):
  * read-modify-write flows must take `withIssueRecordLock` before reading and
  * must not split this write behind an await.
  */
+/**
+ * PAN-2466 no-loss guard: callers that fail to read the existing record fall
+ * back to a fresh template with an EMPTY closeOut, and writing that template
+ * destroys accumulated usage/cost history (observed on six records 2026-07-07).
+ * At the write door, if the incoming closeOut carries no data but the on-disk
+ * record's does, keep the on-disk closeOut. Genuine closeOut updates (any
+ * usage/merges/totals content) always win.
+ */
+function preserveCloseOutSync(path: string, record: PanIssueRecord): PanIssueRecord {
+  const incoming = record.closeOut;
+  const incomingEmpty =
+    !incoming ||
+    (Object.keys(incoming.usage?.byStage ?? {}).length === 0 &&
+      Object.keys(incoming.usage?.totals ?? {}).length === 0 &&
+      (incoming.merges ?? []).length === 0);
+  if (!incomingEmpty || !existsSync(path)) return record;
+  try {
+    const onDisk = JSON.parse(readFileSync(path, 'utf-8')) as PanIssueRecord;
+    const disk = onDisk.closeOut;
+    const diskHasData =
+      disk &&
+      (Object.keys(disk.usage?.byStage ?? {}).length > 0 ||
+        Object.keys(disk.usage?.totals ?? {}).length > 0 ||
+        (disk.merges ?? []).length > 0);
+    if (diskHasData) {
+      console.warn(`[record] Preserving populated closeOut for ${record.issueId} — incoming write carried an empty closeOut (PAN-2466 guard)`);
+      return { ...record, closeOut: disk };
+    }
+  } catch {
+    // Unreadable on-disk record — nothing to preserve.
+  }
+  return record;
+}
+
 export function writeIssueRecordSync(
   project: ProjectConfig,
   issueId: string,
@@ -209,7 +243,7 @@ export function writeIssueRecordSync(
   }
   const now = new Date().toISOString();
   const next: PanIssueRecord = {
-    ...record,
+    ...preserveCloseOutSync(path, record),
     issueId: issueId.toUpperCase(),
     schemaVersion: RECORD_SCHEMA_VERSION,
     created: record.created || now,
@@ -236,7 +270,7 @@ export function writeIssueRecordForWorkspaceSync(
   }
   const now = new Date().toISOString();
   const next: PanIssueRecord = {
-    ...record,
+    ...preserveCloseOutSync(path, record),
     issueId: issueId.toUpperCase(),
     schemaVersion: RECORD_SCHEMA_VERSION,
     created: record.created || now,
