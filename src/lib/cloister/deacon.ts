@@ -47,7 +47,7 @@ import { createInFlightGuard } from './in-flight-guard.js';
 import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
 import { isContextOverflowTail } from '../context-overflow.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
-import { hasOnlyPipelineStateChangesSinceCommit } from '../pipeline-state-paths.js';
+import { haveSameEffectiveCodeCommit } from '../pipeline-state-paths.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -1616,7 +1616,7 @@ export async function checkPostReviewCommits(): Promise<string[]> {
       }
 
       try {
-        if (await hasOnlyPipelineStateChangesSinceCommit(workspacePath, status.reviewedAtCommit, currentHead)) {
+        if (await haveSameEffectiveCodeCommit(workspacePath, status.reviewedAtCommit, currentHead)) {
           setReviewStatusSync(issueId, { reviewedAtCommit: currentHead });
           console.log(`[deacon] State-only post-review commit for ${issueId}: ${status.reviewedAtCommit.substring(0, 8)} → ${currentHead.substring(0, 8)} — review/test preserved`);
           continue;
