@@ -27,8 +27,8 @@
       "markdownBody": "# Review CHANGES REQUESTED for PAN-2230\n\nPR diff includes unrelated PAN-2341 production Cloister changes\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2230 -m \"Fixed review issues\"`"
     }
   ],
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "ratchet-audit-integration": "completed",
     "ratchet-audit-integration.ac1": "completed",
@@ -51,17 +51,13 @@
   },
   "pipeline": {
     "issueId": "PAN-2230",
-    "reviewStatus": "blocked",
-    "testStatus": "passed",
-    "verificationStatus": "failed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T12:07:32.438Z",
-    "reviewNotes": "PR diff includes unrelated PAN-2341 production Cloister changes",
-    "verificationNotes": "Verification FAILED at test (83280ms):\n\nr repo artifacts.\nOffending staged paths:\n  .pan/drafts/PAN-1791.md\n  .pan/specs/PAN-1791.vbrief.json\n\nAllowed flywheel-orchestrator commit paths are:\n  docs/FLYWHEEL-STATE.md\n  .pan/records/\n  .pan/continues/\n  .pan/backlog/\n  .beads/\nRefusing flywheel-orchestrator commit: orchestrators dispatch work; they do not author repo artifacts.\nOffending staged paths:\n  src/foo.ts\n\nAllowed flywheel-orchestrator commit paths are:\n  docs/FLYWHEEL-STATE.md\n  .pan/records/\n  .pan/continues/\n  .pan/backlog/\n  .beads/\nRefusing flywheel-orchestrator commit: orchestrators dispatch work; they do not author repo artifacts.\nOffending staged paths:\n  src/foo.ts\n\nAllowed flywheel-orchestrator commit paths are:\n  docs/FLYWHEEL-STATE.md\n  .pan/records/\n  .pan/continues/\n  .pan/backlog/\n  .beads/\n✗ overdeck boundary gate: 1 site(s) across 1 file(s) still on the OLD panopticon.db\n\nsrc/dashboard/server/routes/issues.ts:1:import { Db } from '../../../lib/overdeck/infra.js';\n\nEach must go through an overdeck door (src/lib/overdeck/*) — not getDatabase() or a database/* store.\nguard-agent-main-push.sh invoked\n⚠ ratchet audit: no base for refs/heads/feature — skipping\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n(node:1964079) ExperimentalWarning: Some other experimental feature\n(Use `node --trace-warnings ...` to show where the warning was created)\n✖ quarantine audit: the following entries lack an issue reference\n  tests/foo.test.ts\nEach quarantine entry must reference an issue — add e.g. # PAN-XXXX.\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n",
+    "updatedAt": "2026-07-07T12:32:04.602Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2462",
-    "reviewedAtCommit": "e090460d2eb0304d00ecf23d29d999ec16270866",
-    "lastVerifiedCommit": "5932a0c51d92a8c60ea25c0f3dde167aec02800d",
     "reviewRequestedAt": "2026-07-07T12:05:21.830Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -121,9 +117,9 @@
         },
         "review": {
           "unknown": {
-            "input": 14728235,
-            "output": 33115,
-            "cacheRead": 14084480,
+            "input": 15362330,
+            "output": 35501,
+            "cacheRead": 14684160,
             "cacheWrite": 0
           }
         },
@@ -158,9 +154,9 @@
           "cacheWrite": 160632
         },
         "unknown": {
-          "input": 14728235,
-          "output": 33115,
-          "cacheRead": 14084480,
+          "input": 15362330,
+          "output": 35501,
+          "cacheRead": 14684160,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
@@ -171,8 +167,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 33.564749,
-        "pricingAsOf": "2026-07-07T12:07:32.503Z"
+        "usd": 34.108244,
+        "pricingAsOf": "2026-07-07T12:32:04.629Z"
       }
     },
     "merges": [
@@ -181,5 +177,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-07T11:40:53.373Z",
-  "updated": "2026-07-07T12:07:38.331Z"
+  "updated": "2026-07-07T12:32:04.630Z"
 }
