@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-07T16:15:04.782Z",
-  "updated": "2026-07-07T22:14:26.477Z",
+  "updated": "2026-07-07T22:45:24.481Z",
   "pipeline": {
     "issueId": "PAN-1644",
     "reviewStatus": "pending",
@@ -20,8 +20,8 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T22:14:26.317Z",
-    "inspectNotes": "Bead title-source-ai-explicit ack: LegacyTitleSource extended with ai-explicit, canRefineTitle() correctly gates default/auto/ai/ai-refined true and manual/ai-explicit/null false, canReplaceTitle() unchanged (default/auto only), and retitleConversation() now persists ai-explicit for both the AI-success and deterministic-fallback-on-timeout paths (single call site, both covered by new unit tests). All 3 ACs met."
+    "updatedAt": "2026-07-07T22:36:28.820Z",
+    "inspectNotes": "Bead title-changed-event ack: ConversationTitleChangedEvent schema added to DomainEvent union with {conversationName,title,titleSource} payload, reducer case bumps conversationsListRevision by 1 (test confirms 7->8), and updateConversationTitle() emits via getEventStore().emitOnly() (sequence auto-assigned by Omit<DomainEvent,\"sequence\"> signature) wrapped in try/catch so persistence never throws when the event store is uninitialized (both paths unit-tested). All 3 ACs met."
   },
   "closeOut": {
     "usage": {
@@ -42,11 +42,19 @@
             "cacheWrite": 213261
           }
         },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 6568,
+            "output": 2276,
+            "cacheRead": 210356,
+            "cacheWrite": 77842
+          }
+        },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 317149,
-            "output": 25567,
-            "cacheRead": 12414720,
+            "input": 420571,
+            "output": 60633,
+            "cacheRead": 34839296,
             "cacheWrite": 0
           }
         }
@@ -64,21 +72,41 @@
           "cacheRead": 7278754,
           "cacheWrite": 213261
         },
+        "anthropic/claude-sonnet-5": {
+          "input": 6568,
+          "output": 2276,
+          "cacheRead": 210356,
+          "cacheWrite": 77842
+        },
         "custom/kimi-k2.7-code": {
-          "input": 317149,
-          "output": 25567,
-          "cacheRead": 12414720,
+          "input": 420571,
+          "output": 60633,
+          "cacheRead": 34839296,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 16.191158,
-        "pricingAsOf": "2026-07-07T22:14:26.464Z"
+        "usd": 20.962919,
+        "pricingAsOf": "2026-07-07T22:36:28.930Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5"
+  "model": "kimi-k2.7-code",
+  "statusOverrides": {
+    "title-source-ai-explicit": "running"
+  },
+  "swarm": {
+    "slotAssignments": [
+      {
+        "slotIndex": 1,
+        "itemId": "title-source-ai-explicit",
+        "agentId": "agent-pan-1644-slot-1",
+        "branch": "feature/pan-1644-slot-1",
+        "assignedAt": "2026-07-07T22:45:23.393Z"
+      }
+    ]
+  }
 }
