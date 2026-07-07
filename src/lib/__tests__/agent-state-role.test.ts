@@ -72,7 +72,9 @@ describe('AgentState role persistence', () => {
   it('builds review role runtime commands from roles/review.md', async () => {
     const { getRoleRuntimeBaseCommand, roleAgentDefinitionPath, spawnRun } = await import('../agents.js');
 
-    expect(roleAgentDefinitionPath('review')).toBe('roles/review.md');
+    const rolePath = roleAgentDefinitionPath('review');
+    expect(rolePath).toMatch(/\/roles\/review\.md$/);
+    expect(existsSync(rolePath)).toBe(true);
     expect(spawnRun).toEqual(expect.any(Function));
 
     const command = await getRoleRuntimeBaseCommand('claude-opus-4-7', 'agent-pan-1048-review', 'review');
