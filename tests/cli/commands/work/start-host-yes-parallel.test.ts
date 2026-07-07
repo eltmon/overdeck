@@ -124,6 +124,7 @@ vi.mock('../../../../src/lib/remote/index.js', () => ({
 
 vi.mock('../../../../src/lib/work-agent-lifecycle.js', () => ({
   assertCanStartFreshSync: vi.fn(),
+  getWorkAgentLifecycleStateSync: vi.fn(() => ({ isRunning: false, isRunningButStuck: false })),
 }));
 
 vi.mock('../../../../src/lib/cloister/work-agent-prompt.js', () => ({

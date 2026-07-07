@@ -37,6 +37,7 @@ describe('planCommand', () => {
   });
 
   it('sends autoStart when --auto-start is provided', async () => {
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const { planCommand } = await import('../plan.js');
 
     await planCommand('PAN-123', { auto: true, autoStart: true });
@@ -53,6 +54,13 @@ describe('planCommand', () => {
       auto: true,
       autoStart: true,
     });
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('--auto-start is deprecated'),
+    );
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('pan start'),
+    );
+    consoleWarnSpy.mockRestore();
   });
 
   it('sends probe when --probe is provided', async () => {

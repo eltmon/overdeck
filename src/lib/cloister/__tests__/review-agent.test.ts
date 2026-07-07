@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('child_process', () => ({
   exec: mocks.exec,
+  execFile: vi.fn(),
 }));
 
 vi.mock('../../agents.js', () => ({
@@ -80,6 +81,11 @@ vi.mock('../review-monitor.js', () => ({
 
 vi.mock('../feedback-writer.js', () => ({
   archiveFeedbackFiles: mocks.archiveFeedbackFiles,
+}));
+
+vi.mock('../merge-verification.js', () => ({
+  shouldSkipDispatchAsMerged: vi.fn(async () => ({ skip: false, reason: 'open' })),
+  verifyMergedBeforeLifecycle: vi.fn(),
 }));
 
 vi.mock('../../pipeline-notifier.js', () => ({

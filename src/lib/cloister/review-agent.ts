@@ -50,6 +50,7 @@ import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } fr
 import { buildRealConflictGateDeps, getCachedConflictGateMergeability, resolveConflictGate } from './conflict-gate.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
+import { shouldSkipDispatchAsMerged } from './merge-verification.js';
 import { readIssueRecordSync, resolveProjectForIssue } from '../pan-dir/record.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { AGENTS_DIR, packageRoot } from '../paths.js';
@@ -410,6 +411,16 @@ function buildSelfReviewPrompt(opts: {
   opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean },
 ): Promise<{ success: boolean; message: string; error?: string; gated?: boolean }> {
   const reviewSessionName = `agent-${opts.issueId.toLowerCase()}-review`;
+
+  // PAN-2420: GitHub-authoritative guard. Do not waste time on conflict-gate
+  // checks or context builds for a PR that GitHub already reports merged.
+  const mergedGuard = await shouldSkipDispatchAsMerged(opts.issueId);
+  if (mergedGuard.skip) {
+    const message = `[review-agent] Skipping review dispatch for ${opts.issueId} — ${mergedGuard.reason}`;
+    console.log(message);
+    emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: opts.issueId });
+    return { success: false, message };
+  }
 
   // Idempotency: if a review role agent for this issue already has an alive
   // tmux pane, treat the current dispatch as a no-op. spawnRun has its own

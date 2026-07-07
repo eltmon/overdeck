@@ -151,11 +151,16 @@ import { OVERDECK_HOME, AGENTS_DIR, sessionFilePath } from '../paths.js';
 import { loadCloisterConfigSync, loadCloisterConfig } from './config.js';
 import { workResumeSlotsAvailable, getConcurrencyLimits, countRunningAgents, resetPatrolDispatchBudget, tryReserveAdvancingSlot, releaseAdvancingSlot, describeRunningAgents } from './concurrency.js';
 import { setReviewStatusSync, loadReviewStatuses, getReviewStatusSync, type ReviewStatus } from '../review-status.js';
+import { needsReviewDispatch } from '../review-dispatch-decision.js';
+import { readIssueRecordSync, ensureIssueRecordSync, writeIssueRecordSync } from '../pan-dir/record.js';
+import { queryBeadsForIssue } from '../beads-query.js';
 import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
 import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync } from '../projects.js';
 import { queueBeadsAutoCommit } from '../pan-dir/auto-commit.js';
+import { withIssueRecordLock } from '../pan-dir/record-lock.js';
+import { recordMainDivergenceHealth, type ProjectMainDivergence } from './deacon-main-divergence.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { mapGitHubStateToCanonical } from '../../core/state-mapping.js';
 import { logDeaconEventSync, logAgentLifecycleSync } from '../persistent-logger.js';
@@ -256,6 +261,7 @@ export interface DeaconState {
   lastMassDeathAlert?: string;   // ISO 8601
   mergeStuckAttempts?: Record<string, number>;  // circuit-breaker attempt counts (PAN-344)
   containerRestarts?: Record<string, ContainerRestartRecord>;  // PAN-464: restart backoff tracking
+  mainDivergence?: ProjectMainDivergence[];
 }
 
 export type DeaconPatrolHealth = 'running' | 'starting' | 'stale' | 'stopped';
@@ -725,6 +731,7 @@ export interface PatrolResult {
   specialists: HealthCheckResult[];
   actionsToken: string[];
   massDeathDetected: boolean;
+  mainDivergence?: ProjectMainDivergence[];
 }
 
 /**
@@ -1133,6 +1140,77 @@ export {
   stalledReviewConvoyRecoveryState,
 } from './deacon-review.js';
 export type { ReviewConvoyLiveness } from './deacon-review.js';
+
+// ============================================================================
+// PAN-2207: Recover completions whose PR is open but review was never dispatched
+// ============================================================================
+
+/**
+ * Detect issues where `pan done` failed mid-flight: PR is open, all beads are
+ * closed, reviewStatus is pending, and reviewRequestedAt was never written.
+ * Verify all beads are closed before re-dispatching review; mark the record
+ * with a tombstone so the patrol does not loop.
+ */
+export async function checkOrphanedCompletions(): Promise<string[]> {
+  const actions: string[] = [];
+  const now = new Date().toISOString();
+
+  try {
+    const statuses = loadReviewStatuses();
+
+    for (const [issueId, status] of Object.entries(statuses)) {
+      try {
+        if (status.reviewStatus !== 'pending') continue;
+        if (status.mergeStatus === 'merged') continue;
+        if (needsReviewDispatch(status)) continue;
+
+        const resolved = resolveProjectFromIssueSync(issueId);
+        if (!resolved) continue;
+        const project = getProjectSync(resolved.projectKey);
+        if (!project) continue;
+
+        const record = readIssueRecordSync(project, issueId);
+        if (record?.pipeline?.panDoneRecoveredAt) continue;
+
+        const issueLower = issueId.toLowerCase();
+        const workspacePath = findWorkspacePath(resolved.projectPath, issueLower);
+        if (!workspacePath || !existsSync(workspacePath)) continue;
+
+        const beadResult = await Effect.runPromise(queryBeadsForIssue(workspacePath, issueId));
+        if (beadResult.transientFailure || beadResult.beads.length === 0) continue;
+        if (beadResult.beads.some((bead) => bead.status !== 'closed')) continue;
+
+        const { stdout } = await execAsync(
+          `gh pr list --head feature/${issueLower} --state open --json url --jq '.[0].url'`,
+          { encoding: 'utf-8', timeout: 15000 }
+        );
+        const prUrl = stdout.trim();
+        if (!prUrl) continue;
+
+        setReviewStatusSync(issueId, { reviewRequestedAt: now, prUrl });
+        // Serialize with setReviewStatusSync's fire-and-forget journal rebuild so
+        // the panDoneRecoveredAt tombstone is written after (and on top of) it.
+        await withIssueRecordLock(issueId, async () => {
+          const nextRecord = ensureIssueRecordSync(project, issueId);
+          nextRecord.pipeline.panDoneRecoveredAt = now;
+          writeIssueRecordSync(project, issueId, nextRecord);
+        });
+
+        const action = `checkOrphanedCompletions: recovered ${issueId} (PR open but review never dispatched)`;
+        logDeaconEventSync(action);
+        actions.push(action);
+        console.log(`[deacon] ${action}`);
+      } catch (issueErr: any) {
+        console.warn(`[deacon] checkOrphanedCompletions: error for ${issueId}: ${issueErr?.message ?? issueErr}`);
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[deacon] checkOrphanedCompletions: patrol error: ${err?.message ?? err}`);
+  }
+
+  return actions;
+}
+
 // ============================================================================
 // PAN-699: Pending test dispatch retry
 // ============================================================================
@@ -2860,6 +2938,13 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...missingStatusActions);
   for (const a of missingStatusActions) addLog('action', a, state.patrolCycle);
 
+  // PAN-2207: recover issues where `pan done` failed mid-flight (PR open + review
+  // never dispatched). Runs after missing-status so we don't race reactive status
+  // creation, but before test/merge recovery so the review pipeline can proceed.
+  const orphanCompletionActions = await checkOrphanedCompletions();
+  actions.push(...orphanCompletionActions);
+  for (const a of orphanCompletionActions) addLog('action', a, state.patrolCycle);
+
   // PAN-1681: Recover test agents that wrote .pan/test/result.json but never
   // POSTed testStatus (nudge once → auto-complete). Runs BEFORE the dispatcher
   // below so a recoverable verdict is honored before any re-dispatch or stuck
@@ -3041,14 +3126,10 @@ export async function runPatrol(): Promise<PatrolResult> {
     for (const a of playwrightActions) addLog('action', a, state.patrolCycle);
   }
 
-  // PAN-1441: sweep host-main beads drift into git. `.beads/{issues.jsonl,
-  // export-state.json}` re-export on `main` whenever the `bd` binary syncs the
-  // shared dolt remote, and there is no single Overdeck write site to hook —
-  // so commit any resulting drift here. queueBeadsAutoCommit is main-only,
-  // debounced, skips missing files, and no-ops when nothing changed.
-  for (const { config: projectConfig } of listProjectsSync()) {
-    if (projectConfig.path) queueBeadsAutoCommit(projectConfig.path);
-  }
+  const projectConfigs = listProjectsSync();
+  for (const { config: projectConfig } of projectConfigs) if (projectConfig.path) queueBeadsAutoCommit(projectConfig.path);
+  const divergenceWarnings = await recordMainDivergenceHealth(state, projectConfigs);
+  for (const warning of divergenceWarnings) addLog('warn', warning, state.patrolCycle);
 
   // Periodic agent state cleanup (PAN-154)
   if (Math.random() < 0.003) {
@@ -3191,6 +3272,7 @@ export async function runPatrol(): Promise<PatrolResult> {
     specialists: results,
     actionsToken: actions,
     massDeathDetected: massDeathCheck.isMassDeath,
+    mainDivergence: state.mainDivergence,
   };
 
   lastPatrolResult = result;

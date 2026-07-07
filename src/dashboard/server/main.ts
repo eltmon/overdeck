@@ -48,6 +48,7 @@ import { clearQueryExpansionCache } from '../../lib/memory/query-expansion.js';
 import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cleanup.js';
 import { startAutoMergeExecutor, stopAutoMergeExecutor } from './services/auto-merge-executor.js';
 import { warnIfAutonomousMergeBackendUnavailable } from './services/merge-backend-health.js';
+import { warnIfAppCannotMerge } from './services/merge-app-scopes-health.js';
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
 import { closeConversationSearchService } from './services/conversation-search-service.js';
 import { startCostReconcileService, stopCostReconcileService } from './services/cost-reconcile-service.js';
@@ -64,6 +65,7 @@ import { ProjectsLive } from '../../lib/overdeck/config.js';
 import { RecordsLive, TmuxLive } from '../../lib/overdeck/infra.js';
 import { getAgentSessionsSync } from '../../lib/tmux.js';
 import { isSmeeConfiguredSync, startSmeeProcessSync } from '../../lib/smee.js';
+import { flushAllPendingAutoCommits } from '../../lib/pan-dir/auto-commit.js';
 
 declare const Bun: unknown;
 
@@ -91,6 +93,7 @@ await mkdir(getOverdeckHome(), { recursive: true });
 ensureInternalTokenSync();
 
 void warnIfAutonomousMergeBackendUnavailable();
+void warnIfAppCannotMerge();
 
 // Prepare the managed tmux context exactly once, before any code path can spawn
 // tmux. After this call `buildTmuxArgs`, `buildTmuxCommandString`, and
@@ -539,6 +542,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopCostReconcileService();
   stopRestartAnnouncer();
   await stopDeaconChild().catch((err) => console.warn('[deacon-supervisor] child shutdown failed:', err));
+  await Effect.runPromise(flushAllPendingAutoCommits()).catch((err) => console.warn('[pan-dir/auto-commit] shutdown flush failed:', err));
   await stopConversationSearchWatcher().catch((err) => console.warn('[conversation-search] watcher shutdown failed:', err));
   closeConversationSearchService();
   closeMemoryFtsDatabases();
