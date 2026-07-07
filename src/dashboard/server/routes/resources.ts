@@ -34,6 +34,15 @@ export {
   postPruneVolumesRoute,
 } from './resources/prune.js';
 export {
+  buildHostVitalsSnapshot,
+  resetHostVitalsForTests,
+  type HostVitalsAgent,
+  type HostVitalsAgentFleet,
+  type HostVitalsContainer,
+  type HostVitalsOptions,
+  type HostVitalsSnapshot,
+} from './resources/host-vitals.js';
+export {
   enrichContainersWithLimits,
   getMemoryLimitLevel,
   recordContainerOomEventsForTests,

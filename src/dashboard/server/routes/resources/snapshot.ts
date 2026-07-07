@@ -8,6 +8,7 @@ import { httpHandler } from '../http-handler.js';
 import { getAgentStatsSnapshotEffect } from './agents-stats.js';
 import { getCoreServicesSnapshot } from './core-services.js';
 import { getHostProcessesSnapshot } from './host-processes.js';
+import { buildHostVitalsSnapshot } from './host-vitals.js';
 import { enrichContainersWithLimits } from './limits.js';
 import { getCurrentDockerStats } from './shared.js';
 
@@ -39,7 +40,15 @@ export function getResourcesEffect(): Effect.Effect<ReturnType<typeof jsonRespon
       })),
       coreServices: getCoreServicesSnapshot(),
       containers,
-      hostVitals: agentStats.hostVitals,
+      hostVitals: buildHostVitalsSnapshot({
+        containers,
+        agents: agents.map((agent) => ({
+          id: String(agent.id),
+          lastActivity: typeof agent.lastActivity === 'string' ? agent.lastActivity : undefined,
+          hasLiveTmuxSession: agent.hasLiveTmuxSession === true,
+        })),
+        agentFleet: agentStats.hostVitals.agents,
+      }),
       hostProcesses: getHostProcessesSnapshot(),
       stoppedContainers,
       networks: [],
