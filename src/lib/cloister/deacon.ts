@@ -1173,11 +1173,7 @@ export async function checkOrphanedCompletions(): Promise<string[]> {
         if (!workspacePath || !existsSync(workspacePath)) continue;
 
         const beadResult = await Effect.runPromise(queryBeadsForIssue(workspacePath, issueId));
-        // Do not treat the JSONL fallback as authoritative when the live `bd`
-        // query failed transiently — skipping this cycle is safer than recovering
-        // on potentially stale/empty bead state.
-        if (beadResult.transientFailure) continue;
-        if (beadResult.beads.length === 0) continue;
+        if (beadResult.transientFailure || beadResult.beads.length === 0) continue;
         if (beadResult.beads.some((bead) => bead.status !== 'closed')) continue;
 
         const { stdout } = await execAsync(
