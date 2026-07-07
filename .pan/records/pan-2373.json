@@ -26,24 +26,24 @@
       "reason": "feedback",
       "note": "[2026-07-07T02:57Z] verification-gate → FAILED — seq 3",
       "timestamp": "2026-07-07T02:57:00.579Z"
-    }
-  ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-07T02:55:13Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2373\n\nCurrent cycle edits the quarantined PAN-2371 test itself and still weakens frontend typechecking\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2373 -m \"Fixed review issues\"`"
     },
     {
-      "seq": 3,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-07-07T02:57:00Z",
-      "markdownBody": "VERIFICATION FAILED for PAN-2373 (attempt 1/3):\n\nFailed check: test\n\nVerification FAILED at test (80944ms):\n\n branch for a clean standalone workspace on main\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/cli/commands/__tests__/start-workspace-branch-repair.test.ts:18:3\n     16|   });\n     17|\n     18|   it('creates the feature branch for a clean standalone workspace on m…\n       |   ^\n     19|     const workspace = '/tmp/overdeck/workspaces/feature-pan-2044';\n     20|     execFileMock.mockImplementation((cmd: string, args: string[], opts…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯\n\n FAIL  |root| tests/cli/commands/work/issue-beads-check.test.ts > hasBeadsTasks > returns false when .beads directory does not exist\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ tests/cli/commands/work/issue-beads-check.test.ts:41:3\n     39|\n     40| describe('hasBeadsTasks', () => {\n     41|   it('returns false when .beads directory does not exist', async () =>…\n       |   ^\n     42|     const { hasBeadsTasks } = await import('../../../../src/cli/comman…\n     43|     expect(hasBeadsTasks(tmpDir, 'PAN-1094')).toBe(false);\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯\n\n FAIL  |root| tests/unit/lib/cloister/deacon-swarm-hold.test.ts > coordinateSwarmSlots per-issue operator hold (PAN-2214) > skips a deacon-ignored issue before any reconcile/dispatch work\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ tests/unit/lib/cloister/deacon-swarm-hold.test.ts:95:3\n     93|\n     94| describe('coordinateSwarmSlots per-issue operator hold (PAN-2214)', ()…\n     95|   it('skips a deacon-ignored issue before any reconcile/dispatch work'…\n       |   ^\n     96|     const { coordinateSwarmSlots } = await import('../../../../src/lib…\n     97|     setupWorkspace('pan-100', 'PAN-100');\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯\n\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-2373 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-2373 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
+      "reason": "feedback",
+      "note": "[2026-07-07T03:18Z] verification-gate → FAILED — seq 4",
+      "timestamp": "2026-07-07T03:18:59.443Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-07T03:23Z] verification-gate → FAILED — seq 5",
+      "timestamp": "2026-07-07T03:23:48.076Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-07T05:23:13.498Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/drafts/PAN-2373.md",
@@ -116,17 +116,20 @@
   },
   "pipeline": {
     "issueId": "PAN-2373",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "verificationStatus": "running",
-    "mergeStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
+    "mergeStatus": "failed",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T03:15:04.493Z",
-    "reviewNotes": "Current cycle edits the quarantined PAN-2371 test itself and still weakens frontend typechecking",
-    "verificationNotes": "Verification FAILED at test (80944ms):\n\n branch for a clean standalone workspace on main\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/cli/commands/__tests__/start-workspace-branch-repair.test.ts:18:3\n     16|   });\n     17|\n     18|   it('creates the feature branch for a clean standalone workspace on m…\n       |   ^\n     19|     const workspace = '/tmp/overdeck/workspaces/feature-pan-2044';\n     20|     execFileMock.mockImplementation((cmd: string, args: string[], opts…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯\n\n FAIL  |root| tests/cli/commands/work/issue-beads-check.test.ts > hasBeadsTasks > returns false when .beads directory does not exist\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ tests/cli/commands/work/issue-beads-check.test.ts:41:3\n     39|\n     40| describe('hasBeadsTasks', () => {\n     41|   it('returns false when .beads directory does not exist', async () =>…\n       |   ^\n     42|     const { hasBeadsTasks } = await import('../../../../src/cli/comman…\n     43|     expect(hasBeadsTasks(tmpDir, 'PAN-1094')).toBe(false);\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯\n\n FAIL  |root| tests/unit/lib/cloister/deacon-swarm-hold.test.ts > coordinateSwarmSlots per-issue operator hold (PAN-2214) > skips a deacon-ignored issue before any reconcile/dispatch work\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ tests/unit/lib/cloister/deacon-swarm-hold.test.ts:95:3\n     93|\n     94| describe('coordinateSwarmSlots per-issue operator hold (PAN-2214)', ()…\n     95|   it('skips a deacon-ignored issue before any reconcile/dispatch work'…\n       |   ^\n     96|     const { coordinateSwarmSlots } = await import('../../../../src/lib…\n     97|     setupWorkspace('pan-100', 'PAN-100');\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯\n\n",
+    "updatedAt": "2026-07-07T05:38:05.960Z",
+    "reviewNotes": "Approved: flake policy, quarantine audit, verification env, and non-blocking flake lane satisfy the review requirements",
+    "testNotes": "Reconciled from green GitHub Actions CI on af5f24ae: lint (https://github.com/eltmon/overdeck/actions/runs/28838994706/job/85528807838)",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "mergeNotes": "Work agent agent-pan-2373 stopped before completing the rebase onto main",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2419",
+    "reviewedAtCommit": "af5f24ae48635a8f4c5805ad8c34462f6434f4dd",
     "lastVerifiedCommit": "0b462104234bbe78d64e87e72d31026ee028f3ac",
-    "reviewRequestedAt": "2026-07-07T02:53:23.874Z",
+    "reviewRequestedAt": "2026-07-07T05:18:41.766Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/drafts/PAN-2373.md",
@@ -216,9 +219,9 @@
         },
         "review": {
           "unknown": {
-            "input": 2201167,
-            "output": 14120,
-            "cacheRead": 1870336,
+            "input": 3360880,
+            "output": 17455,
+            "cacheRead": 2842240,
             "cacheWrite": 0
           }
         },
@@ -230,9 +233,9 @@
             "cacheWrite": 0
           },
           "unknown": {
-            "input": 15892682,
-            "output": 29203,
-            "cacheRead": 14993024,
+            "input": 19888945,
+            "output": 33998,
+            "cacheRead": 18904448,
             "cacheWrite": 0
           }
         }
@@ -257,9 +260,9 @@
           "cacheWrite": 150895
         },
         "unknown": {
-          "input": 18093849,
-          "output": 43323,
-          "cacheRead": 16863360,
+          "input": 23249825,
+          "output": 51453,
+          "cacheRead": 21746688,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
@@ -270,8 +273,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 40.379048250000004,
-        "pricingAsOf": "2026-07-07T03:15:04.562Z"
+        "usd": 44.14107425,
+        "pricingAsOf": "2026-07-07T05:38:06.117Z"
       }
     },
     "merges": [
@@ -283,5 +286,5 @@
     "finalizedAt": "2026-07-06T17:49:27.751Z"
   },
   "created": "2026-07-07T01:35:12.280Z",
-  "updated": "2026-07-07T03:15:04.564Z"
+  "updated": "2026-07-07T05:38:06.149Z"
 }
