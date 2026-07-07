@@ -506,7 +506,7 @@ describe('auto-resume gates', () => {
       lastActivity: BASE_TIME.toISOString(),
     });
 
-    const resumed = await autoResumeStoppedWorkAgents();
+    const resumed = await settleWithStagger(autoResumeStoppedWorkAgents());
 
     expect(resumed).toEqual([agentId]);
     expect(resumeAgentMock).toHaveBeenCalledWith(agentId);
