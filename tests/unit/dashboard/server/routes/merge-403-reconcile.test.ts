@@ -8,13 +8,12 @@ const mockCalls = {
   mergeReviewArtifact: [] as Array<unknown>,
 };
 
-const { execFileImpl, execImpl, existsSyncImpl, mockShouldSkipDispatchAsMerged, mockFindSpecByIssue, mockResolveGitHubIssueSync } = vi.hoisted(() => ({
+const { execFileImpl, execImpl, existsSyncImpl, mockShouldSkipDispatchAsMerged, mockFindSpecByIssue } = vi.hoisted(() => ({
   execFileImpl: vi.fn(),
   execImpl: vi.fn(),
   existsSyncImpl: vi.fn(() => true),
   mockShouldSkipDispatchAsMerged: vi.fn(),
   mockFindSpecByIssue: vi.fn(() => Effect.succeed({ status: 'active' })),
-  mockResolveGitHubIssueSync: vi.fn(() => ({ isGitHub: true, owner: 'eltmon', repo: 'overdeck' })),
 }));
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -242,7 +241,7 @@ vi.mock('../../../../../src/lib/cloister/deacon-canonical-state.js', () => ({
 }));
 
 vi.mock('../../../../../src/lib/tracker-utils.js', () => ({
-  resolveGitHubIssueSync: (...args: Parameters<typeof mockResolveGitHubIssueSync>) => mockResolveGitHubIssueSync(...args),
+  resolveGitHubIssueSync: vi.fn(() => ({ isGitHub: true, owner: 'eltmon', repo: 'overdeck' })),
 }));
 
 import { reconcileStaleMergeStatus } from '../../../../../src/lib/cloister/deacon-merge.js';
@@ -252,7 +251,6 @@ import { triggerMerge } from '../../../../../src/dashboard/server/routes/workspa
 describe('PAN-2420 end-to-end: 403 permission failure then out-of-band merge terminalizes with no respawn', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockResolveGitHubIssueSync.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'overdeck' });
     Object.keys(mockReviewStatus).forEach(key => delete mockReviewStatus[key]);
     mockCalls.setReviewStatus.length = 0;
     mockCalls.completePendingOperation.length = 0;
