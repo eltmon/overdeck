@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-07T04:23:03.777Z",
-  "updated": "2026-07-07T05:20:12.398Z",
+  "updated": "2026-07-07T05:44:36.154Z",
   "pipeline": {
     "issueId": "PAN-2374",
     "reviewStatus": "pending",
@@ -94,5 +94,31 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5"
+  "model": "claude-sonnet-5",
+  "statusOverrides": {
+    "cr-guard": "completed",
+    "cr-guard.ac1": "completed",
+    "cr-guard.ac2": "completed",
+    "cr-guard.ac3": "completed",
+    "cr-guard.ac4": "completed",
+    "cr-reply": "completed",
+    "cr-reply.ac1": "completed",
+    "cr-reply.ac2": "completed",
+    "cr-reply.ac3": "completed",
+    "cr-reply.ac4": "completed",
+    "cr-wire-context": "completed",
+    "cr-wire-context.ac1": "completed",
+    "cr-wire-context.ac2": "completed",
+    "cr-wire-context.ac3": "completed",
+    "cr-wire-context.ac4": "completed",
+    "cr-ingest-module": "completed",
+    "cr-ingest-module.ac1": "completed",
+    "cr-ingest-module.ac2": "completed",
+    "cr-ingest-module.ac3": "completed",
+    "cr-ingest-module.ac4": "completed",
+    "cr-config": "completed",
+    "cr-config.ac1": "completed",
+    "cr-config.ac2": "completed",
+    "cr-config.ac3": "completed"
+  }
 }
