@@ -448,8 +448,11 @@ function rebaseStateOnlyAndRetryPush(
     const clean = yield* isWorkingTreeClean(gitRoot, branch);
     if (!clean) return;
 
+    const localBase = yield* getMergeBase(gitRoot, branch);
+    if (!localBase) return;
+
     const stateOnly = yield* Effect.promise(() =>
-      isStatePlaneOnlyDiff('origin/main', 'main', gitRoot),
+      isStatePlaneOnlyDiff(localBase, 'main', gitRoot),
     ).pipe(
       Effect.catchCause((cause) => {
         warnAutoPush(branch, `state-plane diff check failed: ${String(Cause.squash(cause))}`);
@@ -474,6 +477,25 @@ function rebaseStateOnlyAndRetryPush(
 
     yield* pushOriginMain(gitRoot, branch, true);
   });
+}
+
+function getMergeBase(
+  gitRoot: string,
+  branch: string,
+): Effect.Effect<string | null, never> {
+  const timeoutMs = parsePositiveInteger(
+    process.env.OVERDECK_STATE_PUSH_TIMEOUT_MS,
+    DEFAULT_STATE_PUSH_TIMEOUT_MS,
+  );
+  return runGitWithTimeout(['merge-base', 'origin/main', 'main'], gitRoot, timeoutMs).pipe(
+    Effect.match({
+      onSuccess: (result) => result.stdout.trim() || null,
+      onFailure: (err) => {
+        warnAutoPush(branch, `merge-base failed: ${err.stderr || err._tag}`);
+        return null;
+      },
+    }),
+  );
 }
 
 function isWorkingTreeClean(

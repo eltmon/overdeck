@@ -317,7 +317,7 @@ describe('auto-commit', () => {
     }),
   );
 
-  it.effect('does not rebase or move local commits when origin/main is ahead (PAN-1929)', () =>
+  it.effect('rebases local state-only commits even when origin/main contains source commits', () =>
     Effect.gen(function* () {
       const remoteTmp = mkdtempSync(join(tmpdir(), 'pan-autocommit-remote-'));
       const otherTmp = mkdtempSync(join(tmpdir(), 'pan-autocommit-other-'));
@@ -334,28 +334,26 @@ describe('auto-commit', () => {
         execSync('git add UPSTREAM.md', { cwd: otherTmp });
         execSync('git commit -q -m "upstream change"', { cwd: otherTmp });
         execSync('git push -q origin main', { cwd: otherTmp });
+        const upstreamHead = execSync('git rev-parse HEAD', { cwd: otherTmp, encoding: 'utf-8' }).trim();
 
         const localBase = execSync('git rev-parse HEAD', { cwd: tmp, encoding: 'utf-8' }).trim();
         mkdirSync(join(tmp, '.pan', 'continues'), { recursive: true });
-        const path = join(tmp, '.pan', 'continues', 'pan-1929.vbrief.json');
-        writeFileSync(path, '{"issue":"PAN-1929"}');
+        const path = join(tmp, '.pan', 'continues', 'pan-2375.vbrief.json');
+        writeFileSync(path, '{"issue":"PAN-2375"}');
 
-        queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): update continue for PAN-1929' });
+        queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): update continue for PAN-2375' });
         const result = yield* flushAutoCommits(tmp);
 
         expect(result.committed).toBe(true);
         const commitParent = execSync('git rev-parse HEAD^', { cwd: tmp, encoding: 'utf-8' }).trim();
         const remoteHead = execSync('git rev-parse origin/main', { cwd: tmp, encoding: 'utf-8' }).trim();
-        let remoteIsAncestor = true;
-        try {
-          execSync('git merge-base --is-ancestor origin/main HEAD', { cwd: tmp });
-        } catch {
-          remoteIsAncestor = false;
-        }
 
-        expect(commitParent).toBe(localBase);
+        expect(commitParent).toBe(upstreamHead);
         expect(remoteHead).not.toBe(localBase);
-        expect(remoteIsAncestor).toBe(false);
+        expect(exec(tmp, 'git rev-parse HEAD')).toBe(remoteHead);
+        const pushedLog = execSync('git log --oneline origin/main -2', { cwd: tmp, encoding: 'utf-8' });
+        expect(pushedLog).toContain('chore(state): update continue for PAN-2375');
+        expect(pushedLog).toContain('upstream change');
       } finally {
         rmSync(remoteTmp, { recursive: true, force: true });
         rmSync(otherTmp, { recursive: true, force: true });
