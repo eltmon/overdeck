@@ -1,9 +1,16 @@
 {
   "issueId": "PAN-2450",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-07T06:10:22.566Z"
+    }
+  ],
   "feedback": [],
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "auto-start": "completed",
     "auto-start.ac1": "completed",
@@ -16,16 +23,16 @@
   },
   "pipeline": {
     "issueId": "PAN-2450",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T06:06:14.404Z",
-    "reviewNotes": "Dispatch failed: [review-agent] Skipping review dispatch for PAN-2450 — GitHub PR #2455 is merged",
+    "updatedAt": "2026-07-07T06:10:28.512Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed test setup and rebuilt CLI dist",
     "verificationNotes": "Verification FAILED at lint (68060ms):\n\ns/overdeck/workspaces/feature-pan-2450/sync-sources/skills/pan-show/SKILL.md: pan show exists in top-level help but --help failed\n  /home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/sync-sources/skills/pan-reload/SKILL.md: pan reload exists in top-level help but --help failed\n  /home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/sync-sources/skills/pan-resources/SKILL.md: pan resources exists in top-level help but --help failed\n  /home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/sync-sources/skills/pan-reopen/SKILL.md: pan reopen exists in top-level help but --help failed\n  /home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/sync-sources/skills/pan-review/SKILL.md: pan review exists in top-level help but --help failed\n  /home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/sync-sources/skills/pan-start/SKILL.md: pan start exists in top-level help but --help failed\n  /home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/sync-sources/skills/pan-tts/SKILL.md: pan tts exists in top-level help but --help failed\n  /home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/sync-sources/skills/pan-tell/SKILL.md: pan tell exists in top-level help but --help failed\n  /home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/sync-sources/skills/pan-unpause/SKILL.md: pan unpause exists in top-level help but --help failed\n  /home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/sync-sources/skills/pan-sync-main/SKILL.md: pan sync-main exists in top-level help but --help failed\n  /home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/sync-sources/skills/pan-untroubled/SKILL.md: pan untroubled exists in top-level help but --help failed\n  /home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/sync-sources/skills/pan-up/SKILL.md: pan up exists in top-level help but --help failed\n  /home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/sync-sources/skills/pan-wipe/SKILL.md: pan wipe exists in top-level help but --help failed\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2455",
-    "lastVerifiedCommit": "af9fd682a86329d56b630d598b4b001281ab0a9f",
+    "lastVerifiedCommit": "133b10f3e8abec0027c3ff53ef503e70e8b70e3a",
     "reviewRequestedAt": "2026-07-07T05:09:25.065Z"
   },
   "closeOut": {
@@ -49,9 +56,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1414387,
-            "output": 286679,
-            "cacheRead": 150074234,
+            "input": 1416911,
+            "output": 287201,
+            "cacheRead": 151214458,
             "cacheWrite": 0
           }
         }
@@ -70,15 +77,15 @@
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 1414387,
-          "output": 286679,
-          "cacheRead": 150074234,
+          "input": 1416911,
+          "output": 287201,
+          "cacheRead": 151214458,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 34.982423,
-        "pricingAsOf": "2026-07-07T06:06:14.463Z"
+        "usd": 35.203551,
+        "pricingAsOf": "2026-07-07T06:10:28.600Z"
       }
     },
     "merges": [
@@ -90,5 +97,5 @@
     "finalizedAt": "2026-07-07T04:18:45.208Z"
   },
   "created": "2026-07-07T05:55:33.132Z",
-  "updated": "2026-07-07T06:06:14.522Z"
+  "updated": "2026-07-07T06:10:28.601Z"
 }
