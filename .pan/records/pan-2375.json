@@ -11,23 +11,25 @@
   ],
   "feedback": [],
   "created": "2026-07-07T02:41:17.313Z",
-  "updated": "2026-07-07T02:58:26.183Z",
+  "updated": "2026-07-07T03:06:28.686Z",
   "pipeline": {
     "issueId": "PAN-2375",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T02:58:26.145Z"
+    "updatedAt": "2026-07-07T03:06:28.540Z",
+    "inspectNotes": "Bead state-plane-predicate ack: commit 2fe848f6 is a pure test-colocation move (tests/unit/lib/state-plane.test.ts -> src/lib/__tests__/state-plane.test.ts, import path fixed), no logic changes; verified all 4 acceptance criteria still pass against current src/lib/state-plane.ts (state-only=true, mixed src+state=false, drafts-only=false, empty-diff=true)."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 7848,
-            "output": 167,
+            "input": 22284,
+            "output": 346,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -39,12 +41,28 @@
             "cacheRead": 3045002,
             "cacheWrite": 149428
           }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 6558,
+            "output": 1253,
+            "cacheRead": 110722,
+            "cacheWrite": 71550
+          }
+        },
+        "work": {
+          "unknown": {
+            "input": 1116345,
+            "output": 4382,
+            "cacheRead": 977792,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 7848,
-          "output": 167,
+          "input": 22284,
+          "output": 346,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -53,16 +71,28 @@
           "output": 36158,
           "cacheRead": 3045002,
           "cacheWrite": 149428
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 6558,
+          "output": 1253,
+          "cacheRead": 110722,
+          "cacheWrite": 71550
+        },
+        "unknown": {
+          "input": 1116345,
+          "output": 4382,
+          "cacheRead": 977792,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 3.4546715,
-        "pricingAsOf": "2026-07-07T02:58:26.179Z"
+        "usd": 4.665197,
+        "pricingAsOf": "2026-07-07T03:06:28.662Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5"
+  "harness": "claude-code",
+  "model": "claude-sonnet-5"
 }
