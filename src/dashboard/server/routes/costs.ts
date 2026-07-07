@@ -25,6 +25,7 @@ import {
   migrateAllSessionsSync,
   rebuildCacheSync,
   deduplicateEventsSync,
+  reconcile,
 } from '../../../lib/costs/index.js';
 import {
   getCostsByIssueSync,
@@ -333,7 +334,7 @@ const postCostsReconcileRoute = HttpRouter.add(
   'POST',
   '/api/costs/reconcile',
   httpHandler(Effect.gen(function* () {
-    const overdeck = yield* Effect.tryPromise({
+    const { result, overdeck } = yield* Effect.tryPromise({
       try: async () => {
         const runOverdeck = (source: 'ohmypi' | 'codex') =>
           Effect.runPromise(
@@ -341,19 +342,21 @@ const postCostsReconcileRoute = HttpRouter.add(
               Effect.provide(CostDoorLive),
             ),
           );
-        const [ohmypi, codex] = await Promise.all([
+        const [result, ohmypi, codex] = await Promise.all([
+          Effect.runPromise(reconcile()),
           runOverdeck('ohmypi'),
           runOverdeck('codex'),
         ]);
-        return { ohmypi, codex };
+        return { result, overdeck: { ohmypi, codex } };
       },
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     console.log(
-      `[reconciler] Sweep complete: ohmypi=${overdeck.ohmypi.eventsImported} imported, codex=${overdeck.codex.eventsImported} imported`,
+      `[reconciler] Sweep complete: ${result.eventsImported} imported, ohmypi=${overdeck.ohmypi.eventsImported} imported, codex=${overdeck.codex.eventsImported} imported`,
     );
     return jsonResponse({
       success: true,
+      ...result,
       ohmypi: overdeck.ohmypi,
       codex: overdeck.codex,
       overdeck,
