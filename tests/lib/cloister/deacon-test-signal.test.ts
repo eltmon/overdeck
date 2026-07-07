@@ -115,13 +115,17 @@ function makeWorkspace(issueLower: string, verdict?: { status: string; notes?: s
   return projectPath;
 }
 
+// Import once at module scope; vi.mock hoisting ensures mocks are wired.
+const deaconSignalMod = await import('../../../src/lib/cloister/deacon.js');
+const checkCompletedButUnsignaledTests = deaconSignalMod.checkCompletedButUnsignaledTests;
+const checkPendingTestDispatch = deaconSignalMod.checkPendingTestDispatch;
+
+// ── checkCompletedButUnsignaledTests (PAN-1681 test-signal failsafe) ─────────
+
 describe('checkCompletedButUnsignaledTests (PAN-1681 test-signal failsafe)', () => {
-  let checkCompletedButUnsignaledTests: () => Promise<string[]>;
-  let checkPendingTestDispatch: () => Promise<string[]>;
   const tmpRoots: string[] = [];
 
-  beforeEach(async () => {
-    vi.resetModules();
+  beforeEach(() => {
     currentStatuses = {};
     mockSetReviewStatus.mockReset();
     mockSessionExists.mockReset().mockReturnValue(false);
@@ -132,10 +136,6 @@ describe('checkCompletedButUnsignaledTests (PAN-1681 test-signal failsafe)', () 
     mockMessageAgent.mockReset().mockResolvedValue(undefined);
     mockSpawnRun.mockReset().mockResolvedValue({ id: 'agent-pan-1455-test' });
     mockLoadReviewStatuses.mockReset().mockImplementation(() => currentStatuses);
-
-    const mod = await import('../../../src/lib/cloister/deacon.js');
-    checkCompletedButUnsignaledTests = mod.checkCompletedButUnsignaledTests;
-    checkPendingTestDispatch = mod.checkPendingTestDispatch;
   });
 
   afterEach(() => {
@@ -193,13 +193,13 @@ describe('checkCompletedButUnsignaledTests (PAN-1681 test-signal failsafe)', () 
   });
 
   it('alive + idle + NO artifact → nudges to write+POST but never fabricates a verdict', async () => {
-    const projectPath = makeWorkspace('pan-1242'); // no artifact seeded
+    const projectPath = makeWorkspace('pan-1243'); // no artifact seeded
     tmpRoots.push(projectPath);
     mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'overdeck', projectPath: projectPath });
     mockSessionExists.mockReturnValue(true);
     mockIsPaneDead.mockResolvedValue(false);
     mockGetAgentRuntimeState.mockReturnValue({ state: 'idle', lastActivity: new Date().toISOString() });
-    writeStatusFile({ 'PAN-1242': { issueId: 'PAN-1242', reviewStatus: 'passed', testStatus: 'pending' } });
+    writeStatusFile({ 'PAN-1243': { issueId: 'PAN-1243', reviewStatus: 'passed', testStatus: 'pending' } });
 
     await checkCompletedButUnsignaledTests();
 
