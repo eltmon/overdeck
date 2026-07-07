@@ -388,6 +388,25 @@ export interface CapacityForecastSnapshot {
   };
 }
 
+export interface ResourceHistoryPoint {
+  ts: string;
+  value: number;
+}
+
+export interface ResourceHistoryAnnotation {
+  ts: string;
+  label: string;
+  targetKind: string;
+  targetId: string;
+}
+
+export interface ResourceHistorySnapshot {
+  startedAt: string;
+  cpu: ResourceHistoryPoint[];
+  mem: ResourceHistoryPoint[];
+  annotations: ResourceHistoryAnnotation[];
+}
+
 export interface ResourcesSnapshot {
   containers: ContainerStats[];
   agents: Agent[];

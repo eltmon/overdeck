@@ -4,11 +4,12 @@ interface AgentsSectionProps {
   agents: Agent[];
   filter: string;
   onFocusRow: (id: string) => void;
+  highlightedTarget?: string | null;
   onOpenTerminal?: (agent: Agent) => void;
   onPause?: (agent: Agent) => void;
 }
 
-export function AgentsSection({ agents, filter, onFocusRow, onOpenTerminal, onPause }: AgentsSectionProps) {
+export function AgentsSection({ agents, filter, highlightedTarget, onFocusRow, onOpenTerminal, onPause }: AgentsSectionProps) {
   const rows = agents.filter((agent) => matches(agent, filter));
   if (rows.length === 0) return null;
 
@@ -23,7 +24,8 @@ export function AgentsSection({ agents, filter, onFocusRow, onOpenTerminal, onPa
           return (
             <div
               key={agent.id}
-              className={`grid w-full grid-cols-[1fr_120px_120px_120px_120px_140px] items-center gap-3 bg-background px-4 py-3 text-sm hover:bg-muted/40 ${chip?.state === 'idle' ? 'opacity-60' : ''}`}
+              data-resource-target={`agent:${agent.id}`}
+              className={`grid w-full grid-cols-[1fr_120px_120px_120px_120px_140px] items-center gap-3 bg-background px-4 py-3 text-sm hover:bg-muted/40 ${chip?.state === 'idle' ? 'opacity-60' : ''} ${highlightedTarget === `agent:${agent.id}` ? 'resource-row-highlight ring-2 ring-primary' : ''}`}
             >
               <button type="button" className="text-left focus:outline-none" onFocus={() => onFocusRow(`agent:${agent.id}`)}>
                 <span className="block font-medium text-foreground">{agent.id}</span>

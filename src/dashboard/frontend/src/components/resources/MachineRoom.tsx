@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Agent, ContainerStats, ResourcesSnapshot } from '../../types';
 import { AgentsSection } from './AgentsSection';
 import { CoreServicesSection } from './CoreServicesSection';
+import { HistorySection } from './HistorySection';
 import { HostProcessesSection } from './HostProcessesSection';
 import { MachineRoomTopbar, type MachineRoomGroupBy } from './MachineRoomTopbar';
 import { StacksSection } from './StacksSection';
@@ -23,6 +24,7 @@ export function MachineRoom({ snapshot, onNavigateToAgents, onStop, onPause, onL
   const [filter, setFilter] = useState('');
   const [groupBy, setGroupBy] = useState<MachineRoomGroupBy>('workspace');
   const [focusedRowId, setFocusedRowId] = useState<string | null>(null);
+  const [highlightedTarget, setHighlightedTarget] = useState<string | null>(null);
   const filterRef = useRef<HTMLInputElement | null>(null);
   const rows = useMemo(() => buildRows(snapshot), [snapshot]);
   const filteredRows = rows.filter((row) => matchesFilter(row, filter));
@@ -65,6 +67,7 @@ export function MachineRoom({ snapshot, onNavigateToAgents, onStop, onPause, onL
         <AgentsSection
           agents={snapshot.agents}
           filter={filter}
+          highlightedTarget={highlightedTarget}
           onFocusRow={setFocusedRowId}
           onOpenTerminal={(agent) => onNavigateToAgents?.(agent.id)}
           onPause={(agent) => {
@@ -73,6 +76,7 @@ export function MachineRoom({ snapshot, onNavigateToAgents, onStop, onPause, onL
           }}
         />
         <StacksSection stacks={snapshot.stacks ?? []} filter={filter} groupBy={groupBy} />
+        <HistorySection forecast={snapshot.forecast} onHighlightTarget={setHighlightedTarget} />
         <CoreServicesSection services={snapshot.coreServices ?? []} filter={filter} onFocusRow={setFocusedRowId} />
         <HostProcessesSection processes={snapshot.hostProcesses ?? []} filter={filter} onFocusRow={setFocusedRowId} />
         {groups.map((group) => (
