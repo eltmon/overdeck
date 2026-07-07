@@ -115,9 +115,9 @@ describe('stack teardown resources routes', () => {
   });
 
   it('tears down only docker resources and emits reclaim activity', async () => {
-    const exec = vi.fn(async (command: string) => {
-      if (command.startsWith('docker network ls')) return { stdout: 'feature-pan-2464_default\n', stderr: '' };
-      if (command.startsWith('docker volume ls')) return { stdout: 'feature-pan-2464_data\n', stderr: '' };
+    const exec = vi.fn(async (_file: string, args: string[]) => {
+      if (args[0] === 'network' && args[1] === 'ls') return { stdout: 'feature-pan-2464_default\n', stderr: '' };
+      if (args[0] === 'volume' && args[1] === 'ls') return { stdout: 'feature-pan-2464_data\n', stderr: '' };
       return { stdout: '', stderr: '' };
     });
     setStackTeardownDockerExecForTests(exec);
@@ -128,7 +128,7 @@ describe('stack teardown resources routes', () => {
         .pipe(Effect.provide(EventStoreTest)),
     );
     const body = await readJsonBody(response);
-    const commands = exec.mock.calls.map(([command]) => command);
+    const commands = exec.mock.calls.map(([file, args]) => [file, args]);
 
     expect(response.status).toBe(200);
     expect(body).toMatchObject({
@@ -142,18 +142,19 @@ describe('stack teardown resources routes', () => {
       removedVolumes: ['feature-pan-2464_data'],
     });
     expect(commands).toEqual([
-      'docker stop --time 30 "c-api"',
-      'docker stop --time 30 "c-worker"',
-      'docker rm -f "c-api"',
-      'docker rm -f "c-worker"',
-      'docker network ls --filter "label=com.docker.compose.project=feature-pan-2464" --format "{{.Name}}"',
-      'docker network rm "feature-pan-2464_default"',
-      'docker volume ls --filter "label=com.docker.compose.project=feature-pan-2464" --format "{{.Name}}"',
-      'docker volume rm "feature-pan-2464_data"',
+      ['docker', ['stop', '--time', '30', 'c-api']],
+      ['docker', ['stop', '--time', '30', 'c-worker']],
+      ['docker', ['rm', '-f', 'c-api']],
+      ['docker', ['rm', '-f', 'c-worker']],
+      ['docker', ['network', 'ls', '--filter', 'label=com.docker.compose.project=feature-pan-2464', '--format', '{{.Name}}']],
+      ['docker', ['network', 'rm', 'feature-pan-2464_default']],
+      ['docker', ['volume', 'ls', '--filter', 'label=com.docker.compose.project=feature-pan-2464', '--format', '{{.Name}}']],
+      ['docker', ['volume', 'rm', 'feature-pan-2464_data']],
     ]);
-    expect(commands.join('\n')).not.toContain('/workspaces/feature-pan-2464');
-    expect(commands.join('\n')).not.toContain('git worktree');
-    expect(commands.join('\n')).not.toContain('rm -rf');
+    const commandText = JSON.stringify(commands);
+    expect(commandText).not.toContain('/workspaces/feature-pan-2464');
+    expect(commandText).not.toContain('git worktree');
+    expect(commandText).not.toContain('rm -rf');
     expect(appendedEvents).toHaveLength(1);
     expect(activityEntries).toHaveLength(1);
     expect(activityEntries[0]).toMatchObject({
@@ -166,6 +167,28 @@ describe('stack teardown resources routes', () => {
       ramBytes: 500,
       diskBytes: 1800,
     });
+  });
+
+  it('rejects shell-shaped listed docker resource names before removing them', async () => {
+    const exec = vi.fn(async (_file: string, args: string[]) => {
+      if (args[0] === 'network' && args[1] === 'ls') return { stdout: 'bad";touch /tmp/pwned\n', stderr: '' };
+      return { stdout: '', stderr: '' };
+    });
+    setStackTeardownDockerExecForTests(exec);
+    await Effect.runPromise(getStackTeardownEstimateEffect('PAN-2464'));
+
+    await expect(Effect.runPromise(
+      postStackTeardownEffect('PAN-2464', { confirmToken: 'token-1', typedText: 'feature-pan-2464' })
+        .pipe(Effect.provide(EventStoreTest)),
+    )).rejects.toThrow('Invalid network name');
+
+    expect(exec.mock.calls).not.toContainEqual([
+      'docker',
+      ['network', 'rm', 'bad";touch /tmp/pwned'],
+      expect.any(Object),
+    ]);
+    expect(appendedEvents).toHaveLength(0);
+    expect(activityEntries).toHaveLength(0);
   });
 });
 

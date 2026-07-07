@@ -1,4 +1,4 @@
-import { exec } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 import { Effect } from 'effect';
@@ -11,10 +11,10 @@ import { httpHandler } from '../http-handler.js';
 import { getCurrentDockerStats } from './shared.js';
 import { getResourceStacks, type ResourceStack } from './stacks.js';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 const CONFIRM_TOKEN_TTL_MS = 5 * 60 * 1000;
 
-type DockerTeardownExec = typeof execAsync;
+type DockerTeardownExec = typeof execFileAsync;
 
 interface StackTeardownToken {
   issueId: string;
@@ -36,7 +36,7 @@ export interface StackTeardownInput {
   typedText?: unknown;
 }
 
-let dockerTeardownExec: DockerTeardownExec = execAsync;
+let dockerTeardownExec: DockerTeardownExec = execFileAsync;
 let teardownTokenGenerator: () => string = () => `td-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 let activityEmitter: (options: EmitActivityOptions) => void = emitActivityEntrySync;
 const teardownTokens = new Map<string, StackTeardownToken>();
@@ -54,7 +54,7 @@ export function setStackTeardownActivityEmitterForTests(emitter: (options: EmitA
 }
 
 export function resetStackTeardownForTests(): void {
-  dockerTeardownExec = execAsync;
+  dockerTeardownExec = execFileAsync;
   teardownTokenGenerator = () => `td-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
   activityEmitter = emitActivityEntrySync;
   teardownTokens.clear();
@@ -180,29 +180,33 @@ function runDockerStackTeardown(stack: ResourceStack): Effect.Effect<{
     try: async () => {
       const containers = stack.services.map((service) => service.id).filter(Boolean);
       for (const container of containers) {
-        await dockerTeardownExec(`docker stop --time 30 "${shellEscape(container)}"`, { encoding: 'utf-8', timeout: 35000 });
+        if (!isDockerIdentifier(container)) throw new Error(`Invalid container ID: ${container}`);
+        await dockerTeardownExec('docker', ['stop', '--time', '30', container], { encoding: 'utf-8', timeout: 35000 });
       }
       for (const container of containers) {
-        await dockerTeardownExec(`docker rm -f "${shellEscape(container)}"`, { encoding: 'utf-8', timeout: 30000 });
+        await dockerTeardownExec('docker', ['rm', '-f', container], { encoding: 'utf-8', timeout: 30000 });
       }
 
-      const project = shellEscape(stack.composeProject);
       const networkResult = await dockerTeardownExec(
-        `docker network ls --filter "label=com.docker.compose.project=${project}" --format "{{.Name}}"`,
+        'docker',
+        ['network', 'ls', '--filter', `label=com.docker.compose.project=${stack.composeProject}`, '--format', '{{.Name}}'],
         { encoding: 'utf-8', timeout: 10000 },
       );
       const networks = lines(networkResult.stdout);
       for (const network of networks) {
-        await dockerTeardownExec(`docker network rm "${shellEscape(network)}"`, { encoding: 'utf-8', timeout: 10000 });
+        if (!isDockerIdentifier(network)) throw new Error(`Invalid network name: ${network}`);
+        await dockerTeardownExec('docker', ['network', 'rm', network], { encoding: 'utf-8', timeout: 10000 });
       }
 
       const volumeResult = await dockerTeardownExec(
-        `docker volume ls --filter "label=com.docker.compose.project=${project}" --format "{{.Name}}"`,
+        'docker',
+        ['volume', 'ls', '--filter', `label=com.docker.compose.project=${stack.composeProject}`, '--format', '{{.Name}}'],
         { encoding: 'utf-8', timeout: 10000 },
       );
       const volumes = lines(volumeResult.stdout);
       for (const volume of volumes) {
-        await dockerTeardownExec(`docker volume rm "${shellEscape(volume)}"`, { encoding: 'utf-8', timeout: 10000 });
+        if (!isDockerIdentifier(volume)) throw new Error(`Invalid volume name: ${volume}`);
+        await dockerTeardownExec('docker', ['volume', 'rm', volume], { encoding: 'utf-8', timeout: 10000 });
       }
 
       return { containers, networks, volumes };
@@ -224,8 +228,8 @@ function lines(value: string): string[] {
   return value.split('\n').map((line) => line.trim()).filter(Boolean);
 }
 
-function shellEscape(value: string): string {
-  return value.replace(/"/g, '\\"');
+function isDockerIdentifier(value: string): boolean {
+  return /^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}$/.test(value);
 }
 
 const readJsonBody = Effect.gen(function* () {

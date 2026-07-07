@@ -32,7 +32,7 @@ describe('container verb resources routes', () => {
 
     const body = await runAction('abc', 'stop');
 
-    expect(exec).toHaveBeenCalledWith('docker stop --time 30 "abc"', {
+    expect(exec).toHaveBeenCalledWith('docker', ['stop', '--time', '30', 'abc'], {
       encoding: 'utf-8',
       timeout: 35000,
     });
@@ -41,17 +41,17 @@ describe('container verb resources routes', () => {
   });
 
   it('pause and unpause invoke docker and return refreshed container markers', async () => {
-    const exec = vi.fn(async (command: string) => ({ stdout: command.includes('unpause') ? 'unpaused\n' : 'paused\n', stderr: '' }));
+    const exec = vi.fn(async (_file: string, args: string[]) => ({ stdout: args.includes('unpause') ? 'unpaused\n' : 'paused\n', stderr: '' }));
     setDockerContainerExecForTests(exec);
 
     const paused = await runAction('abc', 'pause');
     const unpaused = await runAction('abc', 'unpause');
 
-    expect(exec).toHaveBeenNthCalledWith(1, 'docker pause "abc"', {
+    expect(exec).toHaveBeenNthCalledWith(1, 'docker', ['pause', 'abc'], {
       encoding: 'utf-8',
       timeout: 10000,
     });
-    expect(exec).toHaveBeenNthCalledWith(2, 'docker unpause "abc"', {
+    expect(exec).toHaveBeenNthCalledWith(2, 'docker', ['unpause', 'abc'], {
       encoding: 'utf-8',
       timeout: 10000,
     });
@@ -73,6 +73,21 @@ describe('container verb resources routes', () => {
 
     expect(response.status).toBe(500);
     expect(body).toEqual({ error: 'permission denied' });
+  });
+
+  it('rejects shell-shaped container IDs before invoking docker', async () => {
+    const exec = vi.fn(async () => ({ stdout: '', stderr: '' }));
+    setDockerContainerExecForTests(exec);
+
+    const response = await Effect.runPromise(
+      dockerContainerActionEffect('abc";touch /tmp/pwned', 'pause').pipe(Effect.provide(EventStoreTest)),
+    );
+    const body = await readJsonBody(response);
+
+    expect(response.status).toBe(400);
+    expect(body).toEqual({ error: 'Invalid container ID' });
+    expect(exec).not.toHaveBeenCalled();
+    expect(appendedEvents).toHaveLength(0);
   });
 });
 

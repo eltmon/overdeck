@@ -1,4 +1,4 @@
-import { exec } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 import { Effect } from 'effect';
@@ -9,16 +9,16 @@ import { EventStoreService } from '../../services/domain-services.js';
 import { httpHandler } from '../http-handler.js';
 import { formatUptime, getContainerHistory, getCurrentDockerStats } from './shared.js';
 
-const execAsync = promisify(exec);
-type DockerExec = typeof execAsync;
-let dockerExec: DockerExec = execAsync;
+const execFileAsync = promisify(execFile);
+type DockerExec = typeof execFileAsync;
+let dockerExec: DockerExec = execFileAsync;
 
 export function setDockerContainerExecForTests(execImpl: DockerExec): void {
   dockerExec = execImpl;
 }
 
 export function resetDockerContainerExecForTests(): void {
-  dockerExec = execAsync;
+  dockerExec = execFileAsync;
 }
 
 export function dockerActionErrorPayload(error: unknown): { error: string } {
@@ -57,9 +57,9 @@ export const getContainerDetailsRoute = HttpRouter.add(
     return yield* httpHandler(Effect.gen(function* () {
       const [inspectResult, logsResult] = yield* Effect.tryPromise({
         try: () => Promise.all([
-          dockerExec(`docker inspect --format '{{json .}}' "${containerId}" 2>/dev/null`, { encoding: 'utf-8', timeout: 5000 })
+          dockerExec('docker', ['inspect', '--format', '{{json .}}', containerId], { encoding: 'utf-8', timeout: 5000 })
             .catch(() => ({ stdout: 'null' })),
-          dockerExec(`docker logs --tail 100 "${containerId}" 2>&1`, { encoding: 'utf-8', timeout: 5000 })
+          dockerExec('docker', ['logs', '--tail', '100', containerId], { encoding: 'utf-8', timeout: 5000 })
             .catch(() => ({ stdout: '' })),
         ]),
         catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
@@ -121,7 +121,7 @@ export const deleteDockerContainerRoute = HttpRouter.add(
     }
 
     yield* Effect.tryPromise({
-      try: () => dockerExec(`docker rm "${id}" 2>&1`, { encoding: 'utf-8', timeout: 10000 }),
+      try: () => dockerExec('docker', ['rm', id], { encoding: 'utf-8', timeout: 10000 }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     yield* eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: getCurrentDockerStats() } } });
@@ -137,12 +137,12 @@ export const postRestartContainerRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const eventStore = yield* EventStoreService;
 
-    if (!id) {
-      return jsonResponse({ error: 'Container ID required' }, { status: 400 });
+    if (!isDockerIdentifier(id)) {
+      return jsonResponse({ error: 'Invalid container ID' }, { status: 400 });
     }
 
     const { stdout } = yield* Effect.tryPromise({
-      try: () => dockerExec(`docker restart "${id}"`, { encoding: 'utf-8', timeout: 30000 }),
+      try: () => dockerExec('docker', ['restart', id], { encoding: 'utf-8', timeout: 30000 }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     yield* eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: getCurrentDockerStats() } } });
@@ -158,12 +158,12 @@ export const postStartContainerRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const eventStore = yield* EventStoreService;
 
-    if (!id) {
-      return jsonResponse({ error: 'Container ID required' }, { status: 400 });
+    if (!isDockerIdentifier(id)) {
+      return jsonResponse({ error: 'Invalid container ID' }, { status: 400 });
     }
 
     const { stdout } = yield* Effect.tryPromise({
-      try: () => dockerExec(`docker start "${id}"`, { encoding: 'utf-8', timeout: 30000 }),
+      try: () => dockerExec('docker', ['start', id], { encoding: 'utf-8', timeout: 30000 }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     yield* eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: getCurrentDockerStats() } } });
@@ -178,12 +178,12 @@ export const getContainerLogsRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    if (!id) {
-      return jsonResponse({ error: 'Container ID required' }, { status: 400 });
+    if (!isDockerIdentifier(id)) {
+      return jsonResponse({ error: 'Invalid container ID' }, { status: 400 });
     }
 
     const { stdout } = yield* Effect.tryPromise({
-      try: () => dockerExec(`docker logs --tail 200 --timestamps "${id}"`, { encoding: 'utf-8', timeout: 10000 }),
+      try: () => dockerExec('docker', ['logs', '--tail', '200', '--timestamps', id], { encoding: 'utf-8', timeout: 10000 }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     return jsonResponse({ logs: stdout });
@@ -195,18 +195,16 @@ export function dockerContainerActionEffect(
   action: 'stop' | 'pause' | 'unpause',
 ): Effect.Effect<ReturnType<typeof jsonResponse>, never, EventStoreService> {
   return Effect.gen(function* () {
-    if (!id) {
-      return jsonResponse({ error: 'Container ID required' }, { status: 400 });
+    if (!isDockerIdentifier(id)) {
+      return jsonResponse({ error: 'Invalid container ID' }, { status: 400 });
     }
 
     const eventStore = yield* EventStoreService;
-    const command = action === 'stop'
-      ? `docker stop --time 30 "${id}"`
-      : `docker ${action} "${id}"`;
+    const args = action === 'stop' ? ['stop', '--time', '30', id] : [action, id];
     const timeout = action === 'stop' ? 35000 : 10000;
 
     const result = yield* Effect.tryPromise({
-      try: () => dockerExec(command, { encoding: 'utf-8', timeout }),
+      try: () => dockerExec('docker', args, { encoding: 'utf-8', timeout }),
       catch: (error) => error,
     }).pipe(
       Effect.matchEffect({
@@ -233,6 +231,10 @@ export function dockerContainerActionEffect(
       containers,
     });
   });
+}
+
+function isDockerIdentifier(value: string): boolean {
+  return /^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}$/.test(value);
 }
 
 export const postStopContainerRoute = HttpRouter.add(

@@ -1,4 +1,4 @@
-import { exec } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 import { Effect } from 'effect';
@@ -9,7 +9,7 @@ import { EventStoreService } from '../../services/domain-services.js';
 import { httpHandler } from '../http-handler.js';
 import { getCurrentDockerStats } from './shared.js';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export const postPruneContainersRoute = HttpRouter.add(
   'POST',
@@ -17,7 +17,7 @@ export const postPruneContainersRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const eventStore = yield* EventStoreService;
     const { stdout } = yield* Effect.tryPromise({
-      try: () => execAsync('docker container prune -f 2>&1', { encoding: 'utf-8', timeout: 30000 }),
+      try: () => execFileAsync('docker', ['container', 'prune', '-f'], { encoding: 'utf-8', timeout: 30000 }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     yield* eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: getCurrentDockerStats() } } });
@@ -38,7 +38,7 @@ export const deleteDockerNetworkRoute = HttpRouter.add(
     }
 
     yield* Effect.tryPromise({
-      try: () => execAsync(`docker network rm "${name}" 2>&1`, { encoding: 'utf-8', timeout: 10000 }),
+      try: () => execFileAsync('docker', ['network', 'rm', name], { encoding: 'utf-8', timeout: 10000 }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     yield* eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: getCurrentDockerStats() } } });
@@ -59,7 +59,7 @@ export const deleteDockerVolumeRoute = HttpRouter.add(
     }
 
     yield* Effect.tryPromise({
-      try: () => execAsync(`docker volume rm "${name}" 2>&1`, { encoding: 'utf-8', timeout: 10000 }),
+      try: () => execFileAsync('docker', ['volume', 'rm', name], { encoding: 'utf-8', timeout: 10000 }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     yield* eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: getCurrentDockerStats() } } });
@@ -73,7 +73,7 @@ export const postPruneVolumesRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const eventStore = yield* EventStoreService;
     const { stdout } = yield* Effect.tryPromise({
-      try: () => execAsync('docker volume prune -f 2>&1', { encoding: 'utf-8', timeout: 30000 }),
+      try: () => execFileAsync('docker', ['volume', 'prune', '-f'], { encoding: 'utf-8', timeout: 30000 }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     yield* eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: getCurrentDockerStats() } } });

@@ -1,4 +1,4 @@
-import { exec } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 import { Effect } from 'effect';
@@ -11,9 +11,9 @@ import { dockerActionErrorPayload } from './containers.js';
 import { getCurrentDockerStats } from './shared.js';
 import { getResourceStacks, type ResourceStack } from './stacks.js';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
-type DockerStackVerbExec = typeof execAsync;
+type DockerStackVerbExec = typeof execFileAsync;
 type StackVerb = 'start' | 'stop' | 'pause';
 
 export interface StackVerbResult {
@@ -23,14 +23,14 @@ export interface StackVerbResult {
   error?: string;
 }
 
-let dockerStackVerbExec: DockerStackVerbExec = execAsync;
+let dockerStackVerbExec: DockerStackVerbExec = execFileAsync;
 
 export function setDockerStackVerbExecForTests(execImpl: DockerStackVerbExec): void {
   dockerStackVerbExec = execImpl;
 }
 
 export function resetDockerStackVerbExecForTests(): void {
-  dockerStackVerbExec = execAsync;
+  dockerStackVerbExec = execFileAsync;
 }
 
 export const postStartStackRoute = HttpRouter.add(
@@ -73,10 +73,18 @@ export function dockerStackVerbEffect(
 
     const results: StackVerbResult[] = [];
     for (const service of stack.services) {
-      const command = commandFor(service.id, service.status, verb);
+      if (!isDockerIdentifier(service.id)) {
+        results.push({
+          containerId: service.id,
+          ok: false,
+          error: 'Invalid container ID',
+        });
+        continue;
+      }
+      const args = argsFor(service.id, service.status, verb);
       const timeout = verb === 'stop' ? 35000 : 30000;
       const result = yield* Effect.tryPromise({
-        try: () => dockerStackVerbExec(command, { encoding: 'utf-8', timeout }),
+        try: () => dockerStackVerbExec('docker', args, { encoding: 'utf-8', timeout }),
         catch: (error) => error,
       }).pipe(
         Effect.matchEffect({
@@ -113,11 +121,15 @@ export function dockerStackVerbEffect(
   });
 }
 
-function commandFor(containerId: string, status: string | undefined, verb: StackVerb): string {
-  if (verb === 'stop') return `docker stop --time 30 "${containerId}"`;
-  if (verb === 'pause') return `docker pause "${containerId}"`;
-  if (status === 'paused') return `docker unpause "${containerId}"`;
-  return `docker start "${containerId}"`;
+function argsFor(containerId: string, status: string | undefined, verb: StackVerb): string[] {
+  if (verb === 'stop') return ['stop', '--time', '30', containerId];
+  if (verb === 'pause') return ['pause', containerId];
+  if (status === 'paused') return ['unpause', containerId];
+  return ['start', containerId];
+}
+
+function isDockerIdentifier(value: string): boolean {
+  return /^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}$/.test(value);
 }
 
 function findStack(issueId: string): ResourceStack | undefined {
