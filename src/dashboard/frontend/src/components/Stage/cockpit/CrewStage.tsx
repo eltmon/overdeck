@@ -14,6 +14,7 @@
  */
 
 import type { SessionNode } from '@overdeck/contracts'
+import { compactModelName, initialsFor } from '../../../lib/model-names'
 
 type CrewState = 'working' | 'listening' | 'reviewing' | 'idle' | 'done'
 
@@ -23,19 +24,6 @@ interface CrewMember {
   sub: string
   state: CrewState
   initials: string
-}
-
-function compactModelName(model: string | undefined): string {
-  if (!model) return 'model pending'
-  return model.replace(/^claude-/, '').replace(/-202\d{5,8}$/, '')
-}
-
-function initialsFor(model: string | undefined): string {
-  const compact = compactModelName(model)
-  const match = compact.match(/^([a-z]+)[^a-z0-9]*([\d.]*)/i)
-  const word = match?.[1] ?? compact
-  const num = (match?.[2] ?? '').split('.')[0]
-  return `${word.slice(0, 1).toUpperCase()}${num}`.slice(0, 3)
 }
 
 function slotLabel(session: SessionNode): string {
