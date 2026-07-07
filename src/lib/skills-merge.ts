@@ -81,10 +81,10 @@ export function mergeSkillsIntoWorkspaceSync(workspacePath: string): MergeResult
   mkdirSync(join(claudeDir, 'agents'), { recursive: true });
 
   // Sources to copy: category → source cache directory
-  const sources: Array<{ category: string; sourceDir: string; targetSubdir: string }> = [
-    { category: 'skills', sourceDir: SKILLS_DIR, targetSubdir: 'skills' },
-    { category: 'agents', sourceDir: CACHE_AGENTS_DIR, targetSubdir: 'agents' },
-    { category: 'rules', sourceDir: CACHE_RULES_DIR, targetSubdir: 'rules' },
+  const sources: Array<{ sourceDir: string; targetSubdir: string }> = [
+    { sourceDir: SKILLS_DIR, targetSubdir: 'skills' },
+    { sourceDir: CACHE_AGENTS_DIR, targetSubdir: 'agents' },
+    { sourceDir: CACHE_RULES_DIR, targetSubdir: 'rules' },
   ];
 
   for (const { sourceDir, targetSubdir } of sources) {

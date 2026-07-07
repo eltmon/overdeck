@@ -4,8 +4,13 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { insertCostEventSync, getTodayCostSync, getCostsByIssueSync } from '../../../src/lib/overdeck/cost-sync.js';
-import { closeOverdeckDatabaseSync } from '../../../src/lib/overdeck/infra.js';
+import {
+  insertCostEventSync,
+  getTodayCostSync,
+  getCostsByIssueSync,
+  getCostForIssueAggregateSync,
+} from '../../../src/lib/overdeck/cost-sync.js';
+import { closeOverdeckDatabaseSync, getOverdeckDatabaseSync } from '../../../src/lib/overdeck/infra.js';
 import type { CostEvent } from '../../../src/lib/costs/events.js';
 
 let originalOverdeckHome: string | undefined;
@@ -99,4 +104,44 @@ describe('getCostsByIssueSync', () => {
     expect(result['PAN-10'].models['gpt-test']).toEqual({ cost: 8, calls: 1, tokens: 2 });
     expect(result['PAN-10'].stages['planning']).toEqual({ cost: 8, calls: 1, tokens: 2 });
   });
+
+  it('returns provider totals that sum to the issue total', () => {
+    insertCostEventSync(costEvent({
+      issueId: 'pan-42', provider: 'openai', sessionType: 'work', model: 'gpt-test', cost: 1.25,
+      input: 100, output: 50, requestId: 'provider-openai',
+    }));
+    insertCostEventSync(costEvent({
+      issueId: 'PAN-42', provider: 'anthropic', sessionType: 'review', model: 'claude-test', cost: 2.75,
+      input: 200, output: 100, requestId: 'provider-anthropic',
+    }));
+    insertRawCostEventWithNullProvider({
+      issueId: 'PAN-42',
+      cost: 0.5,
+      requestId: 'provider-null',
+    });
+
+    const result = getCostForIssueAggregateSync('pan-42');
+
+    expect(result).not.toBeNull();
+    expect(result!.totalCost).toBeCloseTo(4.5, 8);
+    expect(result!.providers).toEqual({
+      anthropic: 2.75,
+      openai: 1.25,
+      unknown: 0.5,
+    });
+    expect(Object.values(result!.providers).reduce((sum, cost) => sum + cost, 0)).toBeCloseTo(result!.totalCost, 8);
+    expect(Object.values(result!.models).reduce((sum, model) => sum + model.cost, 0)).toBeCloseTo(result!.totalCost, 8);
+  });
 });
+
+function insertRawCostEventWithNullProvider(input: { issueId: string; cost: number; requestId: string }): void {
+  getOverdeckDatabaseSync()
+    .prepare(
+      `INSERT INTO cost_events (
+        ts, agent_id, issue_id, session_type, provider, model,
+        input, output, cache_read, cache_write, cost, request_id, source_file, session_id
+      )
+      VALUES (?, 'agent-pan-42', ?, 'work', NULL, 'unknown-provider-model', 10, 5, 0, 0, ?, ?, NULL, 'session-provider-null')`,
+    )
+    .run(Date.parse('2026-06-25T12:00:00.000Z'), input.issueId, input.cost, input.requestId);
+}

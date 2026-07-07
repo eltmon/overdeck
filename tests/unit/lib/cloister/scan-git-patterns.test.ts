@@ -28,6 +28,7 @@ vi.mock('../../../../src/lib/activity-logger.js', () => ({
 
 vi.mock('../../../../src/lib/paths.js', () => ({
   OVERDECK_HOME: '/tmp/overdeck-scan-git-test',
+  COSTS_DIR: '/tmp/overdeck-scan-git-test/costs',
   packageRoot: '/tmp/overdeck-scan-git-test',
   getOverdeckHome: () => '/tmp/overdeck-scan-git-test',
 }));

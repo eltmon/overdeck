@@ -268,4 +268,3 @@ export const collectSourceFiles = (
     },
     catch: (cause) => new FsError({ path: sourceDir, operation: 'collectSourceFiles', cause }),
   });
-
