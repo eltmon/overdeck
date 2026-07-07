@@ -9,8 +9,8 @@
     }
   ],
   "feedback": [],
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "reload-repo-root-resolution": "completed",
     "reload-repo-root-resolution.ac1": "completed",
@@ -26,12 +26,12 @@
   "pipeline": {
     "issueId": "PAN-2095",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T02:03:24.759Z",
+    "updatedAt": "2026-07-07T02:04:24.801Z",
     "reviewNotes": "No blocking correctness, security, requirements, or performance issues found",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Bead reload-build-from-origin-main ack: divergence detection (merge-base --is-ancestor), sibling detached worktree build + dist swap, try/finally worktree cleanup, execAsync-only git calls, and fetch/build failure handling all verified against reload.ts (276 lines, no new any) and cross-checked vs post-merge-deploy.sh sibling-worktree pattern; only non-blocking nit is FR-4 warn-message wording differs from the PRD-quoted text though sha is still printed.",
@@ -122,7 +122,7 @@
       },
       "costAtCloseOut": {
         "usd": 9.547221,
-        "pricingAsOf": "2026-07-07T02:03:24.820Z"
+        "pricingAsOf": "2026-07-07T02:04:24.892Z"
       }
     },
     "merges": [
@@ -134,5 +134,5 @@
     "finalizedAt": "2026-07-07T01:59:17.986Z"
   },
   "created": "2026-07-07T02:02:06.543Z",
-  "updated": "2026-07-07T02:03:24.821Z"
+  "updated": "2026-07-07T02:04:25.708Z"
 }
