@@ -1,7 +1,7 @@
 /**
  * Hook-driven progressive conversation title refinement.
  *
- * Replaces the old polling-based scheduleTitleRefinement with an event-driven
+ * Replaces the old polling-based refinement scheduler with an event-driven
  * turn-complete handler. First refinement happens as soon as a completed
  * assistant message is available; later refinements are debounced by turn count
  * and wall-clock interval.

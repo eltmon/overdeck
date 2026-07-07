@@ -27,6 +27,7 @@ import { ReadModelService } from '../read-model.js';
 import { getConversationByClaudeSessionId, updateConversationTitle, type LegacyConversation } from '../../../lib/overdeck/conversations.js';
 import { derivePromptTitle } from '../../../lib/conversations/transcript-summary.js';
 import { generateAiTitle, resolveSessionFile } from '../../../lib/overdeck/conversation-reads.js';
+import { handleTurnComplete } from '../../../lib/overdeck/title-refinement.js';
 import { appendFreshBriefingUpdate, recordBriefingSessionStart } from '../../../lib/briefing-freshness.js';
 import { resolveComplianceAdvisoryWarning } from '../../../lib/compliance/advisory-warning.js';
 import { injectPromptTimeMemory } from '../../../lib/memory/injection.js';
@@ -449,12 +450,56 @@ const postUserPromptSubmitRoute = HttpRouter.add(
   })),
 );
 
+export async function handleTurnCompleteBody(
+  body: Record<string, unknown>,
+  options: { handleTurnComplete?: typeof handleTurnComplete } = {},
+): Promise<{ ok: boolean; conversationName?: string }> {
+  const sessionId = typeof body.session_id === 'string' ? body.session_id : null;
+  if (!sessionId) {
+    return { ok: true };
+  }
+
+  const conv = getConversationByClaudeSessionId(sessionId);
+  if (!conv) {
+    return { ok: true };
+  }
+
+  const doHandleTurnComplete = options.handleTurnComplete ?? handleTurnComplete;
+  void doHandleTurnComplete(conv, { resolveSessionFile }).catch((err: unknown) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[hooks/turn-complete] title refinement failed for "${conv.name}":`, msg);
+  });
+
+  return { ok: true, conversationName: conv.name };
+}
+
+const postTurnCompleteRoute = HttpRouter.add(
+  'POST',
+  '/api/hooks/turn-complete',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    if (!hasDashboardInternalToken(request)) return jsonResponse({ error: 'unauthorized' }, { status: 401 });
+    const rawBody = yield* request.text;
+
+    let body: Record<string, unknown>;
+    try {
+      body = JSON.parse(rawBody) as Record<string, unknown>;
+    } catch {
+      return jsonResponse({ error: 'invalid JSON' }, { status: 400 });
+    }
+
+    const result = yield* Effect.promise(() => handleTurnCompleteBody(body));
+    return jsonResponse(result);
+  })),
+);
+
 export const hooksRouteLayer = Layer.mergeAll(
   postMemoryInjectRoute,
   postMemorySessionStartRoute,
   postMemoryTurnRoute,
   postPermissionEventRoute,
   postUserPromptSubmitRoute,
+  postTurnCompleteRoute,
 );
 
 function parseMemoryIdentity(value: unknown, sessionId: string): MemoryIdentity | null {
