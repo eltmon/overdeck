@@ -60,10 +60,10 @@
     "issueId": "PAN-2450",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T05:53:42.713Z",
+    "updatedAt": "2026-07-07T05:54:08.543Z",
     "reviewNotes": "Dispatch failed: [review-agent] Skipping review dispatch for PAN-2450 — GitHub PR #2455 is merged",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2455",
     "lastVerifiedCommit": "af9fd682a86329d56b630d598b4b001281ab0a9f",
@@ -119,7 +119,7 @@
       },
       "costAtCloseOut": {
         "usd": 33.268121,
-        "pricingAsOf": "2026-07-07T05:53:42.804Z"
+        "pricingAsOf": "2026-07-07T05:54:08.594Z"
       }
     },
     "merges": [
@@ -131,5 +131,5 @@
     "finalizedAt": "2026-07-07T04:18:45.208Z"
   },
   "created": "2026-07-07T04:55:35.112Z",
-  "updated": "2026-07-07T05:53:42.805Z"
+  "updated": "2026-07-07T05:54:08.597Z"
 }
