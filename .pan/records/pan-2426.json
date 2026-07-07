@@ -12,23 +12,156 @@
       "reason": "resume",
       "agentModel": "claude-fable-5",
       "timestamp": "2026-07-07T16:15:56.212Z"
+    },
+    {
+      "timestamp": "2026-07-07T23:35:32.503Z",
+      "reason": "end",
+      "note": "Implemented xBRIEF v0.8 compatibility across read/write doors, writers, docs, planning templates, and schema fallback tests. Closed all PAN-2426 beads. Gates passed: npm run typecheck, npm run lint, npx vitest run src/lib/vbrief/__tests__/io.test.ts, npx vitest run tests/vbrief/full-spec.test.ts, npx vitest run tests/lib/cloister/failure-tracking.test.ts, npm test. Branch pushed to origin/feature/pan-2426."
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/drafts/pan-2426.md",
+      ".pan/records/pan-2426.json",
+      "src/lib/vbrief/__tests__/create-beads.test.ts",
+      "src/lib/vbrief/__tests__/dag-pan977.test.ts",
+      "src/lib/vbrief/__tests__/dag.test.ts",
+      "src/lib/vbrief/__tests__/lifecycle-io.test.ts",
+      "src/lib/vbrief/types.ts",
+      "tests/integration/agent-spawning.test.ts",
+      "tests/vbrief/full-spec.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/VBRIEF.md",
+      "src/lib/cloister/prompts/planning.md",
+      "src/lib/pan-dir/__tests__/pan-dir.test.ts",
+      "src/lib/pan-dir/specs.ts",
+      "src/lib/vbrief/__tests__/auto-synthesize.test.ts",
+      "src/lib/vbrief/__tests__/io.test.ts",
+      "src/lib/vbrief/auto-synthesize.ts",
+      "src/lib/vbrief/builder.ts",
+      "src/lib/vbrief/dag-cli.ts",
+      "src/lib/vbrief/dag.ts",
+      "src/lib/vbrief/io.ts",
+      "src/lib/vbrief/lifecycle-io.ts",
+      "src/lib/vbrief/vbrief-index.ts",
+      "sync-sources/skills/write-vbrief/SKILL.md"
+    ],
+    "actualChangedFiles": [
+      ".pan/drafts/pan-2426.md",
+      ".pan/records/pan-2426.json",
+      "docs/VBRIEF.md",
+      "src/lib/cloister/prompts/planning.md",
+      "src/lib/pan-dir/__tests__/pan-dir.test.ts",
+      "src/lib/pan-dir/specs.ts",
+      "src/lib/vbrief/__tests__/auto-synthesize.test.ts",
+      "src/lib/vbrief/__tests__/create-beads.test.ts",
+      "src/lib/vbrief/__tests__/dag-pan977.test.ts",
+      "src/lib/vbrief/__tests__/dag.test.ts",
+      "src/lib/vbrief/__tests__/io.test.ts",
+      "src/lib/vbrief/__tests__/lifecycle-io.test.ts",
+      "src/lib/vbrief/auto-synthesize.ts",
+      "src/lib/vbrief/builder.ts",
+      "src/lib/vbrief/dag-cli.ts",
+      "src/lib/vbrief/dag.ts",
+      "src/lib/vbrief/io.ts",
+      "src/lib/vbrief/lifecycle-io.ts",
+      "src/lib/vbrief/types.ts",
+      "src/lib/vbrief/vbrief-index.ts",
+      "sync-sources/skills/write-vbrief/SKILL.md",
+      "tests/integration/agent-spawning.test.ts",
+      "tests/vbrief/full-spec.test.ts"
+    ],
+    "recordedAt": "2026-07-07T23:34:17.286Z"
+  },
   "created": "2026-07-07T15:48:18.781Z",
-  "updated": "2026-07-07T23:34:09.795Z",
+  "updated": "2026-07-07T23:36:02.810Z",
   "pipeline": {
     "issueId": "PAN-2426",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T22:34:18.027Z"
+    "updatedAt": "2026-07-07T23:36:02.572Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2481",
+    "reviewRequestedAt": "2026-07-07T23:35:32.505Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        ".pan/drafts/pan-2426.md",
+        ".pan/records/pan-2426.json",
+        "src/lib/vbrief/__tests__/create-beads.test.ts",
+        "src/lib/vbrief/__tests__/dag-pan977.test.ts",
+        "src/lib/vbrief/__tests__/dag.test.ts",
+        "src/lib/vbrief/__tests__/lifecycle-io.test.ts",
+        "src/lib/vbrief/types.ts",
+        "tests/integration/agent-spawning.test.ts",
+        "tests/vbrief/full-spec.test.ts"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/VBRIEF.md",
+        "src/lib/cloister/prompts/planning.md",
+        "src/lib/pan-dir/__tests__/pan-dir.test.ts",
+        "src/lib/pan-dir/specs.ts",
+        "src/lib/vbrief/__tests__/auto-synthesize.test.ts",
+        "src/lib/vbrief/__tests__/io.test.ts",
+        "src/lib/vbrief/auto-synthesize.ts",
+        "src/lib/vbrief/builder.ts",
+        "src/lib/vbrief/dag-cli.ts",
+        "src/lib/vbrief/dag.ts",
+        "src/lib/vbrief/io.ts",
+        "src/lib/vbrief/lifecycle-io.ts",
+        "src/lib/vbrief/vbrief-index.ts",
+        "sync-sources/skills/write-vbrief/SKILL.md"
+      ],
+      "actualChangedFiles": [
+        ".pan/drafts/pan-2426.md",
+        ".pan/records/pan-2426.json",
+        "docs/VBRIEF.md",
+        "src/lib/cloister/prompts/planning.md",
+        "src/lib/pan-dir/__tests__/pan-dir.test.ts",
+        "src/lib/pan-dir/specs.ts",
+        "src/lib/vbrief/__tests__/auto-synthesize.test.ts",
+        "src/lib/vbrief/__tests__/create-beads.test.ts",
+        "src/lib/vbrief/__tests__/dag-pan977.test.ts",
+        "src/lib/vbrief/__tests__/dag.test.ts",
+        "src/lib/vbrief/__tests__/io.test.ts",
+        "src/lib/vbrief/__tests__/lifecycle-io.test.ts",
+        "src/lib/vbrief/auto-synthesize.ts",
+        "src/lib/vbrief/builder.ts",
+        "src/lib/vbrief/dag-cli.ts",
+        "src/lib/vbrief/dag.ts",
+        "src/lib/vbrief/io.ts",
+        "src/lib/vbrief/lifecycle-io.ts",
+        "src/lib/vbrief/types.ts",
+        "src/lib/vbrief/vbrief-index.ts",
+        "sync-sources/skills/write-vbrief/SKILL.md",
+        "tests/integration/agent-spawning.test.ts",
+        "tests/vbrief/full-spec.test.ts"
+      ],
+      "recordedAt": "2026-07-07T23:34:17.286Z"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 4626244,
+            "output": 4421,
+            "cacheRead": 4309248,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.5": {
+            "input": 21197657,
+            "output": 46590,
+            "cacheRead": 20638720,
+            "cacheWrite": 0
+          }
+        },
         "implementation": {
           "anthropic/claude-fable-5": {
             "input": 6,
@@ -47,6 +180,18 @@
         }
       },
       "totals": {
+        "openai/codex-auto-review": {
+          "input": 4626244,
+          "output": 4421,
+          "cacheRead": 4309248,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.5": {
+          "input": 21197657,
+          "output": 46590,
+          "cacheRead": 20638720,
+          "cacheWrite": 0
+        },
         "anthropic/claude-fable-5": {
           "input": 24558,
           "output": 55494,
@@ -55,11 +200,13 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 18.278699,
-        "pricingAsOf": "2026-07-07T22:34:18.354Z"
+        "usd": 32.790444,
+        "pricingAsOf": "2026-07-07T23:36:02.803Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2481"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
