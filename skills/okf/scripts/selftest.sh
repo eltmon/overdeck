@@ -432,6 +432,63 @@ with tempfile.TemporaryDirectory() as tmp:
 print("ok - reindex.py preserves prose, refreshes marker entries, and appends newest log entries")
 PY
 
+python3 - "$ROOT" <<'PY'
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+
+root = Path(sys.argv[1])
+validate = root / "scripts" / "validate.py"
+diff_lint = root / "scripts" / "diff_lint.py"
+
+def write(path, content):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+with tempfile.TemporaryDirectory() as tmp:
+    bundle = Path(tmp)
+    write(bundle / "missing.md", "---\ntitle: Missing type\n---\n\nBody.\n")
+    proc = subprocess.run([sys.executable, str(validate), "--bundle", str(bundle)], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    assert proc.returncode == 2
+    assert "E_TYPE_MISSING" in proc.stdout
+
+with tempfile.TemporaryDirectory() as tmp:
+    bundle = Path(tmp)
+    write(bundle / "warn.md", "---\ntype: Guide\n---\n\nBody.\n")
+    loose = subprocess.run([sys.executable, str(validate), "--bundle", str(bundle)], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    strict = subprocess.run([sys.executable, str(validate), "--bundle", str(bundle), "--strict"], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    assert loose.returncode == 1
+    assert strict.returncode == 2
+    assert "L_DESCRIPTION_MISSING" in loose.stdout
+
+with tempfile.TemporaryDirectory() as tmp:
+    base = Path(tmp) / "base"
+    head = Path(tmp) / "head"
+    write(base / "warn.md", "---\ntype: Guide\n---\n\nBody.\n")
+    shutil.copytree(base, head)
+    same = subprocess.run([sys.executable, str(diff_lint), "--base", str(base), "--head", str(head)], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    assert same.returncode == 0, same.stdout + same.stderr
+    write(head / "bad.md", "---\ntitle: Bad\n---\n\nBody.\n")
+    changed = subprocess.run([sys.executable, str(diff_lint), "--base", str(base), "--head", str(head)], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    assert changed.returncode == 2
+    assert "NEW ERROR E_TYPE_MISSING" in changed.stdout
+
+with tempfile.TemporaryDirectory() as tmp:
+    bundle = Path(tmp)
+    write(
+        bundle / "okf-embeddings.yaml",
+        "okf_embeddings_version: \"0.1\"\ndefault_profile: local\nprofiles: {}\nchunking: {strategy: concept, max_tokens: 512}\nhash: sha256\nvectors_dir: embeddings\n",
+    )
+    write(bundle / "embeddings" / "local.okfe.jsonl", '{"id":"known#0","concept":"known","hash":"sha256:x","dim":2,"v":[0.6,0.8]}\n')
+    write(bundle / "known.md", "---\ntype: Guide\ndescription: Known.\nx_embed: exclude\n---\n\nKnown body.\n")
+    clean = subprocess.run([sys.executable, str(validate), "--bundle", str(bundle)], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    assert clean.returncode == 0, clean.stdout + clean.stderr
+
+print("ok - validate.py and diff_lint.py enforce deterministic two-tier conformance")
+PY
+
 if grep -InE '^(from|import) ' "$ROOT/scripts/okf_common.py" | grep -Ev ' (annotations|dataclasses|hashlib|pathlib|re|typing|yaml)( |$)|^.*from __future__ import annotations$'; then
   printf 'not ok - okf_common.py imports only stdlib and yaml\n' >&2
   exit 1
