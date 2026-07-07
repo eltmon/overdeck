@@ -21,9 +21,15 @@ import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { getWorkspacePanPaths } from '../../lib/pan-dir/index.js';
 import type { RuntimeName } from '../../lib/runtimes/types.js';
 import { findPlanSync } from '../../lib/vbrief/io.js';
+import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
 import { writeAutoStartVBrief, type AutoSynthesizeIssueInput } from '../../lib/vbrief/auto-synthesize.js';
 import { createBeadsFromVBrief } from '../../lib/vbrief/beads.js';
 import { transitionVBriefOnMain, updatePlanStatus } from '../../lib/vbrief/lifecycle-io.js';
+import {
+  buildStartPlanningBody,
+  printPlanningConnectionError,
+  streamPlanningSession,
+} from './planning-stream.js';
 import {
   BdTransientFailure,
   isTransientBdError,
@@ -79,7 +85,7 @@ async function updateLinearToInProgress(apiKey: string, issueIdentifier: string)
 
 import { shouldSkipTrackerUpdate, getShadowModeStatus } from '../../lib/shadow-mode.js';
 import { createShadowState, updateShadowState } from '../../lib/shadow-state.js';
-import { loadConfigSync } from '../../lib/config.js';
+import { getDashboardApiUrlSync, loadConfigSync } from '../../lib/config.js';
 import {
   loadWorkspaceMetadataSync,
   findRemoteWorkspaceMetadataSync,
@@ -94,7 +100,9 @@ import { isRemoteAvailable } from '../../lib/remote/index.js';
 import type { RemoteWorkspaceMetadata } from '../../lib/remote/interface.js';
 import type { SpawnRemoteAgentOptions } from '../../lib/remote/remote-agents.js';
 import { assertCanStartFreshSync } from '../../lib/work-agent-lifecycle.js';
+import { getWorkAgentLifecycleStateSync } from '../../lib/work-agent-lifecycle.js';
 import { normalizeModelOverrideSync } from '../../lib/model-validation.js';
+import { resolvePlanningMode, type PlanningMode } from './planning-mode.js';
 
 interface IssueOptions {
   model: string;
@@ -108,6 +116,9 @@ interface IssueOptions {
   local?: boolean;
   /** Remote workspace resiliency tier override: ephemeral | durable. */
   tier?: string;
+  /** Explicit planning-depth flag: interactive | auto | skip. */
+  plan?: string;
+  /** Legacy auto-skip-planning flag; deprecated — use --plan skip instead. */
   auto?: boolean;
   host?: boolean;
   yes?: boolean;
@@ -115,6 +126,8 @@ interface IssueOptions {
   /** Drop the saved Claude session pointer (non-destructive) and start a brand-new
    *  session — the one-step "restart fresh" path, e.g. to switch a stopped agent's model. */
   fresh?: boolean;
+  /** Resolved planning mode for this start invocation. Set by issueCommand. */
+  planningMode?: PlanningMode;
 }
 
 /**
@@ -917,6 +930,28 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
   }
 
+  // Resolve planning mode for pan start (PAN-2407): explicit --plan wins over
+  // legacy --auto, then config.planning.default_mode, then shipped default 'auto'.
+  let resolvedPlanningMode: PlanningMode;
+  try {
+    const planningResolution = resolvePlanningMode({
+      planFlag: options.plan,
+      legacyAuto: options.auto,
+      configDefault: yamlConfig.planning?.defaultMode,
+    });
+    resolvedPlanningMode = planningResolution.mode;
+    for (const warning of planningResolution.warnings) {
+      console.warn(warning);
+    }
+  } catch (error) {
+    process.stderr.write(chalk.red(`${error instanceof Error ? error.message : String(error)}\n`));
+    process.exit(1);
+  }
+  options.planningMode = resolvedPlanningMode;
+  // Preserve legacy behavior until route-unplanned-to-planning bead fully wires
+  // resolved mode into the spawn path.
+  options.auto = resolvedPlanningMode === 'skip';
+
   const shouldClearPauseBeforeSpawn = existingAgentState?.paused === true && options.force === true;
   if (existingAgentState?.paused === true && !options.force) {
     process.stderr.write(chalk.red(`Agent ${agentId} is paused and will not be started.\n`));
@@ -936,6 +971,20 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     process.exit(1);
   }
 
+  // No-op with exit 0 when the work agent is already live and running.
+  // Paused/troubled cases are handled above; stopped-but-resumable cases are
+  // left for assertCanStartFreshSync below so the user sees the resume/fresh
+  // guidance unchanged (hazard H2).
+  const lifecycleState = getWorkAgentLifecycleStateSync(agentId);
+  if (lifecycleState.isRunning && !lifecycleState.isRunningButStuck) {
+    console.log(chalk.green(`Work agent for ${id} is already running.`));
+    console.log('');
+    console.log(chalk.dim('Message it:'), chalk.cyan(`pan tell ${id} "..."`));
+    console.log(chalk.dim('Attach:  '), chalk.cyan(`tmux -L overdeck attach -t ${agentId}`));
+    process.exitCode = 0;
+    return;
+  }
+
   const spinner = ora(`Preparing workspace for ${id}...`).start();
 
   try {
@@ -951,6 +1000,93 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
     // Find workspace (local or remote based on preference)
     const { workspacePath, isRemote } = findWorkspaceWithLocation(id, locationPreference);
+
+    // Overflow scale-out (PAN-1676): a FRESH issue (no workspace anywhere, no
+    // explicit --local) routes to a fly.io machine when the local work pool is
+    // already at max_work_agents and remote.overflow_to_remote is enabled.
+    // Compute this before the PAN-2407 planning route so the start-planning
+    // request reports the resolved workspace location (local vs remote).
+    let overflowToRemote = false;
+    if (!isRemote && !workspacePath && !options.local && locationPreference !== 'local') {
+      const overflowConfig = loadConfigSync().remote;
+      if (overflowConfig?.enabled && overflowConfig.overflow_to_remote) {
+        const { getConcurrencyLimits, countRunningAgents } = await import('../../lib/cloister/concurrency.js');
+        const limits = getConcurrencyLimits();
+        const counts = countRunningAgents();
+        if (counts.work >= limits.maxWorkAgents) {
+          overflowToRemote = true;
+          console.log(chalk.cyan(
+            `Local work pool full (${counts.work}/${limits.maxWorkAgents}) — overflowing ${id} to a remote fly.io machine.`
+          ));
+        }
+      }
+    }
+    const effectiveRemote = isRemote || overflowToRemote || (locationPreference === 'remote' && !workspacePath);
+
+    // PAN-2407: route unplanned issues to the start-planning endpoint before
+    // any workspace creation or remote provisioning.
+    const projectRoot = findProjectRoot(id);
+    const existingPlan = workspacePath && !isRemote
+      ? findPlanSync(workspacePath)
+      : await Effect.runPromise(findSpecByIssue(projectRoot, id));
+
+    if (!existingPlan) {
+      if (resolvedPlanningMode === 'auto' || resolvedPlanningMode === 'interactive') {
+        if (options.dryRun) {
+          spinner.info(`Would start ${resolvedPlanningMode} planning session for ${id} (work agent auto-starts on finalize)`);
+          return;
+        }
+
+        spinner.text = `Starting ${resolvedPlanningMode} planning session for ${id}...`;
+        let sessionName = '';
+        try {
+          const response = await fetch(
+            `${getDashboardApiUrlSync()}/api/issues/${encodeURIComponent(id)}/start-planning`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: buildStartPlanningBody({
+                auto: resolvedPlanningMode === 'auto',
+                autoStart: true,
+                probe: false,
+                model: options.model,
+                harness: options.harness,
+                effort: options.effort,
+                workspaceLocation: effectiveRemote ? 'remote' : 'local',
+              }),
+            },
+          );
+
+          if (!response.ok) {
+            let message = `Planning failed (${response.status})`;
+            try {
+              const data = (await response.json()) as { error?: string; hint?: string };
+              message = data.error || data.hint || message;
+            } catch {
+              const text = await response.text().catch(() => '');
+              if (text) message = text;
+            }
+            throw new Error(message);
+          }
+
+          await streamPlanningSession(response, {
+            issueId: id,
+            setSpinnerText: (text) => { spinner.text = text; },
+            onComplete: (name) => { sessionName = name; },
+          });
+
+          spinner.succeed(
+            `${resolvedPlanningMode === 'auto' ? 'Auto-planning' : 'Planning'} session started for ${id}${sessionName ? ` (${sessionName})` : ''}. The work agent will start automatically after planning finalizes.`,
+          );
+          return;
+        } catch (error) {
+          spinner.fail(error instanceof Error ? error.message : String(error));
+          printPlanningConnectionError(id);
+          process.exit(1);
+        }
+      }
+      // mode === 'skip': fall through to the existing auto-synthesize path.
+    }
 
     // --fresh: wipe the work agent's state directory under
     // ~/.overdeck/agents/agent-<id>/ (PAN-1985) so the start below opens a
@@ -1000,33 +1136,13 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       }
     }
 
-    // Overflow scale-out (PAN-1676): a FRESH issue (no workspace anywhere, no
-    // explicit --local) routes to a fly.io machine when the local work pool is
-    // already at max_work_agents and remote.overflow_to_remote is enabled.
-    let overflowToRemote = false;
-    if (!isRemote && !workspacePath && !options.local && locationPreference !== 'local') {
-      const overflowConfig = loadConfigSync().remote;
-      if (overflowConfig?.enabled && overflowConfig.overflow_to_remote) {
-        const { getConcurrencyLimits, countRunningAgents } = await import('../../lib/cloister/concurrency.js');
-        const limits = getConcurrencyLimits();
-        const counts = countRunningAgents();
-        if (counts.work >= limits.maxWorkAgents) {
-          overflowToRemote = true;
-          console.log(chalk.cyan(
-            `Local work pool full (${counts.work}/${limits.maxWorkAgents}) — overflowing ${id} to a remote fly.io machine.`
-          ));
-        }
-      }
-    }
-
     // Handle remote workspace
-    if (isRemote || overflowToRemote || (locationPreference === 'remote' && !workspacePath)) {
+    if (effectiveRemote) {
       await handleRemoteWorkspace(id, options, spinner, shouldClearPauseBeforeSpawn);
       return;
     }
 
     // Handle local workspace
-    const projectRoot = findProjectRoot(id);
     let workspace = workspacePath;
     const workspaceExisted = !!workspace;
     let workspaceCreatedThisRun = false;

@@ -421,6 +421,13 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       result.compliance.mode = config.compliance.mode;
     }
 
+    // Merge planning default mode (raw value; validation happens in pan start resolver)
+    if (config.planning?.default_mode !== undefined) {
+      result.planning = {
+        defaultMode: config.planning.default_mode,
+      };
+    }
+
     if (config.registry?.classification) {
       const classification = config.registry.classification;
       if (classification.enabled !== undefined) result.registry.classification.enabled = classification.enabled;
