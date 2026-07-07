@@ -67,6 +67,12 @@ require_grep 'Lines are sorted by `id`' "$OKFE" "okf-embeddings doc includes sor
 require_grep 'okf_embeddings_version` controls compatibility' "$OKFE" "okf-embeddings doc includes succession clause"
 require_grep 'provider: ollama' "$ROOT/templates/okf-embeddings.yaml" "embedding manifest template uses ollama default"
 require_grep 'model: nomic-embed-text' "$ROOT/templates/okf-embeddings.yaml" "embedding manifest template uses nomic-embed-text"
+require_grep 'Open the knowledge PR with `gh pr create`' "$SKILL" "sync opens PR through gh"
+require_grep 'validate.py --strict' "$SKILL" "sync runs strict validation"
+require_grep 'preserve non-matching concepts byte-identically' "$SKILL" "sync topic preserves non-matching concepts"
+require_grep 'Append exactly one dated `log.md` entry' "$ROOT/references/workflow.md" "workflow sync appends one dated log entry"
+require_grep 'Run `reindex.py`' "$ROOT/references/workflow.md" "workflow sync regenerates index"
+require_grep 'never pushes directly to the default branch' "$ROOT/references/workflow.md" "workflow sync is PR-gated"
 
 python3 - "$ROOT" <<'PY'
 import importlib.util

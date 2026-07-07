@@ -31,6 +31,22 @@ remote: git@github.com:example/example-knowledge.git
 - `retro`: after implementation or merge.
 - `extract`: before prompt augmentation or handoff.
 
+## Sync Pass
+
+`/okf sync [--topic "<focus>"]` is the diff-driven maintenance loop.
+
+1. Resolve the bundle and create a new branch in the knowledge repo.
+2. Determine the code/doc change range from the latest relevant `log.md` entry, the PR base, or an explicit user-provided diff.
+3. Map changes to concepts by path references, tags, concept IDs, links, and `search.py` results.
+4. If `--topic "<focus>"` is present, keep only concepts matching the focus by tag or search. Concepts outside that set must remain byte-identical.
+5. Update affected concepts with cited evidence.
+6. Append exactly one dated `log.md` entry for the sync pass.
+7. Run `reindex.py` so marker-delimited `index.md` sections reflect the updated concepts.
+8. Run `validate.py --strict`.
+9. Open a knowledge PR with `gh pr create`.
+
+Sync never pushes directly to the default branch. A failed validation run blocks the PR until the bundle is fixed.
+
 ## Embeddings
 
 Embeddings are derived from Markdown, but shareable shards are committed when their profile says `share: true`.

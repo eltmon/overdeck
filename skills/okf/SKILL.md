@@ -98,8 +98,12 @@ Convert existing docs into OKF without destructive edits.
 Update the bundle from code or documentation diffs.
 
 - Derive the change range from the last `log.md` entry, PR base, or user-specified diff.
-- Use `--topic` to restrict by tags, concept IDs, and search results.
-- Update affected concepts, append dated log entries, regenerate indexes, and validate.
+- Create a knowledge-repo branch first; never write directly to the default branch.
+- Map changed files and symbols to affected concepts by tags, concept IDs, links, and `search.py` results.
+- Use `--topic "<focus>"` to restrict the candidate set by matching tags and search results; preserve non-matching concepts byte-identically.
+- Update affected concepts, append exactly one dated `log.md` entry for the pass, regenerate indexes with `reindex.py`, and run `validate.py --strict`.
+- Open the knowledge PR with `gh pr create`; do not push a direct default-branch update.
+- If validation fails, fix the bundle before opening the PR.
 
 ## `/okf study "<focus>"`
 
