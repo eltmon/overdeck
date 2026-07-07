@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-2374",
   "schemaVersion": 2,
-  "created": "2026-07-07T04:23:03.777Z",
-  "updated": "2026-07-07T04:23:04.460Z",
-  "pipeline": {
-    "issueId": "PAN-2374",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-07T04:23:03.777Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -26,6 +9,46 @@
       "timestamp": "2026-07-07T04:23:03.777Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-07T04:23:03.777Z",
+  "updated": "2026-07-07T05:05:44.886Z",
+  "pipeline": {
+    "issueId": "PAN-2374",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-07T05:05:44.858Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 31611,
+            "output": 42615,
+            "cacheRead": 4910078,
+            "cacheWrite": 173126
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-opus-4-8": {
+          "input": 31611,
+          "output": 42615,
+          "cacheRead": 4910078,
+          "cacheWrite": 173126
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 4.76051,
+        "pricingAsOf": "2026-07-07T05:05:44.885Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "model": "kimi-k2.7-code"
 }
