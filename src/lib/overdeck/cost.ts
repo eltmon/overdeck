@@ -15,8 +15,8 @@ import {
   deleteBudgetSync,
 } from '../cost.js';
 import type { CostBudget } from '../cost.js';
-import { parseOhmypiSessionCostEventsSync } from '../cost-parsers/ohmypi-parser.js';
-import { parseCodexSessionSync } from '../cost-parsers/codex-parser.js';
+import { parseOhmypiSessionCostResultSync } from '../cost-parsers/ohmypi-parser.js';
+import { parseCodexSessionCostEventsSync, parseCodexSessionSync } from '../cost-parsers/codex-parser.js';
 import { getOverdeckHome } from '../paths.js';
 import { deriveTieredAgentCostRole } from '../agents/tier-metrics.js';
 
@@ -89,8 +89,26 @@ export const CostEvent = Schema.Struct({
   cost:        Schema.Number,
   requestId:   Schema.NullOr(Schema.String),
   sourceFile:  Schema.NullOr(Schema.String),
+  warnings:    Schema.optional(Schema.Array(Schema.Struct({
+    type:     Schema.String,
+    provider: Schema.NullOr(Schema.String),
+    model:    Schema.String,
+    reason:   Schema.String,
+  }))),
 });
 export type CostEvent = typeof CostEvent.Type;
+
+export interface SkippedCostSession {
+  file: string;
+  reason: string;
+}
+
+export interface CostReconcileWarning {
+  file: string;
+  reason: string;
+  provider: string | null;
+  model: string;
+}
 
 export const Rollup = Schema.Struct({
   key:    Schema.String,
@@ -150,12 +168,14 @@ export type BudgetStatus = typeof BudgetStatus.Type;
 
 export interface CostReconcileSummary {
   imported: number;
+  skipped: SkippedCostSession[];
   sessionsScanned: number;
   eventsImported: number;
   duplicatesSkipped: number;
   errors: string[];
   earliestEventTs: string | null;
   latestEventTs: string | null;
+  warnings: CostReconcileWarning[];
 }
 
 export type CostReconcileExtraRoot =
@@ -572,49 +592,6 @@ export const CostWriterLive = Layer.effect(
         return true;
       });
 
-    const recordCodexCumulative = (event: CostEvent, opts?: { dryRun?: boolean }) =>
-      Effect.gen(function* () {
-        if (!event.sourceFile) return yield* record(event, opts);
-        const existing = yield* Effect.promise(async () => {
-          const rows = await q
-            .select({
-              id:        costEventsTable.id,
-              input:     costEventsTable.input,
-              output:    costEventsTable.output,
-              cacheRead: costEventsTable.cacheRead,
-            })
-            .from(costEventsTable)
-            .where(eq(costEventsTable.sourceFile, event.sourceFile as string))
-            .limit(1);
-          return rows as Array<{ id: number; input: number | null; output: number | null; cacheRead: number | null }>;
-        });
-
-        const row = existing[0];
-        if (!row) return yield* record(event, opts);
-
-        const previousTokens = (row.input ?? 0) + (row.output ?? 0) + (row.cacheRead ?? 0);
-        const nextTokens = event.input + event.output + event.cacheRead;
-        if (nextTokens <= previousTokens) return false;
-        if (opts?.dryRun) return true;
-
-        yield* Effect.promise(() =>
-          q
-            .update(costEventsTable)
-            .set({
-              ts:          event.ts,
-              input:       event.input,
-              output:      event.output,
-              cacheRead:   event.cacheRead,
-              cost:        event.cost,
-              model:       event.model,
-              sessionType: event.sessionType,
-            })
-            .where(eq(costEventsTable.sourceFile, event.sourceFile as string)),
-        );
-        yield* bus.emit({ type: 'cost.recorded', payload: { issueId: event.issueId, cost: event.cost } });
-        return true;
-      });
-
     // Catch-up sweep for pi/codex session files.
     // Walks OVERDECK_HOME/agents/<id>/sessions/**/*.jsonl (pi) or
     // OVERDECK_HOME/agents/<id>/codex-home/sessions/**/*.jsonl (codex),
@@ -629,12 +606,14 @@ export const CostWriterLive = Layer.effect(
         const source = opts?.source ?? 'claude';
         const empty: CostReconcileSummary = {
           imported: 0,
+          skipped: [],
           sessionsScanned: 0,
           eventsImported: 0,
           duplicatesSkipped: 0,
           errors: [],
           earliestEventTs: null,
           latestEventTs: null,
+          warnings: [],
         };
         if (source !== 'ohmypi' && source !== 'codex') return empty;
 
@@ -647,11 +626,23 @@ export const CostWriterLive = Layer.effect(
         });
 
         let imported = 0;
+        const skipped: SkippedCostSession[] = [];
         let duplicatesSkipped = 0;
         let sessionsScanned = 0;
         let earliestEventTs: string | null = null;
         let latestEventTs: string | null = null;
         const errors: string[] = [];
+        const warnings: CostReconcileWarning[] = [];
+        const markSkipped = (file: string, reason: string) => {
+          skipped.push({ file, reason });
+          console.warn(`[cost-reconcile] skipped ${file}: ${reason}`);
+        };
+        const markWarning = (warning: CostReconcileWarning) => {
+          warnings.push(warning);
+          console.warn(
+            `[cost-reconcile] warning ${warning.file}: ${warning.reason} provider=${warning.provider ?? 'unknown'} model=${warning.model}`,
+          );
+        };
 
         const noteImportedTimestamp = (ts: Date) => {
           const iso = ts.toISOString();
@@ -736,15 +727,36 @@ export const CostWriterLive = Layer.effect(
           for (const sessionFile of sessionFiles) {
             sessionsScanned++;
             if (source === 'ohmypi') {
-              const events = yield* Effect.sync(() => {
+              const parsed = yield* Effect.sync(() => {
                 try {
-                  return parseOhmypiSessionCostEventsSync(sessionFile);
+                  return parseOhmypiSessionCostResultSync(sessionFile);
                 } catch (cause) {
-                  errors.push(`${sessionFile}: ${cause instanceof Error ? cause.message : String(cause)}`);
-                  return [];
+                  const reason = cause instanceof Error ? cause.message : String(cause);
+                  errors.push(`${sessionFile}: ${reason}`);
+                  return { ok: false as const, reason };
                 }
               });
+              if (!parsed.ok) {
+                markSkipped(sessionFile, parsed.reason ?? 'unreadable');
+                continue;
+              }
+
+              const events = parsed.usageEvents ?? [];
+              if (events.length === 0) {
+                markSkipped(sessionFile, 'no-usage');
+                continue;
+              }
+              const unpricedWarnings = parsed.unpricedModels ?? [];
+              if (unpricedWarnings.length) markSkipped(sessionFile, 'unpriced-model');
+
               for (const usage of events) {
+                const derivedWarnings = unpricedWarnings
+                  .filter(warning => warning.model === usage.model && warning.provider === usage.provider)
+                  .map(warning => ({ type: 'unpriced-model' as const, ...warning }));
+                const eventWarnings = usage.warnings?.length ? usage.warnings : derivedWarnings;
+                for (const warning of eventWarnings) {
+                  markWarning({ file: sessionFile, reason: warning.reason, provider: warning.provider, model: warning.model });
+                }
                 const ts = new Date(usage.timestamp);
                 const event: CostEvent = {
                   ts,
@@ -761,6 +773,7 @@ export const CostWriterLive = Layer.effect(
                   cost:        usage.cost,
                   requestId:   usage.requestId,
                   sourceFile:  sessionFile,
+                  warnings:    eventWarnings.length > 0 ? eventWarnings : undefined,
                 };
 
                 if (yield* record(event, { dryRun: opts?.dryRun })) {
@@ -773,51 +786,66 @@ export const CostWriterLive = Layer.effect(
               continue;
             }
 
-            const session = yield* Effect.sync(() => {
+            const events = yield* Effect.sync(() => {
               try {
-                return parseCodexSessionSync(sessionFile);
+                return parseCodexSessionCostEventsSync(sessionFile);
               } catch (cause) {
                 errors.push(`${sessionFile}: ${cause instanceof Error ? cause.message : String(cause)}`);
-                return null;
+                return [];
               }
             });
-            if (!session) continue;
+            if (events.length === 0) {
+              markSkipped(sessionFile, 'no-usage');
+              continue;
+            }
+            if (events.some((event) => event.model === 'unknown')) {
+              markSkipped(sessionFile, 'unknown-model');
+            }
+            const codexSession = root.inferIssueFromCwd
+              ? yield* Effect.sync(() => parseCodexSessionSync(sessionFile))
+              : null;
+            const issueId = root.inferIssueFromCwd
+              ? (inferIssueFromPath(codexSession?.cwd) ?? 'UNKNOWN' as IssueIdType)
+              : root.issueId;
+            for (const usage of events) {
+              const ts = new Date(usage.timestamp);
+              const event: CostEvent = {
+                ts,
+                issueId,
+                agentId:     root.agentName,
+                sessionId:   usage.sessionId,
+                sessionType: root.sessionType,
+                provider:    usage.provider,
+                model:       usage.model,
+                input:       usage.input,
+                output:      usage.output,
+                cacheRead:   usage.cacheRead,
+                cacheWrite:  usage.cacheWrite,
+                cost:        usage.cost,
+                requestId:   usage.requestId,
+                sourceFile:  sessionFile,
+              };
 
-            const ts = new Date(session.startTime);
-            const event: CostEvent = {
-              ts,
-              issueId:     root.inferIssueFromCwd ? (inferIssueFromPath(session.cwd) ?? 'UNKNOWN' as IssueIdType) : root.issueId,
-              agentId:     root.agentName,
-              sessionId:   session.sessionId,
-              sessionType: root.inferIssueFromCwd ? root.sessionType : readAgentRoleSync(join(agentsDir, root.agentName)),
-              provider:    null,
-              model:       session.model ?? null,
-              input:       session.usage.inputTokens,
-              output:      session.usage.outputTokens,
-              cacheRead:   session.usage.cacheReadTokens ?? 0,
-              cacheWrite:  0,
-              cost:        session.cost_v2 ?? session.cost,
-              requestId:   null,
-              sourceFile:  sessionFile,
-            };
-
-            if (yield* recordCodexCumulative(event, { dryRun: opts?.dryRun })) {
-              imported++;
-              noteImportedTimestamp(ts);
-            } else {
-              duplicatesSkipped++;
+              if (yield* record(event, { dryRun: opts?.dryRun })) {
+                imported++;
+                noteImportedTimestamp(ts);
+              } else {
+                duplicatesSkipped++;
+              }
             }
           }
         }
 
         return {
           imported,
+          skipped,
           sessionsScanned,
           eventsImported: imported,
           duplicatesSkipped,
           errors,
           earliestEventTs,
           latestEventTs,
+          warnings,
         };
       });
 
@@ -926,12 +954,19 @@ export const CostApi = HttpApiGroup.make('costs')
       }),
       success: Schema.Struct({
         imported:          Schema.Number,
+        skipped:           Schema.Array(Schema.Struct({ file: Schema.String, reason: Schema.String })),
         sessionsScanned:   Schema.Number,
         eventsImported:    Schema.Number,
         duplicatesSkipped: Schema.Number,
         errors:            Schema.Array(Schema.String),
         earliestEventTs:   Schema.NullOr(Schema.String),
         latestEventTs:     Schema.NullOr(Schema.String),
+        warnings:          Schema.Array(Schema.Struct({
+          file:     Schema.String,
+          reason:   Schema.String,
+          provider: Schema.NullOr(Schema.String),
+          model:    Schema.String,
+        })),
       }),
       error:   CostIngestError,
     }),

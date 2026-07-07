@@ -150,7 +150,7 @@ async function deliverVerificationFeedback(
     return;
   }
 
-  surfaceIssueFeedbackNeedsYou(issueId, target.reason, {
+  await surfaceIssueFeedbackNeedsYou(issueId, target.reason, {
     specialist: 'verification-gate',
     ...details,
   });

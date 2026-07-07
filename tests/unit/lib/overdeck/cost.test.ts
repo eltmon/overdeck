@@ -422,6 +422,7 @@ describe('CostWriter — record persists to archive then DB then bus', () => {
       errors: [],
       earliestEventTs: null,
       latestEventTs: null,
+      skipped: [],
     });
   });
 
