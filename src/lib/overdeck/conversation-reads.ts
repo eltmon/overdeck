@@ -833,7 +833,7 @@ export async function retitleConversation(
         console.warn(`[conversations] retitle timed out for "${name}"; using deterministic fallback title "${title}"`);
       }
       if (!title) return result({ error: 'Title model returned an empty result' }, 502);
-      updateConversationTitle(name, title, 'ai');
+      updateConversationTitle(name, title, 'ai-explicit');
       console.log(`[claude-invoke] SUCCESS purpose=conversation-retitle | conversation=${name} | title="${title}"`);
       return result({ title });
     } finally {
