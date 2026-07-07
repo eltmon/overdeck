@@ -82,6 +82,12 @@ require_grep 'Never delete or rename a README' "$SKILL" "convert preserves READM
 require_grep 'After confirmed edits, run `reindex.py` and `validate.py --strict`' "$SKILL" "convert validates confirmed edits"
 require_grep 'Never delete or rename a README or source document during conversion' "$ROOT/references/conversion.md" "conversion reference preserves README"
 require_grep 'infer the narrowest useful type' "$ROOT/references/taxonomy.md" "taxonomy guides author type inference"
+require_grep 'pan memory search --issue <id>' "$SKILL" "retro mines Overdeck observations when available"
+require_grep 'never import Overdeck code' "$SKILL" "retro forbids Overdeck imports"
+require_grep 'Without Overdeck, use `git diff` plus current transcript/session context' "$SKILL" "retro has standalone fallback"
+require_grep 'Concepts created from them must cite the recorded decision' "$ROOT/references/overdeck.md" "overdeck retro cites recorded decisions"
+require_grep 'The fallback path must still create validating concepts' "$ROOT/references/overdeck.md" "overdeck fallback validates without pan"
+require_grep 'opens a PR' "$ROOT/references/overdeck.md" "overdeck retro is PR-gated"
 
 python3 - "$ROOT" <<'PY'
 import importlib.util

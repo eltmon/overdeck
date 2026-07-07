@@ -123,8 +123,11 @@ Capture knowledge after implementation.
 
 - Review the diff and available session context.
 - Ask: what would have made this work easier if documented before the session?
-- File those answers as focused concepts with citations.
-- With Overdeck present, observations may be used as input; without Overdeck, use the diff and transcript context.
+- File those answers as focused concepts with citations to decisions, diffs, transcripts, or observations.
+- Detect Overdeck only by checking whether `pan` is on `PATH` and responds; never import Overdeck code.
+- With Overdeck present, mine issue observations with `pan memory search --issue <id> ... --json`.
+- Without Overdeck, use `git diff` plus current transcript/session context as feedstock.
+- Create or update concepts on a knowledge-repo branch, run `reindex.py` and `validate.py --strict`, then open a PR.
 
 ## `/okf extract "<query>" [--budget <tokens>]`
 
