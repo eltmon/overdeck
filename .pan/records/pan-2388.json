@@ -1,7 +1,39 @@
 {
   "issueId": "PAN-2388",
   "schemaVersion": 2,
-  "feedback": [],
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-07T17:33:32.949Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-07T17:34Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-07T17:34:39.378Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-07T17:34Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-07T17:34:45.639Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-07T17:34:39Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2388\n\nOhMyPi unpriced-token metadata is dropped before warning/archive/route surfacing\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2388 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-07T17:34:45Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2388\n\nOhMyPi unpriced-token metadata is dropped before warning/archive/route surfacing\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2388 -m \"Fixed review issues\"`"
+    }
+  ],
   "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
@@ -15,13 +47,14 @@
   },
   "pipeline": {
     "issueId": "PAN-2388",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "failed",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T17:33:30.571Z",
+    "updatedAt": "2026-07-07T17:34:39.333Z",
+    "reviewNotes": "OhMyPi unpriced-token metadata is dropped before warning/archive/route surfacing",
     "testNotes": "typecheck passed; npm test passed (896/900 test files, 8762/8821 tests, frontend 3/3); lint failed at lint:circular on cycle src/lib/agents.ts > src/lib/agents/resume.ts > src/lib/review-status.ts > src/lib/cloister/feedback-target.ts. Cycle files are outside PAN-2388 working set. Browser UAT not required per vBRIEF NonGoals.",
     "inspectNotes": "Bead ohmypi-fixtures ack: commit 9de8b447 touches only codex-parser.ts (revert of CodexCostEventUsage additions), a cost-reconcile integration test, and a runbook doc -- zero changes to ohmypi-parser.ts, ohmypi-parser.test.ts, or any ohmypi fixture file. Not this beads scope; AC1-4 remain satisfied unchanged from the prior verified state (c6b01bb3). No action needed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2470",
@@ -141,7 +174,7 @@
       },
       "costAtCloseOut": {
         "usd": 239.473587,
-        "pricingAsOf": "2026-07-07T17:33:30.624Z"
+        "pricingAsOf": "2026-07-07T17:34:39.372Z"
       }
     },
     "merges": [],
@@ -173,12 +206,5 @@
     }
   },
   "created": "2026-07-07T17:32:25.282Z",
-  "updated": "2026-07-07T17:33:32.949Z",
-  "sessionHistory": [
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-07T17:33:32.949Z"
-    }
-  ]
+  "updated": "2026-07-07T17:34:45.639Z"
 }
