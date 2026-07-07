@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-06T23:52:27.788Z",
-  "updated": "2026-07-07T01:00:12.917Z",
+  "updated": "2026-07-07T01:59:01.862Z",
   "pipeline": {
     "issueId": "PAN-2095",
     "reviewStatus": "pending",
@@ -94,5 +94,17 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5"
+  "model": "claude-sonnet-5",
+  "statusOverrides": {
+    "reload-repo-root-resolution": "completed",
+    "reload-repo-root-resolution.ac1": "completed",
+    "reload-repo-root-resolution.ac2": "completed",
+    "reload-repo-root-resolution.ac3": "completed",
+    "reload-build-from-origin-main": "completed",
+    "reload-build-from-origin-main.ac1": "completed",
+    "reload-build-from-origin-main.ac2": "completed",
+    "reload-build-from-origin-main.ac3": "completed",
+    "reload-build-from-origin-main.ac4": "completed",
+    "reload-build-from-origin-main.ac5": "completed"
+  }
 }
