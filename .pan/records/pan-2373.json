@@ -141,10 +141,10 @@
     "issueId": "PAN-2373",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T01:20:36.121Z",
+    "updatedAt": "2026-07-07T01:32:14.856Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2419",
     "reviewRequestedAt": "2026-07-06T20:25:44.117Z",
     "scopeDrift": {
@@ -206,8 +206,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 49154,
-            "output": 4604,
+            "input": 55653,
+            "output": 4832,
             "cacheRead": 1280,
             "cacheWrite": 0
           }
@@ -248,6 +248,12 @@
             "output": 159275,
             "cacheRead": 84485120,
             "cacheWrite": 0
+          },
+          "unknown": {
+            "input": 27517,
+            "output": 275,
+            "cacheRead": 2432,
+            "cacheWrite": 0
           }
         }
       },
@@ -259,8 +265,8 @@
           "cacheWrite": 130920
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 49154,
-          "output": 4604,
+          "input": 55653,
+          "output": 4832,
           "cacheRead": 1280,
           "cacheWrite": 0
         },
@@ -271,9 +277,9 @@
           "cacheWrite": 150895
         },
         "unknown": {
-          "input": 1305135,
-          "output": 10528,
-          "cacheRead": 1112448,
+          "input": 1332652,
+          "output": 10803,
+          "cacheRead": 1114880,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
@@ -284,8 +290,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 28.696553,
-        "pricingAsOf": "2026-07-07T01:20:36.164Z"
+        "usd": 28.83734425,
+        "pricingAsOf": "2026-07-07T01:32:14.892Z"
       }
     },
     "merges": [
@@ -297,5 +303,5 @@
     "finalizedAt": "2026-07-06T17:49:27.751Z"
   },
   "created": "2026-07-06T20:06:54.624Z",
-  "updated": "2026-07-07T01:20:36.166Z"
+  "updated": "2026-07-07T01:32:14.895Z"
 }
