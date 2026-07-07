@@ -449,7 +449,7 @@ function buildLeakedSpecialists(
     }));
 }
 
-function evaluateSeverity(
+export function evaluateSeverity(
   thresholds: SystemHealthThresholds,
   data: {
     availableMemoryBytes: number;

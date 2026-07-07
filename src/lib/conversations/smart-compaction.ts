@@ -1008,7 +1008,6 @@ async function generateSmartSummaryPromise(options: CompactionOptions): Promise<
   // Forks summarize the entire conversation (no "kept" recent portion);
   // compaction keeps recent entries verbatim and only summarizes older history.
   const keepRecentTokens = options.keepRecentTokens ?? (isFork ? Number.MAX_SAFE_INTEGER : 20000);
-  const reserveTokens = options.reserveTokens ?? 16384;
   const model = options.model || DEFAULT_SUMMARY_MODEL;
   const richMode = options.richMode ?? false;
   const includeThinking = options.includeThinkingInSummary ?? true;

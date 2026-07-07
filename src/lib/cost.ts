@@ -6,7 +6,7 @@
  */
 
 import { Effect } from 'effect';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, readdirSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
 import { join } from 'path';
 import { COSTS_DIR } from './paths.js';
 import { FsError } from './errors.js';
@@ -111,6 +111,7 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   { provider: 'openai', model: 'gpt-5.4', inputPer1k: 0.0025, outputPer1k: 0.015, cacheReadPer1k: 0.00025, currency: 'USD' },
   { provider: 'openai', model: 'gpt-5.4-mini', inputPer1k: 0.00075, outputPer1k: 0.0045, cacheReadPer1k: 0.000075, currency: 'USD' },
   { provider: 'openai', model: 'gpt-5.4-pro', inputPer1k: 0.030, outputPer1k: 0.180, currency: 'USD' },
+  { provider: 'openai', model: 'gpt-4.1-nano', inputPer1k: 0.0001, outputPer1k: 0.0004, cacheReadPer1k: 0.000025, currency: 'USD' },
   { provider: 'openai', model: 'gpt-5.3-codex', inputPer1k: 0.00175, outputPer1k: 0.014, cacheReadPer1k: 0.000175, currency: 'USD' },
   { provider: 'openai', model: 'codex-4o', inputPer1k: 0.00175, outputPer1k: 0.014, cacheReadPer1k: 0.000175, currency: 'USD' },
   { provider: 'openai', model: 'codex-4o-mini', inputPer1k: 0.00075, outputPer1k: 0.0045, cacheReadPer1k: 0.000075, currency: 'USD' },

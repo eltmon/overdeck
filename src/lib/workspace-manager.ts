@@ -13,7 +13,6 @@ import { getContainersReferencingWorkspacePathPromise, stopWorkspaceDockerPromis
 import { removeWorkspacePromise } from './workspace-manager/remove.js';
 import {
   preTrustDirectorySync,
-  relocateVenvScripts,
 } from './workspace-manager/worktree-ops.js';
 import type {
   AddReposToWorkspaceOptions,
@@ -22,7 +21,6 @@ import type {
   PanMigrationResult,
   WorkspaceCreateOptions,
   WorkspaceCreateResult,
-  WorkspaceProgress,
   WorkspaceRemoveOptions,
   WorkspaceRemoveResult,
 } from './workspace-manager/types.js';

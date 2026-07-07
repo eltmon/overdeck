@@ -35,7 +35,6 @@ import type {
 } from '../vbrief/continue-state.js';
 import { listOverdeckAgentStatesSync } from '../overdeck/agent-state-sync.js';
 import {
-  getIssueRecordPath,
   getIssueWorkspacePath,
   queueIssueRecordCommit,
   RECORD_SCHEMA_VERSION,
@@ -43,7 +42,6 @@ import {
   readIssueRecordSync,
   writeIssueRecordSync,
   type PanIssueRecord,
-  type PanIssueCloseOutRecord,
   type PanIssuePipelineRecord,
   type PanIssueUsageRecord,
 } from './record.js';

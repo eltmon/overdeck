@@ -110,7 +110,6 @@ async function doCompact(sessionFile: string): Promise<NativeCompactionResult> {
   const tokensBefore = await estimateContextTokens(sessionFile);
 
   let summary: string;
-  let summaryModel: string | null;
   try {
     const result = await Effect.runPromise(generateSmartSummary({
       jsonlPath: sessionFile,
@@ -119,11 +118,9 @@ async function doCompact(sessionFile: string): Promise<NativeCompactionResult> {
       mode: 'fork',
     }));
     summary = result.summary;
-    summaryModel = result.summaryModel;
   } catch (error) {
     console.warn(`[conversation-compaction] Smart summary failed, falling back to heuristic:`, error);
     summary = await Effect.runPromise(generateFallbackSummary(sessionFile));
-    summaryModel = null;
   }
 
   const continuation = buildContinuationSummary(summary, settings.model);

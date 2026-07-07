@@ -141,6 +141,7 @@ describe('completePlanningArtifacts', () => {
     expect(commands).toEqual([
       ['add', '.pan/'],
       ['add', '.beads/'],
+      ['add', '.gitignore'],
     ]);
     expect(commands.flat()).not.toContain('-f');
   });

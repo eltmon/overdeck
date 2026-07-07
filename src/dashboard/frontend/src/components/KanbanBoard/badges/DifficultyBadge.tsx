@@ -1,4 +1,4 @@
-import type { ComplexityLevel } from '../../../../../../lib/cloister/complexity.js';
+import type { ComplexityLevel } from '../types';
 
 const DIFFICULTY_COLORS: Record<ComplexityLevel, string> = {
   trivial: 'badge-bg-success text-success-foreground',

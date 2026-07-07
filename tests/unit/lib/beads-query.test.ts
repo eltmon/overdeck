@@ -1,7 +1,7 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const childProcessMocks = vi.hoisted(() => ({
@@ -135,6 +135,25 @@ describe('queryBeadsForIssuePromise', () => {
     ]);
     expect(result.transientFailure).toBeInstanceOf(BdTransientFailure);
     expect(childProcessMocks.execFile).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not queue ready-bead patrol reads behind an existing bd lock', async () => {
+    const { bdProcessLockPath } = await import('../../../src/lib/bd-process-lock.js');
+    const { queryReadyBeadsByIssueLabelsPromise } = await import('../../../src/lib/beads-query.js');
+    const path = await bdProcessLockPath(workspacePath);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, `${JSON.stringify({ pid: process.pid, ts: Date.now(), caller: 'create beads from vBRIEF' })}\n`);
+    writeFileSync(join(workspacePath, '.beads', 'issues.jsonl'), [
+      JSON.stringify({ id: 'jsonl-1', title: 'PAN-1094: ready', status: 'open', labels: ['pan-1094'], dependency_count: 0 }),
+      JSON.stringify({ id: 'jsonl-2', title: 'PAN-1094: blocked', status: 'open', labels: ['pan-1094'], dependency_count: 1 }),
+    ].join('\n') + '\n');
+
+    const result = await queryReadyBeadsByIssueLabelsPromise(workspacePath, ['PAN-1094']);
+
+    expect(result.byIssue['pan-1094']).toEqual([
+      expect.objectContaining({ id: 'jsonl-1', title: 'PAN-1094: ready' }),
+    ]);
+    expect(childProcessMocks.execFile).not.toHaveBeenCalled();
   });
 
   it('resolves feature workspaces to one project-level beads query root', async () => {

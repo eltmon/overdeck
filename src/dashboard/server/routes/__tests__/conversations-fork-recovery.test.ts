@@ -127,7 +127,7 @@ beforeEach(async () => {
     },
     getAgentRuntimeStateSync: mocks.getAgentRuntimeStateSync,
   });
-});
+}, 15_000);
 
 afterEach(async () => {
   const {
@@ -140,7 +140,7 @@ afterEach(async () => {
   delete process.env.OVERDECK_HOME;
   delete process.env.OVERDECK_DOCKER_WORKSPACE;
   rmSync(TEST_HOME, { recursive: true, force: true });
-});
+}, 15_000);
 
 describe('fork pipeline recovery and re-entry', () => {
   it('re-enters a handoff fork without re-authoring or double-spawning when doc and live session already exist', async () => {

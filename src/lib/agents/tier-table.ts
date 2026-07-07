@@ -6,6 +6,8 @@ import type { ModelProvider } from '../model-fallback.js';
 import { resolveModelIdSync } from '../model-capabilities.js';
 import { getProviderForModelSync, PROVIDERS } from '../providers.js';
 import { canUseHarnessSync } from '../harness-policy.js';
+import { readIssueRecordSync } from '../pan-dir/record.js';
+import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 
 export const TIERED_EXECUTION_DIFFICULTIES: readonly VBriefDifficulty[] = ['trivial', 'simple', 'medium', 'complex', 'expert'] as const;
 export const TIERED_EXECUTION_SUBSCRIPTIONS = ['all', 'flagged', 'sampled'] as const;
@@ -131,23 +133,58 @@ export const TIERED_EXECUTION_ISSUE_OVERRIDES = ['on', 'off'] as const;
 export type TieredExecutionIssueOverride = typeof TIERED_EXECUTION_ISSUE_OVERRIDES[number];
 
 /**
- * Per-issue tiered_execution opt-in/out (PAN-1791 FR-9). An issue's vBRIEF
- * may set `tiered_execution: 'on' | 'off'` in plan.metadata; an explicit
- * value wins over the global `tiered_execution.enabled` flag, and an unset
- * value inherits it — zero behavior change from today. Any other value is a
- * config error (fail-loud, no silent inherit on typos like 'yes' or true).
+ * Per-issue tiered_execution opt-in/out (PAN-1791 FR-9, PAN-2383 FR-1). Resolves with precedence:
+ * record override > plan.metadata.tiered_execution > config.enabled.
+ *
+ * An issue's vBRIEF may set `tiered_execution: 'on' | 'off'` in plan.metadata; a record
+ * override takes precedence; an explicit value wins over the global `tiered_execution.enabled`
+ * flag, and an unset value inherits it — zero behavior change when no overrides exist.
+ * Any invalid value is a config error (fail-loud, no silent inherit on typos).
  */
 export function resolveTieredExecutionEnabled(
   config: Pick<TieredExecutionConfig, 'enabled'>,
   planMetadata?: { [key: string]: unknown },
+  recordOverride?: 'on' | 'off' | null,
 ): boolean {
-  const override = planMetadata?.tiered_execution;
-  if (override === undefined || override === null) return config.enabled;
-  if (override === 'on') return true;
-  if (override === 'off') return false;
+  // Record override takes precedence
+  if (recordOverride === 'on') return true;
+  if (recordOverride === 'off') return false;
+
+  // Plan metadata second
+  const planValue = planMetadata?.tiered_execution;
+  if (planValue === undefined || planValue === null) return config.enabled;
+  if (planValue === 'on') return true;
+  if (planValue === 'off') return false;
   throw new TieredExecutionConfigError(
-    `plan.metadata.tiered_execution must be one of ${TIERED_EXECUTION_ISSUE_OVERRIDES.join(', ')}; got ${JSON.stringify(override)}`,
+    `plan.metadata.tiered_execution must be one of ${TIERED_EXECUTION_ISSUE_OVERRIDES.join(', ')}; got ${JSON.stringify(planValue)}`,
   );
+}
+
+/**
+ * Issue-aware wrapper for resolveTieredExecutionEnabled (PAN-2383 foundation).
+ * Reads the per-issue record to extract the record override, applies precedence:
+ * record override > plan.metadata.tiered_execution > config.enabled.
+ */
+export function resolveTieredExecutionEnabledForIssue(
+  config: Pick<TieredExecutionConfig, 'enabled'>,
+  issueId: string,
+  planMetadata?: { [key: string]: unknown },
+): boolean {
+  const resolved = resolveProjectFromIssueSync(issueId);
+  if (!resolved) {
+    // Fallback to plan/config if project cannot be resolved
+    return resolveTieredExecutionEnabled(config, planMetadata);
+  }
+
+  const project = getProjectSync(resolved.projectKey);
+  if (!project) {
+    return resolveTieredExecutionEnabled(config, planMetadata);
+  }
+
+  const record = readIssueRecordSync(project, issueId);
+  const recordOverride = record?.tieredExecutionOverride;
+
+  return resolveTieredExecutionEnabled(config, planMetadata, recordOverride);
 }
 
 function isRuntimeName(value: string): value is RuntimeName {

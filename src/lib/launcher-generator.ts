@@ -410,6 +410,7 @@ const PROVIDER_ENV_UNSETS = [
   'GEMINI_API_KEY',
   'API_TIMEOUT_MS',
   'CLAUDE_CODE_API_KEY_HELPER_TTL_MS',
+  'CLAUDE_CODE_AUTO_COMPACT_WINDOW',
 ];
 
 function buildCommand(config: LauncherConfig): string[] {
@@ -797,7 +798,7 @@ function computeCodexCommandTokens(config: LauncherConfig, useExec: boolean): st
   return [useExec ? `exec ${cmd}` : cmd];
 }
 
-function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
+export function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
   const piMode = config.piMode ?? 'rpc';
   if (!config.piSessionDir) {
     throw new Error('Pi launcher requires piSessionDir');

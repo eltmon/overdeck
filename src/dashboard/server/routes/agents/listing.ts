@@ -167,6 +167,31 @@ export const getAgentsRoute = HttpRouter.add(
               };
             }
 
+            if (!session && !isRemote) {
+              return {
+                id: name,
+                issueId,
+                runtime: state.harness ?? 'claude-code',
+                model: state.model || (isPlanning ? 'opus' : 'sonnet'),
+                status: 'unknown' as const,
+                startedAt,
+                lastActivity: runtimeData?.lastActivity || state.lastActivity,
+                ...buildAgentGateFailureSnapshot(state),
+                killCount: health.killCount || 0,
+                workspace: state.workspace || null,
+                workspaceLocation: 'local' as const,
+                git: null,
+                type: 'agent',
+                role: state.role ?? (isStrike ? 'strike' : isPlanning ? 'plan' : 'work'),
+                hasLiveTmuxSession: false,
+                hasPendingQuestion: false,
+                pendingQuestionCount: 0,
+                lastFailureReason: state.lastFailureReason || 'No live tmux session found for registered agent',
+                resolution: runtimeData?.resolution || 'working',
+                resolutionCount: runtimeData?.resolutionCount || 0,
+              };
+            }
+
             const issueReviewStatus = getReviewStatusSync(issueId);
             const hasActiveSpecialist = issueReviewStatus?.reviewStatus === 'reviewing'
               || issueReviewStatus?.testStatus === 'testing'
@@ -202,6 +227,7 @@ export const getAgentsRoute = HttpRouter.add(
               git: gitStatus,
               type: 'agent',
               role: state.role ?? (isStrike ? 'strike' : isPlanning ? 'plan' : 'work'),
+              hasLiveTmuxSession: true,
               hasPendingQuestion: enrichment.hasPendingQuestion,
               pendingQuestionCount: enrichment.pendingQuestionCount,
               pendingQuestionPrompt: enrichment.pendingQuestionPrompt,

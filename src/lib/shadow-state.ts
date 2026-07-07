@@ -112,7 +112,7 @@ function getShadowStatePath(issueId: string): string {
 }async function createShadowStatePromise(
   issueId: string,
   initialTrackerStatus: IssueState = 'open',
-  triggeredBy: string = 'unknown'
+  _triggeredBy: string = 'unknown'
 ): Promise<ShadowState> {
   ensureShadowStateDir();
 

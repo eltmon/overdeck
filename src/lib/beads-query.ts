@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'path';
 import { promisify } from 'util';
 import { Data, Effect } from 'effect';
-import { BdTransientFailure, runBdWithRetry, type RunBdWithRetryOptions } from './bd-process-lock.js';
+import { BdTransientFailure, readBdProcessLockHolder, runBdWithRetry, type RunBdWithRetryOptions } from './bd-process-lock.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -157,6 +157,12 @@ export async function queryReadyBeadsByIssueLabelsPromise(
   if (issueLabels.length === 0) return { byIssue: {} };
 
   try {
+    const holder = await readBdProcessLockHolder({ workspacePath });
+    if (holder) {
+      const beads = await readAllBeadsFromJsonl(workspacePath);
+      return { byIssue: groupReadyBeadsByIssue(beads, issueLabels) };
+    }
+
     const { stdout } = await runBdWithRetry(
       `query ready beads for ${issueLabels.join(',')}`,
       () => execFileAsync(
@@ -180,7 +186,7 @@ export async function queryReadyBeadsByIssueLabelsPromise(
   }
 }
 
-async function assertIssueHasBeadsPromise(
+export async function assertIssueHasBeadsPromise(
   workspacePath: string,
   issueId: string,
   retryOptions: Omit<RunBdWithRetryOptions, 'workspacePath'> = {},
