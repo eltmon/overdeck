@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-2464",
   "schemaVersion": 2,
-  "created": "2026-07-07T13:26:02.854Z",
-  "updated": "2026-07-07T13:26:03.227Z",
-  "pipeline": {
-    "issueId": "PAN-2464",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-07T13:26:02.854Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -26,6 +9,102 @@
       "timestamp": "2026-07-07T13:26:02.854Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-07T13:26:02.854Z",
+  "updated": "2026-07-07T20:59:24.112Z",
+  "pipeline": {
+    "issueId": "PAN-2464",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-07T20:59:24.070Z",
+    "inspectNotes": "Bead stacks-grouping ack: commit d63984e1 is purely additive (new Playwright visual spec + screenshot for the whole Machine Room UI), does not modify stacks.ts/snapshot.ts, and does not regress the grouping/phase/aggregation logic already verified and passed under 0d3408ac21. The spec mocks /api/resources with a hand-authored fixture rather than exercising the real server, so it supplements but does not independently re-verify AC1/2/4 at the server level; no new violations."
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 28073036,
+            "output": 13042,
+            "cacheRead": 26209792,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.5": {
+            "input": 79017202,
+            "output": 223707,
+            "cacheRead": 75189120,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 14377,
+            "output": 89700,
+            "cacheRead": 7757351,
+            "cacheWrite": 243998
+          }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 6717,
+            "output": 10579,
+            "cacheRead": 1380808,
+            "cacheWrite": 109538
+          }
+        },
+        "work": {
+          "unknown": {
+            "input": 45169738,
+            "output": 109466,
+            "cacheRead": 42713088,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/codex-auto-review": {
+          "input": 28073036,
+          "output": 13042,
+          "cacheRead": 26209792,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.5": {
+          "input": 79017202,
+          "output": 223707,
+          "cacheRead": 75189120,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 14377,
+          "output": 89700,
+          "cacheRead": 7757351,
+          "cacheWrite": 243998
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 6717,
+          "output": 10579,
+          "cacheRead": 1380808,
+          "cacheWrite": 109538
+        },
+        "unknown": {
+          "input": 45169738,
+          "output": 109466,
+          "cacheRead": 42713088,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 108.794296,
+        "pricingAsOf": "2026-07-07T20:59:24.111Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
-  "model": "claude-fable-5"
+  "model": "claude-sonnet-5"
 }
