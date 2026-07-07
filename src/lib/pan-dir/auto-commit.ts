@@ -448,19 +448,9 @@ function rebaseStateOnlyAndRetryPush(
     const clean = yield* isWorkingTreeClean(gitRoot, branch);
     if (!clean) return;
 
-    const localBase = yield* getMergeBase(gitRoot, branch);
-    if (!localBase) return;
-
-    const stateOnly = yield* Effect.promise(() =>
-      isStatePlaneOnlyDiff(localBase, 'main', gitRoot),
-    ).pipe(
-      Effect.catchCause((cause) => {
-        warnAutoPush(branch, `state-plane diff check failed: ${String(Cause.squash(cause))}`);
-        return Effect.succeed(false);
-      }),
-    );
+    const stateOnly = yield* areLocalAheadCommitsStatePlaneOnly(gitRoot, branch);
     if (!stateOnly) {
-      warnAutoPush(branch, 'non-fast-forward push rejected and local ahead diff is not state-plane-only; leaving local main ahead of origin/main');
+      warnAutoPush(branch, 'non-fast-forward push rejected and at least one local-ahead commit is not state-plane-only; leaving local main ahead of origin/main');
       return;
     }
 
@@ -479,19 +469,70 @@ function rebaseStateOnlyAndRetryPush(
   });
 }
 
-function getMergeBase(
+function areLocalAheadCommitsStatePlaneOnly(
   gitRoot: string,
   branch: string,
+): Effect.Effect<boolean, never> {
+  const timeoutMs = parsePositiveInteger(
+    process.env.OVERDECK_STATE_PUSH_TIMEOUT_MS,
+    DEFAULT_STATE_PUSH_TIMEOUT_MS,
+  );
+
+  return Effect.gen(function* () {
+    const commits = yield* runGitWithTimeout(
+      ['rev-list', '--reverse', 'origin/main..main'],
+      gitRoot,
+      timeoutMs,
+    ).pipe(
+      Effect.match({
+        onSuccess: (result) => result.stdout.split('\n').map((line) => line.trim()).filter(Boolean),
+        onFailure: (err) => {
+          warnAutoPush(branch, `local-ahead commit list failed: ${err.stderr || err._tag}`);
+          return [];
+        },
+      }),
+    );
+    if (commits.length === 0) return true;
+
+    for (const commit of commits) {
+      const parent = yield* getSingleParent(gitRoot, branch, commit);
+      if (!parent) return false;
+
+      const stateOnly = yield* Effect.promise(() =>
+        isStatePlaneOnlyDiff(parent, commit, gitRoot),
+      ).pipe(
+        Effect.catchCause((cause) => {
+          warnAutoPush(branch, `state-plane commit check failed for ${commit}: ${String(Cause.squash(cause))}`);
+          return Effect.succeed(false);
+        }),
+      );
+      if (!stateOnly) return false;
+    }
+
+    return true;
+  });
+}
+
+function getSingleParent(
+  gitRoot: string,
+  branch: string,
+  commit: string,
 ): Effect.Effect<string | null, never> {
   const timeoutMs = parsePositiveInteger(
     process.env.OVERDECK_STATE_PUSH_TIMEOUT_MS,
     DEFAULT_STATE_PUSH_TIMEOUT_MS,
   );
-  return runGitWithTimeout(['merge-base', 'origin/main', 'main'], gitRoot, timeoutMs).pipe(
+
+  return runGitWithTimeout(['rev-list', '--parents', '-n', '1', commit], gitRoot, timeoutMs).pipe(
     Effect.match({
-      onSuccess: (result) => result.stdout.trim() || null,
+      onSuccess: (result) => {
+        const parts = result.stdout.trim().split(/\s+/).filter(Boolean);
+        if (parts.length === 2) return parts[1] ?? null;
+        warnAutoPush(branch, `local-ahead commit ${commit} is not a single-parent commit; leaving local main ahead of origin/main`);
+        return null;
+      },
       onFailure: (err) => {
-        warnAutoPush(branch, `merge-base failed: ${err.stderr || err._tag}`);
+        warnAutoPush(branch, `parent lookup failed for ${commit}: ${err.stderr || err._tag}`);
         return null;
       },
     }),

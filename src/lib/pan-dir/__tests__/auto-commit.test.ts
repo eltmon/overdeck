@@ -267,6 +267,44 @@ describe('auto-commit', () => {
     }),
   );
 
+  it.effect('does not rebase when local source commits cancel out to a state-only net diff', () =>
+    Effect.gen(function* () {
+      const remoteTmp = setBareOrigin(tmp);
+      const otherTmp = makeOtherClone(remoteTmp);
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      try {
+        mkdirSync(join(tmp, 'src'), { recursive: true });
+        writeFileSync(join(tmp, 'src', 'transient.ts'), 'export const transient = true;\n');
+        execSync('git add src/transient.ts', { cwd: tmp });
+        execSync('git commit -q -m "feat: transient source"', { cwd: tmp });
+        rmSync(join(tmp, 'src', 'transient.ts'));
+        execSync('git add src/transient.ts', { cwd: tmp });
+        execSync('git commit -q -m "revert: transient source"', { cwd: tmp });
+
+        mkdirSync(join(otherTmp, '.pan', 'records'), { recursive: true });
+        writeFileSync(join(otherTmp, '.pan', 'records', 'pan-remote.json'), '{"remote":true}\n');
+        execSync('git add .pan/records/pan-remote.json', { cwd: otherTmp });
+        execSync('git commit -q -m "chore(state): remote state"', { cwd: otherTmp });
+        execSync('git push -q origin main', { cwd: otherTmp });
+
+        mkdirSync(join(tmp, '.pan', 'records'), { recursive: true });
+        const path = join(tmp, '.pan', 'records', 'pan-local.json');
+        writeFileSync(path, '{"local":true}\n');
+
+        queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): local state' });
+        const result = yield* flushAutoCommits(tmp);
+
+        expect(result.committed).toBe(true);
+        expect(exec(tmp, 'git rev-parse HEAD')).not.toBe(exec(tmp, 'git rev-parse origin/main'));
+        expect(warn.mock.calls.some((call) => String(call[0]).includes('not state-plane-only'))).toBe(true);
+      } finally {
+        warn.mockRestore();
+        rmSync(remoteTmp, { recursive: true, force: true });
+        rmSync(otherTmp, { recursive: true, force: true });
+      }
+    }),
+  );
+
   it.effect('skips push when OVERDECK_STATE_AUTOPUSH is disabled', () =>
     Effect.gen(function* () {
       const remoteTmp = setBareOrigin(tmp);
