@@ -36,9 +36,9 @@
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "failed",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-07T07:18:19.566Z",
+    "mergeStatus": "pending",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-07T08:40:26.506Z",
     "reviewNotes": "Approved; UI pipeline and merge-verification checks passed",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "mergeNotes": "Work agent agent-pan-2450 stopped before completing the rebase onto main",
@@ -117,7 +117,7 @@
       },
       "costAtCloseOut": {
         "usd": 50.4271632,
-        "pricingAsOf": "2026-07-07T07:18:19.589Z"
+        "pricingAsOf": "2026-07-07T08:40:26.529Z"
       }
     },
     "merges": [
@@ -129,5 +129,5 @@
     "finalizedAt": "2026-07-07T04:18:45.208Z"
   },
   "created": "2026-07-07T06:28:28.585Z",
-  "updated": "2026-07-07T07:18:19.589Z"
+  "updated": "2026-07-07T08:40:26.530Z"
 }
