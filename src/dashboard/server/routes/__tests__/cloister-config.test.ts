@@ -44,7 +44,7 @@ describe('cloister config route', () => {
     mocks.reloadDurableCloisterConfig.mockReturnValue({ accepted: true });
   });
 
-  it('reloads the live child Cloister after saving config updates', { timeout: 20_000 }, async () => {
+  it('reloads the live child Cloister after saving config updates', async () => {
     const updates = { monitoring: { check_interval: 17 } };
 
     const result = await requestCloisterRoute('/api/cloister/config', {

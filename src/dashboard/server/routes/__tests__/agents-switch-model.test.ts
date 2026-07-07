@@ -26,7 +26,7 @@ async function postAgentSwitchModel(agentId: string, body: Record<string, unknow
 }
 
 describe('POST /api/agents/:id/switch-model', () => {
-  it('rejects model switching for pipeline agents', { timeout: 20_000 }, async () => {
+  it('rejects model switching for pipeline agents', async () => {
     const response = await postAgentSwitchModel('agent-pan-1928', { model: 'claude-fable-5' });
 
     expect(response.status).toBe(409);
