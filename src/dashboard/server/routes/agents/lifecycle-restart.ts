@@ -6,6 +6,8 @@ import { Effect } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 import type { RuntimeName } from '../../../../lib/runtimes/types.js';
 import { resolveStaffing } from '../../../../lib/agents/staffing.js';
+import { findPlanSync, readWorkspacePlanSync } from '../../../../lib/vbrief/io.js';
+import { resolveTieredExecutionEnabled } from '../../../../lib/agents/tier-table.js';
 
 import {
   getAgentState,
@@ -685,20 +687,51 @@ async function buildRestartConfigChangeList(): Promise<RestartConfigChangeItem[]
       continue;
     }
 
-    // Compute new staffing from current config
+    // Compute new staffing from current config by reading the real vBRIEF work item
     let newModel = agent.model;
     let newHarness = agent.harness ?? 'claude-code';
+    let staffingError: string | undefined;
 
     try {
-      const staffing = resolveStaffing(
-        { id: 'work', title: 'work', metadata: {} },
-        { spawnKey: `work:${agent.issueId.toLowerCase()}` }
-      );
-      newModel = staffing.model;
-      newHarness = staffing.harness;
+      const workspacePath = agent.workspace;
+      if (!workspacePath) {
+        staffingError = 'No workspace path available';
+      } else {
+        // Read the actual vBRIEF plan to get the real work item
+        const planPath = findPlanSync(workspacePath);
+        if (!planPath) {
+          staffingError = 'No plan found in workspace';
+        } else {
+          const plan = readWorkspacePlanSync(workspacePath);
+          if (!plan || !plan.plan.items) {
+            staffingError = 'Invalid plan structure';
+          } else {
+            // Find the work item in the plan (id='work' or first work-role item)
+            const workItem = plan.plan.items.find((item: any) => item.id === 'work') ||
+                           plan.plan.items.find((item: any) => item.metadata?.role === 'work');
+
+            if (!workItem) {
+              staffingError = 'No work item found in plan';
+            } else {
+              // Use the real work item with plan metadata for staffing resolution
+              const staffing = resolveStaffing(workItem, {
+                planMetadata: plan.plan.metadata,
+                spawnKey: `work:${agent.issueId.toLowerCase()}`,
+              });
+              newModel = staffing.model;
+              newHarness = staffing.harness;
+            }
+          }
+        }
+      }
     } catch (err) {
-      // If staffing resolution fails, keep the current values
-      console.warn(`[restart-config] Failed to resolve staffing for ${agent.id}: ${err}`);
+      staffingError = err instanceof Error ? err.message : String(err);
+      console.warn(`[restart-config] Failed to resolve staffing for ${agent.id}: ${staffingError}`);
+    }
+
+    // If there was an error resolving current config, skip this agent
+    if (staffingError) {
+      continue;
     }
 
     items.push({
@@ -740,6 +773,52 @@ export const getAgentsRestartConfigRoute = HttpRouter.add(
 // ─── Route: POST /api/agents/restart-with-current-config ────────────────────
 // Restart selected agents with current config
 
+async function resolveCurrentStaffing(agentId: string, agentState: any, issueId: string): Promise<{ newModel: string; newHarness: string; error?: string }> {
+  const workspacePath = agentState.workspace;
+  if (!workspacePath) {
+    return { newModel: agentState.model, newHarness: agentState.harness ?? 'claude-code', error: 'No workspace path available' };
+  }
+
+  try {
+    // Read the actual vBRIEF plan to get the real work item
+    const planPath = findPlanSync(workspacePath);
+    if (!planPath) {
+      return { newModel: agentState.model, newHarness: agentState.harness ?? 'claude-code', error: 'No plan found in workspace' };
+    }
+
+    const plan = readWorkspacePlanSync(workspacePath);
+    if (!plan || !plan.plan.items) {
+      return { newModel: agentState.model, newHarness: agentState.harness ?? 'claude-code', error: 'Invalid plan structure' };
+    }
+
+    // Find the work item in the plan (id='work' or first work-role item)
+    const workItem = plan.plan.items.find((item: any) => item.id === 'work') ||
+                     plan.plan.items.find((item: any) => item.metadata?.role === 'work');
+
+    if (!workItem) {
+      return { newModel: agentState.model, newHarness: agentState.harness ?? 'claude-code', error: 'No work item found in plan' };
+    }
+
+    // Use the real work item with plan metadata for staffing resolution
+    const staffing = resolveStaffing(workItem, {
+      planMetadata: plan.plan.metadata,
+      spawnKey: `work:${issueId.toLowerCase()}`,
+    });
+
+    return {
+      newModel: staffing.model,
+      newHarness: staffing.harness,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return {
+      newModel: agentState.model,
+      newHarness: agentState.harness ?? 'claude-code',
+      error: `Failed to resolve staffing: ${msg}`,
+    };
+  }
+}
+
 export const postAgentsRestartWithConfigRoute = HttpRouter.add(
   'POST',
   '/api/agents/restart-with-current-config',
@@ -751,32 +830,42 @@ export const postAgentsRestartWithConfigRoute = HttpRouter.add(
       return jsonResponse({ error: 'agentIds array is required and must not be empty' }, { status: 400 });
     }
 
+    // Get eligible agents from the same predicate as the GET route
+    const eligibleAgents = yield* Effect.promise(() => buildRestartConfigChangeList());
+    const eligibleIds = new Set(eligibleAgents.map(a => a.agentId));
+
     const results: { id: string; status: string; newModel?: string; newHarness?: string; error?: string }[] = [];
 
     for (const agentId of agentIds) {
       try {
+        // Check if agent is in the eligible set
+        if (!eligibleIds.has(agentId)) {
+          results.push({ id: agentId, status: 'ineligible', error: 'Agent is not eligible for restart (paused, troubled, stopped, or not a work agent)' });
+          continue;
+        }
+
         const agentState = yield* getAgentState(agentId);
         if (!agentState) {
-          results.push({ id: agentId, status: 'not_found', error: `Agent ${agentId} not found` });
+          results.push({ id: agentId, status: 'not_found', error: `Agent state not found` });
           continue;
         }
 
         const issueId = agentState.issueId ?? agentId.replace(/^agent-/, '').toUpperCase();
 
-        // Resolve new staffing
-        let newModel = agentState.model;
-        let newHarness = agentState.harness ?? 'claude-code';
+        // Resolve new staffing using the real work item
+        const staffingResult = yield* Effect.promise(() => resolveCurrentStaffing(agentId, agentState, issueId));
 
-        try {
-          const staffing = resolveStaffing(
-            { id: 'work', title: 'work', metadata: {} },
-            { spawnKey: `work:${issueId.toLowerCase()}` }
-          );
-          newModel = staffing.model;
-          newHarness = staffing.harness;
-        } catch (err) {
-          console.warn(`[restart-config] Failed to resolve staffing for ${agentId}: ${err}`);
+        if (staffingResult.error) {
+          results.push({
+            id: agentId,
+            status: 'staffing_error',
+            error: staffingResult.error,
+          });
+          continue;
         }
+
+        const newModel = staffingResult.newModel;
+        const newHarness = staffingResult.newHarness;
 
         // Restart with new config
         const restartResult = yield* Effect.promise(() => restartAgent(agentId, {
