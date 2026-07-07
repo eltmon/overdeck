@@ -1,5 +1,5 @@
-import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Effect } from 'effect';
 
 const mockReviewStatus: Record<string, any> = {};
 const mockCalls = {
@@ -244,12 +244,13 @@ vi.mock('../../../../../src/lib/tracker-utils.js', () => ({
   resolveGitHubIssueSync: vi.fn(() => ({ isGitHub: true, owner: 'eltmon', repo: 'overdeck' })),
 }));
 
-import { reconcileStaleMergeStatus } from '../../../../../src/lib/cloister/deacon-merge.js';
-import { postMergeLifecycle } from '../../../../../src/lib/cloister/merge-agent.js';
-import { triggerMerge } from '../../../../../src/dashboard/server/routes/workspaces/merge-ops.js';
+let reconcileStaleMergeStatus: typeof import('../../../../../src/lib/cloister/deacon-merge.js')['reconcileStaleMergeStatus'];
+let postMergeLifecycle: typeof import('../../../../../src/lib/cloister/merge-agent.js')['postMergeLifecycle'];
+let triggerMerge: typeof import('../../../../../src/dashboard/server/routes/workspaces/merge-ops.js')['triggerMerge'];
 
 describe('PAN-2420 end-to-end: 403 permission failure then out-of-band merge terminalizes with no respawn', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    vi.resetModules();
     vi.clearAllMocks();
     Object.keys(mockReviewStatus).forEach(key => delete mockReviewStatus[key]);
     mockCalls.setReviewStatus.length = 0;
@@ -271,6 +272,10 @@ describe('PAN-2420 end-to-end: 403 permission failure then out-of-band merge ter
       return Promise.resolve({ stdout: '' });
     });
     execImpl.mockResolvedValue({ stdout: '' });
+
+    ({ reconcileStaleMergeStatus } = await import('../../../../../src/lib/cloister/deacon-merge.js'));
+    ({ postMergeLifecycle } = await import('../../../../../src/lib/cloister/merge-agent.js'));
+    ({ triggerMerge } = await import('../../../../../src/dashboard/server/routes/workspaces/merge-ops.js'));
   });
 
   it('records merge_status=failed with mergeNotes naming the missing scope on 403 permission error', async () => {
