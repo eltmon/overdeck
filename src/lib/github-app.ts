@@ -127,6 +127,60 @@ export interface MergeBackendStatusDeps {
   checkGhAuth?: () => Promise<boolean>;
 }
 
+export type AppCanMergeResult = {
+  configured: boolean;
+  canMerge?: boolean;
+  missing?: string[];
+  detail: string;
+};
+
+export interface VerifyAppCanMergeDeps {
+  isConfigured?: () => boolean;
+  generateToken?: () => Promise<InstallationToken>;
+}
+
+/**
+ * Verify the configured GitHub App installation has the permissions required
+ * to merge pull requests via the API.
+ */
+export async function verifyAppCanMerge(
+  deps: VerifyAppCanMergeDeps = {}
+): Promise<AppCanMergeResult> {
+  const isConfigured = deps.isConfigured ?? isGitHubAppConfigured;
+  if (!isConfigured()) {
+    return { configured: false, detail: 'GitHub App is not configured' };
+  }
+
+  const generateToken = deps.generateToken ?? (async () =>
+    Effect.runPromise(generateInstallationToken()));
+
+  const token = await generateToken();
+  const permissions = token.permissions ?? {};
+  const missing: string[] = [];
+  if (permissions.pull_requests !== 'write') {
+    missing.push('pull_requests:write');
+  }
+  if (permissions.contents !== 'write') {
+    missing.push('contents:write');
+  }
+
+  if (missing.length === 0) {
+    return {
+      configured: true,
+      canMerge: true,
+      missing: [],
+      detail: 'GitHub App installation has merge permissions',
+    };
+  }
+
+  return {
+    configured: true,
+    canMerge: false,
+    missing,
+    detail: `GitHub App installation is missing required permissions: ${missing.join(', ')}`,
+  };
+}
+
 type GitHubCheckRunApiResponse = {
   check_runs?: Array<{
     id?: number;
