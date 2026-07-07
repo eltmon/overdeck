@@ -17,32 +17,29 @@
       "reason": "feedback",
       "note": "[2026-07-07T06:36Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-07T06:36:43.834Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-07T06:36:43Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2375\n\nFR-5 retry still checks full origin/main..main tree diff, blocking remote-source/local-state recovery\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2375 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-07T06:51:22.323Z"
     }
   ],
+  "feedback": [],
   "created": "2026-07-07T02:41:17.313Z",
-  "updated": "2026-07-07T06:44:50.822Z",
+  "updated": "2026-07-07T06:51:31.968Z",
   "pipeline": {
     "issueId": "PAN-2375",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T06:44:50.778Z",
-    "reviewNotes": "FR-5 retry still checks full origin/main..main tree diff, blocking remote-source/local-state recovery",
+    "updatedAt": "2026-07-07T06:51:31.487Z",
+    "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
     "inspectNotes": "Bead state-plane-predicate ack: commit 2fe848f6 is a pure test-colocation move (tests/unit/lib/state-plane.test.ts -> src/lib/__tests__/state-plane.test.ts, import path fixed), no logic changes; verified all 4 acceptance criteria still pass against current src/lib/state-plane.ts (state-only=true, mixed src+state=false, drafts-only=false, empty-diff=true).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2457",
-    "lastVerifiedCommit": "15193f81a33b5147dc18fd8837cb09f31343ee82",
+    "lastVerifiedCommit": "a1e27c714a5596831cc98a8c815180a97a5a87aa",
     "reviewRequestedAt": "2026-07-07T06:33:45.658Z"
   },
   "closeOut": {
@@ -88,9 +85,9 @@
         },
         "work": {
           "unknown": {
-            "input": 87571108,
-            "output": 139694,
-            "cacheRead": 83831424,
+            "input": 93289133,
+            "output": 147522,
+            "cacheRead": 89330304,
             "cacheWrite": 0
           }
         }
@@ -115,9 +112,9 @@
           "cacheWrite": 149428
         },
         "unknown": {
-          "input": 93454105,
-          "output": 159585,
-          "cacheRead": 89278592,
+          "input": 99172130,
+          "output": 167413,
+          "cacheRead": 94777472,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -128,8 +125,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 55.0055934,
-        "pricingAsOf": "2026-07-07T06:44:50.821Z"
+        "usd": 57.9841824,
+        "pricingAsOf": "2026-07-07T06:51:31.595Z"
       }
     },
     "merges": [
