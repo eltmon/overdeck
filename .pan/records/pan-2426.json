@@ -17,9 +17,27 @@
       "timestamp": "2026-07-07T23:35:32.503Z",
       "reason": "end",
       "note": "Implemented xBRIEF v0.8 compatibility across read/write doors, writers, docs, planning templates, and schema fallback tests. Closed all PAN-2426 beads. Gates passed: npm run typecheck, npm run lint, npx vitest run src/lib/vbrief/__tests__/io.test.ts, npx vitest run tests/vbrief/full-spec.test.ts, npx vitest run tests/lib/cloister/failure-tracking.test.ts, npm test. Branch pushed to origin/feature/pan-2426."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-07T23:37Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-07T23:37:46.911Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-07T23:37:49.380Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-07T23:37:46Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2426\n\npan plan finalize rewrites xBRIEF v0.8 drafts back to vBRIEFInfo\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2426 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/drafts/pan-2426.md",
@@ -77,15 +95,16 @@
     "recordedAt": "2026-07-07T23:34:17.286Z"
   },
   "created": "2026-07-07T15:48:18.781Z",
-  "updated": "2026-07-07T23:36:02.810Z",
+  "updated": "2026-07-07T23:37:49.381Z",
   "pipeline": {
     "issueId": "PAN-2426",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T23:36:02.572Z",
+    "updatedAt": "2026-07-07T23:37:40.246Z",
+    "reviewNotes": "pan plan finalize rewrites xBRIEF v0.8 drafts back to vBRIEFInfo",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2481",
     "reviewRequestedAt": "2026-07-07T23:35:32.505Z",
     "scopeDrift": {
@@ -156,9 +175,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 21197657,
-            "output": 46590,
-            "cacheRead": 20638720,
+            "input": 21944301,
+            "output": 49279,
+            "cacheRead": 21303296,
             "cacheWrite": 0
           }
         },
@@ -187,9 +206,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 21197657,
-          "output": 46590,
-          "cacheRead": 20638720,
+          "input": 21944301,
+          "output": 49279,
+          "cacheRead": 21303296,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -200,8 +219,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 32.790444,
-        "pricingAsOf": "2026-07-07T23:36:02.803Z"
+        "usd": 33.613742,
+        "pricingAsOf": "2026-07-07T23:37:40.366Z"
       }
     },
     "merges": [
