@@ -46,17 +46,14 @@
       "reason": "feedback",
       "note": "[2026-07-07T19:16Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-07T19:16:30.838Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-07T19:16:30Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1872\n\nstack-health PAN-1872 test does not exercise the undefined issueId crash path\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1872 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-07T19:26:51.070Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/records/pan-1872.json"
@@ -87,20 +84,21 @@
     "recordedAt": "2026-07-07T18:50:25.599Z"
   },
   "created": "2026-07-06T16:22:21.638Z",
-  "updated": "2026-07-07T19:16:30.838Z",
+  "updated": "2026-07-07T19:48:25.527Z",
   "pipeline": {
     "issueId": "PAN-1872",
-    "reviewStatus": "blocked",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-07T19:16:24.183Z",
-    "reviewNotes": "stack-health PAN-1872 test does not exercise the undefined issueId crash path",
-    "verificationNotes": "Branch has no implementation — only pipeline artifacts (.pan/vbrief/beads) changed vs origin/main. The work agent produced no code (likely a kickoff-delivery zombie — PAN-2179).",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-07T19:48:25.451Z",
+    "reviewNotes": "Prior stack-health regression-test blocker fixed; no blocking findings",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2474",
-    "reviewedAtCommit": "cbede7dbc680cb95e5d7247aaf68d6d7fbdf9cc2",
-    "lastVerifiedCommit": "e22af6b46299375cee336eb83e8b64b7f14691a5",
+    "reviewedAtCommit": "4436b5297de45fe19cc043a399ae53e5f7950355",
+    "lastVerifiedCommit": "4436b5297de45fe19cc043a399ae53e5f7950355",
     "reviewRequestedAt": "2026-07-07T18:51:21.330Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -137,9 +135,9 @@
       "byStage": {
         "codex": {
           "openai/gpt-5.5": {
-            "input": 1444749,
-            "output": 7091,
-            "cacheRead": 1254400,
+            "input": 3396473,
+            "output": 11335,
+            "cacheRead": 3143936,
             "cacheWrite": 0
           }
         },
@@ -177,18 +175,18 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 765473,
-            "output": 60863,
-            "cacheRead": 24048128,
+            "input": 812171,
+            "output": 74013,
+            "cacheRead": 33214464,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 1444749,
-          "output": 7091,
-          "cacheRead": 1254400,
+          "input": 3396473,
+          "output": 11335,
+          "cacheRead": 3143936,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -204,15 +202,15 @@
           "cacheWrite": 129964
         },
         "custom/kimi-k2.7-code": {
-          "input": 1237800,
-          "output": 68829,
-          "cacheRead": 26643200,
+          "input": 1284498,
+          "output": 81979,
+          "cacheRead": 35809536,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 9.247396,
-        "pricingAsOf": "2026-07-07T19:16:24.227Z"
+        "usd": 12.46899,
+        "pricingAsOf": "2026-07-07T19:48:25.489Z"
       }
     },
     "merges": [
