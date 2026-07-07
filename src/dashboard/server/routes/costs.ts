@@ -335,13 +335,16 @@ const postCostsReconcileRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const overdeck = yield* Effect.tryPromise({
       try: async () => {
-        const run = (source: 'ohmypi' | 'codex') =>
+        const runOverdeck = (source: 'ohmypi' | 'codex') =>
           Effect.runPromise(
             CostWriter.use((writer) => writer.reconcile({ source })).pipe(
               Effect.provide(CostDoorLive),
             ),
           );
-        const [ohmypi, codex] = await Promise.all([run('ohmypi'), run('codex')]);
+        const [ohmypi, codex] = await Promise.all([
+          runOverdeck('ohmypi'),
+          runOverdeck('codex'),
+        ]);
         return { ohmypi, codex };
       },
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
