@@ -11,15 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-07T01:06:13.356Z",
-  "updated": "2026-07-07T03:56:58.349Z",
+  "updated": "2026-07-07T04:06:04.984Z",
   "pipeline": {
     "issueId": "PAN-2420",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
-    "verificationStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-07T03:56:53.452Z"
+    "readyForMerge": true,
+    "updatedAt": "2026-07-07T04:06:04.894Z",
+    "reviewNotes": "No blocking findings in PR-scoped review",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "reviewedAtCommit": "91804f9eec60a1749b466d5f6fe015b5da90eec7"
   },
   "closeOut": {
     "usage": {
@@ -40,11 +43,27 @@
             "cacheWrite": 576864
           }
         },
+        "review": {
+          "unknown": {
+            "input": 2082054,
+            "output": 9035,
+            "cacheRead": 1824256,
+            "cacheWrite": 0
+          }
+        },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 608131,
+            "output": 11593,
+            "cacheRead": 2670336,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1014323,
-            "output": 200105,
-            "cacheRead": 92278272,
+            "input": 1042687,
+            "output": 209819,
+            "cacheRead": 99634688,
             "cacheWrite": 0
           }
         }
@@ -62,23 +81,29 @@
           "cacheRead": 13233382,
           "cacheWrite": 576864
         },
+        "unknown": {
+          "input": 2082054,
+          "output": 9035,
+          "cacheRead": 1824256,
+          "cacheWrite": 0
+        },
         "custom/kimi-k2.7-code": {
-          "input": 1014323,
-          "output": 200105,
-          "cacheRead": 92278272,
+          "input": 1650818,
+          "output": 221412,
+          "cacheRead": 102305024,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 31.4167895,
-        "pricingAsOf": "2026-07-07T03:56:53.478Z"
+        "usd": 36.4839365,
+        "pricingAsOf": "2026-07-07T04:06:04.984Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "integration-test": "completed",
     "integration-test.ac1": "completed",
