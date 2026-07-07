@@ -4,17 +4,17 @@
     "created": "2026-07-05T21:56:35Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2388: feat(costs): deliberate token/cost capture for non-claude-code harnesses — ohmypi and codex as first-class metering citizens",
-    "updated": "2026-07-05T22:04:04.477Z"
+    "updated": "2026-07-07T18:40:57.374Z"
   },
   "plan": {
     "id": "pan-2388",
     "title": "feat(costs): deliberate token/cost capture for non-claude-code harnesses — ohmypi and codex as first-class metering citizens",
-    "status": "proposed",
+    "status": "completed",
     "uid": "175617a9-4ad1-460e-aa32-78d3e9b0281e",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-05T21:56:35Z",
-    "updated": "2026-07-05T22:04:04.477Z",
+    "updated": "2026-07-07T18:40:57.374Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2388",
@@ -790,5 +790,5 @@
       "canonicalFilename": "2026-07-05-PAN-2388-feat-costs-deliberate-token-cost-capture-for-non-claude-code-harnesses-ohmypi-and-codex-as-first-class-metering-citizens.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

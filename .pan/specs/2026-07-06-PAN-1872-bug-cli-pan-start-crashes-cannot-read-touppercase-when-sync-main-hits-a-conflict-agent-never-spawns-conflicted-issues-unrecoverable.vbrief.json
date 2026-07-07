@@ -4,17 +4,17 @@
     "created": "2026-07-06T17:00:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-1872: bug(cli): pan start crashes when sync-main hits a conflict — retroactive verification plan",
-    "updated": "2026-07-06T16:26:34.435Z"
+    "updated": "2026-07-07T20:54:29.442Z"
   },
   "plan": {
     "id": "pan-1872",
     "title": "bug(cli): pan start crashes ('Cannot read ... toUpperCase') when sync-main hits a conflict — agent never spawns, conflicted issues unrecoverable",
-    "status": "proposed",
+    "status": "completed",
     "uid": "b3e1d9f7-4c2a-4a8e-9b15-7f8c3d6e1a20",
     "author": "agent:claude-sonnet-4-6",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-07-06T17:00:00.000Z",
-    "updated": "2026-07-06T16:26:34.435Z",
+    "updated": "2026-07-07T20:54:29.442Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1872",
@@ -118,5 +118,5 @@
       "canonicalFilename": "2026-07-06-PAN-1872-bug-cli-pan-start-crashes-cannot-read-touppercase-when-sync-main-hits-a-conflict-agent-never-spawns-conflicted-issues-unrecoverable.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
