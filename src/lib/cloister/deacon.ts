@@ -2657,6 +2657,48 @@ export async function checkMergedAdvancingSessions(): Promise<string[]> {
   return actions;
 }
 
+const TERMINAL_ADVANCING_IDLE_REAP_MS = 10 * 60 * 1000;
+
+/**
+ * PAN-2341: Reap non-merged terminal advancing sessions after a short idle
+ * window. This bypasses specialist keep-alive only after the pane has sat idle
+ * long enough for operator inspection, then marks the agents row stopped so the
+ * advancing ceiling frees in the same patrol.
+ */
+export async function checkIdleTerminalAdvancingSessions(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    const { isIdlePastThreshold, selectNonMergedTerminalAdvancingSessions } = await import('./reap-terminal-sessions.js');
+    const statuses = loadReviewStatuses();
+    const aliveSessions = await Effect.runPromise(listSessionNames());
+    const candidates = selectNonMergedTerminalAdvancingSessions(statuses, [...aliveSessions]);
+    const now = Date.now();
+
+    for (const session of candidates) {
+      const runtime = getAgentRuntimeStateSync(session);
+      if (!isIdlePastThreshold(runtime, TERMINAL_ADVANCING_IDLE_REAP_MS, now)) continue;
+
+      try {
+        await Effect.runPromise(killSession(session));
+      } catch (err) {
+        console.warn(`[deacon] Failed to reap idle terminal advancing session ${session}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      const markedStopped = markAdvancingSessionStopped(session);
+      actions.push(
+        markedStopped
+          ? `Reaped idle terminal advancing session ${session} (verdict recorded, idle >=10m, row stopped)`
+          : `Reaped idle terminal advancing session ${session} (verdict recorded, idle >=10m)`,
+      );
+      console.log(`[deacon] Reaped idle terminal advancing session ${session} (PAN-2341)`);
+      logDeaconEventSync(`checkIdleTerminalAdvancingSessions: reaped ${session} — terminal verdict idle >=10m (PAN-2341)`);
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error reaping idle terminal advancing sessions:', msg);
+  }
+  return actions;
+}
+
 /** Pane must be idle at least this long before the awaiting-test reaper kills it. */
 const AWAITING_TEST_IDLE_REAP_MS = 10 * 60 * 1000;
 
@@ -2895,6 +2937,10 @@ export async function runPatrol(): Promise<PatrolResult> {
   const reapedMergedAdvancingActions = await checkMergedAdvancingSessions();
   actions.push(...reapedMergedAdvancingActions);
   for (const a of reapedMergedAdvancingActions) addLog('action', a, state.patrolCycle);
+
+  const reapedIdleTerminalAdvancingActions = await checkIdleTerminalAdvancingSessions();
+  actions.push(...reapedIdleTerminalAdvancingActions);
+  for (const a of reapedIdleTerminalAdvancingActions) addLog('action', a, state.patrolCycle);
 
   // PAN-1778: proactively refresh Claude credentials on active remote agents
   // when the host credentials file changes, with a 15 min fallback cadence.
