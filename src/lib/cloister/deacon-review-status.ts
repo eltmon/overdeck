@@ -427,8 +427,10 @@ export async function handleWorkCompleted(issueId: string): Promise<string[]> {
  * PAN-1908: per-issue orphan reconciler for a single review-status row. Used by
  * the legacy checkOrphanedReviewStatuses safety net and by reactive handlers.
  */
-async function reconcileReviewStatusOrphan(issueId: string, status: ReviewStatusLike): Promise<string[]> {
+async function reconcileReviewStatusOrphan(issueId: string, rawStatus: ReviewStatusLike): Promise<string[]> {
   const actions: string[] = [];
+
+  const status = getReviewStatusSync(issueId) ?? rawStatus;
 
   if (status.stuck) return actions;
   if (status.deaconIgnored) return actions;
@@ -655,8 +657,9 @@ export async function recoverStalledReviewConvoys(
     return actions;
   }
 
-  for (const [issueId, status] of Object.entries(statuses)) {
+  for (const [issueId, rawStatus] of Object.entries(statuses)) {
     try {
+      const status = getReviewStatusSync(issueId) ?? rawStatus;
       if (status.reviewStatus !== 'reviewing' && status.reviewStatus !== 'pending') continue;
       if (status.stuck || status.deaconIgnored) continue;
 
@@ -861,4 +864,3 @@ export async function checkMissingReviewStatuses(): Promise<string[]> {
 
   return actions;
 }
-

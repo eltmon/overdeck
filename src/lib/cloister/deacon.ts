@@ -2539,46 +2539,6 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
 }
 
 /**
- * PAN-1716: Defense-in-depth reaper for completed advancing-role sessions.
- *
- * Every review/test/ship session whose phase verdict is already terminal but is
- * still tmux-alive is a zombie: Claude sits idle at its prompt forever, yet
- * `countRunningAgents()` keeps counting it against the PAN-1665 advancing
- * ceiling. Enough of them starve every new dispatch and livelock the pipeline.
- *
- * The completion paths (`pan specialists done`, the HTTP route) kill the session
- * directly; this janitor catches any they miss so a single dropped kill can't
- * accumulate into a livelock. Runs early in the patrol so freed ceiling slots
- * benefit this same cycle's dispatchers.
- */
-export async function checkTerminalAdvancingSessions(): Promise<string[]> {
-  const actions: string[] = [];
-  try {
-    const { selectTerminalAdvancingSessions, KEEP_SPECIALIST_SESSIONS_ALIVE } = await import('./reap-terminal-sessions.js');
-    // PAN-2007: operator-requested temporary keep-alive — do not reap specialist
-    // sessions so they stay visible through the pipeline until close-out.
-    if (KEEP_SPECIALIST_SESSIONS_ALIVE) return actions;
-    const statuses = loadReviewStatuses();
-    const aliveSessions = await Effect.runPromise(listSessionNames());
-    const toKill = selectTerminalAdvancingSessions(statuses, [...aliveSessions]);
-    for (const session of toKill) {
-      try {
-        await Effect.runPromise(killSession(session));
-        actions.push(`Reaped terminal advancing session ${session} (verdict recorded, session idle)`);
-        console.log(`[deacon] Reaped terminal advancing session ${session} (PAN-1716)`);
-        logDeaconEventSync(`checkTerminalAdvancingSessions: reaped ${session} — phase verdict terminal but session alive (PAN-1716)`);
-      } catch (err) {
-        console.warn(`[deacon] Failed to reap terminal session ${session}: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    }
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error('[deacon] Error reaping terminal advancing sessions:', msg);
-  }
-  return actions;
-}
-
-/**
  * PAN-1726: Defense-in-depth reaper for the WORK session of a merged issue.
  *
  * `postMergeLifecycle` pauses + kills `agent-<id>` at merge time, but a server
@@ -2719,6 +2679,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...stuckRemediationActions);
   for (const a of stuckRemediationActions) addLog('action', a, state.patrolCycle);
 
+  const { reconcileInFlightJournals } = await import('./advancing-selfheal.js');
+  const reconciledJournalActions = await reconcileInFlightJournals();
+  actions.push(...reconciledJournalActions);
+  for (const a of reconciledJournalActions) addLog('action', a, state.patrolCycle);
+
   // Process any pending post-merge lifecycle that wasn't consumed on startup (PAN-626).
   // In dev mode, the deploy script may fail to restart cleanly, leaving the pending file.
   try {
@@ -2839,6 +2804,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   // PAN-1716: Reap completed advancing-role (review/test/ship) sessions that are
   // still tmux-alive before the dispatchers run, so freed ceiling slots are
   // available to this same cycle's review/test/ship re-dispatch below.
+  const { checkIdleTerminalAdvancingSessions, checkMergedAdvancingSessions, checkTerminalAdvancingSessions } = await import('./advancing-selfheal.js');
   const reapedTerminalActions = await checkTerminalAdvancingSessions();
   actions.push(...reapedTerminalActions);
   for (const a of reapedTerminalActions) addLog('action', a, state.patrolCycle);
@@ -2849,6 +2815,14 @@ export async function runPatrol(): Promise<PatrolResult> {
   const reapedWorkActions = await checkMergedWorkSessions();
   actions.push(...reapedWorkActions);
   for (const a of reapedWorkActions) addLog('action', a, state.patrolCycle);
+
+  const reapedMergedAdvancingActions = await checkMergedAdvancingSessions();
+  actions.push(...reapedMergedAdvancingActions);
+  for (const a of reapedMergedAdvancingActions) addLog('action', a, state.patrolCycle);
+
+  const reapedIdleTerminalAdvancingActions = await checkIdleTerminalAdvancingSessions();
+  actions.push(...reapedIdleTerminalAdvancingActions);
+  for (const a of reapedIdleTerminalAdvancingActions) addLog('action', a, state.patrolCycle);
 
   // PAN-1778: proactively refresh Claude credentials on active remote agents
   // when the host credentials file changes, with a 15 min fallback cadence.
@@ -3473,6 +3447,8 @@ export function startDeacon(): void {
   // first patrol. PAN-1908: use the thin table-query reconcile instead of directory scans.
   void (async () => {
     await reconcileAgentLiveness();
+    const { runBootAdvancingSelfHeal } = await import('./advancing-selfheal.js');
+    await runBootAdvancingSelfHeal();
     runScheduledPatrol('startup');
   })().catch((err) => {
     const msg = err instanceof Error ? err.message : String(err);

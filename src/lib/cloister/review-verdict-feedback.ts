@@ -73,7 +73,7 @@ function buildReviewFeedbackBody(opts: {
   return `# Review ${verdictLabel} for ${opts.issueId}\n\n${synthesis}${sourceLine}\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n\`pan review request ${opts.issueId} -m "Fixed review issues"\``;
 }
 
-async function postPrComment(prUrl: string | undefined, body: string): Promise<boolean> {
+export async function postPrComment(prUrl: string | undefined, body: string): Promise<boolean> {
   const parsed = parseGitHubPrUrl(prUrl);
   if (!parsed) return false;
 

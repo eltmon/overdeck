@@ -207,6 +207,33 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-58 tick 88 (2026-07-07) — quiet: PAN-2388 slots merged but issue needs finalize (operator); PAN-2464 planned; lane drained, all operator-gated
+
+**MAIN GREEN (`27330395e3`, unchanged).**
+- **PAN-2388 (priority pair): both slots MERGED, but issue OPEN [planning, in-review]** — NOT in ready set (not schedulable via merge door). Cost-capture code is on main; the ISSUE needs a swarm finalize/close step (operator-owned assembly throughout). REPORTED, not forced. Surface: does PAN-2388 need `pan swarm finalize`/manual close now both slots merged?
+- **PAN-2464 (off-book) finished planning** — planner session gone. NOT auto-started (intent unconfirmed; off-book dashboard feature). Await operator confirm before any start.
+- **B3/PAN-2167 NOT authorized** (no fix, no session). Lane B slot free; surfaced.
+- **MIN report-only:** MIN-861/865/862 at rfm (reported w/ UAT URLs); M7/MIN-729 in review; MIN-857 held. No PAN drain (all ready = MIN).
+- **A8/PAN-2297 STILL wedged** (`pan-1847`). Surfaced. Holding A9/A13. No off-book planning now (PAN-2445 clean). **Lane drained + priority PAN-2388 landed — run at a clean waiting state, all open items operator-gated: B3 auth, PAN-2388 finalize, PAN-2464 confirm, MIN UAT.**
+
+## RUN-58 tick 87 (2026-07-07) — ★★ PAN-2388 BOTH slots MERGED (priority cost-capture pair DONE!); 3 MIN at rfm (report-only); B3 still unauthorized
+
+**MAIN GREEN (`27330395e3`).**
+- **★★ PAN-2388 (operator #1 priority) — BOTH slots MERGED** — slot-1 codex-fixtures + slot-3 ohmypi-fixtures both `merged`. The codex/ohmypi cost-capture pair has landed. May need swarm finalize/close (operator-owned assembly throughout — surface; if PAN-2388 appears as a ready PAN issue next tick, drain/close it). This clears the long-running assembly stall.
+- **MIN at rfm → REPORTED (never merged, per policy):** MIN-865 (`https://feature-min-865.myn.localhost`), MIN-861/M2 (`https://feature-min-861.myn.localhost`), MIN-862/M6 (`https://feature-min-862.myn.localhost`). M7/MIN-729 still in review. Await operator UAT + per-issue go.
+- **B3/PAN-2167 NOT authorized** (no fix, no session). Lane B slot free; surfaced (recommend dispatch — self-heals A8 + record/re-CI).
+- **PAN-2464 off-book planning** (Machine Room /resources overhaul) still running — re-surfaced (confirm intended). No new off-book spawns (PAN-2445 otherwise clean).
+- **A8/PAN-2297 STILL wedged** (`pan-1847`). Surfaced. Holding A9/A13. No PAN drain (all ready = MIN report-only). Overdeck order-book lane drained (~11 landed) + priority PAN-2388 now done.
+
+## RUN-58 tick 86 (2026-07-07) — A7 CLOSED; ★ PAN-2388 slot-1 MERGED (cost pair 1/3 landing!); ⚠ off-book planning-pan-2464 surfaced
+
+**MAIN GREEN (`27330395e3`).** A7/PAN-2230 confirmed CLOSED. Order book ~11 landed.
+- **★ PAN-2388 (priority) slot-1 codex-fixtures MERGED** — `feature/pan-2388-slot-1 (merged)`. Cost-capture pair is landing (1 of 3 slots merged; slot-3 ohmypi-fixtures still ready-to-merge/unmerged). Assembly advancing (operator freed budget / assembled). Not failed-merge → re-surface, no recover.
+- **⚠ PAN-2445 WATCH — OFF-BOOK planning spawn surfaced:** `planning-pan-2464` = "feat(dashboard): Machine Room — complete /resources overhaul (attribution, reclaim advisor, stop/pause…)". Created 13:23, labels planning/planned, **NOT in order book, NOT LEX**. Been planning ~1h26m ($6.36). Likely operator-created (matches the dashboard-work pattern like PAN-2450) but surfaced per watch — confirm intended vs lifecycle-momentum. NOT killed (operator's call).
+- **B3/PAN-2167 NOT authorized** (no fix, no session). Lane B slot free; surfaced (recommend dispatch — self-heals A8 + record/re-CI).
+- **MIN report-only:** ready = MIN-862 (failed-verification, no retry) + MIN-857 (held). M2/MIN-861 + M7/MIN-729 in review.
+- **A8/PAN-2297 STILL wedged** (`pan-1847`). Surfaced. Holding A9/A13. No PAN drain (nothing ready). Overdeck lane still drained pending operator gates.
+
 ## RUN-58 tick 85 (2026-07-07) — A7 main-GREEN → closing out (order book ~11 done); Overdeck lane DRAINED pending operator gates (B3/PAN-2167 + PAN-2388)
 
 **A7/PAN-2230 red-main verdict GREEN** (`27330395e3` CI success) → **close-out dispatched** (`pan close --force`, bg). **Order book ~11 landed** (Lane A A1-A7+A10, Lane B B0/B1/B2).
