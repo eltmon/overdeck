@@ -10,6 +10,7 @@ const { mockExecAsync } = vi.hoisted(() => ({
 
 vi.mock('child_process', () => ({
   exec: vi.fn(),
+  execFile: vi.fn(),
 }));
 vi.mock('util', async (importOriginal) => {
   const actual = await importOriginal<typeof import('util')>();
