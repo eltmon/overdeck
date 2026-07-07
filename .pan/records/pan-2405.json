@@ -23,15 +23,15 @@
     }
   ],
   "created": "2026-07-06T14:48:34.495Z",
-  "updated": "2026-07-07T19:00:29.861Z",
+  "updated": "2026-07-07T19:03:15.494Z",
   "pipeline": {
     "issueId": "PAN-2405",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T19:00:29.713Z",
+    "updatedAt": "2026-07-07T19:03:15.417Z",
     "reviewNotes": "restart-with-current-config resolves staffing from a fake work item",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2476",
     "lastVerifiedCommit": "d2e667095012bba7847ae533493ec5855456b1cd",
@@ -42,38 +42,38 @@
       "byStage": {
         "codex": {
           "openai/gpt-5.5": {
-            "input": 707505,
-            "output": 4770,
-            "cacheRead": 619136,
+            "input": 973531,
+            "output": 5214,
+            "cacheRead": 883456,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 182,
-            "output": 38702,
-            "cacheRead": 17118140,
-            "cacheWrite": 725413
+            "input": 186,
+            "output": 39164,
+            "cacheRead": 17850852,
+            "cacheWrite": 728480
           }
         }
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 707505,
-          "output": 4770,
-          "cacheRead": 619136,
+          "input": 973531,
+          "output": 5214,
+          "cacheRead": 883456,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 182,
-          "output": 38702,
-          "cacheRead": 17118140,
-          "cacheWrite": 725413
+          "input": 186,
+          "output": 39164,
+          "cacheRead": 17850852,
+          "cacheWrite": 728480
         }
       },
       "costAtCloseOut": {
-        "usd": 3.706784,
-        "pricingAsOf": "2026-07-07T19:00:29.840Z"
+        "usd": 3.940213,
+        "pricingAsOf": "2026-07-07T19:03:15.493Z"
       }
     },
     "merges": [
