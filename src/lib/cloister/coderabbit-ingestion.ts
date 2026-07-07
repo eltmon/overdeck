@@ -10,6 +10,7 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { lookupPullRequestNumberForBranch } from '../github-pr-lookup.js';
+import { postPrComment } from './review-verdict-feedback.js';
 
 const execAsync = promisify(exec);
 
@@ -20,6 +21,50 @@ export interface CodeRabbitFinding {
   line?: number;
   body: string;
   url?: string;
+}
+
+/**
+ * Canonical reply template when a CodeRabbit finding has been addressed.
+ *
+ * Calling convention: `postCodeRabbitReply(prUrl, 'addressed', finding.body)`
+ */
+export const CODERABBIT_REPLY_ADDRESSED = (finding: string): string =>
+  `Thanks for the finding — addressed: ${finding}`;
+
+/**
+ * Canonical reply template when a CodeRabbit finding is rejected.
+ *
+ * Calling convention: `postCodeRabbitReply(prUrl, 'rejected', finding.body, rationale)`
+ */
+export const CODERABBIT_REPLY_REJECTED = (finding: string, rationale: string): string =>
+  `Thanks for the finding — after review we're not applying this: ${finding}. Rationale: ${rationale}`;
+
+/**
+ * Reply to a CodeRabbit finding on the PR thread.
+ *
+ * @param prUrl - The GitHub PR URL.
+ * @param disposition - Whether the finding was addressed or rejected.
+ * @param finding - The finding text (usually `finding.body`).
+ * @param rationale - Required when disposition is 'rejected'; explains why.
+ * @returns true if the comment was posted, false on any error (never throws).
+ *
+ * This is a best-effort reply path and MUST NOT read or write review status.
+ */
+export async function postCodeRabbitReply(
+  prUrl: string,
+  disposition: 'addressed' | 'rejected',
+  finding: string,
+  rationale?: string,
+): Promise<boolean> {
+  try {
+    const body =
+      disposition === 'addressed'
+        ? CODERABBIT_REPLY_ADDRESSED(finding)
+        : CODERABBIT_REPLY_REJECTED(finding, rationale ?? 'no rationale provided');
+    return await postPrComment(prUrl, body);
+  } catch {
+    return false;
+  }
 }
 
 async function resolveOwnerRepo(workspace: string): Promise<{ owner: string; repo: string } | null> {
