@@ -36,6 +36,16 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-06T23:30:57.338Z"
+    },
+    {
+      "timestamp": "2026-07-07T00:07:46.681Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-07T00:07:48.094Z"
     }
   ],
   "feedback": [],
@@ -44,6 +54,7 @@
       ".beads/issues.jsonl",
       ".pan/drafts/pan-2387.md",
       ".pan/records/pan-2387.json",
+      "src/lib/__tests__/agent-state-role.test.ts",
       "src/lib/agents/spawn.ts",
       "src/lib/cost.ts",
       "src/lib/manifest.ts",
@@ -53,6 +64,7 @@
       "sync-sources/hooks/record-cost-event.js.map",
       "tests/lib/memory/providers.test.ts",
       "tests/lib/overdeck/cost-sync.test.ts",
+      "tests/playwright/conversation-supervisor-uat.test.ts",
       "tests/unit/lib/cloister/scan-git-patterns.test.ts",
       "tests/unit/lib/overdeck/cost-reconcile.test.ts",
       "tests/unit/lib/pan-444-post-merge-step0.test.ts"
@@ -92,6 +104,7 @@
       "src/dashboard/frontend/src/lib/cost-bucket-labels.ts",
       "src/dashboard/server/routes/issues.ts",
       "src/dashboard/server/services/cost-reconcile-service.ts",
+      "src/lib/__tests__/agent-state-role.test.ts",
       "src/lib/agents/spawn.ts",
       "src/lib/cost-parsers/__tests__/codex-parser-gpt55.test.ts",
       "src/lib/cost-parsers/__tests__/fixtures/rollout-gpt55-nested.jsonl",
@@ -114,14 +127,15 @@
       "sync-sources/hooks/record-cost-event.js.map",
       "tests/lib/memory/providers.test.ts",
       "tests/lib/overdeck/cost-sync.test.ts",
+      "tests/playwright/conversation-supervisor-uat.test.ts",
       "tests/unit/lib/cloister/scan-git-patterns.test.ts",
       "tests/unit/lib/overdeck/cost-reconcile.test.ts",
       "tests/unit/lib/pan-444-post-merge-step0.test.ts"
     ],
-    "recordedAt": "2026-07-06T23:08:37.455Z"
+    "recordedAt": "2026-07-07T00:07:09.510Z"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "unknown-backfill": "completed",
     "unknown-backfill.ac1": "completed",
@@ -165,12 +179,12 @@
   "pipeline": {
     "issueId": "PAN-2387",
     "reviewStatus": "reviewing",
-    "testStatus": "passed",
-    "verificationStatus": "passed",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T23:58:59.013Z",
+    "updatedAt": "2026-07-07T00:07:47.771Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed verification failure",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -178,12 +192,13 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/2432",
     "reviewedAtCommit": "4dc456c9627272a6fb90acc3c6b7ee8ccb11878b",
     "lastVerifiedCommit": "4dc456c9627272a6fb90acc3c6b7ee8ccb11878b",
-    "reviewRequestedAt": "2026-07-06T23:08:44.604Z",
+    "reviewRequestedAt": "2026-07-07T00:07:46.682Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".beads/issues.jsonl",
         ".pan/drafts/pan-2387.md",
         ".pan/records/pan-2387.json",
+        "src/lib/__tests__/agent-state-role.test.ts",
         "src/lib/agents/spawn.ts",
         "src/lib/cost.ts",
         "src/lib/manifest.ts",
@@ -193,6 +208,7 @@
         "sync-sources/hooks/record-cost-event.js.map",
         "tests/lib/memory/providers.test.ts",
         "tests/lib/overdeck/cost-sync.test.ts",
+        "tests/playwright/conversation-supervisor-uat.test.ts",
         "tests/unit/lib/cloister/scan-git-patterns.test.ts",
         "tests/unit/lib/overdeck/cost-reconcile.test.ts",
         "tests/unit/lib/pan-444-post-merge-step0.test.ts"
@@ -232,6 +248,7 @@
         "src/dashboard/frontend/src/lib/cost-bucket-labels.ts",
         "src/dashboard/server/routes/issues.ts",
         "src/dashboard/server/services/cost-reconcile-service.ts",
+        "src/lib/__tests__/agent-state-role.test.ts",
         "src/lib/agents/spawn.ts",
         "src/lib/cost-parsers/__tests__/codex-parser-gpt55.test.ts",
         "src/lib/cost-parsers/__tests__/fixtures/rollout-gpt55-nested.jsonl",
@@ -254,11 +271,12 @@
         "sync-sources/hooks/record-cost-event.js.map",
         "tests/lib/memory/providers.test.ts",
         "tests/lib/overdeck/cost-sync.test.ts",
+        "tests/playwright/conversation-supervisor-uat.test.ts",
         "tests/unit/lib/cloister/scan-git-patterns.test.ts",
         "tests/unit/lib/overdeck/cost-reconcile.test.ts",
         "tests/unit/lib/pan-444-post-merge-step0.test.ts"
       ],
-      "recordedAt": "2026-07-06T23:08:37.455Z"
+      "recordedAt": "2026-07-07T00:07:09.510Z"
     }
   },
   "closeOut": {
@@ -266,8 +284,8 @@
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 110670,
-            "output": 15757,
+            "input": 111863,
+            "output": 16213,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -296,10 +314,10 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 19831,
-            "output": 14038,
-            "cacheRead": 1846920,
-            "cacheWrite": 265858
+            "input": 19835,
+            "output": 15647,
+            "cacheRead": 2060794,
+            "cacheWrite": 270094
           }
         },
         "test": {
@@ -313,8 +331,8 @@
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 110670,
-          "output": 15757,
+          "input": 111863,
+          "output": 16213,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -331,10 +349,10 @@
           "cacheWrite": 649636
         },
         "anthropic/claude-sonnet-5": {
-          "input": 19831,
-          "output": 14038,
-          "cacheRead": 1846920,
-          "cacheWrite": 265858
+          "input": 19835,
+          "output": 15647,
+          "cacheRead": 2060794,
+          "cacheWrite": 270094
         },
         "custom/kimi-k2.7-code": {
           "input": 1465210,
@@ -344,8 +362,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 40.782481,
-        "pricingAsOf": "2026-07-06T23:58:59.065Z"
+        "usd": 40.851944,
+        "pricingAsOf": "2026-07-07T00:07:47.919Z"
       }
     },
     "merges": [
@@ -354,5 +372,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-06T22:14:47.667Z",
-  "updated": "2026-07-06T23:58:59.065Z"
+  "updated": "2026-07-07T00:07:48.094Z"
 }
