@@ -4,17 +4,26 @@
 # No NEW directed import cycle may appear in src/. A BASELINED cycle may disappear,
 # lowering the baseline; a new cycle fails CI. Baseline is
 # scripts/circular-deps-baseline.txt (one canonical cycle per line).
-# Run with --update to drop cycles that have been removed (D3). --update never
-# adds cycles: introducing a new cycle requires a separate, issue-referenced
-# decision (D4).
+#
+# Modes:
+#   (no args)     check current src/ against the baseline
+#   --update      drop cycles that have been removed; never add new ones
+#   --regen       rewrite the baseline from the current cycle list
+#
+# --update lowers the ratchet when cycles are removed (D3). --regen is for initial
+# seeding or deliberate rebaselining; introducing a new cycle still requires a
+# separate, issue-referenced decision because lint-ratchet-audit.sh audits the
+# baseline for additions (D4).
 #
 set -euo pipefail
 
 MODE=check
 if [[ "${1:-}" == "--update" ]]; then
   MODE=update
+elif [[ "${1:-}" == "--regen" ]]; then
+  MODE=regen
 elif [[ $# -gt 0 ]]; then
-  echo "usage: bash scripts/lint-circular-deps.sh [--update]" >&2
+  echo "usage: bash scripts/lint-circular-deps.sh [--update | --regen]" >&2
   exit 2
 fi
 
@@ -41,9 +50,18 @@ current=$(mktemp)
 node "$CANON" < "$current_raw" > "$current"
 rm -f "$current_raw"
 
+# Regen mode: rewrite the baseline from the current cycle list.
+if [[ "$MODE" == "regen" ]]; then
+  cp "$current" "$BASELINE"
+  count=$(wc -l < "$current")
+  rm -f "$current"
+  echo "✓ circular-deps baseline regenerated ($count cycles)"
+  exit 0
+fi
+
 # Ensure baseline file exists.
 if [[ ! -f "$BASELINE" ]]; then
-  echo "✖ missing $BASELINE — run the REGEN command in this script's header." >&2
+  echo "✖ missing $BASELINE — regenerate it: bash scripts/lint-circular-deps.sh --regen" >&2
   rm -f "$current"
   exit 1
 fi
