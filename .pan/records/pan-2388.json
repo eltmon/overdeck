@@ -31,17 +31,14 @@
       "reason": "feedback",
       "note": "[2026-07-07T18:02Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-07T18:02:46.553Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-07T18:02:46Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2388\n\nManual reconcile route drops the existing Claude transcript reconciler\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2388 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-07T18:04:40.911Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".beads/export-state.json",
@@ -198,17 +195,18 @@
   },
   "pipeline": {
     "issueId": "PAN-2388",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T18:02:45.660Z",
+    "updatedAt": "2026-07-07T18:04:45.351Z",
     "reviewNotes": "Manual reconcile route drops the existing Claude transcript reconciler",
     "testNotes": "typecheck passed; npm test passed (896/900 test files, 8762/8821 tests, frontend 3/3); lint failed at lint:circular on cycle src/lib/agents.ts > src/lib/agents/resume.ts > src/lib/review-status.ts > src/lib/cloister/feedback-target.ts. Cycle files are outside PAN-2388 working set. Browser UAT not required per vBRIEF NonGoals.",
     "inspectNotes": "Bead ohmypi-fixtures ack: commit 9de8b447 touches only codex-parser.ts (revert of CodexCostEventUsage additions), a cost-reconcile integration test, and a runbook doc -- zero changes to ohmypi-parser.ts, ohmypi-parser.test.ts, or any ohmypi fixture file. Not this beads scope; AC1-4 remain satisfied unchanged from the prior verified state (c6b01bb3). No action needed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2470",
+    "lastVerifiedCommit": "39d770364c889004aa39af26d8d1a18d8c116a9d",
     "reviewRequestedAt": "2026-07-07T18:01:33.672Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -429,7 +427,7 @@
       },
       "costAtCloseOut": {
         "usd": 256.154714,
-        "pricingAsOf": "2026-07-07T18:02:45.698Z"
+        "pricingAsOf": "2026-07-07T18:04:45.434Z"
       }
     },
     "merges": [
@@ -463,5 +461,5 @@
     }
   },
   "created": "2026-07-07T17:32:25.282Z",
-  "updated": "2026-07-07T18:02:46.553Z"
+  "updated": "2026-07-07T18:04:45.444Z"
 }
