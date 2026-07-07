@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-2230",
   "schemaVersion": 2,
-  "created": "2026-07-07T06:16:55.749Z",
-  "updated": "2026-07-07T06:16:56.431Z",
-  "pipeline": {
-    "issueId": "PAN-2230",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-07T06:16:55.749Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -26,6 +9,60 @@
       "timestamp": "2026-07-07T06:16:55.749Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-07T06:16:55.749Z",
+  "updated": "2026-07-07T08:43:11.997Z",
+  "pipeline": {
+    "issueId": "PAN-2230",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-07T08:43:11.973Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 7133,
+            "output": 200,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 18569,
+            "output": 49146,
+            "cacheRead": 4142292,
+            "cacheWrite": 160632
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-haiku-4-5": {
+          "input": 7133,
+          "output": 200,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 18569,
+          "output": 49146,
+          "cacheRead": 4142292,
+          "cacheWrite": 160632
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 4.404727,
+        "pricingAsOf": "2026-07-07T08:43:11.996Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "model": "kimi-k2.7-code"
 }
