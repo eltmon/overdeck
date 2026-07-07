@@ -28052,6 +28052,7 @@ function mergeConfigs(...configs) {
 			if (!isComplianceMode(config.compliance.mode)) throw new Error(`config.yaml: compliance.mode must be ${COMPLIANCE_MODES.join(", ")}`);
 			result.compliance.mode = config.compliance.mode;
 		}
+		if (config.planning?.default_mode !== void 0) result.planning = { defaultMode: config.planning.default_mode };
 		if (config.registry?.classification) {
 			const classification = config.registry.classification;
 			if (classification.enabled !== void 0) result.registry.classification.enabled = classification.enabled;
