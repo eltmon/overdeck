@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-2420",
   "schemaVersion": 2,
-  "created": "2026-07-07T01:06:13.356Z",
-  "updated": "2026-07-07T01:06:13.543Z",
-  "pipeline": {
-    "issueId": "PAN-2420",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-07T01:06:13.356Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -26,6 +9,60 @@
       "timestamp": "2026-07-07T01:06:13.356Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-07T01:06:13.356Z",
+  "updated": "2026-07-07T01:35:28.235Z",
+  "pipeline": {
+    "issueId": "PAN-2420",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-07T01:35:28.211Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 7862,
+            "output": 258,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 45900,
+            "output": 66449,
+            "cacheRead": 13233382,
+            "cacheWrite": 576864
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 7862,
+          "output": 258,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 45900,
+          "output": 66449,
+          "cacheRead": 13233382,
+          "cacheWrite": 576864
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 12.1198825,
+        "pricingAsOf": "2026-07-07T01:35:28.234Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "model": "kimi-k2.7-code"
 }
