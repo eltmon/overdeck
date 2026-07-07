@@ -21,3 +21,7 @@ OKF does not prescribe a fixed taxonomy. Use these types as consistent defaults,
 - Use a specific existing project term when it is clearer than a generic one.
 - Keep one idea per concept. Split mixed concepts before adding more headings.
 - Use tags for cross-cutting grouping; do not invent tag index files.
+
+## Authoring
+
+When `/okf author "<topic>"` creates a concept, infer the narrowest useful type from this taxonomy and confirm ambiguous choices before writing. New concepts should include `type`, `title`, `description`, `tags`, and `timestamp` when the information is available; unknown existing keys are preserved on updates.

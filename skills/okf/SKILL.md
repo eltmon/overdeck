@@ -79,19 +79,22 @@ Create a knowledge bundle and pointer file.
 
 Write or update one concept for one idea.
 
-- Infer a concept type from `references/taxonomy.md`, then confirm when user input is ambiguous.
-- Use `templates/concept.md`.
+- Infer exactly one concept ID and one concept type from `references/taxonomy.md`; confirm when the type or path is ambiguous.
+- Use `templates/concept.md` and let the skill manage frontmatter. Include `type`, `title`, `description`, `tags`, and `timestamp` when available.
+- Preserve unknown frontmatter keys on updates.
 - Add relative or bundle-root links only when they point to real concepts or clearly planned knowledge.
-- Regenerate indexes and logs, then validate.
+- Run `reindex.py`, append a dated `log.md` entry, then run `validate.py --strict` before offering the change.
 
 ## `/okf convert <path>`
 
 Convert existing docs into OKF without destructive edits.
 
-- Start with a dry-run conversion plan.
+- Start with a dry-run conversion plan that lists source path, target concept ID, inferred type, and whether a rename is proposed.
 - Add frontmatter before renaming files.
-- Never delete a README or source document.
+- Apply renames only after explicit confirmation.
+- Never delete or rename a README or source document.
 - Preserve citations and convert wiki-style links where possible.
+- After confirmed edits, run `reindex.py` and `validate.py --strict`.
 
 ## `/okf sync [--topic "<focus>"]`
 

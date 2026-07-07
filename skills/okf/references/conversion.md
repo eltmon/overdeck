@@ -6,10 +6,12 @@ Convert source material into OKF conservatively. Existing documents are source e
 
 - Start with a dry-run plan that lists proposed concept IDs, types, and source files.
 - Add frontmatter before any rename.
-- Never delete a README or source document during conversion.
+- Apply renames only after explicit confirmation from the user.
+- Never delete or rename a README or source document during conversion.
 - Preserve existing citations and outbound links.
 - Prefer bundle-root links (`/path/to/concept.md`) for durable cross-links.
 - Record uncertain mappings in the PR description instead of guessing silently.
+- After confirmed edits, regenerate indexes and logs with `reindex.py`, then run `validate.py --strict`.
 
 ## Loose Markdown
 

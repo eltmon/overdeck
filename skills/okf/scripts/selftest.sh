@@ -73,6 +73,15 @@ require_grep 'preserve non-matching concepts byte-identically' "$SKILL" "sync to
 require_grep 'Append exactly one dated `log.md` entry' "$ROOT/references/workflow.md" "workflow sync appends one dated log entry"
 require_grep 'Run `reindex.py`' "$ROOT/references/workflow.md" "workflow sync regenerates index"
 require_grep 'never pushes directly to the default branch' "$ROOT/references/workflow.md" "workflow sync is PR-gated"
+require_grep 'Infer exactly one concept ID and one concept type' "$SKILL" "author infers one concept and type"
+require_grep 'Include `type`, `title`, `description`, `tags`, and `timestamp`' "$SKILL" "author requires recommended frontmatter"
+require_grep 'Run `reindex.py`, append a dated `log.md` entry, then run `validate.py --strict`' "$SKILL" "author reindexes logs and validates"
+require_grep 'dry-run conversion plan' "$SKILL" "convert starts with dry-run plan"
+require_grep 'Apply renames only after explicit confirmation' "$SKILL" "convert gates renames on confirmation"
+require_grep 'Never delete or rename a README' "$SKILL" "convert preserves README files"
+require_grep 'After confirmed edits, run `reindex.py` and `validate.py --strict`' "$SKILL" "convert validates confirmed edits"
+require_grep 'Never delete or rename a README or source document during conversion' "$ROOT/references/conversion.md" "conversion reference preserves README"
+require_grep 'infer the narrowest useful type' "$ROOT/references/taxonomy.md" "taxonomy guides author type inference"
 
 python3 - "$ROOT" <<'PY'
 import importlib.util
