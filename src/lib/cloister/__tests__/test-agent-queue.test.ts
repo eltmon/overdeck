@@ -15,6 +15,11 @@ vi.mock('../../review-status.js', () => ({
   setReviewStatusSync: vi.fn(),
 }));
 
+vi.mock('../merge-verification.js', () => ({
+  shouldSkipDispatchAsMerged: vi.fn(async () => ({ skip: false, reason: 'open' })),
+  verifyMergedBeforeLifecycle: vi.fn(),
+}));
+
 import { spawnRun } from '../../agents.js';
 import { resolveProjectFromIssueSync } from '../../projects.js';
 import { setReviewStatusSync } from '../../review-status.js';
