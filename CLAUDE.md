@@ -476,9 +476,9 @@ When `agents.rtk.enabled` is true, Bash outputs the agent sees (git status, npm 
 
 Overdeck uses **vBRIEF v0.5** for machine-readable work plans. Key references:
 
-- **Canonical spec:** [github.com/deftai/vBRIEF](https://github.com/deftai/vBRIEF)
-- **Our fork:** [github.com/eltmon/vBRIEF](https://github.com/eltmon/vBRIEF)
-- **Extension proposal:** [deftai/vBRIEF#1](https://github.com/deftai/vBRIEF/issues/1)
+- **Canonical spec:** [github.com/deftai/xBRIEF](https://github.com/deftai/xBRIEF) (renamed from vBRIEF at v0.7.0; spec now v0.8)
+- **Our fork:** [github.com/eltmon/xBRIEF](https://github.com/eltmon/xBRIEF)
+- **Extension proposal:** [deftai/xBRIEF#40](https://github.com/deftai/xBRIEF/issues/40) (supersedes #1)
 - **Overdeck docs:** [docs/VBRIEF.md](docs/VBRIEF.md) — full schema, lifecycle, and migration notes
 
 ### The four-artifact model (PAN-1124: single-spec-on-main)
