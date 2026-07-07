@@ -4,17 +4,17 @@
     "created": "2026-07-06T23:59:29.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2095: pan reload builds stale primary worktree source (divergent from origin/main) — landed strike fixes never go live",
-    "updated": "2026-07-07T00:08:35.303Z"
+    "updated": "2026-07-07T02:26:42.104Z"
   },
   "plan": {
     "id": "pan-2095",
     "title": "bug(deploy): pan reload builds stale primary worktree source (divergent from origin/main) — landed strike fixes never go live",
-    "status": "running",
+    "status": "completed",
     "uid": "0573d515-cd40-4409-987f-4db11203aa8a",
     "author": "agent:claude-opus-4-8",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-06T23:59:29.000Z",
-    "updated": "2026-07-07T00:08:35.303Z",
+    "updated": "2026-07-07T02:26:42.104Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2095",
@@ -227,5 +227,5 @@
       "canonicalFilename": "2026-07-07-PAN-2095-bug-deploy-pan-reload-builds-stale-primary-worktree-source-divergent-from-origin-main-landed-strike-fixes-never-go-live.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
