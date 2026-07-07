@@ -3400,6 +3400,46 @@ function runScheduledPatrol(source: 'startup' | 'interval'): void {
   }
 }
 
+export interface BootAdvancingSelfHealDeps {
+  reconcileInFlightJournals(): Promise<string[]>;
+  checkMergedAdvancingSessions(): Promise<string[]>;
+  checkIdleTerminalAdvancingSessions(): Promise<string[]>;
+  log(message: string): void;
+}
+
+const defaultBootAdvancingSelfHealDeps: BootAdvancingSelfHealDeps = {
+  reconcileInFlightJournals,
+  checkMergedAdvancingSessions,
+  checkIdleTerminalAdvancingSessions,
+  log: logDeaconEventSync,
+};
+
+export async function runBootAdvancingSelfHeal(
+  deps: BootAdvancingSelfHealDeps = defaultBootAdvancingSelfHealDeps,
+): Promise<string[]> {
+  const actions: string[] = [];
+  const steps: Array<[string, () => Promise<string[]>]> = [
+    ['reconcileInFlightJournals', deps.reconcileInFlightJournals],
+    ['checkMergedAdvancingSessions', deps.checkMergedAdvancingSessions],
+    ['checkIdleTerminalAdvancingSessions', deps.checkIdleTerminalAdvancingSessions],
+  ];
+
+  for (const [name, step] of steps) {
+    try {
+      const stepActions = await step();
+      actions.push(...stepActions);
+      if (stepActions.length > 0) {
+        deps.log(`startDeacon: ${name} boot self-heal actions: ${stepActions.join('; ')}`);
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      deps.log(`startDeacon: ${name} boot self-heal failed: ${msg}`);
+    }
+  }
+
+  return actions;
+}
+
 // ============================================================================
 // Deacon Log Buffer
 // ============================================================================
@@ -3557,6 +3597,7 @@ export function startDeacon(): void {
   // first patrol. PAN-1908: use the thin table-query reconcile instead of directory scans.
   void (async () => {
     await reconcileAgentLiveness();
+    await runBootAdvancingSelfHeal();
     runScheduledPatrol('startup');
   })().catch((err) => {
     const msg = err instanceof Error ? err.message : String(err);
