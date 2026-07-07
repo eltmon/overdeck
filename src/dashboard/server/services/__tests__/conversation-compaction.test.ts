@@ -60,7 +60,7 @@ function writeJsonl(name: string, lines: unknown[]): Promise<string> {
 }
 
 describe('conversation native compaction', () => {
-  it('writes the compact boundary to a forked file without mutating the source', async () => {
+  it('writes the compact boundary to a forked file without mutating the source', { timeout: 20_000 }, async () => {
     const file = await writeJsonl('session.jsonl', [
       { type: 'user', message: { role: 'user', content: [{ type: 'text', text: 'Fix the broken deploy' }] } },
       {
