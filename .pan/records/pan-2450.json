@@ -60,14 +60,13 @@
     "issueId": "PAN-2450",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T05:48:50.187Z",
+    "updatedAt": "2026-07-07T05:53:42.713Z",
     "reviewNotes": "Dispatch failed: [review-agent] Skipping review dispatch for PAN-2450 — GitHub PR #2455 is merged",
-    "verificationNotes": "Verification FAILED at test (63847ms):\n\n/Projects/overdeck/workspaces/feature-pan-2450/dist/chunk-ruWRV7i3.js' imported from /home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/dist/cli/index.js\n    at finalizeResolution (node:internal/modules/esm/resolve:274:11)\n    at moduleResolve (node:internal/modules/esm/resolve:859:10)\n    at defaultResolve (node:internal/modules/esm/resolve:983:11)\n    at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)\n    at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)\n    at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)\n    at ModuleJob._link (node:internal/modules/esm/module_job:182:49) {\n  code: 'ERR_MODULE_NOT_FOUND',\n  url: 'file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2450/dist/chunk-ruWRV7i3.js'\n}\n\nNode.js v22.22.0\n\"\n\n ❯ src/cli/commands/__tests__/done.test.ts:51:84\n     49|\n     50|   it('rejects --test-waived without a reason (AC4)', () => {\n     51|     expect(() => execFileSync('node', [CLI, 'done', 'PAN-1501', '--tes…\n       |                                                                                    ^\n     52|       /error: option '--test-waived <reason>' argument missing/i,\n     53|     );\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts > spawnConversationSession PTY supervisor wiring > wraps Claude Code conversations with the PTY supervisor and waits for its socket\nError: pty-supervisor build artifact missing — run `npm run build`.\n ❯ spawnConversationSession src/lib/overdeck/conversation-runtime.ts:596:13\n    594|     supervisorScriptPath = resolvePtySupervisorScriptPath();\n    595|     if (!existsSync(supervisorScriptPath)) {\n    596|       throw new Error('pty-supervisor build artifact missing — run `np…\n       |             ^\n    597|     }\n    598|     await writePtyToken(tmuxSession);\n ❯ src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts:126:5\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2455",
-    "lastVerifiedCommit": "843300d2530def69b7a19c26e7744bab14cd3b69",
+    "lastVerifiedCommit": "af9fd682a86329d56b630d598b4b001281ab0a9f",
     "reviewRequestedAt": "2026-07-07T05:09:25.065Z"
   },
   "closeOut": {
@@ -91,9 +90,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1331538,
-            "output": 262533,
-            "cacheRead": 136567930,
+            "input": 1371516,
+            "output": 269796,
+            "cacheRead": 141621370,
             "cacheWrite": 0
           }
         }
@@ -112,15 +111,15 @@
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 1331538,
-          "output": 262533,
-          "cacheRead": 136567930,
+          "input": 1371516,
+          "output": 269796,
+          "cacheRead": 141621370,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 32.240939,
-        "pricingAsOf": "2026-07-07T05:48:50.232Z"
+        "usd": 33.268121,
+        "pricingAsOf": "2026-07-07T05:53:42.804Z"
       }
     },
     "merges": [
@@ -132,5 +131,5 @@
     "finalizedAt": "2026-07-07T04:18:45.208Z"
   },
   "created": "2026-07-07T04:55:35.112Z",
-  "updated": "2026-07-07T05:48:50.233Z"
+  "updated": "2026-07-07T05:53:42.805Z"
 }
