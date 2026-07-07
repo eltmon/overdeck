@@ -207,6 +207,170 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-58 tick 63 (2026-07-07) — static (3rd tick): all levers operator-gated; deliberately HOLDING new Lane A dispatches (would just create more PAN-2167-wedged branches)
+
+**MAIN GREEN (faffae87a4, unchanged). No change since t62.** PAN-2167 not authorized/dispatched (no fix, no session) → B2/A7/A8 still wedged. PAN-2388 both slots ready-to-merge (assembly-gated). Ready set = MIN-857 (held). No off-book planning (PAN-2445 clean).
+- **DECISION — hold new Lane A dispatches (A9/PAN-2229, A13/PAN-2445) until PAN-2167 lands.** Even a fresh workspace (initially conflict-free) will get a sibling's record written onto it by the deacon's cross-workspace sync the moment the *next* issue closes out → becomes wedged on the same add/add conflict. Fanning out now just manufactures more wedged branches. Correct posture: hold dispatch, keep escalation surfaced, drain what ripens (A6 review, MYN train), wait on operator (PAN-2167 authorization + PAN-2388 budget).
+- Everything else static/operator-gated: A6/PAN-2374 in review (progressing), MIN-857 UAT (Ed), MYN M1/M3 (own train), PAN-2383/PAN-2388 budget (operator), dashboard redeploy (operator's call).
+
+## RUN-58 tick 62 (2026-07-07) — PAN-2167 escalation STRENGTHENED: now blocks B2 + A7 + A8 (3 order-book items); dashboard reload failed 2h ago (stale)
+
+**MAIN GREEN (faffae87a4, unchanged). No change on operator-gated items.**
+- **★ PAN-2167 now wedges THREE order-book items.** Investigated A8/PAN-2297 (was going to dispatch it as Lane A trickle): it's already `in-progress` with spec+workspace but DORMANT (no session), has ONLY planning commits (no implementation), and its branch carries **3 divergent sibling records** (`pan-1847`, `pan-2289`, `pan-2296`) → a resume/start would abort at sync-main on the same PAN-2167 add/add class. So PAN-2167 blocks **B2 (Lane B critical path) + A7 + A8** — the dominant blocker for the in-flight order-book cohort. NOT dispatched (operator tick-62 instruction: "If NOT authorized → leave surfaced"; operator has not authorized). NOT force-started A8 (blocked + no-hand-resolve).
+- **PAN-2388 (priority):** both slots still `ready-to-merge · unmerged` (assembly-gated on PAN-2383 budget). No change; re-surfaced.
+- **B2/A7 conflict unchanged** (both branches still diverge on `.pan/records/pan-2420.json`). No retry.
+- **⚠ SYSTEM NOTE:** `pan status` shows "Last dashboard restart: ⚠ FAILED (pan reload, 2h ago, 161.4s, pid 10595, agent-pan-2450)". Stale (pre-dates the 07:15/07:19 merges), live server on :3011 is functional (API calls work), but the PAN-2450 dashboard redesign may not be deployed to the live UI. SURFACED, not acting — live dashboard restart is boot-path-risky (feedback_no_live_boot_hotpatch). Operator's call on a redeploy.
+- Ready set = MIN-857 (MYN, UAT-held). No off-book planning (PAN-2445 clean). No new squash-assemblies. No drain, no safe dispatch (all in-flight starts wedged by PAN-2167).
+
+## RUN-58 tick 61 (2026-07-07) — ★ PAN-2388 both slots ready-to-merge (cost-capture work DONE, assembly-gated); A5 CLOSED; B2+A7 still wedged on PAN-2167 (not yet authorized)
+
+**MAIN GREEN (faffae87a4, unchanged).**
+- **★ PAN-2388 (priority pair) both slots now `ready-to-merge`** — slot-1 codex-fixtures + slot-3 ohmypi-fixtures both `ready-to-merge · unmerged · session alive` (were `running` last tick). **The codex/ohmypi cost-capture implementation is DONE**; only assembly/merge remains — operator-gated (budget held by PAN-2383, slot-3 merge issue). Not failed-merge → re-surfaced, no recover (per instruction). Near completion for the #1 priority.
+- **A5/PAN-2375 now CLOSED** (close-out completed). PAN-2450 CLOSED (t60). Order book ~8 landed, A5+A10 closed out.
+- **PAN-2167 NOT authorized/dispatched** — no fix on main, no pan-2167 session, no operator reply. B2/PAN-2341 + A7/PAN-2230 both still have `.pan/records/pan-2420.json` divergence → both stay start-blocked. Re-surfaced with dispatch recommendation. No retry, no hand-resolve.
+- Ready set = MIN-857 (MYN/GitLab, UAT-held) — no overdeck items to drain. No off-book planning (PAN-2445 clean). No new squash-assemblies.
+
+## RUN-58 tick 60 (2026-07-07) — ⚠ PAN-2167 records conflict now blocks BOTH B2 (Lane B critical path) + A7; A5/PAN-2450 closing; B2 spec landed but start wedged
+
+**MAIN GREEN (faffae87a4).** A5/PAN-2375 + PAN-2450 verified green on main.
+- **★ ESCALATION — PAN-2167 records add/add conflict now blocks the Lane B critical path.** Operator ANSWERED B2's design Q → B2/PAN-2341 spec finalized (`…advancing-ceiling-permanently-jams…no-journal-reconcile-zombie-reap-on-boot`). But `pan start PAN-2341` **aborted at sync-main with the SAME `.pan/records/pan-2420.json` add/add conflict** that blocks A7. So PAN-2167 now wedges **B2 (Lane B serial critical path) AND A7** — escalated from trickle-nibble to pipeline-blocker. Fresh workspaces are fine; only in-flight branches predating PAN-2420's close-out are hit.
+  - **RECOMMEND operator authorize dispatching PAN-2167's fix** (sync-main auto-resolve `.pan/records/<other>.json` → take incoming/main). NOT auto-dispatched: it's off-order-book + high-blast-radius sync-main machinery, and the operator's tick prompts treat PAN-2167 as an external dependency ("if PAN-2167 fix merged"). Flywheel will `pan plan/start PAN-2167` on operator's go.
+- **CLOSE-OUTS (main green):** PAN-2450 → **CLOSED** (close-out complete). A5/PAN-2375 → close-out running (workspace teardown; still OPEN, verify next tick). Both used `pan close --force`.
+- **A7 (PAN-2230) still start-blocked** (same PAN-2167 conflict). 
+- Ready set = MIN-857 (MYN/GitLab, UAT-held) — MIN-854 dropped (MYN train). PAN-2388: 2 slots running, 0 merged (operator-gated). PAN-2445 clean.
+
+## RUN-58 tick 59 (2026-07-07) — A5/PAN-2375 + PAN-2450 MERGED (order book ~8); close-out DEFERRED to main-green; A7/B2 still blocked
+
+**MERGES LANDED:** A5/PAN-2375 (`f93fb65c2a`, #2457) + PAN-2450 (`faffae87a4`, #2455). **Order book ~8 landed: B0/2318, A1/2373, A2/2371, A3/2336, A4/2095, A5/2375, A10/2420, B1/2207.**
+- **MAIN CI in_progress on `faffae87a4`** (the PAN-2450 merge HEAD) — WATCH for red next tick.
+- **Close-out DEFERRED to next tick, gated on main-green.** Both issues correctly at `merged`+`verifying-on-main` (postMergeLifecycle ran). Reasons to hold: (a) verifying-on-main IS the correct resting state while main CI runs; (b) close-out is destructive (workspace teardown + branch delete) — premature teardown before main-green would strand a red-main fix; (c) `pan close` is INTERACTIVE (`Proceed? [y/N]`) → use **`pan close <id> --force`** (found via --help) next tick once CI green.
+- **A7 (PAN-2230) STILL start-blocked** — PAN-2167 unfixed, `.pan/records/pan-2420.json` divergence still on branch. Surfaced, no retry/hand-resolve.
+- **B2 (PAN-2341) STILL blocked** — no spec, operator flag Q unanswered.
+- Ready set = MIN-854 + MIN-857 (MYN/GitLab own train; 857 UAT-held) — NOT overdeck-scheduled. PAN-2388: 2 slots running, 0 merged (operator-gated). PAN-2445 clean. No off-book planning.
+- REUSABLE: `pan close` prompts `Proceed with close-out? [y/N]` — backgrounded/no-stdin → Exit 13. Use `--force`. And DON'T close-out while main CI still in_progress on the merge HEAD — verifying-on-main is the correct wait state; close only after main-green.
+
+## RUN-58 tick 58 (2026-07-07) — DRAINED A5/PAN-2375 (#2457, order-book) + PAN-2450 (#2455, dashboard) → auto-merge @07:12; A7 still blocked; B2 still blocked
+
+**MAIN GREEN (bff8fc02ae, unchanged).**
+- **★ DRAIN: scheduled auto-merge for 2 ready+green PRs** (both review+test passed, all CI green):
+  - **A5/PAN-2375 (#2457)** — ORDER-BOOK Lane A. sched id 22, mergeAt 07:12.
+  - **PAN-2450 (#2455)** — non-order-book ("project-overview pipeline section redesign"); ready at the gate, not operator-owned → drained (auto_pickup gates *new dispatch*, not the merge gate). sched id 23, mergeAt 07:12.
+  - Merge mechanism reminder: `POST /api/flywheel/auto-merge/schedule` needs BOTH `x-internal-token` AND `Origin: http://localhost:3011` headers (else `{"error":"Missing origin"}`).
+- **A7 (PAN-2230) STILL start-blocked** — PAN-2167 fix not merged, `.pan/records/pan-2420.json` divergence still present on branch. No retry, no hand-resolve; surfaced.
+- **B2 (PAN-2341) STILL blocked** — no spec, operator flag Q unanswered.
+- MIN-854 + MIN-857 ready but MYN/GitLab (own merge train; 857 UAT-held) — NOT overdeck-scheduled. PAN-2388: 2 slots running, 0 merged (operator-gated). PAN-2445 clean. No new squash-assemblies.
+
+## RUN-58 tick 57 (2026-07-07) — A7 (PAN-2230) PLANNED but START BLOCKED on sync-main records add/add conflict → substrate bug (PAN-2167); B2 still blocked
+
+**MAIN GREEN (bff8fc02ae, unchanged).**
+- **A7 (PAN-2230, circular-dep ratchet) PLANNED, START BLOCKED.** planning-pan-2230 completed + spec proposed (`2026-07-07-PAN-2230-…circular-dependency-ratchet-madge…`), but `pan start PAN-2230` **aborted at sync-main**: add/add conflict on `.pan/records/pan-2420.json`. No work agent spawned; workspace clean (merge aborted). A8=2297, A9=2229, A13=2445 remain.
+  - **ROOT CAUSE (investigated):** merge-base has NO pan-2420.json; feature/pan-2230 *created* it via the deacon's cross-workspace record sync (`f63771653f` — writing sibling PAN-2420's close-out record onto this unrelated branch), main *independently* created the same file (A10 #2420 real close-out) → add/add → sync-main aborts. **Recurs** for any in-flight branch whose base predates a sibling's close-out.
+  - **SURFACED → PAN-2167** (existing OPEN `bug`+`substrate-improvement`, same root cause "pipeline-written .pan/records dirty the worktree"). Added new-manifestation comment (blocks `pan start`, not just `pan review request`) + deterministic fix (sync-main auto-resolve `.pan/records/<other>.json` by taking incoming/main). A7 left pending, NOT hand-resolved (flywheel doesn't edit workspace files).
+- **B2 (PAN-2341, Lane B) STILL blocked** — no spec, planner idle (unchanged) on KEEP_SPECIALIST_SESSIONS_ALIVE Q. Operator not yet answered. Lane B blocked.
+- **PAN-2388: slot-3 resumed** — now 2 of 3 slots running (slot-1 codex-fixtures + slot-3 ohmypi-fixtures, both `session alive · unmerged`). Neither failed-merge → no recovery; re-surfaced. 0 slots merged (assembly stalled, operator-gated).
+- Ready set = MIN-857 (MYN, UAT-held). No off-book planning (PAN-2445 clean). No new squash-assemblies since PAN-2407. No drain (nothing ready+green).
+- REUSABLE: `pan start` sync-main add/add conflict on `.pan/records/<sibling>.json` = deacon cross-workspace record sync collided with main's close-out record. Diagnose: `git -C <ws> diff $(git -C <ws> merge-base HEAD origin/main) HEAD -- <file>` shows `new file mode` on branch side. Surface to PAN-2167; do NOT hand-resolve.
+
+## RUN-58 tick 56 (2026-07-07) — quiet: B2 still blocked on operator flag Q; A7 planning; PAN-2407 also squash-assembled; ready set = MIN-857 (held)
+
+**MAIN GREEN (bff8fc02ae).** Latest merge: operator squash-assembled **PAN-2407** (paved-road `pan start`, #2458) — a kimi test item, NOT order-book; noted, no action.
+- **B2 (PAN-2341, Lane B) STILL blocked** — planner idle (ctx 27%, unchanged) on KEEP_SPECIALIST_SESSIONS_ALIVE design Q. Operator engaged (actively squash-assembling) but hasn't answered; leaving surfaced (option-2 default). Not re-dispatching (duplicate-planning-race risk + operator is live).
+- **A7 (PAN-2230) still planning** (planning-pan-2230 live, no spec yet). A5/A6 in review. A8=2297, A9=2229, A13=2445 remain.
+- Ready set = MIN-857 (MYN, UAT-held). PAN-2373 stale entry CLEARED. PAN-2388 slot-1 running (assembly stall, operator-gated). Off-book planning: none (PAN-2445 clean).
+- No dispatch (lanes full: A5/A6/A7 + B2-blocked + MYN M1/M3/M9), no drain (nothing ready+green). Order book ~7 landed unchanged.
+
+## RUN-58 tick 55 (2026-07-07) — A1 (PAN-2373) MERGED+CLOSED (operator squash-assembled #2460); order book ~7 landed; A7 planning; B2 still blocked
+
+**MAIN GREEN (177fd1f750).**
+- **★ A1 (PAN-2373, flake policy) MERGED via operator squash-assembly #2460** (`177fd1f750`), bypassing the verification-stuck loop (same pattern as B1/#2453). PAN-2373 already CLOSED. Its ready-set entry (#2419) is STALE (superseded) — do NOT schedule it. **Order book ~7 landed: B0/2318, A1/2373, A2/2371, A3/2336, A4/2095, A10/2420, B1/2207.**
+- **B2 (PAN-2341, Lane B) STILL blocked** on the KEEP_SPECIALIST_SESSIONS_ALIVE design Q (operator not yet answered). Lane B blocked; surfaced (option-2 default).
+- **A7 (PAN-2230, circular-dep ratchet) planning DISPATCHED** (bg) — Lane A trickle (A1/A10 done freed slots; A5/A6 in review + A7 planning). A8=2297, A9=2229, A13=2445 remain.
+- Ready set = PAN-2373 (STALE, skip) + MIN-857 (held). PAN-2388 assembly-stalled (operator). MYN Lane M (M1/M3/M9). PAN-2445 CLEAN.
+- REUSABLE: operator squash-assembles a verification/commit-stuck order-book item to main (bypassing the pipeline) → the issue CLOSES but its original PR/ready-status lingers STALE in the ready set. Detect merged-via-squash by `git log origin/main | grep "<id>, squash-assembled"`; close-out (already closed) + DON'T schedule the stale PR.
+
+## RUN-58 tick 54 (2026-07-07) — no change: B2 planner still awaiting operator design answer; A1 fresh cycle progressing; main green
+
+**MAIN GREEN (536c88d3e2).** Quiet tick — nothing new to act on.
+- **B2 (PAN-2341, Lane B) planner STILL idle** at the KEEP_SPECIALIST_SESSIONS_ALIVE design Q (ctx/out unchanged — operator not yet answered). Lane B blocked; surfaced w/ option-2 default. Don't re-dispatch (would re-ask); wait for operator.
+- **A1 (PAN-2373): fresh review cycle, no verdict yet** (feedback empty — progressing, not failed). Not in ready set.
+- A5/A6 in review. MYN Lane M (M1/M3/M9) — holding M4(MIN-858)/M5(MIN-859) dispatch (3 MYN in flight; Ed works MYN — let cohort progress). Ready set = MIN-857 (held). PAN-2388 assembly-stalled (operator). PAN-2445 CLEAN.
+- OPERATOR-GATED SET (all surfaced, flywheel levers exhausted): B2 design-Q, PAN-2388 assembly, MIN-857 UAT-merge. A1 self-progressing (fresh cycle). Nothing to dispatch (lanes full) / drain (nothing ready).
+
+## RUN-58 tick 53 (2026-07-07) — B2 planner ESCALATED to interactive on a design Q (KEEP_SPECIALIST_SESSIONS_ALIVE) → surfaced; A1 fresh cycle; main green
+
+**MAIN GREEN (536c88d3e2).**
+- **B2 (PAN-2341, Lane B) planner BLOCKED on a design decision (escalated --auto→interactive, idle ~16min):** pane asks *"Which would you like? Option 1 keep the KEEP_SPECIALIST_SESSIONS_ALIVE flag, or is PAN-2007's keep-alive now obsolete (making option 2 clean)?"* — a real design call about the zombie-reap approach that touches prior operator request PAN-2007. **Flywheel can't answer (pan tell forbidden) → SURFACED to operator.** RECOMMENDATION per B2's own PRD framing (".pan/drafts/PAN-2341.md: KEEP_SPECIALIST_SESSIONS_ALIVE … is the STRUCTURAL ROOT of the zombie problem; the PAN-1716 reaper is disabled"): **option-2 direction — the flag's blanket keep-alive is the bug the reaper must overcome** (reap terminal-verdict advancing sessions even when the flag is set, scoped so live work isn't reaped). Operator: answer the planner (pan tell / dashboard) or authorize this default → I re-dispatch. **Lane B blocked on B2 until resolved.**
+- REUSABLE: a `pan plan --auto` agent that hits an unresolvable contradiction ESCALATES to interactive (asks a question, idles) — the flywheel can't answer it (pan tell forbidden). Detect: planner pane shows a question + "Brewed for Nmin" with static ctx/out. Surface the Q + a PRD-grounded default; operator answers or authorizes re-dispatch.
+- **A1 (PAN-2373): fresh review cycle** (feedback empty, progressing). A6/A5 in review. MYN Lane M (M1/M3/M9). Ready set = MIN-857 (held). PAN-2388 slot running (assembly stall, operator-gated). PAN-2445 CLEAN.
+
+## RUN-58 tick 52 (2026-07-07) — B2 planning progressing (Opus, design deliberation not stall); A1 fresh review cycle; main green
+
+**MAIN GREEN (536c88d3e2).** All lanes occupied and progressing.
+- **B2 (PAN-2341, Lane B) planning ACTIVELY (~28min, NOT stalled)** — Opus 4.8, pane "Option 1, keep the flag" (deliberating the KEEP_SPECIALIST_SESSIONS_ALIVE design decision at the core of the zombie-reap fix; ctx 27%, +283). Thorough cloister-machinery plan. Start when spec finalizes.
+- **A1 (PAN-2373) got a FRESH review cycle** — feedback dir cleared (was 003/004/005), work agent short 1m turn idle, not in pending-review. Likely re-engaged (PAN-2452 idle-escalation?) or synced-main + re-submitted → verification re-running. Watch if it passes this round.
+- A6 (PAN-2374) running, A5 (PAN-2375) review. MYN Lane M (M1/M3/M9). Ready set = MIN-857 (held). PAN-2388 slot running (assembly stall, operator-gated). PAN-2445 CLEAN. Nothing to dispatch (lanes full) / drain (nothing ready).
+
+## RUN-58 tick 51 (2026-07-07) — main green stable; PAN-2456 closed; B2 planning; A6 running; all lanes occupied
+
+**MAIN GREEN (536c88d3e2).** PAN-2456 (red-main mock-isolation) CLOSED.
+- **B2 (PAN-2341, Lane B) still PLANNING** (planning-pan-2341 live, no spec yet) — start when finalized. A6 (PAN-2374) running. A5 (PAN-2375) review. A1 (PAN-2373) verification-stuck (operator lever).
+- **All lanes occupied:** Lane A = A1/A5/A6; Lane B = B2 (planning); Lane M = M1(MIN-860 review)/M3(MIN-854)/M9(MIN-865) + M8(MIN-864) held on MIN-857.
+- Ready set = MIN-857 (held, skip). PAN-2388 slot running (assembly stall, operator-gated). PAN-2445 CLEAN (only order-book planning live). Nothing new to dispatch (lanes full) or drain (nothing ready).
+
+## RUN-58 tick 50 (2026-07-07) — RED MAIN FIXED (strike-2456, mock-isolation, GREEN 536c88d3e2); B2 (PAN-2341) dispatched; A6 started
+
+**MAIN GREEN (536c88d3e2).** Red main resolved.
+- **strike-2456 FIXED it (mechanism = MOCK POLLUTION, candidate #2):** `536c88d3e2 test(cloister): isolate merge 403 reconcile mocks` — B1's new test files leaked mocks into A10's merge-403-reconcile test; the strike isolated the mocks (test-only, clean). CI green (run 28842345419). The strike self-completed (`pan done --strike` → verifying-on-main) + HEAD matches origin/main — **closing out PAN-2456 (bg).** (Strike landed the fix to main itself via done --strike; green+clean so fine.)
+- **★ B2 = PAN-2341 (deacon boot reconcile + zombie reap) DISPATCHED** — anchors re-verified present (reap-terminal-sessions.ts:33, deacon.ts:2477); `pan plan PAN-2341 --auto` (bg, planning-pan-2341 spinning up). Lane B critical path resumes (B1 cleared → B2, one-at-a-time). TENET-10: full suite before merge.
+- **A6 (PAN-2374, CodeRabbit) PLANNED → started (bg).** Lane A: A1 (verification-stuck) + A5 (review) + A6 (starting). A7=PAN-2230, A8=PAN-2297, A9=PAN-2229, A13=PAN-2445 remain.
+- Ready set = MIN-857 (held, skip). PAN-2388 assembly-stalled (operator). A1 verification-stuck (operator). MYN Lane M moving. PAN-2445 CLEAN. Order book: B0+A2+A3+A4+A10+B1 landed (+ trio PAN-2389/2387/2402), B2 in flight.
+
+## RUN-58 tick 49 (2026-07-07) — RED MAIN persists; strike-2456 working (~13min, verifying); B2/drain held on green
+
+**MAIN RED (bc5a7dd5c2, B1↔A10 merge-403-reconcile).** strike-pan-2456 in progress (~13min): running contracts build + vitest in its workspace to pin the fix (behavioral reconcile-terminalize vs mock pollution). NOT pushed yet; operator did NOT green another way. I own the merge → land on PR CI green next tick.
+- B2 (PAN-2341) + overdeck drain HELD until strike greens main. A6 (PAN-2374) planning continues (safe). A5 in review. MIN-857 held. PAN-2388 assembly-stalled (operator). MYN Lane M moving. PAN-2445 CLEAN.
+
+## RUN-58 tick 48 (2026-07-07) — RED MAIN (P0): B1 broke A10's merge-403-reconcile test → filed PAN-2456 + struck; B2 held; A10 closed
+
+**RED MAIN — B1↔A10 interaction.** bc5a7dd5c2 (B1/PAN-2207 squash-assembly) `test` FAILED; e9a43d1b6a (A10/PAN-2420) was green → B1 landing on top broke it.
+- **Failure:** `tests/unit/dashboard/server/routes/merge-403-reconcile.test.ts` "reconciler terminalizes … out-of-band merge" → `expected false to be true` (1 failed / 8598 passed). This is A10's OWN test (PAN-2420 merge-door work); B1's `done.ts +30` + `deacon.ts +82` (new checkOrphanedCompletions patrol) + 2 new test files broke it — behavioral interaction OR cross-file mock pollution (CI=true single-fork). Filed **PAN-2456 (blocks-main)** with both candidate mechanisms + `reconcileMergedButReviewing()` (deacon-merge.ts:506) anchor; struck **strike-pan-2456** (codex/gpt-5.5). I OWN the merge (review diff → gates → gh-API squash → pan close).
+- **B2 (PAN-2341) HELD until main green** (strike-2456 fixes). B2 anchors confirmed present on main (reap-terminal-sessions.ts:33, deacon.ts:2477) — ready to dispatch on green.
+- **A10 (PAN-2420) CLOSED OUT.** A6 (PAN-2374) planning (planning-pan-2374 live). MIN-857 HELD. PAN-2388 assembly stall (operator-gated). MYN Lane M moving. PAN-2445 CLEAN.
+- REUSABLE: landing two cloister-adjacent items close together (A10 merge-door + B1 done/deacon) can interact-break even when each is green alone — the Lane-B-serial rule exists for exactly this; A10 (Lane A) + B1 (Lane B) both touching the merge/reconcile path collided.
+
+## RUN-58 tick 47 (2026-07-07) — LANE B GATE OPEN: B1 (PAN-2207) + A10 (PAN-2420) MERGED (operator unblocked); B2 waits for main-green; A6 planning
+
+**Order book advancing — B1 (Lane B) + A10 (Lane A) landed.** Main CI IN_PROGRESS (bc5a7dd5c2 B1-squash-assembly #2453 + e9a43d1b6a A10 #2452) — wait for GREEN before B2.
+- **OPERATOR UNBLOCKED LANE B:** B1 (PAN-2207) MERGED via squash-assembly PR #2453 (original branch stranded by PAN-2454 ratchet-audit bug; PR #2425 closed superseded) → **PAN-2207 CLOSED.** A10 (PAN-2420) MERGED autonomously via the pipeline door (#2452) → **closing out (PAN-2420 was OPEN).** Lane B gate now OPEN.
+- **B2 = PAN-2341 (deacon boot reconcile + zombie reap) — DISPATCH once main-green CONFIRMS** (operator instruction). PRD Verified-Against 6681632bfe (144 stale) — **re-verify anchors at dispatch**: `reap-terminal-sessions.ts:33` KEEP_SPECIALIST_SESSIONS_ALIVE, `deacon.ts:2477` checkTerminalAdvancingSessions, `deacon-auto-resume.ts` applyBootReconciliationDecision. Lane B, TENET-10 (full suite green before merge).
+- **Lane A trickle continues (operator-authorized A6-A9, A13):** A6 (PAN-2374 CodeRabbit) planning dispatched (bg). A5 (PAN-2375) in review; A1 (PAN-2373) still verification-stuck (operator lever).
+- **NEW substrate bug noted: PAN-2454 (ratchet-audit bug)** — stranded B1's original branch; operator filed. Not order-book (don't manage).
+- **PAN-2388 (PRIORITY): assembly stall, operator-gated.** MIN-857 HELD. MYN Lane M moving (M1/M3/M9). PAN-2445 CLEAN.
+
+## RUN-58 tick 46 (2026-07-07) — HOLDING PATTERN: overdeck lane fully operator-gated (A1/2388/857 unchanged); MYN lane the only mover (M1/M3/M9). Flywheel levers exhausted on the gated set.
+
+**Order book: 5/19 landed. Main GREEN (02714ae797, no new merges).**
+- **A1 (PAN-2373) + B1 (PAN-2207) STILL stuck** — PAN-2452 idle-escalation did NOT re-engage them (not yet deployed / doesn't cover). A1 feedback unchanged (005, verification restart-status assert), B1 idle pane unchanged. Both = operator/re-engage levers I lack.
+- **PAN-2388 (PRIORITY): slots `ready-to-merge`/unmerged** — assembly stall, operator-gated.
+- **MIN-857: HELD** (Ed UAT). Ready set = MIN-857 only (skip).
+- **ONLY MOVER = MYN Lane M** (own train, I don't merge): M1 (MIN-860 review), M3 (MIN-854 running), M9 (MIN-865 running).
+- **HONEST STATE: the overdeck order-book lane is blocked on 4 operator-gated items** (A1 re-engage/sync-main, B1 branch reconstruction/PAN-2451, PAN-2388 swarm assembly, MIN-857 UAT merge). All surfaced with root causes. Flywheel productive levers exhausted for these; not over-dispatching into the gate friction. A5/A10 in review (may ripen). Watching for operator action + MYN progress + MIN-857 merge (→ unblocks M8/MIN-864).
+
+## RUN-58 tick 45 (2026-07-07) — MIN-854 (M3) STARTED (was planned; earlier 'stall' was wrong-dir); MYN lane moving (M1/M3/M9); overdeck lane gate-throttled (A1/B1)
+
+**Order book: 5/19 landed. Main GREEN (02714ae797).** Operator merged **PAN-2452 (idle-alive escalation)** — addresses the exact idle-frozen-agent class behind A1/B1 (good — their re-engage may become automatic).
+- **★ MIN-854 (M3, fizzy notif tray) STARTED** — `agent-min-854`, 15 beads, → in_progress via Linear. **CONFIRMS: my earlier "MIN-854 stalled pre-finalize ×2" was WRONG** (checked overdeck `.pan/specs`, but MYN specs live in the MYN project). MYN planning finalizes fine. **MYN Lane M now MOVING on its own train (independent of overdeck gates): M1 (MIN-860 review) + M3 (MIN-854 running) + M9 (MIN-865 running).**
+- **Overdeck lane still gate-throttled** (unchanged): A1 (PAN-2373 verification: restart-status assert + deacon-ci-retry flake, agent idle 2/3), B1 (PAN-2207 commit-msg PAN-2451) — both operator/re-engage-lever; PAN-2452 may auto-resolve them. A5/A10 in review.
+- **PAN-2388 (PRIORITY): slots `running`** (assembly stall, operator-gated). MIN-857 HELD. Ready set = MIN-857 (skip). PAN-2445 CLEAN.
+- Lane M order-book items dispatch cleanly via `pan start MIN-<n>` once planned (test-via-start; don't trust overdeck-dir spec check for MIN-*).
+
+## RUN-58 tick 44 (2026-07-06) — A1 verification failure READ (restart-status assert + deacon-ci-retry flake); agent idle-stuck at 2/3, no bypass; surfaced. 2 gate-stuck items (A1, B1).
+
+**Order book: 5/19 landed. Main GREEN (074e0d9379; 02714ae797 CI in_progress).**
+- **A1 (PAN-2373, flake-policy) verification failure ROOT-CAUSED (feedback 005, attempt 2/3):** `test` gate fails on (a) **`src/lib/__tests__/restart-status.test.ts:154`** — `readRestartStatus()` returns EXTRA fields (gaveUp/initiator/issueId/pid/reason, trigger:"watchdog") vs the written `entry` → a REAL assertion mismatch (restart-status schema drift — likely A1's branch stale vs a main restart-status change, OR A1 must update the test); (b) **`tests/lib/cloister/deacon-ci-retry.test.ts:154` "Hook timed out in 5000ms"** — a FLAKE (the exact class A1's flake-policy would quarantine — ironic). **Agent IDLE at attempt 2/3** (not re-attempting → 3/3 bypass never fires). The verification gate is CORRECTLY blocking A1 (real restart-status failure) — A1's agent must fix it + sync-main, but it's not re-engaging. **Surfaced: A1 stuck in verification, agent idle; needs re-engage (flywheel can't pan tell; pan start risks dup) — operator lever, OR it needs sync-main to pick up any main-side restart-status fix.** Secondary Lane A item — done deep-investing.
+- **Throughput gate-limited by A1 (verification) + B1 (commit-msg, PAN-2451)** — both need operator/re-engage levers I lack. Ceiling relaxed; deacon healthy; not a systemic wedge.
+- **MIN-865 (M9) running. M1 (MIN-860) in review. PAN-2388 (PRIORITY): slots `running`** (assembly stall, operator-gated). Ready set = MIN-857 (held). PAN-2445 CLEAN. Held dispatches (Lane A full: A1/A5/A10).
+
 ## RUN-58 tick 43 (2026-07-06) — throughput root-caused = GATE-FRICTION loops (A1 verification-gate 3× fail; B1 commit-msg) not ceiling/wedge; held dispatches (Lane A full)
 
 **Order book: 5/19 landed. Main GREEN (074e0d9379).** No overdeck merge since A4 (tick 39) — root-caused this window:

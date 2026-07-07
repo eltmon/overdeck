@@ -553,6 +553,7 @@ describe('workflows', () => {
 
     it('should remove verifying labels when applying the closed-out label', async () => {
       mockCurrentGitHubLabels();
+
       const ctx = {
         issueId: 'PAN-100',
         projectPath: testDir,

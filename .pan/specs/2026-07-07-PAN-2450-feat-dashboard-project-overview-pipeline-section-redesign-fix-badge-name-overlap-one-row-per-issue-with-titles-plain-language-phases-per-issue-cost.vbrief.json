@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.6",
     "created": "2026-07-07T02:17:06.494Z",
-    "updated": "2026-07-07T02:18:34.575Z",
+    "updated": "2026-07-07T07:33:41.798Z",
     "author": "overdeck/auto-start",
     "description": "Auto-synthesized minimal plan for PAN-2450: feat(dashboard): project-overview pipeline section redesign — fix badge/name overlap, one row per issue with titles, plain-language phases, per-issue cost",
     "inspectionPolicy": "never"
@@ -10,12 +10,12 @@
   "plan": {
     "id": "pan-2450",
     "title": "feat(dashboard): project-overview pipeline section redesign — fix badge/name overlap, one row per issue with titles, plain-language phases, per-issue cost",
-    "status": "running",
+    "status": "completed",
     "uid": "f50e7d95-3714-495a-a6db-704ceb2dbd6d",
     "author": "overdeck/auto-start",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-07-07T02:17:06.494Z",
-    "updated": "2026-07-07T02:18:34.575Z",
+    "updated": "2026-07-07T07:33:41.798Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2450",
@@ -118,5 +118,5 @@
     ],
     "edges": []
   },
-  "status": "active"
+  "status": "completed"
 }

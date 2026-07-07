@@ -9,7 +9,7 @@
  *
  * This module exposes a fire-and-forget commit primitive that the pan-dir
  * writers call after they update a file. Commits are:
- *   - debounced (default 2s) so a burst of writes coalesces into one commit
+ *   - fixed-window coalesced (default 10m) so a burst of writes becomes one commit
  *   - serialized within a process so the git index is never contested
  *   - best-effort: failures are logged and never thrown back to the caller
  *   - main-only: feature branches have their own commit cadence owned by agents
@@ -21,18 +21,35 @@
 
 import { existsSync } from 'fs';
 import { dirname, join, sep } from 'path';
-import { Effect, Layer, Stream } from 'effect';
+import { Cause, Duration, Effect, Layer, Stream } from 'effect';
 import { ChildProcess } from 'effect/unstable/process';
 import * as NodeChildProcessSpawner from '@effect/platform-node/NodeChildProcessSpawner';
 import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem';
 import * as NodePath from '@effect/platform-node/NodePath';
 import { GitError } from '../errors.js';
+import { isStatePlaneOnlyDiff } from '../state-plane.js';
 
 const spawnerLayer = NodeChildProcessSpawner.layer.pipe(
   Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer))
 );
 
-const DEBOUNCE_MS = 2_000;
+const DEFAULT_STATE_FLUSH_WINDOW_MS = 10 * 60 * 1_000;
+const STATE_FLUSH_WINDOW_MS = parseStateFlushWindowMs(process.env.OVERDECK_STATE_FLUSH_WINDOW_MS);
+const DEFAULT_STATE_PUSH_TIMEOUT_MS = 30_000;
+
+function parseStateFlushWindowMs(value: string | undefined): number {
+  if (!value) return DEFAULT_STATE_FLUSH_WINDOW_MS;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_STATE_FLUSH_WINDOW_MS;
+  return parsed;
+}
+
+function parsePositiveInteger(value: string | undefined, fallback: number): number {
+  if (!value) return fallback;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return parsed;
+}
 
 interface QueuedCommit {
   paths: Set<string>;
@@ -124,22 +141,46 @@ function runGit(
     Effect.scoped,
     Effect.provide(spawnerLayer),
     Effect.catchCause((cause) =>
-      Effect.fail(
-        new GitError({
-          command: ['git', ...args],
-          stderr: String(cause),
-          exitCode: -1,
-          cause,
-        }),
-      ),
+      Effect.fail(causeToGitError(cause, args)),
     ),
   );
 }
 
+function runGitWithTimeout(
+  args: readonly string[],
+  cwd: string,
+  timeoutMs: number,
+): Effect.Effect<GitResult, GitError> {
+  return runGit(args, cwd).pipe(
+    Effect.timeout(Duration.millis(timeoutMs)),
+    Effect.catchCause((cause) =>
+      Effect.fail(causeToGitError(cause, args)),
+    ),
+  );
+}
+
+function causeToGitError(cause: Cause.Cause<unknown>, args: readonly string[]): GitError {
+  const squashed = Cause.squash(cause);
+  if (isGitError(squashed)) return squashed;
+  return new GitError({
+    command: ['git', ...args],
+    stderr: String(squashed),
+    exitCode: -1,
+    cause,
+  });
+}
+
+function isGitError(value: unknown): value is GitError {
+  return typeof value === 'object'
+    && value !== null
+    && '_tag' in value
+    && value._tag === 'GitError';
+}
+
 /**
  * Queue an auto-commit for one or more files. Returns immediately; the actual
- * git commit happens after the debounce window. Multiple calls for the same
- * project root inside the window coalesce.
+ * git commit happens at the end of the fixed flush window. Multiple calls for
+ * the same project root inside the window coalesce without extending it.
  *
  * PAN-1908: `repoRoot` allows committing files to a different git checkout
  * than the project root (e.g., a declared infra repo for per-issue permanent
@@ -158,14 +199,13 @@ export function queueAutoCommit(opts: {
   if (existing) {
     paths.forEach((p) => existing.paths.add(p));
     existing.subjects.push(subject);
-    clearTimeout(existing.timer);
-    existing.timer = setTimeout(() => void flushInner(projectRoot), DEBOUNCE_MS);
+    existing.repoRoot ??= repoRoot;
     return;
   }
   pending.set(projectRoot, {
     paths: new Set(paths),
     subjects: [subject],
-    timer: setTimeout(() => void flushInner(projectRoot), DEBOUNCE_MS),
+    timer: setTimeout(() => void flushInner(projectRoot), STATE_FLUSH_WINDOW_MS),
     repoRoot,
   });
 }
@@ -181,7 +221,7 @@ export function queueAutoCommit(opts: {
  *
  * Only existing files are queued: a missing/deleted `issues.jsonl` is skipped so
  * the janitor never stages — and propagates — a transient empty-DB deletion (the
- * PAN-1158 hazard). queueAutoCommit is main-only, debounced, and a no-op when
+ * PAN-1158 hazard). queueAutoCommit is main-only, coalesced, and a no-op when
  * nothing changed.
  */
 export function queueBeadsAutoCommit(projectRoot: string): void {
@@ -202,6 +242,18 @@ export function flushAutoCommits(
   projectRoot: string,
 ): Effect.Effect<FlushResult, never> {
   return Effect.promise(() => flushPromise(projectRoot));
+}
+
+/**
+ * Force a flush of every project root with a pending auto-commit. Used during
+ * graceful process shutdown so the fixed window does not strand committable
+ * state as a dirty tree.
+ */
+export function flushAllPendingAutoCommits(): Effect.Effect<FlushResult[], never> {
+  return Effect.promise(() => {
+    const projectRoots = Array.from(pending.keys());
+    return Promise.all(projectRoots.map((projectRoot) => flushPromise(projectRoot)));
+  });
 }
 
 function flushPromise(projectRoot: string): Promise<FlushResult> {
@@ -330,8 +382,191 @@ function doCommit(
     );
     if (typeof commitOk !== 'boolean') return commitOk;
 
+    yield* maybePushStateCommit(gitRoot, branch);
+
     return { committed: true };
   });
+}
+
+function maybePushStateCommit(
+  gitRoot: string,
+  branch: string,
+): Effect.Effect<void, never> {
+  if (process.env.OVERDECK_STATE_AUTOPUSH === '0') {
+    return Effect.void;
+  }
+
+  return pushOriginMain(gitRoot, branch, false);
+}
+
+function pushOriginMain(
+  gitRoot: string,
+  branch: string,
+  retry: boolean,
+): Effect.Effect<void, never> {
+  const timeoutMs = parsePositiveInteger(
+    process.env.OVERDECK_STATE_PUSH_TIMEOUT_MS,
+    DEFAULT_STATE_PUSH_TIMEOUT_MS,
+  );
+
+  return runGitWithTimeout(['push', 'origin', 'main'], gitRoot, timeoutMs).pipe(
+    Effect.matchEffect({
+      onSuccess: () => Effect.void,
+      onFailure: (err) => {
+        const message = err.stderr || err._tag;
+        if (!retry && isNonFastForwardPushError(message)) {
+          return rebaseStateOnlyAndRetryPush(gitRoot, branch);
+        }
+        warnAutoPush(branch, `push failed: ${message}`);
+        return Effect.void;
+      },
+    }),
+  );
+}
+
+function rebaseStateOnlyAndRetryPush(
+  gitRoot: string,
+  branch: string,
+): Effect.Effect<void, never> {
+  const timeoutMs = parsePositiveInteger(
+    process.env.OVERDECK_STATE_PUSH_TIMEOUT_MS,
+    DEFAULT_STATE_PUSH_TIMEOUT_MS,
+  );
+
+  return Effect.gen(function* () {
+    const fetched = yield* runGitWithTimeout(['fetch', 'origin', 'main'], gitRoot, timeoutMs).pipe(
+      Effect.matchEffect({
+        onSuccess: () => Effect.succeed(true),
+        onFailure: (err) => {
+          warnAutoPush(branch, `fetch before rebase failed: ${err.stderr || err._tag}`);
+          return Effect.succeed(false);
+        },
+      }),
+    );
+    if (!fetched) return;
+
+    const clean = yield* isWorkingTreeClean(gitRoot, branch);
+    if (!clean) return;
+
+    const stateOnly = yield* areLocalAheadCommitsStatePlaneOnly(gitRoot, branch);
+    if (!stateOnly) {
+      warnAutoPush(branch, 'non-fast-forward push rejected and at least one local-ahead commit is not state-plane-only; leaving local main ahead of origin/main');
+      return;
+    }
+
+    const rebased = yield* runGitWithTimeout(['rebase', 'origin/main'], gitRoot, timeoutMs).pipe(
+      Effect.matchEffect({
+        onSuccess: () => Effect.succeed(true),
+        onFailure: (err) => {
+          warnAutoPush(branch, `state-only rebase failed: ${err.stderr || err._tag}`);
+          return Effect.succeed(false);
+        },
+      }),
+    );
+    if (!rebased) return;
+
+    yield* pushOriginMain(gitRoot, branch, true);
+  });
+}
+
+function areLocalAheadCommitsStatePlaneOnly(
+  gitRoot: string,
+  branch: string,
+): Effect.Effect<boolean, never> {
+  const timeoutMs = parsePositiveInteger(
+    process.env.OVERDECK_STATE_PUSH_TIMEOUT_MS,
+    DEFAULT_STATE_PUSH_TIMEOUT_MS,
+  );
+
+  return Effect.gen(function* () {
+    const commits = yield* runGitWithTimeout(
+      ['rev-list', '--reverse', 'origin/main..main'],
+      gitRoot,
+      timeoutMs,
+    ).pipe(
+      Effect.match({
+        onSuccess: (result) => result.stdout.split('\n').map((line) => line.trim()).filter(Boolean),
+        onFailure: (err) => {
+          warnAutoPush(branch, `local-ahead commit list failed: ${err.stderr || err._tag}`);
+          return null;
+        },
+      }),
+    );
+    if (commits === null) return false;
+    if (commits.length === 0) return true;
+
+    for (const commit of commits) {
+      const parent = yield* getSingleParent(gitRoot, branch, commit);
+      if (!parent) return false;
+
+      const stateOnly = yield* Effect.promise(() =>
+        isStatePlaneOnlyDiff(parent, commit, gitRoot),
+      ).pipe(
+        Effect.catchCause((cause) => {
+          warnAutoPush(branch, `state-plane commit check failed for ${commit}: ${String(Cause.squash(cause))}`);
+          return Effect.succeed(false);
+        }),
+      );
+      if (!stateOnly) return false;
+    }
+
+    return true;
+  });
+}
+
+function getSingleParent(
+  gitRoot: string,
+  branch: string,
+  commit: string,
+): Effect.Effect<string | null, never> {
+  const timeoutMs = parsePositiveInteger(
+    process.env.OVERDECK_STATE_PUSH_TIMEOUT_MS,
+    DEFAULT_STATE_PUSH_TIMEOUT_MS,
+  );
+
+  return runGitWithTimeout(['rev-list', '--parents', '-n', '1', commit], gitRoot, timeoutMs).pipe(
+    Effect.match({
+      onSuccess: (result) => {
+        const parts = result.stdout.trim().split(/\s+/).filter(Boolean);
+        if (parts.length === 2) return parts[1] ?? null;
+        warnAutoPush(branch, `local-ahead commit ${commit} is not a single-parent commit; leaving local main ahead of origin/main`);
+        return null;
+      },
+      onFailure: (err) => {
+        warnAutoPush(branch, `parent lookup failed for ${commit}: ${err.stderr || err._tag}`);
+        return null;
+      },
+    }),
+  );
+}
+
+function isWorkingTreeClean(
+  gitRoot: string,
+  branch: string,
+): Effect.Effect<boolean, never> {
+  return runGit(['status', '--porcelain'], gitRoot).pipe(
+    Effect.matchEffect({
+      onSuccess: (result) => {
+        const clean = result.stdout.trim().length === 0;
+        if (!clean) {
+          warnAutoPush(branch, 'non-fast-forward push rejected and working tree is dirty; leaving local main ahead of origin/main');
+        }
+        return Effect.succeed(clean);
+      },
+      onFailure: (err) => {
+        warnAutoPush(branch, `working-tree cleanliness check failed: ${err.stderr || err._tag}`);
+        return Effect.succeed(false);
+      },
+    }),
+  );
+}
+
+function isNonFastForwardPushError(message: string): boolean {
+  return /non-fast-forward|fetch first|failed to push some refs|rejected/i.test(message);
+}
+
+function warnAutoPush(branch: string, message: string): void {
+  console.warn(`[pan-dir/auto-commit] auto-push warning for ${branch}: ${message}`);
 }
 
 /**

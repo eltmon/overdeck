@@ -18,7 +18,9 @@ allowed-tools:
 
 # Overdeck Planning Lifecycle
 
-`pan plan <id>` starts a planning session for an issue. Use `--auto` when the user wants the planning agent to run non-interactively and infer defensible defaults. Use `--probe` when the plan needs an adversarial pre-finalize self-pass; `--effort high` enables the same probe instructions automatically. Use `--auto-start` only when an autonomous orchestrator should start the work agent after planning finalizes.
+`pan plan <id>` is the plan-ONLY verb: it starts a planning session for an issue and produces a PRD and vBRIEF, but it does not start the work agent. Use `pan start <id>` when you want planning and work in one command.
+
+Use `--auto` when the user wants the planning agent to run non-interactively and infer defensible defaults. Use `--probe` when the plan needs an adversarial pre-finalize self-pass; `--effort high` enables the same probe instructions automatically.
 
 ## Available commands
 
@@ -62,10 +64,12 @@ pan plan PAN-1071 --probe
 ## Auto-start after planning
 
 ```bash
-pan plan PAN-1071 --auto --auto-start
+pan start PAN-1071
 ```
 
-`--auto-start` stamps `autoSpawnOnFinalize: true` into the planning agent state so `pan plan finalize` can start the work agent after it promotes the plan. This is an explicit autonomy opt-in for flywheel/orchestrator flows; default human planning leaves the issue in Planned until `pan start <id>` or Start Agent.
+`pan start <id>` is the paved-road way to plan (non-interactively by default) and start the work agent in one command. The work agent auto-starts after planning finalizes.
+
+The legacy `--auto-start` flag on `pan plan <id>` is deprecated and kept only through the deprecation window. It stamped `autoSpawnOnFinalize: true` into the planning agent state so `pan plan finalize` could start the work agent after it promoted the plan; use `pan start <id>` instead.
 
 ## Finalizing (`pan plan finalize`)
 
@@ -101,8 +105,7 @@ This promotes the workspace vBRIEF to `<projectRoot>/.pan/specs/`, syncs beads, 
 
 ## Related commands
 
-- `pan start <id>` — start implementation from an existing vBRIEF and beads.
-- `pan start <id> --auto` — skip planning and synthesize a minimal vBRIEF/beads from the issue title/body before starting work.
+- `pan start <id>` — the paved road: plan (if needed) and start implementation in one command.
 - `pan tell <id> <message>` — send feedback to a running planning or work agent.
 - `pan kill <id>` — stop a planning or work agent without deleting the workspace.
 

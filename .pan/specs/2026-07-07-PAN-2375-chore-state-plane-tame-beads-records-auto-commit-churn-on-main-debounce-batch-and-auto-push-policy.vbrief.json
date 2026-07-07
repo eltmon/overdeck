@@ -4,17 +4,17 @@
     "created": "2026-07-07T02:44:46.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2375: tame beads/records auto-commit churn on main — debounce, batch, and auto-push policy",
-    "updated": "2026-07-07T02:58:34.188Z"
+    "updated": "2026-07-07T07:33:41.711Z"
   },
   "plan": {
     "id": "pan-2375",
     "title": "chore(state-plane): tame beads/records auto-commit churn on main — debounce, batch, and auto-push policy",
-    "status": "running",
+    "status": "completed",
     "uid": "e89ea3a7-191c-44d4-abc6-35ffb882bb54",
     "author": "agent:claude-opus-4-8",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-07T02:44:46.000Z",
-    "updated": "2026-07-07T02:58:34.188Z",
+    "updated": "2026-07-07T07:33:41.711Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2375",
@@ -590,5 +590,5 @@
       "canonicalFilename": "2026-07-07-PAN-2375-chore-state-plane-tame-beads-records-auto-commit-churn-on-main-debounce-batch-and-auto-push-policy.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }

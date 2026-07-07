@@ -17,7 +17,7 @@
 import { exec, execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { basename, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 
 import { Effect, Layer } from 'effect';
@@ -640,12 +640,6 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
       }
 
       const agentId = `agent-${issueId.toLowerCase()}`;
-      if (!await Effect.runPromise(sessionExists(agentId))) {
-        const error = `Work agent ${agentId} is not running. Polyrepo merge requires the work agent to rebase every affected repo and push.`;
-        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
-        completePendingOperation(issueId, error);
-        return { success: false, statusCode: 400, error };
-      }
 
       mergeSet = {
         ...mergeSet,
@@ -661,6 +655,11 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
         testsStatus?: string;
       }> = [];
       const repoHeadsBefore = new Map<string, string>();
+      // PAN-2461: repos whose source branch already contains the target branch need no
+      // rebase round-trip — a retry after the work agent already rebased+pushed must not
+      // wait 30 minutes for a push that will never come (mirrors the monorepo
+      // "already contains origin/main" skip).
+      const alreadyRebased = new Set<string>();
 
       for (const repo of activeRepos) {
         const repoWorkspacePath = join(workspacePath, repo.repoKey);
@@ -675,6 +674,21 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
           { cwd: repoWorkspacePath, encoding: 'utf-8', timeout: 10000 }
         );
         repoHeadsBefore.set(repo.repoKey, headBefore.trim());
+        try {
+          await execAsync(`git fetch origin ${repo.targetBranch} ${repo.sourceBranch}`, {
+            cwd: repoWorkspacePath, encoding: 'utf-8', timeout: 30000,
+          });
+          await execAsync(
+            `git merge-base --is-ancestor origin/${repo.targetBranch} origin/${repo.sourceBranch}`,
+            { cwd: repoWorkspacePath, encoding: 'utf-8', timeout: 10000 }
+          );
+          alreadyRebased.add(repo.repoKey);
+          mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { rebaseStatus: 'passed' });
+          console.log(`[merge] ${repo.repoKey} feature branch already contains origin/${repo.targetBranch} — skipping rebase request for ${issueId}`);
+          continue;
+        } catch {
+          // Not an ancestor (or fetch failed) — a rebase is genuinely required.
+        }
         mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { rebaseStatus: 'requested' });
       }
       upsertMergeSetSync(mergeSet);
@@ -687,15 +701,26 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
         return { success: false, statusCode: 400, error, repos: mergeResults };
       }
 
-      const rebaseInstructions = activeRepos.map((repo, index) => (
-        `${index + 1}. cd ${repo.repoKey}\n   git fetch origin ${repo.targetBranch}\n   git rebase origin/${repo.targetBranch}\n   git push --force-with-lease`
-      )).join('\n');
-      const rebaseMsg = `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Rebase and push every affected repo in this merge set:\n\n${rebaseInstructions}\n\nResolve any conflicts in the workspaces above, complete every rebase, and push all affected branches. Do NOT merge PRs/MRs yourself.`;
-      await messageAgent(agentId, rebaseMsg);
+      const reposNeedingRebase = activeRepos.filter(repo => !alreadyRebased.has(repo.repoKey));
+
+      if (reposNeedingRebase.length > 0 && !await Effect.runPromise(sessionExists(agentId))) {
+        const error = `Work agent ${agentId} is not running. Polyrepo merge requires the work agent to rebase every affected repo and push.`;
+        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
+        completePendingOperation(issueId, error);
+        return { success: false, statusCode: 400, error };
+      }
+
+      if (reposNeedingRebase.length > 0) {
+        const rebaseInstructions = reposNeedingRebase.map((repo, index) => (
+          `${index + 1}. cd ${repo.repoKey}\n   git fetch origin ${repo.targetBranch}\n   git rebase origin/${repo.targetBranch}\n   git push --force-with-lease`
+        )).join('\n');
+        const rebaseMsg = `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Rebase and push every affected repo in this merge set:\n\n${rebaseInstructions}\n\nResolve any conflicts in the workspaces above, complete every rebase, and push all affected branches. Do NOT merge PRs/MRs yourself.`;
+        await messageAgent(agentId, rebaseMsg);
+      }
 
       const REBASE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes — complex polyrepo rebases need time for conflict resolution
       const POLL_INTERVAL_MS = 5000;
-      const pushedRepos = new Set<string>();
+      const pushedRepos = new Set<string>(alreadyRebased);
       const rebaseStart = Date.now();
 
       while (Date.now() - rebaseStart < REBASE_TIMEOUT_MS && pushedRepos.size < activeRepos.length) {
@@ -742,9 +767,24 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
       }
 
       setReviewStatus(issueId, { mergeStatus: 'verifying', mergeNotes: undefined });
+      // PAN-2461: gates must run with rendered placeholders and the workspace ROOT.
+      // The previous call passed the repo subdir (doubling gate.path → <ws>/fe/fe)
+      // and no placeholders (docker exec hit the literal "myn-{{FEATURE_FOLDER}}-fe-1").
+      const featureFolder = basename(workspacePath);
+      const gatePlaceholders = {
+        FEATURE_NAME: featureFolder.replace(/^feature-/, ''),
+        FEATURE_FOLDER: featureFolder,
+        BRANCH_NAME: `feature/${featureFolder.replace(/^feature-/, '')}`,
+        COMPOSE_PROJECT: `${basename(projectPath)}-${featureFolder}`,
+        DOMAIN: projectConfig?.workspace?.dns?.domain || 'localhost',
+        PROJECT_NAME: basename(projectPath),
+        PROJECT_PATH: projectPath,
+        PROJECTS_DIR: dirname(projectPath),
+        WORKSPACE_PATH: workspacePath,
+      };
+
       for (const repo of activeRepos) {
         const repoConfig = projectConfig.workspace.repos.find(configRepo => configRepo.name === repo.repoKey);
-        const repoWorkspacePath = join(workspacePath, repo.repoKey);
         const gateIdentifiers = new Set<string>([
           repo.repoKey,
           repoConfig?.path || '',
@@ -764,7 +804,9 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
           continue;
         }
 
-        const gateResults = await Effect.runPromise(runQualityGates(gates, repoWorkspacePath, 'pre_push'));
+        const gateResults = await Effect.runPromise(runQualityGates(gates, workspacePath, 'pre_push', {
+          placeholders: { ...gatePlaceholders, CHANGED_BASE: `origin/${repo.targetBranch}` },
+        }));
         const failedGate = gateResults.find(result => !result.passed && result.required !== false);
         if (failedGate) {
           const error = `Polyrepo post-rebase verification failed for ${repo.repoKey} at ${failedGate.name}`;
