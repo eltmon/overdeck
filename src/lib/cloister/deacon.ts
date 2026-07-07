@@ -184,13 +184,6 @@ import { withConcurrencyLimit } from '../concurrency.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { checkStuckAgentRemediation } from './stuck-remediation.js';
-import {
-  checkIdleTerminalAdvancingSessions,
-  checkMergedAdvancingSessions,
-  checkTerminalAdvancingSessions,
-  reconcileInFlightJournals,
-  runBootAdvancingSelfHeal,
-} from './advancing-selfheal.js';
 import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { reconcileOrphanProposedSpecs } from './orphan-proposed-reconciler.js';
@@ -2685,6 +2678,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...stuckRemediationActions);
   for (const a of stuckRemediationActions) addLog('action', a, state.patrolCycle);
 
+  const { reconcileInFlightJournals } = await import('./advancing-selfheal.js');
   const reconciledJournalActions = await reconcileInFlightJournals();
   actions.push(...reconciledJournalActions);
   for (const a of reconciledJournalActions) addLog('action', a, state.patrolCycle);
@@ -2809,6 +2803,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   // PAN-1716: Reap completed advancing-role (review/test/ship) sessions that are
   // still tmux-alive before the dispatchers run, so freed ceiling slots are
   // available to this same cycle's review/test/ship re-dispatch below.
+  const { checkIdleTerminalAdvancingSessions, checkMergedAdvancingSessions, checkTerminalAdvancingSessions } = await import('./advancing-selfheal.js');
   const reapedTerminalActions = await checkTerminalAdvancingSessions();
   actions.push(...reapedTerminalActions);
   for (const a of reapedTerminalActions) addLog('action', a, state.patrolCycle);
@@ -3443,6 +3438,7 @@ export function startDeacon(): void {
   // first patrol. PAN-1908: use the thin table-query reconcile instead of directory scans.
   void (async () => {
     await reconcileAgentLiveness();
+    const { runBootAdvancingSelfHeal } = await import('./advancing-selfheal.js');
     await runBootAdvancingSelfHeal();
     runScheduledPatrol('startup');
   })().catch((err) => {
