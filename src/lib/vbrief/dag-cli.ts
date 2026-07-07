@@ -25,7 +25,7 @@ import {
   type TaskCommandOptions,
   type TaskOperationResult,
 } from './dag.js';
-import { findPlanSync, readWorkspacePlanSync } from './io.js';
+import { findPlanSync, normalizeVBriefEnvelope, readWorkspacePlanSync } from './io.js';
 import {
   getProjectConfigFromWorkspacePath,
   resolveProjectForIssue,
@@ -95,7 +95,7 @@ function releasePlanWriter(planPath: string, writerId: string): void {
 }
 
 function readPlanFile(planPath: string): VBriefDocument {
-  return JSON.parse(readFileSync(planPath, 'utf-8')) as VBriefDocument;
+  return normalizeVBriefEnvelope(JSON.parse(readFileSync(planPath, 'utf-8'))) as VBriefDocument;
 }
 
 function writePlanFileAtomic(planPath: string, doc: VBriefDocument): void {

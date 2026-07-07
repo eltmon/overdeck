@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from '@effect/vitest'
 import { Effect } from 'effect'
-import { existsSync, mkdtempSync, rmSync } from 'fs'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 
@@ -110,6 +110,41 @@ describe('spec helpers', () => {
       const read = yield* readSpec(path)
       expect(read.status).toBe('proposed')
       expect(read.plan.id).toBe('PAN-967')
+    }),
+  )
+
+  it.effect('reads a v0.8 xBRIEFInfo pan spec document with top-level status', () =>
+    Effect.gen(function* () {
+      const paths = yield* ensurePanDirs(TEST_DIR)
+      const path = join(paths.specsDir, '2026-06-30-PAN-2426-xbrief-v08.vbrief.json')
+      writeFileSync(
+        path,
+        JSON.stringify(
+          {
+            xBRIEFInfo: {
+              version: '0.8',
+              created: '2026-06-30T00:00:00Z',
+              updated: '2026-06-30T00:00:00Z',
+            },
+            status: 'active',
+            plan: {
+              id: 'PAN-2426',
+              title: 'xBRIEF v0.8',
+              status: 'active',
+              items: [],
+              edges: [],
+            },
+          },
+          null,
+          2,
+        ),
+        'utf-8',
+      )
+
+      const read = yield* readSpec(path)
+      expect(read.status).toBe('active')
+      expect(read.vBRIEFInfo.version).toBe('0.8')
+      expect(read.plan.id).toBe('PAN-2426')
     }),
   )
 

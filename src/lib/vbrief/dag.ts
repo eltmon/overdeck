@@ -12,6 +12,7 @@ import {
   resolveProjectForIssue,
   writeStatusOverridesSync,
 } from '../pan-dir/record.js';
+import { normalizeVBriefEnvelope } from './io.js';
 
 export interface WaveItem {
   id: string;
@@ -1041,7 +1042,7 @@ export function buildPipelineMirrorFromStatus(issueId: string, status: Record<st
 }
 
 async function readPlanFileFromDisk(planPath: string): Promise<VBriefDocument> {
-  return JSON.parse(await readFile(planPath, 'utf-8')) as VBriefDocument;
+  return normalizeVBriefEnvelope(JSON.parse(await readFile(planPath, 'utf-8'))) as VBriefDocument;
 }
 
 export const readPlanFile = (planPath: string): Effect.Effect<VBriefDocument, VBriefDagError> =>

@@ -24,7 +24,7 @@ import {
   slugify,
   type VBriefLifecycleDir,
 } from './lifecycle.js';
-import { readPlanSync } from './io.js';
+import { normalizeVBriefEnvelope, readPlanSync } from './io.js';
 import { invalidateVBriefIndex } from './vbrief-index.js';
 import type { VBriefDocument } from './types.js';
 import { getProjectPanPaths, updateSpecStatus } from '../pan-dir/specs.js';
@@ -55,7 +55,7 @@ function readSpecFileSync(path: string): PanSpecDocument | null {
   }
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    parsed = normalizeVBriefEnvelope(JSON.parse(raw));
   } catch {
     return null;
   }

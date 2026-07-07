@@ -5,7 +5,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { applyEffectiveDifficulty } from '../../agents/tier-escalation.js';
 import { resolveTier } from '../../agents/resolve-tier.js';
-import { findPlanSync, isPlanningCompleteSync, isPlanningProposed, readPlanSync, readTierOverrides, readWorkspacePlanSync, recordTierPromotion, updateItemStatus, updateSubItemStatus } from '../io.js';
+import { findPlanSync, isPlanningCompleteSync, isPlanningProposed, normalizeVBriefEnvelope, readPlanSync, readTierOverrides, readWorkspacePlanSync, recordTierPromotion, updateItemStatus, updateSubItemStatus } from '../io.js';
 import { subItemsOf, type VBriefDocument, type VBriefSubItem } from '../types.js';
 
 let PROJECT_ROOT: string;
@@ -189,6 +189,49 @@ describe('readPlan', () => {
     expect(result.plan.id).toBe('TEST');
     expect(result.plan.items).toHaveLength(1);
     expect(result.plan.items[0].id).toBe('item-1');
+  });
+
+  it('accepts xBRIEFInfo v0.8 documents and exposes the internal vBRIEFInfo field', () => {
+    const doc = makePlanDoc([{ id: 'item-1' }]);
+    const planPath = writePlanDoc({
+      ...doc,
+      vBRIEFInfo: undefined,
+      xBRIEFInfo: { version: '0.8', created: '2026-01-01T00:00:00Z' },
+    } as unknown as VBriefDocument);
+
+    const result = readPlanSync(planPath);
+
+    expect(result.vBRIEFInfo.version).toBe('0.8');
+    expect(result.xBRIEFInfo).toBeUndefined();
+    expect(result.plan.items[0].id).toBe('item-1');
+  });
+
+  it('still accepts vBRIEFInfo v0.6 documents unchanged', () => {
+    const doc = makePlanDoc([{ id: 'item-1' }]);
+    doc.vBRIEFInfo.version = '0.6';
+    const planPath = writePlanDoc(doc);
+
+    const result = readPlanSync(planPath);
+
+    expect(result.vBRIEFInfo).toEqual(doc.vBRIEFInfo);
+    expect(result.plan).toEqual(doc.plan);
+  });
+
+  it('leaves documents with vBRIEFInfo unchanged when normalizing', () => {
+    const doc = {
+      vBRIEFInfo: { version: '0.6', created: '2026-01-01T00:00:00Z' },
+      xBRIEFInfo: { version: '0.8', created: '2026-01-02T00:00:00Z' },
+      plan: makePlanDoc().plan,
+    };
+
+    expect(normalizeVBriefEnvelope(doc)).toBe(doc);
+  });
+
+  it('mentions both accepted envelope keys when rejecting a malformed document', () => {
+    const badPath = join(PROJECT_ROOT, 'missing-envelope.json');
+    writeFileSync(badPath, JSON.stringify({ plan: makePlanDoc().plan }, null, 2));
+
+    expect(() => readPlanSync(badPath)).toThrow(/vBRIEFInfo.*xBRIEFInfo|xBRIEFInfo.*vBRIEFInfo/);
   });
 
   it('throws for nonexistent file', () => {
