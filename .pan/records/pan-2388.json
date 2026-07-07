@@ -231,11 +231,11 @@
     "issueId": "PAN-2388",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T18:10:10.791Z",
+    "updatedAt": "2026-07-07T18:10:48.897Z",
     "reviewNotes": "Reconcile route still removes legacy top-level response fields",
     "testNotes": "typecheck passed; npm test passed (896/900 test files, 8762/8821 tests, frontend 3/3); lint failed at lint:circular on cycle src/lib/agents.ts > src/lib/agents/resume.ts > src/lib/review-status.ts > src/lib/cloister/feedback-target.ts. Cycle files are outside PAN-2388 working set. Browser UAT not required per vBRIEF NonGoals.",
     "inspectNotes": "Bead ohmypi-fixtures ack: commit 9de8b447 touches only codex-parser.ts (revert of CodexCostEventUsage additions), a cost-reconcile integration test, and a runbook doc -- zero changes to ohmypi-parser.ts, ohmypi-parser.test.ts, or any ohmypi fixture file. Not this beads scope; AC1-4 remain satisfied unchanged from the prior verified state (c6b01bb3). No action needed.",
@@ -465,7 +465,7 @@
       },
       "costAtCloseOut": {
         "usd": 261.765742,
-        "pricingAsOf": "2026-07-07T18:10:10.843Z"
+        "pricingAsOf": "2026-07-07T18:10:48.946Z"
       }
     },
     "merges": [
@@ -499,5 +499,5 @@
     }
   },
   "created": "2026-07-07T17:32:25.282Z",
-  "updated": "2026-07-07T18:10:10.846Z"
+  "updated": "2026-07-07T18:10:48.954Z"
 }
