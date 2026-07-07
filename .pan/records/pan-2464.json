@@ -1,6 +1,18 @@
 {
   "issueId": "PAN-2464",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-07T21:19:11.614Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-07T21:19:42.141Z"
+    }
+  ],
   "feedback": [],
   "harness": "codex",
   "model": "gpt-5.5",
@@ -107,18 +119,19 @@
   },
   "pipeline": {
     "issueId": "PAN-2464",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T21:13:55.043Z",
-    "reviewNotes": "New Docker resource mutation routes build shell commands from unvalidated IDs",
+    "updatedAt": "2026-07-07T21:19:45.923Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed test",
     "verificationNotes": "Verification FAILED at test (100817ms):\n\nPanePids src/dashboard/server/routes/resources/agents-stats.ts:216:10\n    214|\n    215| function defaultListPanePids(sessionName: string): Effect.Effect<reado…\n    216|   return listPaneValues(sessionName, '#{pane_pid}').pipe(\n       |          ^\n    217|     Effect.map((values) => values\n    218|       .map((value) => Number(value.trim()))\n ❯ Array.<anonymous> src/dashboard/server/routes/resources/agents-stats.ts:152:53\n ❯ next node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/effect.ts:1275:25\n ❯ Object.~effect/Effect/evaluate node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/core.ts:513:30\n ❯ FiberImpl.runLoop node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/effect.ts:633:39\n ❯ runLoop node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/effect.ts:593:22\n ❯ evaluate node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/effect.ts:5195:8\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/resources-agents-table.test.ts > GET /api/resources (agents table) > returns docker container stats from the collector\n FAIL  |root| src/dashboard/server/routes/__tests__/resources-agents-table.test.ts > GET /api/resources (agents table) > returns docker container stats from the collector\nAssertionError: expected [ { name: 'container-1', …(5) } ] to deeply equal [ { name: 'container-1', …(3) } ]\n\n- Expected\n+ Received\n\n  [\n    {\n      \"cpu\": \"10%\",\n      \"mem\": \"100MiB\",\n+     \"memLimitBytes\": null,\n      \"name\": \"container-1\",\n+     \"oomKills24h\": 0,\n      \"status\": \"running\",\n    },\n  ]\n\n ❯ src/dashboard/server/routes/__tests__/resources-agents-table.test.ts:128:29\n    126|     const { body } = await runResourcesEffect();\n    127|\n    128|     expect(body.containers).toEqual([\n       |                             ^\n    129|       { name: 'container-1', cpu: '10%', mem: '100MiB', status: 'runni…\n    130|     ]);\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯\n\n",
     "inspectNotes": "Bead stacks-grouping ack: commit d63984e1 is purely additive (new Playwright visual spec + screenshot for the whole Machine Room UI), does not modify stacks.ts/snapshot.ts, and does not regress the grouping/phase/aggregation logic already verified and passed under 0d3408ac21. The spec mocks /api/resources with a hand-authored fixture rather than exercising the real server, so it supplements but does not independently re-verify AC1/2/4 at the server level; no new violations.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2477",
-    "reviewRequestedAt": "2026-07-07T21:06:30.487Z",
+    "lastVerifiedCommit": "596b42f6c40126ba7cf63fb9634018d1bd96c137",
+    "reviewRequestedAt": "2026-07-07T21:18:58.704Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/records/pan-2464.json",
@@ -270,15 +283,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 30313444,
-            "output": 14539,
-            "cacheRead": 28372736,
+            "input": 30750105,
+            "output": 15238,
+            "cacheRead": 28789376,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 88643169,
-            "output": 239564,
-            "cacheRead": 84231680,
+            "input": 90313048,
+            "output": 244097,
+            "cacheRead": 85713152,
             "cacheWrite": 0
           }
         },
@@ -317,15 +330,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 30313444,
-          "output": 14539,
-          "cacheRead": 28372736,
+          "input": 30750105,
+          "output": 15238,
+          "cacheRead": 28789376,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 88643169,
-          "output": 239564,
-          "cacheRead": 84231680,
+          "input": 90313048,
+          "output": 244097,
+          "cacheRead": 85713152,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -354,8 +367,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 116.854228,
-        "pricingAsOf": "2026-07-07T21:13:55.075Z"
+        "usd": 118.672989,
+        "pricingAsOf": "2026-07-07T21:19:45.959Z"
       }
     },
     "merges": [
@@ -364,5 +377,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-07T21:13:55.080Z",
-  "updated": "2026-07-07T21:13:55.080Z"
+  "updated": "2026-07-07T21:19:45.969Z"
 }
