@@ -8,6 +8,7 @@ import { getOpenAIAuthStatus } from '../openai-auth.js';
 import { ensureOpenAICompatibleProxyRunning } from '../openai-compatible-proxy.js';
 import { validateProviderHealth } from '../provider-health.js';
 import { getProviderEnvSync, getProviderForModelSync } from '../providers.js';
+import { hasModelCapabilitySync, getModelCapabilitySync, resolveModelIdSync } from '../model-capabilities.js';
 import type { Role } from './agent-state.js';
 
 /** Map abstract/future model names to CLIProxy-supported names.
@@ -92,6 +93,7 @@ const PROVIDER_ENV_KEYS = [
   'ANTHROPIC_DEFAULT_SONNET_MODEL',
   'ANTHROPIC_SMALL_FAST_MODEL',
   'CLAUDE_CODE_SUBAGENT_MODEL',
+  'CLAUDE_CODE_AUTO_COMPACT_WINDOW',
   'OPENAI_API_KEY',
   'GEMINI_API_KEY',
   'API_TIMEOUT_MS',
@@ -106,11 +108,24 @@ const PROVIDER_ENV_KEYS = [
   'DASHSCOPE_API_KEY',
 ] as const;
 
+function getClaudeCodeAutoCompactWindowForModel(model: string): number | undefined {
+  const provider = getProviderForModelSync(model);
+  if (provider.name === 'anthropic') return undefined;
+
+  const resolvedModel = resolveModelIdSync(model);
+  if (!hasModelCapabilitySync(resolvedModel)) return undefined;
+  return getModelCapabilitySync(resolvedModel).contextWindow;
+}
+
 export async function getProviderExportsForModel(model: string): Promise<string> {
   const envVars = await getProviderEnvForModel(model);
   const unsetLines = PROVIDER_ENV_KEYS.map(key => `unset ${key}`);
+  const autoCompactWindow = getClaudeCodeAutoCompactWindowForModel(model);
   const exportLines = Object.entries(envVars)
     .map(([k, v]) => `export ${k}="${v.replace(/"/g, '\\"')}"`);
+  if (autoCompactWindow !== undefined) {
+    exportLines.push(`export CLAUDE_CODE_AUTO_COMPACT_WINDOW="${autoCompactWindow}"`);
+  }
 
   return [...unsetLines, ...exportLines].join('\n') + '\n';
 }
@@ -137,7 +152,12 @@ export async function buildSpawnEnvForModel(
     sanitized[k] = v;
   }
   const providerEnv = await getProviderEnvForModel(model);
-  return { ...sanitized, ...providerEnv };
+  const autoCompactWindow = getClaudeCodeAutoCompactWindowForModel(model);
+  return {
+    ...sanitized,
+    ...providerEnv,
+    ...(autoCompactWindow !== undefined ? { CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(autoCompactWindow) } : {}),
+  };
 }
 
 /**

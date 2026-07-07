@@ -61,7 +61,15 @@ const getCostsSummaryRoute = HttpRouter.add(
         const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-        type Entry = { issueId?: string; cost?: number; input?: number; output?: number; model?: string };
+        type Entry = {
+          issueId?: string;
+          cost?: number;
+          input?: number;
+          output?: number;
+          cacheRead?: number;
+          cacheWrite?: number;
+          model?: string;
+        };
         const scope = (entries: Entry[]) =>
           projectPrefix
             ? entries.filter((e) => typeof e.issueId === 'string' && e.issueId.toUpperCase().startsWith(`${projectPrefix}-`))
@@ -73,7 +81,10 @@ const getCostsSummaryRoute = HttpRouter.add(
 
         const summarize = (entries: Entry[]) => ({
           totalCost: entries.reduce((sum, e) => sum + (e.cost || 0), 0),
-          totalTokens: entries.reduce((sum, e) => sum + ((e.input || 0) + (e.output || 0)), 0),
+          totalTokens: entries.reduce(
+            (sum, e) => sum + ((e.input || 0) + (e.output || 0) + (e.cacheRead || 0) + (e.cacheWrite || 0)),
+            0,
+          ),
           entryCount: entries.length,
           byModel: entries.reduce<Record<string, number>>((acc, e) => {
             if (e.model) acc[e.model] = (acc[e.model] || 0) + (e.cost || 0);

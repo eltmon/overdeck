@@ -593,7 +593,7 @@ describe('pipeline state change predicate', () => {
   it('classifies only pipeline state paths as verdict-preserving', async () => {
     mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
       cb(null, {
-        stdout: '.pan/records/pan-714.json\n.pan/continue.json\n.pan/specs/PAN-714.vbrief.json\n.beads/issues.jsonl\n',
+        stdout: '.pan/records/pan-714.json\n.pan/continue.json\n.pan/specs/PAN-714.vbrief.json\n.pan/test/result.json\n.pan/review/reviewer.json\n.pan/feedback/PAN-714.md\n.beads/issues.jsonl\n',
         stderr: '',
       });
     });

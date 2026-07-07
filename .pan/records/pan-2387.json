@@ -1,0 +1,376 @@
+{
+  "issueId": "PAN-2387",
+  "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-06T22:16:24.346Z"
+    },
+    {
+      "timestamp": "2026-07-06T22:17:26.142Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-06T22:17:26.509Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-06T22:20Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-07-06T22:20:59.135Z"
+    },
+    {
+      "timestamp": "2026-07-06T23:08:44.603Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-06T23:08:45.501Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-06T23:30:57.338Z"
+    },
+    {
+      "timestamp": "2026-07-07T00:07:46.681Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-07T00:07:48.094Z"
+    }
+  ],
+  "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".beads/issues.jsonl",
+      ".pan/drafts/pan-2387.md",
+      ".pan/records/pan-2387.json",
+      "src/lib/__tests__/agent-state-role.test.ts",
+      "src/lib/agents/spawn.ts",
+      "src/lib/cost.ts",
+      "src/lib/manifest.ts",
+      "src/lib/overdeck/conversation-cost-session.ts",
+      "src/lib/skills-merge.ts",
+      "sync-sources/hooks/record-cost-event.js",
+      "sync-sources/hooks/record-cost-event.js.map",
+      "tests/lib/memory/providers.test.ts",
+      "tests/lib/overdeck/cost-sync.test.ts",
+      "tests/playwright/conversation-supervisor-uat.test.ts",
+      "tests/unit/lib/cloister/scan-git-patterns.test.ts",
+      "tests/unit/lib/overdeck/cost-reconcile.test.ts",
+      "tests/unit/lib/pan-444-post-merge-step0.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/lib/overdeck/__tests__/cost-sync.test.ts"
+    ],
+    "declaredScope": [
+      "src/dashboard/frontend/src/components/CostBreakdownModal.tsx",
+      "src/dashboard/frontend/src/components/CostsPage.tsx",
+      "src/dashboard/frontend/src/lib/__tests__/cost-bucket-labels.test.ts",
+      "src/dashboard/frontend/src/lib/cost-bucket-labels.ts",
+      "src/dashboard/server/routes/issues.ts",
+      "src/dashboard/server/services/cost-reconcile-service.ts",
+      "src/lib/cost-parsers/__tests__/codex-parser-gpt55.test.ts",
+      "src/lib/cost-parsers/__tests__/fixtures/rollout-gpt55-nested.jsonl",
+      "src/lib/costs/__tests__/attribution.test.ts",
+      "src/lib/costs/__tests__/reconciler-buckets.test.ts",
+      "src/lib/costs/__tests__/unknown-backfill.test.ts",
+      "src/lib/costs/attribution.ts",
+      "src/lib/costs/reconciler.ts",
+      "src/lib/memory/__tests__/extraction-pricing.test.ts",
+      "src/lib/memory/providers/types.ts",
+      "src/lib/overdeck/__tests__/cost-codex-reconcile.test.ts",
+      "src/lib/overdeck/__tests__/cost-sync.test.ts",
+      "src/lib/overdeck/conversations.ts",
+      "src/lib/overdeck/cost-sync.ts",
+      "src/lib/overdeck/cost.ts"
+    ],
+    "actualChangedFiles": [
+      ".beads/issues.jsonl",
+      ".pan/drafts/pan-2387.md",
+      ".pan/records/pan-2387.json",
+      "src/dashboard/frontend/src/components/CostBreakdownModal.tsx",
+      "src/dashboard/frontend/src/components/CostsPage.tsx",
+      "src/dashboard/frontend/src/lib/__tests__/cost-bucket-labels.test.ts",
+      "src/dashboard/frontend/src/lib/cost-bucket-labels.ts",
+      "src/dashboard/server/routes/issues.ts",
+      "src/dashboard/server/services/cost-reconcile-service.ts",
+      "src/lib/__tests__/agent-state-role.test.ts",
+      "src/lib/agents/spawn.ts",
+      "src/lib/cost-parsers/__tests__/codex-parser-gpt55.test.ts",
+      "src/lib/cost-parsers/__tests__/fixtures/rollout-gpt55-nested.jsonl",
+      "src/lib/cost.ts",
+      "src/lib/costs/__tests__/attribution.test.ts",
+      "src/lib/costs/__tests__/reconciler-buckets.test.ts",
+      "src/lib/costs/__tests__/unknown-backfill.test.ts",
+      "src/lib/costs/attribution.ts",
+      "src/lib/costs/reconciler.ts",
+      "src/lib/manifest.ts",
+      "src/lib/memory/__tests__/extraction-pricing.test.ts",
+      "src/lib/memory/providers/types.ts",
+      "src/lib/overdeck/__tests__/cost-codex-reconcile.test.ts",
+      "src/lib/overdeck/conversation-cost-session.ts",
+      "src/lib/overdeck/conversations.ts",
+      "src/lib/overdeck/cost-sync.ts",
+      "src/lib/overdeck/cost.ts",
+      "src/lib/skills-merge.ts",
+      "sync-sources/hooks/record-cost-event.js",
+      "sync-sources/hooks/record-cost-event.js.map",
+      "tests/lib/memory/providers.test.ts",
+      "tests/lib/overdeck/cost-sync.test.ts",
+      "tests/playwright/conversation-supervisor-uat.test.ts",
+      "tests/unit/lib/cloister/scan-git-patterns.test.ts",
+      "tests/unit/lib/overdeck/cost-reconcile.test.ts",
+      "tests/unit/lib/pan-444-post-merge-step0.test.ts"
+    ],
+    "recordedAt": "2026-07-07T00:07:09.510Z"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "unknown-backfill": "completed",
+    "unknown-backfill.ac1": "completed",
+    "unknown-backfill.ac2": "completed",
+    "unknown-backfill.ac3": "completed",
+    "unknown-backfill.ac4": "completed",
+    "reconciler-ingest-buckets": "completed",
+    "reconciler-ingest-buckets.ac1": "completed",
+    "reconciler-ingest-buckets.ac2": "completed",
+    "reconciler-ingest-buckets.ac3": "completed",
+    "reconciler-ingest-buckets.ac4": "completed",
+    "frontend-bucket-labels": "completed",
+    "frontend-bucket-labels.ac1": "completed",
+    "frontend-bucket-labels.ac2": "completed",
+    "frontend-bucket-labels.ac3": "completed",
+    "codex-rollout-fixture-test": "completed",
+    "codex-rollout-fixture-test.ac1": "completed",
+    "codex-rollout-fixture-test.ac2": "completed",
+    "codex-rollout-fixture-test.ac3": "completed",
+    "codex-sweep-wiring": "completed",
+    "codex-sweep-wiring.ac1": "completed",
+    "codex-sweep-wiring.ac2": "completed",
+    "codex-sweep-wiring.ac3": "completed",
+    "codex-sweep-wiring.ac4": "completed",
+    "memory-extraction-pricing": "completed",
+    "memory-extraction-pricing.ac1": "completed",
+    "memory-extraction-pricing.ac2": "completed",
+    "memory-extraction-pricing.ac3": "completed",
+    "memory-extraction-pricing.ac4": "completed",
+    "unify-issue-costs-endpoint": "completed",
+    "unify-issue-costs-endpoint.ac1": "completed",
+    "unify-issue-costs-endpoint.ac2": "completed",
+    "unify-issue-costs-endpoint.ac3": "completed",
+    "unify-issue-costs-endpoint.ac4": "completed",
+    "attribution-classifier": "completed",
+    "attribution-classifier.ac1": "completed",
+    "attribution-classifier.ac2": "completed",
+    "attribution-classifier.ac3": "completed",
+    "attribution-classifier.ac4": "completed"
+  },
+  "pipeline": {
+    "issueId": "PAN-2387",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-07T00:17:41.225Z",
+    "reviewNotes": "Approved; reviewed 6c1521cc with no blocking findings",
+    "testNotes": "npm run typecheck passed (contracts built, tsc --noEmit clean for main/hooks/evals). npm run lint passed all subcommands: eslint, effect pinning, permissions, state-writes, overdeck-boundaries, skills, prompts, file-size, source-introspection, ratchet-audit. npm test passed: 861 test files passed (4 skipped), 8542 tests passed (52 skipped); frontend tests 3 files/32 tests passed. No browser UAT required: acceptance criteria are data/aggregation-level (cost classification, endpoint plane unification, pricing table, codex sweep, fixture parsing) with frontend bucket labels covered by unit tests.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "inspectNotes": "Bead attribution-classifier ack: all 4 ACs verified in working tree (classifySessionBucket FLYWHEEL/CONVERSATIONS/UNATTRIBUTED logic + findConversationForCostSessionSync locator/tmux_session lookup, both covered by attribution.test.ts). Note: commit f713b8ea43d itself is beads-bookkeeping only (closes unrelated bead workspace-uloh8, not workspace-oic6o) — the actual implementation landed earlier in 1548526f3a327deb824dcc95de8af6e568b07dc4.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2432",
+    "reviewedAtCommit": "e0627b17ff71a7399789ddead3ac430dab4e0fe1",
+    "lastVerifiedCommit": "4dc456c9627272a6fb90acc3c6b7ee8ccb11878b",
+    "reviewRequestedAt": "2026-07-07T00:07:46.682Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        ".beads/issues.jsonl",
+        ".pan/drafts/pan-2387.md",
+        ".pan/records/pan-2387.json",
+        "src/lib/__tests__/agent-state-role.test.ts",
+        "src/lib/agents/spawn.ts",
+        "src/lib/cost.ts",
+        "src/lib/manifest.ts",
+        "src/lib/overdeck/conversation-cost-session.ts",
+        "src/lib/skills-merge.ts",
+        "sync-sources/hooks/record-cost-event.js",
+        "sync-sources/hooks/record-cost-event.js.map",
+        "tests/lib/memory/providers.test.ts",
+        "tests/lib/overdeck/cost-sync.test.ts",
+        "tests/playwright/conversation-supervisor-uat.test.ts",
+        "tests/unit/lib/cloister/scan-git-patterns.test.ts",
+        "tests/unit/lib/overdeck/cost-reconcile.test.ts",
+        "tests/unit/lib/pan-444-post-merge-step0.test.ts"
+      ],
+      "declaredScopeUntouched": [
+        "src/lib/overdeck/__tests__/cost-sync.test.ts"
+      ],
+      "declaredScope": [
+        "src/dashboard/frontend/src/components/CostBreakdownModal.tsx",
+        "src/dashboard/frontend/src/components/CostsPage.tsx",
+        "src/dashboard/frontend/src/lib/__tests__/cost-bucket-labels.test.ts",
+        "src/dashboard/frontend/src/lib/cost-bucket-labels.ts",
+        "src/dashboard/server/routes/issues.ts",
+        "src/dashboard/server/services/cost-reconcile-service.ts",
+        "src/lib/cost-parsers/__tests__/codex-parser-gpt55.test.ts",
+        "src/lib/cost-parsers/__tests__/fixtures/rollout-gpt55-nested.jsonl",
+        "src/lib/costs/__tests__/attribution.test.ts",
+        "src/lib/costs/__tests__/reconciler-buckets.test.ts",
+        "src/lib/costs/__tests__/unknown-backfill.test.ts",
+        "src/lib/costs/attribution.ts",
+        "src/lib/costs/reconciler.ts",
+        "src/lib/memory/__tests__/extraction-pricing.test.ts",
+        "src/lib/memory/providers/types.ts",
+        "src/lib/overdeck/__tests__/cost-codex-reconcile.test.ts",
+        "src/lib/overdeck/__tests__/cost-sync.test.ts",
+        "src/lib/overdeck/conversations.ts",
+        "src/lib/overdeck/cost-sync.ts",
+        "src/lib/overdeck/cost.ts"
+      ],
+      "actualChangedFiles": [
+        ".beads/issues.jsonl",
+        ".pan/drafts/pan-2387.md",
+        ".pan/records/pan-2387.json",
+        "src/dashboard/frontend/src/components/CostBreakdownModal.tsx",
+        "src/dashboard/frontend/src/components/CostsPage.tsx",
+        "src/dashboard/frontend/src/lib/__tests__/cost-bucket-labels.test.ts",
+        "src/dashboard/frontend/src/lib/cost-bucket-labels.ts",
+        "src/dashboard/server/routes/issues.ts",
+        "src/dashboard/server/services/cost-reconcile-service.ts",
+        "src/lib/__tests__/agent-state-role.test.ts",
+        "src/lib/agents/spawn.ts",
+        "src/lib/cost-parsers/__tests__/codex-parser-gpt55.test.ts",
+        "src/lib/cost-parsers/__tests__/fixtures/rollout-gpt55-nested.jsonl",
+        "src/lib/cost.ts",
+        "src/lib/costs/__tests__/attribution.test.ts",
+        "src/lib/costs/__tests__/reconciler-buckets.test.ts",
+        "src/lib/costs/__tests__/unknown-backfill.test.ts",
+        "src/lib/costs/attribution.ts",
+        "src/lib/costs/reconciler.ts",
+        "src/lib/manifest.ts",
+        "src/lib/memory/__tests__/extraction-pricing.test.ts",
+        "src/lib/memory/providers/types.ts",
+        "src/lib/overdeck/__tests__/cost-codex-reconcile.test.ts",
+        "src/lib/overdeck/conversation-cost-session.ts",
+        "src/lib/overdeck/conversations.ts",
+        "src/lib/overdeck/cost-sync.ts",
+        "src/lib/overdeck/cost.ts",
+        "src/lib/skills-merge.ts",
+        "sync-sources/hooks/record-cost-event.js",
+        "sync-sources/hooks/record-cost-event.js.map",
+        "tests/lib/memory/providers.test.ts",
+        "tests/lib/overdeck/cost-sync.test.ts",
+        "tests/playwright/conversation-supervisor-uat.test.ts",
+        "tests/unit/lib/cloister/scan-git-patterns.test.ts",
+        "tests/unit/lib/overdeck/cost-reconcile.test.ts",
+        "tests/unit/lib/pan-444-post-merge-step0.test.ts"
+      ],
+      "recordedAt": "2026-07-07T00:07:09.510Z"
+    }
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 113513,
+            "output": 16806,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 15745,
+            "output": 69403,
+            "cacheRead": 12511882,
+            "cacheWrite": 232630
+          },
+          "anthropic/claude-opus-4-8": {
+            "input": 32128,
+            "output": 107107,
+            "cacheRead": 19845931,
+            "cacheWrite": 646815
+          }
+        },
+        "planning": {
+          "anthropic/claude-opus-4-8": {
+            "input": 135,
+            "output": 3394,
+            "cacheRead": 744103,
+            "cacheWrite": 2821
+          }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 19835,
+            "output": 15647,
+            "cacheRead": 2060794,
+            "cacheWrite": 270094
+          }
+        },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 1465210,
+            "output": 33674,
+            "cacheRead": 9027840,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 113513,
+          "output": 16806,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 15745,
+          "output": 69403,
+          "cacheRead": 12511882,
+          "cacheWrite": 232630
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 32263,
+          "output": 110501,
+          "cacheRead": 20590034,
+          "cacheWrite": 649636
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 19835,
+          "output": 15647,
+          "cacheRead": 2060794,
+          "cacheWrite": 270094
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 1465210,
+          "output": 33674,
+          "cacheRead": 9027840,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 40.851944,
+        "pricingAsOf": "2026-07-07T00:17:41.252Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2432"
+    ],
+    "ranOn": "eltmon-z790"
+  },
+  "created": "2026-07-06T22:14:47.667Z",
+  "updated": "2026-07-07T00:17:41.254Z"
+}

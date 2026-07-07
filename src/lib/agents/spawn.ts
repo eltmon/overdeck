@@ -431,7 +431,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Strike agents bypass the normal pipeline (no plan/beads/review/test) —
   // see roles/strike.md. The beads gate is the only thing we skip; everything
   // else (workspace health, supervisor wiring, launcher) is identical.
-  if (role !== 'strike') {
+  if (role !== 'strike' && options.slotItemId === undefined) {
     // Use a short lock timeout when spawning from HTTP handlers so dashboard
     // requests fail fast to the JSONL fallback instead of blocking behind CLI
     // processes that hold the cross-process bd lock. The CLI `pan start` path
@@ -574,7 +574,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   let prompt = options.prompt || '';
 
   // FPP: Check for pending work on hook
-  const { hasWork, items } = checkHookSync(agentId);
+  const { hasWork } = checkHookSync(agentId);
   if (hasWork) {
     const fixedPointPrompt = generateFixedPointPromptSync(agentId);
     if (fixedPointPrompt) {

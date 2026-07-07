@@ -4,17 +4,17 @@
     "created": "2026-07-06T18:25:57Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2336: fix create-beads.test.ts CI flake by mocking bd at the child_process.execFile callback level so real bd is never invoked",
-    "updated": "2026-07-06T19:15:29.767Z"
+    "updated": "2026-07-06T23:23:54.667Z"
   },
   "plan": {
     "id": "pan-2336",
     "title": "bug(ci-flake): create-beads.test.ts intermittently fails in CI with 'table not found: issues' (beads DB setup race)",
-    "status": "running",
+    "status": "completed",
     "uid": "e3cf179c-9fe2-4835-a4ec-478058b23e03",
     "author": "agent:claude-opus-4-8",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-06T18:25:57Z",
-    "updated": "2026-07-06T19:15:29.767Z",
+    "updated": "2026-07-06T23:23:54.667Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2336",
@@ -137,5 +137,5 @@
       "canonicalFilename": "2026-07-06-PAN-2336-bug-ci-flake-create-beads-test-ts-intermittently-fails-in-ci-with-table-not-found-issues-beads-db-setup-race.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }

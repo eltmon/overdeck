@@ -1,9 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { Effect } from 'effect';
-import { emitActivityEntrySync } from '../activity-logger.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
-import { startWorkSync } from '../cv.js';
 import { sendGracefulRestartWarning } from '../graceful-restart.js';
 import { checkHookSync, generateFixedPointPromptSync } from '../hooks.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
