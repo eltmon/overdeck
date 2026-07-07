@@ -11,19 +11,29 @@
   ],
   "feedback": [],
   "created": "2026-07-07T16:15:04.782Z",
-  "updated": "2026-07-07T22:05:23.263Z",
+  "updated": "2026-07-07T22:14:26.477Z",
   "pipeline": {
     "issueId": "PAN-1644",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T22:05:23.229Z"
+    "updatedAt": "2026-07-07T22:14:26.317Z",
+    "inspectNotes": "Bead title-source-ai-explicit ack: LegacyTitleSource extended with ai-explicit, canRefineTitle() correctly gates default/auto/ai/ai-refined true and manual/ai-explicit/null false, canReplaceTitle() unchanged (default/auto only), and retitleConversation() now persists ai-explicit for both the AI-success and deterministic-fallback-on-timeout paths (single call site, both covered by new unit tests). All 3 ACs met."
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 271,
+            "output": 200,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
         "plan": {
           "anthropic/claude-fable-5": {
             "input": 21475,
@@ -31,24 +41,44 @@
             "cacheRead": 7278754,
             "cacheWrite": 213261
           }
+        },
+        "work": {
+          "custom/kimi-k2.7-code": {
+            "input": 317149,
+            "output": 25567,
+            "cacheRead": 12414720,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
+        "anthropic/claude-haiku-4-5": {
+          "input": 271,
+          "output": 200,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
         "anthropic/claude-fable-5": {
           "input": 21475,
           "output": 65365,
           "cacheRead": 7278754,
           "cacheWrite": 213261
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 317149,
+          "output": 25567,
+          "cacheRead": 12414720,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 13.427525000000001,
-        "pricingAsOf": "2026-07-07T22:05:23.262Z"
+        "usd": 16.191158,
+        "pricingAsOf": "2026-07-07T22:14:26.464Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "kimi-k2.7-code"
+  "model": "claude-sonnet-5"
 }
