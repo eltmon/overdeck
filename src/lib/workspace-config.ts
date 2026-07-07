@@ -125,6 +125,9 @@ export interface QualityGateConfig {
   container?: boolean;
   /** Container name pattern (supports {{FEATURE_FOLDER}} etc.) */
   container_name?: string;
+  /** PAN-2461: rerun the gate up to N times on failure before recording it as
+   *  failed — CI-parity for suites with known order-dependent flakes. */
+  retry?: number;
 }
 
 export interface DatabaseConfig extends Record<string, unknown> {
