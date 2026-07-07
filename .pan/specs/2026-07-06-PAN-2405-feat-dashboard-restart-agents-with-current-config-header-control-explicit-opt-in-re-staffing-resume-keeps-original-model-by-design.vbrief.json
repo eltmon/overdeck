@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.6",
     "created": "2026-07-06T14:47:14.825Z",
-    "updated": "2026-07-06T14:47:14.825Z",
+    "updated": "2026-07-07T20:43:37.684Z",
     "author": "overdeck/auto-start",
     "description": "Auto-synthesized minimal plan for PAN-2405: feat(dashboard): 'Restart agents with current config' header control — explicit opt-in re-staffing; resume keeps original model by design",
     "inspectionPolicy": "never"
@@ -10,12 +10,12 @@
   "plan": {
     "id": "pan-2405",
     "title": "feat(dashboard): 'Restart agents with current config' header control — explicit opt-in re-staffing; resume keeps original model by design",
-    "status": "proposed",
+    "status": "completed",
     "uid": "1e72b7b0-1f15-4033-be58-1887b85d77bf",
     "author": "overdeck/auto-start",
-    "sequence": 1,
+    "sequence": 4,
     "created": "2026-07-06T14:47:14.825Z",
-    "updated": "2026-07-06T14:47:14.825Z",
+    "updated": "2026-07-07T20:43:37.684Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2405",
@@ -126,5 +126,6 @@
       }
     ],
     "edges": []
-  }
+  },
+  "status": "completed"
 }
