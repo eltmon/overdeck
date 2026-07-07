@@ -170,7 +170,7 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
     retry: false,
   });
 
-  const { data: restartConfigData, refetch: refetchRestartConfig } = useQuery({
+  const { data: restartConfigData } = useQuery({
     queryKey: ['restart-config-list'],
     queryFn: fetchRestartConfigList,
     enabled: showRestartConfigModal,

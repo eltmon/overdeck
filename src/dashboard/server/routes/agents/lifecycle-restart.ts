@@ -675,10 +675,8 @@ async function buildRestartConfigChangeList(): Promise<RestartConfigChangeItem[]
   for (const agent of agents) {
     if (!agent.issueId) continue;
 
-    const lifecycle = await Effect.runPromise(getWorkAgentLifecycleState(agent.id));
-
     // Skip paused/troubled agents
-    if (lifecycle.isPaused || lifecycle.isTroubled) {
+    if ((agent as any).paused || (agent as any).troubled) {
       continue;
     }
 
@@ -711,8 +709,8 @@ async function buildRestartConfigChangeList(): Promise<RestartConfigChangeItem[]
       newModel,
       newHarness,
       changed: agent.model !== newModel || (agent.harness ?? 'claude-code') !== newHarness,
-      paused: lifecycle.isPaused,
-      troubled: lifecycle.isTroubled,
+      paused: (agent as any).paused ?? false,
+      troubled: (agent as any).troubled ?? false,
       status: agent.status,
     });
   }
