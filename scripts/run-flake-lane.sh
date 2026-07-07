@@ -42,7 +42,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
 
   result="PASS"
   # Non-blocking per-file: a failure sets the result to FAIL but continues.
-  if ! OVERDECK_FLAKE_LANE=1 npx vitest run "$path" --configLoader runner >/tmp/flake-lane-last.log 2>&1; then
+  if ! OVERDECK_FLAKE_LANE=1 npx vitest run "$path" --configLoader runner 2>&1 | tee /tmp/flake-lane-last.log; then
     result="FAIL"
     overall=1
   fi

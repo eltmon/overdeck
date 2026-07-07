@@ -44,7 +44,7 @@ describe('vitest.config.ts flake policy', () => {
     expect(config.test.forks.maxForks).toBe(2);
   });
 
-  it('sets retry:1 in verification mode, excludes quarantined tests, and caps forks', async () => {
+  it('sets retry:1 in verification mode, excludes quarantined tests, and preserves local fork count', async () => {
     vi.stubEnv('CI', undefined);
     vi.stubEnv('OVERDECK_VERIFICATION', '1');
     vi.stubEnv('OVERDECK_FLAKE_LANE', undefined);
@@ -54,7 +54,7 @@ describe('vitest.config.ts flake policy', () => {
     expect(config.test.retry).toBe(1);
     expect(config.test.exclude).toContain('tests/playwright/conversation-supervisor-uat.test.ts');
     expect(config.test.exclude).toContain('src/lib/vbrief/__tests__/create-beads.test.ts');
-    expect(config.test.forks.maxForks).toBe(2);
+    expect(config.test.forks.maxForks).toBe(4);
   });
 
   it('flake-lane mode sets retry:1 and does not exclude quarantined tests', async () => {
