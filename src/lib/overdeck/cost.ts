@@ -103,6 +103,13 @@ export interface SkippedCostSession {
   reason: string;
 }
 
+export interface CostReconcileWarning {
+  file: string;
+  reason: string;
+  provider: string | null;
+  model: string;
+}
+
 export const Rollup = Schema.Struct({
   key:    Schema.String,
   role:   Schema.optional(Schema.String),
@@ -168,6 +175,7 @@ export interface CostReconcileSummary {
   errors: string[];
   earliestEventTs: string | null;
   latestEventTs: string | null;
+  warnings: CostReconcileWarning[];
 }
 
 export type CostReconcileExtraRoot =
@@ -605,6 +613,7 @@ export const CostWriterLive = Layer.effect(
           errors: [],
           earliestEventTs: null,
           latestEventTs: null,
+          warnings: [],
         };
         if (source !== 'ohmypi' && source !== 'codex') return empty;
 
@@ -623,9 +632,16 @@ export const CostWriterLive = Layer.effect(
         let earliestEventTs: string | null = null;
         let latestEventTs: string | null = null;
         const errors: string[] = [];
+        const warnings: CostReconcileWarning[] = [];
         const markSkipped = (file: string, reason: string) => {
           skipped.push({ file, reason });
           console.warn(`[cost-reconcile] skipped ${file}: ${reason}`);
+        };
+        const markWarning = (warning: CostReconcileWarning) => {
+          warnings.push(warning);
+          console.warn(
+            `[cost-reconcile] warning ${warning.file}: ${warning.reason} provider=${warning.provider ?? 'unknown'} model=${warning.model}`,
+          );
         };
 
         const noteImportedTimestamp = (ts: Date) => {
@@ -735,6 +751,14 @@ export const CostWriterLive = Layer.effect(
               }
 
               for (const usage of events) {
+                for (const warning of usage.warnings ?? []) {
+                  markWarning({
+                    file:     sessionFile,
+                    reason:   warning.reason,
+                    provider: warning.provider,
+                    model:    warning.model,
+                  });
+                }
                 const ts = new Date(usage.timestamp);
                 const event: CostEvent = {
                   ts,
@@ -823,6 +847,7 @@ export const CostWriterLive = Layer.effect(
           errors,
           earliestEventTs,
           latestEventTs,
+          warnings,
         };
       });
 
@@ -938,6 +963,12 @@ export const CostApi = HttpApiGroup.make('costs')
         errors:            Schema.Array(Schema.String),
         earliestEventTs:   Schema.NullOr(Schema.String),
         latestEventTs:     Schema.NullOr(Schema.String),
+        warnings:          Schema.Array(Schema.Struct({
+          file:     Schema.String,
+          reason:   Schema.String,
+          provider: Schema.NullOr(Schema.String),
+          model:    Schema.String,
+        })),
       }),
       error:   CostIngestError,
     }),

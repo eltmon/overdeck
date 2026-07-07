@@ -362,6 +362,10 @@ const postCostsReconcileRoute = HttpRouter.add(
         ohmypi: overdeck.ohmypi.skipped,
         codex: overdeck.codex.skipped,
       },
+      warnings: {
+        ohmypi: overdeck.ohmypi.warnings,
+        codex: overdeck.codex.warnings,
+      },
     });
   })),
 );

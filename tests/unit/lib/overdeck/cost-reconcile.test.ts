@@ -276,38 +276,8 @@ describe('CostWriter.reconcile — ohmypi source', () => {
     expect((insertedValues[1] as Record<string, unknown>).requestId).toBe('ohmypi:sess-abc:e2');
   });
 
-  it('reports unpriced ohmypi models while preserving their events', async () => {
+  it('surfaces and preserves ohmypi unpriced-token warning metadata during reconcile', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const agentDir = '/fake/pan/agents';
-    const sessionFile = '/fake/pan/agents/agent-pan-1/sessions/sess.jsonl';
-
-    vi.mocked(readdirSync).mockImplementation((dir, _opts) => {
-      if (String(dir) === agentDir) return [makeDirent('agent-pan-1', true)];
-      if (String(dir) === '/fake/pan/agents/agent-pan-1/sessions') return [makeDirent('sess.jsonl', false)];
-      return [];
-    });
-    vi.mocked(parseOhmypiSessionCostResultSync).mockReturnValue({
-      ok: true,
-      usageEvents: makePiCostEvents(sessionFile),
-      unpricedModels: [{ provider: 'custom', model: 'unknown-model', reason: 'unpriced-model' }],
-    });
-
-    const { dbLayer, busLayer, archiveLayer, insertedValues } = makeTestLayer();
-    const layer = CostWriterLive.pipe(
-      Layer.provide(dbLayer), Layer.provide(busLayer), Layer.provide(archiveLayer),
-    );
-
-    const result = await Effect.runPromise(
-      CostWriter.use((w) => w.reconcile({ source: 'ohmypi' })).pipe(Effect.provide(layer)),
-    );
-
-    expect(result).toMatchObject({ imported: 2, skipped: [{ file: sessionFile, reason: 'unpriced-model' }] });
-    expect(insertedValues).toHaveLength(2);
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(warnSpy).toHaveBeenCalledWith(`[cost-reconcile] skipped ${sessionFile}: unpriced-model`);
-  });
-
-  it('preserves ohmypi unpriced-token warning metadata during reconcile', async () => {
     const agentDir = '/fake/pan/agents';
     const sessionFile = '/fake/pan/agents/agent-pan-1/sessions/sess.jsonl';
 
@@ -346,7 +316,16 @@ describe('CostWriter.reconcile — ohmypi source', () => {
       CostWriter.use((w) => w.reconcile({ source: 'ohmypi' })).pipe(Effect.provide(layer)),
     );
 
-    expect(result).toMatchObject({ imported: 1, sessionsScanned: 1, eventsImported: 1, skipped: [] });
+    expect(result).toMatchObject({
+      imported: 1,
+      sessionsScanned: 1,
+      eventsImported: 1,
+      skipped: [],
+      warnings: [{ file: sessionFile, reason: 'unknown-provider', provider: 'mystery', model: 'mystery-model' }],
+    });
+    expect(warnSpy).toHaveBeenCalledWith(
+      `[cost-reconcile] warning ${sessionFile}: unknown-provider provider=mystery model=mystery-model`,
+    );
     expect(appendedEvents).toHaveLength(1);
     expect(appendedEvents[0]).toMatchObject({
       requestId: 'ohmypi:sess-abc:e1',
