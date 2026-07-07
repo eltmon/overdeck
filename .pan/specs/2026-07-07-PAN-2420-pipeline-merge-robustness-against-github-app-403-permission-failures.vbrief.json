@@ -4,7 +4,7 @@
     "created": "2026-07-07T01:14:10.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2420: pipeline merge fails with GitHub App 403 'Resource not accessible by integration' — merge door falls back to nothing",
-    "updated": "2026-07-07T01:23:31.957Z"
+    "updated": "2026-07-07T01:29:31.764Z"
   },
   "plan": {
     "id": "pan-2420",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "c8a084a7-9f7b-4d14-a2b2-fa114d17126b",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-07T01:14:10.000Z",
-    "updated": "2026-07-07T01:23:31.957Z",
+    "updated": "2026-07-07T01:29:31.764Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2420",
