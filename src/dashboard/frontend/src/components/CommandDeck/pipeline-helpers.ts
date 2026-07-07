@@ -66,6 +66,15 @@ export function isNeedsYouFeature(feature: ProjectFeature, reviewStatus: ReviewS
   if (reviewStatus?.readyForMerge || feature.readyForMerge) return true;
   if (feature.sessions?.some(session => session.paused)) return true;
   if (feature.sessions?.some(session => session.type === 'planning' && session.awaitingInput)) return true;
+  // Plan proposed but not yet approved: PRD exists, no workspace continue state,
+  // and no active planning session still writing the plan.
+  if (
+    feature.hasPrd &&
+    !feature.hasState &&
+    !feature.sessions?.some(session => session.type === 'planning')
+  ) {
+    return true;
+  }
   return false;
 }
 

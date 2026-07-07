@@ -293,6 +293,60 @@ describe('ProjectOverview', () => {
     expect(screen.getByRole('region', { name: /being reviewed pipeline stage/i })).toHaveTextContent('PAN-1');
   });
 
+  it('pins plan-approval-pending issues first with an amber waiting-on-you chip', () => {
+    render(
+      <ProjectOverview
+        projectName="overdeck"
+        features={[
+          makeFeature({ issueId: 'PAN-1', title: 'In progress', agentStatus: 'running', hasPlanning: true, hasPrd: true, hasState: true }),
+          makeFeature({
+            issueId: 'PAN-2',
+            title: 'Plan approval pending',
+            status: 'open',
+            stateLabel: 'Todo',
+            agentStatus: null,
+            hasPlanning: true,
+            hasPrd: true,
+            hasState: false,
+          }),
+        ]}
+        issueCosts={{}}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole('region', { name: /needs you pipeline stage/i })).toHaveTextContent('PAN-2');
+    expect(rowFor('PAN-2')).toHaveTextContent('waiting on you');
+    expect(rowFor('PAN-2')).toHaveTextContent('plan approval pending');
+    expect(screen.getByRole('region', { name: /being built pipeline stage/i })).toHaveTextContent('PAN-1');
+  });
+
+  it('does not treat an active planning session as waiting on you', () => {
+    render(
+      <ProjectOverview
+        projectName="overdeck"
+        features={[
+          makeFeature({
+            issueId: 'PAN-1',
+            title: 'Planning',
+            status: 'open',
+            stateLabel: 'Todo',
+            agentStatus: null,
+            hasPlanning: true,
+            hasPrd: true,
+            hasState: false,
+            sessions: [{ type: 'planning', presence: 'active', model: 'claude-sonnet-4-6' }] as ProjectFeature['sessions'],
+          }),
+        ]}
+        issueCosts={{}}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    expect(screen.queryByRole('region', { name: /needs you pipeline stage/i })).not.toBeInTheDocument();
+    expect(rowFor('PAN-1')).toHaveTextContent('planning');
+  });
+
   it('shows stuck reasons as the row subline for blocked issues', () => {
     useDashboardStore.setState({
       reviewStatusByIssueId: {
