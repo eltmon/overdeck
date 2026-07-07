@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SKILL="$ROOT/SKILL.md"
 SPEC="$ROOT/references/spec.md"
+README="$ROOT/README.md"
+OKFE="$ROOT/references/okf-embeddings.md"
 
 require_grep() {
   local pattern="$1"
@@ -33,6 +35,36 @@ require_grep 'never invent missing knowledge' "$SKILL" "reading rule: never inve
 require_grep 'ee67a5ca27044ebe7c38385f5b6cffc2305a9c1a' "$SPEC" "spec includes upstream source commit SHA"
 require_grep 'Apache-2.0' "$SPEC" "spec includes Apache-2.0 attribution"
 require_grep '^# Open Knowledge Format \(OKF\)' "$SPEC" "spec includes vendored OKF text"
+
+python3 - "$SKILL" "$README" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+skill = Path(sys.argv[1]).read_text(encoding="utf-8")
+readme = Path(sys.argv[2]).read_text(encoding="utf-8")
+
+command_re = re.compile(r"\| `(/okf [^`]+)` \|")
+skill_commands = command_re.findall(skill)
+readme_commands = command_re.findall(readme)
+
+if skill_commands != readme_commands:
+    raise SystemExit(f"README command drift: SKILL={skill_commands!r} README={readme_commands!r}")
+
+mutated = "\n".join(line for line in readme.splitlines() if "`/okf lint`" not in line)
+mutated_commands = command_re.findall(mutated)
+if skill_commands == mutated_commands:
+    raise SystemExit("README command drift negative check did not detect a mismatch")
+
+print("ok - README command names match SKILL.md table and drift check detects mismatch")
+PY
+
+require_grep 'mkdir -p ~/.claude/skills' "$README" "README includes standalone copy-install path"
+require_grep 'git, gh, Python 3, and PyYAML' "$README" "README names standalone requirements"
+require_grep 'okf_embeddings_version: "0.1"' "$OKFE" "okf-embeddings doc includes manifest schema"
+require_grep '"id":"tables/orders#0"' "$OKFE" "okf-embeddings doc includes shard line format"
+require_grep 'Lines are sorted by `id`' "$OKFE" "okf-embeddings doc includes sorting rule"
+require_grep 'okf_embeddings_version` controls compatibility' "$OKFE" "okf-embeddings doc includes succession clause"
 
 python3 - "$ROOT" <<'PY'
 import importlib.util
