@@ -103,15 +103,18 @@ describe('coordinateSwarmSlots per-issue operator hold (PAN-2214)', () => {
     expect(actions).not.toContain('[swarm] considered PAN-100: swarm eligible');
   });
 
-  it('skips a stuck issue the same way', async () => {
+  it('coordinates THROUGH a system-stuck issue, logging the pass (PAN-2469)', async () => {
+    // PAN-2469 semantic change: `stuck` is a system-set failure marker, not an
+    // operator hold. Halting coordination on it froze PAN-2388's ready slots
+    // for hours. Only deaconIgnored halts coordination now.
     const { coordinateSwarmSlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
     setupWorkspace('pan-101', 'PAN-101');
-    mocks.getReviewStatusSync.mockReturnValue({ stuck: true });
+    mocks.getReviewStatusSync.mockReturnValue({ stuck: true, stuckReason: 'verification_stuck' });
 
     const actions = await coordinateSwarmSlots();
 
-    expect(actions).toContain('[swarm] skipped PAN-101: stuck — operator hold');
-    expect(actions).not.toContain('[swarm] considered PAN-101: swarm eligible');
+    expect(actions).toContain('[swarm] PAN-101 is system-stuck (verification_stuck) — coordinating anyway (stuck no longer halts assembly, PAN-2469)');
+    expect(actions).not.toContain('[swarm] skipped PAN-101: stuck — operator hold');
   });
 
   it('honors the hold even when coordination is filtered to that issue (reactive path)', async () => {
