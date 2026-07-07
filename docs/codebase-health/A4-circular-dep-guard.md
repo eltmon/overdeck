@@ -27,7 +27,7 @@ The codebase has 77 import cycles under `src/` (production source only; test and
 
 **FR-2** — The guard fails when `scripts/circular-deps-baseline.txt` contains stale entries for cycles that no longer exist.
 
-**FR-3** — The guard passes (exit 0) on the current branch with a committed baseline capturing today's 76 cycles.
+**FR-3** — The guard passes (exit 0) on the current branch with a committed baseline capturing today's 77 cycles.
 
 **FR-4** — Running `bash scripts/lint-circular-deps.sh --update` lowers the baseline by dropping removed cycles; it never adds new cycles.
 
@@ -69,7 +69,7 @@ Make it executable: `chmod +x scripts/lint-circular-deps.sh`.
 
 ```bash
 bash scripts/lint-circular-deps.sh --regen
-wc -l scripts/circular-deps-baseline.txt   # expect 76 entries
+wc -l scripts/circular-deps-baseline.txt   # expect 77 entries
 ```
 
 ### WI-4 — Extend `scripts/lint-ratchet-audit.sh`

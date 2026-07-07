@@ -79,7 +79,7 @@ predecessor lands.
 |---|---|---|---|
 | 14 | [PAN-2374](https://github.com/eltmon/overdeck/issues/2374) | CodeRabbit: install config, ingest reviews opportunistically into convoy context, reply-on-address, structurally non-gating (locked by test) | **PRD written — on main** |
 | 15 | [PAN-2229](https://github.com/eltmon/overdeck/issues/2229) | Prompt-regression evals for `roles/*.md` + CI diff gate (soul-degradation class) | PRD exists on main (pre-epic) — re-verify at execution |
-| 16 | [PAN-2230](https://github.com/eltmon/overdeck/issues/2230) | Circular-dependency ratchet (madge shrink-only baseline in lint chain) | **IMPLEMENTED** — `npm run lint:circular` guards `src/` against new cycles; 76-cycle baseline at `scripts/circular-deps-baseline.txt` |
+| 16 | [PAN-2230](https://github.com/eltmon/overdeck/issues/2230) | Circular-dependency ratchet (madge shrink-only baseline in lint chain) | **IMPLEMENTED** — `npm run lint:circular` guards `src/` against new cycles; 77-cycle baseline at `scripts/circular-deps-baseline.txt` |
 | 17 | [PAN-2297](https://github.com/eltmon/overdeck/issues/2297) | File-size baseline auto-lowering on the UAT batch merge path | **PRD written — on main** |
 | 18 | [PAN-2265](https://github.com/eltmon/overdeck/issues/2265) | GraphQL quota exhaustion remediation | already in-review — shepherd to close, no new PRD |
 
