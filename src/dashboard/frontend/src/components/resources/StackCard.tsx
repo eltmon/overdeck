@@ -39,7 +39,7 @@ export function StackCard({
     isShadow: false,
   };
   const reviewStatus: BucketedFeature['reviewStatus'] = stack.phase === 'merged'
-    ? { mergeStatus: 'merged' }
+    ? { issueId: stack.issueId ?? stack.id, mergeStatus: 'merged' }
     : undefined;
   const chip = pipelineChipFor({
     phase: stack.phase === 'merged' ? 'ship' : stack.phase,

@@ -1,10 +1,10 @@
-import { RefObject } from 'react';
+import type { Ref } from 'react';
 
 export type MachineRoomGroupBy = 'workspace' | 'kind' | 'flat';
 
 interface MachineRoomTopbarProps {
   filter: string;
-  filterRef: RefObject<HTMLInputElement | null>;
+  filterRef: Ref<HTMLInputElement>;
   groupBy: MachineRoomGroupBy;
   stale: boolean;
   updatedAt?: string;
