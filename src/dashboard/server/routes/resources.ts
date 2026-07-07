@@ -130,6 +130,15 @@ export {
   type StackContainerResource,
 } from './resources/stacks.js';
 export {
+  dockerStackVerbEffect,
+  postPauseStackRoute,
+  postStartStackRoute,
+  postStopStackRoute,
+  resetDockerStackVerbExecForTests,
+  setDockerStackVerbExecForTests,
+  type StackVerbResult,
+} from './resources/stack-verbs.js';
+export {
   getStackTeardownEstimateEffect,
   getStackTeardownEstimateRoute,
   postStackTeardownEffect,

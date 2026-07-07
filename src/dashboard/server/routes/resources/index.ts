@@ -21,6 +21,11 @@ import { getResourceHistoryRoute } from './history.js';
 import { deleteResourceVenvRoute } from './reclaim.js';
 import { getResourcesRoute } from './snapshot.js';
 import {
+  postPauseStackRoute,
+  postStartStackRoute,
+  postStopStackRoute,
+} from './stack-verbs.js';
+import {
   getStackTeardownEstimateRoute,
   postStackTeardownRoute,
 } from './teardown.js';
@@ -42,6 +47,9 @@ export const resourcesRouteLayer = Layer.mergeAll(
   postUnpauseContainerRoute,
   getContainerLogsRoute,
   deleteResourceVenvRoute,
+  postStartStackRoute,
+  postStopStackRoute,
+  postPauseStackRoute,
   getStackTeardownEstimateRoute,
   postStackTeardownRoute,
 );
