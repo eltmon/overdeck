@@ -6,6 +6,11 @@ vi.mock('../review-agent.js', () => ({
   spawnReviewSubRoleForIssue: mockSpawnReviewSubRole,
 }));
 
+vi.mock('../merge-verification.js', () => ({
+  shouldSkipDispatchAsMerged: vi.fn(async () => ({ skip: false, reason: 'open' })),
+  verifyMergedBeforeLifecycle: vi.fn(),
+}));
+
 const mockDeliverReviewVerdictFeedback = vi.hoisted(() => vi.fn());
 vi.mock('../review-verdict-feedback.js', async () => {
   const { Effect } = await import('effect');

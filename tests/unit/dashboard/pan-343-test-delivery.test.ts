@@ -53,6 +53,11 @@ vi.mock('../../../src/lib/review-status.js', () => ({
   getReviewStatusSync: vi.fn(),
 }));
 
+vi.mock('../../../src/lib/cloister/merge-verification.js', () => ({
+  shouldSkipDispatchAsMerged: vi.fn(async () => ({ skip: false, reason: 'open' })),
+  verifyMergedBeforeLifecycle: vi.fn(),
+}));
+
 // ---------------------------------------------------------------------------
 // Import the production function AFTER mocks are in place
 // ---------------------------------------------------------------------------

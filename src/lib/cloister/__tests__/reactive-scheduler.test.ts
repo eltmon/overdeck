@@ -74,6 +74,11 @@ vi.mock('../issue-closed.js', () => ({
   isIssueClosed: vi.fn(async () => false),
 }));
 
+vi.mock('../merge-verification.js', () => ({
+  shouldSkipDispatchAsMerged: vi.fn(async () => ({ skip: false, reason: 'open' })),
+  verifyMergedBeforeLifecycle: vi.fn(),
+}));
+
 vi.mock('../../activity-logger.js', () => ({
   emitActivityEntry: vi.fn(),
   emitActivityEntrySync: vi.fn(),

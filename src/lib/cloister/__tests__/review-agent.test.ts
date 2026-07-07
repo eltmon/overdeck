@@ -82,6 +82,11 @@ vi.mock('../feedback-writer.js', () => ({
   archiveFeedbackFiles: mocks.archiveFeedbackFiles,
 }));
 
+vi.mock('../merge-verification.js', () => ({
+  shouldSkipDispatchAsMerged: vi.fn(async () => ({ skip: false, reason: 'open' })),
+  verifyMergedBeforeLifecycle: vi.fn(),
+}));
+
 vi.mock('../../pipeline-notifier.js', () => ({
   notifyPipeline: mocks.notifyPipeline,
 }));

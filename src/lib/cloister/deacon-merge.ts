@@ -1,7 +1,7 @@
 import { existsSync, readdirSync } from 'fs';
 import { readdir } from 'fs/promises';
 import { join } from 'path';
-import { exec, execFile } from 'child_process';
+import { exec, execFile } from 'node:child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { AGENTS_DIR } from '../paths.js';
@@ -158,9 +158,11 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
       // completed/cancelled and clears review status. Treating the cleared/
       // resurrected row as "stale" here re-fires the post-merge handoff,
       // which REOPENS the closed tracker issue (PAN-1190, 2026-06-11).
+      let specStatus: string | undefined;
       try {
         const { findSpecByIssue } = await import('../pan-dir/specs.js');
         const spec = await Effect.runPromise(findSpecByIssue(project.projectPath, issueId));
+        specStatus = spec?.status;
         if (spec && (spec.status === 'completed' || spec.status === 'cancelled')) {
           staleMergeReconciled.add(issueId);
           continue;
@@ -217,20 +219,22 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
       }
 
       if (isMerged) {
-        // PAN-1994: Skip the entire reconcile (including setReviewStatusSync) if
-        // a planning or work agent is actively running. Setting mergeStatus=merged
-        // while a fresh re-plan is in progress would contaminate the new pipeline
-        // cycle with stale prior-merge state. Leave staleMergeReconciled unset so
-        // the next patrol re-evaluates once the active agent has finished.
+        // PAN-1994: Defer terminalization only when a genuine re-plan is in
+        // progress. An active planning-<issue> agent or a spec back at
+        // draft/proposed means a fresh planning cycle is running; setting
+        // mergeStatus='merged' would contaminate it. A lone zombie work agent
+        // is NOT a reason to defer — the branch is already merged on GitHub,
+        // so we terminalize and let postMergeLifecycle kill the stale session.
         const issueLower = issueId.toLowerCase();
         const planState = getAgentStateSync(`planning-${issueLower}`);
-        const workState = getAgentStateSync(`agent-${issueLower}`);
-        const hasActiveAgent =
-          planState?.status === 'running' || planState?.status === 'starting' ||
-          workState?.status === 'running' || workState?.status === 'starting';
+        const hasPlanningAgent = planState?.status === 'running' || planState?.status === 'starting';
+        const isReplanning = specStatus === 'draft' || specStatus === 'proposed';
 
-        if (hasActiveAgent) {
-          console.log(`[deacon] ${issueId}: active agent in progress — deferring stale-merge reconcile (PAN-1994)`);
+        if (hasPlanningAgent || isReplanning) {
+          const reason = hasPlanningAgent
+            ? 'active planning agent in progress'
+            : `spec status is '${specStatus}' (re-planning in progress)`;
+          console.log(`[deacon] ${issueId}: ${reason} — deferring stale-merge reconcile (PAN-1994)`);
           continue;
         }
 
