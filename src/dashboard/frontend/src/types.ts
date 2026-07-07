@@ -372,12 +372,29 @@ export interface ResourceStack {
   uatUrl?: string;
 }
 
+export interface CapacityForecastSnapshot {
+  stacks: Array<{
+    stackId: string;
+    issueId: string | null;
+    composeProject: string;
+    predictedRamBytes: number;
+    predictedLoad: number;
+    approximate: true;
+    source: 'last-run-peak' | 'fleet-median';
+  }>;
+  headroom: {
+    freeRamBytes: number;
+    loadHeadroom: number;
+  };
+}
+
 export interface ResourcesSnapshot {
   containers: ContainerStats[];
   agents: Agent[];
   updatedAt: string;
   hostVitals?: HostVitalsSnapshot;
   spawnGate?: SpawnGateSnapshot;
+  forecast?: CapacityForecastSnapshot;
   stale?: boolean;
   stacks?: ResourceStack[];
   coreServices?: CoreServiceResource[];

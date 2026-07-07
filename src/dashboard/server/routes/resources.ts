@@ -66,6 +66,16 @@ export {
   type MinimalAgentState,
 } from './resources/agents-stats.js';
 export {
+  buildCapacityForecast,
+  persistStackForecastPeak,
+  recordStackForecastSample,
+  resetCapacityForecastForTests,
+  setForecastStateFileForTests,
+  type CapacityForecastPayload,
+  type StackForecastRow,
+  type StackPeakRecord,
+} from './resources/forecast.js';
+export {
   buildCoreServices,
   getCoreServicesSnapshot,
   type CoreServiceRow,

@@ -7,6 +7,7 @@ import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
 import { getAgentStatsSnapshotEffect } from './agents-stats.js';
 import { getCoreServicesSnapshot } from './core-services.js';
+import { buildCapacityForecast } from './forecast.js';
 import { getHostProcessesSnapshot } from './host-processes.js';
 import { buildHostVitalsSnapshot } from './host-vitals.js';
 import { enrichContainersWithLimits } from './limits.js';
@@ -35,6 +36,16 @@ export function getResourcesEffect(): Effect.Effect<ReturnType<typeof jsonRespon
         hasLiveTmuxSession: tmuxSessionNames.has(state.id),
       }));
     const agentStatsById = new Map(agentStats.agents.map((agent) => [agent.id, agent]));
+    const hostVitals = buildHostVitalsSnapshot({
+      containers,
+      agents: agents.map((agent) => ({
+        id: String(agent.id),
+        lastActivity: typeof agent.lastActivity === 'string' ? agent.lastActivity : undefined,
+        hasLiveTmuxSession: agent.hasLiveTmuxSession === true,
+      })),
+      agentFleet: agentStats.hostVitals.agents,
+    });
+    const stacks = getResourceStacks(containers);
 
     return jsonResponse({
       agents: agents.map((agent) => ({
@@ -43,20 +54,13 @@ export function getResourcesEffect(): Effect.Effect<ReturnType<typeof jsonRespon
       })),
       coreServices: getCoreServicesSnapshot(),
       containers,
-      hostVitals: buildHostVitalsSnapshot({
-        containers,
-        agents: agents.map((agent) => ({
-          id: String(agent.id),
-          lastActivity: typeof agent.lastActivity === 'string' ? agent.lastActivity : undefined,
-          hasLiveTmuxSession: agent.hasLiveTmuxSession === true,
-        })),
-        agentFleet: agentStats.hostVitals.agents,
-      }),
+      forecast: buildCapacityForecast(stacks, { hostVitals }),
+      hostVitals,
       hostProcesses: getHostProcessesSnapshot(),
       stoppedContainers,
       networks: [],
       spawnGate,
-      stacks: getResourceStacks(containers),
+      stacks,
       volumes: [],
       updatedAt: new Date().toISOString(),
     });

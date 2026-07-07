@@ -113,6 +113,7 @@ describe('PAN-2464 resources route no-loss audit', () => {
       'agents',
       'containers',
       'coreServices',
+      'forecast',
       'hostProcesses',
       'hostVitals',
       'networks',
