@@ -123,10 +123,9 @@
     "issueId": "PAN-2373",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
-    "mergeStatus": "failed",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T05:38:05.960Z",
+    "updatedAt": "2026-07-07T22:10:26.760Z",
     "reviewNotes": "Approved: flake policy, quarantine audit, verification env, and non-blocking flake lane satisfy the review requirements",
     "testNotes": "Reconciled from green GitHub Actions CI on af5f24ae: lint (https://github.com/eltmon/overdeck/actions/runs/28838994706/job/85528807838)",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -179,17 +178,19 @@
         "vitest.config.ts"
       ],
       "recordedAt": "2026-07-07T02:53:14.005Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-07T22:10:26.760Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 2,
-            "output": 7700,
-            "cacheRead": 143935,
-            "cacheWrite": 2818
+            "input": 1274,
+            "output": 9951,
+            "cacheRead": 6970292,
+            "cacheWrite": 6821
           }
         },
         "memory-extraction": {
@@ -238,19 +239,19 @@
             "cacheWrite": 0
           },
           "unknown": {
-            "input": 19888945,
-            "output": 33998,
-            "cacheRead": 18904448,
+            "input": 21561738,
+            "output": 36592,
+            "cacheRead": 20145920,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 14633,
-          "output": 17303,
-          "cacheRead": 1428431,
-          "cacheWrite": 130920
+          "input": 15905,
+          "output": 19554,
+          "cacheRead": 8254788,
+          "cacheWrite": 134923
         },
         "cliproxy/gpt-5.4-mini": {
           "input": 55653,
@@ -265,9 +266,9 @@
           "cacheWrite": 150895
         },
         "unknown": {
-          "input": 23249825,
-          "output": 51453,
-          "cacheRead": 21746688,
+          "input": 24922618,
+          "output": 54047,
+          "cacheRead": 22988160,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
@@ -278,8 +279,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 44.14107425,
-        "pricingAsOf": "2026-07-07T05:38:06.117Z"
+        "usd": 53.90384025,
+        "pricingAsOf": "2026-07-07T22:09:04.258Z"
       }
     },
     "merges": [
@@ -291,5 +292,5 @@
     "finalizedAt": "2026-07-06T17:49:27.751Z"
   },
   "created": "2026-07-07T01:35:12.280Z",
-  "updated": "2026-07-07T05:38:50.232Z"
+  "updated": "2026-07-07T22:10:26.760Z"
 }

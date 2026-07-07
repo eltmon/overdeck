@@ -207,6 +207,244 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-58 tick 122 (2026-07-07) — PAN-2464 CLOSED; quiet, main stable green; PAN-2426/2468 in-flight
+
+Main GREEN (`11c03106f3`, stable). **PAN-2464 CLOSED** (Machine Room /resources overhaul fully done). PAN-2468 (OKF) work agent + PAN-2426 (xBRIEF) planning — both in flight, not ready. M7/MIN-729 verifying. No PAN drain (ready = MIN-865/861 report-only). **B3/PAN-2167** unauthorized. **A8/PAN-2297** wedged (`pan-1847`). A9/A13 held. No new off-book planning (PAN-2445 clean). Order book ~11 landed + many extra PAN drains done. Waiting on PAN-2426/2468 to ripen + operator (B3 auth, MIN UAT).
+
+## RUN-58 tick 121 (2026-07-07) — ✓ Playwright flake cleared on re-run (main green); PAN-2464 (Machine Room) CLOSING
+
+**MAIN GREEN (`11c03106f3`)** — re-run cleared the Playwright-install flake; PAN-2464 verified. **PAN-2464 (Machine Room /resources overhaul) close-out dispatched.** Big dashboard feature fully landed.
+- No PAN drain (ready = MIN-865/861 report-only; PAN-2426 still working). PAN-2426 + PAN-2468 planning/working. M7/MIN-729 verifying. **B3/PAN-2167** unauthorized. **A8/PAN-2297** wedged (`pan-1847`). Order book ~11 landed.
+- Run tally: 3 red-main P0s handled (PAN-2471 real cycle=strike; 2× Playwright flake=rerun, filed PAN-2478); MIN-857 partial-merge fixed (PAN-2467); 5+ extra PAN drains (2450/2405/1872/2464 + PAN-2388 finalize).
+
+## RUN-58 tick 120 (2026-07-07) — ⚠ RED MAIN = Playwright-install flake AGAIN (2nd) → re-ran + FILED PAN-2478 (CI-reliability bug)
+
+**⚠ RED MAIN on `11c03106f3` (PAN-2464 merge) — SAME Playwright-install apt flake as PAN-2405 (tick 113), NOT PAN-2464's code.** `test` job "Install Playwright browsers": `Err packages.microsoft.com/repos/azure-cli noble InRelease — Clearsigned file isn't valid, got 'NOSPLIT'`.
+- **ACTION 1: re-ran CI** (`gh run rerun 28901223300 --failed`) → in_progress. Will green main.
+- **ACTION 2: FILED PAN-2478** (CI-reliability substrate bug) — recurring Playwright-browser-install apt flake red-mains legit merges (2x now: PAN-2405 + PAN-2464). Fixes suggested: retry install step / drop azure-cli apt source / cache ms-playwright / treat as infra-retryable in flake policy (PAN-2373). Fits the RUN-58 CI/CD-reliability theme.
+- **NEXT TICK:** re-run verdict — GREEN → bg `pan close PAN-2464 --force`; RED-same-flake → rerun again; RED-real → strike.
+- REUSABLE: 2nd+ occurrence of a recurring CI flake red-mainning merges → don't just re-run silently; FILE it as a CI-reliability bug with the exact signature + fix options. This flake sig = `test` job / "Install Playwright browsers" / `packages.microsoft.com` / `NOSPLIT` / exit 100.
+- PAN-2426 working, PAN-2468 planning, M7/MIN-729 verifying. B3/PAN-2167 unauthorized. A8/PAN-2297 wedged. MIN-865/861 rfm report.
+
+## RUN-58 tick 119 (2026-07-07) — ★ PAN-2464 (Machine Room /resources) MERGED (#2477, 11c03106f3); main CI verifying → red-main watch
+
+**PAN-2464 MERGED** — `11c03106f3 PAN-2464 (#2477)` at 21:52. The Machine Room /resources dashboard overhaul is on main. Main CI **in_progress** → **red-main watch** (large dashboard change).
+- **NEXT TICK:** red-main verdict on 11c03106f3 — GREEN → bg `pan close PAN-2464 --force`; RED-Playwright-flake → `gh run rerun <id> --failed`; RED-real (typecheck/lint/circular) → strike (recipe tick-101). Close deferred to green.
+- No PAN drain (ready = MIN-865/861 report-only; PAN-2426 still working). PAN-2426 + PAN-2468 planning/working. M7/MIN-729 verifying. **B3/PAN-2167** unauthorized. **A8/PAN-2297** wedged (`pan-1847`). Order book ~11 landed.
+
+## RUN-58 tick 118 (2026-07-07) — ★ DRAIN: PAN-2464 (Machine Room /resources) ready+green → SCHEDULED (#2477, mergeAt ~21:51)
+
+**MAIN GREEN (`5061004549`).**
+- **★ PAN-2464 (Machine Room /resources overhaul, dashboard) SCHEDULED** — passed review+test, PR #2477 all-green + CLEAN + settled (latest `fix: wire reclaim row actions` 21:35) → auto-merge id 31, mergeAt 21:51:39Z. NEXT TICK: merged → **red-main watch HARD** (dashboard code — distinguish Playwright-install flake [rerun] from real cycle/typecheck [strike]) → green → bg `pan close PAN-2464 --force`.
+- PAN-2426 + PAN-2468 planning. M7/MIN-729 verifying. **B3/PAN-2167** unauthorized. **A8/PAN-2297** wedged (`pan-1847`). MIN-865/861 rfm report. Order book ~11 landed.
+
+## RUN-58 tick 117 (2026-07-07) — NO CHANGE; main green 5061004549; PAN-2464 in review, all else in-flight/operator-gated
+
+Static since t116. Main GREEN. PAN-2464 (dashboard) in review (not ready); PAN-2426 + PAN-2468 planning; M7/MIN-729 verifying. No PAN drain (ready = MIN-865/861 report-only). B3/PAN-2167 unauthorized. A8/PAN-2297 wedged (`pan-1847`). A9/A13 held. No new off-book planning (PAN-2445 clean). Order book ~11 landed + both marquee deliverables done. Waiting on PAN-2464 to ripen + operator (B3 auth, MIN UAT). Widened reschedule ~1000s.
+
+## RUN-58 tick 116 (2026-07-07) — PAN-1872 CLOSED; quiet, main stable green; PAN-2464 in review (next drain)
+
+Main GREEN (`5061004549`, stable). PAN-1872 CLOSED (both PAN drains done+closed). PAN-2464 (dashboard) in active review (`agent-pan-2464-review` up) — next drain when ready. PAN-2426 + PAN-2468 planning. M7/MIN-729 verifying. No PAN drain (ready = MIN-865/861 report-only). **B3/PAN-2167** unauthorized. **A8/PAN-2297** wedged (`pan-1847`). A9/A13 held. No new off-book planning (PAN-2445 clean). Order book ~11 landed. Nothing to launch/drain — waiting on PAN-2464 to ripen + operator (B3 auth, MIN UAT).
+
+## RUN-58 tick 115 (2026-07-07) — ✓ PAN-1872 green + closing; PAN-2405 CLOSED; both PAN drains done; main stable green
+
+**MAIN GREEN (`5061004549`)** — PAN-1872 merge verified (no flake). **PAN-2405 CLOSED**; **PAN-1872 close-out dispatched**. Both PAN drains this stretch fully done (dashboard restart-agents + pan-start crash fix).
+- No PAN drain (ready = MIN-865/861 report-only). PAN-2464 review, PAN-2426/2468 planning, M7/MIN-729 verifying. **B3/PAN-2167** unauthorized. **A8/PAN-2297** wedged (`pan-1847`). A9/A13 held. No new off-book planning (PAN-2445 clean). Order book ~11 landed.
+
+## RUN-58 tick 114 (2026-07-07) — ✓ flake cleared on re-run (PAN-2405 green, closing); PAN-1872 also MERGED (5061004549)
+
+**Red-main flake RESOLVED by re-run** — e076314112 (PAN-2405) CI now **success** (Playwright-install flake cleared on `gh run rerun --failed`). PAN-2405 close-out dispatched.
+- **★ PAN-1872 (#2474) MERGED** — main HEAD `5061004549 PAN-1872 (#2474)` (scheduled merge id 30 fired once main recovered). Main CI on 5061004549 **in_progress** → NEXT TICK: green → bg `pan close PAN-1872 --force`; red-flake → re-run; real-fail → strike.
+- **2 more PAN drains landed this stretch** (PAN-2405 dashboard restart-agents + PAN-1872 pan-start crash fix). PAN-2464 review, PAN-2426/2468 planning, M7/MIN-729 verifying.
+- **B3/PAN-2167** unauthorized. **A8/PAN-2297** wedged (`pan-1847`). MIN-865/861 rfm report. Order book ~11 landed. 2 red-main P0s this run (PAN-2471 real cycle + this Playwright flake) — both cleared.
+
+## RUN-58 tick 113 (2026-07-07) — ⚠ RED MAIN = CI FLAKE (Playwright-install network error, NOT code) → re-ran CI; PAN-1872 re-schedule after green
+
+**⚠ RED MAIN on `e076314112` (PAN-2405 merge) — but it's a CI FLAKE, not a code break.** Failing job = `test` at "Install Playwright browsers": `E: Failed to fetch https://packages.microsoft.com/... Clearsigned file isn't valid, got 'NOSPLIT'` → `Failed to install browsers / exited code 100`. Transient apt/network error in CI env; PAN-2405's dashboard code is fine.
+- **ACTION: re-ran failed CI** (`gh run rerun 28895923571 --failed`) → queued/re-running. NO code strike (flake, not regression).
+- **REUSABLE:** red main where `test` job fails at "Install Playwright browsers" with apt/`packages.microsoft.com`/`Clearsigned`/`NOSPLIT`/`exited code 100` = **CI infra flake** → `gh run rerun <run-id> --failed`, do NOT diagnose/strike code. Distinguish from real failures (typecheck/lint/circular/test-assertion) which DO need a strike.
+- **PAN-1872 (#2474) UNSTABLE** (scheduled merge didn't fire; main red) → re-schedule when main green + PR CLEAN. PAN-2405 OPEN (verifying, red until re-run greens).
+- **NEXT TICK:** re-run verdict — GREEN → bg `pan close PAN-2405 --force` + re-schedule PAN-1872; RED-again (same flake) → re-run again; (real failure) → strike.
+- PAN-2464 review, PAN-2426/2468 planning, M7/MIN-729 verifying. B3/PAN-2167 unauthorized. A8/PAN-2297 wedged. MIN-865/861 rfm report.
+
+## RUN-58 tick 112 (2026-07-07) — ★ PAN-2405 MERGED (#2476, e076314112); PAN-1872 settled CLEAN → SCHEDULED (#2474, mergeAt ~20:26)
+
+**PAN-2405 MERGED** — `e076314112 PAN-2405 (#2476)` (dashboard 'Restart agents with current config') at 20:19. Main CI **in_progress** → red-main watch (dashboard code, cycle risk). NEXT TICK: green → bg `pan close PAN-2405 --force`; red → P0 strike.
+- **★ PAN-1872 (#2474) settled CLEAN → SCHEDULED** — record-push loop finally quiesced (last commit 20:09) → auto-merge id 30, mergeAt 20:26:33Z. NEXT TICK: merged+green → bg `pan close PAN-1872 --force`.
+- PAN-2464 review, PAN-2426/2468 planning, M7/MIN-729 verifying. **B3/PAN-2167** unauthorized. **A8/PAN-2297** wedged (`pan-1847`). MIN-865/861 rfm report. Order book ~11 landed + 2 more PAN drains in flight (2405 merged, 1872 scheduled).
+
+## RUN-58 tick 111 (2026-07-07) — ★ PAN-2405 settled CLEAN → SCHEDULED (#2476, mergeAt ~20:16); PAN-1872 still in record-push loop
+
+**MAIN GREEN (`b0ea025a92`).**
+- **★ PAN-2405 (#2476, dashboard 'Restart agents with current config') SCHEDULED** — settled CLEAN → auto-merge id 29, mergeAt 20:16:30Z. NEXT TICK: merged+green → bg `pan close PAN-2405 --force`.
+- **PAN-1872 (#2474) STILL in record-push loop** — 3rd+ record commit (`chore(records): close PAN-1872 verification` 20:09) re-triggered CI (flake+build pending). Same multi-push loop as B2 (~40min to settle); wait-settle, don't churn — grab when CLEAN.
+- PAN-2464 review, PAN-2426/2468 planning, M7/MIN-729 verifying. **B3/PAN-2167** unauthorized. **A8/PAN-2297** wedged. MIN-865/861 rfm report. Order book ~11 landed.
+
+## RUN-58 tick 110 (2026-07-07) — PAN-1872 + PAN-2405 ready but both re-CI'd (record-push) → wait-settle; main green
+
+**MAIN GREEN (`b0ea025a92`).** Two PAN drains pending on the record-push re-CI:
+- **PAN-1872 (#2474)** — scheduled last tick but a `chore(records): mark PAN-1872 review passed` (19:52) re-triggered `test` → UNSTABLE, missed the 19:55 window. Wait for green+CLEAN → RE-schedule (old id 28 won't fire on UNSTABLE).
+- **PAN-2405 (#2476)** — NEW ready ("feat(dashboard): Restart agents with current config"), OPEN; `test` pending / UNSTABLE (record-push re-CI). Wait for green+CLEAN → schedule.
+- NOTE: the verdict-freshness fix (b0ea025a92) keeps the *review verdict* fresh across trailing commits, but does NOT stop GitHub CI re-triggering on the PR HEAD — so merges still get delayed ~10min each by record-push. Deeper PAN-2167 fix (don't push records to ready PR / `[skip ci]`) still warranted. Don't churn-schedule; grab both when they settle.
+- **B3/PAN-2167** unauthorized. **A8/PAN-2297** wedged (`pan-1847`). MIN-865/861 rfm report; M7/MIN-729 verifying. PAN-2464 review, PAN-2426/2468 planning. Order book ~11 landed.
+
+## RUN-58 tick 109 (2026-07-07) — ★ DRAIN: PAN-1872 (pan-start crash fix) ready+green → SCHEDULED (#2474, mergeAt ~19:55); PAN-2464 → review
+
+**MAIN GREEN (`b0ea025a92`).**
+- **★ PAN-1872 SCHEDULED** — "bug(cli): pan start crashes ('Cannot read...toUpperCase')" (real CLI crash-guard fix; was a lifecycle-patrol spawn earlier, now completed legit work). Issue OPEN, PR #2474 all-green + CLEAN + settled → auto-merge scheduled id 28, mergeAt 19:55:48Z. NEXT TICK: merged + main-green → bg `pan close PAN-1872 --force` (low red-main risk — normalizeIssue guard).
+- **PAN-2464 → review** (`agent-pan-2464-review-supervisor` spawned; work agent still active). PAN-2426 + PAN-2468 planning. M7/MIN-729 verifying.
+- **MIN report-only:** MIN-865/861 rfm. **B3/PAN-2167** unauthorized. **A8/PAN-2297** wedged (`pan-1847`). A9/A13 held. No new off-book planning (PAN-2445 clean). Order book ~11 landed.
+
+## RUN-58 tick 108 (2026-07-07) — NO CHANGE (2nd); main green b0ea025a92; PAN-2464/2426 in-flight, all else operator-gated
+
+Static since t106. Main GREEN. PAN-2464 (dashboard) working; PAN-2426 planning; M7/MIN-729 verifying. No PAN drain (ready = MIN-865/861 report-only). B3/PAN-2167 unauthorized. A8/PAN-2297 wedged (`pan-1847`). A9/A13 held. No new off-book planning (PAN-2445 clean). Order book ~11 landed + both marquee deliverables done. Waiting on PAN-2464/2426 to ripen + operator (B3 auth, MIN UAT). Widened reschedule ~1000s.
+
+## RUN-58 tick 107 (2026-07-07) — NO CHANGE; main stable green (b0ea025a92); PAN-2464/2426 in-flight, all else operator-gated
+
+Identical to t106. Main GREEN. Both marquee deliverables done+closed. PAN-2464 (dashboard) working; PAN-2426 + PAN-2468 + MIN-867 planning; M7/MIN-729 verifying. No PAN drain (ready = MIN-865/861 report-only). B3/PAN-2167 unauthorized. A8/PAN-2297 wedged. A9/A13 held. No new off-book planning (PAN-2445 clean). Order book ~11 landed. Nothing to launch/drain — waiting on PAN-2464/2426 to ripen + operator (B3 auth, MIN UAT). Widened reschedule.
+
+## RUN-58 tick 106 (2026-07-07) — PAN-2388 CLOSED (priority pair fully done); quiet, main stable green, work in-flight
+
+**MAIN GREEN (`b0ea025a92`, stable). PAN-2388 CLOSED** — both marquee deliverables (B2/PAN-2341 Lane B + PAN-2388 cost pair) fully DONE + closed. Stale PAN-2207/2407 ready entries cleared on their own.
+- PAN-2464 (dashboard) working; PAN-2426 + PAN-2468 planning; M7/MIN-729 verifying. No PAN drain (ready = MIN-865/861 report-only). **B3/PAN-2167** unauthorized. **A8/PAN-2297** wedged (`pan-1847`). A9/A13 held. No new off-book planning (PAN-2445 clean). Order book ~11 landed.
+- RUN-58 scorecard so far: order book ~11 landed; both marquee deliverables done; 1 red-main P0 (PAN-2471) caught+cleared+closed; MIN-857 partial-merge caught+completed (+ PAN-2467 filed); operator dev-burst work (PAN-2464/2426/2468) in flight. Only standing order-book lever: B3/PAN-2167 auth.
+
+## RUN-58 tick 105 (2026-07-07) — ✓ PAN-2388 green + CLOSING (priority pair DONE); verdict-freshness fix landed; stale ready entries skipped
+
+**MAIN GREEN (`b0ea025a92`)** — PAN-2388 merge verified green (no red-main). Main also picked up `b0ea025a92 fix(review): ignore trailing state commits for verdict freshness` — **addresses the record-push re-CI/verdict-freshness friction** I've flagged (trailing state commits no longer invalidate verdicts). Operator/pipeline landed it.
+- **✓ PAN-2388 (priority cost-capture pair) close-out dispatched** — both marquee deliverables now fully DONE (Lane B B2/PAN-2341 + cost pair PAN-2388).
+- **Stale ready entries SKIPPED:** ready set showed PAN-2207 + PAN-2407 — both are **CLOSED issues, squash-assembled** (#2453/#2458; PRs #2425/#2415 closed-not-merged) → stale review_status rows that never cleared. Already on main; NOT scheduled. (Cosmetic drift, not filed — issues closed.)
+- No actionable PAN drain (ready = 2 stale + MIN-865/861 report-only). PAN-2464 working (→ review); PAN-2426/2468 + MIN-867 planning; M7/MIN-729 verifying.
+- **B3/PAN-2167** unauthorized. **A8/PAN-2297** wedged (`pan-1847`). A9/A13 held. No new off-book planning (PAN-2445 clean). Order book ~11 landed.
+
+## RUN-58 tick 104 (2026-07-07) — ★ PAN-2388 (priority pair) MERGED via #2470 (3936537ed6); main CI verifying → red-main watch; PAN-2464 pushing
+
+**MAIN → `3936537ed6 PAN-2388 (#2470)`** — **★ PAN-2388 (priority cost-capture pair) FINALIZED + MERGED** via unified PR #2470 (the assembly step the operator owned produced a PR that landed). Main CI **in_progress** → **red-main watch** (swarm/cost code). NEXT TICK: green → PAN-2388 verifying-on-main → close (operator/pipeline; if stalled I close). red → P0 strike.
+- **PAN-2464 pushing** `feature/pan-2464` (about to PR/review). PAN-2426/2468 + MIN-867 planning. M7/MIN-729 verifying.
+- No PAN drain (ready = MIN-865/861 report-only). **B3/PAN-2167** unauthorized. **A8/PAN-2297** wedged (`pan-1847`). A9/A13 held. No new off-book planning (PAN-2445 clean).
+- **Order book ~11 landed + PAN-2388 pair now fully merged** — both marquee deliverables (Lane B B2/PAN-2341 + cost pair PAN-2388) DONE.
+
+## RUN-58 tick 103 (2026-07-07) — red-main incident CLOSED (PAN-2471 CLOSED, main stable green); quiet, work in-flight
+
+**MAIN GREEN (`294d162612`, stable). PAN-2471 CLOSED** — red-main incident fully wrapped.
+- PAN-2464 (dashboard) working; PAN-2426 + PAN-2468 planning; M7/MIN-729 verifying. No PAN drain (ready = MIN-865/861 report-only; PAN-2464/2426 not ready).
+- **B3/PAN-2167** unauthorized. **PAN-2388** OPEN finalize-pending. **MIN report-only:** MIN-865/861 rfm. **A8/PAN-2297** wedged (`pan-1847`). A9/A13 held. No new off-book planning (PAN-2445 clean). Order book ~11 landed + PAN-2388 done. 1 red-main P0 handled+closed this run (PAN-2471).
+- WATCH PAN-2464 (dashboard) + PAN-2426 (xBRIEF/spec machinery — cycle risk) at their merges.
+
+## RUN-58 tick 102 (2026-07-07) — ✓ MAIN GREEN (red-main resolved, 294d162612); PAN-2471 closing; normal ops resumed
+
+**✓ MAIN GREEN on `294d162612`** (the feedback-target cycle-break fix) — CI success. **Red-main outage RESOLVED** (~16:30→17:46, ~76min; flywheel caught→bounded→struck→PR'd→merged end-to-end). Circular-dep guard passes on main.
+- **PAN-2471 close-out dispatched** (`pan close --force`, bg).
+- **Normal ops resumed.** No PAN drain yet (ready = MIN-865/861 report-only; PAN-2464/2426 still working, not ready). PAN-2464 (dashboard, real features) + PAN-2426 working; PAN-2468 + MIN-867 planning; M7/MIN-729 verifying.
+- **B3/PAN-2167** unauthorized (surfaced). **PAN-2388** OPEN finalize-pending. **MIN report-only:** MIN-865/861 rfm. **A8/PAN-2297** wedged (`pan-1847`). A9/A13 held. Order book ~11 landed + PAN-2388 pair done.
+- WATCH: when PAN-2464 (dashboard) + PAN-2426 (xBRIEF, touches spec-link machinery) reach merge → red-main watch (PAN-2426 is adjacent to the vBRIEF/xBRIEF code; PAN-2469-class cycle risk).
+
+## RUN-58 tick 101 (2026-07-07) — ★ RED MAIN FIX MERGED (PR #2472, 294d162612); main CI confirming green; close PAN-2471 on green
+
+**RED MAIN FIX MERGED** — PR #2472 fully green+CLEAN (lint/circular guard PASS, test PASS 8m1s — strike's local "broad failures" were the known full-suite hang, NOT real), merged via `gh pr merge --squash` → main HEAD `294d162612 fix(cloister): break feedback target agent cycle`.
+- **Main CI on `294d162612` (the fix) IN_PROGRESS** — should GREEN (guard passes). **NEXT TICK: confirm main GREEN → bg `pan close PAN-2471 --force`** + resume normal PAN drains. If somehow still red → re-diagnose.
+- **No PAN drain yet** (ready = MIN-865/861 report-only; PAN-2464/2426 still working — not ready). Red-main outage: ~16:30→17:46 (~76min), cleared by the strike + flywheel PR-and-merge.
+- Held/secondary: PAN-2464 (real features) + PAN-2426 working; B3/PAN-2167 unauthorized; PAN-2388 finalize-pending; MIN-865/861 rfm report; A8 wedged.
+- REUSABLE (red-main strike full recipe): strike breaks cycle + pushes `strike/<id>` → flywheel `gh pr create --head strike/<id> --base main` → wait PR CI green (esp. lint) → `gh pr merge <pr> --squash` (strike PRs have no review status; auto-merge/schedule won't take them) → confirm main-green → `pan close <id> --force`.
+
+## RUN-58 tick 100 (2026-07-07) — RED MAIN fix pushed (strike broke feedback cycle) → PR #2472 created + CI running; merge when green
+
+**Main still RED — fix in PR #2472, CI running.**
+- **strike-pan-2471 DONE its work:** broke the cycle (`64558723a8 fix(cloister): break feedback target agent cycle` — inverted `feedback-target.ts ↔ review-verdict-feedback.ts` dep, no baseline changes, guard green, typecheck+lint+focused-vitest pass). Per `roles/strike.md`, strike agents push the branch but do NOT PR/merge/`pan done` — so it pushed `strike/pan-2471` and stopped.
+- **FLYWHEEL created PR #2472** (strike/pan-2471 → main). CI running (lint — the red job — will green; CodeRabbit passed; mergeable UNSTABLE only from pending CI).
+- **NEXT TICK:** when PR #2472 CI GREEN (esp. lint/circular guard) → **MERGE it** to green main. Strike PRs have no review status → `auto-merge/schedule` may reject; use `gh pr merge 2472 --squash` directly (red-main P0, operator-authorized-merge — recoverable). WATCH the PR `test` job: strike saw the full suite fail broadly + hang LOCALLY (known full-suite flake/OOM, PAN not this fix — the fix is a minimal cycle break); if PR `test` fails, assess flake-vs-real before merge, but lint-green is the red-main resolver. Do NOT --admin-bypass.
+- **REUSABLE:** strike agents push their branch and STOP (no PR/merge/pan done per roles/strike.md). To land a strike fix: `gh pr create --head strike/<id> --base main` then merge when CI green. Strike workspace = `workspaces/feature-<id>-strike`, branch `strike/<id>`.
+- Held until main green: PAN-2464/2426 working (can't merge); B3/PAN-2167 unauthorized; PAN-2388 finalize-pending; MIN-865/861 rfm report; A8 wedged.
+
+## RUN-58 tick 99 (2026-07-07) — RED MAIN P0: strike-pan-2471 BROKE the cycle (dep inversion, guard green, no baseline); verifying tests pre-commit
+
+**Main still RED (no fix landed yet)** — strike in progress + nearly done.
+- **★ strike-pan-2471 FIXED the cycle** — pane: "✓ circular-dependency guard passed (77 baselined cycles; no new cycles)" via **dependency inversion, NO baseline changes** (broke the actual cycle — correct, guard forbids baselining new cycles). typecheck + full lint PASS. Running test suite now before commit (8m52s bg terminal). No PR yet.
+- **NEXT TICK:** strike commits → `pan done` → review/test → PR. **DRAIN the strike PR FAST** (schedule auto-merge when green+CLEAN) to green main. Then resume normal PAN drains (PAN-2464/2426).
+- Main CI: `e4a9fb056d` (another chore(state) beads) in_progress — still red-family until the strike fix lands.
+- Secondary (all held until main green): PAN-2464 (real features: container control/resource stats) + PAN-2426 working (can't merge); B3/PAN-2167 unauthorized; PAN-2388 finalize-pending; MIN-865/861 rfm report; A8 wedged.
+
+## RUN-58 tick 98 (2026-07-07) — ⚠⚠ RED MAIN P0: new circular dependency breaks lint guard (PAN-2469 deacon-swarm.ts) → filed PAN-2471 + STRUCK
+
+**⚠⚠ RED MAIN (P0) — lint circular-dep guard failing.** `✖ new circular dependencies found — these must be removed, not baselined`.
+- **Regression bounded:** last GREEN `fcab19d555` (16:17), first RED `746a04202f` (16:30) = `chore(ratchet): baseline deacon-swarm.ts at 1016 for PAN-2469 stuck-hold semantics + drift logging`. **PAN-2469's deacon-swarm.ts code (stuck-hold + drift logging) introduced a new import cycle** that A7/PAN-2230's guard (correctly) rejects.
+- Operator pushed **5 bookkeeping commits since** (a72046bb63, 5c0c49a320, 31ee11c4fa, 86b6c6f166, ca82384de9 — all chore(state)/chore(beads), NOT fixes) → apparently unaware. Red ~40min, blocking merge gate (+ my PAN drains).
+- **ACTION: filed PAN-2471 (blocks-main) + STRUCK** → `strike-pan-2471` live (branch `strike/pan-2471`). Strike will run madge, find the cycle, BREAK it (not baseline), verify lint, land on main-green. PAN-2469 itself is OPEN/in-flight; struck the dedicated blocks-main issue to fix main independently.
+- **NEXT TICK PRIORITY:** monitor strike + confirm main GREEN. Until green: NO PAN drains (can't merge to red main). PAN-2464 (committing real features: container control/resource stats), PAN-2426/2468 continue working but can't merge until green.
+- Secondary: B3/PAN-2167 unauthorized; PAN-2388 finalize-pending; MIN-865/861 rfm (report); A8 wedged; planning-min-867 (MYN, report-only).
+
+## RUN-58 tick 97 (2026-07-07) — quiet; PAN-2464 working (37m turn); main advancing (beads); no PAN drain, all else in-flight/operator-gated
+
+**MAIN → `31ee11c4fa`** (beads sync). CI in_progress (low risk).
+- **PAN-2464 working** (37m turn — long but active: running bd commands w/ reviewer approvals, not stuck). PAN-2426/2468 planning. M7/MIN-729 verifying. MIN-867 finished planning.
+- No PAN items ready to drain (ready = MIN-865/861 report-only). **B3/PAN-2167** unauthorized. **PAN-2388** OPEN finalize-pending. **A8/PAN-2297** wedged (`pan-1847`). A9/A13 held. No new off-book planning (PAN-2445 clean). Order book ~11 landed + PAN-2388 done.
+- WATCH: PAN-2464 turn length (37m) — if it doesn't reach done/review in 1-2 ticks or goes idle, look closer.
+
+## RUN-58 tick 96 (2026-07-07) — operator dev burst continues (PAN-2464 working, PAN-2426/2468 + MIN-867 + PAN-1644 planning); main advancing, no PAN drain
+
+**MAIN → `5c0c49a320`** (PAN-1644 vBRIEF proposed + PAN-2469 deacon-swarm stuck-hold ratchet + beads). CI in_progress (low risk).
+- **PAN-2464 working** (22m, healthy). **PAN-2426** progressing (WI-1 landed t95; planning more). **PAN-2468** planning. **PAN-1644** finished planning (proposed) — operator didn't kill; NOT auto-started (off-book, operator's call to start).
+- **New off-book activity (operator-driven dev burst — surfaced, not alarmed):** `planning-min-867` (new MYN issue, report-only per MIN policy), PAN-2469 (stuck-hold semantics, baseline landed). Operator is loading many new issues; flywheel drains PAN as ready + reports MIN, no per-item alarm.
+- **B3/PAN-2167** unauthorized. **PAN-2388** OPEN finalize-pending. **MIN report-only:** MIN-865/861 rfm; M7/MIN-729 verifying; MIN-867 planning. **A8/PAN-2297** wedged (`pan-1847`). A9/A13 held. No PAN drain (ready = MIN). Order book ~11 landed + PAN-2388 done.
+
+## RUN-58 tick 95 (2026-07-07) — PAN-2464 RECOVERED (past inspection gate); PAN-2426 WI-1 landed; ⚠ off-book planning-pan-1644 (old issue) surfaced
+
+**MAIN GREEN (`fcab19d555`).** New: `6240cf4a4f docs: point vBRIEF spec links at renamed xBRIEF repos (PAN-2426 WI-1)` — **PAN-2426 (xBRIEF migration) WI-1 landed** + beads sync.
+- **PAN-2464 (Machine Room) RECOVERED** — past the inspection-error gate; now running isolated Playwright bead verification (`npm run dev` on :3012). Not stuck; progressing.
+- **⚠ PAN-2445 WATCH — off-book planning-pan-1644 surfaced:** PAN-1644 = "Hook-driven progressive conversation titling", created **2026-06-07** (a MONTH-old issue), off-book, planning/planned. A planner on an issue that old while operator drives fresh work (2464/2426/2468) = likely **lifecycle-momentum burn**, not deliberate. SURFACED for operator (kill or keep — flywheel doesn't kill).
+- **PAN-2426 + PAN-2468 still planning** (operator, off-book). M7/MIN-729 verifying.
+- **B3/PAN-2167** unauthorized. **PAN-2388** OPEN finalize-pending. **MIN report-only:** MIN-865/861 rfm. **A8/PAN-2297** wedged (`pan-1847`). A9/A13 held. No PAN drain (ready = MIN). Order book ~11 landed + PAN-2388 done.
+
+## RUN-58 tick 94 (2026-07-07) — main advancing (beads sync, CI in_progress); PAN-2464 stopped at inspection gate (watch); M7 verifying; else operator-gated
+
+**MAIN → `e846f26c80`** (beads sync). CI in_progress → confirm green next tick (low risk).
+- **PAN-2464 (Machine Room) work agent STOPPED at "required inspection-error gate"** — correctly respecting a failed bead inspection (no bandaid). WATCH next tick: recovers (fixes inspection) → continues; still stopped/idle 2+ ticks → surface as stuck work agent. Not intervening (agent's own loop).
+- **PAN-2426 + PAN-2468 still planning** (off-book, operator). M7/MIN-729 now has work+review+test (verifying, report-only).
+- **No PAN drain** (ready set = MIN-865/861 report-only). **B3/PAN-2167** unauthorized. **PAN-2388** OPEN finalize-pending. **A8/PAN-2297** wedged (`pan-1847`). A9/A13 held. No new off-book planning (PAN-2445 clean beyond 2426/2464/2468). Order book ~11 landed + PAN-2388 done.
+
+## RUN-58 tick 93 (2026-07-07) — operator loading new off-book dev work: PAN-2464 STARTED (work agent live), PAN-2426 + PAN-2468 planning; main green
+
+**MAIN GREEN (`03152b758c`)** — PAN-2468 docs v2 (OKF skill PRD). Operator actively driving new work.
+- **PAN-2464 (Machine Room /resources overhaul) STARTED** — `agent-pan-2464` work agent live + progressing (~12min; navigating a `pan-2464.json` records-file, PAN-2167 class, working around it). Operator-started → treat as active PAN work, DRAIN when ready.
+- **Off-book planning surfaced (PAN-2445 watch), operator-driven (not lifecycle-momentum → not burn):**
+  - `planning-pan-2426` = "adapt to upstream xBRIEF v0.8 (vBRIEF→xBRIEF rename + spec upgrade)". Off-book feature.
+  - `planning-pan-2468` = OKF knowledge skill (matches the docs PRD commits operator is authoring).
+  - Both non-order-book; will DRAIN as normal PAN work when ready (operator intent clear).
+- **PAN-2388** OPEN, finalize pending (operator). **B3/PAN-2167** unauthorized (surfaced). **MIN report-only:** MIN-865/861 at rfm; M7/MIN-729 review; MIN-857 fully merged. **A8/PAN-2297** wedged (`pan-1847`). A9/A13 held. Order book ~11 landed + PAN-2388 done. Tightening heartbeat — more in-flight activity to track now.
+
+## RUN-58 tick 92 (2026-07-07) — NO CHANGE; main GREEN 751fac55c9 (PAN-2468 docs verified); all operator-gated
+
+Main CI GREEN on `751fac55c9` (PAN-2468 docs PRD). No other change since t91. PAN-2388 finalize-pending (OPEN). B3/PAN-2167 unauthorized. PAN-2464 planned/unstarted. MIN-865/861 reported at rfm; M7/MIN-729 in review. A8/PAN-2297 wedged (`pan-1847`). A9/A13 held. MIN-857 fully merged (both repos). No off-book planning (PAN-2445 clean). Order book ~11 landed + PAN-2388 pair done. Nothing to launch/drain — waiting on operator (B3 auth, PAN-2388 finalize, PAN-2464 confirm, MIN UAT).
+
+## RUN-58 tick 91 (2026-07-07) — MIN-857 confirmed fully merged; main advanced (PAN-2468 docs PRD, CI in_progress); else operator-gated
+
+**MAIN → `751fac55c9`** — "docs(okf): add PRD for OKF knowledge skill v1 (PAN-2468)" (docs-only, operator; CI in_progress → confirm green next tick, low red-main risk).
+- **MIN-857 fully merged both repos** (api 0-ahead confirmed; the glab-compare parse error was a tooling glitch, not a merge issue). Close is operator-owned.
+- **PAN-2388** OPEN, finalize pending (operator). **B3/PAN-2167** unauthorized (surfaced). **PAN-2464** planned/unstarted (unconfirmed). **PAN-2468** = new off-book OKF-skill PRD landed (docs commit, not an agent-spawn → not a PAN-2445 trigger; operator-owned, noted).
+- **MIN report-only:** MIN-861/865 at rfm (reported); MIN-862 dropped from ready set (state progressed); M7/MIN-729 in review.
+- **A8/PAN-2297 STILL wedged** (`pan-1847`). Holding A9/A13. No off-book planning (PAN-2445 clean). Overdeck lane drained (~11 landed). All open items operator-gated.
+
+## RUN-58 — OPERATOR DIRECTIVE (post-t90): completed MIN-857 partial multi-repo merge (api half) + filed pipeline-gap PAN-2467
+
+Operator flagged: MIN-857 FE half merged (mind-your-now main `6db908564`, all 4 UAT commits) but **api half never merged** — `mind-your-now-backend` `feature/min-857` had 2 unmerged commits (`34e0dbf8` dev-profile voice-seconds override + `04998e4c`) that prevent voice UAT cap bricking. Explicit per-issue operator authorization to complete the api merge.
+- **VERIFIED at code level (glab api):** feature/min-857 was 2 commits ahead of backend main, `merged:false`, **no MR in any state**. Confirmed exactly as operator described.
+- **COMPLETED:** created backend MR **!56** (feature/min-857 → main, via `glab api POST` — `glab mr create` fails from the GitHub Overdeck cwd; use `glab api` against gitlab.com). Mergeable (no conflicts, 0 approvals required, no blocking pipeline). Merged via `glab api PUT .../merge` → merge commit `78bf3620f`, 15:03:40Z. Verified feature/min-857 now **0 ahead** of backend main. MIN-857 fully merged both repos; voice UAT unblocked.
+- **FILED PAN-2467** (pipeline gap): multi-repo merge train merged FE-only + treated MIN-857 done, stranding the api branch. Fix: enumerate all repos with changes on the issue's branch set, require a merged MR per repo before 'merged'; block+surface if any sibling repo unmerged. Memory: [[project_myn_multirepo_merge]].
+- REUSABLE: MYN issues span `mind-your-now` (FE) + `mind-your-now-backend` (api, GitLab). To merge a backend branch with no local checkout: `glab api POST projects/eltmon%2Fmind-your-now-backend/merge_requests -f source_branch=... -f target_branch=main -f title=...` then `glab api PUT .../merge_requests/<iid>/merge`. Verify via `repository/compare?from=main&to=feature%2Fmin-<n>` → commits ahead should be 0 after.
+
+## RUN-58 tick 90 (2026-07-07) — NO CHANGE (drained, all operator-gated); main green 888485eb4f
+
+Identical to t89. Main GREEN. PAN-2388 finalize-pending (OPEN, operator). B3/PAN-2167 unauthorized. PAN-2464 planned/unstarted. MIN-861/865/862 reported at rfm; M7/MIN-729 in review; MIN-857 held. A8/PAN-2297 wedged (`pan-1847`). A9/A13 held. No off-book planning (PAN-2445 clean). Order book ~11 landed + PAN-2388 pair done. Nothing to launch/drain — waiting on operator (B3 auth, PAN-2388 finalize, PAN-2464 confirm, MIN UAT). Widened reschedule.
+
+## RUN-58 tick 89 (2026-07-07) — quiet (drained, operator-gated); operator landed PAN-2428 traefik fix (main green 888485eb4f)
+
+**MAIN GREEN (`888485eb4f`).** New: operator merged **PAN-2428** (traefik auto-connect to workspace stack networks) + `410c11c911` + deacon ratchet. Not order-book, CI green — noted.
+- **PAN-2388** still OPEN [planning, in-review] — finalize/close still pending (operator-owned). Not in ready set. Report.
+- **B3/PAN-2167** still unauthorized (surfaced ~9 ticks; operator engaged but not acting — likely deliberate given blast radius; keeping in status openQuestions, not belaboring).
+- **PAN-2464** off-book, planned, NOT started (intent unconfirmed).
+- **MIN report-only:** MIN-861/865/862 at rfm (reported); M7/MIN-729 in review; MIN-857 held.
+- **A8/PAN-2297 STILL wedged** (`pan-1847`). Holding A9/A13. No off-book planning (PAN-2445 clean). Overdeck lane drained (~11 landed) + PAN-2388 pair done — steady waiting state, all open items operator-gated.
+
 ## RUN-58 tick 88 (2026-07-07) — quiet: PAN-2388 slots merged but issue needs finalize (operator); PAN-2464 planned; lane drained, all operator-gated
 
 **MAIN GREEN (`27330395e3`, unchanged).**

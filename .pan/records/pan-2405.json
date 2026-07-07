@@ -55,17 +55,18 @@
   ],
   "feedback": [],
   "created": "2026-07-06T14:48:34.495Z",
-  "updated": "2026-07-07T19:53:32.987Z",
+  "updated": "2026-07-07T23:00:42.001Z",
   "pipeline": {
     "issueId": "PAN-2405",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-07T19:52:18.271Z",
+    "mergeStatus": "failed",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-07T23:00:41.945Z",
     "reviewNotes": "backend restart config now uses scheduled item staffing",
     "testNotes": "Gates passed: npm run typecheck; npm test -- tests/unit/dashboard/routes/agents-no-loss.test.ts (full backend suite 896 files, frontend issueActions tests 3 files).",
+    "mergeNotes": "Workspace does not exist",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2476",
     "reviewedAtCommit": "b8ddbf1deff17a09459d42eb26b3f64e1d0c5b2c",
     "lastVerifiedCommit": "b8ddbf1deff17a09459d42eb26b3f64e1d0c5b2c",
@@ -121,7 +122,7 @@
       },
       "costAtCloseOut": {
         "usd": 9.888619,
-        "pricingAsOf": "2026-07-07T19:52:18.306Z"
+        "pricingAsOf": "2026-07-07T23:00:41.999Z"
       }
     },
     "merges": [
