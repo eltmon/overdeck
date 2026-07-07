@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-07T15:48:18.781Z",
-  "updated": "2026-07-07T22:34:18.356Z",
+  "updated": "2026-07-07T23:34:09.795Z",
   "pipeline": {
     "issueId": "PAN-2426",
     "reviewStatus": "pending",
@@ -63,5 +63,32 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.5"
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "schema-checkpoint": "completed",
+    "schema-checkpoint.ac1": "completed",
+    "schema-checkpoint.ac2": "completed",
+    "writer-bump": "completed",
+    "writer-bump.ac1": "completed",
+    "writer-bump.ac2": "completed",
+    "writer-bump.ac3": "completed",
+    "template-bump": "completed",
+    "template-bump.ac1": "completed",
+    "template-bump.ac2": "completed",
+    "template-bump.ac3": "completed",
+    "write-door": "completed",
+    "write-door.ac1": "completed",
+    "write-door.ac2": "completed",
+    "write-door.ac3": "completed",
+    "write-door.ac4": "completed",
+    "docs-update": "completed",
+    "docs-update.ac1": "completed",
+    "docs-update.ac2": "completed",
+    "read-compat": "completed",
+    "read-compat.ac1": "completed",
+    "read-compat.ac2": "completed",
+    "read-compat.ac3": "completed",
+    "read-compat.ac4": "completed",
+    "read-compat.ac5": "completed"
+  }
 }
