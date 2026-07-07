@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-2095",
   "schemaVersion": 2,
-  "created": "2026-07-06T23:52:27.788Z",
-  "updated": "2026-07-06T23:52:28.091Z",
-  "pipeline": {
-    "issueId": "PAN-2095",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-06T23:52:27.788Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -26,6 +9,90 @@
       "timestamp": "2026-07-06T23:52:27.788Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-06T23:52:27.788Z",
+  "updated": "2026-07-07T01:00:12.917Z",
+  "pipeline": {
+    "issueId": "PAN-2095",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-07T01:00:12.873Z",
+    "inspectNotes": "Bead reload-build-from-origin-main ack: divergence detection (merge-base --is-ancestor), sibling detached worktree build + dist swap, try/finally worktree cleanup, execAsync-only git calls, and fetch/build failure handling all verified against reload.ts (276 lines, no new any) and cross-checked vs post-merge-deploy.sh sibling-worktree pattern; only non-blocking nit is FR-4 warn-message wording differs from the PRD-quoted text though sha is still printed."
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 25172,
+            "output": 1074,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 18899,
+            "output": 33546,
+            "cacheRead": 2030607,
+            "cacheWrite": 155708
+          }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 6570,
+            "output": 8904,
+            "cacheRead": 778028,
+            "cacheWrite": 96243
+          }
+        },
+        "work": {
+          "unknown": {
+            "input": 5826482,
+            "output": 17409,
+            "cacheRead": 5395968,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 25172,
+          "output": 1074,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 18899,
+          "output": 33546,
+          "cacheRead": 2030607,
+          "cacheWrite": 155708
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 6570,
+          "output": 8904,
+          "cacheRead": 778028,
+          "cacheWrite": 96243
+        },
+        "unknown": {
+          "input": 5826482,
+          "output": 17409,
+          "cacheRead": 5395968,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 8.27144,
+        "pricingAsOf": "2026-07-07T01:00:12.908Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "model": "claude-sonnet-5"
 }
