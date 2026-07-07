@@ -2,7 +2,6 @@ import { Effect } from 'effect';
 
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { readIssueRecordSync, writeIssueRecordSync, type PanIssueRecord } from '../pan-dir/record.js';
-import { markWorkspaceStuck } from '../review-status.js';
 import { listSessionNames, sessionExists } from '../tmux.js';
 
 export type IssueFeedbackTarget =
@@ -11,6 +10,7 @@ export type IssueFeedbackTarget =
 
 export interface ResolveIssueFeedbackTargetOptions {
   itemId?: string;
+  revivePipelinePausedAgent?: (agentId: string, issueId: string) => Promise<boolean>;
 }
 
 async function isLiveSession(agentId: string): Promise<boolean> {
@@ -105,7 +105,8 @@ export async function resolveIssueFeedbackTarget(
   // pipeline's to clear when it has actionable feedback to deliver: unpause and
   // resume the whole-issue agent so the feedback lands. Operator pauses (pan pause,
   // any non-"needs-you:" reason) are never touched.
-  const revived = await revivePipelinePausedAgent(wholeIssueAgentId, normalizedIssue);
+  const revive = opts.revivePipelinePausedAgent ?? revivePipelinePausedAgent;
+  const revived = await revive(wholeIssueAgentId, normalizedIssue);
   if (revived) return { agentId: wholeIssueAgentId };
 
   const suffix = requestedItemId ? ` for item ${requestedItemId}` : '';
@@ -129,7 +130,7 @@ async function revivePipelinePausedAgent(agentId: string, issueId: string): Prom
 
     console.log(`[feedback-target] ${agentId} is pipeline-paused (${state.pausedReason}) — unpausing to deliver feedback for ${issueId}`);
     clearAgentPausedSync(agentId);
-    const { resumeAgent } = await import('../agents.js');
+    const { resumeAgent } = await import('../agents/resume.js');
     const result = await resumeAgent(agentId);
     if (!result.success) {
       console.warn(`[feedback-target] Failed to revive ${agentId}: ${result.error}`);
@@ -142,12 +143,13 @@ async function revivePipelinePausedAgent(agentId: string, issueId: string): Prom
   }
 }
 
-export function surfaceIssueFeedbackNeedsYou(
+export async function surfaceIssueFeedbackNeedsYou(
   issueId: string,
   reason: string,
   details: Record<string, unknown> = {},
-): void {
+): Promise<void> {
   try {
+    const { markWorkspaceStuck } = await import('../review-status.js');
     markWorkspaceStuck(issueId, 'feedback_delivery_needs_you', {
       reason,
       ...details,

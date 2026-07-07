@@ -25461,13 +25461,36 @@ function getIssueRecordBasePath(project, issueId) {
 * read-modify-write flows must take `withIssueRecordLock` before reading and
 * must not split this write behind an await.
 */
+/**
+* PAN-2466 no-loss guard: callers that fail to read the existing record fall
+* back to a fresh template with an EMPTY closeOut, and writing that template
+* destroys accumulated usage/cost history (observed on six records 2026-07-07).
+* At the write door, if the incoming closeOut carries no data but the on-disk
+* record's does, keep the on-disk closeOut. Genuine closeOut updates (any
+* usage/merges/totals content) always win.
+*/
+function preserveCloseOutSync(path, record) {
+	const incoming = record.closeOut;
+	if (!(!incoming || Object.keys(incoming.usage?.byStage ?? {}).length === 0 && Object.keys(incoming.usage?.totals ?? {}).length === 0 && (incoming.merges ?? []).length === 0) || !existsSync$1(path)) return record;
+	try {
+		const disk = JSON.parse(readFileSync$1(path, "utf-8")).closeOut;
+		if (disk && (Object.keys(disk.usage?.byStage ?? {}).length > 0 || Object.keys(disk.usage?.totals ?? {}).length > 0 || (disk.merges ?? []).length > 0)) {
+			console.warn(`[record] Preserving populated closeOut for ${record.issueId} — incoming write carried an empty closeOut (PAN-2466 guard)`);
+			return {
+				...record,
+				closeOut: disk
+			};
+		}
+	} catch {}
+	return record;
+}
 function writeIssueRecordSync(project, issueId, record) {
 	const path = getIssueRecordPath(project, issueId);
 	const dir = dirname$1(path);
 	if (!existsSync$1(dir)) mkdirSync$1(dir, { recursive: true });
 	const now = (/* @__PURE__ */ new Date()).toISOString();
 	const next = {
-		...record,
+		...preserveCloseOutSync(path, record),
 		issueId: issueId.toUpperCase(),
 		schemaVersion: 2,
 		created: record.created || now,
@@ -31061,7 +31084,8 @@ function toCostArchiveEvent(event) {
 		cost: typeof event.cost === "number" ? event.cost : 0,
 		...typeof event.requestId === "string" ? { requestId: event.requestId } : {},
 		...typeof event.sessionId === "string" ? { sessionId: event.sessionId } : {},
-		...typeof event.sourceFile === "string" ? { source: event.sourceFile } : {}
+		...typeof event.sourceFile === "string" ? { source: event.sourceFile } : {},
+		...Array.isArray(event.warnings) ? { warnings: event.warnings } : {}
 	};
 }
 succeed$1(CostArchive, CostArchive.of((() => {

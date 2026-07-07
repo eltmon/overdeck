@@ -171,8 +171,8 @@ describe('CostWriter.reconcile — codex extra roots', () => {
         eventsImported: 1,
         duplicatesSkipped: 0,
         errors: [],
-        earliestEventTs: '2026-06-17T10:00:00.000Z',
-        latestEventTs: '2026-06-17T10:00:00.000Z',
+        earliestEventTs: '2026-06-17T10:00:02.000Z',
+        latestEventTs: '2026-06-17T10:00:02.000Z',
       });
       expect(second).toMatchObject({
         imported: 0,

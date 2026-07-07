@@ -134,8 +134,8 @@ describe('resolveIssueFeedbackTarget', () => {
     );
   });
 
-  it('surfaces needs-you feedback as a stuck workspace marker', () => {
-    surfaceIssueFeedbackNeedsYou('PAN-2214', 'No live feedback target for PAN-2214', {
+  it('surfaces needs-you feedback as a stuck workspace marker', async () => {
+    await surfaceIssueFeedbackNeedsYou('PAN-2214', 'No live feedback target for PAN-2214', {
       specialist: 'test-agent',
       feedbackPath: '/repo/.pan/feedback/001-test-agent-failed.md',
     });

@@ -227,4 +227,3 @@ export function saveOverdeckAgentStateSync(state: AgentState): void {
     `INSERT OR REPLACE INTO agents (${AGENT_COLUMNS_FOR_DB.join(', ')}) VALUES (${AGENT_COLUMNS_FOR_DB.map(() => '?').join(', ')})`,
   ).run(...stateToOverdeckParamsForDb(state, updatedAt));
 }
-

@@ -11,7 +11,7 @@ import {
 import { CostArchive, EventBus } from '../infra.js';
 import { CostWriter, CostWriterLive } from '../cost.js';
 
-describe('CostWriter.reconcile — codex update-on-growth', () => {
+describe('CostWriter.reconcile — codex per-turn update-on-growth', () => {
   let odb: OverdeckTestDb;
 
   beforeEach(() => {
@@ -22,25 +22,26 @@ describe('CostWriter.reconcile — codex update-on-growth', () => {
     teardownOverdeckTestDb(odb);
   });
 
-  it('imports a gpt-5.5 rollout once and updates the row when cumulative usage grows', async () => {
+  it('imports each gpt-5.5 token_count once and appends only the new turn when the rollout grows', async () => {
     const rolloutFile = seedCodexAgent(odb, { input: 12000, cached: 4000, output: 800 });
     const layer = makeWriterLayer(odb);
 
     const first = await Effect.runPromise(
       CostWriter.use((w) => w.reconcile({ source: 'codex' })).pipe(Effect.provide(layer)),
     );
-    expect(first).toMatchObject({ imported: 1, eventsImported: 1, duplicatesSkipped: 0 });
+    expect(first).toMatchObject({ imported: 1, eventsImported: 1, duplicatesSkipped: 0, skipped: [] });
     let rows = readRows(odb);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       issue_id: 'PAN-9999',
       agent_id: 'agent-pan-9999',
       session_id: 'thread-pan-9999',
-      session_type: 'work',
+      session_type: 'codex',
       model: 'gpt-5.5',
       input: 12000,
       output: 800,
       cache_read: 4000,
+      request_id: 'codex:thread-pan-9999:0',
       source_file: rolloutFile,
     });
     expect(rows[0]!.cost).toBeGreaterThan(0);
@@ -48,20 +49,23 @@ describe('CostWriter.reconcile — codex update-on-growth', () => {
     const unchanged = await Effect.runPromise(
       CostWriter.use((w) => w.reconcile({ source: 'codex' })).pipe(Effect.provide(layer)),
     );
-    expect(unchanged).toMatchObject({ imported: 0, eventsImported: 0, duplicatesSkipped: 1 });
+    expect(unchanged).toMatchObject({ imported: 0, eventsImported: 0, duplicatesSkipped: 1, skipped: [] });
     expect(readRows(odb)).toHaveLength(1);
 
     appendTokenCount(rolloutFile, { input: 18000, cached: 6000, output: 1500 });
     const grown = await Effect.runPromise(
       CostWriter.use((w) => w.reconcile({ source: 'codex' })).pipe(Effect.provide(layer)),
     );
-    expect(grown).toMatchObject({ imported: 1, eventsImported: 1, duplicatesSkipped: 0 });
+    expect(grown).toMatchObject({ imported: 1, eventsImported: 1, duplicatesSkipped: 1, skipped: [] });
     rows = readRows(odb);
-    expect(rows).toHaveLength(1);
-    expect(rows[0]!.input).toBe(18000);
-    expect(rows[0]!.output).toBe(1500);
-    expect(rows[0]!.cache_read).toBe(6000);
-    expect(rows[0]!.cost).toBeGreaterThan(0);
+    expect(rows).toHaveLength(2);
+    expect(rows[1]).toMatchObject({
+      request_id: 'codex:thread-pan-9999:1',
+      input: 6000,
+      output: 700,
+      cache_read: 2000,
+    });
+    expect(rows[1]!.cost).toBeGreaterThan(0);
   });
 });
 
