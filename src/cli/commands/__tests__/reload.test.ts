@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -11,8 +12,12 @@ const mocks = vi.hoisted(() => ({
   writeRestartStatus: vi.fn(),
   resolveBundledServerPath: vi.fn(),
   spawnDashboardDetached: vi.fn(),
+  exec: vi.fn(),
   spawn: vi.fn(),
   statSync: vi.fn(),
+  fsRm: vi.fn(),
+  fsCp: vi.fn(),
+  fsRename: vi.fn(),
   readDevSupervisorMarker: vi.fn(),
   devSupervisorRefusalLines: vi.fn(),
 }));
@@ -54,12 +59,23 @@ vi.mock('../restart.js', () => ({
   spawnDashboardDetached: mocks.spawnDashboardDetached,
 }));
 
-vi.mock('child_process', () => ({
-  spawn: mocks.spawn,
-}));
+vi.mock('child_process', () => {
+  const exec = mocks.exec as typeof mocks.exec & { [promisify.custom]?: unknown };
+  exec[promisify.custom] = (command: string, options: { cwd?: string }) => mocks.exec(command, options);
+  return {
+    exec,
+    spawn: mocks.spawn,
+  };
+});
 
 vi.mock('fs', async (importActual) => ({
   ...(await importActual<typeof import('fs')>()),
+  promises: {
+    ...(await importActual<typeof import('fs')>()).promises,
+    rm: mocks.fsRm,
+    cp: mocks.fsCp,
+    rename: mocks.fsRename,
+  },
   statSync: mocks.statSync,
 }));
 
@@ -77,12 +93,31 @@ function mockSpawnExits(opts: { install?: number; build?: number } = {}): void {
   });
 }
 
+function mockExecByCommand(handlers: Record<string, Array<{ stdout?: string; code?: number; stderr?: string }>>): void {
+  const remaining = new Map(Object.entries(handlers).map(([command, results]) => [command, [...results]]));
+  mocks.exec.mockImplementation(async (command: string) => {
+    const queue = remaining.get(command);
+    const result = queue?.shift();
+    if (!result) {
+      throw new Error(`Unexpected exec command: ${command}`);
+    }
+    if (typeof result.code === 'number' && result.code !== 0) {
+      const error = new Error(result.stderr || `Command failed: ${command}`) as Error & { code: number; stderr?: string };
+      error.code = result.code;
+      error.stderr = result.stderr;
+      throw error;
+    }
+    return { stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
+  });
+}
+
 describe('reloadCommand', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.exitCode = undefined;
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     mocks.acquireRestartLock.mockReturnValue(Effect.succeed({ release: vi.fn(() => Promise.resolve()) }));
     mocks.readRestartLockHolder.mockReturnValue(Effect.succeed(null));
     mocks.readPlatformConfig.mockReturnValue({
@@ -97,6 +132,13 @@ describe('reloadCommand', () => {
     mocks.resolveBundledServerPath.mockReturnValue('/tmp/server.js');
     mocks.readDevSupervisorMarker.mockReturnValue(null);
     mocks.devSupervisorRefusalLines.mockReturnValue([]);
+    mocks.fsRm.mockResolvedValue(undefined);
+    mocks.fsCp.mockResolvedValue(undefined);
+    mocks.fsRename.mockResolvedValue(undefined);
+    mockExecByCommand({
+      "git 'fetch' 'origin' 'main'": [{ stdout: '' }],
+      "git 'merge-base' '--is-ancestor' 'origin/main' 'HEAD'": [{ stdout: '' }],
+    });
   });
 
   it('signals a running pan dev supervisor (SIGUSR2) instead of refusing or restarting (PAN-1662)', async () => {
@@ -173,8 +215,11 @@ describe('reloadCommand', () => {
 
     // Deps are installed before the build so a rebase-added runtime dep can't
     // produce a server bundle that boot-crashes (ERR_MODULE_NOT_FOUND).
-    expect(mocks.spawn).toHaveBeenCalledWith('bun', ['install'], expect.objectContaining({ stdio: 'inherit' }));
-    expect(mocks.spawn).toHaveBeenCalledWith('npm', ['run', 'build'], expect.objectContaining({ stdio: 'inherit' }));
+    expect(mocks.exec).toHaveBeenCalledWith("git 'fetch' 'origin' 'main'", expect.objectContaining({ cwd: process.cwd() }));
+    expect(mocks.exec).toHaveBeenCalledWith("git 'merge-base' '--is-ancestor' 'origin/main' 'HEAD'", expect.objectContaining({ cwd: process.cwd() }));
+    expect(mocks.exec).not.toHaveBeenCalledWith(expect.stringContaining("'worktree' 'add'"), expect.anything());
+    expect(mocks.spawn).toHaveBeenCalledWith('bun', ['install'], expect.objectContaining({ cwd: process.cwd(), stdio: 'inherit' }));
+    expect(mocks.spawn).toHaveBeenCalledWith('npm', ['run', 'build'], expect.objectContaining({ cwd: process.cwd(), stdio: 'inherit' }));
     const installOrder = mocks.spawn.mock.calls.findIndex(([c]) => c === 'bun');
     const buildOrder = mocks.spawn.mock.calls.findIndex(([c, a]) => c === 'npm' && a[1] === 'build');
     expect(installOrder).toBeLessThan(buildOrder);
@@ -183,6 +228,7 @@ describe('reloadCommand', () => {
   });
 
   it('aborts without building or restarting when bun install fails', async () => {
+    mocks.statSync.mockReturnValue({ mtimeMs: 1000 });
     mockSpawnExits({ install: 1 });
 
     await reloadCommand({});
@@ -203,6 +249,80 @@ describe('reloadCommand', () => {
     expect(mocks.restartDashboard).not.toHaveBeenCalled();
     expect(mocks.stopDashboard).not.toHaveBeenCalled();
     expect(mocks.spawnDashboardDetached).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('builds from a detached origin/main worktree and swaps dist when primary HEAD is stale', async () => {
+    const repoRoot = process.cwd();
+    const buildWorktree = `${repoRoot.replace(/\/[^/]+$/, '')}/.pan-reload-build-${process.pid}`;
+    mocks.statSync
+      .mockReturnValueOnce({ mtimeMs: 1000 })
+      .mockReturnValueOnce({ mtimeMs: 2000 });
+    mockExecByCommand({
+      "git 'fetch' 'origin' 'main'": [{ stdout: '' }],
+      "git 'merge-base' '--is-ancestor' 'origin/main' 'HEAD'": [{ code: 1 }],
+      "git 'rev-parse' '--short' 'origin/main'": [{ stdout: '0973c8c\n' }],
+      [`git 'worktree' 'add' '--detach' '${buildWorktree}' 'origin/main'`]: [{ stdout: '' }],
+      [`git 'worktree' 'remove' '--force' '${buildWorktree}'`]: [{ stdout: '' }],
+    });
+    mockSpawnExits();
+
+    await reloadCommand({});
+
+    expect(mocks.spawn).toHaveBeenCalledWith('bun', ['install'], expect.objectContaining({ cwd: buildWorktree }));
+    expect(mocks.spawn).toHaveBeenCalledWith('npm', ['run', 'build'], expect.objectContaining({ cwd: buildWorktree }));
+    expect(mocks.fsCp).toHaveBeenCalledWith(`${buildWorktree}/dist`, `${repoRoot}/dist.incoming`, { recursive: true });
+    expect(mocks.fsRename).toHaveBeenCalledWith(`${repoRoot}/dist`, `${repoRoot}/dist.old.${process.pid}`);
+    expect(mocks.fsRename).toHaveBeenCalledWith(`${repoRoot}/dist.incoming`, `${repoRoot}/dist`);
+    expect(mocks.exec).toHaveBeenCalledWith(
+      `git 'worktree' 'remove' '--force' '${buildWorktree}'`,
+      expect.objectContaining({ cwd: repoRoot }),
+    );
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('0973c8c'));
+    expect(mocks.restartDashboard).toHaveBeenCalledTimes(1);
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('cleans up the detached worktree and preserves the running server when worktree build fails', async () => {
+    const repoRoot = process.cwd();
+    const buildWorktree = `${repoRoot.replace(/\/[^/]+$/, '')}/.pan-reload-build-${process.pid}`;
+    mocks.statSync.mockReturnValue({ mtimeMs: 1000 });
+    mockExecByCommand({
+      "git 'fetch' 'origin' 'main'": [{ stdout: '' }],
+      "git 'merge-base' '--is-ancestor' 'origin/main' 'HEAD'": [{ code: 1 }],
+      "git 'rev-parse' '--short' 'origin/main'": [{ stdout: '0973c8c\n' }],
+      [`git 'worktree' 'add' '--detach' '${buildWorktree}' 'origin/main'`]: [{ stdout: '' }],
+      [`git 'worktree' 'remove' '--force' '${buildWorktree}'`]: [{ stdout: '' }],
+    });
+    mockSpawnExits({ build: 1 });
+
+    await reloadCommand({});
+
+    expect(mocks.exec).toHaveBeenCalledWith(
+      `git 'worktree' 'remove' '--force' '${buildWorktree}'`,
+      expect.objectContaining({ cwd: repoRoot }),
+    );
+    expect(mocks.fsRm).toHaveBeenCalledWith(buildWorktree, { recursive: true, force: true });
+    expect(mocks.restartDashboard).not.toHaveBeenCalled();
+    expect(mocks.writeRestartStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ success: false, error: expect.stringContaining('Build failed') }),
+    );
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('does not restart the dashboard when git fetch fails', async () => {
+    mocks.statSync.mockReturnValue({ mtimeMs: 1000 });
+    mockExecByCommand({
+      "git 'fetch' 'origin' 'main'": [{ code: 128, stderr: 'fetch failed' }],
+    });
+
+    await reloadCommand({});
+
+    expect(mocks.spawn).not.toHaveBeenCalled();
+    expect(mocks.restartDashboard).not.toHaveBeenCalled();
+    expect(mocks.writeRestartStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ success: false, error: expect.stringContaining('fetch failed') }),
+    );
     expect(process.exitCode).toBe(1);
   });
 });
