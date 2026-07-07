@@ -337,11 +337,24 @@ export interface HostVitalsSnapshot {
   };
 }
 
+export interface SpawnGateSnapshot {
+  state: 'OPEN' | 'SOFT' | 'BLOCKED';
+  reason: string;
+  pressure: number;
+  stale?: boolean;
+  warnings: Array<{
+    severity?: 'warning' | 'critical';
+    code?: string;
+    message: string;
+  }>;
+}
+
 export interface ResourcesSnapshot {
   containers: ContainerStats[];
   agents: Agent[];
   updatedAt: string;
   hostVitals?: HostVitalsSnapshot;
+  spawnGate?: SpawnGateSnapshot;
   stale?: boolean;
   coreServices?: CoreServiceResource[];
   hostProcesses?: HostProcessResource[];

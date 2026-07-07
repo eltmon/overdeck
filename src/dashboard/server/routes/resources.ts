@@ -87,6 +87,14 @@ export {
   resetResourceHistorySamples,
 } from './resources/history.js';
 export {
+  getSpawnGatePayloadEffect,
+  mapSpawnGateDecision,
+  resetSpawnGateHealthSnapshotReaderForTests,
+  setSpawnGateHealthSnapshotReaderForTests,
+  type SpawnGatePayload,
+  type SpawnGateState,
+} from './resources/spawn-gate.js';
+export {
   resourcesRouteLayer,
   default,
 } from './resources/index.js';

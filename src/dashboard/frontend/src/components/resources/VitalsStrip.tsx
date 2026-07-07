@@ -1,10 +1,12 @@
-import type { HostVitalsSnapshot } from '../../types';
+import type { HostVitalsSnapshot, SpawnGateSnapshot } from '../../types';
+import { SpawnGateVital } from './SpawnGateVital';
 
 interface VitalsStripProps {
   hostVitals?: HostVitalsSnapshot;
+  spawnGate?: SpawnGateSnapshot;
 }
 
-export function VitalsStrip({ hostVitals }: VitalsStripProps) {
+export function VitalsStrip({ hostVitals, spawnGate }: VitalsStripProps) {
   const vitals = hostVitals ?? emptyHostVitals();
   const memTotal = vitals.mem.usedBytes + vitals.mem.availableBytes;
   const memPct = memTotal > 0 ? Math.round((vitals.mem.usedBytes / memTotal) * 100) : 0;
@@ -24,7 +26,7 @@ export function VitalsStrip({ hostVitals }: VitalsStripProps) {
       </VitalsCell>
       <VitalsCell label="Docker" value={`${vitals.docker.running}/${vitals.docker.containers}`} sub={`${vitals.docker.stacks} stacks`} />
       <VitalsCell label="Agents" value={`${vitals.agents.active}/${vitals.agents.sessions}`} sub={`${vitals.agents.idleOver15m} idle`} />
-      <VitalsCell label="Spawn gate" value="OPEN" sub="ready for work" />
+      <SpawnGateVital spawnGate={spawnGate} />
     </div>
   );
 }

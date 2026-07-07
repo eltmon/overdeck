@@ -59,7 +59,7 @@ export function MachineRoom({ snapshot, onNavigateToAgents, onStop, onPause, onL
         onFilterChange={setFilter}
         onGroupByChange={setGroupBy}
       />
-      <VitalsStrip hostVitals={snapshot.hostVitals} />
+      <VitalsStrip hostVitals={snapshot.hostVitals} spawnGate={snapshot.spawnGate} />
       <div className="flex-1 overflow-auto px-6 py-5">
         <AgentsSection
           agents={snapshot.agents}

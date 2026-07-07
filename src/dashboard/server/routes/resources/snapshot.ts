@@ -11,12 +11,14 @@ import { getHostProcessesSnapshot } from './host-processes.js';
 import { buildHostVitalsSnapshot } from './host-vitals.js';
 import { enrichContainersWithLimits } from './limits.js';
 import { getCurrentDockerStats } from './shared.js';
+import { getSpawnGatePayloadEffect } from './spawn-gate.js';
 
 /** Build the GET /api/resources response from the SQLite agents table. */
 export function getResourcesEffect(): Effect.Effect<ReturnType<typeof jsonResponse>, never, never> {
   return Effect.gen(function* () {
     const containers = enrichContainersWithLimits(getCurrentDockerStats());
     const agentStats = yield* getAgentStatsSnapshotEffect();
+    const spawnGate = yield* getSpawnGatePayloadEffect();
     const stoppedContainers: unknown[] = [];
 
     // PAN-1908: authoritative agent registry is the SQLite agents table.
@@ -52,6 +54,7 @@ export function getResourcesEffect(): Effect.Effect<ReturnType<typeof jsonRespon
       hostProcesses: getHostProcessesSnapshot(),
       stoppedContainers,
       networks: [],
+      spawnGate,
       volumes: [],
       updatedAt: new Date().toISOString(),
     });
