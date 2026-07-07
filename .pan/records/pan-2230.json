@@ -31,11 +31,11 @@
     "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T09:54:30.724Z",
+    "updatedAt": "2026-07-07T10:18:36.586Z",
     "reviewNotes": "Verification failed at test",
-    "verificationNotes": "Verification FAILED at test (137952ms):\n\n__/agents-switch-model.test.ts > POST /api/agents/:id/switch-model > rejects model switching for pipeline agents\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/routes/__tests__/agents-switch-model.test.ts:29:3\n     27|\n     28| describe('POST /api/agents/:id/switch-model', () => {\n     29|   it('rejects model switching for pipeline agents', async () => {\n       |   ^\n     30|     const response = await postAgentSwitchModel('agent-pan-1928', { mo…\n     31|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/cloister-config.test.ts > cloister config route > reloads the live child Cloister after saving config updates\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/routes/__tests__/cloister-config.test.ts:47:3\n     45|   });\n     46|\n     47|   it('reloads the live child Cloister after saving config updates', as…\n       |   ^\n     48|     const updates = { monitoring: { check_interval: 17 } };\n     49|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯\n\n FAIL  |root| src/dashboard/server/services/__tests__/conversation-compaction.test.ts > conversation native compaction > writes the compact boundary to a forked file without mutating the source\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/services/__tests__/conversation-compaction.test.ts:63:3\n     61|\n     62| describe('conversation native compaction', () => {\n     63|   it('writes the compact boundary to a forked file without mutating th…\n       |   ^\n     64|     const file = await writeJsonl('session.jsonl', [\n     65|       { type: 'user', message: { role: 'user', content: [{ type: 'text…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯\n\n",
+    "verificationNotes": "Verification FAILED at test (83198ms):\n\n⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| tests/fixtures/pan-help.test.ts > pan --help fixture > keeps singular and plural project add options in sync\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ tests/fixtures/pan-help.test.ts:69:3\n     67|   });\n     68|\n     69|   it('keeps singular and plural project add options in sync', () => {\n       |   ^\n     70|     const singular = captureCommandHelp('project add --help').replaceA…\n     71|     const plural = captureCommandHelp('projects add --help');\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯\n\n FAIL  |root| tests/lib/cloister/deacon-context-overflow.test.ts > checkApiErrorAgents — context-window overflow recovery > (a) detects overflow at an idle prompt → Overdeck-side compacts via resumeAgent (never /compact) and records attempt 1\nError: Hook timed out in 5000ms.\nIf this is a long-running hook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n ❯ tests/lib/cloister/deacon-context-overflow.test.ts:121:3\n    119|   let stuckOverflowNativeRecoveryState: Map<string, { attempts: number…\n    120|\n    121|   beforeEach(async () => {\n       |   ^\n    122|     vi.resetModules();\n    123|     mockSendKeys.mockReset().mockResolvedValue(undefined);\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯\n\n FAIL  |root| src/cli/commands/__tests__/start-sync-main-conflict.test.ts > pan start sync-main conflict (PAN-1872) > continues to spawn the agent when sync-main reports a conflict\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/cli/commands/__tests__/start-sync-main-conflict.test.ts:213:3\n    211|   });\n    212|\n    213|   it('continues to spawn the agent when sync-main reports a conflict',…\n       |   ^\n    214|     syncMainMock.mockResolvedValue({\n    215|       success: false,\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2462",
-    "reviewRequestedAt": "2026-07-07T09:49:45.536Z",
+    "reviewRequestedAt": "2026-07-07T10:14:50.318Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/drafts/PAN-2230.md",
@@ -43,7 +43,10 @@
         ".pan/records/pan-2230.json",
         "docs/ci-cd/CICD-QUEUE.md",
         "docs/codebase-health/REFACTOR-QUEUE.md",
-        "scripts/canonicalize-circular-deps.js"
+        "scripts/canonicalize-circular-deps.js",
+        "src/dashboard/server/routes/__tests__/agents-switch-model.test.ts",
+        "src/dashboard/server/routes/__tests__/cloister-config.test.ts",
+        "src/dashboard/server/services/__tests__/conversation-compaction.test.ts"
       ],
       "declaredScopeUntouched": [],
       "declaredScope": [
@@ -68,9 +71,12 @@
         "scripts/canonicalize-circular-deps.js",
         "scripts/circular-deps-baseline.txt",
         "scripts/lint-circular-deps.sh",
-        "scripts/lint-ratchet-audit.sh"
+        "scripts/lint-ratchet-audit.sh",
+        "src/dashboard/server/routes/__tests__/agents-switch-model.test.ts",
+        "src/dashboard/server/routes/__tests__/cloister-config.test.ts",
+        "src/dashboard/server/services/__tests__/conversation-compaction.test.ts"
       ],
-      "recordedAt": "2026-07-07T09:49:33.522Z"
+      "recordedAt": "2026-07-07T10:14:25.451Z"
     }
   },
   "closeOut": {
@@ -94,17 +100,17 @@
         },
         "review": {
           "unknown": {
-            "input": 4968607,
-            "output": 18068,
-            "cacheRead": 4477056,
+            "input": 6451449,
+            "output": 21387,
+            "cacheRead": 5924352,
             "cacheWrite": 0
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1207568,
-            "output": 80090,
-            "cacheRead": 38118400,
+            "input": 1240873,
+            "output": 88317,
+            "cacheRead": 42552064,
             "cacheWrite": 0
           }
         }
@@ -123,21 +129,21 @@
           "cacheWrite": 160632
         },
         "unknown": {
-          "input": 4968607,
-          "output": 18068,
-          "cacheRead": 4477056,
+          "input": 6451449,
+          "output": 21387,
+          "cacheRead": 5924352,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 1207568,
-          "output": 80090,
-          "cacheRead": 38118400,
+          "input": 1240873,
+          "output": 88317,
+          "cacheRead": 42552064,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 18.353087,
-        "pricingAsOf": "2026-07-07T09:54:30.761Z"
+        "usd": 20.260979,
+        "pricingAsOf": "2026-07-07T10:18:36.623Z"
       }
     },
     "merges": [
@@ -145,6 +151,6 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "created": "2026-07-07T09:54:30.218Z",
-  "updated": "2026-07-07T09:54:30.762Z"
+  "created": "2026-07-07T10:18:36.092Z",
+  "updated": "2026-07-07T10:18:36.625Z"
 }
