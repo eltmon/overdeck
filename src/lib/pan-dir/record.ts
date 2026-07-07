@@ -108,6 +108,8 @@ export interface PanIssuePipelineRecord {
   deaconIgnored?: boolean;
   deaconIgnoredAt?: string;
   deaconIgnoredReason?: string;
+  /** PAN-2207: durable tombstone set when deacon recovers a stuck-pending completion; cleared by re-run of `pan done`. */
+  panDoneRecoveredAt?: string;
   closedOut?: boolean;
   closedOutAt?: string;
   reviewerVerdicts?: unknown;
