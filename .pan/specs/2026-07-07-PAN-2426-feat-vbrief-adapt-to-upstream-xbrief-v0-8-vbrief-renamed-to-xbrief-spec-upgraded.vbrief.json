@@ -39,62 +39,11 @@
     ],
     "narratives": {
       "Problem": "Upstream renamed the plan-document spec (deftai/vBRIEF -> deftai/xBRIEF) and bumped it to v0.8: the info envelope key changed from vBRIEFInfo to xBRIEFInfo. Overdeck writes v0.6 documents and its readers reject the xBRIEFInfo envelope outright. Upstream's backlog contains a 'remove vbrief readpath' item, so the legacy envelope will eventually stop being readable by upstream tooling. Our fork eltmon/vBRIEF is 9 commits behind with 0 unique commits.",
-      "Proposal": "Translate the envelope key at the read/write doors only, keeping the internal TypeScript field vBRIEFInfo unchanged (PRD D-1). Read door: a normalizeVBriefEnvelope helper applied at all seven raw-parse read sites accepts xBRIEFInfo and normalizes it to the internal field. Write door: a single serializeVBriefDocument function derives the on-disk key from the document version (>=0.7 -> xBRIEFInfo, <0.7 -> vBRIEFInfo; PRD D-2) and replaces JSON.stringify at exactly seven spec write sites. Writers (builder.ts, auto-synthesize.ts) and the two agent-facing prompt surfaces (planning template, write-vbrief skill; operator-approved D7) bump to version 0.8. The fork is fast-forwarded and renamed eltmon/xBRIEF. All in one PR (D-4).",
+      "Proposal": "Translate the envelope key at the read/write doors only, keeping the internal TypeScript field vBRIEFInfo unchanged (PRD D-1). Read door: a normalizeVBriefEnvelope helper applied at all seven raw-parse read sites accepts xBRIEFInfo and normalizes it to the internal field. Write door: a single serializeVBriefDocument function derives the on-disk key from the document version (>=0.7 -> xBRIEFInfo, <0.7 -> vBRIEFInfo; PRD D-2) and replaces JSON.stringify at exactly seven spec write sites. Writers (builder.ts, auto-synthesize.ts) and the two agent-facing prompt surfaces (planning template, write-vbrief skill; operator-approved D7) bump to version 0.8. The fork sync + rename (FR-7) was completed externally on 2026-07-07 (both masters at 56824ed4da99; CLAUDE.md links updated on main in 6240cf4a4f) - the plan carries only the remaining docs/VBRIEF.md reference updates. All code changes land in one PR (D-4).",
       "NonGoals": "- Adopting PlanItem.type, PlanItem.summary, planRefs, status \"auto\" rollups, Source/Confidence narrative keys, or the x-xbrief/* extension registry (file follow-up issues if wanted)\n- Changing pipeline call sites to emit failed instead of blocked (the enum already permits failed; semantics adoption is a separate behavioral change)\n- Renaming .vbrief.json artifacts, docs/VBRIEF.md, the /write-vbrief skill name, or the vbrief/ viewer components (PRD D-5; requires a no-loss audit if ever done)\n- Renaming the internal TypeScript field vBRIEFInfo or touching any frontend component (PRD D-1, NFR-1)\n- Routing clone/byte-count/lock-file/tier-override JSON.stringify uses through the serializer (PRD D-6)\n- Adding ajv (or any validator) as a package dependency"
     },
     "autoDecisions": [],
     "items": [
-      {
-        "id": "fork-sync",
-        "title": "Sync fork to upstream and rename eltmon/vBRIEF -> eltmon/xBRIEF",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-07-07T16:05:00.000Z",
-        "metadata": {
-          "difficulty": "simple",
-          "kind": "infra",
-          "issueLabel": "pan-2426",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "files_scope": [
-            ".pan/continue.json"
-          ],
-          "files_scope_confidence": "high",
-          "verify_commands": [
-            "gh api repos/eltmon/xBRIEF/commits/master -q .sha",
-            "gh api repos/deftai/xBRIEF/commits/master -q .sha"
-          ],
-          "expected_outputs": [
-            "both commands print the identical commit SHA"
-          ],
-          "readiness": "ready",
-          "traces": [
-            "FR-7"
-          ],
-          "acJustification": "Ops-only item with a single mechanical success condition (SHA equality after ff + rename); 2 ACs cover it fully."
-        },
-        "narrative": {
-          "Action": "GitHub ops, no code. Run: (1) gh api -X POST repos/eltmon/vBRIEF/merge-upstream -f branch=master (pure fast-forward; verified 2026-07-07: fork is 0 ahead / 9 behind). (2) gh api -X PATCH repos/eltmon/vBRIEF -f name=xBRIEF (GitHub redirects the old name). (3) Verify gh api repos/eltmon/xBRIEF/commits/master -q .sha equals the same query against deftai/xBRIEF. The workspace gh token is eltmon with admin:true on the fork (verified). The gh ops leave no repo diff; record the verified SHA pair in a .pan/continue.json session note. CLAUDE.md link updates are handled in the docs-update item, not here."
-        },
-        "items": [
-          {
-            "id": "fork-sync.ac1",
-            "title": "gh api repos/eltmon/xBRIEF/commits/master -q .sha returns the same SHA as gh api repos/deftai/xBRIEF/commits/master -q .sha",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "fork-sync.ac2",
-            "title": "gh api repos/eltmon/xBRIEF -q .name returns xBRIEF (rename applied; old URL redirects)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
       {
         "id": "read-compat",
         "title": "Read door: accept the xBRIEFInfo envelope at all seven read sites",
@@ -438,7 +387,7 @@
       },
       {
         "id": "docs-update",
-        "title": "Docs: xBRIEF v0.8 compat section in docs/VBRIEF.md and CLAUDE.md link updates",
+        "title": "Docs: xBRIEF v0.8 compat section and reference updates in docs/VBRIEF.md",
         "status": "pending",
         "priority": "low",
         "created": "2026-07-07T16:05:00.000Z",
@@ -449,17 +398,16 @@
           "requiresInspection": false,
           "inspectionDepth": "fast",
           "files_scope": [
-            "docs/VBRIEF.md",
-            "CLAUDE.md"
+            "docs/VBRIEF.md"
           ],
           "files_scope_confidence": "high",
           "verify_commands": [
             "grep -n 'xBRIEF' docs/VBRIEF.md | head -5",
-            "grep -n 'deftai/vBRIEF\\|eltmon/vBRIEF' CLAUDE.md docs/VBRIEF.md || true"
+            "grep -n 'deftai/vBRIEF\\|eltmon/vBRIEF' docs/VBRIEF.md || true"
           ],
           "expected_outputs": [
             "docs/VBRIEF.md contains an xBRIEF v0.8 section near the top",
-            "the stale-link grep prints nothing (no remaining deftai/vBRIEF or eltmon/vBRIEF links outside historical changelog context)"
+            "the stale-link grep prints nothing (no remaining deftai/vBRIEF or eltmon/vBRIEF links)"
           ],
           "readiness": "ready",
           "traces": [
@@ -469,7 +417,7 @@
           "acJustification": "Docs-only item; 2 ACs cover both files' observable end states."
         },
         "narrative": {
-          "Action": "1) docs/VBRIEF.md - add a short 'xBRIEF v0.8' section at the top: upstream rename (deftai/vBRIEF -> deftai/xBRIEF, 2026-06-26), the envelope-key compatibility rule (version >= 0.7 writes xBRIEFInfo, < 0.7 writes vBRIEFInfo; round-trip preserving, never up-converts - PRD D-2), which versions Overdeck reads (0.5-0.8) and writes (0.8). Do not rename the file (D-5). 2) CLAUDE.md 'vBRIEF Plans & Lifecycle' section - update the upstream links: github.com/deftai/vBRIEF -> github.com/deftai/xBRIEF and github.com/eltmon/vBRIEF -> github.com/eltmon/xBRIEF (the fork rename from the fork-sync item)."
+          "Action": "docs/VBRIEF.md only (PRD amendment A-4). 1) Add a short 'xBRIEF v0.8' section at the top: upstream rename (deftai/vBRIEF -> deftai/xBRIEF, 2026-06-26), the envelope-key compatibility rule (version >= 0.7 writes xBRIEFInfo, < 0.7 writes vBRIEFInfo; round-trip preserving, never up-converts - PRD D-2), which versions Overdeck reads (0.5-0.8) and writes (0.8). Do not rename the file (D-5). 2) Update the stale references at lines 3, 7, 9, and 374 (locate by the quoted links, lines drift): github.com/deftai/vBRIEF -> github.com/deftai/xBRIEF; github.com/eltmon/vBRIEF -> github.com/eltmon/xBRIEF; the extension proposal deftai/vBRIEF#1 -> deftai/xBRIEF#40 (superseding #1; draft PR deftai/xBRIEF#41). Do NOT edit CLAUDE.md's link block - it was already updated on main in commit 6240cf4a4f and arrives in this workspace via sync-main; re-editing would create merge conflicts. The fork sync + rename itself is DONE (verified 2026-07-07: both masters at SHA 56824ed4da99) - no gh ops in this item."
         },
         "items": [
           {
@@ -482,7 +430,7 @@
           },
           {
             "id": "docs-update.ac2",
-            "title": "CLAUDE.md's vBRIEF Plans & Lifecycle section links to deftai/xBRIEF and eltmon/xBRIEF; grep for the old repo paths returns no live links",
+            "title": "grep for deftai/vBRIEF and eltmon/vBRIEF in docs/VBRIEF.md returns nothing; the extension-proposal link resolves to deftai/xBRIEF#40 and the diff contains no CLAUDE.md changes",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -526,11 +474,6 @@
         "from": "write-door",
         "to": "schema-checkpoint",
         "type": "blocks"
-      },
-      {
-        "from": "fork-sync",
-        "to": "docs-update",
-        "type": "informs"
       },
       {
         "from": "read-compat",
