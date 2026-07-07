@@ -36,19 +36,15 @@
   },
   "pipeline": {
     "issueId": "PAN-2341",
-    "reviewStatus": "passed",
-    "testStatus": "failed",
-    "verificationStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T10:10:57.751Z",
-    "reviewNotes": "review passed; skipped-test reconcile fix verified",
-    "testNotes": "typecheck PASSED, lint PASSED, focused PAN-2341 tests PASSED (6 files, 24 tests). Full npm test FAILED: 12 test files failed / 8 tests failed. Four failures are deterministic regressions introduced by PAN-2341: src/lib/cloister/advancing-selfheal.ts imports loadReviewStatuses from ../review-status.js and logDeaconEventSync from ../persistent-logger.js at the top level, and src/lib/cloister/deacon.ts imports advancing-selfheal.ts at the top level. Existing tests that partially mock those modules now fail to load with No <export> export is defined on the ... mock. Affected files: src/lib/cloister/__tests__/deacon-auto-closeout.test.ts, tests/unit/lib/cloister/guard-advancing-dispatch.test.ts, tests/unit/dashboard/server/routes/merge-reconciliation.test.ts. Eight additional tests timed out under full-suite parallel load but pass in isolation. UAT not required: PRD explicitly states Browser/Playwright verification — backend-only change.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-07-07T10:38:29.629Z",
     "inspectNotes": "Bead reconcile-journals-sweep BLOCKED: src/lib/cloister/advancing-selfheal.ts:45-48 isReconciliableStatus() requires BOTH status.reviewStatus AND status.testStatus to be in JOURNAL_RECONCILE_STATES (line 15: pending/reviewing/passed/failed/blocked/testing/dispatch_failed). That set omits the legitimate testStatus value \"skipped\" (a real, commonly-set value per src/lib/review-status.ts:45, treated on par with passed for merge-gating at lines 144/173/873/901/937). Any issue with reviewStatus: reviewing|pending (clearly in-flight) and testStatus: skipped (tests not required/applicable) is silently excluded from both the DB-row loop (line 74) and the tmux-alive session loop (line 89) — reconcileInFlightJournals never calls getReviewStatusSync for it, so a journaled advancing verdict on such an issue is never reconciled. This violates FR-1 (must call getReviewStatusSync for every in-flight issue) and is not caught by the shipped tests, which only ever construct status() with testStatus: pending (default) and never exercise skipped. Fix: change isReconciliableStatus to gate on reviewStatus alone (or on either field independently, with skipped treated as a valid non-excluding testStatus), then add a test case with testStatus: skipped + reviewStatus: reviewing to prove the fix. Everything else in the commit checks out: getReviewStatusSync already owns journal->DB reconcile (review-status.ts:757, PAN-1988), the sweep call at deacon.ts:2722 genuinely precedes checkTerminalAdvancingSessions at deacon.ts:2846 (confirmed live, not just the ordering test), and startDeacon triggers runScheduledPatrol(startup) before the interval loop so FR-1s on-boot language is satisfied via the patrol path. markAdvancingSessionStopped is correctly unwired per the beads own scope (wire sweep into the patrol — singular), so that is not a blocker.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2463",
-    "reviewedAtCommit": "120096be60dfde9ea90e86bc9a2f93741f006e42",
     "reviewRequestedAt": "2026-07-07T10:03:20.476Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -124,9 +120,9 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 470242,
-            "output": 14593,
-            "cacheRead": 2133504,
+            "input": 472822,
+            "output": 16121,
+            "cacheRead": 2529792,
             "cacheWrite": 0
           }
         },
@@ -165,15 +161,15 @@
           "cacheWrite": 95697
         },
         "custom/kimi-k2.7-code": {
-          "input": 470242,
-          "output": 14593,
-          "cacheRead": 2133504,
+          "input": 472822,
+          "output": 16121,
+          "cacheRead": 2529792,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 39.276362,
-        "pricingAsOf": "2026-07-07T10:10:57.840Z"
+        "usd": 39.360220000000005,
+        "pricingAsOf": "2026-07-07T10:38:29.672Z"
       }
     },
     "merges": [
@@ -182,5 +178,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-07T10:10:57.860Z",
-  "updated": "2026-07-07T10:10:57.860Z"
+  "updated": "2026-07-07T10:38:29.673Z"
 }
