@@ -6,6 +6,7 @@ SKILL="$ROOT/SKILL.md"
 SPEC="$ROOT/references/spec.md"
 README="$ROOT/README.md"
 OKFE="$ROOT/references/okf-embeddings.md"
+MODEL_BRIDGES="$ROOT/references/model-bridges.md"
 
 require_grep() {
   local pattern="$1"
@@ -67,6 +68,80 @@ require_grep 'Lines are sorted by `id`' "$OKFE" "okf-embeddings doc includes sor
 require_grep 'okf_embeddings_version` controls compatibility' "$OKFE" "okf-embeddings doc includes succession clause"
 require_grep 'provider: ollama' "$ROOT/templates/okf-embeddings.yaml" "embedding manifest template uses ollama default"
 require_grep 'model: nomic-embed-text' "$ROOT/templates/okf-embeddings.yaml" "embedding manifest template uses nomic-embed-text"
+require_grep 'codex login status' "$MODEL_BRIDGES" "model bridges require codex auth check"
+require_grep 'codex exec -m <model> --sandbox workspace-write --output-last-message <output-file> "<prompt>"' "$MODEL_BRIDGES" "model bridges document codex exec invocation shape"
+require_grep 'gemini -p "<prompt>" -m <model>' "$MODEL_BRIDGES" "model bridges document gemini invocation shape"
+require_grep '/codex:rescue' "$MODEL_BRIDGES" "model bridges document codex plugin bridge"
+require_grep '/gemini:task' "$MODEL_BRIDGES" "model bridges document gemini plugin bridge"
+require_grep 'mcp__codex__\*' "$MODEL_BRIDGES" "model bridges document codex MCP bridge"
+require_grep 'mcp__gemini__\*' "$MODEL_BRIDGES" "model bridges document gemini MCP bridge"
+require_grep 'ai-cli-mcp' "$MODEL_BRIDGES" "model bridges document generic MCP bridge"
+require_grep 'ERROR: Requested model \[model\] cannot be served by this OKF skill session\.' "$MODEL_BRIDGES" "model bridges include hard error template"
+require_grep 'Bridge: \[bridge-name\]' "$MODEL_BRIDGES" "model bridge error names bridge"
+require_grep 'Install: \[install-command\]' "$MODEL_BRIDGES" "model bridge error names install command"
+require_grep 'Auth: \[auth-step\]' "$MODEL_BRIDGES" "model bridge error names auth step"
+require_grep 'pan knowledge --model <model>` bypasses this portable ladder' "$MODEL_BRIDGES" "model bridges document Overdeck routing bypass"
+require_grep 'pan knowledge --model <model>` bypasses this portable ladder' "$SKILL" "SKILL.md documents Overdeck routing bypass"
+
+python3 - <<'PY'
+from pathlib import Path
+import json
+import os
+import subprocess
+import sys
+import tempfile
+
+with tempfile.TemporaryDirectory() as tmp:
+    tmp_path = Path(tmp)
+    calls = tmp_path / "calls.jsonl"
+    stub = tmp_path / "codex"
+    stub.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, os, sys\n"
+        "with open(os.environ['OKF_CODEX_CALLS'], 'a', encoding='utf-8') as f:\n"
+        "    f.write(json.dumps(sys.argv[1:]) + '\\n')\n",
+        encoding="utf-8",
+    )
+    stub.chmod(0o755)
+    output = tmp_path / "last-message.txt"
+    env = dict(os.environ)
+    env["PATH"] = f"{tmp_path}{os.pathsep}{env.get('PATH', '')}"
+    env["OKF_CODEX_CALLS"] = str(calls)
+
+    proc = subprocess.run(
+        [
+            "codex",
+            "exec",
+            "-m",
+            "gpt-5.5",
+            "--sandbox",
+            "workspace-write",
+            "--output-last-message",
+            str(output),
+            "write payroll knowledge",
+        ],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr
+    recorded = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
+    assert recorded == [[
+        "exec",
+        "-m",
+        "gpt-5.5",
+        "--sandbox",
+        "workspace-write",
+        "--output-last-message",
+        str(output),
+        "write payroll knowledge",
+    ]], recorded
+
+print("ok - codex bridge stub records documented exec invocation shape")
+PY
+
 require_grep 'Open the knowledge PR with `gh pr create`' "$SKILL" "sync opens PR through gh"
 require_grep 'validate.py --strict' "$SKILL" "sync runs strict validation"
 require_grep 'preserve non-matching concepts byte-identically' "$SKILL" "sync topic preserves non-matching concepts"

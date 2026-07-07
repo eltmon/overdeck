@@ -26,11 +26,11 @@ The bundle is the source of truth. Keep changes small, cited, and PR-gated. Dete
 | Command | Purpose | Primary references |
 | --- | --- | --- |
 | `/okf init` | Create or connect a project knowledge bundle. | `references/workflow.md`, `references/spec.md` |
-| `/okf author "<topic>"` | Write or refresh one focused concept. | `templates/concept.md`, `references/taxonomy.md` |
+| `/okf author "<topic>"` | Write or refresh one focused concept. | `templates/concept.md`, `references/taxonomy.md`, `references/model-bridges.md` |
 | `/okf convert <path>` | Convert existing docs into OKF concepts without deleting originals. | `references/conversion.md` |
-| `/okf sync [--topic "<focus>"]` | Update concepts from code or documentation changes. | `references/workflow.md` |
-| `/okf study "<focus>"` | Pre-feature pass that documents current behavior for a topic. | `references/workflow.md`, `references/taxonomy.md` |
-| `/okf retro` | Post-implementation pass that captures what would have helped. | `references/workflow.md` |
+| `/okf sync [--topic "<focus>"]` | Update concepts from code or documentation changes. | `references/workflow.md`, `references/model-bridges.md` |
+| `/okf study "<focus>"` | Pre-feature pass that documents current behavior for a topic. | `references/workflow.md`, `references/taxonomy.md`, `references/model-bridges.md` |
+| `/okf retro` | Post-implementation pass that captures what would have helped. | `references/workflow.md`, `references/model-bridges.md` |
 | `/okf extract "<query>" [--budget <tokens>]` | Return ranked, token-budgeted, cited concepts for prompt use. | `references/spec.md` |
 | `/okf validate [--strict]` | Run the deterministic conformance gate. | `references/conformance.md` |
 | `/okf lint` | Run advisory semantic patrol for stale or weak knowledge. | `references/conformance.md` |
@@ -61,10 +61,12 @@ When answering from a bundle or preparing prompt context:
 For `/okf study`, `/okf retro`, `/okf sync`, and `/okf author`, honor `--model <model>` using this ladder:
 
 1. Use the current harness natively when it can serve the requested model.
-2. Use a vendor CLI already on `PATH`, such as `codex exec -m <model> ...` or `gemini -p ... -m <model>`, after checking auth.
-3. Use an installed bridge plugin command when available.
-4. Use an available MCP bridge tool when available.
-5. If none can serve the model, stop with a hard error that names the requested model, the bridge that would serve it, the install command, and the auth step. Never silently substitute another model.
+2. Use a vendor CLI already on `PATH`: after `codex login status`, invoke `codex exec -m <model> --sandbox workspace-write --output-last-message <output-file> "<prompt>"`; after ADC or `GOOGLE_API_KEY` verification, invoke `gemini -p "<prompt>" -m <model>`.
+3. Use an installed bridge plugin command when available, such as `/codex:rescue` or `/gemini:task`.
+4. Use an available MCP bridge tool when available, such as `mcp__codex__*`, `mcp__gemini__*`, or `ai-cli-mcp` when it explicitly supports the requested model.
+5. If none can serve the model, stop with the hard error template in `references/model-bridges.md`, naming the requested model, bridge, install command, and auth step. Never silently substitute another model.
+
+Under Overdeck, `pan knowledge --model <model>` bypasses this portable ladder and uses Overdeck model routing.
 
 ## `/okf init`
 
