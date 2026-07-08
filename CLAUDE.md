@@ -319,7 +319,7 @@ After 3 consecutive failures, verification is bypassed to prevent permanent bloc
 
 ## Agent Auto-Resume Gates
 
-Deacon auto-resume is intentionally suppressible through three gates:
+Deacon auto-resume is intentionally suppressible through manual/lifecycle gates:
 
 - **Boot no-resume:** `OVERDECK_NO_RESUME=1`, `pan dev --no-resume`, or
   `pan up --no-resume` disables orphan recovery and stopped-agent auto-resume for
@@ -332,6 +332,22 @@ Deacon auto-resume is intentionally suppressible through three gates:
   preserve failure counters/backoff state in `state.json`. `pan untroubled <id>`
   clears the troubled gate and failure fields after the underlying crash cause has
   been investigated. It does not spawn the agent.
+
+Resource gates also bound auto-resume and dispatch:
+
+- **Count gate:** the work-agent concurrency governor limits how many work agents
+  can be running or resumed in one patrol.
+- **Load gate:** high 1-minute load defers resume attempts until a later patrol.
+- **Memory gate:** the resource governor checks MemAvailable, hysteresis bands,
+  and estimated agent footprint before autonomous resume, boot reconciliation,
+  and advancing-role dispatch. Under HARD pressure it stops merged/closed stacks
+  first, then pauses eligible idle work agents. See
+  [`docs/RESOURCE-GOVERNOR.md`](docs/RESOURCE-GOVERNOR.md).
+
+The managed tmux server is the liveness oracle for every agent. When launched
+through systemd, the `tmux-server` user unit sets
+`ManagedOOMPreference=avoid` so systemd-oomd avoids killing the shared tmux
+server before less central agent processes.
 
 These gates are orthogonal to the global Deacon freeze in SQLite
 (`deacon.globally_paused`) and the per-issue Deacon ignore flag in review status.

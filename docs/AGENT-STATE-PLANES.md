@@ -32,12 +32,24 @@ Overdeck splits every piece of agent and pipeline state into exactly one of thre
 
 **Rebuild path.** `pan admin db rebuild-agents` reconstructs the `agents` table from the rollback `state.json` files + live tmux reconciliation. The permanent record plus tmux is sufficient to restore the runtime view.
 
+**Admission policy.** Runtime transitions that start or resume agents are
+memory-governed as well as count/load-governed. Deacon consults the resource
+governor before autonomous resume, boot reconciliation, and advancing-role
+dispatch; under pressure it defers admission or sheds reclaimable resources
+instead of blindly recreating every stopped session. See
+[`docs/RESOURCE-GOVERNOR.md`](RESOURCE-GOVERNOR.md).
+
 ### 3. Liveness oracle — tmux on the `overdeck` socket
 
 **What lives here:** the answer to "is this agent actually running?"
 
 - A tmux session named after the agent id exists on socket `-L overdeck`.
 - Lifecycle events project agent status, but tmux remains the ground truth for physical presence.
+
+The shared tmux server is protected as part of the liveness oracle. When
+systemd is available, Overdeck starts the managed `tmux-server` user unit with
+`ManagedOOMPreference=avoid` so a systemd-oomd event is less likely to kill the
+single tmux server that anchors every live agent session.
 
 ## Infra-repo configuration (`pan_records`)
 

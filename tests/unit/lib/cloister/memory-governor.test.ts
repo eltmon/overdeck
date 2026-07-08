@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { Effect } from 'effect';
 
 const readProcMemoryMock = vi.fn();
 const loadConfigSyncMock = vi.fn();
@@ -13,7 +14,7 @@ const execFileMock = vi.fn((_cmd: string, _args: string[], _opts: unknown, cb: (
   cb(null, { stdout: '', stderr: '' });
 });
 
-vi.mock('../../../../src/dashboard/server/services/system-health-service.js', () => ({
+vi.mock('../../../../src/lib/proc-memory.js', () => ({
   readProcMemory: (...args: unknown[]) => readProcMemoryMock(...args),
 }));
 
@@ -21,8 +22,15 @@ vi.mock('../../../../src/lib/config-yaml/load.js', () => ({
   loadConfigSync: (...args: unknown[]) => loadConfigSyncMock(...args),
 }));
 
-vi.mock('../../../../src/dashboard/server/routes/resources/shared.js', () => ({
-  getDockerStatsCollector: () => ({ getStats: (...args: unknown[]) => getStatsMock(...args) }),
+vi.mock('../../../../src/lib/docker-stats.js', () => ({
+  DockerStatsCollector: class {
+    start() {
+      return Effect.succeed(undefined);
+    }
+    getStats() {
+      return getStatsMock();
+    }
+  },
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
@@ -60,6 +68,7 @@ import {
   nextGovernorMode,
   resetGovernorModeForTests,
   computeLearnedFootprintBytes,
+  buildMemoryGovernorResourceStacks,
   estimateFootprint,
   canAdmit,
   getCachedMemoryVerdict,
@@ -67,8 +76,9 @@ import {
   selectAgentToPause,
   shed,
   type GovernorReserves,
+  type ResourceStack,
+  type StackContainerResource,
 } from '../../../../src/lib/cloister/memory-governor.js';
-import { getResourceStacks, type ResourceStack, type StackContainerResource } from '../../../../src/dashboard/server/routes/resources/stacks.js';
 
 const GIB = 1024 ** 3;
 
@@ -268,7 +278,13 @@ function mergedStack(issueId: string, memoryBytes: number, serviceId = `${issueI
     issueTitle: issueId,
     composeProject: `feature-${issueId.toLowerCase()}`,
     serviceCount: 1,
-    services: [{ id: serviceId, name: serviceId, memoryUsage: memoryBytes, status: 'running' }] as StackContainerResource[],
+    services: [{
+      id: serviceId,
+      name: serviceId,
+      memoryUsage: memoryBytes,
+      status: 'running',
+      labels: { 'overdeck.phase': 'merged', 'com.docker.compose.project': `feature-${issueId.toLowerCase()}` },
+    }] as StackContainerResource[],
     aggregates: { cpuPercent: 0, memoryBytes, diskBytes: 0 },
     phase: 'merged',
   };
@@ -324,9 +340,8 @@ describe('shed() (PAN-2500 tiered-eviction integration)', () => {
   });
 
   it('stops both merged stacks first, then pauses the idle agent only if still HARD afterward (PRD AC-4)', async () => {
-    getStatsMock.mockReturnValue([]); // stacks come from getResourceStacks(containers); stub via direct override below
     const stacks = [mergedStack('PAN-1', 1 * GIB, 'pan-1-svc'), mergedStack('PAN-2', 1 * GIB, 'pan-2-svc')];
-    vi.spyOn(await import('../../../../src/dashboard/server/routes/resources/stacks.js'), 'getResourceStacks').mockReturnValue(stacks);
+    getStatsMock.mockReturnValue(stacks.flatMap((stack) => stack.services));
 
     listRunningAgentsSyncMock.mockReturnValue([
       { id: 'agent-pan-3', issueId: 'PAN-3', role: 'work', tmuxActive: true, flywheelRunId: 'run-1' },
@@ -347,7 +362,7 @@ describe('shed() (PAN-2500 tiered-eviction integration)', () => {
   });
 
   it('never sheds an operator-attached (no flywheelRunId) agent even under sustained HARD pressure', async () => {
-    vi.spyOn(await import('../../../../src/dashboard/server/routes/resources/stacks.js'), 'getResourceStacks').mockReturnValue([]);
+    getStatsMock.mockReturnValue([]);
     listRunningAgentsSyncMock.mockReturnValue([
       { id: 'agent-operator', issueId: 'PAN-4', role: 'work', tmuxActive: true, flywheelRunId: undefined },
     ]);

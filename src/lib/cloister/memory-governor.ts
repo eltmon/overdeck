@@ -1,19 +1,21 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { readProcMemory } from '../../dashboard/server/services/system-health-service.js';
+import { Effect } from 'effect';
+import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 import { loadConfigSync } from '../config-yaml/load.js';
 import { loadCloisterConfigSync } from './config.js';
-import { getDockerStatsCollector } from '../../dashboard/server/routes/resources/shared.js';
-import { getResourceStacks, type ResourceStack, type StackContainerResource } from '../../dashboard/server/routes/resources/stacks.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { listRunningAgentsSync } from '../agents/queries.js';
 import { getAgentRuntimeStateSync } from '../agents/runtime-state.js';
 import { setAgentPausedSync, GOVERNOR_SLOT_PAUSE_REASON_PREFIX } from '../agents/agent-state.js';
 import { stopAgentSync } from '../agents/termination.js';
+import { DockerStatsCollector, type ContainerStats } from '../docker-stats.js';
+import { readProcMemory } from '../proc-memory.js';
 
 const execFileAsync = promisify(execFile);
 
 const GIB = 1024 ** 3;
+let dockerStatsCollector: DockerStatsCollector | null = null;
 
 export type MemoryPressureBand = 'ok' | 'soft' | 'hard';
 
@@ -135,11 +137,11 @@ function bandForGovernorMode(mode: GovernorMode): MemoryPressureBand {
  */
 export async function assessMemoryPressure(): Promise<MemoryVerdict> {
   const reserves = readGovernorReserves();
-  const snapshot = await readProcMemory();
-  governorMode = nextGovernorMode(snapshot.memAvailable, reserves, governorMode);
+  const memAvailable = (await readProcMemory()).memAvailable;
+  governorMode = nextGovernorMode(memAvailable, reserves, governorMode);
   const verdict: MemoryVerdict = {
     band: bandForGovernorMode(governorMode),
-    availableBytes: snapshot.memAvailable,
+    availableBytes: memAvailable,
     thresholds: { warningBytes: reserves.softBytes, criticalBytes: reserves.hardBytes },
   };
   cachedVerdict = verdict;
@@ -157,6 +159,32 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
 // live stack exists yet for the project.
 
 export type FootprintRole = 'work' | 'review' | 'test';
+
+export interface StackContainerResource {
+  id: string;
+  name: string;
+  cpuPercent?: number;
+  memoryUsage?: number;
+  memoryLimit?: number;
+  diskUsage?: number;
+  status?: string;
+  labels?: Record<string, string>;
+}
+
+export interface ResourceStack {
+  id: string;
+  issueId: string | null;
+  issueTitle: string;
+  composeProject: string;
+  serviceCount: number;
+  services: StackContainerResource[];
+  aggregates: {
+    cpuPercent: number;
+    memoryBytes: number;
+    diskBytes: number;
+  };
+  phase: 'merged' | 'work' | 'todo';
+}
 
 function coldStartFootprintBytes(role: FootprintRole): number {
   const resources = loadConfigSync().config.resources;
@@ -184,6 +212,83 @@ export function computeLearnedFootprintBytes(stacks: readonly ResourceStack[], p
   return average > 0 ? average : null;
 }
 
+function getMemoryGovernorDockerStatsCollector(): DockerStatsCollector {
+  if (!dockerStatsCollector) {
+    dockerStatsCollector = new DockerStatsCollector();
+    Effect.runFork(
+      dockerStatsCollector.start().pipe(Effect.provide(nodeServicesLayer)),
+    );
+  }
+  return dockerStatsCollector;
+}
+
+function composeProjectFor(container: StackContainerResource): string | null {
+  const labelProject = container.labels?.['com.docker.compose.project']?.trim();
+  if (labelProject) return labelProject;
+
+  const issueProject = container.name.match(/^(.+?feature[-_](?:pan|min|aur|krux)[-_]?\d+)/i);
+  if (issueProject?.[1]) return issueProject[1];
+
+  const match = container.name.match(/^(.+?)[_-][a-z0-9]+[._-][0-9]+$/i);
+  return match?.[1] ?? null;
+}
+
+function issueIdFromText(value: string): string | null {
+  const match = value.match(/(?:workspaces[\\/])?feature[-_](pan|min|aur|krux)[-_]?(\d+)/i)
+    ?? value.match(/\b(pan|min|aur|krux)[-_]?(\d+)\b/i);
+  if (!match) return null;
+  return `${match[1].toUpperCase()}-${match[2]}`;
+}
+
+function issueIdFor(composeProject: string, services: StackContainerResource[]): string | null {
+  if (composeProject === 'unassigned') return null;
+  const fromProject = issueIdFromText(composeProject);
+  if (fromProject) return fromProject;
+
+  for (const service of services) {
+    const labelText = Object.values(service.labels ?? {}).join(' ');
+    const fromLabels = issueIdFromText(labelText);
+    if (fromLabels) return fromLabels;
+  }
+
+  return null;
+}
+
+function phaseForServices(services: StackContainerResource[]): ResourceStack['phase'] {
+  return services.some((service) => service.labels?.['overdeck.phase'] === 'merged') ? 'merged' : 'todo';
+}
+
+export function buildMemoryGovernorResourceStacks(containers: StackContainerResource[]): ResourceStack[] {
+  const groups = new Map<string, StackContainerResource[]>();
+  for (const container of containers) {
+    const key = composeProjectFor(container) ?? 'unassigned';
+    groups.set(key, [...(groups.get(key) ?? []), container]);
+  }
+
+  return [...groups.entries()].map(([composeProject, services]) => {
+    const issueId = issueIdFor(composeProject, services);
+    return {
+      id: issueId ?? composeProject,
+      issueId,
+      issueTitle: issueId ?? 'Unassigned',
+      composeProject,
+      serviceCount: services.length,
+      services,
+      aggregates: {
+        cpuPercent: Math.round(services.reduce((sum, service) => sum + (service.cpuPercent ?? 0), 0) * 10) / 10,
+        memoryBytes: services.reduce((sum, service) => sum + (service.memoryUsage ?? 0), 0),
+        diskBytes: services.reduce((sum, service) => sum + (service.diskUsage ?? 0), 0),
+      },
+      phase: phaseForServices(services),
+    };
+  }).sort((a, b) => a.id.localeCompare(b.id));
+}
+
+function readResourceStacks(): ResourceStack[] {
+  const containers = getMemoryGovernorDockerStatsCollector().getStats() as ContainerStats[];
+  return buildMemoryGovernorResourceStacks(containers);
+}
+
 /**
  * Estimate the footprint (bytes) of an agent about to be admitted for `role`
  * in `projectKey`: the learned average live stack RSS for that project when
@@ -191,8 +296,7 @@ export function computeLearnedFootprintBytes(stacks: readonly ResourceStack[], p
  * cold-start default.
  */
 export async function estimateFootprint(role: FootprintRole, projectKey: string): Promise<number> {
-  const containers = getDockerStatsCollector().getStats() as unknown as StackContainerResource[];
-  const stacks = getResourceStacks(containers);
+  const stacks = readResourceStacks();
   const learned = computeLearnedFootprintBytes(stacks, projectKey);
   return learned ?? coldStartFootprintBytes(role);
 }
@@ -295,8 +399,7 @@ async function stopStackContainers(stack: ResourceStack): Promise<void> {
 export async function shed(): Promise<ShedResult> {
   const result: ShedResult = { stoppedStacks: [], pausedAgents: [] };
 
-  const containers = getDockerStatsCollector().getStats() as unknown as StackContainerResource[];
-  const stacks = getResourceStacks(containers);
+  const stacks = readResourceStacks();
   const runningAgents = listRunningAgentsSync().filter((a) => a.tmuxActive);
   const agentsLike: ShedAgentLike[] = runningAgents.map((a) => ({ issueId: a.issueId, hasLiveTmuxSession: a.tmuxActive }));
 
