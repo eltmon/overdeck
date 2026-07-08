@@ -207,6 +207,15 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-60 tick 8 (2026-07-08) — B3 FAST recovery: reworked → FULL verification gate PASSED (de0340c7) → re-review PASSING; healthy, ~merge-ready. PAN-2510 implementing. Main green.
+
+- **B3/PAN-2167 moving fast, NOT stalled.** After the tick-7 rework nudge: work agent fixed the classifier blocker, committed (HEAD `de0340c7`), re-requested review. Server log: `[quality-gate]` ran typecheck + frontend-typecheck + lint + build + test (all required) → **[request-review] Verification passed for PAN-2167 (de0340c7)** → review convoy respawned (19:39). Fresh review agent (gpt-5.5) then wrote its report and **signaled PASSED — "No performance concerns found"** and will stop. So: rework → full-suite gate (correct env) → re-review-passed, all in ~10 min. **This VALIDATES PAN-2511:** the gate runs the full suite in the right environment; the work agent's earlier local git-EPERM failures were irrelevant noise.
+- **Dispatch insight:** the deacon advances the pipeline on `handleAgentStoppedEvent` (agent STOP). The review agent's rate-limit-modal wedge is post-verdict and the runtime already marks it not-running (tmux pane is a cosmetic zombie), so it does NOT block dispatch. (Confirmed: `pan tell` to it returned "not running" — mid-respawn.)
+- **NEXT (tick 9):** once review-passed stop fires → check merge-readiness (UAT not required + gate passed → readyForMerge) → MERGE B3 → close out → START B4/PAN-2359 (spec proposed bab2c75b33).
+- **PAN-2510** (`agent-pan-2510`) healthy — implementing Docker-teardown beads (typecheck run, +209/-20, gpt-5.5, no wedge).
+- **Env note:** sqlite3 CLI not installed on this box → read pipeline state from panes + `~/.overdeck/logs/dashboard.log` (`[quality-gate]`/`[request-review]`/`[review-agent]`) + deacon.log, not sqlite.
+- Main GREEN (5fa2bca3e4 CI in_progress; prior greens). HOLDS + 2 operator questions (PAN-1520) unchanged.
+
 ## RUN-60 tick 7 (2026-07-08) — B3 review BLOCKED (real bug caught 👍) + both B3 agents WEDGED on codex rate-limit modal → nudged (kept gpt-5.5) → reworking; filed PAN-2513; started PAN-2510 (auto-start gap)
 
 **Two things on B3/PAN-2167, not one stall:**
