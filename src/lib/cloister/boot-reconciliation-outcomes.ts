@@ -2,7 +2,8 @@ export type BootReconciliationOutcomeReason =
   | 'resumed'
   | 'no-resumable-session'
   | 'deferred-concurrency'
-  | 'deferred-load';
+  | 'deferred-load'
+  | 'deferred-memory';
 
 export interface BootReconciliationOutcome {
   id: string;

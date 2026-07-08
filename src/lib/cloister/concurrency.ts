@@ -25,6 +25,7 @@ import {
   getAgentRuntimeStateSync,
 } from '../agents.js';
 import { countAgentsByStatus } from '../overdeck/agents.js';
+import { getCachedMemoryVerdict } from './memory-governor.js';
 
 const DEFAULT_MAX_WORK_AGENTS = 6;
 const DEFAULT_RESERVED_ADVANCING_SLOTS = 3;
@@ -155,12 +156,17 @@ export function workResumeSlotsAvailable(
 
 /**
  * Whether an advancing-role (review/test/ship) dispatch is allowed. Gated on the
- * overall ceiling so review/test/ship can always claim their reserved headroom.
+ * overall ceiling so review/test/ship can always claim their reserved headroom —
+ * and, per PAN-2500 specialist-budget, on the memory governor: don't reserve GB
+ * for a specialist under memory pressure. Count-slot semantics are UNCHANGED
+ * when the cached band is 'ok' (or no patrol has assessed memory yet).
  */
 export function canDispatchAdvancing(
   counts: RunningCounts = countRunningAgents(),
   limits: ConcurrencyLimits = getConcurrencyLimits(),
 ): boolean {
+  const verdict = getCachedMemoryVerdict();
+  if (verdict && verdict.band !== 'ok') return false;
   return counts.total < limits.totalCeiling;
 }
 
@@ -186,14 +192,17 @@ export function resetPatrolDispatchBudget(): void {
 
 /**
  * Claim one advancing-role (review/test/ship) dispatch slot for this patrol.
- * Returns false when the total ceiling is reached — the caller must DEFER (leave
- * status untouched so a later patrol retries), never fail. Counts both tmux-alive
- * agents and advancing dispatches already reserved this patrol.
+ * Returns false when the total ceiling is reached, or (PAN-2500 specialist-budget)
+ * when the memory governor's cached band is not 'ok' — the caller must DEFER
+ * (leave status untouched so a later patrol retries), never fail. Counts both
+ * tmux-alive agents and advancing dispatches already reserved this patrol.
  */
 export function tryReserveAdvancingSlot(
   counts: RunningCounts = countRunningAgents(),
   limits: ConcurrencyLimits = getConcurrencyLimits(),
 ): boolean {
+  const verdict = getCachedMemoryVerdict();
+  if (verdict && verdict.band !== 'ok') return false;
   if (counts.total + advancingReservedThisPatrol >= limits.totalCeiling) return false;
   advancingReservedThisPatrol++;
   return true;

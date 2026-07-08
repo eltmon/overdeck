@@ -14,6 +14,7 @@
 1013 src/dashboard/server/routes/workspaces/workspace-data.ts
 1520 src/dashboard/server/services/issue-data-service.ts
 1321 src/dashboard/server/ws-rpc.ts
+1017 src/lib/cloister/deacon-auto-resume.ts
 1016 src/lib/cloister/deacon-swarm.ts
 3545 src/lib/cloister/deacon.ts
 1374 src/lib/cloister/merge-agent.ts
@@ -29,5 +30,5 @@
 1110 src/lib/review-status.ts
 1475 src/lib/settings-api.ts
 1205 src/lib/sync.ts
-1261 src/lib/tmux.ts
+1268 src/lib/tmux.ts
 1092 src/lib/vbrief/dag.ts

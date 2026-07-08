@@ -6,6 +6,7 @@ import { isStartingWithinGrace } from './agent-grace.js';
 import { resumedBootReconciliationOutcome, skippedBootReconciliationOutcome, skippedBootReconciliationOutcomes, type BootReconciliationApplyResult, type BootReconciliationOutcome } from './boot-reconciliation-outcomes.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { getConcurrencyLimits, countRunningAgents, workResumeSlotsAvailable } from './concurrency.js';
+import { assessMemoryPressure, canAdmit, estimateFootprint, type MemoryVerdict } from './memory-governor.js';
 import {
   getBootReconciliationHeldResumeSet,
   getBootReconciliationPendingHoldSet,
@@ -43,6 +44,7 @@ import {
   sessionExistsSync,
 } from '../tmux.js';
 import { queryReadyBeadsByIssueLabels, resolveBeadsQueryRoot, type BeadEntry } from '../beads-query.js';
+import { resolveProjectFromIssueSync } from '../projects.js';
 
 export interface AutoResumeNotifierDeps {
   notifyAgentStopped: (agentId: string) => void;
@@ -601,6 +603,8 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
 const RESUME_LOAD_FACTOR = 1.5;
 // Pause between consecutive resume spawns so the herd is spread across the cycle.
 const RESUME_STAGGER_MS = 150;
+// Let a just-resumed agent's stack/RSS settle before deciding whether to admit another boot candidate.
+const BOOT_MEMORY_SETTLE_MS = 250;
 
 function shouldRetryUndeliveredKickoff(state: AgentState): boolean {
   return state.role === 'work' && state.kickoffDelivered === false;
@@ -754,6 +758,11 @@ export async function handleAgentStoppedEvent(
       logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} deferred — load gate tripped (load1=${load1.toFixed(2)} > ${loadCeiling.toFixed(2)})`);
       return null;
     }
+    const memVerdict = await assessMemoryPressure();
+    if (memVerdict.band !== 'ok') {
+      logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} deferred — memory gate (${memVerdict.band}), availMB=${Math.round(memVerdict.availableBytes / 1048576)}`);
+      return null;
+    }
   }
 
   const runtimeStateForLog = getAgentRuntimeStateSync(agentId);
@@ -855,6 +864,11 @@ export async function autoResumeStoppedWorkAgents(deps: AutoResumeNotifierDeps):
       logDeaconEventSync(`autoResumeStoppedWorkAgents: load gate tripped (load1=${load1.toFixed(2)} > ${loadCeiling.toFixed(2)} = ${cores} cores * ${RESUME_LOAD_FACTOR}); deferring remaining candidates to next patrol`);
       break;
     }
+    const memVerdict = await assessMemoryPressure();
+    if (memVerdict.band !== 'ok') {
+      logDeaconEventSync(`autoResumeStoppedWorkAgents: memory gate (${memVerdict.band}), availMB=${Math.round(memVerdict.availableBytes / 1048576)}; deferring remaining candidates to next patrol`);
+      break;
+    }
     // Stagger spawns so the scheduler can absorb each `claude` before the next.
     if (resumeAttempts > 0) {
       await new Promise(r => setTimeout(r, RESUME_STAGGER_MS));
@@ -880,6 +894,26 @@ function bootReconciliationDecisionKey(): string | null {
   const state = getBootReconciliationState();
   if (!state.decision || state.decision === 'pending') return null;
   return `${state.bootId ?? 'boot'}:${state.decision}:${JSON.stringify(state.perAgent)}`;
+}
+
+async function bootMemoryAdmissionVerdict(agent: { issueId: string }): Promise<{ admitted: true } | { admitted: false; verdict: MemoryVerdict; footprintBytes?: number }> {
+  const verdict = await assessMemoryPressure();
+  if (verdict.band !== 'ok') return { admitted: false, verdict };
+
+  const projectKey = resolveProjectFromIssueSync(agent.issueId)?.projectKey ?? agent.issueId;
+  const footprintBytes = await estimateFootprint('work', projectKey);
+  if (!canAdmit(footprintBytes, verdict.availableBytes)) {
+    return { admitted: false, verdict, footprintBytes };
+  }
+
+  return { admitted: true };
+}
+
+function logBootMemoryDeferral(admission: { verdict: MemoryVerdict; footprintBytes?: number }): void {
+  const footprintSuffix = admission.footprintBytes === undefined
+    ? ''
+    : `, footprintMB=${Math.round(admission.footprintBytes / 1048576)}`;
+  logDeaconEventSync(`applyBootReconciliationDecision: memory gate (${admission.verdict.band}), availMB=${Math.round(admission.verdict.availableBytes / 1048576)}${footprintSuffix}; deferring remaining candidates`);
 }
 
 export async function applyBootReconciliationDecision(
@@ -914,6 +948,7 @@ export async function applyBootReconciliationDecision(
   const workSlots = workResumeSlotsAvailable(runningBefore, concurrencyLimits);
   const cores = cpus().length || 1;
   const loadCeiling = cores * RESUME_LOAD_FACTOR;
+  let settleBeforeMemoryCheck = false;
 
   for (let index = 0; index < candidates.length; index++) {
     const agent = candidates[index];
@@ -932,6 +967,18 @@ export async function applyBootReconciliationDecision(
       outcomes.push(...skippedBootReconciliationOutcomes(deferredAgents, 'deferred-load'));
       break;
     }
+    if (settleBeforeMemoryCheck) {
+      await new Promise(r => setTimeout(r, BOOT_MEMORY_SETTLE_MS));
+      settleBeforeMemoryCheck = false;
+    }
+    const memoryAdmission = await bootMemoryAdmissionVerdict(agent);
+    if (!memoryAdmission.admitted) {
+      logBootMemoryDeferral(memoryAdmission);
+      const deferredAgents = candidates.slice(index);
+      deferred += deferredAgents.length;
+      outcomes.push(...skippedBootReconciliationOutcomes(deferredAgents, 'deferred-memory'));
+      break;
+    }
     if (resumeAttempts > 0) {
       await new Promise(r => setTimeout(r, RESUME_STAGGER_MS));
     }
@@ -945,6 +992,7 @@ export async function applyBootReconciliationDecision(
       resumed.push(result);
       outcomes.push(resumedBootReconciliationOutcome(agent));
       resumeAttempts++;
+      settleBeforeMemoryCheck = true;
     } else {
       const skipReason = bootReconciliationSkipReason(agent) ?? 'other';
       skipped[skipReason]++;

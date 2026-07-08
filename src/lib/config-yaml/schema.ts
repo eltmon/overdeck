@@ -389,6 +389,12 @@ export interface ResourcesConfig {
   agent_warn_count?: number;
   /** Work-agent count threshold that blocks new spawns */
   agent_block_count?: number;
+  /** PAN-2500: cold-start footprint estimate (GiB) for a work agent with no live per-project docker-stack data yet */
+  governor_footprint_default_work_gb?: number;
+  /** PAN-2500: cold-start footprint estimate (GiB) for a review agent */
+  governor_footprint_default_review_gb?: number;
+  /** PAN-2500: cold-start footprint estimate (GiB) for a test agent */
+  governor_footprint_default_test_gb?: number;
 }
 
 export interface IssuesConfig {
@@ -821,6 +827,10 @@ export interface NormalizedConfig {
     governorRecoveryReserveGb: number;
     agentWarnCount: number;
     agentBlockCount: number;
+    /** PAN-2500: cold-start per-role footprint defaults, GiB (used when no live per-project stack data exists). */
+    governorFootprintDefaultWorkGb: number;
+    governorFootprintDefaultReviewGb: number;
+    governorFootprintDefaultTestGb: number;
   };
 
   /** Dashboard issue-fetch behavior, normalised (always defined). */

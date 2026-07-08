@@ -34,9 +34,9 @@ import {
 import type { WorkAgentLifecycleState, WorkAgentRecommendedAction } from '../../../../lib/work-agent-lifecycle.js';
 import { emitActivityEntrySync } from '../../../../lib/activity-logger.js';
 import { getResourceConfig, type HealthLeakedSpecialist, type SystemHealthSnapshot } from '../../services/system-health-service.js';
+import { classifyMemoryPressure } from '../../../../lib/cloister/memory-governor.js';
 import { capturePane } from '../../../../lib/tmux.js';
 import type { RuntimeName } from '../../../../lib/runtimes/types.js';
-import { classifyMemoryPressure } from '../../../../lib/cloister/memory-governor.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -555,15 +555,17 @@ export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuar
   const hardWorkAgentLimit = resolveAgentCountEnv('PAN_AGENT_BLOCK_COUNT', resourceConfig.agentBlockCount);
   const warnWorkAgentLimit = resolveAgentCountEnv('PAN_AGENT_WARN_COUNT', resourceConfig.agentWarnCount);
 
-  const memoryPressure = classifyMemoryPressure(health.summary.availableMemoryBytes, health.thresholds);
-
-  if (memoryPressure === 'hard') {
+  const memoryBand = classifyMemoryPressure(health.summary.availableMemoryBytes, {
+    warningBytes: health.thresholds.memoryAvailableWarningBytes,
+    criticalBytes: health.thresholds.memoryAvailableCriticalBytes,
+  });
+  if (memoryBand === 'hard') {
     warnings.push({
       severity: 'critical',
       code: 'memory_pressure',
       message: `Available RAM is critically low (${availableGb} GB).`,
     });
-  } else if (memoryPressure === 'soft') {
+  } else if (memoryBand === 'soft') {
     warnings.push({
       severity: 'warning',
       code: 'memory_pressure',
@@ -587,7 +589,7 @@ export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuar
 
   if (leakedSpecialists.length > 0) {
     warnings.push({
-      severity: memoryPressure === 'hard' ? 'critical' : 'warning',
+      severity: memoryBand === 'hard' ? 'critical' : 'warning',
       code: 'leaked_specialists',
       message: `Leaked specialist sessions detected: ${formatLeakedSpecialistSummary(leakedSpecialists)}${leakedSpecialists.length > 3 ? `, +${leakedSpecialists.length - 3} more` : ''}.`,
     });
