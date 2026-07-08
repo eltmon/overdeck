@@ -21,17 +21,14 @@
       "reason": "resume",
       "agentModel": "kimi-k2.7-code",
       "timestamp": "2026-07-08T00:08:48.892Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-08T00:08:48Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1644\n\nBackfill can overwrite manual/explicit New conversation titles\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1644 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T00:18:44.490Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/records/pan-1644.json",
@@ -101,8 +98,8 @@
     ],
     "recordedAt": "2026-07-08T00:06:50.736Z"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "title-source-ai-explicit": "completed",
     "hook-script-stop": "completed",
@@ -155,13 +152,13 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-08T00:11:51.891Z",
-    "reviewNotes": "Backfill can overwrite manual/explicit New conversation titles",
+    "updatedAt": "2026-07-08T00:18:49.304Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "testNotes": "typecheck passed; lint passed; npm test failed. Blocking failures: (1) tests/unit/lib/overdeck/no-loss-matrix.test.ts requires matrix entries for new PAN-1644 routes: POST /api/admin/conversations/backfill-titles, POST /api/hooks/user-prompt-submit, POST /api/hooks/turn-complete. (2) tests/integration/agent-spawning.test.ts resumeAgent redelivery timed out at 30000ms. Browser UAT not exercised because automated gates failed.",
     "inspectNotes": "Bead title-changed-event ack: ConversationTitleChangedEvent schema added to DomainEvent union with {conversationName,title,titleSource} payload, reducer case bumps conversationsListRevision by 1 (test confirms 7->8), and updateConversationTitle() emits via getEventStore().emitOnly() (sequence auto-assigned by Omit<DomainEvent,\"sequence\"> signature) wrapped in try/catch so persistence never throws when the event store is uninitialized (both paths unit-tested). All 3 ACs met.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2480",
     "reviewedAtCommit": "11f9b9c0b7690f83777ffd740354f913f60e5a0a",
-    "lastVerifiedCommit": "23178cc277772c7306812c61a56aa1251b9e6c9f",
+    "lastVerifiedCommit": "1784dc2b293de79f8471aec1fc28055909c99d73",
     "reviewRequestedAt": "2026-07-08T00:07:22.385Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -278,9 +275,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 2960530,
-            "output": 245848,
-            "cacheRead": 118161664,
+            "input": 2974444,
+            "output": 249966,
+            "cacheRead": 120598272,
             "cacheWrite": 0
           }
         }
@@ -311,15 +308,15 @@
           "cacheWrite": 86241
         },
         "custom/kimi-k2.7-code": {
-          "input": 3334401,
-          "output": 255044,
-          "cacheRead": 121135360,
+          "input": 3348315,
+          "output": 259162,
+          "cacheRead": 123571968,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 44.054358,
-        "pricingAsOf": "2026-07-08T00:11:51.926Z"
+        "usd": 44.547006,
+        "pricingAsOf": "2026-07-08T00:18:49.418Z"
       }
     },
     "merges": [
@@ -346,5 +343,5 @@
     }
   },
   "created": "2026-07-07T23:49:56.919Z",
-  "updated": "2026-07-08T00:11:51.953Z"
+  "updated": "2026-07-08T00:18:49.423Z"
 }
