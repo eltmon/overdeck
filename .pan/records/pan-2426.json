@@ -36,9 +36,9 @@
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "merging",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-08T01:12:00.419Z",
+    "updatedAt": "2026-07-08T03:57:08.747Z",
     "reviewNotes": "Verification failed at test",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2481",
     "reviewedAtCommit": "4f3b8909281b5687a8313c74cf45882e160c2e5d",
@@ -106,15 +106,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 6914958,
-            "output": 6986,
-            "cacheRead": 6292096,
+            "input": 7524402,
+            "output": 7534,
+            "cacheRead": 6803328,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 41881434,
-            "output": 81996,
-            "cacheRead": 40195456,
+            "input": 43569571,
+            "output": 84081,
+            "cacheRead": 42007936,
             "cacheWrite": 0
           }
         },
@@ -145,15 +145,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 6914958,
-          "output": 6986,
-          "cacheRead": 6292096,
+          "input": 7524402,
+          "output": 7534,
+          "cacheRead": 6803328,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 41881434,
-          "output": 81996,
-          "cacheRead": 40195456,
+          "input": 43569571,
+          "output": 84081,
+          "cacheRead": 42007936,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -170,8 +170,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 50.382099,
-        "pricingAsOf": "2026-07-08T01:12:00.466Z"
+        "usd": 51.389654,
+        "pricingAsOf": "2026-07-08T03:57:08.771Z"
       }
     },
     "merges": [
@@ -180,5 +180,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-07T23:45:09.633Z",
-  "updated": "2026-07-08T01:12:00.490Z"
+  "updated": "2026-07-08T03:57:08.771Z"
 }
