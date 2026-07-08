@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-08T21:36:56.346Z",
-  "updated": "2026-07-08T23:02:52.183Z",
+  "updated": "2026-07-08T23:19:28.294Z",
   "pipeline": {
     "issueId": "PAN-2167",
     "reviewStatus": "pending",
@@ -92,5 +92,27 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5"
+  "model": "claude-sonnet-5",
+  "statusOverrides": {
+    "docs-state-plane-gates-wired": "completed",
+    "docs-state-plane-gates-wired.ac1": "completed",
+    "docs-state-plane-gates-wired.ac2": "completed",
+    "wire-approve-merge-gate": "completed",
+    "wire-approve-merge-gate.ac1": "completed",
+    "wire-approve-merge-gate.ac2": "completed",
+    "wire-approve-merge-gate.ac3": "completed",
+    "wire-done-preflight-gate": "completed",
+    "wire-done-preflight-gate.ac1": "completed",
+    "wire-done-preflight-gate.ac2": "completed",
+    "wire-done-preflight-gate.ac3": "completed",
+    "wire-review-request-gate": "completed",
+    "wire-review-request-gate.ac1": "completed",
+    "wire-review-request-gate.ac2": "completed",
+    "wire-review-request-gate.ac3": "completed",
+    "state-plane-status-predicate": "completed",
+    "state-plane-status-predicate.ac1": "completed",
+    "state-plane-status-predicate.ac2": "completed",
+    "state-plane-status-predicate.ac3": "completed",
+    "state-plane-status-predicate.ac4": "completed"
+  }
 }
