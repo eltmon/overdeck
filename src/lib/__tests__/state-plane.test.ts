@@ -114,17 +114,40 @@ describe('parsePorcelainStatusPaths', () => {
     expect(isStatePlaneOnlyStatus(porcelain)).toBe(false);
   });
 
-  it('uses the destination path for state-plane renames', () => {
+  it('uses both paths for state-plane renames', () => {
     const porcelain = 'R  .pan/records/a.json -> .pan/records/b.json';
 
-    expect(parsePorcelainStatusPaths(porcelain)).toEqual(['.pan/records/b.json']);
+    expect(parsePorcelainStatusPaths(porcelain)).toEqual([
+      '.pan/records/a.json',
+      '.pan/records/b.json',
+    ]);
     expect(isStatePlaneOnlyStatus(porcelain)).toBe(true);
   });
 
-  it('returns false for a rename destination outside the state plane', () => {
+  it('returns false for a rename with either path outside the state plane', () => {
     const porcelain = 'R  .pan/records/a.json -> src/a.json';
 
-    expect(parsePorcelainStatusPaths(porcelain)).toEqual(['src/a.json']);
+    expect(parsePorcelainStatusPaths(porcelain)).toEqual([
+      '.pan/records/a.json',
+      'src/a.json',
+    ]);
+    expect(isStatePlaneOnlyStatus(porcelain)).toBe(false);
+  });
+
+  it('returns false for a source-to-state rename', () => {
+    const porcelain = 'R  src/foo.ts -> .pan/records/foo.ts';
+
+    expect(parsePorcelainStatusPaths(porcelain)).toEqual([
+      'src/foo.ts',
+      '.pan/records/foo.ts',
+    ]);
+    expect(isStatePlaneOnlyStatus(porcelain)).toBe(false);
+  });
+
+  it('returns false for a source deletion', () => {
+    const porcelain = ' D src/foo.ts';
+
+    expect(parsePorcelainStatusPaths(porcelain)).toEqual(['src/foo.ts']);
     expect(isStatePlaneOnlyStatus(porcelain)).toBe(false);
   });
 

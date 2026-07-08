@@ -31,4 +31,19 @@ describe('getDirtyWorkspaceErrorForReviewRequestStatus', () => {
     expect(error).toContain(`cd ${workspacePath}`);
     expect(error).toContain('git status');
   });
+
+  it('returns the dirty workspace error for a source-to-state rename', () => {
+    const error = getDirtyWorkspaceErrorForReviewRequestStatus(
+      'R  src/foo.ts -> .pan/records/foo.ts\n',
+      workspacePath,
+    );
+
+    expect(error).toContain('Workspace has uncommitted changes');
+  });
+
+  it('returns the dirty workspace error for a source deletion', () => {
+    const error = getDirtyWorkspaceErrorForReviewRequestStatus(' D src/foo.ts\n', workspacePath);
+
+    expect(error).toContain('Workspace has uncommitted changes');
+  });
 });

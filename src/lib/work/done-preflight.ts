@@ -6,7 +6,7 @@ import { promisify } from 'util';
 import chalk from 'chalk';
 import { Effect } from 'effect';
 import { ProcessSpawnError } from '../errors.js';
-import { isStatePlanePath, parsePorcelainStatusPaths } from '../state-plane.js';
+import { isStatePlaneOnlyStatus } from '../state-plane.js';
 import { getVBriefACStatusSync, syncBeadStatusToVBrief } from '../vbrief/beads.js';
 import { runTestRequirementCheck } from './test-requirement-gate.js';
 
@@ -136,10 +136,7 @@ function getNonStatePlaneStatusLines(porcelain: string): string[] {
     .split('\n')
     .map((line) => line.trimEnd())
     .filter(Boolean)
-    .filter((line) => {
-      const [path] = parsePorcelainStatusPaths(line);
-      return !path || !isStatePlanePath(path);
-    });
+    .filter((line) => !isStatePlaneOnlyStatus(line));
 }
 
 async function checkUncommittedChangesPromise(workspacePath: string): Promise<string[]> {

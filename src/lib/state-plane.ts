@@ -32,11 +32,13 @@ export function parsePorcelainStatusPaths(porcelain: string): string[] {
     .split('\n')
     .map((line) => line.trimEnd())
     .filter(Boolean)
-    .map((line) => {
+    .flatMap((line) => {
       const status = line.slice(0, 2);
       const pathPart = line.length > 3 ? line.slice(3).trim() : '';
-      const path = status.includes('R') ? pathPart.split(' -> ').at(-1) ?? pathPart : pathPart;
-      return unquoteGitPath(path);
+      const paths = status.includes('R') || status.includes('C')
+        ? pathPart.split(' -> ')
+        : [pathPart];
+      return paths.map(unquoteGitPath);
     })
     .filter(Boolean);
 }
