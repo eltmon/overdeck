@@ -30963,6 +30963,15 @@ function ensureRuntimeIndexesSync(db) {
 		db.exec("UPDATE `discovered_sessions` SET `harness` = 'claude-code' WHERE `harness` IS NULL");
 	} catch {}
 	db.exec("CREATE INDEX IF NOT EXISTS `cost_session_id_idx` ON `cost_events` (`session_id`)");
+	try {
+		db.exec("ALTER TABLE `agents` ADD COLUMN `yielded_by_scheduler` integer");
+	} catch {}
+	try {
+		db.exec("ALTER TABLE `agents` ADD COLUMN `yielded_at` integer");
+	} catch {}
+	try {
+		db.exec("ALTER TABLE `agents` ADD COLUMN `last_yield_resume_at` integer");
+	} catch {}
 }
 function getOverdeckDatabaseSync(dbPath = getOverdeckDatabasePath()) {
 	if (overdeckDbSync?.path === dbPath) return overdeckDbSync.db;
