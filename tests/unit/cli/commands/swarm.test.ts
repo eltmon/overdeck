@@ -75,6 +75,20 @@ function makeDeps(doc: VBriefDocument): SwarmCommandDeps {
     ]),
     getFailedMergeBlock: vi.fn(() => ({ issueId: 'PAN-2203', itemId: 'wi-1', slotIndex: 1, note: 'conflict' })),
     recoverFailedMergeSlot: vi.fn(async () => ['[swarm] retrying failed-merge slot 1 (item wi-1) for PAN-2203']),
+    recoverFailedSlots: vi.fn(async () => ['[swarm] retrying failed slot 1 (item wi-1) for PAN-2203: vanished-session']),
+    reconcileSlotState: vi.fn(async () => ({
+      issueId: 'PAN-2203',
+      merged: [],
+      inFlight: [{ itemId: 'wi-1', slotIndex: 1, status: 'in_flight', branch: 'feature/pan-2203-slot-1', agentId: 'agent-pan-2203-slot-1' }],
+      pending: [],
+      branches: [{ slotIndex: 1, branch: 'feature/pan-2203-slot-1', merged: false }],
+      agents: [{ slotIndex: 1, agentId: 'agent-pan-2203-slot-1', status: 'failed', slotItemId: 'wi-1' }],
+    })),
+    classifyInFlightSlots: vi.fn(async (slots) => slots.map(slot => ({
+      ...slot,
+      lifecycle: 'failed' as const,
+      reason: 'vanished-session' as const,
+    }))),
     console: {
       log: vi.fn(),
       error: vi.fn(),
@@ -283,6 +297,33 @@ describe('pan swarm command', () => {
       rmSync(workspace, { recursive: true, force: true });
       resetSwarmLoopSafetyForTests();
     }
+  });
+
+  it('recover retry requeues a non-merge failed slot when no failed-merge block exists', async () => {
+    const doc = makeDoc([
+      makeEligibleItem('wi-1', 'src/a.ts'),
+      makeEligibleItem('wi-2', 'src/b.ts'),
+    ]);
+    const deps = {
+      ...makeDeps(doc),
+      getFailedMergeBlock: vi.fn(() => undefined),
+    };
+
+    const result = await swarmRecoverCommand('PAN-2203', '1', { action: 'retry' }, deps);
+
+    expect(result.ok).toBe(true);
+    expect(deps.reconcileSlotState).toHaveBeenCalledWith('PAN-2203', '/repo/workspaces/feature-pan-2203', doc);
+    expect(deps.classifyInFlightSlots).toHaveBeenCalledWith(
+      [expect.objectContaining({ slotIndex: 1, itemId: 'wi-1' })],
+      undefined,
+      { workspacePath: '/repo/workspaces/feature-pan-2203', issueId: 'PAN-2203' },
+    );
+    expect(deps.recoverFailedSlots).toHaveBeenCalledWith(
+      'PAN-2203',
+      '/repo/workspaces/feature-pan-2203',
+      doc,
+      [expect.objectContaining({ slotIndex: 1, lifecycle: 'failed', reason: 'vanished-session' })],
+    );
   });
 });
 

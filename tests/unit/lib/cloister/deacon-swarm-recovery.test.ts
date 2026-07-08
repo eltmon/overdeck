@@ -6,6 +6,7 @@ import {
   getFailedMergeBlock,
   mergeReadySlots,
   recoverFailedMergeSlot,
+  recoverFailedSlots,
   resetSwarmLoopSafetyForTests,
   type ClassifiedSwarmSlot,
   type CoordinateSwarmSlotsDeps,
@@ -57,6 +58,18 @@ function readySlot(): ClassifiedSwarmSlot {
     agentId: 'agent-pan-2203-slot-1',
     lifecycle: 'ready-to-merge',
     exitStatus: 0,
+  };
+}
+
+function failedSlot(): ClassifiedSwarmSlot {
+  return {
+    itemId: 'wi-a',
+    slotIndex: 1,
+    status: 'in_flight',
+    branch: 'feature/pan-2203-slot-1',
+    agentId: 'agent-pan-2203-slot-1',
+    lifecycle: 'failed',
+    reason: 'vanished-session',
   };
 }
 
@@ -185,5 +198,57 @@ describe('deacon-swarm failed-merge recovery', () => {
     expect(fakeDeps.applyTaskOperationToPlanFile).not.toHaveBeenCalled();
     expect(fakeDeps.spawnRun).not.toHaveBeenCalled();
     expect(getFailedMergeBlock('PAN-2203', workspacePath)?.note).toContain('Operator handoff required');
+  });
+
+  it('automatically retries a non-merge failed slot by clearing ownership and redispatching the item', async () => {
+    const fakeDeps = recoveryDeps();
+
+    await expect(recoverFailedSlots('PAN-2203', workspacePath, doc(), [failedSlot()], fakeDeps))
+      .resolves.toEqual([
+        '[swarm] retrying failed slot 1 (item wi-a) for PAN-2203: vanished-session',
+        '[swarm] dispatched implementation slot 2 (item wi-a) for PAN-2203',
+      ]);
+
+    expect(fakeDeps.applyTaskOperationToPlanFile).toHaveBeenCalledWith(
+      join(workspacePath, '.pan', 'spec.vbrief.json'),
+      {
+        type: 'unblock',
+        itemId: 'wi-a',
+        writerId: 'deacon-swarm',
+        reason: 'Retrying failed swarm slot after vanished-session',
+      },
+      workspacePath,
+    );
+    expect(fakeDeps.clearSlotAssignment).toHaveBeenCalledWith(workspacePath, 'PAN-2203', 1, 'wi-a');
+    expect(fakeDeps.spawnRun).toHaveBeenCalledWith('PAN-2203', 'work', expect.objectContaining({
+      slotIndex: 2,
+      slotItemId: 'wi-a',
+    }));
+    expect(getFailedMergeBlock('PAN-2203', workspacePath)).toBeUndefined();
+  });
+
+  it('escalates repeated non-merge failures to a needs-you recovery block', async () => {
+    const fakeDeps = {
+      ...recoveryDeps(),
+      setReviewStatus: vi.fn(),
+    };
+
+    await recoverFailedSlots('PAN-2203', workspacePath, doc(), [failedSlot()], fakeDeps);
+    await recoverFailedSlots('PAN-2203', workspacePath, doc(), [failedSlot()], fakeDeps);
+
+    await expect(recoverFailedSlots('PAN-2203', workspacePath, doc(), [failedSlot()], fakeDeps))
+      .resolves.toEqual([
+        '[swarm] failed slot 1 (item wi-a) for PAN-2203: vanished-session; retry limit reached — needs operator attention',
+      ]);
+
+    expect(fakeDeps.setReviewStatus).toHaveBeenCalledWith('PAN-2203', expect.objectContaining({
+      stuck: true,
+      stuckReason: 'swarm_slot_failure',
+    }));
+    expect(getFailedMergeBlock('PAN-2203', workspacePath)).toEqual(expect.objectContaining({
+      itemId: 'wi-a',
+      slotIndex: 1,
+      note: expect.stringContaining('failed 3 time'),
+    }));
   });
 });

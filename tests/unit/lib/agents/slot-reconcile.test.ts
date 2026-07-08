@@ -134,4 +134,18 @@ describe('reconcileSlotState', () => {
     ]);
     expect(result.pending).toEqual([]);
   });
+
+  it('does not let a failed agent row keep owning an item after assignment cleanup', async () => {
+    const result = await reconcileSlotState('PAN-1762', '/workspace', makeDoc(['a', 'b', 'c']), {
+      deps: deps(
+        [{ slotIndex: 1, branch: 'feature/pan-1762-slot-1', merged: false }],
+        [{ slotIndex: 1, agentId: 'agent-pan-1762-slot-1', status: 'failed', slotItemId: 'c' }],
+      ),
+    });
+
+    expect(result.inFlight).toEqual([]);
+    expect(result.pending).toEqual([]);
+    expect(result.branches).toEqual([{ slotIndex: 1, branch: 'feature/pan-1762-slot-1', merged: false }]);
+    expect(result.agents).toEqual([{ slotIndex: 1, agentId: 'agent-pan-1762-slot-1', status: 'failed', slotItemId: 'c' }]);
+  });
 });

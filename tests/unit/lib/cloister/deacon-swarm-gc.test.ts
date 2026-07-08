@@ -13,12 +13,13 @@ function slot(overrides: Partial<ReconciledSlotItem> = {}): ReconciledSlotItem {
   };
 }
 
-function deps(sessionNames: string[] = [], options: { worktreeExists?: boolean } = {}): Pick<CoordinateSwarmSlotsDeps, 'runGitCommand' | 'clearSlotAssignment' | 'listSessionNames' | 'slotWorktreeExists'> {
+function deps(sessionNames: string[] = [], options: { worktreeExists?: boolean; resolution?: 'done' | 'completed' | null } = {}): Pick<CoordinateSwarmSlotsDeps, 'runGitCommand' | 'clearSlotAssignment' | 'listSessionNames' | 'slotWorktreeExists' | 'getAgentRuntimeState'> {
   return {
     runGitCommand: vi.fn(async () => undefined),
     clearSlotAssignment: vi.fn(),
     listSessionNames: vi.fn(async () => sessionNames),
     slotWorktreeExists: vi.fn(() => options.worktreeExists ?? true),
+    getAgentRuntimeState: vi.fn(async () => options.resolution ? { resolution: options.resolution } : null),
   };
 }
 
@@ -77,6 +78,24 @@ describe('deacon-swarm merged slot GC', () => {
 
     expect(fakeDeps.runGitCommand).not.toHaveBeenCalled();
     expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
+  });
+
+  it('reaps a merged slot whose live agent session has already completed', async () => {
+    const fakeDeps = deps(['agent-pan-2203-slot-1'], { resolution: 'done' });
+
+    await expect(gcMergedSlots('PAN-2203', '/repo/workspaces/feature-pan-2203', [slot()], fakeDeps))
+      .resolves.toEqual(['[swarm] gc slot 1 (item wi-1) for PAN-2203']);
+
+    expect(fakeDeps.runGitCommand).toHaveBeenCalledWith(
+      'git worktree remove --force "/repo/workspaces/feature-pan-2203-slot-1"',
+      '/repo/workspaces/feature-pan-2203',
+    );
+    expect(fakeDeps.clearSlotAssignment).toHaveBeenCalledWith(
+      '/repo/workspaces/feature-pan-2203',
+      'PAN-2203',
+      1,
+      'wi-1',
+    );
   });
 
   it('guards by conventional agent id when reconcile lost the agentId', async () => {

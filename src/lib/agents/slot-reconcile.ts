@@ -196,6 +196,7 @@ function resolveSlotItemOwnership(
   }
 
   for (const agent of agents) {
+    if (agent.status !== 'running' && agent.status !== 'starting') continue;
     if (!agent.slotItemId || !slotEligibleItemIds.has(agent.slotItemId) || ownership.has(agent.slotItemId)) continue;
     ownership.set(agent.slotItemId, agent.slotIndex);
   }

@@ -7,7 +7,7 @@ export async function gcMergedSlots(
   workspacePath: string,
   slots: ReconciledSlotItem[],
   deps: Pick<CoordinateSwarmSlotsDeps, 'runGitCommand' | 'clearSlotAssignment' | 'listSessionNames'>
-    & Partial<Pick<CoordinateSwarmSlotsDeps, 'slotWorktreeExists'>>,
+    & Partial<Pick<CoordinateSwarmSlotsDeps, 'slotWorktreeExists' | 'getAgentRuntimeState'>>,
 ): Promise<string[]> {
   const actions: string[] = [];
   // A freshly dispatched slot branch points at the feature branch HEAD, so
@@ -22,8 +22,11 @@ export async function gcMergedSlots(
 
     const agentId = slot.agentId ?? `agent-${issueId.toLowerCase()}-slot-${slot.slotIndex}`;
     if (sessionNames.has(agentId)) {
-      actions.push(`[swarm] gc skipped slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: agent session alive`);
-      continue;
+      const runtimeState = deps.getAgentRuntimeState ? await deps.getAgentRuntimeState(agentId) : null;
+      if (runtimeState?.resolution !== 'done' && runtimeState?.resolution !== 'completed') {
+        actions.push(`[swarm] gc skipped slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: agent session alive`);
+        continue;
+      }
     }
 
     const slotWorkspace = `${workspacePath}-slot-${slot.slotIndex}`;

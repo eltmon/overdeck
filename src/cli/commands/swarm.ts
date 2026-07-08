@@ -17,6 +17,7 @@ import {
   coordinateSwarmSlots,
   getFailedMergeBlock,
   recoverFailedMergeSlot,
+  recoverFailedSlots,
   type ClassifiedSwarmSlot,
   type SwarmRecoveryAction,
 } from '../../lib/cloister/deacon-swarm.js';
@@ -47,6 +48,9 @@ export interface SwarmCommandDeps {
   coordinateSwarmSlots: typeof coordinateSwarmSlots;
   getFailedMergeBlock: typeof getFailedMergeBlock;
   recoverFailedMergeSlot: typeof recoverFailedMergeSlot;
+  recoverFailedSlots: typeof recoverFailedSlots;
+  reconcileSlotState: typeof reconcileSlotState;
+  classifyInFlightSlots: typeof classifyInFlightSlots;
   console: ConsoleLike;
 }
 
@@ -99,6 +103,9 @@ const defaultDeps: SwarmCommandDeps = {
   coordinateSwarmSlots,
   getFailedMergeBlock,
   recoverFailedMergeSlot,
+  recoverFailedSlots,
+  reconcileSlotState,
+  classifyInFlightSlots,
   console,
 };
 
@@ -177,16 +184,32 @@ export async function swarmRecoverCommand(
 
   const workspacePath = await deps.ensureWorkspace(issue, loaded.project);
   const block = deps.getFailedMergeBlock(issue, workspacePath);
-  if (!block) {
-    deps.console.error(chalk.red(`No failed-merge slot is recorded for ${issue}.`));
-    return { ok: false, actions: [] };
-  }
-  if (block.slotIndex !== slotIndex) {
+  if (block && block.slotIndex !== slotIndex) {
     deps.console.error(chalk.red(`Recorded failed-merge slot for ${issue} is slot ${block.slotIndex}, not slot ${slotIndex}.`));
     return { ok: false, actions: [] };
   }
 
-  const actions = await deps.recoverFailedMergeSlot(issue, workspacePath, loaded.doc, action);
+  let actions: string[];
+  if (block) {
+    actions = await deps.recoverFailedMergeSlot(issue, workspacePath, loaded.doc, action);
+  } else {
+    if (action !== 'retry') {
+      deps.console.error(chalk.red(`No failed-merge slot is recorded for ${issue}; only --action retry can recover non-merge slot failures.`));
+      return { ok: false, actions: [] };
+    }
+    const reconciled = await deps.reconcileSlotState(issue, workspacePath, loaded.doc);
+    const target = reconciled.inFlight.find(slot => slot.slotIndex === slotIndex);
+    if (!target) {
+      deps.console.error(chalk.red(`No in-flight slot ${slotIndex} is recorded for ${issue}.`));
+      return { ok: false, actions: [] };
+    }
+    const classified = await deps.classifyInFlightSlots([target], undefined, { workspacePath, issueId: issue });
+    if (classified[0]?.lifecycle !== 'failed') {
+      deps.console.error(chalk.red(`Slot ${slotIndex} for ${issue} is ${classified[0]?.lifecycle ?? 'not failed'}; nothing to retry.`));
+      return { ok: false, actions: [] };
+    }
+    actions = await deps.recoverFailedSlots(issue, workspacePath, loaded.doc, classified);
+  }
   for (const line of actions) deps.console.log(line);
 
   return { ok: true, actions, workspacePath };

@@ -31,7 +31,7 @@ import {
 import { applyStatusOverrides } from '../vbrief/io.js';
 import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../vbrief/swarm-readiness.js';
 import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
-import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
+import { getReviewStatusSync, setReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { isDeaconGloballyPausedSync } from '../overdeck/control-settings.js';
 import type { SwarmInferCompletionMode } from './config.js';
 import {
@@ -60,6 +60,7 @@ import {
 } from './deacon-swarm-finalization.js';
 import { gcMergedSlots } from './deacon-swarm-gc.js';
 import { createMinimalIssueRecord, writeSwarmFinalizedAt } from './deacon-swarm-record.js';
+import { clearSlotFailureCount, recoverFailedSlots as recoverFailedSlotsFromClassified, recordStalledSlotRecovery as recordStalledSlotRecoveryFromClassified, resetSwarmSlotFailureRecoveryForTests, type SwarmFailedSlotRecoveryDeps } from './deacon-swarm-recovery.js';
 import { fireTieredCommitHooks } from './swarm-tiered-hooks.js';
 
 export { gcOrphanedSlots } from './deacon-swarm-orphan-gc.js';
@@ -150,6 +151,7 @@ export interface CoordinateSwarmSlotsDeps {
   listSlotAssignments?: (issueId: string, workspacePath: string) => Array<{ slotIndex: number }>;
   /** Request issue-level review once every swarm item has been assembled into the feature branch. */
   requestIssueReview: (issueId: string, workspacePath: string) => Promise<RequestIssueReviewResult>;
+  setReviewStatus?: (issueId: string, update: Partial<ReviewStatus>) => ReviewStatus;
 }
 
 const defaultDeps: CoordinateSwarmSlotsDeps = {
@@ -198,6 +200,7 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   getFinalizedAt: getSwarmFinalizedAt,
   setFinalizedAt: recordSwarmFinalizedAt,
   requestIssueReview: defaultRequestIssueReview,
+  setReviewStatus: setReviewStatusSync,
 };
 
 function defaultGetMaxSlotIndex(): number {
@@ -336,6 +339,7 @@ export async function coordinateSwarmSlots(
         actions.push(`[swarm] ${issueId} slot ${slot.slotIndex} ${slot.lifecycle}${slot.signal ? ` signal: ${slot.signal}` : ''}`);
         if (slot.actions) actions.push(...slot.actions);
       }
+      actions.push(...await recoverFailedSlots(issueId, workspace.workspacePath, doc, classified, deps));
       actions.push(...recordStalledSlotRecovery(issueId, classified, workspace.workspacePath));
       actions.push(...await mergeReadySlots(issueId, workspace.workspacePath, doc, classified, deps));
       actions.push(...await gcMergedSlots(issueId, workspace.workspacePath, reconciled.merged, deps));
@@ -506,6 +510,7 @@ export async function mergeReadySlots(
     recordSlotMergeFire(branchKey);
     const result = await deps.verifyAndMergeSlot({ issueId, featureWorkspace: workspacePath }, slot.slotIndex, item);
     if (result.merged) {
+      clearSlotFailureCount(issueId, workspacePath, item.id);
       await deps.applyTaskOperationToPlanFile(planPath, {
         type: 'done',
         itemId: item.id,
@@ -548,6 +553,7 @@ export function resetSwarmLoopSafetyForTests(): void {
   issueAdvanceFailures.clear();
   failedMergeBlocks.clear();
   slotProgressObservations.clear();
+  resetSwarmSlotFailureRecoveryForTests();
   resetSwarmCompletionInferenceForTests();
 }
 
@@ -672,23 +678,17 @@ export async function recoverFailedMergeSlot(
   ];
 }
 
+export async function recoverFailedSlots(issueId: string, workspacePath: string, doc: VBriefDocument, slots: ClassifiedSwarmSlot[], deps: Omit<SwarmFailedSlotRecoveryDeps, 'dispatchNextWave' | 'getFailedMergeBlock' | 'recordFailedMergeBlock'> = defaultDeps): Promise<string[]> {
+  return recoverFailedSlotsFromClassified(issueId, workspacePath, doc, slots, {
+    ...deps,
+    dispatchNextWave,
+    getFailedMergeBlock,
+    recordFailedMergeBlock,
+  });
+}
+
 export function recordStalledSlotRecovery(issueId: string, slots: ClassifiedSwarmSlot[], workspacePath?: string): string[] {
-  const actions: string[] = [];
-  const normalizedIssueId = issueId.toUpperCase();
-  if (getFailedMergeBlock(normalizedIssueId, workspacePath)) return actions;
-
-  const stalled = slots.find(slot => slot.lifecycle === 'stalled');
-  if (!stalled) return actions;
-
-  recordFailedMergeBlock({
-    issueId: normalizedIssueId,
-    itemId: stalled.itemId,
-    slotIndex: stalled.slotIndex,
-    branch: stalled.branch,
-    note: `Slot ${stalled.slotIndex} stalled with no branch commit or pane output progress`,
-  }, workspacePath);
-  actions.push(`[swarm] stalled slot ${stalled.slotIndex} (item ${stalled.itemId}) for ${normalizedIssueId}: recovery required`);
-  return actions;
+  return recordStalledSlotRecoveryFromClassified(issueId, slots, { getFailedMergeBlock, recordFailedMergeBlock }, workspacePath);
 }
 
 function writeSwarmFailedMergeBlock(
