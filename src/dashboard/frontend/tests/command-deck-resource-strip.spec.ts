@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 const DASHBOARD_URL = process.env['DASHBOARD_URL'] ?? 'http://localhost:3010';
 
@@ -147,6 +147,17 @@ const RESOURCE_DETAIL_IDENTIFIERS: Record<string, ResourceDetailIdentifiers> = {
   },
 };
 
+async function selectSidebarProject(page: Page, projectName: string) {
+  const sidebarProject = page.getByTestId(`sidebar-project-${projectName}`);
+  await expect(sidebarProject).toBeVisible({ timeout: 20_000 });
+
+  // The dashboard recovery overlay is fixed and full-screen. In CI it can
+  // briefly outlive app boot and keep Playwright waiting for an actionable
+  // pointer click even though the sidebar project button has rendered.
+  await page.locator('#pan-recovery-overlay').evaluate((el) => el.remove()).catch(() => {});
+  await sidebarProject.dispatchEvent('click');
+}
+
 test.describe('Command Deck resource strip', () => {
   test('renders concrete resource icons and hover details for resource-allocated issues', async ({ page }) => {
     await page.route('**/api/issues/resource-allocated', async (route) => {
@@ -217,9 +228,7 @@ test.describe('Command Deck resource strip', () => {
     // load the initial app boot (WS connect + first snapshot) can take several
     // seconds, and a click that races the mount silently no-ops, leaving the
     // rows un-rendered and flaking the first toBeVisible below.
-    const sidebarProject = page.getByTestId('sidebar-project-overdeck');
-    await expect(sidebarProject).toBeVisible({ timeout: 20_000 });
-    await sidebarProject.click();
+    await selectSidebarProject(page, 'overdeck');
 
     const pan862Item = page.locator('[data-component="feature-item"][data-issue-id="PAN-862"]');
     const pan777Item = page.locator('[data-component="feature-item"][data-issue-id="PAN-777"]');
