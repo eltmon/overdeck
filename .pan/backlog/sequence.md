@@ -1,61 +1,78 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-07-05T23:06:31.414459Z · model: zai/glm-5.2 · open: 558_
+_Last sequenced: 2026-07-08T07:52:11.752370Z · model: zai/glm-5.2 · open: 573_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 6 | PAN-806 | L | critical | needs-refinement |  |  | Substrate work; improves the foundation required for reliable shipping. |
-| 7 | PAN-2194 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 9 | PAN-2395 | M | critical | ok |  |  | One invalid tiered_execution enum poisons every config read — live conversations falsely marked ended, resume/new-conversation blocked. |
-| 10 | PAN-2341 | M | critical | ok |  |  | Failed verdict POSTs leave advancing agents zombied, filling the ceiling until the whole pipeline freezes. |
 | 11 | PAN-1560 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 11 | PAN-2367 | M | critical | ok |  |  | Swarm finalizer loops with the closed-issue reaper — spawns review agents for ~20 closed issues every patrol (model-spend leak). |
+| 11 | PAN-2500 | XL | critical | ok |  |  | Memory-aware resource governor — autonomous resume skips the RAM admission gate the HTTP spawn path enforces; OOM root cause (host reboot... |
 | 12 | PAN-2270 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 12 | PAN-2372 | M | critical | ok |  |  | Swarm slot finishes its beads but never runs pan done — deacon can't converge it; permanent stall in the default nudge mode. |
+| 12 | PAN-2469 | L | critical | ok |  |  | Swarm has no issue-level assembly owner — finished swarm work sits invisible-to-every-patrol; root cause of PAN-2388/2383/399 stalls. |
 | 13 | PAN-2186 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
+| 13 | PAN-2473 | M | critical | ok |  |  | State-only verdict commits invalidate fresh review/test verdicts — convoys force-respawn in a churn loop (state-plane policy violation). |
+| 13 | PAN-2417 | M | critical | ok |  |  | Self-feeding verdict loop — recording a review/test pass as a chore(state) commit invalidates the pass it records; readyForMerge never ho... |
 | 14 | PAN-2179 | M | critical | ok |  |  | Prevents inert agents that look healthy but do no work. |
 | 14 | PAN-2359 | M | critical | ok |  |  | reapMergedStrikeWorkspaces reaps FRESH strike workspaces — a 0-commit branch looks 'merged', dumping the agent onto main mid-spawn. |
+| 14 | PAN-2461 | L | critical | ok |  |  | Verification-gate needs-you pause + feedback_delivery_needs_you deadlock — the gate pauses the only delivery target, then parks the issue... |
 | 15 | PAN-2169 | M | critical | ok |  |  | Prevents inert agents that look healthy but do no work. |
 | 15 | PAN-2363 | M | critical | ok |  |  | gcMergedSlots reaps a just-spawned swarm slot — fresh 0-commit branch classifies as 'merged' before the agent boots. |
+| 15 | PAN-2486 | M | critical | ok |  |  | Codex rate-limit model-switch dialog wedges agents AND its default silently downgrades to gpt-5.4-mini (~3h silent fleet stall). |
+| 15 | PAN-2498 | M | critical | ok |  |  | Swarm failed WORK slots (dead agent) are never auto-redispatched OR surfaced — swarms silently stall at partial completion. |
 | 16 | PAN-2381 | M | critical | ok |  |  | Three event types missing from the DomainEvent schema union poison the RPC stream — permanent 'Reconnecting…' loop for every tab. |
 | 16 | PAN-2285 | M | critical | ok |  |  | Per-agent codex auth.json rots, wedging agents in a silent 401 token_revoked loop; substrate liveness fix. |
+| 16 | PAN-2467 | M | critical | ok |  |  | Multi-repo merge train merges only one repo — strands sibling repos branches; silent partial delivery of a multi-repo feature to prod. |
+| 16 | PAN-2485 | M | critical | ok |  | PAN-2469 | Dead-session swarm slot (failed, session dead) has NO automatic recovery — coordinator never requeues and pan swarm recover refuses non-m... |
 | 17 | PAN-2108 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 17 | PAN-2360 | M | critical | ok |  |  | Strike kickoff instructs the agent to merge/push main, contradicting roles/strike.md — the PAN-2204 unreviewed-direct-to-main hazard. |
-| 18 | PAN-2336 | M | critical | ok |  |  | create-beads.test CI flake ('table not found: issues') reddens main, blocking the merge gate for every PR. |
+| 17 | PAN-2422 | M | critical | ok |  |  | Rebuilding dist under a live server breaks lazy chunk imports — first click on a not-yet-loaded path crashes with module-not-found. |
+| 17 | PAN-2409 | L | critical | ok |  |  | Enforce the workspace boundary — work agents edited the PRIMARY checkout by absolute path (PAN-2204 class, reproduced 3x on 2026-07-06). |
+| 18 | PAN-2495 | M | critical | ok |  |  | PAN-2487 ci-green merge skip bypassed the CI-green gate and landed a red-required-check change on main. |
+| 18 | PAN-2466 | M | critical | ok |  |  | Close-out/record writer clobbers closeOut.usage with EMPTY data — local cost history lost on the recurring close path. |
 | 19 | PAN-1491 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 20 | PAN-2364 | M | high | ok |  |  | Per-slot failure isolation — one failed-merge slot freezes the ENTIRE issue's swarm behind a manual pan swarm recover. |
+| 20 | PAN-2479 | S | high | ok |  |  | claude-code work-agent launcher passes a role file path to --agent (which wants a registered name) — every claude-code work agent exits b... |
 | 21 | PAN-2379 | M | high | ok |  |  | Verify gate installs deps warn-only + 60s timeout → false verify failures against empty node_modules, blocking swarm convergence. |
+| 21 | PAN-2408 | M | high | ok |  |  | pan start --auto commits the spec to main AFTER creating the worktree — the agent workspace lacks its own spec, triggering wrong-workspac... |
 | 22 | PAN-1830 | M | critical | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 22 | PAN-2292 | M | critical | ok |  |  | Peer-port guard regression crash-loops every post-guard workspace server, cascading host dashboard restart churn. |
+| 22 | PAN-2416 | S | high | ok |  |  | Codex agents can wedge on the Codex CLI first-run/consent screen — spawn must pre-accept non-interactively. |
+| 22 | PAN-2414 | M | high | ok |  |  | Context-overflow recovery is inconsistent — some agents get the compact-respawn, others hit rotation refusal and die holding uncommitted ... |
 | 23 | PAN-2228 | M | critical | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 23 | PAN-2168 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 23 | PAN-2371 | M | high | ok |  |  | conversation-supervisor-uat.test.ts flake (#create click timeout) blocks the verification gate for unrelated PRs through 3/3 cycles. |
+| 23 | PAN-2475 | S | high | ok |  |  | pan admin db restore-verdicts hangs indefinitely on real runs (dry-run fine) — the verdict-restore repair door is unusable interactively. |
+| 23 | PAN-2451 | M | high | ok |  |  | Work agent stranded behind commit-msg gate after overflow-restart + auto-commit + merge-main (non-issue-ref commits). |
 | 24 | PAN-2323 | M | high | ok |  |  | Flywheel respawn after crash starts a blank session instead of resuming the live rich one — orphans operator direction. |
 | 24 | PAN-1166 | M | high | ok |  |  | Hard prerequisite of the Overdeck Anywhere epic — re-gate /ws/terminal + bind auth before any remote exposure. |
+| 24 | PAN-2445 | M | high | ok |  |  | Deacon lifecycle patrol auto-dispatches PLANNING for stale planning-state issues — off-book, and staffed from Fable when no model is reco... |
+| 24 | PAN-2449 | M | high | ok |  |  | GITHUB_REPOS env var shadows projects.yaml github_repo — unknown IDs fall through to Linear and plan the WRONG issue. |
 | 25 | PAN-2307 | M | high | ok |  |  | Respawned flywheel sits idle with no kickoff; stuck-remediation starved when dashboard lifetime < patrol duration. |
+| 25 | PAN-2454 | M | high | ok |  |  | Ratchet audit fails per-commit on push ranges whose NET baseline delta is zero — strands finished, fully-cleared branches. |
+| 25 | PAN-2423 | M | high | ok |  |  | pan workspace rebuild hardcodes the overdeck- compose prefix — mismatches project templates and verification container names. |
 | 26 | PAN-2259 | M | critical | ok |  |  | GitHub quota failures block close, edit, and orchestration paths. |
 | 26 | PAN-2293 | M | high | ok |  |  | Patrol cycles >180s read as stale heartbeat mid-cycle; watchdog kills the dashboard on first observation. |
-| 26 | PAN-2396 | M | high | ok |  |  | --no-resume must be a full quiescence escape hatch — gate sequencer auto-trigger + all autonomous role runs, not just deacon resume. |
+| 26 | PAN-2406 | M | high | ok |  |  | Close-out gaps: verify-merged rejects record-only deltas; slot/suffixed worktrees never torn down; teardown abort fires after worktree re... |
+| 26 | PAN-2478 | S | high | ok |  |  | CI flake: Playwright browser install fails on packages.microsoft.com apt (NOSPLIT) — red-mains legit merges. |
 | 27 | PAN-2337 | M | high | ok |  |  | In-place build under a live dashboard breaks new PTY-supervisor spawns until restart — pin artifact + atomic reload. |
 | 27 | PAN-2351 | M | high | ok |  | PAN-1166 | Overdeck Anywhere P0: scoped access tokens + WS/SSE heartbeats — the security prerequisite that blocks ALL remote exposure. |
 | 28 | PAN-2165 | M | critical | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 28 | PAN-2322 | M | high | ok |  |  | Workspace/UAT agent can seize primary :3011 via an override env var — harden the host dashboard-port guard. |
-| 28 | PAN-2375 | M | high | ok |  |  | Tame beads/records auto-commit churn on main — debounce, batch, and auto-push so pan reload never deploys stale, diverged code. |
+| 28 | PAN-2428 | M | high | ok |  |  | MYN workspace Traefik routing broken post-rebrand — legacy panopticon network + missing traefik.docker.network label make UAT unreachable. |
+| 28 | PAN-2430 | M | high | ok |  |  | Frontend typecheck fails with dozens of pre-existing unused-local errors — blocks verification for any frontend-scoped issue. |
 | 29 | PAN-807 | L | critical | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 29 | PAN-2331 | S | high | ok |  |  | Codex rate-limit 'switch model?' modal stalls autonomous agents with no auto-dismiss — freezes work. |
-| 29 | PAN-2385 | M | high | ok |  |  | Commit-feed broadcast + subscribe-policy supervisor have no production caller — the Standing Crew's review silently does nothing. |
 | 30 | PAN-2333 | M | high | ok |  |  | Codex weekly-quota exhaustion freezes agents at an unanswerable modal — need resource alert + downshift/pause policy. |
-| 30 | PAN-2373 | M | high | ok |  |  | Flake policy — CI retry semantics, quarantine mechanism, and a non-blocking flake lane so an intermittent test never gates a release. |
+| 30 | PAN-2465 | S | high | ok |  | PAN-2461 | pan done PR lookup fails at MYN polyrepo root — "no git remotes found" makes completion exit nonzero. |
+| 30 | PAN-2421 | M | high | ok |  |  | Dashboard server route tests flake under full-suite verification load (timeouts/assert mismatches) but pass in isolation. |
 | 31 | PAN-1520 | L | critical | needs-refinement |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 31 | PAN-2300 | M | high | ok |  |  | pan done --strike verifies squash-merge via branch ancestry (always fails) — red-main strikes can't complete their handoff. |
-| 31 | PAN-2378 | M | high | ok |  |  | Tiered-execution configuration UI — edit the tier table, global/project enable, per-issue override visibility (operator-priority). |
 | 32 | PAN-1497 | M | critical | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 32 | PAN-2383 | M | high | ok |  |  | Editable per-issue Standing Crew toggle on the issue view — upgrade PAN-2378's read-only chip; first tiered-execution dogfood issue. |
 | 33 | PAN-1650 | L | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 33 | PAN-2387 | M | high | ok |  |  | Costs by Issue topped by a $12.7k UNKNOWN bucket; per-issue total shows $0.00 while model rows sum higher; codex cost misattributed. |
 | 34 | PAN-1557 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 34 | PAN-2388 | M | high | ok |  |  | Deliberate token/cost capture for non-claude-code harnesses — ohmypi and codex as first-class metering citizens. |
 | 35 | PAN-1452 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 35 | PAN-2390 | M | high | ok |  |  | systemd-oomd killed overdeck-tmux-server (all 55 agent processes) under host memory pressure — set ManagedOOMPreference=avoid. |
 | 36 | PAN-804 | L | critical | needs-refinement |  |  | Substrate work; improves the foundation required for reliable shipping. |
@@ -69,41 +86,43 @@ _Last sequenced: 2026-07-05T23:06:31.414459Z · model: zai/glm-5.2 · open: 558_
 | 44 | PAN-1766 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 45 | PAN-2308 | M | high | ok |  | PAN-2292 | Migrate stale generated compose files off PORT=3011 + deacon quarantine for deterministic boot refusals. |
 | 47 | PAN-1416 | M | high | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
-| 47 | PAN-2297 | S | medium | ok |  |  | Auto-lower file-size baseline on the UAT-batch merge path — shrink-then-merge currently reddens main. |
+| 47 | PAN-2499 | XL | medium | ok |  | PAN-2487, PAN-2493 | Unify the three issue views into one progressive-density IssueView (rail/cockpit/console) — operator-reviewed mockup, no-loss. |
 | 48 | PAN-955 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 48 | PAN-2377 | M | high | ok |  |  | First-class 'special orders' runs — operator-supplied order book executed with lane semantics (proven manually on RUN-56). |
+| 50 | PAN-2493 | M | medium | ok |  | PAN-2487 | Align the cockpit Agents-lane and sidebar issue-tree feature sets (two-way gaps) — parity pass. |
 | 51 | PAN-2075 | XL | high | ok | ✓ |  | Container; ranks by child impact, not directly pickable. |
+| 52 | PAN-2492 | M | medium | ok |  | PAN-2486 | Pane-detected waits (rate-limit/session-resume) surface as needs-you but cannot be answered from the dashboard — only the terminal. |
 | 53 | PAN-2233 | L | high | ok |  |  | Shrinks oversized substrate files so future changes stay tractable. |
 | 54 | PAN-2232 | L | high | ok |  |  | Shrinks oversized substrate files so future changes stay tractable. |
 | 55 | PAN-2229 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 55 | PAN-2391 | M | medium | ok |  |  | Tiered-execution: weighted model distributions per tier — consume multiple subscription plans (gpt-5.5, glm-5.2, kimi-k2.7-code). |
+| 55 | PAN-2489 | S | medium | ok |  |  | Strike agents are invisible in the project issue tree — needs-you pings with no node to click. |
 | 56 | PAN-2190 | L | high | ok |  |  | Shrinks oversized substrate files so future changes stay tractable. |
 | 57 | PAN-2149 | L | high | ok |  |  | Shrinks oversized substrate files so future changes stay tractable. |
-| 58 | PAN-2386 | M | medium | ok |  |  | pan plan --auto-start always refused on multi-repo workspaces — complete-planning leaves its own dirt behind; refusal is silent. |
+| 58 | PAN-2491 | S | medium | ok |  |  | Migrate @xenova/transformers to @huggingface/transformers — eliminates silent npx install failures from sharp 0.32 postinstall. |
 | 60 | PAN-2006 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 60 | PAN-2350 | XL | medium | ok | ✓ |  | Epic: Overdeck Anywhere — remote access, Hermes bridge, mobile, and the shared relay backbone (PRD-backed, phased). |
 | 62 | PAN-933 | M | high | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 63 | PAN-334 | M | high | ok |  |  | Prevents inert agents that look healthy but do no work. |
-| 63 | PAN-2254 | M | high | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 65 | PAN-2080 | M | high | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 65 | PAN-2352 | M | medium | ok |  | PAN-2351 | Overdeck Anywhere P1a: remote dashboard access via Cloudflare Tunnel + Access — the coffee-shop story (operator-only). |
 | 68 | PAN-1207 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 69 | PAN-1198 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
-| 70 | PAN-2384 | M | medium | ok |  |  | Agents page crashes to the error boundary — TypeError reading 'replace' in agent-card useMemo during the agent spawn window. |
+| 70 | PAN-2468 | L | medium | ok |  |  | OKF knowledge skill v1 — Karpathy-loop wiki + okf-embeddings vector extension (/okf). |
 | 71 | PAN-1767 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 72 | PAN-2189 | L | high | ok |  |  | Shrinks oversized substrate files so future changes stay tractable. |
+| 72 | PAN-2443 | L | medium | ok |  | PAN-2388 | OpenTelemetry GenAI semconv — OTLP ingestion layer for cross-harness telemetry (tokens/latency/tools). |
 | 73 | PAN-1828 | M | high | ok |  |  | Prevents inert agents that look healthy but do no work. |
+| 74 | PAN-2442 | XL | medium | ok |  | PAN-2416 | Agent Client Protocol (ACP) as Overdeck structured control plane — replace tmux keystrokes, transcript parsers, prompt-detection with typ... |
 | 75 | PAN-2193 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
-| 75 | PAN-2374 | M | medium | ok |  |  | CodeRabbit integration — opportunistic ingestion of reviews, never gating (structurally non-gating invariants). |
-| 76 | PAN-2095 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 76 | PAN-2255 | M | high | ok |  | PAN-2228 | Routine backlog item; rank reflects current shipping leverage. |
+| 76 | PAN-2399 | S | medium | ok |  |  | Wire replay_threshold/compaction_reroute into the slot-recovery respawn seam (PAN-2397 W3b). |
 | 77 | PAN-1618 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 78 | PAN-1209 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
+| 78 | PAN-2424 | XL | medium | ok | ✓ |  | Epic: the Order Book — first-class operator priority queue (markdown-authored, backlog-exempt, load-governed, flywheel-integrated). |
 | 80 | PAN-2353 | M | medium | ok |  | PAN-2351 | Overdeck Anywhere P1b: Hermes external-agent bridge — scoped API over Fly 6PN (first external-service integration). |
 | 81 | PAN-2188 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 84 | PAN-1246 | M | high | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 85 | PAN-1219 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 85 | PAN-1917 | L | high | ok |  |  | Restores conversation/session visibility across non-Claude harnesses. |
 | 85 | PAN-2354 | M | medium | ok |  | PAN-2351 | Overdeck Anywhere P1c: needs-you push notification bridge (ntfy first, Web Push later). |
 | 86 | PAN-1217 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 87 | PAN-813 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
@@ -116,22 +135,18 @@ _Last sequenced: 2026-07-05T23:06:31.414459Z · model: zai/glm-5.2 · open: 558_
 | 94 | PAN-262 | M | high | ok |  |  | Shrinks oversized substrate files so future changes stay tractable. |
 | 95 | PAN-2240 | M | high | ok |  |  | Restores conversation/session visibility across non-Claude harnesses. |
 | 95 | PAN-2355 | M | medium | ok |  | PAN-2351, PAN-2352 | Overdeck Anywhere P2: mobile PWA — Needs-You feed, conversation view, pipeline board, Web Push. |
-| 96 | PAN-2207 | M | high | ok |  |  | GitHub quota failures block close, edit, and orchestration paths. |
 | 97 | PAN-1912 | M | high | ok |  |  | Restores conversation/session visibility across non-Claude harnesses. |
 | 98 | PAN-1556 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 99 | PAN-1433 | M | high | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 100 | PAN-1330 | M | high | ok |  |  | Restores conversation/session visibility across non-Claude harnesses. |
 | 100 | PAN-2334 | M | medium | ok |  |  | Write a Definition of Ready + wire it into the pickup gate to catch junk issues before an agent is spawned. |
-| 100 | PAN-2393 | M | medium | ok |  | PAN-2387 | Per-line-item cost + tokens on issue-view tree rows; every Standing Crew member (incl. supervisor) gets its own row. |
 | 101 | PAN-675 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 102 | PAN-629 | M | high | ok |  |  | GitHub quota failures block close, edit, and orchestration paths. |
-| 105 | PAN-2230 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 105 | PAN-2392 | M | medium | ok |  | PAN-2387, PAN-2388, PAN-2385 | Standing Crew cost panel — per-member roster with cost, tokens, verdicts, escalations (mockup included). |
 | 106 | PAN-1454 | L | high | needs-refinement |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 107 | PAN-2059 | XL | high | ok | ✓ |  | Container; ranks by child impact, not directly pickable. |
 | 108 | PAN-1889 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 110 | PAN-1578 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 110 | PAN-2389 | M | medium | ok |  |  | Regenerate the token spend report post-rebrand — backfill cost events from stored JSONL conversations, no legacy DB import. |
 | 111 | PAN-1558 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 112 | PAN-1254 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 113 | PAN-1253 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
@@ -170,6 +185,7 @@ _Last sequenced: 2026-07-05T23:06:31.414459Z · model: zai/glm-5.2 · open: 558_
 | 148 | PAN-1154 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 150 | PAN-687 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 150 | PAN-2287 | XS | low | ok |  |  | Every supervisor.log line is written twice (appendFile + stdio redirect) — misled incident triage. |
+| 150 | PAN-2487 | M | low | ok |  |  | CI-green merge skip + Ship & Merge cockpit view + active-node spinner — LANDED on main; only SSE/polyrepo/persist follow-ups remain. |
 | 151 | PAN-1824 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 152 | PAN-2280 | M | medium | ok |  | PAN-2252 | Stops resumed conversations from silently losing transcript writes. |
 | 154 | PAN-1937 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
@@ -178,6 +194,7 @@ _Last sequenced: 2026-07-05T23:06:31.414459Z · model: zai/glm-5.2 · open: 558_
 | 157 | PAN-1674 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 158 | PAN-1672 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 160 | PAN-1490 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
+| 160 | PAN-2484 | S | low | ok |  |  | fix(uat-train): ready set misses merge-eligible issues without flywheel merge verbs — eligibility sweep LANDED on main. |
 | 161 | PAN-1446 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 162 | PAN-1438 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 163 | PAN-1392 | L | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
@@ -192,6 +209,7 @@ _Last sequenced: 2026-07-05T23:06:31.414459Z · model: zai/glm-5.2 · open: 558_
 | 178 | PAN-658 | M | medium | ok |  | PAN-2356 | Shared Sessions v0 — Phase 4 of Overdeck Anywhere, sequenced after the #2356 relay (plain WSS rooms, WebRTC deferred). |
 | 180 | PAN-324 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 180 | PAN-2319 | S | low | ok |  |  | 'COST LIMIT REACHED for undefined' spams every cycle — fix undefined subject, throttle, configurable default. |
+| 180 | PAN-2444 | M | low | needs-refinement |  |  | Optional SageOx re-integration — session-reasoning capture for OSS projects (per-project opt-in). |
 | 181 | PAN-1122 | M | medium | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 182 | PAN-1565 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 183 | PAN-1461 | M | medium | ok |  |  | Restores conversation/session visibility across non-Claude harnesses. |
@@ -288,7 +306,6 @@ _Last sequenced: 2026-07-05T23:06:31.414459Z · model: zai/glm-5.2 · open: 558_
 | 280 | PAN-1750 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 281 | PAN-1748 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 282 | PAN-1740 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 283 | PAN-1739 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 284 | PAN-1735 | L | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 286 | PAN-1728 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 288 | PAN-1720 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
@@ -309,7 +326,6 @@ _Last sequenced: 2026-07-05T23:06:31.414459Z · model: zai/glm-5.2 · open: 558_
 | 307 | PAN-1126 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 308 | PAN-1124 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 309 | PAN-1121 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 310 | PAN-1115 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 311 | PAN-1066 | L | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 312 | PAN-1037 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 313 | PAN-943 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
@@ -351,7 +367,6 @@ _Last sequenced: 2026-07-05T23:06:31.414459Z · model: zai/glm-5.2 · open: 558_
 | 354 | PAN-1854 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 355 | PAN-1853 | M | medium | ok |  |  | Restores conversation/session visibility across non-Claude harnesses. |
 | 356 | PAN-1646 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
-| 357 | PAN-1644 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 358 | PAN-1623 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 360 | PAN-1571 | M | medium | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 361 | PAN-1552 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
@@ -570,25 +585,17 @@ _Last sequenced: 2026-07-05T23:06:31.414459Z · model: zai/glm-5.2 · open: 558_
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
-### PAN-2194 (rank 7)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
 ### PAN-2395 (rank 9)
 
 Live incident (2026-07-05): a YAML boolean-coerced enum threw on every config load, falsely ending a live conversation and blocking resume/creation. Data-corrupting + liveness-killing; critical substrate.
-
-### PAN-2341 (rank 10)
-
-A transient server bug leaves completed review/test agents holding advancing-ceiling slots forever, freezing all advancement. Self-healing journal reconcile + zombie reap on boot/patrol is a critical liveness fix for the shipping pipeline itself.
 
 ### PAN-1560 (rank 11)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
-### PAN-2367 (rank 11)
+### PAN-2500 (rank 11)
 
-Pinned in-pipeline (merged/verifying on main). Runaway review-agent spawn loop on the production deacon; self-limiting in damage but burns model spend every ~2.4 min until deployed.
+Root cause of two host OOM/reboot events: the autonomous resume/dispatch path skips the memory admission gate the HTTP spawn path enforces. A data-corrupting + liveness-killing substrate fix for the shipping pipeline itself; epic PAN-1666 child. Now in-pipeline.
 
 ### PAN-2270 (rank 12)
 
@@ -596,11 +603,23 @@ Substrate or architecture work ranks high because stable orchestration is the pr
 
 ### PAN-2372 (rank 12)
 
-Root-caused live (RUN-56): classifyDurableReadySlot is unreachable while a slot session is alive, so a clean+ahead slot that forgets pan done strands forever. Blocks the whole multi-agent convergence value prop.
+Still the PAN-2357-family durable-completion swarm gap (empty continue.json) — rank preserved.
+
+### PAN-2469 (rank 12)
+
+5-whys root cause: swarm slots complete individually but nothing owns the all-slots-done transition to assemble/verify/review. Days lost to this; the deacon logs a spammed symptom every 60s. Critical substrate for swarm convergence.
 
 ### PAN-2186 (rank 13)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
+
+### PAN-2473 (rank 13)
+
+Every verdict write lands a state-plane commit, HEAD moves, staleness machinery treats the fresh verdict as stale and re-dispatches. Each spurious cycle burns a full review convoy (~20-40 min + tokens). State-plane predicate missing from the verdict comparison. In-pipeline (merged/verifying).
+
+### PAN-2417 (rank 13)
+
+Sibling of PAN-2473: PAN-2402 earned review+test+readyForMerge three times in 90 min and lost it within seconds each time. The verdict-recording commit is itself the staleness trigger. Critical merge-readiness blocker. In-pipeline (merged/verifying).
 
 ### PAN-2179 (rank 14)
 
@@ -610,6 +629,10 @@ Substrate or architecture work ranks high because stable orchestration is the pr
 
 Destructive silent loss of fresh strike work (observed 2026-07-04): ahead==0 ambiguity eats a just-spawned strike before it commits. Same provably-merged-guard family as PAN-2363.
 
+### PAN-2461 (rank 14)
+
+The gate creates the condition (agent paused) that makes feedback delivery impossible; nothing resumes or re-verifies when the env heals. Six issues parked simultaneously. Plus no local flake tolerance and container-down gates mislabel as lint failures. Critical pipeline-flow blocker.
+
 ### PAN-2169 (rank 15)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
@@ -617,6 +640,14 @@ Substrate or architecture work ranks high because stable orchestration is the pr
 ### PAN-2363 (rank 15)
 
 Swarm variant of PAN-2359: every swarm dispatch rolls the dice on a silent destructive reap. Destructive-patrols-need-durable-proof rule; critical.
+
+### PAN-2486 (rank 15)
+
+strike + 2 work agents wedged 1-3h on an interactive dialog no automation dismisses; dismissing via the delivery door confirmed the DEFAULT (switch to mini), silently downgrading substrate-coding sessions. Liveness + invisible quality risk.
+
+### PAN-2498 (rank 15)
+
+A failed work slot (missing-agent/vanished-session) is only logged then dropped; its item is never reset to pending and its dead branch holds the slot index, so dispatchNextWave can never refill. Permanent silent stall (PAN-399 sat 1/3 for a day). Critical swarm-liveness gap.
 
 ### PAN-2381 (rank 16)
 
@@ -626,6 +657,14 @@ Operator-facing outage: an unknown event type kills the whole subscription strea
 
 A stale seed-once copy of ~/.codex/auth.json forks the OAuth refresh chain, so respawned codex agents wedge permanently in a 401 retry loop while looking healthy on every surface — the same liveness-illusion class as PAN-2172. A staleness re-seed at spawn plus a troubled-gate trip on repeated token_revoked restores reliable codex dispatch, which is a prerequisite for shipping any gpt-5.5-routed work.
 
+### PAN-2467 (rank 16)
+
+MIN-857 was treated as merged/done after only the frontend repo merged; the api branch with UAT-critical commits was left unmerged with no MR. Correctness gap that can ship half a feature to production — a multi-repo train must merge every participating repo before done.
+
+### PAN-2485 (rank 16)
+
+A dead-session failed slot is a terminal classification with no consumer; recover only handles FailedMergeBlock. Required: coordinator owns failed slots (requeue + gc dead branch), recover covers non-merge failures, gcMergedSlots reaps promptly. Part of PAN-2469 state machine.
+
 ### PAN-2108 (rank 17)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
@@ -634,9 +673,21 @@ Substrate or architecture work ranks high because stable orchestration is the pr
 
 Observed: a codex strike pushed its fix straight to origin/main. Contract contradiction between kickoff template and strike role; direct-to-main hazard, critical.
 
-### PAN-2336 (rank 18)
+### PAN-2422 (rank 17)
 
-A beads-DB setup race reddens main on unrelated commits; red main empties the merge gate (Mission #1). Deterministic schema provisioning is a substrate reliability fix.
+Intervening npm run build deletes old hashed chunks the live server still resolves at call time. Same deploy-reliability family as PAN-2337/PAN-2380. Fix: versioned dist dir + atomic symlink flip, or eager boot-time imports.
+
+### PAN-2409 (rank 17)
+
+Nothing blocks a work agent from writing outside its workspace; three Haiku agents put real implementation into primary, so review evaluated an incomplete branch. The standing write-to-main hazard, now reproduced. Needs a hard write-boundary.
+
+### PAN-2495 (rank 18)
+
+A merge path that can skip CI-green let a PR with a red required test check land on main, reddening main (RUN-58: ~45 min P0 recovery). A skip may only apply to non-required checks; the no-loss audit must be a required blocking gate. Critical gate-integrity fix.
+
+### PAN-2466 (rank 18)
+
+Twice in a day the local per-issue records for just-closed issues were rewritten with empty byStage/totals/merges while the remote carried real usage. Silently destroys exactly the data the cost-visibility program (PAN-2387/2388) builds. Writer must read-modify-write closeOut.
 
 ### PAN-1491 (rank 19)
 
@@ -646,9 +697,17 @@ Substrate or architecture work ranks high because stable orchestration is the pr
 
 failedMergeBlock is per-issue not per-slot, so swarm parallelism serializes on the first problem. Hardening follow-up to the landed PAN-2357; high.
 
+### PAN-2479 (rank 20)
+
+spawnAgent builds --agent roles/work.md, but --agent takes a registered agent name; claude exits 1 with "not found" that the supervisor swallows as a 30s ready-timeout. Surfaces when routing lands on claude-code (kimi). Small, high-leverage fix. In-pipeline (merged/verifying).
+
 ### PAN-2379 (rank 21)
 
 Verified live (RUN-56): concurrent bun installs time out, gates run against empty node_modules, deacon re-fails every patrol. False-fail-that-blocks-convergence; high.
+
+### PAN-2408 (rank 21)
+
+Each worktree (branched pre-spec) lacks its .pan/specs/*.vbrief.json while later siblings have it; agents conclude the spec is in the wrong workspace and re-anchor on primary (the direct cause of PAN-2409). Ordering fix: commit spec before worktree creation.
 
 ### PAN-1830 (rank 22)
 
@@ -658,6 +717,14 @@ High score reflects direct risk to pipeline progress, operator recovery, or auto
 
 A dashboard-identity guard refuses PORT=3011 but the devcontainer template still sets it, so every new workspace server crash-loops by design. Regression fix; merged and verifying on main.
 
+### PAN-2416 (rank 22)
+
+A review agent sat ~20 min on the onboarding "Press enter to continue" screen with review_status failed and no notes. Per-session first-run dependent. Spawn path must guarantee no interactive onboarding.
+
+### PAN-2414 (rank 22)
+
+Two agents hit ~100% context the same afternoon with opposite outcomes (PAN-1781 respawn vs PAN-1980 refusal + death with 2 modified files). One deliberate policy for overflow recovery; the PAN-1781 fix must apply uniformly.
+
 ### PAN-2228 (rank 23)
 
 Two-door delivery hardening now has a PRD + needs-handoff; stays critical substrate tied to zombie-kickoff (PAN-2179).
@@ -666,9 +733,13 @@ Two-door delivery hardening now has a PRD + needs-handoff; stays critical substr
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
-### PAN-2371 (rank 23)
+### PAN-2475 (rank 23)
 
-A timing flake in a blocking UAT exhausted verification cycles for an orthogonal lint change. CI-green-vs-gate-red; high, unblocks the gate.
+Every non-dry-run invocation hung until killed (60/90/240s) while dry-run completes in seconds; write phase blocks on a lock or unsettled top-level await. Same hang signature seen in pan swarm resume / pan review reset — likely one shared CLI-never-exits root.
+
+### PAN-2451 (rank 23)
+
+Branch 108 commits ahead with merge/auto-commit/overflow-checkpoint messages that fail the issue-ref gate; the agent stalls pre-submit and the deacon does not re-engage a pre-submit-frozen work agent.
 
 ### PAN-2323 (rank 24)
 
@@ -678,9 +749,25 @@ A crash-respawned orchestrator reads only resume-session.json (written on gracef
 
 Delta: 2026-07-04 comment makes this the blocking prerequisite of epic PAN-2350 (Phase 0 / PAN-2351 scoped tokens depend on it); bootstrap path already merged, remaining work is the lockdown. Elevated from low to high.
 
+### PAN-2445 (rank 24)
+
+With auto_pickup off and an active order book, the patrol still dispatched planning on claude-fable-5 (most expensive) by silent default. Autonomous dispatch must respect the pickup gate and never resolve to an operator-undesignated model (no-hardcoded-fallback rule).
+
+### PAN-2449 (rank 24)
+
+Planning LEX-1 (GitHub-tracked) spawned planning-min-206 against the wrong project. parseGitHubReposSync ignores projects.yaml whenever GITHUB_REPOS yields any entries. Planning-correctness gap with no warning.
+
 ### PAN-2307 (rank 25)
 
 A respawned orchestrator holds the singleton slot but never gets a tick, and remediation lives at the tail of long patrols killed by watchdog churn. Kickoff-on-respawn + early/independent liveness check; merged, verifying on main.
+
+### PAN-2454 (rank 25)
+
+feature/pan-2207 (188 commits, review+tests passed) could not be pushed: the audit rejected an intermediate bump that later commits reverted, though the range net delta was zero. Made the remote branch CONFLICTING, blocking merge on a cleared issue.
+
+### PAN-2423 (rank 25)
+
+Rebuild brought a MYN stack up as overdeck-feature-min-857-* while the verification gate execs myn-feature-min-857-fe-1 — "No such container", work agent needs-you-paused. Derive the project name from the workspace dev script, never a hardcoded prefix.
 
 ### PAN-2259 (rank 26)
 
@@ -690,9 +777,13 @@ Substrate or architecture work ranks high because stable orchestration is the pr
 
 PAN-2219 stamped the heartbeat at cycle start but long remediation cycles still exceed the 180s threshold, and stale = immediate restart. Deferral like the health path stops the churn; merged, verifying on main.
 
-### PAN-2396 (rank 26)
+### PAN-2406 (rank 26)
 
-During the PAN-2395 incident the sequencer auto-trigger respawned under --no-resume; the operator's emergency hatch is incomplete. High liveness/control fix.
+Found batch-closing 35 issues. Branches differing only by .pan/records + main merges abort as "does not match merged PR head"; slot/suffixed workspaces leak. Content-level containment (cf. PAN-2311 verifier) needed.
+
+### PAN-2478 (rank 26)
+
+Transient apt-mirror failures reaching packages.microsoft.com turn green PRs into red main after merge (two RUN-58 occurrences), stalling all merges. Retry/cache the browser install so a transient third-party hiccup self-heals.
 
 ### PAN-2337 (rank 27)
 
@@ -710,9 +801,13 @@ Substrate or architecture work ranks high because stable orchestration is the pr
 
 The peer-port guard has an override that a workspace/UAT agent could set to impersonate the production dashboard. Security hardening of the single-dashboard invariant.
 
-### PAN-2375 (rank 28)
+### PAN-2428 (rank 28)
 
-64 state commits/day leaves local main perpetually ahead of origin, so pan reload can ship stale code and mislead audits. High substrate hygiene.
+Post-rebrand Traefik (overdeck-traefik) shares no network with workspace containers; missing label picks an unreachable devnet IP → 499 timeouts. Fresh MYN workspace must return 200 through Traefik with no manual network connects.
+
+### PAN-2430 (rank 28)
+
+Pre-existing unused-local errors in shared modules block the typecheck gate for unrelated issues. Short-term relax noUnusedLocals; long-term clean up and re-enable. Gate-blocking flake-class debt.
 
 ### PAN-807 (rank 29)
 
@@ -722,17 +817,17 @@ Substrate or architecture work ranks high because stable orchestration is the pr
 
 When codex quota runs low, an interactive model-switch modal blocks the agent input loop; many agents froze at once. A narrow launcher/config auto-dismiss is a quick, high-value liveness fix.
 
-### PAN-2385 (rank 29)
-
-Second ignition gap (cf. PAN-2283): broadcastCommit has zero non-test callers; supervisor.subscribe is unreachable with owns_inspection=false. A shipped subsystem's core behavior is inert; high.
-
 ### PAN-2333 (rank 30)
 
 Quota exhaustion currently produces a wall of frozen agents and dead-end NEEDS-YOU cards. A proactive quota resource alert + deliberate downshift/pause policy prevents silent agent freezes; broader than PAN-2331.
 
-### PAN-2373 (rank 30)
+### PAN-2465 (rank 30)
 
-Pinned in-pipeline (planned). Foundational CI/CD-epic phase-0 work: retry+quarantine+flake-lane with audited tracking. Unblocks the verification gate class of failures.
+gh pr list runs in the polyrepo workspace root (no remotes; repos are subdirs). Noisy/ambiguous completion for polyrepo projects; iterate workspace.repos per-forge, or skip with an explicit per-repo note.
+
+### PAN-2421 (rank 30)
+
+Five server route/integration tests time out or assert wrong under the verification gate but pass locally — resource/contention flakes that redden main on otherwise-good merges. Flake-tolerance family (PAN-2373 lane).
 
 ### PAN-1520 (rank 31)
 
@@ -741,10 +836,6 @@ Substrate or architecture work ranks high because stable orchestration is the pr
 ### PAN-2300 (rank 31)
 
 Re-scoped under epic PAN-2376 to defect 1 only (squash-merge ancestry check always fails); defect 2 moved to PAN-2360. Strike-completion impact unchanged, rank held.
-
-### PAN-2378 (rank 31)
-
-Pinned in-pipeline (merged/verifying). Operator-designated must-land-before-RUN-56; the editable Settings surface over PAN-2283's wiring.
 
 ### PAN-1497 (rank 32)
 
@@ -758,17 +849,9 @@ Pinned in-pipeline (in-progress). First Standing-Crew test-drive; the write-door
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
-### PAN-2387 (rank 33)
-
-Pinned in-pipeline (planned). The cost-transparency page undermines its own story; three aggregation/parser defects. Tiered-execution makes per-issue cost the pitch, so $0 tiers are product-level failure; high.
-
 ### PAN-1557 (rank 34)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-2388 (rank 34)
-
-Pinned in-pipeline (planned). Cost capture was Claude-Code-only; the other two shipped harnesses were never designed into metering. Multi-harness is now the normal case; high.
 
 ### PAN-1452 (rank 35)
 
@@ -800,7 +883,7 @@ A non-idempotent label transition aborts the whole close-out relabel when an exp
 
 ### PAN-2167 (rank 41)
 
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
+Body unchanged in substance; still the state-plane clean-tree gate blocker for pan review request — rank preserved.
 
 ### PAN-2106 (rank 42)
 
@@ -818,74 +901,6 @@ Substrate or architecture work ranks high because stable orchestration is the pr
 
 Follow-up hardening to PAN-2292: live workspaces still carry PORT=3011, and the deacon burns restart attempts on deterministic ServerConfig refusals. Migration pass + quarantine stop the churn.
 
-### PAN-1416 (rank 47)
-
-Top-tier item because it has near-term operator value and a clear path to verification.
-
-### PAN-2297 (rank 47)
-
-The PAN-2227 baseline auto-lowering doesn't fire on UAT-batch merges, so a shrunk file leaves a stale-high baseline that fails lint:file-size on main. Wire the same lowering into the UAT merge/write path; planned.
-
-### PAN-955 (rank 48)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-2377 (rank 48)
-
-Pattern proven manually; makes campaign orchestration mechanical (lane enforcement, pickup-gate release) instead of prose the model must honor. Strategic substrate; high.
-
-### PAN-2075 (rank 51)
-
-Epic container score is derived from open child issues; it is not directly pickable.
-
-### PAN-2233 (rank 53)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-2232 (rank 54)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-2229 (rank 55)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-2391 (rank 55)
-
-Operator requirement to use up several plans rather than pinning one model per tier; deterministic selection (replay-safe). Medium, extends the shipped tier table.
-
-### PAN-2190 (rank 56)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-2149 (rank 57)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-2386 (rank 58)
-
-Structural impossibility for multi-repo projects: post-commit record modification + untracked sub-repo dirs trip the dirty guard, and the refusal is buried in lifecycle.log. Medium; unblocks the auto-start flow.
-
-### PAN-2006 (rank 60)
-
-Top-tier item because it has near-term operator value and a clear path to verification.
-
-### PAN-2350 (rank 60)
-
-Strategic feature epic unifying four remote-access dreams behind three primitives (reachability, identity, remote-safe API). Children are phased; P0 (security) ranks high on its own merit. Container — not directly pickable.
-
-### PAN-933 (rank 62)
-
-Top-tier item because it has near-term operator value and a clear path to verification.
-
-### PAN-334 (rank 63)
-
-Top-tier item because it has near-term operator value and a clear path to verification.
-
-### PAN-2254 (rank 63)
-
-Top-tier item because it has near-term operator value and a clear path to verification.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -893,10 +908,10 @@ Top-tier item because it has near-term operator value and a clear path to verifi
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-07-05T23:06:31.414459Z",
+  "generatedAt": "2026-07-08T07:52:11.752370Z",
   "model": "zai/glm-5.2",
   "pass": "incremental",
-  "openCount": 558,
+  "openCount": 573,
   "nodes": [
     {
       "issue": "PAN-806",
@@ -907,19 +922,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "needs-refinement",
       "dependsOn": [],
       "why": "Substrate work; improves the foundation required for reliable shipping.",
-      "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2194",
-      "rank": 7,
-      "size": "M",
-      "importance": "critical",
-      "score": 99,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
       "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
       "gate": "auto",
       "planning": "auto"
@@ -938,19 +940,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-2341",
-      "rank": 10,
-      "size": "M",
-      "importance": "critical",
-      "score": 97,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Failed verdict POSTs leave advancing agents zombied, filling the ceiling until the whole pipeline freezes.",
-      "rationale": "A transient server bug leaves completed review/test agents holding advancing-ceiling slots forever, freezing all advancement. Self-healing journal reconcile + zombie reap on boot/patrol is a critical liveness fix for the shipping pipeline itself.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1560",
       "rank": 11,
       "size": "M",
@@ -960,19 +949,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "dependsOn": [],
       "why": "Hardens the pipeline paths that ship all other work.",
       "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2367",
-      "rank": 11,
-      "size": "M",
-      "importance": "critical",
-      "score": 95,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Swarm finalizer loops with the closed-issue reaper — spawns review agents for ~20 closed issues every patrol (model-spend leak).",
-      "rationale": "Pinned in-pipeline (merged/verifying on main). Runaway review-agent spawn loop on the production deacon; self-limiting in damage but burns model spend every ~2.4 min until deployed.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -998,7 +974,7 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "ok",
       "dependsOn": [],
       "why": "Swarm slot finishes its beads but never runs pan done — deacon can't converge it; permanent stall in the default nudge mode.",
-      "rationale": "Root-caused live (RUN-56): classifyDurableReadySlot is unreachable while a slot session is alive, so a clean+ahead slot that forgets pan done strands forever. Blocks the whole multi-agent convergence value prop.",
+      "rationale": "Still the PAN-2357-family durable-completion swarm gap (empty continue.json) — rank preserved.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1120,19 +1096,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-2336",
-      "rank": 18,
-      "size": "M",
-      "importance": "critical",
-      "score": 90,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "create-beads.test CI flake ('table not found: issues') reddens main, blocking the merge gate for every PR.",
-      "rationale": "A beads-DB setup race reddens main on unrelated commits; red main empties the merge gate (Mission #1). Deterministic schema provisioning is a substrate reliability fix.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1491",
       "rank": 19,
       "size": "M",
@@ -1224,19 +1187,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-2371",
-      "rank": 23,
-      "size": "M",
-      "importance": "high",
-      "score": 83,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "conversation-supervisor-uat.test.ts flake (#create click timeout) blocks the verification gate for unrelated PRs through 3/3 cycles.",
-      "rationale": "A timing flake in a blocking UAT exhausted verification cycles for an orthogonal lint change. CI-green-vs-gate-red; high, unblocks the gate.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2323",
       "rank": 24,
       "size": "M",
@@ -1302,19 +1252,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-2396",
-      "rank": 26,
-      "size": "M",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "--no-resume must be a full quiescence escape hatch — gate sequencer auto-trigger + all autonomous role runs, not just deacon resume.",
-      "rationale": "During the PAN-2395 incident the sequencer auto-trigger respawned under --no-resume; the operator's emergency hatch is incomplete. High liveness/control fix.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2337",
       "rank": 27,
       "size": "M",
@@ -1369,19 +1306,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-2375",
-      "rank": 28,
-      "size": "M",
-      "importance": "high",
-      "score": 79,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Tame beads/records auto-commit churn on main — debounce, batch, and auto-push so pan reload never deploys stale, diverged code.",
-      "rationale": "64 state commits/day leaves local main perpetually ahead of origin, so pan reload can ship stale code and mislead audits. High substrate hygiene.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-807",
       "rank": 29,
       "size": "L",
@@ -1408,19 +1332,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-2385",
-      "rank": 29,
-      "size": "M",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Commit-feed broadcast + subscribe-policy supervisor have no production caller — the Standing Crew's review silently does nothing.",
-      "rationale": "Second ignition gap (cf. PAN-2283): broadcastCommit has zero non-test callers; supervisor.subscribe is unreachable with owns_inspection=false. A shipped subsystem's core behavior is inert; high.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2333",
       "rank": 30,
       "size": "M",
@@ -1430,19 +1341,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "dependsOn": [],
       "why": "Codex weekly-quota exhaustion freezes agents at an unanswerable modal — need resource alert + downshift/pause policy.",
       "rationale": "Quota exhaustion currently produces a wall of frozen agents and dead-end NEEDS-YOU cards. A proactive quota resource alert + deliberate downshift/pause policy prevents silent agent freezes; broader than PAN-2331.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2373",
-      "rank": 30,
-      "size": "M",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Flake policy — CI retry semantics, quarantine mechanism, and a non-blocking flake lane so an intermittent test never gates a release.",
-      "rationale": "Pinned in-pipeline (planned). Foundational CI/CD-epic phase-0 work: retry+quarantine+flake-lane with audited tracking. Unblocks the verification gate class of failures.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1469,19 +1367,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "dependsOn": [],
       "why": "pan done --strike verifies squash-merge via branch ancestry (always fails) — red-main strikes can't complete their handoff.",
       "rationale": "Re-scoped under epic PAN-2376 to defect 1 only (squash-merge ancestry check always fails); defect 2 moved to PAN-2360. Strike-completion impact unchanged, rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2378",
-      "rank": 31,
-      "size": "M",
-      "importance": "high",
-      "score": 77,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Tiered-execution configuration UI — edit the tier table, global/project enable, per-issue override visibility (operator-priority).",
-      "rationale": "Pinned in-pipeline (merged/verifying). Operator-designated must-land-before-RUN-56; the editable Settings surface over PAN-2283's wiring.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1525,19 +1410,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-2387",
-      "rank": 33,
-      "size": "M",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Costs by Issue topped by a $12.7k UNKNOWN bucket; per-issue total shows $0.00 while model rows sum higher; codex cost misattributed.",
-      "rationale": "Pinned in-pipeline (planned). The cost-transparency page undermines its own story; three aggregation/parser defects. Tiered-execution makes per-issue cost the pitch, so $0 tiers are product-level failure; high.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1557",
       "rank": 34,
       "size": "M",
@@ -1547,19 +1419,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "dependsOn": [],
       "why": "Hardens the pipeline paths that ship all other work.",
       "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2388",
-      "rank": 34,
-      "size": "M",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Deliberate token/cost capture for non-claude-code harnesses — ohmypi and codex as first-class metering citizens.",
-      "rationale": "Pinned in-pipeline (planned). Cost capture was Claude-Code-only; the other two shipped harnesses were never designed into metering. Multi-harness is now the normal case; high.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1664,7 +1523,7 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "ok",
       "dependsOn": [],
       "why": "Hardens the pipeline paths that ship all other work.",
-      "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
+      "rationale": "Body unchanged in substance; still the state-plane clean-tree gate blocker for pan review request — rank preserved.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1732,19 +1591,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "dependsOn": [],
       "why": "Prevents workspace servers from impersonating production dashboard.",
       "rationale": "Top-tier item because it has near-term operator value and a clear path to verification.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2297",
-      "rank": 47,
-      "size": "S",
-      "importance": "medium",
-      "score": 63,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Auto-lower file-size baseline on the UAT-batch merge path — shrink-then-merge currently reddens main.",
-      "rationale": "The PAN-2227 baseline auto-lowering doesn't fire on UAT-batch merges, so a shrunk file leaves a stale-high baseline that fails lint:file-size on main. Wire the same lowering into the UAT merge/write path; planned.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1828,19 +1674,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-2391",
-      "rank": 55,
-      "size": "M",
-      "importance": "medium",
-      "score": 66,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Tiered-execution: weighted model distributions per tier — consume multiple subscription plans (gpt-5.5, glm-5.2, kimi-k2.7-code).",
-      "rationale": "Operator requirement to use up several plans rather than pinning one model per tier; deterministic selection (replay-safe). Medium, extends the shipped tier table.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2190",
       "rank": 56,
       "size": "L",
@@ -1863,19 +1696,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "dependsOn": [],
       "why": "Shrinks oversized substrate files so future changes stay tractable.",
       "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2386",
-      "rank": 58,
-      "size": "M",
-      "importance": "medium",
-      "score": 64,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan plan --auto-start always refused on multi-repo workspaces — complete-planning leaves its own dirt behind; refusal is silent.",
-      "rationale": "Structural impossibility for multi-repo projects: post-commit record modification + untracked sub-repo dirs trip the dirty guard, and the refusal is buried in lifecycle.log. Medium; unblocks the auto-start flow.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1928,19 +1748,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "ok",
       "dependsOn": [],
       "why": "Prevents inert agents that look healthy but do no work.",
-      "rationale": "Top-tier item because it has near-term operator value and a clear path to verification.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2254",
-      "rank": 63,
-      "size": "M",
-      "importance": "high",
-      "score": 73,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Bug fix with direct operator or pipeline reliability impact.",
       "rationale": "Top-tier item because it has near-term operator value and a clear path to verification.",
       "gate": "auto",
       "planning": "auto"
@@ -2000,19 +1807,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-2384",
-      "rank": 70,
-      "size": "M",
-      "importance": "medium",
-      "score": 61,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Agents page crashes to the error boundary — TypeError reading 'replace' in agent-card useMemo during the agent spawn window.",
-      "rationale": "One partial agent row kills the whole fleet view exactly when the operator looks; nullish-guard + card-level boundary. Medium, narrow fix.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1767",
       "rank": 71,
       "size": "M",
@@ -2054,32 +1848,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
     {
       "issue": "PAN-2193",
       "rank": 75,
-      "size": "M",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Substrate work; improves the foundation required for reliable shipping.",
-      "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2374",
-      "rank": 75,
-      "size": "M",
-      "importance": "medium",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "CodeRabbit integration — opportunistic ingestion of reviews, never gating (structurally non-gating invariants).",
-      "rationale": "Opportunistic external review leveraged when available, structurally impossible to become load-bearing. Medium; no deps, pairs with review automation.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2095",
-      "rank": 76,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -2180,19 +1948,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "ok",
       "dependsOn": [],
       "why": "Hardens the pipeline paths that ship all other work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1917",
-      "rank": 85,
-      "size": "L",
-      "importance": "high",
-      "score": 66,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Restores conversation/session visibility across non-Claude harnesses.",
-      "rationale": "The body is a UX/data-page redesign with a PRD, but it remains behind the underlying multi-harness transcript pipeline.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2350,18 +2105,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-2207",
-      "rank": 96,
-      "size": "M",
-      "importance": "high",
-      "score": 64,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "GitHub quota failures block close, edit, and orchestration paths.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1912",
       "rank": 97,
       "size": "M",
@@ -2423,21 +2166,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-2393",
-      "rank": 100,
-      "size": "M",
-      "importance": "medium",
-      "score": 53,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-2387"
-      ],
-      "why": "Per-line-item cost + tokens on issue-view tree rows; every Standing Crew member (incl. supervisor) gets its own row.",
-      "rationale": "Operator requirement for per-member cost legibility; invariant: sum of line items == issue rollup == Costs page. Medium, depends on PAN-2387 attribution.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-675",
       "rank": 101,
       "size": "M",
@@ -2458,18 +2186,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "ok",
       "dependsOn": [],
       "why": "GitHub quota failures block close, edit, and orchestration paths.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2230",
-      "rank": 105,
-      "size": "M",
-      "importance": "high",
-      "score": 62,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Substrate work; improves the foundation required for reliable shipping.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2536,19 +2252,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "condition": "ok",
       "dependsOn": [],
       "why": "Hardens the pipeline paths that ship all other work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2389",
-      "rank": 110,
-      "size": "M",
-      "importance": "medium",
-      "score": 51,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Regenerate the token spend report post-rebrand — backfill cost events from stored JSONL conversations, no legacy DB import.",
-      "rationale": "Pinned in-pipeline (planned). Proves the cache-derivability bet for cost history; read-only backfill + fixes the Pages 404. Medium.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4447,18 +4150,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "planning": "auto"
     },
     {
-      "issue": "PAN-1739",
-      "rank": 283,
-      "size": "M",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1735",
       "rank": 284,
       "size": "L",
@@ -4691,18 +4382,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
     {
       "issue": "PAN-1121",
       "rank": 309,
-      "size": "M",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1115",
-      "rank": 310,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -5196,18 +4875,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
     {
       "issue": "PAN-1646",
       "rank": 356,
-      "size": "M",
-      "importance": "medium",
-      "score": 41,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Routine backlog item; rank reflects current shipping leverage.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1644",
-      "rank": 357,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -7750,6 +7417,568 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "why": "Routine backlog item; rank reflects current shipping leverage.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-2500",
+      "rank": 11,
+      "size": "XL",
+      "importance": "critical",
+      "score": 96,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Memory-aware resource governor — autonomous resume skips the RAM admission gate the HTTP spawn path enforces; OOM root cause (host reboot...",
+      "rationale": "Root cause of two host OOM/reboot events: the autonomous resume/dispatch path skips the memory admission gate the HTTP spawn path enforces. A data-corrupting + liveness-killing substrate fix for the shipping pipeline itself; epic PAN-1666 child. Now in-pipeline.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2469",
+      "rank": 12,
+      "size": "L",
+      "importance": "critical",
+      "score": 95,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Swarm has no issue-level assembly owner — finished swarm work sits invisible-to-every-patrol; root cause of PAN-2388/2383/399 stalls.",
+      "rationale": "5-whys root cause: swarm slots complete individually but nothing owns the all-slots-done transition to assemble/verify/review. Days lost to this; the deacon logs a spammed symptom every 60s. Critical substrate for swarm convergence.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2473",
+      "rank": 13,
+      "size": "M",
+      "importance": "critical",
+      "score": 94,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "State-only verdict commits invalidate fresh review/test verdicts — convoys force-respawn in a churn loop (state-plane policy violation).",
+      "rationale": "Every verdict write lands a state-plane commit, HEAD moves, staleness machinery treats the fresh verdict as stale and re-dispatches. Each spurious cycle burns a full review convoy (~20-40 min + tokens). State-plane predicate missing from the verdict comparison. In-pipeline (merged/verifying).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2417",
+      "rank": 13,
+      "size": "M",
+      "importance": "critical",
+      "score": 94,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Self-feeding verdict loop — recording a review/test pass as a chore(state) commit invalidates the pass it records; readyForMerge never ho...",
+      "rationale": "Sibling of PAN-2473: PAN-2402 earned review+test+readyForMerge three times in 90 min and lost it within seconds each time. The verdict-recording commit is itself the staleness trigger. Critical merge-readiness blocker. In-pipeline (merged/verifying).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2461",
+      "rank": 14,
+      "size": "L",
+      "importance": "critical",
+      "score": 94,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Verification-gate needs-you pause + feedback_delivery_needs_you deadlock — the gate pauses the only delivery target, then parks the issue...",
+      "rationale": "The gate creates the condition (agent paused) that makes feedback delivery impossible; nothing resumes or re-verifies when the env heals. Six issues parked simultaneously. Plus no local flake tolerance and container-down gates mislabel as lint failures. Critical pipeline-flow blocker.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2486",
+      "rank": 15,
+      "size": "M",
+      "importance": "critical",
+      "score": 93,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Codex rate-limit model-switch dialog wedges agents AND its default silently downgrades to gpt-5.4-mini (~3h silent fleet stall).",
+      "rationale": "strike + 2 work agents wedged 1-3h on an interactive dialog no automation dismisses; dismissing via the delivery door confirmed the DEFAULT (switch to mini), silently downgrading substrate-coding sessions. Liveness + invisible quality risk.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2498",
+      "rank": 15,
+      "size": "M",
+      "importance": "critical",
+      "score": 93,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Swarm failed WORK slots (dead agent) are never auto-redispatched OR surfaced — swarms silently stall at partial completion.",
+      "rationale": "A failed work slot (missing-agent/vanished-session) is only logged then dropped; its item is never reset to pending and its dead branch holds the slot index, so dispatchNextWave can never refill. Permanent silent stall (PAN-399 sat 1/3 for a day). Critical swarm-liveness gap.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2467",
+      "rank": 16,
+      "size": "M",
+      "importance": "critical",
+      "score": 93,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Multi-repo merge train merges only one repo — strands sibling repos branches; silent partial delivery of a multi-repo feature to prod.",
+      "rationale": "MIN-857 was treated as merged/done after only the frontend repo merged; the api branch with UAT-critical commits was left unmerged with no MR. Correctness gap that can ship half a feature to production — a multi-repo train must merge every participating repo before done.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2485",
+      "rank": 16,
+      "size": "M",
+      "importance": "critical",
+      "score": 92,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-2469"
+      ],
+      "why": "Dead-session swarm slot (failed, session dead) has NO automatic recovery — coordinator never requeues and pan swarm recover refuses non-m...",
+      "rationale": "A dead-session failed slot is a terminal classification with no consumer; recover only handles FailedMergeBlock. Required: coordinator owns failed slots (requeue + gc dead branch), recover covers non-merge failures, gcMergedSlots reaps promptly. Part of PAN-2469 state machine.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2422",
+      "rank": 17,
+      "size": "M",
+      "importance": "critical",
+      "score": 92,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Rebuilding dist under a live server breaks lazy chunk imports — first click on a not-yet-loaded path crashes with module-not-found.",
+      "rationale": "Intervening npm run build deletes old hashed chunks the live server still resolves at call time. Same deploy-reliability family as PAN-2337/PAN-2380. Fix: versioned dist dir + atomic symlink flip, or eager boot-time imports.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2409",
+      "rank": 17,
+      "size": "L",
+      "importance": "critical",
+      "score": 92,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Enforce the workspace boundary — work agents edited the PRIMARY checkout by absolute path (PAN-2204 class, reproduced 3x on 2026-07-06).",
+      "rationale": "Nothing blocks a work agent from writing outside its workspace; three Haiku agents put real implementation into primary, so review evaluated an incomplete branch. The standing write-to-main hazard, now reproduced. Needs a hard write-boundary.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2495",
+      "rank": 18,
+      "size": "M",
+      "importance": "critical",
+      "score": 91,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "PAN-2487 ci-green merge skip bypassed the CI-green gate and landed a red-required-check change on main.",
+      "rationale": "A merge path that can skip CI-green let a PR with a red required test check land on main, reddening main (RUN-58: ~45 min P0 recovery). A skip may only apply to non-required checks; the no-loss audit must be a required blocking gate. Critical gate-integrity fix.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2466",
+      "rank": 18,
+      "size": "M",
+      "importance": "critical",
+      "score": 91,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Close-out/record writer clobbers closeOut.usage with EMPTY data — local cost history lost on the recurring close path.",
+      "rationale": "Twice in a day the local per-issue records for just-closed issues were rewritten with empty byStage/totals/merges while the remote carried real usage. Silently destroys exactly the data the cost-visibility program (PAN-2387/2388) builds. Writer must read-modify-write closeOut.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2479",
+      "rank": 20,
+      "size": "S",
+      "importance": "high",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "claude-code work-agent launcher passes a role file path to --agent (which wants a registered name) — every claude-code work agent exits b...",
+      "rationale": "spawnAgent builds --agent roles/work.md, but --agent takes a registered agent name; claude exits 1 with \"not found\" that the supervisor swallows as a 30s ready-timeout. Surfaces when routing lands on claude-code (kimi). Small, high-leverage fix. In-pipeline (merged/verifying).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2408",
+      "rank": 21,
+      "size": "M",
+      "importance": "high",
+      "score": 87,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan start --auto commits the spec to main AFTER creating the worktree — the agent workspace lacks its own spec, triggering wrong-workspac...",
+      "rationale": "Each worktree (branched pre-spec) lacks its .pan/specs/*.vbrief.json while later siblings have it; agents conclude the spec is in the wrong workspace and re-anchor on primary (the direct cause of PAN-2409). Ordering fix: commit spec before worktree creation.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2416",
+      "rank": 22,
+      "size": "S",
+      "importance": "high",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Codex agents can wedge on the Codex CLI first-run/consent screen — spawn must pre-accept non-interactively.",
+      "rationale": "A review agent sat ~20 min on the onboarding \"Press enter to continue\" screen with review_status failed and no notes. Per-session first-run dependent. Spawn path must guarantee no interactive onboarding.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2414",
+      "rank": 22,
+      "size": "M",
+      "importance": "high",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Context-overflow recovery is inconsistent — some agents get the compact-respawn, others hit rotation refusal and die holding uncommitted ...",
+      "rationale": "Two agents hit ~100% context the same afternoon with opposite outcomes (PAN-1781 respawn vs PAN-1980 refusal + death with 2 modified files). One deliberate policy for overflow recovery; the PAN-1781 fix must apply uniformly.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2475",
+      "rank": 23,
+      "size": "S",
+      "importance": "high",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan admin db restore-verdicts hangs indefinitely on real runs (dry-run fine) — the verdict-restore repair door is unusable interactively.",
+      "rationale": "Every non-dry-run invocation hung until killed (60/90/240s) while dry-run completes in seconds; write phase blocks on a lock or unsettled top-level await. Same hang signature seen in pan swarm resume / pan review reset — likely one shared CLI-never-exits root.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2451",
+      "rank": 23,
+      "size": "M",
+      "importance": "high",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Work agent stranded behind commit-msg gate after overflow-restart + auto-commit + merge-main (non-issue-ref commits).",
+      "rationale": "Branch 108 commits ahead with merge/auto-commit/overflow-checkpoint messages that fail the issue-ref gate; the agent stalls pre-submit and the deacon does not re-engage a pre-submit-frozen work agent.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2445",
+      "rank": 24,
+      "size": "M",
+      "importance": "high",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Deacon lifecycle patrol auto-dispatches PLANNING for stale planning-state issues — off-book, and staffed from Fable when no model is reco...",
+      "rationale": "With auto_pickup off and an active order book, the patrol still dispatched planning on claude-fable-5 (most expensive) by silent default. Autonomous dispatch must respect the pickup gate and never resolve to an operator-undesignated model (no-hardcoded-fallback rule).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2449",
+      "rank": 24,
+      "size": "M",
+      "importance": "high",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "GITHUB_REPOS env var shadows projects.yaml github_repo — unknown IDs fall through to Linear and plan the WRONG issue.",
+      "rationale": "Planning LEX-1 (GitHub-tracked) spawned planning-min-206 against the wrong project. parseGitHubReposSync ignores projects.yaml whenever GITHUB_REPOS yields any entries. Planning-correctness gap with no warning.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2454",
+      "rank": 25,
+      "size": "M",
+      "importance": "high",
+      "score": 83,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Ratchet audit fails per-commit on push ranges whose NET baseline delta is zero — strands finished, fully-cleared branches.",
+      "rationale": "feature/pan-2207 (188 commits, review+tests passed) could not be pushed: the audit rejected an intermediate bump that later commits reverted, though the range net delta was zero. Made the remote branch CONFLICTING, blocking merge on a cleared issue.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2423",
+      "rank": 25,
+      "size": "M",
+      "importance": "high",
+      "score": 83,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan workspace rebuild hardcodes the overdeck- compose prefix — mismatches project templates and verification container names.",
+      "rationale": "Rebuild brought a MYN stack up as overdeck-feature-min-857-* while the verification gate execs myn-feature-min-857-fe-1 — \"No such container\", work agent needs-you-paused. Derive the project name from the workspace dev script, never a hardcoded prefix.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2406",
+      "rank": 26,
+      "size": "M",
+      "importance": "high",
+      "score": 82,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Close-out gaps: verify-merged rejects record-only deltas; slot/suffixed worktrees never torn down; teardown abort fires after worktree re...",
+      "rationale": "Found batch-closing 35 issues. Branches differing only by .pan/records + main merges abort as \"does not match merged PR head\"; slot/suffixed workspaces leak. Content-level containment (cf. PAN-2311 verifier) needed.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2478",
+      "rank": 26,
+      "size": "S",
+      "importance": "high",
+      "score": 82,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CI flake: Playwright browser install fails on packages.microsoft.com apt (NOSPLIT) — red-mains legit merges.",
+      "rationale": "Transient apt-mirror failures reaching packages.microsoft.com turn green PRs into red main after merge (two RUN-58 occurrences), stalling all merges. Retry/cache the browser install so a transient third-party hiccup self-heals.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2428",
+      "rank": 28,
+      "size": "M",
+      "importance": "high",
+      "score": 81,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "MYN workspace Traefik routing broken post-rebrand — legacy panopticon network + missing traefik.docker.network label make UAT unreachable.",
+      "rationale": "Post-rebrand Traefik (overdeck-traefik) shares no network with workspace containers; missing label picks an unreachable devnet IP → 499 timeouts. Fresh MYN workspace must return 200 through Traefik with no manual network connects.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2430",
+      "rank": 28,
+      "size": "M",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Frontend typecheck fails with dozens of pre-existing unused-local errors — blocks verification for any frontend-scoped issue.",
+      "rationale": "Pre-existing unused-local errors in shared modules block the typecheck gate for unrelated issues. Short-term relax noUnusedLocals; long-term clean up and re-enable. Gate-blocking flake-class debt.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2465",
+      "rank": 30,
+      "size": "S",
+      "importance": "high",
+      "score": 79,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-2461"
+      ],
+      "why": "pan done PR lookup fails at MYN polyrepo root — \"no git remotes found\" makes completion exit nonzero.",
+      "rationale": "gh pr list runs in the polyrepo workspace root (no remotes; repos are subdirs). Noisy/ambiguous completion for polyrepo projects; iterate workspace.repos per-forge, or skip with an explicit per-repo note.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2421",
+      "rank": 30,
+      "size": "M",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Dashboard server route tests flake under full-suite verification load (timeouts/assert mismatches) but pass in isolation.",
+      "rationale": "Five server route/integration tests time out or assert wrong under the verification gate but pass locally — resource/contention flakes that redden main on otherwise-good merges. Flake-tolerance family (PAN-2373 lane).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2499",
+      "rank": 47,
+      "size": "XL",
+      "importance": "medium",
+      "score": 66,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-2487",
+        "PAN-2493"
+      ],
+      "why": "Unify the three issue views into one progressive-density IssueView (rail/cockpit/console) — operator-reviewed mockup, no-loss.",
+      "rationale": "Three independently-built views (Console/Cockpit/Rail) drift; the spinner and ship row each had to be added twice. One data model + component family at three densities, with the mockup component inventory as a surface-lock no-loss gate. Operator-reviewed 2026-07-08; sizeable but not substrate.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2493",
+      "rank": 50,
+      "size": "M",
+      "importance": "medium",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-2487"
+      ],
+      "why": "Align the cockpit Agents-lane and sidebar issue-tree feature sets (two-way gaps) — parity pass.",
+      "rationale": "Gap A: cockpit lane lacks per-session lifecycle actions the sidebar has. Gap B: sidebar lacks the Verification node + gate breakdown the cockpit has. Extract shared row + verification components so future additions land in both.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2492",
+      "rank": 52,
+      "size": "M",
+      "importance": "medium",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-2486"
+      ],
+      "why": "Pane-detected waits (rate-limit/session-resume) surface as needs-you but cannot be answered from the dashboard — only the terminal.",
+      "rationale": "rateLimit/sessionResume waits have no answerable dashboard component; click-through falls through to the AUQ-reopen path. Prefer resolving at source (PAN-2486) so they never reach needs-you; until then, render an inline answer widget that drives real keystrokes.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2489",
+      "rank": 55,
+      "size": "S",
+      "importance": "medium",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Strike agents are invisible in the project issue tree — needs-you pings with no node to click.",
+      "rationale": "Resource discovery matches agent-<issue>* under feature-<issue>; strikes use strike-<issue> in feature-<issue>-strike worktrees — neither matches. Include strike sessions as a Strike node with full Row affordances. Pipeline-side sibling: PAN-2270.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2491",
+      "rank": 58,
+      "size": "S",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Migrate @xenova/transformers to @huggingface/transformers — eliminates silent npx install failures from sharp 0.32 postinstall.",
+      "rationale": "sharp<0.33 runs a network postinstall that fails silently under npx (EACCES on a stale libvips dir) — npx swallows it → exit 1, no error. Successor ships prebuilt binaries, no postinstall. Install-reliability fix for the npx @overdeck/core path.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2468",
+      "rank": 70,
+      "size": "L",
+      "importance": "medium",
+      "score": 56,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "OKF knowledge skill v1 — Karpathy-loop wiki + okf-embeddings vector extension (/okf).",
+      "rationale": "Portable Claude Code skill maintaining a project knowledge wiki in Open Knowledge Format; hybrid BM25+vector search. Standalone (git+gh+Python). In-pipeline (in-review). Feature, not substrate.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2443",
+      "rank": 72,
+      "size": "L",
+      "importance": "medium",
+      "score": 56,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-2388"
+      ],
+      "why": "OpenTelemetry GenAI semconv — OTLP ingestion layer for cross-harness telemetry (tokens/latency/tools).",
+      "rationale": "gen_ai.* conventions standardize per-harness telemetry pain, but experimental + no cost/pricing in spec. Pin a snapshot + shim; token counts standardize, per-token rates remain ours. Cost-telemetry follow-on to PAN-2387/2388.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2442",
+      "rank": 74,
+      "size": "XL",
+      "importance": "medium",
+      "score": 55,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-2416"
+      ],
+      "why": "Agent Client Protocol (ACP) as Overdeck structured control plane — replace tmux keystrokes, transcript parsers, prompt-detection with typ...",
+      "rationale": "ACP standardizes the three things Overdeck reimplements per-harness (delivery, transcript, permission prompts). Large architectural play; research/PRD stage. Removes the per-harness scraping substrate.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2399",
+      "rank": 76,
+      "size": "S",
+      "importance": "medium",
+      "score": 53,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Wire replay_threshold/compaction_reroute into the slot-recovery respawn seam (PAN-2397 W3b).",
+      "rationale": "tier-replay.ts is live library code whose production seam is slot-recovery: respawn prompts should carry rendered feed replay. Small, self-contained follow-on scoped out of PAN-2397 W3.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2424",
+      "rank": 78,
+      "size": "XL",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Epic: the Order Book — first-class operator priority queue (markdown-authored, backlog-exempt, load-governed, flywheel-integrated).",
+      "rationale": "Formalizes the proven RUN-56/57/58 special-orders pattern: operator-authored priority queue that outranks the backlog, runs as fast as deps+load allow, exempt from auto-pickup. Operator-confirmed pillars. Container with no children filed yet; ranks by intended child impact.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": true
+    },
+    {
+      "issue": "PAN-2487",
+      "rank": 150,
+      "size": "M",
+      "importance": "low",
+      "score": 44,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CI-green merge skip + Ship & Merge cockpit view + active-node spinner — LANDED on main; only SSE/polyrepo/persist follow-ups remain.",
+      "rationale": "Operator-requested, landed directly on main (2026-07-08). Work itself shipped; the open issue now tracks follow-ups (SSE vs polling, polyrepo ship-log coverage, persist last log). Ranked low — effectively done.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2484",
+      "rank": 160,
+      "size": "S",
+      "importance": "low",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "fix(uat-train): ready set misses merge-eligible issues without flywheel merge verbs — eligibility sweep LANDED on main.",
+      "rationale": "Landed on main (2026-07-08); sweepEligibleFeatures + flywheel emit-merge-verbs rule shipped. Open issue tracks only follow-up hardening (enrich swept features, unit test). Effectively done.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2444",
+      "rank": 180,
+      "size": "M",
+      "importance": "low",
+      "score": 38,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Optional SageOx re-integration — session-reasoning capture for OSS projects (per-project opt-in).",
+      "rationale": "Research-stage: SageOx was removed in May; upstream has since shipped the equivalents and attribution concerns are superseded. Optional per-project opt-in, no clear pull yet. Needs refinement on whether/how to re-integrate.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -7916,34 +8145,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
     },
     {
       "from": "PAN-2376",
-      "to": "PAN-2373",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2376",
-      "to": "PAN-2371",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2376",
-      "to": "PAN-2207",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2376",
-      "to": "PAN-2341",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2376",
       "to": "PAN-2167",
       "type": "contains",
       "source": "github-ref",
@@ -8000,42 +8201,7 @@ Top-tier item because it has near-term operator value and a clear path to verifi
     },
     {
       "from": "PAN-2376",
-      "to": "PAN-2095",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2376",
-      "to": "PAN-2375",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2376",
-      "to": "PAN-2374",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2376",
       "to": "PAN-2229",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2376",
-      "to": "PAN-2230",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2376",
-      "to": "PAN-2297",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
@@ -8097,74 +8263,11 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "confidence": 1
     },
     {
-      "from": "PAN-2387",
-      "to": "PAN-2393",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2387",
-      "to": "PAN-2392",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2388",
-      "to": "PAN-2392",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2385",
-      "to": "PAN-2392",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2387",
-      "to": "PAN-2389",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2388",
-      "to": "PAN-2389",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2367",
-      "to": "PAN-2372",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.72
-    },
-    {
       "from": "PAN-2379",
       "to": "PAN-2372",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.7
-    },
-    {
-      "from": "PAN-2391",
-      "to": "PAN-2388",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.72
-    },
-    {
-      "from": "PAN-2396",
-      "to": "PAN-2395",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
     },
     {
       "from": "PAN-2359",
@@ -8179,6 +8282,125 @@ Top-tier item because it has near-term operator value and a clear path to verifi
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.85
+    },
+    {
+      "from": "PAN-1666",
+      "to": "PAN-2500",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2486",
+      "to": "PAN-2492",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2487",
+      "to": "PAN-2499",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-2493",
+      "to": "PAN-2499",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-2487",
+      "to": "PAN-2493",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-2495",
+      "to": "PAN-2487",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.85
+    },
+    {
+      "from": "PAN-2485",
+      "to": "PAN-2469",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.85
+    },
+    {
+      "from": "PAN-2498",
+      "to": "PAN-2469",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-2469",
+      "to": "PAN-2467",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-2417",
+      "to": "PAN-2473",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-2473",
+      "to": "PAN-2406",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-2408",
+      "to": "PAN-2409",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.75
+    },
+    {
+      "from": "PAN-2409",
+      "to": "PAN-2414",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.55
+    },
+    {
+      "from": "PAN-2466",
+      "to": "PAN-2443",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-2489",
+      "to": "PAN-2270",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-2465",
+      "to": "PAN-2461",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-2416",
+      "to": "PAN-2442",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.55
     }
   ]
 }
