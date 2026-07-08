@@ -219,6 +219,20 @@ test.describe('Command Deck resource strip', () => {
         body: JSON.stringify([]),
       });
     });
+    await page.route('**/api/boot-reconciliation', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          decision: null,
+          perAgent: {},
+          decidedAt: null,
+          bootId: null,
+          graceDeadline: null,
+          set: [],
+        }),
+      });
+    });
 
     await page.goto(`${DASHBOARD_URL}/command-deck`);
 
