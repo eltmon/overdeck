@@ -23,16 +23,16 @@
   "pipeline": {
     "issueId": "PAN-2297",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merging",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T23:47:15.220Z",
+    "updatedAt": "2026-07-08T00:01:18.107Z",
     "reviewNotes": "No blocking findings; targeted file-size reconcile tests passed",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Spec fidelity passed: helper matches bead workspace-kbkf5 by running bash scripts/lint-file-size.sh --update in the worktree, checking/staging scripts/file-size-baseline.txt via runGit, returning changed boolean, and adding lower/no-op/drop tests. Constraint compliance passed: uses async execFile in server-reachable helper, no execSync in helper, no prohibited destructive or retry-delay patterns found.",
-    "reviewedAtCommit": "be57f9989ce35d47fc54c28123bafc1e9b224be4",
+    "reviewedAtCommit": "f72b4015fc699709d1161c3f221567554c03cc5b",
+    "lastVerifiedCommit": "f72b4015fc699709d1161c3f221567554c03cc5b",
     "reviewRequestedAt": "2026-07-07T23:43:45.589Z"
   },
   "closeOut": {
@@ -40,15 +40,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 3350126,
-            "output": 4597,
-            "cacheRead": 2970368,
+            "input": 3649447,
+            "output": 4946,
+            "cacheRead": 3263744,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 13110454,
-            "output": 36529,
-            "cacheRead": 12432640,
+            "input": 15094115,
+            "output": 38635,
+            "cacheRead": 14259840,
             "cacheWrite": 0
           },
           "unknown": {
@@ -60,10 +60,10 @@
         },
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 4452,
-            "output": 13759,
-            "cacheRead": 17639079,
-            "cacheWrite": 22804
+            "input": 4745,
+            "output": 16154,
+            "cacheRead": 21722614,
+            "cacheWrite": 26526
           },
           "openai/gpt-5.5": {
             "input": 54508,
@@ -95,19 +95,27 @@
             "cacheRead": 3068380,
             "cacheWrite": 145060
           }
+        },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 450375,
+            "output": 5719,
+            "cacheRead": 2189568,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 3350126,
-          "output": 4597,
-          "cacheRead": 2970368,
+          "input": 3649447,
+          "output": 4946,
+          "cacheRead": 3263744,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 13431104,
-          "output": 44346,
-          "cacheRead": 13410560,
+          "input": 15414765,
+          "output": 46452,
+          "cacheRead": 15237760,
           "cacheWrite": 0
         },
         "unknown": {
@@ -117,10 +125,10 @@
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
-          "input": 4452,
-          "output": 13759,
-          "cacheRead": 17639079,
-          "cacheWrite": 22804
+          "input": 4745,
+          "output": 16154,
+          "cacheRead": 21722614,
+          "cacheWrite": 26526
         },
         "cliproxy/gpt-5.4-mini": {
           "input": 8690,
@@ -133,11 +141,17 @@
           "output": 32515,
           "cacheRead": 3068380,
           "cacheWrite": 145060
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 450375,
+          "output": 5719,
+          "cacheRead": 2189568,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 40.276133,
-        "pricingAsOf": "2026-07-07T23:47:15.280Z"
+        "usd": 47.154712,
+        "pricingAsOf": "2026-07-08T00:01:18.317Z"
       }
     },
     "merges": [],
@@ -147,5 +161,5 @@
     "slotAssignments": []
   },
   "created": "2026-07-07T23:25:44.874Z",
-  "updated": "2026-07-07T23:47:41.376Z"
+  "updated": "2026-07-08T00:01:18.365Z"
 }
