@@ -12,9 +12,22 @@
       "timestamp": "2026-07-08T03:27:07.334Z",
       "reason": "end",
       "note": "All PAN-2468 beads are closed. Verified remaining knowledge CLI wrapper with npx vitest run --testNamePattern knowledge and npm run lint; feature workspace is clean and pushed."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-08T03:29Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-08T03:29:26.821Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-08T03:29:26Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2468\n\nFR-18/FR-19 on-demand mnemos/Ollama installers are not wired, and Ollama ensure never starts a stopped server\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2468 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/records/pan-2468.json",
@@ -187,15 +200,16 @@
     "recordedAt": "2026-07-08T03:26:46.995Z"
   },
   "created": "2026-07-07T15:47:12.301Z",
-  "updated": "2026-07-08T03:27:20.899Z",
+  "updated": "2026-07-08T03:29:26.821Z",
   "pipeline": {
     "issueId": "PAN-2468",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-08T03:27:20.752Z",
+    "updatedAt": "2026-07-08T03:29:26.700Z",
+    "reviewNotes": "FR-18/FR-19 on-demand mnemos/Ollama installers are not wired, and Ollama ensure never starts a stopped server",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2488",
     "reviewRequestedAt": "2026-07-08T03:27:07.338Z",
     "scopeDrift": {
@@ -375,21 +389,21 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 39273229,
-            "output": 18847,
-            "cacheRead": 36584832,
+            "input": 39368718,
+            "output": 19112,
+            "cacheRead": 36674176,
             "cacheWrite": 0
           },
           "openai/gpt-5.4-mini": {
-            "input": 11841404,
-            "output": 27758,
-            "cacheRead": 11405696,
+            "input": 15908782,
+            "output": 34572,
+            "cacheRead": 15336064,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 89416782,
-            "output": 197678,
-            "cacheRead": 86646272,
+            "input": 91449464,
+            "output": 203173,
+            "cacheRead": 88501120,
             "cacheWrite": 0
           }
         },
@@ -404,21 +418,21 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 39273229,
-          "output": 18847,
-          "cacheRead": 36584832,
+          "input": 39368718,
+          "output": 19112,
+          "cacheRead": 36674176,
           "cacheWrite": 0
         },
         "openai/gpt-5.4-mini": {
-          "input": 11841404,
-          "output": 27758,
-          "cacheRead": 11405696,
+          "input": 15908782,
+          "output": 34572,
+          "cacheRead": 15336064,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 89416782,
-          "output": 197678,
-          "cacheRead": 86646272,
+          "input": 91449464,
+          "output": 203173,
+          "cacheRead": 88501120,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -429,8 +443,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 86.8801442,
-        "pricingAsOf": "2026-07-08T03:27:20.862Z"
+        "usd": 89.2897863,
+        "pricingAsOf": "2026-07-08T03:29:26.798Z"
       }
     },
     "merges": [
