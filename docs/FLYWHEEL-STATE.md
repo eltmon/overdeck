@@ -217,6 +217,12 @@ Operator: primary local main diverged (20 bot chore(state) commits ahead / 6 beh
 - **LOOSE ENDS for operator:** (1) PAN-1644 draft untracked; (2) scratch has the primary's lifecycle-restart.ts alt-implementation if worth comparing; (3) freshly-dirty beads = normal ongoing bot writes.
 - REUSABLE: flywheel CANNOT commit/push code even via merge — `guard-flywheel-orchestrator-commit.sh` (pre-commit + pre-push) gates on OVERDECK_AGENT_ID; for an operator-directed reconcile merge, `env -u OVERDECK_AGENT_ID git commit/push` lets the guard pass on its own context-check (never `--no-verify`).
 
+## RUN-58 tick 143 (2026-07-07) — PAN-1644 converged (CLEAN+all-green) → scheduled id 36 mergeAt 03:16; main green
+
+**MAIN GREEN (`4f71893371`, CI success).** No red main.
+- **PAN-1644 (#2480) reached the converged state** — mergeState CLEAN, all CI green, newest commit is the 02:48 close-out record itself (no newer chore push). Applied the proven recipe → scheduled auto-merge id **36**, mergeAt **03:16:21**. Same escape path A8 used; if it slips on a self-generated record push, wait for re-convergence (don't schedule into churn). Treating as routine PAN drain (normal pipeline PR; operator-owned flag was the draft file — no countermand received).
+- PAN-2468 (OKF) working not-ready. M7/MIN-729 verifying. MIN-865/861 rfm — report only (UAT-held). **B3/PAN-2167** unauthorized — 2 issues (A8, PAN-1644) now hit this loop; the fix ends it.
+
 ## RUN-58 tick 142 (2026-07-07) — A8/PAN-2297 CLOSED-OUT + main GREEN (4f71893371, CI success); PAN-1644 now in the same PAN-2167 record churn (wait-settle)
 
 **MAIN GREEN (`4f71893371`, CI success).** A8's merge verified clean — no regression from the file-size-baseline change. No red main.
