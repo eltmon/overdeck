@@ -217,6 +217,13 @@ Operator: primary local main diverged (20 bot chore(state) commits ahead / 6 beh
 - **LOOSE ENDS for operator:** (1) PAN-1644 draft untracked; (2) scratch has the primary's lifecycle-restart.ts alt-implementation if worth comparing; (3) freshly-dirty beads = normal ongoing bot writes.
 - REUSABLE: flywheel CANNOT commit/push code even via merge — `guard-flywheel-orchestrator-commit.sh` (pre-commit + pre-push) gates on OVERDECK_AGENT_ID; for an operator-directed reconcile merge, `env -u OVERDECK_AGENT_ID git commit/push` lets the guard pass on its own context-check (never `--no-verify`).
 
+## RUN-58 tick 155 (2026-07-08) — 🔴 RED MAIN: strike PAN-2496 WORKING (not wedged) — has fix locally (ahead 1), verifying typecheck+test before push
+
+**🔴 RED MAIN (`e51dd2defe`) — recovery in progress.** Strike PAN-2496 is actively working (6m+, not wedged like PAN-2490): "strike/pan-2496 is already a direct child of origin/main, nothing to rebase; running npm run typecheck, then the full test command." Branch `strike/pan-2496` is **ahead 1** (dup-removal commit made locally) but NOT pushed yet — it's verifying before push. Good behaviour; no re-tell needed.
+- **Next:** on push (ship-log count → 1) → flywheel `gh pr create --head strike/pan-2496` → `gh pr merge --squash --admin` on green → main green → close PAN-2496.
+- If it wedges (idle, ahead-1, unpushed, reported-only) → forceful `pan tell` EXECUTE-NOW+push-mandatory (PAN-2490 recipe).
+- PAN-2468 (work+review), PAN-2485 (strike), PAN-2322 (swarm slot-2) in flight. MIN-865/861 rfm report-only.
+
 ## RUN-58 tick 154 (2026-07-08) — 🔴 RED MAIN P0: UAT merge collision — PAN-1644 + PAN-2490 both registered ship-log → DUPLICATE NO_LOSS_MATRIX entry → filed PAN-2496 + STRUCK
 
 **🔴 RED MAIN (`e51dd2defe`, test job = failure).** The UAT batch promotion (PAN-1644) collided with the PAN-2490 no-loss fix that landed ~10min earlier. BOTH registered `GET /api/issues/:id/ship-log` in NO_LOSS_MATRIX → duplicate surface key → `no-loss-matrix.test.ts:143 "matrix has no duplicate surface entries"` FAILS. Confirmed on main: two entries (line 277 `door: Ship log / ship view surface` from PAN-2490/#2494; line 280 `door: getShipLog + ReviewStatusResolver` from PAN-1644).
