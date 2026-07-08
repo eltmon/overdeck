@@ -14,6 +14,7 @@ import {
   resolveSessionFile,
 } from '../../../lib/overdeck/conversation-reads.js';
 import {
+  getConversationByName,
   listConversations,
   updateConversationTitle,
 } from '../../../lib/overdeck/conversations.js';
@@ -117,6 +118,12 @@ export async function handleBackfillTitlesBody(
         const date = new Date(conv.createdAt).toISOString().slice(0, 10);
         candidate = `Untitled — ${date}`;
         reason = 'no transcript';
+      }
+
+      const fresh = getConversationByName(conv.name);
+      if (!fresh || fresh.title !== 'New conversation' || fresh.titleSource !== 'default') {
+        skipped.push({ name: conv.name, reason: 'no longer eligible' });
+        continue;
       }
 
       if (!dryRun) {

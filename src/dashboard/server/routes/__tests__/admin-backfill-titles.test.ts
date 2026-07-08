@@ -18,6 +18,7 @@ import {
   archiveConversation,
   createConversation,
   getConversationByName,
+  updateConversationTitle,
 } from '../../../../lib/overdeck/conversations.js';
 import { handleBackfillTitlesBody, type BackfillTitlesDependencies } from '../admin.js';
 
@@ -159,6 +160,36 @@ describe('handleBackfillTitlesBody', () => {
     expect(result.skipped).toHaveLength(0);
 
     const unchanged = getConversationByName('backfill-manual-new-conversation');
+    expect(unchanged?.title).toBe('New conversation');
+    expect(unchanged?.titleSource).toBe('manual');
+  });
+
+  it('does not overwrite a title that became manual between snapshot and update', async () => {
+    createConversation({
+      name: 'backfill-stale-snapshot',
+      tmuxSession: 'tmux-backfill-stale-snapshot',
+      cwd: '/tmp',
+      title: 'New conversation',
+      titleSource: 'default',
+    });
+
+    const deps: BackfillTitlesDependencies = {
+      resolveSessionFile: async () => join(testHome, 'fake-session.jsonl'),
+      getCachedMessages: vi.fn().mockImplementation(async () => {
+        // Simulate an intervening manual edit after the listConversations snapshot.
+        updateConversationTitle('backfill-stale-snapshot', 'New conversation', 'manual');
+        return { messages: [{ role: 'user', text: 'some prompt' }] };
+      }),
+    };
+
+    const result = await handleBackfillTitlesBody({ dryRun: false }, deps);
+
+    expect(result.updated).toHaveLength(0);
+    expect(result.skipped).toEqual([
+      { name: 'backfill-stale-snapshot', reason: 'no longer eligible' },
+    ]);
+
+    const unchanged = getConversationByName('backfill-stale-snapshot');
     expect(unchanged?.title).toBe('New conversation');
     expect(unchanged?.titleSource).toBe('manual');
   });
