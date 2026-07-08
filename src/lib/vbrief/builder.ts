@@ -138,7 +138,7 @@ export class PlanBuilder {
     const version = getPackageVersion();
     return {
       vBRIEFInfo: {
-        version: '0.6',
+        version: '0.8',
         created: now,
         author: `overdeck/${version}`,
         description: this._description,

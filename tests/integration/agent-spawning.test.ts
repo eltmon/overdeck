@@ -763,7 +763,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     });
 
     it('resumeAgent marks kickoff redelivered only after the redelivery lands', { timeout: 30_000 }, async () => {
-      vi.useFakeTimers();
+      vi.useFakeTimers({ shouldAdvanceTime: true });
       const tmux = await import('../../src/lib/tmux.js');
       const agentId = 'agent-pan-resume-redeliver-second';
       writeResumableWorkAgent(agentId, false);

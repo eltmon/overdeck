@@ -336,6 +336,28 @@ describe('stampPlanForFinalization', () => {
     expect(after.plan.metadata?.canonicalFilename).toMatch(/^\d{4}-\d{2}-\d{2}-PAN-946-/);
   });
 
+  it('preserves the xBRIEFInfo envelope when stamping v0.8 drafts', () => {
+    const path = join(TEST_DIR, 'spec.vbrief.json');
+    writePlan(path, makePlanDoc({
+      status: 'draft',
+      metadata: { someOtherField: 'kept' },
+    }));
+    const draft = JSON.parse(readFileSync(path, 'utf-8')) as any;
+    draft.xBRIEFInfo = { ...draft.vBRIEFInfo, version: '0.8' };
+    delete draft.vBRIEFInfo;
+    writeFileSync(path, JSON.stringify(draft, null, 2), 'utf-8');
+
+    stampPlanForFinalization(path, 'PAN-946');
+
+    const raw = JSON.parse(readFileSync(path, 'utf-8')) as any;
+    expect(raw.xBRIEFInfo.version).toBe('0.8');
+    expect(raw.xBRIEFInfo.updated).toBeTruthy();
+    expect(raw.vBRIEFInfo).toBeUndefined();
+    expect(raw.plan.status).toBe('proposed');
+    expect(raw.plan.metadata.someOtherField).toBe('kept');
+    expect(raw.plan.metadata.canonicalFilename).toMatch(/^\d{4}-\d{2}-\d{2}-PAN-946-/);
+  });
+
   it('initializes sequence to 1 when previously missing', () => {
     const path = join(TEST_DIR, 'spec.vbrief.json');
     const doc = makePlanDoc();

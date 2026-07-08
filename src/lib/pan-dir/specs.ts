@@ -3,7 +3,7 @@ import { Effect, FileSystem } from 'effect'
 import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem'
 import { FsError } from '../errors.js'
 
-import { VBriefMergeConflictError } from '../vbrief/io.js'
+import { normalizeVBriefEnvelope, serializeVBriefDocument, VBriefMergeConflictError } from '../vbrief/io.js'
 import { generateVBriefFilename, parseVBriefFilename, slugify } from '../vbrief/lifecycle.js'
 import { invalidateVBriefIndex } from '../vbrief/vbrief-index.js'
 import type { VBriefDocument } from '../vbrief/types.js'
@@ -73,7 +73,7 @@ function parsePanSpecDocumentFromString(raw: string, path: string): PanSpecDocum
 
   let parsed: unknown
   try {
-    parsed = JSON.parse(raw)
+    parsed = normalizeVBriefEnvelope(JSON.parse(raw))
   } catch (error) {
     throw new Error(`Invalid JSON in pan spec ${path}: ${(error as Error).message}`)
   }
@@ -102,8 +102,8 @@ function parsePanSpecDocumentFromString(raw: string, path: string): PanSpecDocum
   // Validate required vBRIEF shape
   if (!doc.vBRIEFInfo || !doc.plan) {
     throw new Error(
-      `Invalid vBRIEF format in ${path}: missing 'vBRIEFInfo' and/or 'plan' top-level keys. ` +
-        `vBRIEF v0.5 requires exactly { "vBRIEFInfo": { "version": "0.5" }, "plan": { ... } }. ` +
+      `Invalid vBRIEF format in ${path}: missing 'vBRIEFInfo' or 'xBRIEFInfo' and/or 'plan' top-level keys. ` +
+        `vBRIEF/xBRIEF v0.5-v0.8 requires { "vBRIEFInfo" or "xBRIEFInfo": { "version": "0.5" through "0.8" }, "plan": { ... } }. ` +
         `See docs/VBRIEF.md for the correct format.`,
     )
   }
@@ -140,7 +140,7 @@ export function writeSpec(
     }
     const fs = yield* FileSystem.FileSystem
     const tmp = `${path}.tmp`
-    yield* fs.writeFileString(tmp, JSON.stringify(doc, null, 2)).pipe(
+    yield* fs.writeFileString(tmp, serializeVBriefDocument(doc)).pipe(
       Effect.mapError((cause) => new FsError({ path: tmp, operation: 'writeFileString', cause })),
     )
     yield* fs.rename(tmp, path).pipe(

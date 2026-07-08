@@ -1,7 +1,6 @@
 /**
  * vBRIEF DAG utilities — critical path, graph analysis, wave scheduling, per-item dispatch
  */
-
 import { existsSync } from 'fs';
 import { mkdir, readdir, readFile, rename, rm, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
@@ -12,6 +11,7 @@ import {
   resolveProjectForIssue,
   writeStatusOverridesSync,
 } from '../pan-dir/record.js';
+import { normalizeVBriefEnvelope, serializeVBriefDocument } from './io.js';
 
 export interface WaveItem {
   id: string;
@@ -853,7 +853,7 @@ export function validatePlanIssue(doc: VBriefDocument, issueId: string): void {
 async function writePlanFileAtomically(planPath: string, doc: VBriefDocument): Promise<void> {
   await mkdir(dirname(planPath), { recursive: true });
   const tmp = `${planPath}.${process.pid}.${Date.now()}.tmp`;
-  await writeFile(tmp, JSON.stringify(doc, null, 2), 'utf-8');
+  await writeFile(tmp, serializeVBriefDocument(doc), 'utf-8');
   await rename(tmp, planPath);
 }
 
@@ -1041,7 +1041,7 @@ export function buildPipelineMirrorFromStatus(issueId: string, status: Record<st
 }
 
 async function readPlanFileFromDisk(planPath: string): Promise<VBriefDocument> {
-  return JSON.parse(await readFile(planPath, 'utf-8')) as VBriefDocument;
+  return normalizeVBriefEnvelope(JSON.parse(await readFile(planPath, 'utf-8'))) as VBriefDocument;
 }
 
 export const readPlanFile = (planPath: string): Effect.Effect<VBriefDocument, VBriefDagError> =>

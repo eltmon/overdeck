@@ -3,10 +3,13 @@
  *
  * Promoting a generation merges the uat/* branch itself into main (one no-ff
  * merge), so main receives EXACTLY the tree the operator exercised — including
- * the assembly agent's conflict resolutions. Per-feature PRs are marked merged
- * by GitHub automatically (their head commits become reachable from main), and
- * each member issue then flows through the standard per-issue post-merge
- * lifecycle exactly once, behind the PAN-328 in-flight guard.
+ * the assembly agent's conflict resolutions. The deliberate exception is
+ * file-size baseline reconciliation: scripts/file-size-baseline.txt is CI
+ * metadata, so stale-high entries may be lowered or dropped before push.
+ * Per-feature PRs are marked merged by GitHub automatically (their head commits
+ * become reachable from main), and each member issue then flows through the
+ * standard per-issue post-merge lifecycle exactly once, behind the PAN-328
+ * in-flight guard.
  *
  * Hard precondition: the generation's baseSha must still equal origin/main —
  * promoting a stale tree would silently drop commits that landed since
@@ -20,6 +23,7 @@ import { tmpdir } from 'os';
 import { promisify } from 'util';
 import { execFile } from 'child_process';
 import type { UatGeneration, UatGenerationStatus } from '../overdeck/merge-sync.js';
+import { reconcileFileSizeBaseline } from './file-size-reconcile.js';
 import type { GenerationStorePort } from './uat-generation-engine.js';
 
 const execFileAsync = promisify(execFile);
@@ -201,7 +205,7 @@ export async function promoteUatGeneration(
   };
 }
 
-/** Real git wiring: throwaway detached worktree off origin/main, no-ff merge, push. */
+/** Real git wiring: throwaway detached worktree off origin/main, no-ff merge, baseline reconcile, push. */
 export function buildUatPromoteGitDeps(projectRoot: string): UatPromoteGitDeps {
   const runGit = (args: string[], cwd: string) =>
     execFileAsync('git', args, { cwd, maxBuffer: 16 * 1024 * 1024 });
@@ -223,6 +227,8 @@ export function buildUatPromoteGitDeps(projectRoot: string): UatPromoteGitDeps {
           .then(() => originRef)
           .catch(() => safeBranch);
         await runGit(['merge', '--no-ff', ref, '-m', message], worktreePath);
+        const { changed } = await reconcileFileSizeBaseline(worktreePath, runGit);
+        if (changed) await runGit(['commit', '--amend', '--no-edit'], worktreePath);
         await runGit(['push', 'origin', 'HEAD:main'], worktreePath);
         return (await runGit(['rev-parse', 'HEAD'], worktreePath)).stdout.trim();
       } finally {
