@@ -207,6 +207,17 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-60 tick 3 (2026-07-08) — 🔴 RED MAIN is TWO-LAYER: PAN-2507 units (FIXED) + CHRONIC flaky blocking Playwright step (~12h, since 09:31) → filed PAN-2509 + STRUCK; hold PAN-2508 close + B3 until reliably-green
+
+**The red main was NOT just PAN-2507.** CI history: last GREEN main = `c463befcde` @ 09:31Z; last 40 runs = 19 success / 20 failure — main has flip-flopped for ~12h. Root cause of the flip-flop: a single chronically flaky Playwright spec in a BLOCKING CI step.
+- **CORRECTION to tick 2:** I mis-read `gh run watch --exit-status | tail; echo $?` as green — `$?` was **tail's** exit (0), not gh's. 535206b871 actually **FAILED**. The pipe masks the real exit code — never trust `$?` after a pipe. (Lesson: capture `PIPESTATUS[0]` or run watch without a pipe.)
+- **THE FLAKE:** `src/dashboard/frontend/tests/command-deck-resource-strip.spec.ts:151` — `locator.click` on `getByTestId('sidebar-project-overdeck')` times out ("element resolved… 18× waiting for visible/enabled/stable"). Classic re-render/animation instability. Passed at last-green c463befcde; unchanged since 09:31 ⇒ FLAKY not broken. Prior de-flake: PAN-1609.
+- **SUBSTRATE GAP:** `.github/workflows/ci.yml:189` "Run Command Deck Playwright spec" runs this spec DIRECTLY (no retry/quarantine). The PAN-2373 flake policy (`flaky-quarantine.txt`, `run-flake-lane.sh`, non-blocking lane @ ci.yml:196) covers vitest, NOT this hardcoded blocking Playwright step. So a ~50% flake gates every merge.
+- **ACTION:** filed [PAN-2509](https://github.com/eltmon/overdeck/issues/2509) (blocks-main) → `pan strike PAN-2509` (session strike-pan-2509 live 18:18). Fix = stabilize the click if quick, else retry/move-to-non-blocking-lane per PAN-2373; keep coverage. Self-validating (fix ⇒ step no longer flake-blocks its own PR CI).
+- **PAN-2508:** fix CORRECT + on main (unit tests green); left at verifying-on-main [merged, blocks-main] — its issue (PAN-2507 units) IS resolved but I hold close-out until main is reliably green (post-PAN-2509) so verify-on-main is honest.
+- **B3/PAN-2167:** still planned; HOLD start until PAN-2509 lands reliably-green (starting B3 on a 50%-flaky main means B3's own merge flakes). No second Lane B item.
+- strike-pan-2508 idle (done, rate-limit dialog) — reaped when PAN-2508 closes. No pause. MIN rfm unchanged (report-only).
+
 ## RUN-60 tick 2 (2026-07-08) — 🟡 strike PAN-2508 fix LANDED on main (all 4 unit-test groups fixed) but strike PUSHED DIRECT-TO-MAIN (contract violation) + only-red-left = Command Deck Playwright flake; awaiting 535206b871 CI
 
 **Strike PAN-2508 fix is CORRECT + COMPLETE + on origin/main** (verified at code level): agentToParams `yieldedAt ?? null` + `lastYieldResumeAt ?? null` (agents-db.ts:165-166); SCHEMA_VERSION→59; barrel exports +clearYieldForResumeSync/+setAgentYieldedSync (2 matches); deacon-auto-resume os-mock fixed (passes on CI — strike used a non-literal-`homedir` approach). Strike ran full suite locally green (930 files/8969 tests). The PAN-2507 unit-test breakage is RESOLVED.
