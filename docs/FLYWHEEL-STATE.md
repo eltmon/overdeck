@@ -207,6 +207,14 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-60 tick 4 (2026-07-08) — 🟡 PAN-2509 flake fix PARTIAL (click fixed, hover still flaked) → strike found DEEPER root cause (BootReconciliationModal), applying 2nd fix; both strikes push DIRECT-TO-MAIN (B5)
+
+**PAN-2509 first fix (929f4dcdc7) was PARTIAL.** It removed `#pan-recovery-overlay` + dispatchEvent-click → the sidebar CLICK now passes (failure moved 151→162). But the SAME spec then flaked on `locator.hover` (10s timeout) — a 2nd pointer-intercept. CI on 929f4dcdc7 = FAILURE (test job, hover).
+- **DEEPER ROOT CAUSE (durable lesson — strike found it, good work):** the interceptor is **`BootReconciliationModal`**, NOT the recovery overlay. The isolated resource-strip Playwright spec does NOT mock `/api/boot-reconciliation`, so in CI the real boot state opens that full-screen modal, intercepting pointer click AND hover. **Fix = stub `/api/boot-reconciliation` as inactive in the spec** (kill the modal at the data source, don't delete DOM). Applies to ANY isolated Command Deck Playwright spec that clicks/hovers — mock boot-reconciliation to keep the app shell quiet. Strike is implementing this now (still engaged, ~23m).
+- **CI-EXIT-CODE lesson reinforced:** ran `gh run watch --exit-status; RC=$?` with NO pipe → `WATCH_RC=1` correctly captured the failure (vs tick-2's pipe-masked false-green). Pattern: `gh run watch <id> --exit-status; RC=$?` (no pipe) OR read `gh run view --json conclusion` directly.
+- **BOTH strikes pushed DIRECT-TO-MAIN** (PAN-2508 96d7e99eb2 + PAN-2509 929f4dcdc7) via `pan done --strike` instead of handing the flywheel the PR merge — SYSTEMATIC gpt-5.5 strike behavior. Each landed a red-CI commit on main. Strong B5/PAN-2360 + PAN-2300 + PAN-2270 evidence; bump B5.
+- HOLD PAN-2508 close + PAN-2509 close + B3 start until the 2nd fix lands reliably-green. No pause. MIN rfm report-only.
+
 ## RUN-60 tick 3 (2026-07-08) — 🔴 RED MAIN is TWO-LAYER: PAN-2507 units (FIXED) + CHRONIC flaky blocking Playwright step (~12h, since 09:31) → filed PAN-2509 + STRUCK; hold PAN-2508 close + B3 until reliably-green
 
 **The red main was NOT just PAN-2507.** CI history: last GREEN main = `c463befcde` @ 09:31Z; last 40 runs = 19 success / 20 failure — main has flip-flopped for ~12h. Root cause of the flip-flop: a single chronically flaky Playwright spec in a BLOCKING CI step.
