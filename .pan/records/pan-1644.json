@@ -41,17 +41,14 @@
       "reason": "feedback",
       "note": "[2026-07-08T00:29Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-08T00:29:48.443Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-08T00:29:48Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1644\n\nTitle refinement debounce and API-error Stop hook blockers remain\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1644 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T00:40:00.759Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/records/pan-1644.json",
@@ -169,19 +166,20 @@
   },
   "pipeline": {
     "issueId": "PAN-1644",
-    "reviewStatus": "blocked",
-    "testStatus": "pending",
+    "reviewStatus": "reviewing",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-08T00:29:44.200Z",
-    "reviewNotes": "Title refinement debounce and API-error Stop hook blockers remain",
-    "testNotes": "typecheck passed; lint passed; npm test failed. Blocking failures: (1) tests/unit/lib/overdeck/no-loss-matrix.test.ts requires matrix entries for new PAN-1644 routes: POST /api/admin/conversations/backfill-titles, POST /api/hooks/user-prompt-submit, POST /api/hooks/turn-complete. (2) tests/integration/agent-spawning.test.ts resumeAgent redelivery timed out at 30000ms. Browser UAT not exercised because automated gates failed.",
+    "updatedAt": "2026-07-08T00:40:56.740Z",
+    "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "inspectNotes": "Bead title-changed-event ack: ConversationTitleChangedEvent schema added to DomainEvent union with {conversationName,title,titleSource} payload, reducer case bumps conversationsListRevision by 1 (test confirms 7->8), and updateConversationTitle() emits via getEventStore().emitOnly() (sequence auto-assigned by Omit<DomainEvent,\"sequence\"> signature) wrapped in try/catch so persistence never throws when the event store is uninitialized (both paths unit-tested). All 3 ACs met.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2480",
     "reviewedAtCommit": "11f9b9c0b7690f83777ffd740354f913f60e5a0a",
-    "lastVerifiedCommit": "bfac0a4fb83cac050de2c672db8cf904c0882ade",
+    "lastVerifiedCommit": "32701639ed82aa42456d74475f822d0a552ad401",
     "reviewRequestedAt": "2026-07-08T00:07:22.385Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -258,9 +256,9 @@
       "byStage": {
         "codex": {
           "openai/gpt-5.5": {
-            "input": 4416957,
-            "output": 11978,
-            "cacheRead": 3757440,
+            "input": 5580105,
+            "output": 13831,
+            "cacheRead": 4911232,
             "cacheWrite": 0
           }
         },
@@ -298,18 +296,18 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 3021580,
-            "output": 260286,
-            "cacheRead": 129299456,
+            "input": 3067403,
+            "output": 276599,
+            "cacheRead": 135238144,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 4416957,
-          "output": 11978,
-          "cacheRead": 3757440,
+          "input": 5580105,
+          "output": 13831,
+          "cacheRead": 4911232,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -331,15 +329,15 @@
           "cacheWrite": 86241
         },
         "custom/kimi-k2.7-code": {
-          "input": 3395451,
-          "output": 269482,
-          "cacheRead": 132273152,
+          "input": 3441274,
+          "output": 285795,
+          "cacheRead": 138211840,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 48.756013,
-        "pricingAsOf": "2026-07-08T00:29:44.238Z"
+        "usd": 50.672417,
+        "pricingAsOf": "2026-07-08T00:40:56.798Z"
       }
     },
     "merges": [
@@ -366,5 +364,5 @@
     }
   },
   "created": "2026-07-07T23:49:56.919Z",
-  "updated": "2026-07-08T00:29:48.443Z"
+  "updated": "2026-07-08T00:40:56.798Z"
 }
