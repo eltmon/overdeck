@@ -10,23 +10,22 @@ import { listRunningAgentsSync } from '../agents/queries.js';
 import { getAgentRuntimeStateSync } from '../agents/runtime-state.js';
 import { setAgentPausedSync, GOVERNOR_SLOT_PAUSE_REASON_PREFIX } from '../agents/agent-state.js';
 import { stopAgentSync } from '../agents/termination.js';
+import {
+  getCachedMemoryVerdict,
+  setCachedMemoryVerdict,
+  type MemoryPressureBand,
+  type MemoryPressureThresholds,
+  type MemoryVerdict,
+} from './memory-verdict-cache.js';
 
 const execFileAsync = promisify(execFile);
 
 const GIB = 1024 ** 3;
 
-export type MemoryPressureBand = 'ok' | 'soft' | 'hard';
-
-export interface MemoryPressureThresholds {
-  warningBytes: number;
-  criticalBytes: number;
-}
-
-export interface MemoryVerdict {
-  band: MemoryPressureBand;
-  availableBytes: number;
-  thresholds: MemoryPressureThresholds;
-}
+// Re-exported for backward compatibility — memory-verdict-cache.ts is now the
+// canonical source (it must have no imports of its own to stay cycle-free).
+export type { MemoryPressureBand, MemoryPressureThresholds, MemoryVerdict };
+export { getCachedMemoryVerdict };
 
 /**
  * Shared memory-pressure predicate — the single source of truth for both the
@@ -65,30 +64,11 @@ export interface GovernorReserves {
 }
 
 let governorMode: GovernorMode = 'admitting';
-let cachedVerdict: MemoryVerdict | null = null;
 
 /** Test-only: reset the module-level hysteresis state between test cases. */
 export function resetGovernorModeForTests(): void {
   governorMode = 'admitting';
-  cachedVerdict = null;
-}
-
-/**
- * The verdict from the most recent assessMemoryPressure() call, or null before
- * any patrol has run one. Synchronous — no I/O — so synchronous call sites
- * (PAN-2500 specialist-budget: canDispatchAdvancing/tryReserveAdvancingSlot in
- * concurrency.ts, called from many places across deacon.ts/deacon-review-status.ts)
- * can consult live-ish memory pressure without becoming async themselves. At
- * most one patrol cycle stale; wire-deacon-gate already calls
- * assessMemoryPressure every patrol before advancing dispatch runs.
- */
-export function getCachedMemoryVerdict(): MemoryVerdict | null {
-  return cachedVerdict;
-}
-
-/** Test-only. */
-export function setCachedMemoryVerdictForTests(verdict: MemoryVerdict | null): void {
-  cachedVerdict = verdict;
+  setCachedMemoryVerdict(null);
 }
 
 export function readGovernorReserves(): GovernorReserves {
@@ -142,7 +122,7 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
     availableBytes: snapshot.memAvailable,
     thresholds: { warningBytes: reserves.softBytes, criticalBytes: reserves.hardBytes },
   };
-  cachedVerdict = verdict;
+  setCachedMemoryVerdict(verdict);
   return verdict;
 }
 

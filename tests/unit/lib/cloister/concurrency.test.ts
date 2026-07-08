@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, vi } from 'vitest';
 
 const getCachedMemoryVerdictMock = vi.fn();
 
-vi.mock('../../../../src/lib/cloister/memory-governor.js', () => ({
+vi.mock('../../../../src/lib/cloister/memory-verdict-cache.js', () => ({
   getCachedMemoryVerdict: (...args: unknown[]) => getCachedMemoryVerdictMock(...args),
 }));
 

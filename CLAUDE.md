@@ -319,7 +319,7 @@ After 3 consecutive failures, verification is bypassed to prevent permanent bloc
 
 ## Agent Auto-Resume Gates
 
-Deacon auto-resume is intentionally suppressible through three gates:
+Deacon auto-resume is intentionally suppressible through four gates:
 
 - **Boot no-resume:** `OVERDECK_NO_RESUME=1`, `pan dev --no-resume`, or
   `pan up --no-resume` disables orphan recovery and stopped-agent auto-resume for
@@ -332,6 +332,14 @@ Deacon auto-resume is intentionally suppressible through three gates:
   preserve failure counters/backoff state in `state.json`. `pan untroubled <id>`
   clears the troubled gate and failure fields after the underlying crash cause has
   been investigated. It does not spawn the agent.
+- **Memory gate (PAN-2500):** `assessMemoryPressure()` in `src/lib/cloister/memory-governor.ts`
+  gates every autonomous resume/dispatch path — boot recovery, patrol auto-resume,
+  reactive resume-on-stop, and review/test/ship dispatch — on live memory pressure,
+  not just agent count and CPU load. Below the SOFT reserve it defers new admissions;
+  below HARD it sheds (stops merged/closed docker stacks, then pauses idle work
+  agents); it never re-admits until memory clears RECOVERY. See
+  [`docs/RESOURCE-GOVERNOR.md`](docs/RESOURCE-GOVERNOR.md) for the full model. This
+  is separate from `--no-resume`, which suppresses resume outright regardless of memory.
 
 These gates are orthogonal to the global Deacon freeze in SQLite
 (`deacon.globally_paused`) and the per-issue Deacon ignore flag in review status.

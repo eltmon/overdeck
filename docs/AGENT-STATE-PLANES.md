@@ -39,6 +39,13 @@ Overdeck splits every piece of agent and pipeline state into exactly one of thre
 - A tmux session named after the agent id exists on socket `-L overdeck`.
 - Lifecycle events project agent status, but tmux remains the ground truth for physical presence.
 
+**Admission is memory-governed (PAN-2500).** Before the deacon starts a new tmux session for an
+agent — boot recovery, patrol auto-resume, or reactive resume-on-stop — it now consults
+`assessMemoryPressure()` alongside the existing count and load gates. See
+[`docs/RESOURCE-GOVERNOR.md`](RESOURCE-GOVERNOR.md) for the full model. The managed tmux server
+unit (`overdeck-tmux-server.service`) also carries `ManagedOOMPreference=avoid`, so a governor miss
+degrades gracefully instead of `systemd-oomd` killing every agent process at once.
+
 ## Infra-repo configuration (`pan_records`)
 
 Each project in `projects.yaml` declares where `.pan/` records are committed:

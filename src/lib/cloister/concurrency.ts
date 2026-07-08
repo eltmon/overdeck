@@ -25,7 +25,7 @@ import {
   getAgentRuntimeStateSync,
 } from '../agents.js';
 import { countAgentsByStatus } from '../overdeck/agents.js';
-import { getCachedMemoryVerdict } from './memory-governor.js';
+import { getCachedMemoryVerdict } from './memory-verdict-cache.js';
 
 const DEFAULT_MAX_WORK_AGENTS = 6;
 const DEFAULT_RESERVED_ADVANCING_SLOTS = 3;
