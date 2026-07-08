@@ -6,6 +6,7 @@ import { isStartingWithinGrace } from './agent-grace.js';
 import { resumedBootReconciliationOutcome, skippedBootReconciliationOutcome, skippedBootReconciliationOutcomes, type BootReconciliationApplyResult, type BootReconciliationOutcome } from './boot-reconciliation-outcomes.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { getConcurrencyLimits, countRunningAgents, workResumeSlotsAvailable } from './concurrency.js';
+import { assessMemoryPressure } from './memory-governor.js';
 import {
   getBootReconciliationHeldResumeSet,
   getBootReconciliationPendingHoldSet,
@@ -754,6 +755,11 @@ export async function handleAgentStoppedEvent(
       logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} deferred — load gate tripped (load1=${load1.toFixed(2)} > ${loadCeiling.toFixed(2)})`);
       return null;
     }
+    const memVerdict = await assessMemoryPressure();
+    if (memVerdict.band !== 'ok') {
+      logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} deferred — memory gate (${memVerdict.band}), availMB=${Math.round(memVerdict.availableBytes / 1048576)}`);
+      return null;
+    }
   }
 
   const runtimeStateForLog = getAgentRuntimeStateSync(agentId);
@@ -855,6 +861,11 @@ export async function autoResumeStoppedWorkAgents(deps: AutoResumeNotifierDeps):
       logDeaconEventSync(`autoResumeStoppedWorkAgents: load gate tripped (load1=${load1.toFixed(2)} > ${loadCeiling.toFixed(2)} = ${cores} cores * ${RESUME_LOAD_FACTOR}); deferring remaining candidates to next patrol`);
       break;
     }
+    const memVerdict = await assessMemoryPressure();
+    if (memVerdict.band !== 'ok') {
+      logDeaconEventSync(`autoResumeStoppedWorkAgents: memory gate (${memVerdict.band}), availMB=${Math.round(memVerdict.availableBytes / 1048576)}; deferring remaining candidates to next patrol`);
+      break;
+    }
     // Stagger spawns so the scheduler can absorb each `claude` before the next.
     if (resumeAttempts > 0) {
       await new Promise(r => setTimeout(r, RESUME_STAGGER_MS));
@@ -930,6 +941,14 @@ export async function applyBootReconciliationDecision(
       const deferredAgents = candidates.slice(index);
       deferred += deferredAgents.length;
       outcomes.push(...skippedBootReconciliationOutcomes(deferredAgents, 'deferred-load'));
+      break;
+    }
+    const memVerdict = await assessMemoryPressure();
+    if (memVerdict.band !== 'ok') {
+      logDeaconEventSync(`applyBootReconciliationDecision: memory gate (${memVerdict.band}), availMB=${Math.round(memVerdict.availableBytes / 1048576)}; deferring remaining candidates`);
+      const deferredAgents = candidates.slice(index);
+      deferred += deferredAgents.length;
+      outcomes.push(...skippedBootReconciliationOutcomes(deferredAgents, 'deferred-memory'));
       break;
     }
     if (resumeAttempts > 0) {
