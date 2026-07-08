@@ -92,6 +92,35 @@ stack RSS + a small reserve for tool spikes like Playwright/vitest) is not measu
 docker-stack component dominates and is what `estimateFootprint` measures; the process/tool-spike
 component is covered by the SOFT reserve's margin rather than tracked per-agent.
 
+### Memory-DRIVEN admission ceiling (PAN-2504)
+
+PAN-2500 shipped the footprint budget as a **brake** — `assessMemoryPressure()` *defers* new
+admissions once free RAM drops below the SOFT reserve. But the admission **ceiling** stayed a fixed
+count (`max_work_agents`, default 6), so a large box idled far below its RAM: the governor never
+*drove utilization up* toward the budget, it only stopped a flood.
+
+PAN-2504 closes that gap. When `concurrency.memory_driven = true`, `workResumeSlotsAvailable()`
+returns a **memory-derived** ceiling instead of `max_work_agents - running`:
+
+```
+additional_slots = floor((availableBytes − softReserve) / work_footprint_gb)
+                   capped by (memory_driven_max_work_agents − running_work)
+```
+
+The SOFT reserve is read from the cached memory verdict's `thresholds.warningBytes`, so the
+computation is synchronous and needs no import of the governor (avoiding the dependency cycle that
+`memory-verdict-cache.ts` exists to break). `availableBytes` already reflects running agents' RSS,
+so the result is genuinely *how many more fit*. Every deacon admission path
+(`handleAgentStoppedEvent`, `autoResumeStoppedWorkAgents`, `applyBootReconciliationDecision`)
+consults `workResumeSlotsAvailable`, so all three become memory-driven at once.
+
+Safety: the upfront slot count *is* the projected budget (footprints that fit under the reserve), so
+one patrol admitting up to it cannot exceed the budget even before RSS materializes; the
+per-iteration `assessMemoryPressure()` brake is the real-time floor if the footprint estimate was
+too low; and `memory_driven_max_work_agents` is a hard upper bound. The mode is **opt-in** (default
+`false`) — unset installs keep the fixed count cap. When the governor has not yet published a
+verdict, the helper fails safe to the count cap rather than admitting blind.
+
 ## Eviction ladder
 
 `shed()` runs only when the band is `hard`. It reclaims cheapest-value-first:
@@ -147,6 +176,15 @@ Percentage defaults are computed once at process startup from `os.totalmem()`
 (`computeGovernorReserveDefaultsGb` in `src/lib/config-yaml/defaults.ts`) — they scale to the host,
 not a fixed constant. Every value can be overridden explicitly in `config.yaml`; an unset value
 always falls back to the documented default, never a silent inline literal.
+
+The **memory-driven admission ceiling** (PAN-2504) is configured separately, under `[concurrency]`
+in `~/.overdeck/cloister.toml` (the cloister config, not `config.yaml`):
+
+| Key | Default | Meaning |
+|---|---|---|
+| `memory_driven` | `false` | Opt-in. When true, the work-agent ceiling is the live memory budget instead of `max_work_agents`. |
+| `memory_driven_max_work_agents` | `24` | Hard safety cap on concurrent work agents when `memory_driven` is on. |
+| `work_footprint_gb` | `2` | Per-work-agent RSS estimate used for the budget. Larger ⇒ fewer, more conservative admissions. |
 
 ## Related documents
 
