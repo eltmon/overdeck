@@ -44,14 +44,16 @@
   },
   "pipeline": {
     "issueId": "PAN-2297",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-08T01:32:31.941Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-08T01:34:16.537Z",
+    "testNotes": "typecheck passed; lint passed (skills, prompts, file-size, source-introspection, no-coderabbit-merge-gate, circular, ratchet-audit, quarantine-audit); tests passed: file-size-reconcile.test.ts (3/3), uat-promote.test.ts (10/10), uat-promote-baseline.test.ts (1/1 real-git integration reproducing PAN-2296). No browser UAT required — acceptance criteria are backend/git/CI only.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2482",
+    "reviewedAtCommit": "39930d20cf3ca4ec890033539ab22a2d291037d8",
     "lastVerifiedCommit": "f10d394daf193102f72494a95069720ae1f3c7ee",
     "reviewRequestedAt": "2026-07-08T01:32:20.693Z"
   },
@@ -60,15 +62,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 6891808,
-            "output": 10288,
-            "cacheRead": 6163584,
+            "input": 6955727,
+            "output": 10397,
+            "cacheRead": 6177664,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 32660299,
-            "output": 63096,
-            "cacheRead": 31123584,
+            "input": 33391952,
+            "output": 64207,
+            "cacheRead": 31704192,
             "cacheWrite": 0
           },
           "unknown": {
@@ -127,15 +129,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 6891808,
-          "output": 10288,
-          "cacheRead": 6163584,
+          "input": 6955727,
+          "output": 10397,
+          "cacheRead": 6177664,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 32980949,
-          "output": 70913,
-          "cacheRead": 32101504,
+          "input": 33712602,
+          "output": 72024,
+          "cacheRead": 32682112,
           "cacheWrite": 0
         },
         "unknown": {
@@ -170,8 +172,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 61.768133,
-        "pricingAsOf": "2026-07-08T01:32:32.107Z"
+        "usd": 62.846992,
+        "pricingAsOf": "2026-07-08T01:34:16.600Z"
       }
     },
     "merges": [],
@@ -182,5 +184,5 @@
     "finalizedAt": "2026-07-08T01:15:23.672Z"
   },
   "created": "2026-07-07T23:25:44.874Z",
-  "updated": "2026-07-08T01:32:33.594Z"
+  "updated": "2026-07-08T01:34:16.612Z"
 }
