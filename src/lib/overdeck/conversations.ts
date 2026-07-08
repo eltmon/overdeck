@@ -24,6 +24,7 @@ import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getOverdeckHome } from '../paths.js';
 import { Db, EventBus, getOverdeckDatabaseSync } from './infra.js';
+import { getEventStore } from '../../dashboard/server/event-store.js';
 import { ensureDiscoveredSessionsSchema } from './discovered-sessions.js';
 
 // ── Local Drizzle table definitions ──────────────────────────────────────────
@@ -618,7 +619,7 @@ export const ConversationsApi = HttpApiGroup.make('conversations')
 // moving the storage boundary to overdeck.db. They must not call the legacy
 // panopticon.db conversation helpers.
 
-export type LegacyTitleSource = 'auto' | 'ai' | 'ai-refined' | 'manual' | 'default';
+export type LegacyTitleSource = 'auto' | 'ai' | 'ai-refined' | 'ai-explicit' | 'manual' | 'default';
 
 export interface ForkRequest {
   parentConversationName: string;
@@ -1301,6 +1302,15 @@ export function updateConversationTitle(name: string, title: string, titleSource
   overdeckDb()
     .prepare(`UPDATE conversations SET title = ?, title_source = COALESCE(?, title_source) WHERE name = ?`)
     .run(title, titleSource ?? null, name);
+  try {
+    getEventStore().emitOnly({
+      type: 'conversation.title_changed',
+      timestamp: new Date().toISOString(),
+      payload: { conversationName: name, title, titleSource: titleSource ?? '' },
+    });
+  } catch {
+    // Event store is uninitialized in CLI/test contexts; title persistence is enough.
+  }
 }
 
 export function archiveConversation(name: string): void {
@@ -1416,6 +1426,13 @@ export function clearStuckForks(): number {
 export function canReplaceTitle(conv: LegacyConversation): boolean {
   if (conv.titleSource === 'manual') return false;
   return conv.titleSource === 'default' || conv.titleSource === 'auto';
+}
+
+export function canRefineTitle(conv: LegacyConversation): boolean {
+  return conv.titleSource === 'default'
+    || conv.titleSource === 'auto'
+    || conv.titleSource === 'ai'
+    || conv.titleSource === 'ai-refined';
 }
 
 export function listFavoritedIds(type: LegacyFavoriteType): string[] {

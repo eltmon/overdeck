@@ -39,6 +39,11 @@ if [ -z "$INTERNAL_TOKEN" ]; then
 fi
 
 if command -v jq >/dev/null 2>&1; then
+  TITLE_BODY=$(printf '%s' "$INPUT" | jq -c '{session_id: (.session_id // ""), prompt: (.prompt // .message // .input // "")}' 2>/dev/null)
+  if [ -n "$TITLE_BODY" ]; then
+    curl -s -m 1 -X POST -H 'Content-Type: application/json' -H "x-overdeck-internal-token: $INTERNAL_TOKEN" --data "$TITLE_BODY" "$PAN_DASHBOARD_URL/api/hooks/user-prompt-submit" >/dev/null 2>&1 || true
+  fi
+
   INJECT_BODY=$(printf '%s' "$INPUT" | jq -c --arg agentId "$AGENT_ID" '{prompt: (.prompt // .message // .input // ""), sessionId: (.session_id // ""), agentId: $agentId}' 2>/dev/null)
   if [ -n "$INJECT_BODY" ]; then
     INJECT_RESPONSE=$(curl -s -m 1 -X POST -H 'Content-Type: application/json' -H "x-overdeck-internal-token: $INTERNAL_TOKEN" --data "$INJECT_BODY" "$PAN_DASHBOARD_URL/api/memory/inject" 2>/dev/null || true)

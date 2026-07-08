@@ -59,6 +59,7 @@ Verbs that **don't** get wrapped (current exclusion list, with rationale):
 | `pan scope`, `pan swarm`, `pan workspace`, `pan test` | Power-user commands documented in topical/workflow skills as needed. |
 | `pan cost`, `pan update`, `pan serve` | Operations whose `--help` is self-contained. |
 | `pan health` | Distinct from `pan doctor`; runtime-health output is meant to be read directly. |
+| `pan admin conversations` | Internal backfill utility; `--help` covers the single subcommand. |
 
 This list is **deliberate, not aspirational.** Adding a wrapper for any of these should be justified case-by-case.
 
