@@ -6,9 +6,83 @@
       "reason": "resume",
       "agentModel": "kimi-k2.7-code",
       "timestamp": "2026-07-08T02:09:12.953Z"
+    },
+    {
+      "timestamp": "2026-07-08T02:37:28.340Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/records/pan-1644.json",
+      "scripts/file-size-baseline.txt",
+      "sync-sources/hooks/record-cost-event.js.map",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts"
+    ],
+    "declaredScopeUntouched": [
+      "skills/pan-admin-config/SKILL.md",
+      "src/cli/index.ts"
+    ],
+    "declaredScope": [
+      "docs/SKILLS-CONVENTION.md",
+      "packages/contracts/src/event-reducers.ts",
+      "packages/contracts/src/events.ts",
+      "skills/pan-admin-config/SKILL.md",
+      "src/cli/commands/admin/conversations-handler.ts",
+      "src/cli/commands/admin/index.ts",
+      "src/cli/index.ts",
+      "src/dashboard/server/routes/__tests__/admin-backfill-titles.test.ts",
+      "src/dashboard/server/routes/__tests__/hooks-turn-complete.test.ts",
+      "src/dashboard/server/routes/__tests__/hooks-user-prompt.test.ts",
+      "src/dashboard/server/routes/admin.ts",
+      "src/dashboard/server/routes/hooks.ts",
+      "src/lib/conversations/transcript-summary.ts",
+      "src/lib/overdeck/conversation-message.ts",
+      "src/lib/overdeck/conversation-reads.ts",
+      "src/lib/overdeck/conversations.ts",
+      "src/lib/overdeck/title-refinement.ts",
+      "sync-sources/hooks/stop-hook*",
+      "sync-sources/hooks/user-prompt-submit-hook*",
+      "tests/dashboard/event-reducers.test.ts",
+      "tests/unit/lib/conversations/derive-prompt-title.test.ts",
+      "tests/unit/lib/overdeck/conversation-message-title.test.ts",
+      "tests/unit/lib/overdeck/title-events.test.ts",
+      "tests/unit/lib/overdeck/title-refinement.test.ts",
+      "tests/unit/lib/overdeck/title-sources.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".pan/records/pan-1644.json",
+      "docs/SKILLS-CONVENTION.md",
+      "packages/contracts/src/event-reducers.ts",
+      "packages/contracts/src/events.ts",
+      "scripts/file-size-baseline.txt",
+      "src/cli/commands/admin/conversations-handler.ts",
+      "src/cli/commands/admin/index.ts",
+      "src/dashboard/server/routes/__tests__/admin-backfill-titles.test.ts",
+      "src/dashboard/server/routes/__tests__/hooks-turn-complete.test.ts",
+      "src/dashboard/server/routes/__tests__/hooks-user-prompt.test.ts",
+      "src/dashboard/server/routes/admin.ts",
+      "src/dashboard/server/routes/hooks.ts",
+      "src/lib/conversations/transcript-summary.ts",
+      "src/lib/overdeck/conversation-message.ts",
+      "src/lib/overdeck/conversation-reads.ts",
+      "src/lib/overdeck/conversations.ts",
+      "src/lib/overdeck/title-refinement.ts",
+      "sync-sources/hooks/record-cost-event.js.map",
+      "sync-sources/hooks/stop-hook",
+      "sync-sources/hooks/user-prompt-submit-hook",
+      "tests/dashboard/event-reducers.test.ts",
+      "tests/unit/lib/conversations/derive-prompt-title.test.ts",
+      "tests/unit/lib/overdeck/conversation-message-title.test.ts",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts",
+      "tests/unit/lib/overdeck/title-events.test.ts",
+      "tests/unit/lib/overdeck/title-refinement.test.ts",
+      "tests/unit/lib/overdeck/title-sources.test.ts"
+    ],
+    "recordedAt": "2026-07-08T02:37:17.830Z"
+  },
   "harness": "claude-code",
   "model": "kimi-k2.7-code",
   "statusOverrides": {
@@ -63,12 +137,12 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": true,
-    "updatedAt": "2026-07-08T02:37:10.089Z",
+    "updatedAt": "2026-07-08T02:41:09.995Z",
     "reviewNotes": "No blocking findings; focused title hook tests passed",
     "testNotes": "typecheck passed; lint passed (including skills, prompts, file-size, source-introspection, circular, ratchet, quarantine audits); npm test passed (921 test files passed, 8875 tests passed, 4/52 skipped; frontend issueActions tests passed). Browser UAT exercised on workspace dashboard (port 3020): loaded dashboard, opened conversation 20260707-2531, retitled from 'Conversation retitle history and status' to 'PAN-1644 UAT Test Title', and verified the new title propagated to both the conversation header and the left sidebar conversation list.",
     "inspectNotes": "Bead title-changed-event ack: ConversationTitleChangedEvent schema added to DomainEvent union with {conversationName,title,titleSource} payload, reducer case bumps conversationsListRevision by 1 (test confirms 7->8), and updateConversationTitle() emits via getEventStore().emitOnly() (sequence auto-assigned by Omit<DomainEvent,\"sequence\"> signature) wrapped in try/catch so persistence never throws when the event store is uninitialized (both paths unit-tested). All 3 ACs met.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2480",
-    "reviewedAtCommit": "ee182f011f468d4b2ea7fb4168e41e9aa33224e0",
+    "reviewedAtCommit": "776f9afd72c7c3b3a11c9b151c64c6fbf1c46dc1",
     "lastVerifiedCommit": "c9df3272408f6beb50a1981f57e455335c229a3b",
     "reviewRequestedAt": "2026-07-08T02:07:59.245Z",
     "scopeDrift": {
@@ -227,7 +301,7 @@
       },
       "costAtCloseOut": {
         "usd": 68.928534,
-        "pricingAsOf": "2026-07-08T02:37:10.114Z"
+        "pricingAsOf": "2026-07-08T02:41:10.055Z"
       }
     },
     "merges": [
@@ -254,5 +328,5 @@
     }
   },
   "created": "2026-07-08T02:09:12.766Z",
-  "updated": "2026-07-08T02:37:10.119Z"
+  "updated": "2026-07-08T02:41:10.073Z"
 }
