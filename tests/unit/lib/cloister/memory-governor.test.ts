@@ -4,6 +4,14 @@ const readProcMemoryMock = vi.fn();
 const loadConfigSyncMock = vi.fn();
 const getStatsMock = vi.fn();
 const resolveProjectFromIssueSyncMock = vi.fn();
+const loadCloisterConfigSyncMock = vi.fn();
+const listRunningAgentsSyncMock = vi.fn();
+const getAgentRuntimeStateSyncMock = vi.fn();
+const setAgentPausedSyncMock = vi.fn();
+const stopAgentSyncMock = vi.fn();
+const execFileMock = vi.fn((_cmd: string, _args: string[], _opts: unknown, cb: (err: unknown, res: { stdout: string; stderr: string }) => void) => {
+  cb(null, { stdout: '', stderr: '' });
+});
 
 vi.mock('../../../../src/dashboard/server/services/system-health-service.js', () => ({
   readProcMemory: (...args: unknown[]) => readProcMemoryMock(...args),
@@ -21,6 +29,31 @@ vi.mock('../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssueSync: (...args: unknown[]) => resolveProjectFromIssueSyncMock(...args),
 }));
 
+vi.mock('../../../../src/lib/cloister/config.js', () => ({
+  loadCloisterConfigSync: (...args: unknown[]) => loadCloisterConfigSyncMock(...args),
+}));
+
+vi.mock('../../../../src/lib/agents/queries.js', () => ({
+  listRunningAgentsSync: (...args: unknown[]) => listRunningAgentsSyncMock(...args),
+}));
+
+vi.mock('../../../../src/lib/agents/runtime-state.js', () => ({
+  getAgentRuntimeStateSync: (...args: unknown[]) => getAgentRuntimeStateSyncMock(...args),
+}));
+
+vi.mock('../../../../src/lib/agents/agent-state.js', () => ({
+  setAgentPausedSync: (...args: unknown[]) => setAgentPausedSyncMock(...args),
+  GOVERNOR_SLOT_PAUSE_REASON_PREFIX: '[governor-slot]',
+}));
+
+vi.mock('../../../../src/lib/agents/termination.js', () => ({
+  stopAgentSync: (...args: unknown[]) => stopAgentSyncMock(...args),
+}));
+
+vi.mock('node:child_process', () => ({
+  execFile: (...args: unknown[]) => (execFileMock as any)(...args),
+}));
+
 import {
   assessMemoryPressure,
   classifyMemoryPressure,
@@ -30,6 +63,9 @@ import {
   estimateFootprint,
   canAdmit,
   getCachedMemoryVerdict,
+  selectStackShedCandidates,
+  selectAgentToPause,
+  shed,
   type GovernorReserves,
 } from '../../../../src/lib/cloister/memory-governor.js';
 import { getResourceStacks, type ResourceStack, type StackContainerResource } from '../../../../src/dashboard/server/routes/resources/stacks.js';
@@ -222,5 +258,105 @@ describe('canAdmit (PAN-2500 footprint-budget)', () => {
       availableBytes -= footprintEach;
     }
     expect(admitted).toBe(4); // 4 * 5GB = 20GB budget exactly; the 5th has nothing left
+  });
+});
+
+function mergedStack(issueId: string, memoryBytes: number, serviceId = `${issueId.toLowerCase()}-svc-1`): ResourceStack {
+  return {
+    id: issueId,
+    issueId,
+    issueTitle: issueId,
+    composeProject: `feature-${issueId.toLowerCase()}`,
+    serviceCount: 1,
+    services: [{ id: serviceId, name: serviceId, memoryUsage: memoryBytes, status: 'running' }] as StackContainerResource[],
+    aggregates: { cpuPercent: 0, memoryBytes, diskBytes: 0 },
+    phase: 'merged',
+  };
+}
+
+describe('selectStackShedCandidates (PAN-2500 tiered-eviction)', () => {
+  it('selects merged/closed stacks with no live agent referencing them, via buildReclaimPayload (never re-derived)', () => {
+    const stacks = [mergedStack('PAN-1', 2 * GIB), { ...mergedStack('PAN-2', 1 * GIB), phase: 'work' as const }];
+    const result = selectStackShedCandidates(stacks, []);
+    expect(result.map((s) => s.issueId)).toEqual(['PAN-1']);
+  });
+
+  it('excludes a merged stack whose issue still has a live agent session', () => {
+    const stacks = [mergedStack('PAN-1', 2 * GIB)];
+    const result = selectStackShedCandidates(stacks, [{ issueId: 'PAN-1', hasLiveTmuxSession: true }]);
+    expect(result).toEqual([]);
+  });
+});
+
+describe('selectAgentToPause (PAN-2500 tiered-eviction)', () => {
+  const agents = [
+    { id: 'agent-pan-1', issueId: 'PAN-1', flywheelRunId: 'run-1' },
+    { id: 'agent-pan-2', issueId: 'PAN-2', flywheelRunId: undefined }, // operator-started
+  ];
+
+  it('never selects an operator-attached (no flywheelRunId) agent when exemptOperatorStarted is true', () => {
+    const result = selectAgentToPause(agents, () => true, true);
+    expect(result?.id).toBe('agent-pan-1');
+  });
+
+  it('only selects an idle agent', () => {
+    const result = selectAgentToPause(agents, (id) => id === 'agent-pan-2', true);
+    // agent-pan-2 is idle but operator-started (exempt) -> no eligible candidate
+    expect(result).toBeNull();
+  });
+
+  it('considers all candidates when exemptOperatorStarted is false', () => {
+    const result = selectAgentToPause(agents, (id) => id === 'agent-pan-2', false);
+    expect(result?.id).toBe('agent-pan-2');
+  });
+});
+
+describe('shed() (PAN-2500 tiered-eviction integration)', () => {
+  beforeEach(() => {
+    resetGovernorModeForTests();
+    loadConfigSyncMock.mockReturnValue({
+      config: { resources: { governorSoftReserveGb: 8, governorHardReserveGb: 4, governorRecoveryReserveGb: 12 } },
+    });
+    loadCloisterConfigSyncMock.mockReturnValue({ concurrency: { exempt_operator_started: true } });
+    execFileMock.mockClear();
+    setAgentPausedSyncMock.mockClear();
+    stopAgentSyncMock.mockClear();
+  });
+
+  it('stops both merged stacks first, then pauses the idle agent only if still HARD afterward (PRD AC-4)', async () => {
+    getStatsMock.mockReturnValue([]); // stacks come from getResourceStacks(containers); stub via direct override below
+    const stacks = [mergedStack('PAN-1', 1 * GIB, 'pan-1-svc'), mergedStack('PAN-2', 1 * GIB, 'pan-2-svc')];
+    vi.spyOn(await import('../../../../src/dashboard/server/routes/resources/stacks.js'), 'getResourceStacks').mockReturnValue(stacks);
+
+    listRunningAgentsSyncMock.mockReturnValue([
+      { id: 'agent-pan-3', issueId: 'PAN-3', role: 'work', tmuxActive: true, flywheelRunId: 'run-1' },
+    ]);
+    getAgentRuntimeStateSyncMock.mockReturnValue({ state: 'idle' });
+    // First assess (after stacks): still hard. Second (after pausing the agent): clears to ok.
+    readProcMemoryMock.mockResolvedValueOnce({ memAvailable: 1 * GIB }).mockResolvedValue({ memAvailable: 20 * GIB });
+
+    const result = await shed();
+
+    expect(result.stoppedStacks.sort()).toEqual(['PAN-1', 'PAN-2']);
+    expect(execFileMock).toHaveBeenCalledWith('docker', ['stop', '--time', '30', 'pan-1-svc'], expect.anything(), expect.anything());
+    expect(execFileMock).toHaveBeenCalledWith('docker', ['stop', '--time', '30', 'pan-2-svc'], expect.anything(), expect.anything());
+    expect(execFileMock).not.toHaveBeenCalledWith('docker', expect.arrayContaining(['pause']), expect.anything(), expect.anything());
+    expect(result.pausedAgents).toEqual(['agent-pan-3']);
+    expect(setAgentPausedSyncMock).toHaveBeenCalledWith('agent-pan-3', expect.stringContaining('[governor-slot]'), true);
+    expect(stopAgentSyncMock).toHaveBeenCalledWith('agent-pan-3');
+  });
+
+  it('never sheds an operator-attached (no flywheelRunId) agent even under sustained HARD pressure', async () => {
+    vi.spyOn(await import('../../../../src/dashboard/server/routes/resources/stacks.js'), 'getResourceStacks').mockReturnValue([]);
+    listRunningAgentsSyncMock.mockReturnValue([
+      { id: 'agent-operator', issueId: 'PAN-4', role: 'work', tmuxActive: true, flywheelRunId: undefined },
+    ]);
+    getAgentRuntimeStateSyncMock.mockReturnValue({ state: 'idle' });
+    readProcMemoryMock.mockResolvedValue({ memAvailable: 1 * GIB }); // stays hard forever
+
+    const result = await shed();
+
+    expect(result.pausedAgents).toEqual([]);
+    expect(setAgentPausedSyncMock).not.toHaveBeenCalled();
   });
 });

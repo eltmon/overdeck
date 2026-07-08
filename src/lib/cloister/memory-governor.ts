@@ -1,8 +1,17 @@
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { readProcMemory } from '../../dashboard/server/services/system-health-service.js';
 import { loadConfigSync } from '../config-yaml/load.js';
+import { loadCloisterConfigSync } from './config.js';
 import { getDockerStatsCollector } from '../../dashboard/server/routes/resources/shared.js';
 import { getResourceStacks, type ResourceStack, type StackContainerResource } from '../../dashboard/server/routes/resources/stacks.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
+import { listRunningAgentsSync } from '../agents/queries.js';
+import { getAgentRuntimeStateSync } from '../agents/runtime-state.js';
+import { setAgentPausedSync, GOVERNOR_SLOT_PAUSE_REASON_PREFIX } from '../agents/agent-state.js';
+import { stopAgentSync } from '../agents/termination.js';
+
+const execFileAsync = promisify(execFile);
 
 const GIB = 1024 ** 3;
 
@@ -195,4 +204,129 @@ export async function estimateFootprint(role: FootprintRole, projectKey: string)
  */
 export function canAdmit(footprintBytes: number, availableBytes: number): boolean {
   return footprintBytes <= availableBytes - readGovernorReserves().softBytes;
+}
+
+// --- PAN-2500 tiered-eviction ------------------------------------------------
+//
+// shed() runs under HARD pressure, reclaiming cheapest-value-first: merged/
+// closed docker stacks (pure reclaim, no running work lost) before pausing an
+// idle work agent (frees claude RSS, resumable via --resume once RECOVERY is
+// crossed). Never an operator-attached agent or a core service. Never
+// `docker pause` to reclaim RAM (retains RSS) — only `docker stop`.
+
+export interface ShedResult {
+  stoppedStacks: string[];
+  pausedAgents: string[];
+}
+
+interface ShedCandidateAgent {
+  id: string;
+  issueId: string;
+  flywheelRunId?: string | null;
+}
+
+export interface ShedAgentLike {
+  issueId?: string | null;
+  hasLiveTmuxSession?: boolean;
+}
+
+/**
+ * Pure core: which merged/closed stacks are safe to stop.
+ *
+ * This mirrors reclaim.ts's isClosedStack (stack.phase === 'merged') + live-
+ * issue exclusion exactly, rather than importing buildReclaimPayload directly:
+ * the root tsconfig.json excludes src/dashboard/**, so any import from
+ * reclaim.ts pulls its unrelated deleteResourceVenvEffect (a pre-existing,
+ * out-of-scope HttpRouter.schemaParams type error under the ROOT tsconfig's
+ * effect resolution — that route typechecks fine under the dashboard's own
+ * tsconfig/node_modules) into this module's compilation graph and breaks the
+ * build. Keep this predicate in sync with reclaim.ts's isClosedStack if that
+ * definition ever changes.
+ */
+export function selectStackShedCandidates(
+  stacks: readonly ResourceStack[],
+  runningAgents: readonly ShedAgentLike[],
+): ResourceStack[] {
+  const liveIssueIds = new Set(
+    runningAgents
+      .filter((agent) => agent.hasLiveTmuxSession === true)
+      .map((agent) => agent.issueId?.toUpperCase())
+      .filter((issueId): issueId is string => Boolean(issueId)),
+  );
+  return stacks.filter(
+    (stack) => stack.issueId && stack.phase === 'merged' && !liveIssueIds.has(stack.issueId.toUpperCase()),
+  );
+}
+
+/**
+ * Pure core: the next idle work agent to pause, exempting operator-started
+ * agents (PAN-1812, mirrors emergencyBrake's exemption in concurrency.ts —
+ * duplicated rather than imported to avoid a memory-governor <-> concurrency
+ * circular import) and any agent not in an 'idle' runtime state.
+ */
+export function selectAgentToPause(
+  candidates: readonly ShedCandidateAgent[],
+  isIdle: (agentId: string) => boolean,
+  exemptOperatorStarted: boolean,
+): ShedCandidateAgent | null {
+  const eligible = exemptOperatorStarted
+    ? candidates.filter((a) => a.flywheelRunId !== undefined && a.flywheelRunId !== null && a.flywheelRunId !== '')
+    : candidates;
+  return eligible.find((a) => isIdle(a.id)) ?? null;
+}
+
+async function stopStackContainers(stack: ResourceStack): Promise<void> {
+  for (const service of stack.services) {
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}$/.test(service.id)) continue;
+    try {
+      await execFileAsync('docker', ['stop', '--time', '30', service.id], { encoding: 'utf-8', timeout: 35000 });
+    } catch {
+      // Best effort — a container already stopped or gone is not a shed failure.
+    }
+  }
+}
+
+/**
+ * Reclaim under HARD pressure. Stops ALL merged/closed stacks unconditionally
+ * (pure reclaim, cheap), then — only if still HARD afterward — pauses idle
+ * work agents one at a time, re-checking memory pressure after each pause,
+ * until it clears HARD or no eligible idle agent remains.
+ */
+export async function shed(): Promise<ShedResult> {
+  const result: ShedResult = { stoppedStacks: [], pausedAgents: [] };
+
+  const containers = getDockerStatsCollector().getStats() as unknown as StackContainerResource[];
+  const stacks = getResourceStacks(containers);
+  const runningAgents = listRunningAgentsSync().filter((a) => a.tmuxActive);
+  const agentsLike: ShedAgentLike[] = runningAgents.map((a) => ({ issueId: a.issueId, hasLiveTmuxSession: a.tmuxActive }));
+
+  for (const stack of selectStackShedCandidates(stacks, agentsLike)) {
+    await stopStackContainers(stack);
+    if (stack.issueId) result.stoppedStacks.push(stack.issueId);
+  }
+
+  let verdict = await assessMemoryPressure();
+  if (verdict.band !== 'hard') return result;
+
+  const exemptOperatorStarted = loadCloisterConfigSync().concurrency?.exempt_operator_started;
+  const workAgents: ShedCandidateAgent[] = runningAgents
+    .filter((a) => a.role === 'work')
+    .map((a) => ({ id: a.id, issueId: a.issueId, flywheelRunId: a.flywheelRunId }));
+  const paused = new Set<string>();
+
+  while (verdict.band === 'hard') {
+    const next = selectAgentToPause(
+      workAgents.filter((a) => !paused.has(a.id)),
+      (agentId) => getAgentRuntimeStateSync(agentId)?.state === 'idle',
+      exemptOperatorStarted ?? true,
+    );
+    if (!next) break;
+    setAgentPausedSync(next.id, `${GOVERNOR_SLOT_PAUSE_REASON_PREFIX} memory pressure — shed under HARD reserve`, true);
+    stopAgentSync(next.id);
+    paused.add(next.id);
+    result.pausedAgents.push(next.id);
+    verdict = await assessMemoryPressure();
+  }
+
+  return result;
 }
