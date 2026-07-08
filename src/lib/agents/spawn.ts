@@ -288,6 +288,11 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   if (options.reviewSynthesisAgentId) state.reviewSynthesisAgentId = options.reviewSynthesisAgentId;
   if (options.reviewOutputPath) state.reviewOutputPath = options.reviewOutputPath;
 
+  const extraEnvExports = [...flywheelEnvExports(flywheelEnv), ...(options.extraEnvExports ?? [])];
+  if (role === 'knowledge' && !extraEnvExports.includes('export PATH="$HOME/.overdeck/bin:$PATH"')) {
+    extraEnvExports.push('export PATH="$HOME/.overdeck/bin:$PATH"');
+  }
+
   const launcherContent = generateLauncherScriptSync({
     role,
     workingDir: workspace,
@@ -297,7 +302,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     promptFile: shouldDeliverPromptViaTmux ? undefined : promptFile,
     promptFileMode: undefined,
     overdeckEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
-    extraEnvExports: [...flywheelEnvExports(flywheelEnv), ...(options.extraEnvExports ?? [])],
+    extraEnvExports,
     baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole, options.effort),
     appendSystemPromptFiles: await claudeSystemPromptFiles(workspace, resolvedHarness),
     sessionId,

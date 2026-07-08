@@ -47,6 +47,8 @@ export interface EmbedSessionsOptions {
   provider?: EmbeddingProviderName;
   /** Override model from config */
   model?: string;
+  /** Auto-install Ollama when the local provider is selected */
+  autoInstall?: boolean;
   /** Override Ollama base URL */
   ollamaBaseUrl?: string;
   /** Max concurrent embedding tasks */
@@ -140,7 +142,11 @@ export async function embedSessions(opts: EmbedSessionsOptions = {}): Promise<Em
   const ensureOllamaFn = opts.ensureOllamaFn ?? ensureOllama;
 
   if (provider === 'ollama') {
-    await ensureOllamaFn({ baseUrl: opts.ollamaBaseUrl, model });
+    await ensureOllamaFn({
+      autoInstall: opts.autoInstall ?? true,
+      baseUrl: opts.ollamaBaseUrl,
+      model,
+    });
   }
 
   const sessionIds = selectSessionIdsForEmbedding(opts.sessionIds, model, opts.regenerate === true);

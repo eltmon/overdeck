@@ -265,11 +265,43 @@ describe('embedSessions', () => {
 
     expect(result.embedded).toBe(1);
     expect(ensureOllamaFn).toHaveBeenCalledWith({
+      autoInstall: true,
       baseUrl: undefined,
       model: 'nomic-embed-text',
     });
     expect(embedFn).toHaveBeenCalledWith('ollama', expect.objectContaining({ model: 'nomic-embed-text' }));
     expect(getEmbedding(session!.id, 'nomic-embed-text')?.length).toBe(768);
+  });
+
+  it('enables Ollama auto-install when the local provider is selected', async () => {
+    seedEnrichedSession(1);
+    const ensureOllamaFn = vi.fn(async (opts: { autoInstall?: boolean; baseUrl?: string; model?: string }) => ({
+      status: 'already-running' as const,
+      baseUrl: opts.baseUrl ?? 'http://localhost:11434',
+      model: opts.model ?? 'nomic-embed-text',
+    }));
+
+    await embedSessions({
+      provider: 'ollama',
+      embedFn: mockEmbedFn as typeof import('../embeddings/providers.js').embed,
+      ensureOllamaFn: ensureOllamaFn as typeof import('../../ollama.js').ensureOllama,
+      maxParallel: 1,
+      config: {
+        compactionModel: 'claude-haiku-4-5',
+        manualCompactMode: 'claude-code',
+        richCompaction: true,
+        titleModel: 'claude-haiku-4-5',
+        watchDirs: [],
+        scanMaxParallel: null,
+        embeddings: true,
+        embeddingProvider: 'ollama',
+        embeddingModel: 'text-embedding-3-small',
+        embeddingAutoOnDeep: false,
+        enrichment: { quickModel: null, deepModel: null, maxParallel: 1, costConfirmThreshold: 1 },
+      },
+    });
+
+    expect(ensureOllamaFn).toHaveBeenCalledWith(expect.objectContaining({ autoInstall: true }));
   });
 
   it('stores Voyage voyage-code-3 embeddings as 1024 dimensions', async () => {
