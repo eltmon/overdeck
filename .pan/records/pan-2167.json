@@ -47,6 +47,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-08T23:35:27.030Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T23:39:57.617Z"
     }
   ],
   "feedback": [],
@@ -86,22 +91,22 @@
     "recordedAt": "2026-07-08T23:32:23.025Z"
   },
   "created": "2026-07-08T21:36:56.346Z",
-  "updated": "2026-07-08T23:36:38.572Z",
+  "updated": "2026-07-08T23:40:01.975Z",
   "pipeline": {
     "issueId": "PAN-2167",
     "reviewStatus": "reviewing",
-    "testStatus": "passed",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-08T23:36:38.524Z",
-    "reviewNotes": "pan done still misclassifies leading-space state-plane porcelain as source dirt",
+    "updatedAt": "2026-07-08T23:40:01.837Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "inspectNotes": "Bead state-plane-status-predicate ack: isStatePlaneOnlyStatus/parsePorcelainStatusPaths added to src/lib/state-plane.ts satisfy all 4 ACs (MM/untracked in-plane true, non-plane path false, empty clean true+[], rename dest resolution both directions); 13/13 tests pass independently verified; no any/execSync/oversized files.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2512",
-    "lastVerifiedCommit": "92316efa32996c18de60f89b273a2502570c640f",
+    "lastVerifiedCommit": "de0340c790132fae343c7f45260a5341dbfe79c5",
     "reviewRequestedAt": "2026-07-08T23:32:29.138Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -144,15 +149,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 2734130,
-            "output": 3389,
-            "cacheRead": 2414464,
+            "input": 2807940,
+            "output": 3607,
+            "cacheRead": 2476160,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 26607245,
-            "output": 46267,
-            "cacheRead": 26050048,
+            "input": 28052919,
+            "output": 51216,
+            "cacheRead": 27407872,
             "cacheWrite": 0
           }
         },
@@ -175,15 +180,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 2734130,
-          "output": 3389,
-          "cacheRead": 2414464,
+          "input": 2807940,
+          "output": 3607,
+          "cacheRead": 2476160,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 26607245,
-          "output": 46267,
-          "cacheRead": 26050048,
+          "input": 28052919,
+          "output": 51216,
+          "cacheRead": 27407872,
           "cacheWrite": 0
         },
         "anthropic/claude-opus-4-8": {
@@ -200,8 +205,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 21.925599000000002,
-        "pricingAsOf": "2026-07-08T23:36:38.572Z"
+        "usd": 23.192231,
+        "pricingAsOf": "2026-07-08T23:40:01.968Z"
       }
     },
     "merges": [
