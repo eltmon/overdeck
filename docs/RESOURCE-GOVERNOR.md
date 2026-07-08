@@ -158,6 +158,52 @@ host with:
 systemctl show overdeck-tmux-server.service -p ManagedOOMPreference
 ```
 
+## Preemptive scheduling (PAN-2507)
+
+The governor sizes the *pool* (how many agents may run); the **preemptive scheduler** schedules
+*within* it for maximum pipeline throughput. The problem it solves: when a review/test/merge
+("advancing") dispatch cannot reserve capacity, the deacon otherwise defers to the next patrol —
+indefinitely, if idle work agents hold the box. The pipeline's *drain* then starves behind its
+*fill*. Preemption lets a blocked advancing dispatch **yield** an idle work agent — pause it
+(resumable; session killed, state preserved) to free the slot/memory, dispatch the advancing role,
+and auto-resume the yielded agent oldest-first once capacity returns.
+
+Priority is fixed; preemption only flows **down** it, never up:
+
+```
+merge/ship  >  test  >  review  >  work-rework  >  work-new
+```
+
+An advancing dispatch may yield a work agent; new work never preempts anything; advancing roles
+never preempt each other. The owner of the mechanic is `src/lib/cloister/preemption.ts`:
+
+- **Victim selection** (`selectYieldVictim`, pure) requires an agent that is role `work`, status
+  `running`, idle (`isAgentIdleForNudge`), **not** operator-attached, **not** already paused, and
+  **not** inside its post-resume re-yield cooldown. Among the eligible it prefers (a) an agent whose
+  own issue is blocked on the pipeline (`reviewStatus` `pending` or `reviewing` — it is waiting
+  anyway), then (b) the longest-idle.
+- **Yield** (`yieldWorkAgentFor`) reuses the `paused: true` write path plus two attribution fields
+  (`yieldedByScheduler`, `yieldedAt`), so **every** existing no-resume gate — deacon skip paths,
+  boot reconciliation exclusion, spawn refusal — protects a yielded agent for free. It stops the
+  session through the async `stopAgent` Effect.
+- **Resume-first** (`resumeYieldedAgents`) runs at the top of `autoResumeStoppedWorkAgents`, ahead of
+  any other stopped candidate, oldest-`yieldedAt` first, capped by the free work-slot budget and
+  gated on the same per-iteration `assessMemoryPressure()` brake.
+- **Anti-thrash**: an agent resumed from a yield may not be re-yielded for `yield_cooldown_secs`
+  (tracked via `lastYieldResumeAt`); at most `max_yielded` agents may be yielded at once; and a yield
+  only sticks when the reservation retry actually succeeds — otherwise the victim is resumed
+  immediately.
+
+An operator `pan unpause` on a yielded agent clears the yield attribution too (it self-heals),
+preserving only `lastYieldResumeAt` as the cooldown tracker. Every yield and resume emits a
+`logDeaconEventSync` line and a plain-sentence activity-feed entry naming both issues, e.g.
+`Yielded agent-pan-1234 (idle 22m) to run review for PAN-5678`.
+
+This is opt-in and **disabled by default** — an unset install keeps the static defer-until-attrition
+behavior at every dispatch site (see the config table below). It complements, and does not replace,
+the eviction ladder: `shed()` still owns docker-stack reclaim under HARD memory pressure; preemption
+only pauses idle work agents at slot granularity for throughput.
+
 ## Config keys and defaults
 
 All keys live under `resources:` in `~/.overdeck/config.yaml`. Snake_case in the YAML file; the
@@ -185,6 +231,15 @@ in `~/.overdeck/cloister.toml` (the cloister config, not `config.yaml`):
 | `memory_driven` | `false` | Opt-in. When true, the work-agent ceiling is the live memory budget instead of `max_work_agents`. |
 | `memory_driven_max_work_agents` | `24` | Hard safety cap on concurrent work agents when `memory_driven` is on. |
 | `work_footprint_gb` | `2` | Per-work-agent RSS estimate used for the budget. Larger ⇒ fewer, more conservative admissions. |
+
+The **preemptive scheduler** (PAN-2507) is also configured under `[concurrency]` in
+`~/.overdeck/cloister.toml`:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `preemption` | `false` | Opt-in. When true, a blocked advancing (review/test/merge) dispatch may yield an idle work agent to free capacity. Unset ⇒ zero behavior change — every dispatch site defers until attrition as before. |
+| `max_yielded` | `3` | Anti-thrash: the most work agents that may be in the yielded (scheduler-paused) state at once. |
+| `yield_cooldown_secs` | `600` | Anti-thrash: an agent resumed from a yield may not be re-yielded until this many seconds elapse. |
 
 ## Related documents
 

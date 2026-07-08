@@ -341,6 +341,16 @@ Deacon auto-resume is intentionally suppressible through four gates:
   [`docs/RESOURCE-GOVERNOR.md`](docs/RESOURCE-GOVERNOR.md) for the full model. This
   is separate from `--no-resume`, which suppresses resume outright regardless of memory.
 
+Separately, the **preemptive scheduler** (PAN-2507, opt-in via `[concurrency]
+preemption = true`) may **yield** an idle work agent — pause it to free capacity
+for a blocked review/test/merge dispatch. A yield reuses the same `paused: true`
+gate (so all four suppression gates above protect it), tagged with
+`yieldedByScheduler`/`yieldedAt`. Unlike an operator pause it is **self-clearing**:
+`autoResumeStoppedWorkAgents` resumes yielded agents oldest-first, ahead of any
+other stopped candidate, once a slot and the memory gate allow — and `pan
+unpause` on a yielded agent clears the yield attribution too. See
+[`docs/RESOURCE-GOVERNOR.md`](docs/RESOURCE-GOVERNOR.md) → "Preemptive scheduling".
+
 These gates are orthogonal to the global Deacon freeze in SQLite
 (`deacon.globally_paused`) and the per-issue Deacon ignore flag in review status.
 
