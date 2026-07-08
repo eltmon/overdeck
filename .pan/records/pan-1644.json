@@ -1,6 +1,13 @@
 {
   "issueId": "PAN-1644",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-08T02:09:12.953Z"
+    }
+  ],
   "feedback": [],
   "harness": "claude-code",
   "model": "kimi-k2.7-code",
@@ -51,20 +58,19 @@
   "pipeline": {
     "issueId": "PAN-1644",
     "reviewStatus": "passed",
-    "testStatus": "failed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-08T01:46:38.943Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-08T02:28:04.196Z",
     "reviewNotes": "No blocking findings; focused title hook tests passed",
-    "testNotes": "typecheck passed; lint passed; npm test failed. Blocking failures: (1) tests/unit/lib/overdeck/no-loss-matrix.test.ts requires matrix entries for new PAN-1644 routes: POST /api/admin/conversations/backfill-titles, POST /api/hooks/user-prompt-submit, POST /api/hooks/turn-complete. (2) tests/integration/agent-spawning.test.ts > resumeAgent marks kickoff redelivered only after the redelivery lands timed out at 30000ms. Browser UAT not exercised because automated gates failed; acceptance criteria require the conversation list to update from conversation.title_changed, so UAT would be needed after gate fixes.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "testNotes": "typecheck passed; lint passed (including skills, prompts, file-size, source-introspection, circular, ratchet, quarantine audits); npm test passed (921 test files passed, 8875 tests passed, 4/52 skipped; frontend issueActions tests passed). Browser UAT exercised on workspace dashboard (port 3020): loaded dashboard, opened conversation 20260707-2531, retitled from 'Conversation retitle history and status' to 'PAN-1644 UAT Test Title', and verified the new title propagated to both the conversation header and the left sidebar conversation list.",
     "inspectNotes": "Bead title-changed-event ack: ConversationTitleChangedEvent schema added to DomainEvent union with {conversationName,title,titleSource} payload, reducer case bumps conversationsListRevision by 1 (test confirms 7->8), and updateConversationTitle() emits via getEventStore().emitOnly() (sequence auto-assigned by Omit<DomainEvent,\"sequence\"> signature) wrapped in try/catch so persistence never throws when the event store is uninitialized (both paths unit-tested). All 3 ACs met.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2480",
-    "reviewedAtCommit": "bfbc3e799183007fe02b44ee27a71b1b87c8b42f",
-    "lastVerifiedCommit": "620ae5a74127409fc007aa7a208d743778ba99f4",
-    "reviewRequestedAt": "2026-07-08T01:20:16.324Z",
+    "reviewedAtCommit": "c9df3272408f6beb50a1981f57e455335c229a3b",
+    "lastVerifiedCommit": "c9df3272408f6beb50a1981f57e455335c229a3b",
+    "reviewRequestedAt": "2026-07-08T02:07:59.245Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/records/pan-1644.json",
@@ -132,7 +138,7 @@
         "tests/unit/lib/overdeck/title-refinement.test.ts",
         "tests/unit/lib/overdeck/title-sources.test.ts"
       ],
-      "recordedAt": "2026-07-08T01:11:32.762Z"
+      "recordedAt": "2026-07-08T02:07:52.384Z"
     }
   },
   "closeOut": {
@@ -140,9 +146,9 @@
       "byStage": {
         "codex": {
           "openai/gpt-5.5": {
-            "input": 10686305,
-            "output": 24536,
-            "cacheRead": 9854080,
+            "input": 11472734,
+            "output": 27384,
+            "cacheRead": 10536064,
             "cacheWrite": 0
           }
         },
@@ -172,26 +178,26 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 373871,
-            "output": 9196,
-            "cacheRead": 2973696,
+            "input": 1118215,
+            "output": 39115,
+            "cacheRead": 19810538,
             "cacheWrite": 0
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 4367696,
-            "output": 299279,
-            "cacheRead": 153933568,
+            "input": 5002908,
+            "output": 339275,
+            "cacheRead": 171731200,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 10686305,
-          "output": 24536,
-          "cacheRead": 9854080,
+          "input": 11472734,
+          "output": 27384,
+          "cacheRead": 10536064,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -213,15 +219,15 @@
           "cacheWrite": 86241
         },
         "custom/kimi-k2.7-code": {
-          "input": 4741567,
-          "output": 308475,
-          "cacheRead": 156907264,
+          "input": 6121123,
+          "output": 378390,
+          "cacheRead": 191541738,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 59.159882,
-        "pricingAsOf": "2026-07-08T01:46:39.084Z"
+        "usd": 68.27932,
+        "pricingAsOf": "2026-07-08T02:28:04.267Z"
       }
     },
     "merges": [
@@ -247,6 +253,6 @@
       "note": "Slot branch feature/pan-1644-slot-1 did not merge cleanly"
     }
   },
-  "created": "2026-07-08T01:46:38.985Z",
-  "updated": "2026-07-08T01:46:39.101Z"
+  "created": "2026-07-08T02:09:12.766Z",
+  "updated": "2026-07-08T02:28:04.267Z"
 }
