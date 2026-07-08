@@ -68,3 +68,14 @@ export interface DockerCleanupResult {
   /** Human-readable log of cleanup steps taken */
   steps: string[];
 }
+
+/**
+ * Result of tearing down a workspace Docker stack by project/network name,
+ * independent of whether the workspace directory still exists.
+ */
+export interface WorkspaceDockerTeardownResult {
+  /** Whether the _devnet network is confirmed absent after teardown */
+  networkRemoved: boolean;
+  /** Human-readable log of teardown steps taken */
+  steps: string[];
+}
