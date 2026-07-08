@@ -217,6 +217,14 @@ Operator: primary local main diverged (20 bot chore(state) commits ahead / 6 beh
 - **LOOSE ENDS for operator:** (1) PAN-1644 draft untracked; (2) scratch has the primary's lifecycle-restart.ts alt-implementation if worth comparing; (3) freshly-dirty beads = normal ongoing bot writes.
 - REUSABLE: flywheel CANNOT commit/push code even via merge — `guard-flywheel-orchestrator-commit.sh` (pre-commit + pre-push) gates on OVERDECK_AGENT_ID; for an operator-directed reconcile merge, `env -u OVERDECK_AGENT_ID git commit/push` lets the guard pass on its own context-check (never `--no-verify`).
 
+## RUN-58 tick 153 (2026-07-08) — operator promoted UAT batch uat/pan-cedar-0708 (PAN-1644) → main; fresh Observe→Act: PAN-1644 excluded+closing, clean batch has no new PAN members
+
+**Operator-directed fresh Observe→Act.** Operator promoted UAT generation `uat/pan-cedar-0708` to main at `e51dd2defe Merge UAT batch uat/pan-cedar-0708 (PAN-1644)`. Re-derived from current source of truth:
+- **PAN-1644 (#2480) MERGED (04:47:11) via the promotion** — EXCLUDED from activePipeline; `pan close PAN-1644 --force` backgrounded. (The auto-merge id 37 I'd scheduled for 04:51 was pre-empted by the operator's UAT promotion at 04:47 — same outcome, PAN-1644 landed.)
+- **Clean re-assembled batch: NO new PAN members** — fresh `pan review pending --ready` shows only MIN-865/861 (UAT-held GitLab MRs, report-only). PAN-2468 not ready. So there is nothing to auto-merge; the clean batch excludes the promoted PAN-1644 and contains no fresh PAN.
+- Main CI in_progress on the UAT merge commit e51dd2defe (verifying a merge of already-green PAN-1644 — low risk; confirm green next tick).
+- **Substrate priorities still surfaced (unauthorized):** PAN-2495 (ci-green-skip buried a red main) + B3/PAN-2167 (record-push churn). M7/MIN-729 verifying.
+
 ## RUN-58 tick 152 (2026-07-08) — 🟢 MAIN GREEN confirmed (release 0.44.0); PAN-2490 closed; resumed drains → PAN-1644 scheduled id 37
 
 **🟢 MAIN GREEN confirmed** — head `9d1c736917 chore: release 0.44.0`, CI **success**. Red main fully resolved and main advanced to release 0.44.0. **PAN-2490 closed-out.** Recovery done; back to normal ops.
