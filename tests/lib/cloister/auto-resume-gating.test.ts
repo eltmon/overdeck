@@ -13,6 +13,7 @@ describe('auto-resume gates', () => {
   let originalNoResume: string | undefined;
   let originalCwd: string;
   let resumeAgentMock: ReturnType<typeof vi.fn>;
+  let memoryAssessment: { band: 'ok' | 'soft' | 'hard'; availMB: number };
   let bootReconciliationState: {
     decision: 'pending' | 'resume_all' | 'hold_all' | 'per_agent' | null;
     perAgent: Record<string, 'resume' | 'hold'>;
@@ -40,6 +41,7 @@ describe('auto-resume gates', () => {
     process.env.OVERDECK_HOME = tempHome;
     delete process.env.OVERDECK_NO_RESUME;
     resumeAgentMock = vi.fn();
+    memoryAssessment = { band: 'ok', availMB: 65536 };
     resumeSlotsMock = 999;
     bootReconciliationState = {
       decision: null,
@@ -76,6 +78,7 @@ describe('auto-resume gates', () => {
     vi.doUnmock('../../../src/lib/operator-interventions.js');
     vi.doUnmock('../../../src/lib/tmux.js');
     vi.doUnmock('../../../src/lib/cloister/concurrency.js');
+    vi.doUnmock('../../../src/lib/cloister/memory-governor.js');
     vi.doUnmock('os');
     vi.doUnmock('child_process');
     vi.doUnmock('ora');
@@ -164,6 +167,19 @@ describe('auto-resume gates', () => {
       tryReserveSwarmSlot: () => true,
       releaseSwarmSlot: vi.fn(),
       canDispatchAdvancing: () => true,
+    }));
+    vi.doMock('../../../src/lib/cloister/memory-governor.js', () => ({
+      assessMemoryPressure: vi.fn(async () => ({
+        ...memoryAssessment,
+        availBytes: memoryAssessment.availMB * 1024 ** 2,
+        warningBytes: 4 * 1024 ** 3,
+        criticalBytes: 2 * 1024 ** 3,
+      })),
+      classifyMemoryPressure: vi.fn((availBytes: number, warningBytes: number, criticalBytes: number) => {
+        if (availBytes < criticalBytes) return 'hard';
+        if (availBytes < warningBytes) return 'soft';
+        return 'ok';
+      }),
     }));
     vi.doMock('../../../src/lib/review-status.js', () => ({
       getReviewStatus: vi.fn().mockReturnValue({
@@ -864,6 +880,26 @@ describe('auto-resume gates', () => {
     expect(resumeAgentMock).not.toHaveBeenCalled();
     expect(vi.mocked(logger.logDeaconEventSync)).toHaveBeenCalledWith(
       expect.stringContaining('load gate tripped'),
+    );
+  });
+
+  it('skips all resumes when the memory gate reports soft pressure', async () => {
+    resumeAgentMock.mockResolvedValue({ success: true });
+    memoryAssessment = { band: 'soft', availMB: 3072 };
+    const { agents, autoResumeStoppedWorkAgents } = await loadDeaconWithResumeMock({
+      loadavg: [1, 1, 1],
+      cpusCount: 24,
+    });
+    const logger = await import('../../../src/lib/persistent-logger.js');
+    saveCandidate(agents, 'agent-pan-1141-memory-0');
+    saveCandidate(agents, 'agent-pan-1141-memory-1');
+
+    const resumed = await settleWithStagger(autoResumeStoppedWorkAgents());
+
+    expect(resumed).toEqual([]);
+    expect(resumeAgentMock).not.toHaveBeenCalled();
+    expect(vi.mocked(logger.logDeaconEventSync)).toHaveBeenCalledWith(
+      expect.stringContaining('memory gate tripped (band=soft, availMB=3072)'),
     );
   });
 

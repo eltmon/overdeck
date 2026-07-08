@@ -6,6 +6,7 @@ import { isStartingWithinGrace } from './agent-grace.js';
 import { resumedBootReconciliationOutcome, skippedBootReconciliationOutcome, skippedBootReconciliationOutcomes, type BootReconciliationApplyResult, type BootReconciliationOutcome } from './boot-reconciliation-outcomes.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { getConcurrencyLimits, countRunningAgents, workResumeSlotsAvailable } from './concurrency.js';
+import { assessMemoryPressure, type MemoryPressureAssessment } from './memory-governor.js';
 import {
   getBootReconciliationHeldResumeSet,
   getBootReconciliationPendingHoldSet,
@@ -54,6 +55,10 @@ const orphanFailureRecordedForAutoResume = new Set<string>();
 const appliedBootReconciliationDecisions = new Set<string>();
 
 const emptyBootReconciliationApplyResult = (): BootReconciliationApplyResult => ({ resumed: [], outcomes: [], skipped: { workspace_missing: 0, merged: 0, completed: 0, other: 0 }, deferred: 0 });
+
+function memoryGateLogSuffix(assessment: MemoryPressureAssessment): string {
+  return `memory gate tripped (band=${assessment.band}, availMB=${assessment.availMB})`;
+}
 
 function isVerifyPausedAgentState(state: Pick<AgentState, 'issueId' | 'paused'>): boolean {
   if (state.paused !== true || !state.issueId) return false;
@@ -754,6 +759,11 @@ export async function handleAgentStoppedEvent(
       logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} deferred — load gate tripped (load1=${load1.toFixed(2)} > ${loadCeiling.toFixed(2)})`);
       return null;
     }
+    const memory = await assessMemoryPressure();
+    if (memory.band !== 'ok') {
+      logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} deferred — ${memoryGateLogSuffix(memory)}`);
+      return null;
+    }
   }
 
   const runtimeStateForLog = getAgentRuntimeStateSync(agentId);
@@ -855,6 +865,11 @@ export async function autoResumeStoppedWorkAgents(deps: AutoResumeNotifierDeps):
       logDeaconEventSync(`autoResumeStoppedWorkAgents: load gate tripped (load1=${load1.toFixed(2)} > ${loadCeiling.toFixed(2)} = ${cores} cores * ${RESUME_LOAD_FACTOR}); deferring remaining candidates to next patrol`);
       break;
     }
+    const memory = await assessMemoryPressure();
+    if (memory.band !== 'ok') {
+      logDeaconEventSync(`autoResumeStoppedWorkAgents: ${memoryGateLogSuffix(memory)}; deferring remaining candidates to next patrol`);
+      break;
+    }
     // Stagger spawns so the scheduler can absorb each `claude` before the next.
     if (resumeAttempts > 0) {
       await new Promise(r => setTimeout(r, RESUME_STAGGER_MS));
@@ -927,6 +942,14 @@ export async function applyBootReconciliationDecision(
     const load1 = loadavg()[0];
     if (load1 > loadCeiling) {
       logDeaconEventSync(`applyBootReconciliationDecision: load gate tripped (load1=${load1.toFixed(2)} > ${loadCeiling.toFixed(2)} = ${cores} cores * ${RESUME_LOAD_FACTOR}); deferring remaining candidates`);
+      const deferredAgents = candidates.slice(index);
+      deferred += deferredAgents.length;
+      outcomes.push(...skippedBootReconciliationOutcomes(deferredAgents, 'deferred-load'));
+      break;
+    }
+    const memory = await assessMemoryPressure();
+    if (memory.band !== 'ok') {
+      logDeaconEventSync(`applyBootReconciliationDecision: ${memoryGateLogSuffix(memory)}; deferring remaining candidates`);
       const deferredAgents = candidates.slice(index);
       deferred += deferredAgents.length;
       outcomes.push(...skippedBootReconciliationOutcomes(deferredAgents, 'deferred-load'));

@@ -14,6 +14,16 @@ const appSettingsMocks = vi.hoisted(() => ({
   stampBootReconciliation: vi.fn(),
 }));
 
+const memoryGovernorMocks = vi.hoisted(() => ({
+  assessMemoryPressure: vi.fn(async () => ({
+    band: 'ok',
+    availMB: 65536,
+    availBytes: 65536 * 1024 ** 2,
+    warningBytes: 4 * 1024 ** 3,
+    criticalBytes: 2 * 1024 ** 3,
+  })),
+}));
+
 vi.mock('os', async (importOriginal) => {
   const actual = await importOriginal<typeof import('os')>();
   return {
@@ -87,6 +97,11 @@ vi.mock('../../../lib/shadow-state.js', async () => {
 
 vi.mock('../issue-closed.js', () => ({
   isIssueClosed: vi.fn(async () => false),
+}));
+
+vi.mock('../memory-governor.js', () => ({
+  assessMemoryPressure: memoryGovernorMocks.assessMemoryPressure,
+  classifyMemoryPressure: vi.fn(),
 }));
 
 vi.mock('../concurrency.js', () => ({
@@ -308,6 +323,7 @@ import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { captureTranscriptUserRecordSnapshot } from '../../../lib/transcript-landing.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../../lib/activity-logger.js';
 import { queryReadyBeadsByIssueLabels } from '../../../lib/beads-query.js';
+import { logDeaconEventSync } from '../../../lib/persistent-logger.js';
 
 const mockGetAgentState = getAgentStateSync as any;
 const mockGetAgentStateAsync = getAgentState as any;
@@ -321,6 +337,7 @@ const mockGetReviewStatus = getReviewStatusSync as any;
 const mockGetShadowState = getShadowState as any;
 const mockSessionExists = sessionExists as any;
 const mockQueryReadyBeadsByIssueLabels = queryReadyBeadsByIssueLabels as any;
+const mockLogDeaconEventSync = logDeaconEventSync as any;
 const mockIsAgentIdleForNudge = isAgentIdleForNudge as any;
 const mockIsIssueClosed = isIssueClosed as any;
 const mockExistsSync = existsSync as any;
@@ -385,6 +402,13 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
     mockDeliverInitialPromptWithRetry.mockResolvedValue({ ok: true, path: 'supervisor' });
     mockRecordAgentFailure.mockResolvedValue(null);
     mockCaptureTranscriptUserRecordSnapshot.mockResolvedValue({ sessionFile: '/tmp/session.jsonl', userRecordCount: 0 });
+    memoryGovernorMocks.assessMemoryPressure.mockResolvedValue({
+      band: 'ok',
+      availMB: 65536,
+      availBytes: 65536 * 1024 ** 2,
+      warningBytes: 4 * 1024 ** 3,
+      criticalBytes: 2 * 1024 ** 3,
+    });
     mockExistsSync.mockImplementation(noCompletedMarkers);
     vi.mocked(listAllAgentsSync).mockReturnValue([
       bootCandidateAgent('agent-pan-871', 'PAN-871'),
@@ -593,6 +617,41 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
     });
     expect(mockResumeAgent).toHaveBeenCalledTimes(1);
     expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-871');
+  });
+
+  it('defers boot reconciliation resumes when the memory gate reports soft pressure', async () => {
+    memoryGovernorMocks.assessMemoryPressure.mockResolvedValue({
+      band: 'soft',
+      availMB: 3072,
+      availBytes: 3072 * 1024 ** 2,
+      warningBytes: 4 * 1024 ** 3,
+      criticalBytes: 2 * 1024 ** 3,
+    });
+    appSettingsMocks.getBootReconciliationState.mockReturnValue({
+      decision: 'resume_all',
+      perAgent: {},
+      decidedAt: '2026-06-29T15:00:30.000Z',
+      bootId: 'boot-pan-2076-memory-soft',
+      bootStartedAt: '2026-06-29T15:00:00.000Z',
+      graceDeadline: '2026-06-29T15:00:30.000Z',
+    });
+
+    const result = await applyBootReconciliationDecision();
+
+    expect(result.resumed).toEqual([]);
+    expect(result.deferred).toBe(1);
+    expect(result.outcomes).toEqual([
+      {
+        id: 'agent-pan-871',
+        issueId: 'PAN-871',
+        outcome: 'skipped',
+        reason: 'deferred-load',
+      },
+    ]);
+    expect(mockResumeAgent).not.toHaveBeenCalled();
+    expect(mockLogDeaconEventSync).toHaveBeenCalledWith(
+      expect.stringContaining('memory gate tripped (band=soft, availMB=3072)'),
+    );
   });
 
   it('reports skipped outcomes when boot reconciliation candidates have no resumable session', async () => {

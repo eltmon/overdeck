@@ -26,6 +26,7 @@ const mockWorkResumeSlotsAvailable = vi.fn();
 const mockCountRunningAgents = vi.fn();
 const mockGetConcurrencyLimits = vi.fn();
 const mockIsIssueClosed = vi.fn();
+const mockAssessMemoryPressure = vi.fn();
 const mockExistingPaths = vi.hoisted(() => new Set<string>());
 
 vi.mock('effect', async (importOriginal) => {
@@ -99,6 +100,11 @@ vi.mock('../issue-closed.js', () => ({
   isIssueClosed: (...args: unknown[]) => mockIsIssueClosed(...args),
 }));
 
+vi.mock('../memory-governor.js', () => ({
+  assessMemoryPressure: (...args: unknown[]) => mockAssessMemoryPressure(...args),
+  classifyMemoryPressure: vi.fn(),
+}));
+
 vi.mock('../../../lib/activity-logger.js', () => ({
   emitActivityEntry: vi.fn(),
   emitActivityEntrySync: vi.fn(),
@@ -162,6 +168,13 @@ describe('PAN-1908 reactive liveness handlers', () => {
     mockCountRunningAgents.mockReturnValue({ work: 0, advancing: 0, total: 0 });
     mockGetConcurrencyLimits.mockReturnValue({ maxWorkAgents: 6, reservedAdvancingSlots: 3, totalCeiling: 9 });
     mockIsIssueClosed.mockResolvedValue(false);
+    mockAssessMemoryPressure.mockResolvedValue({
+      band: 'ok',
+      availMB: 65536,
+      availBytes: 65536 * 1024 ** 2,
+      warningBytes: 4 * 1024 ** 3,
+      criticalBytes: 2 * 1024 ** 3,
+    });
     mockExistingPaths.clear();
   });
 
@@ -217,6 +230,27 @@ describe('PAN-1908 reactive liveness handlers', () => {
 
       expect(result).toBeNull();
       expect(mockResumeAgent).not.toHaveBeenCalled();
+    });
+
+    it('defers when the memory gate reports hard pressure', async () => {
+      mockGetAgentStateSync.mockReturnValue(makeState());
+      mockGetReviewStatusSync.mockReturnValue({ reviewStatus: 'blocked' });
+      mockAssessMemoryPressure.mockResolvedValue({
+        band: 'hard',
+        availMB: 1536,
+        availBytes: 1536 * 1024 ** 2,
+        warningBytes: 4 * 1024 ** 3,
+        criticalBytes: 2 * 1024 ** 3,
+      });
+      const logger = await import('../../../lib/persistent-logger.js');
+
+      const result = await handleAgentStoppedEvent('agent-pan-1908');
+
+      expect(result).toBeNull();
+      expect(mockResumeAgent).not.toHaveBeenCalled();
+      expect(vi.mocked(logger.logDeaconEventSync)).toHaveBeenCalledWith(
+        expect.stringContaining('memory gate tripped (band=hard, availMB=1536)'),
+      );
     });
 
     it('skips a stopped work agent whose workspace is missing', async () => {
