@@ -106,17 +106,14 @@
   },
   "pipeline": {
     "issueId": "PAN-2468",
-    "reviewStatus": "passed",
-    "testStatus": "failed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-08T05:10:25.052Z",
-    "reviewNotes": "review passed; prior mnemos and Ollama blockers resolved",
-    "testNotes": "Track A self-test, typecheck, and lint passed. Vitest project gate failed with 2 fixture/matrix omissions: (1) synced-skills fixture missing pan-knowledge skill (WI-17); (2) no-loss matrix missing GET /api/issues/:id/ship-log route. UAT required by WI-18 AC2 but skipped because project gates failed. Verdict: TESTS FAILED.",
+    "updatedAt": "2026-07-08T05:16:31.230Z",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2488",
-    "reviewedAtCommit": "798b5ac7de208a0579bafc0369564b7b97857b95",
     "lastVerifiedCommit": "e9214f9d087c128a72a6f5a31500de0c60a2364a",
     "reviewRequestedAt": "2026-07-08T04:28:40.005Z",
     "scopeDrift": {
@@ -296,9 +293,9 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 45894244,
-            "output": 24111,
-            "cacheRead": 42888960,
+            "input": 46303389,
+            "output": 24885,
+            "cacheRead": 43208832,
             "cacheWrite": 0
           },
           "openai/gpt-5.4-mini": {
@@ -308,9 +305,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 108591108,
-            "output": 232806,
-            "cacheRead": 104716800,
+            "input": 115458344,
+            "output": 239142,
+            "cacheRead": 111486464,
             "cacheWrite": 0
           }
         },
@@ -324,18 +321,18 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 502502,
-            "output": 16265,
-            "cacheRead": 6395648,
+            "input": 670818,
+            "output": 18221,
+            "cacheRead": 7493376,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 45894244,
-          "output": 24111,
-          "cacheRead": 42888960,
+          "input": 46303389,
+          "output": 24885,
+          "cacheRead": 43208832,
           "cacheWrite": 0
         },
         "openai/gpt-5.4-mini": {
@@ -345,9 +342,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 108591108,
-          "output": 232806,
-          "cacheRead": 104716800,
+          "input": 115458344,
+          "output": 239142,
+          "cacheRead": 111486464,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -357,15 +354,15 @@
           "cacheWrite": 413386
         },
         "custom/kimi-k2.7-code": {
-          "input": 502502,
-          "output": 16265,
-          "cacheRead": 6395648,
+          "input": 670818,
+          "output": 18221,
+          "cacheRead": 7493376,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 109.36249125,
-        "pricingAsOf": "2026-07-08T05:10:25.101Z"
+        "usd": 113.80155525,
+        "pricingAsOf": "2026-07-08T05:16:31.294Z"
       }
     },
     "merges": [
@@ -374,5 +371,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-08T05:10:21.674Z",
-  "updated": "2026-07-08T05:10:25.130Z"
+  "updated": "2026-07-08T05:16:31.302Z"
 }
