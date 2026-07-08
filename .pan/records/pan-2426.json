@@ -33,15 +33,16 @@
   },
   "pipeline": {
     "issueId": "PAN-2426",
-    "reviewStatus": "failed",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merging",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T23:53:24.509Z",
+    "updatedAt": "2026-07-08T01:12:00.419Z",
     "reviewNotes": "Verification failed at test",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2481",
-    "lastVerifiedCommit": "0fccf795860dde28978d2e44f9a7631b6bdf171b",
+    "reviewedAtCommit": "4f3b8909281b5687a8313c74cf45882e160c2e5d",
+    "lastVerifiedCommit": "4f3b8909281b5687a8313c74cf45882e160c2e5d",
     "reviewRequestedAt": "2026-07-07T23:35:32.505Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -105,15 +106,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 5186779,
-            "output": 5285,
-            "cacheRead": 4694912,
+            "input": 6914958,
+            "output": 6986,
+            "cacheRead": 6292096,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 31708895,
-            "output": 62611,
-            "cacheRead": 30710656,
+            "input": 41881434,
+            "output": 81996,
+            "cacheRead": 40195456,
             "cacheWrite": 0
           }
         },
@@ -132,19 +133,27 @@
             "cacheRead": 8556920,
             "cacheWrite": 498081
           }
+        },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 412749,
+            "output": 8398,
+            "cacheRead": 3632640,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 5186779,
-          "output": 5285,
-          "cacheRead": 4694912,
+          "input": 6914958,
+          "output": 6986,
+          "cacheRead": 6292096,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 31708895,
-          "output": 62611,
-          "cacheRead": 30710656,
+          "input": 41881434,
+          "output": 81996,
+          "cacheRead": 40195456,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -152,11 +161,17 @@
           "output": 55494,
           "cacheRead": 9014081,
           "cacheWrite": 499546
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 412749,
+          "output": 8398,
+          "cacheRead": 3632640,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 40.503552,
-        "pricingAsOf": "2026-07-07T23:53:24.759Z"
+        "usd": 50.382099,
+        "pricingAsOf": "2026-07-08T01:12:00.466Z"
       }
     },
     "merges": [
@@ -165,5 +180,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-07T23:45:09.633Z",
-  "updated": "2026-07-07T23:53:24.883Z"
+  "updated": "2026-07-08T01:12:00.490Z"
 }
