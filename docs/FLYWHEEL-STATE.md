@@ -217,6 +217,14 @@ Operator: primary local main diverged (20 bot chore(state) commits ahead / 6 beh
 - **LOOSE ENDS for operator:** (1) PAN-1644 draft untracked; (2) scratch has the primary's lifecycle-restart.ts alt-implementation if worth comparing; (3) freshly-dirty beads = normal ongoing bot writes.
 - REUSABLE: flywheel CANNOT commit/push code even via merge — `guard-flywheel-orchestrator-commit.sh` (pre-commit + pre-push) gates on OVERDECK_AGENT_ID; for an operator-directed reconcile merge, `env -u OVERDECK_AGENT_ID git commit/push` lets the guard pass on its own context-check (never `--no-verify`).
 
+## RUN-58 tick 147 (2026-07-08) — 🔴 RED MAIN still: fix on main (14e35a1987) is PARTIAL — only issues-no-loss.test.ts, no-loss-matrix.ts entry MISSING → will re-red; strike polling; direct-to-main bypass actor racing
+
+**🔴 RED MAIN not yet resolved.** Main advanced `8797566e2d → 40b138a11e → 14e35a1987` via **direct-to-main bot commits** (`40b138a11e feat(tree)… PAN-2487 follow-up`, `14e35a1987 test(routes): add ship-log to no-loss route matrix (PAN-2490 red-main fix)`) — an operator-adjacent bypass-orchestration flow landing PAN-2487 fixes directly, racing my strike.
+- **The fix is INCOMPLETE.** `14e35a1987` touched only `tests/unit/dashboard/routes/issues-no-loss.test.ts` (3 lines: expectedRoutes + 29→30). The SECOND failing test — `tests/unit/lib/overdeck/no-loss-matrix.test.ts:95` — needs a `NO_LOSS_MATRIX` entry in `tests/unit/lib/overdeck/no-loss-matrix.ts`. **Verified: ship-log is NOT in that matrix on main.** So the `test` job will FAIL again on 14e35a1987 → main stays red.
+- **Strike PAN-2490 (codex/gpt-5.5) is only polling CI** — never pushed to `strike/pan-2490`, believes its fix is complete. It made the partial fix (or the bypass flow did) and is waiting for a green that won't come until the matrix entry lands.
+- **Plan:** watch short. When `test` fails on 14e35a1987, the strike (live agent) should re-engage and add the matrix entry — OR the bypass flow lands it. If neither adds `NO_LOSS_MATRIX[ship-log]` within a cycle, escalate (the red-main fix is stuck half-done). Not PRing/admin-merging (fix already on main path); not micro-managing the strike.
+- PAN-1644 (#2480) UNSTABLE (secondary). M7/MIN-729 verifying. MIN-865/861 rfm report-only. B3/PAN-2167 unauthorized.
+
 ## RUN-58 tick 146 (2026-07-07) — 🔴 RED MAIN P0: PAN-2487 ship-log route broke no-loss audit (29→30 routes) → filed PAN-2490 + STRUCK
 
 **🔴 RED MAIN (`8797566e2d`, CI test job = failure).** Real failure, not a flake. Two **no-loss audit** tests fail deterministically:
