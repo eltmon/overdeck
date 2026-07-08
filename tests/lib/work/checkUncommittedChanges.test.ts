@@ -69,6 +69,37 @@ describe('checkUncommittedChanges', () => {
     expect(result[2]).toContain('src/bar.ts');
   });
 
+  it('monorepo: returns empty array when only state-plane files are dirty', async () => {
+    mkdirSync(join(tempDir, '.git'));
+    mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
+      cb(null, {
+        stdout: '?? .pan/records/pan-2167.json\nMM .pan/test/result.json\n',
+        stderr: '',
+      });
+    });
+
+    const { checkUncommittedChanges } = await import('../../../src/lib/work/done-preflight.js');
+    const result = await Effect.runPromise(checkUncommittedChanges(tempDir));
+    expect(result).toEqual([]);
+  });
+
+  it('monorepo: reports only source lines when source and state-plane files are dirty', async () => {
+    mkdirSync(join(tempDir, '.git'));
+    mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
+      cb(null, {
+        stdout: 'MM .pan/records/pan-2167.json\n M src/foo.ts\n?? .pan/test/result.json\n',
+        stderr: '',
+      });
+    });
+
+    const { checkUncommittedChanges } = await import('../../../src/lib/work/done-preflight.js');
+    const result = await Effect.runPromise(checkUncommittedChanges(tempDir));
+    expect(result).toEqual([
+      '  Uncommitted changes:',
+      '     M src/foo.ts',
+    ]);
+  });
+
   it('monorepo: returns empty array when git is unavailable', async () => {
     mkdirSync(join(tempDir, '.git'));
     mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
@@ -118,6 +149,25 @@ describe('checkUncommittedChanges', () => {
     expect(result.some((l) => l.includes('dirty-file.ts'))).toBe(true);
     // repo-b is clean — should not appear
     expect(result.some((l) => l.includes('repo-b'))).toBe(false);
+  });
+
+  it('polyrepo: omits state-plane status lines from dirty sub-repo output', async () => {
+    const subA = join(tempDir, 'repo-a');
+    mkdirSync(join(subA, '.git'), { recursive: true });
+
+    mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
+      cb(null, {
+        stdout: 'MM .pan/records/pan-2167.json\n M src/dirty-file.ts\n',
+        stderr: '',
+      });
+    });
+
+    const { checkUncommittedChanges } = await import('../../../src/lib/work/done-preflight.js');
+    const result = await Effect.runPromise(checkUncommittedChanges(tempDir));
+    expect(result).toEqual([
+      '  Uncommitted changes in repo-a/:',
+      '     M src/dirty-file.ts',
+    ]);
   });
 
   it('polyrepo: skips hidden directories (starting with .)', async () => {
