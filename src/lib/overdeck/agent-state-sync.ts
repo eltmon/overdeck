@@ -20,6 +20,9 @@ type OverdeckAgentRow = {
   kickoff_delivered: number | null;
   paused: number | null;
   paused_reason: string | null;
+  yielded_by_scheduler: number | null;
+  yielded_at: number | null;
+  last_yield_resume_at: number | null;
   troubled: number | null;
   channels_enabled: number | null;
   consecutive_failures: number | null;
@@ -63,6 +66,9 @@ export const AGENT_COLUMNS_FOR_DB = [
   'kickoff_delivered',
   'paused',
   'paused_reason',
+  'yielded_by_scheduler',
+  'yielded_at',
+  'last_yield_resume_at',
   'troubled',
   'channels_enabled',
   'consecutive_failures',
@@ -129,6 +135,9 @@ function overdeckRowToAgentState(row: OverdeckAgentRow): AgentState {
     kickoffDelivered: boolFromInteger(row.kickoff_delivered),
     paused: boolFromInteger(row.paused),
     pausedReason: row.paused_reason ?? undefined,
+    yieldedByScheduler: boolFromInteger(row.yielded_by_scheduler),
+    yieldedAt: isoFromMillis(row.yielded_at),
+    lastYieldResumeAt: isoFromMillis(row.last_yield_resume_at),
     troubled: boolFromInteger(row.troubled),
     consecutiveFailures: row.consecutive_failures ?? undefined,
     firstFailureInRunAt: isoFromMillis(row.first_failure_in_run_at),
@@ -178,6 +187,9 @@ export function stateToOverdeckParamsForDb(state: AgentState, updatedAt: number)
     state.kickoffDelivered == null ? null : (state.kickoffDelivered ? 1 : 0),
     state.paused == null ? null : (state.paused ? 1 : 0),
     state.pausedReason ?? null,
+    state.yieldedByScheduler == null ? null : (state.yieldedByScheduler ? 1 : 0),
+    millisFromIso(state.yieldedAt),
+    millisFromIso(state.lastYieldResumeAt),
     state.troubled == null ? null : (state.troubled ? 1 : 0),
     state.channelsEnabled == null ? null : (state.channelsEnabled ? 1 : 0),
     state.consecutiveFailures ?? null,

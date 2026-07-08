@@ -40,6 +40,7 @@ afterEach(() => {
 import {
   getAgentStateSync,
   saveAgentStateSync,
+  clearAgentPausedSync,
   getAgentState,
   saveAgentState,
   type AgentState,
@@ -145,5 +146,50 @@ describe('agents state SQLite backing', () => {
     const loaded = getAgentStateSync(id);
     expect(loaded).toBeDefined();
     expect(loaded?.id).toBe(id);
+  });
+
+  // PAN-2507 (AC-2): yield attribution fields persist through the agents table.
+  it('round-trips the PAN-2507 yield fields through the agents table', () => {
+    const id = agentId('yield-roundtrip');
+    saveAgentStateSync(makeAgentState({
+      id,
+      paused: true,
+      pausedReason: 'yield: making room for review of PAN-5678',
+      pausedAt: '2026-07-08T00:00:00.000Z',
+      yieldedByScheduler: true,
+      yieldedAt: '2026-07-08T00:00:00.000Z',
+      lastYieldResumeAt: '2026-07-07T00:00:00.000Z',
+    }));
+
+    const loaded = getAgentStateSync(id);
+    expect(loaded?.paused).toBe(true);
+    expect(loaded?.yieldedByScheduler).toBe(true);
+    expect(loaded?.yieldedAt).toBe('2026-07-08T00:00:00.000Z');
+    expect(loaded?.lastYieldResumeAt).toBe('2026-07-07T00:00:00.000Z');
+  });
+
+  // PAN-2507 (FR-5 / AC-2): an operator unpause clears the yield attribution,
+  // but preserves lastYieldResumeAt (a re-yield cooldown tracker, not a pause field).
+  it('clearAgentPausedSync clears yield attribution but keeps lastYieldResumeAt', () => {
+    const id = agentId('yield-unpause');
+    saveAgentStateSync(makeAgentState({
+      id,
+      paused: true,
+      pausedReason: 'yield: making room for review of PAN-5678',
+      pausedAt: '2026-07-08T00:00:00.000Z',
+      yieldedByScheduler: true,
+      yieldedAt: '2026-07-08T00:00:00.000Z',
+      lastYieldResumeAt: '2026-07-07T00:00:00.000Z',
+    }));
+
+    expect(clearAgentPausedSync(id)).toBe(true);
+
+    const loaded = getAgentStateSync(id);
+    expect(loaded?.paused).toBeFalsy();
+    expect(loaded?.pausedReason).toBeUndefined();
+    expect(loaded?.yieldedByScheduler).toBeUndefined();
+    expect(loaded?.yieldedAt).toBeUndefined();
+    // Cooldown tracker survives unpause so a just-resumed agent isn't re-yielded.
+    expect(loaded?.lastYieldResumeAt).toBe('2026-07-07T00:00:00.000Z');
   });
 });

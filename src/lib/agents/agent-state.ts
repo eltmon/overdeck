@@ -53,6 +53,23 @@ export interface AgentState {
   paused?: boolean;
   pausedReason?: string;
   pausedAt?: string;
+  /**
+   * PAN-2507: true when this work agent was paused by the preemptive scheduler
+   * (yielded to free capacity for an advancing dispatch), as distinct from an
+   * operator pause. Reuses `paused: true` so every existing no-resume gate
+   * protects the yielded agent; this flag lets the deacon resume yielded agents
+   * oldest-first and lets `pan unpause` self-clear the yield attribution.
+   */
+  yieldedByScheduler?: boolean;
+  /** PAN-2507: ISO timestamp of the yield (oldest-first resume ordering). */
+  yieldedAt?: string;
+  /**
+   * PAN-2507: ISO timestamp of the most recent resume-from-yield. Enforces the
+   * re-yield cooldown (an agent just resumed from a yield may not be re-yielded
+   * until `yield_cooldown_secs` elapse). Survives unpause (it is a cooldown
+   * tracker, not a pause field).
+   */
+  lastYieldResumeAt?: string;
   troubled?: boolean;
   troubledAt?: string;
   consecutiveFailures?: number;
@@ -204,6 +221,9 @@ function cleanAgentState(raw: AgentState): AgentState {
     paused: raw.paused,
     pausedReason: raw.pausedReason,
     pausedAt: raw.pausedAt,
+    yieldedByScheduler: raw.yieldedByScheduler,
+    yieldedAt: raw.yieldedAt,
+    lastYieldResumeAt: raw.lastYieldResumeAt,
     troubled: raw.troubled,
     troubledAt: raw.troubledAt,
     consecutiveFailures: raw.consecutiveFailures,
@@ -442,10 +462,17 @@ function applyAgentUnpaused(state: AgentState): void {
   delete state.paused;
   delete state.pausedReason;
   delete state.pausedAt;
+  // PAN-2507 (FR-5): clearing a pause also clears the scheduler-yield
+  // attribution, so an operator `pan unpause` on a yielded agent self-clears
+  // the yield. `lastYieldResumeAt` is deliberately preserved — it is a
+  // re-yield cooldown tracker, not a pause field.
+  delete state.yieldedByScheduler;
+  delete state.yieldedAt;
 }
 
 function isAgentPauseClear(state: AgentState): boolean {
-  return !state.paused && state.pausedReason === undefined && state.pausedAt === undefined;
+  return !state.paused && state.pausedReason === undefined && state.pausedAt === undefined
+    && state.yieldedByScheduler === undefined && state.yieldedAt === undefined;
 }
 
 /** Clears the persistent manual pause gate without spawning the agent. */
