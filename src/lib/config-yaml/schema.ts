@@ -138,6 +138,15 @@ export interface NormalizedFeatureRegistryConfig {
   };
 }
 
+export interface KnowledgeConfig {
+  /** Spawn `pan knowledge <issue> --retro` after a successful merge lifecycle. Default: false. */
+  post_merge_auto_retro?: boolean;
+}
+
+export interface NormalizedKnowledgeConfig {
+  postMergeAutoRetro: boolean;
+}
+
 export type ManualCompactMode = 'claude-code' | 'overdeck-native';
 
 export interface ConversationsConfig {
@@ -491,6 +500,9 @@ export interface YamlConfig {
   /** Knowledge registry population configuration */
   registry?: FeatureRegistryConfig;
 
+  /** OKF/knowledge-agent behavior */
+  knowledge?: KnowledgeConfig;
+
   /** Multi-tool sync configuration */
   tools?: {
     /**
@@ -797,6 +809,9 @@ export interface NormalizedConfig {
 
   /** Knowledge registry population configuration */
   registry: NormalizedFeatureRegistryConfig;
+
+  /** OKF/knowledge-agent behavior */
+  knowledge: NormalizedKnowledgeConfig;
 
   /** Shadow mode configuration */
   shadow: NormalizedShadowConfig;

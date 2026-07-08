@@ -138,6 +138,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     registry: {
       classification: { ...DEFAULT_CONFIG.registry.classification },
     },
+    knowledge: {
+      ...DEFAULT_CONFIG.knowledge,
+    },
     shadow: {
       enabled: DEFAULT_CONFIG.shadow.enabled,
       trackers: { ...DEFAULT_CONFIG.shadow.trackers },
@@ -659,6 +662,12 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     if (config.issues) {
       if (typeof config.issues.closed_window_days === 'number') {
         result.issues.closedWindowDays = config.issues.closed_window_days;
+      }
+    }
+
+    if (config.knowledge) {
+      if (typeof config.knowledge.post_merge_auto_retro === 'boolean') {
+        result.knowledge.postMergeAutoRetro = config.knowledge.post_merge_auto_retro;
       }
     }
 

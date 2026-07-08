@@ -140,6 +140,9 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
       perDayCostCapUsd: 1,
     },
   },
+  knowledge: {
+    postMergeAutoRetro: false,
+  },
   shadow: {
     enabled: false,
     trackers: {
