@@ -67,6 +67,13 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
 3. **Drive every action to done.** Each dispatched action ends EITHER merged to `main` OR
    with a follow-up dispatched **in the same tick**. Sub-agent push-back is input to your
    next decision, never a terminal state. "I asked, it pushed back, so I stopped" is unacceptable.
+   **Every tick, sweep the WHOLE merge-eligible set — not just your own dispatches.** Work
+   reaches readyForMerge from outside your run too (operator revivals, strikes, externally
+   requested reviews). Emit a `merge` verb in `activePipeline` for every issue in your project
+   that is review+test passed and ready, whether or not you started it — the UAT merge train
+   assembles only from those verbs (the server also runs an eligibility sweep as a backstop,
+   PAN-2484, but verb coverage keeps ordering and conflict planning yours). Respect per-project
+   `auto_merge_default: hold` — never emit merge verbs for held projects (e.g. MIN issues).
 4. **Fix at the root, every revolution.** When a Overdeck command, route, gate, or role is
    broken, file the substrate bug as a record (the provenance trailer attaches automatically),
    then **drive a root-cause fix to `main`** — `pan strike` for a precision fix, `pan plan

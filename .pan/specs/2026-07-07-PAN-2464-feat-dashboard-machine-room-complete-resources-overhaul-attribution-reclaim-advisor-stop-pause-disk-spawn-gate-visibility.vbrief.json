@@ -4,17 +4,17 @@
     "created": "2026-07-07T13:32:48Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2464: feat(dashboard): Machine Room — complete /resources overhaul (attribution, reclaim advisor, stop/pause, disk, spawn-gate visibility)",
-    "updated": "2026-07-07T15:44:52.574Z"
+    "updated": "2026-07-08T00:04:47.703Z"
   },
   "plan": {
     "id": "pan-2464",
     "title": "feat(dashboard): Machine Room — complete /resources overhaul (attribution, reclaim advisor, stop/pause, disk, spawn-gate visibility)",
-    "status": "approved",
+    "status": "completed",
     "uid": "5b2e0079-5807-4705-bfdb-f658d8397977",
     "author": "agent:claude-fable-5",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-07-07T13:32:48Z",
-    "updated": "2026-07-07T15:44:52.574Z",
+    "updated": "2026-07-08T00:04:47.703Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2464",
@@ -1752,5 +1752,5 @@
       "canonicalFilename": "2026-07-07-PAN-2464-feat-dashboard-machine-room-complete-resources-overhaul-attribution-reclaim-advisor-stop-pause-disk-spawn-gate-visibility.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
