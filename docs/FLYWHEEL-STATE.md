@@ -217,6 +217,14 @@ Operator: primary local main diverged (20 bot chore(state) commits ahead / 6 beh
 - **LOOSE ENDS for operator:** (1) PAN-1644 draft untracked; (2) scratch has the primary's lifecycle-restart.ts alt-implementation if worth comparing; (3) freshly-dirty beads = normal ongoing bot writes.
 - REUSABLE: flywheel CANNOT commit/push code even via merge — `guard-flywheel-orchestrator-commit.sh` (pre-commit + pre-push) gates on OVERDECK_AGENT_ID; for an operator-directed reconcile merge, `env -u OVERDECK_AGENT_ID git commit/push` lets the guard pass on its own context-check (never `--no-verify`).
 
+## RUN-58 tick 148 (2026-07-08) — 🔴 RED MAIN: confirmed test-job fail (run 28916303552); strike PAN-2490 directed to land the missing NO_LOSS_MATRIX entry (operator-engaged)
+
+**🔴 RED MAIN (`14e35a1987`, CI test job = failure, run 28916303552).** Operator confirmed my tick-147 read: the direct-to-main partial fix did NOT green CI — `NO_LOSS_MATRIX` still missing `GET /api/issues/:id/ship-log`.
+- **State:** main has the `issues-no-loss.test.ts` half (via bypass-flow commit 14e35a1987). Strike `strike/pan-2490` is ahead-1/behind-1, unpushed, and was about to hand off WITHOUT the matrix entry (it correctly refused to close). The ONLY remaining failure: no `NO_LOSS_MATRIX` entry in `tests/unit/lib/overdeck/no-loss-matrix.ts`.
+- **ACTION (P0 red-main exception to the no-pan-tell norm — sanctioned delivery door, operator-engaged):** `pan tell pan-2490` with the exact remaining step — rebase onto origin/main, add ONLY the `NO_LOSS_MATRIX[GET /api/issues/:id/ship-log]` entry, `npm test -- no-loss-matrix issues-no-loss` green, commit + push `strike/pan-2490`, reply to flywheel. Strike was already independently re-pulling the failure when the message landed.
+- **Next:** on strike push → flywheel `gh pr create --head strike/pan-2490 --base main` → merge on green → close PAN-2490 → main green. Then file the PAN-2487 ci-green-merge-skip bypass follow-up.
+- All drains/MIN-report/PAN-2445-watch DEFERRED until main green. M7/MIN-729 verifying; PAN-1644 UNSTABLE (secondary).
+
 ## RUN-58 tick 147 (2026-07-08) — 🔴 RED MAIN still: fix on main (14e35a1987) is PARTIAL — only issues-no-loss.test.ts, no-loss-matrix.ts entry MISSING → will re-red; strike polling; direct-to-main bypass actor racing
 
 **🔴 RED MAIN not yet resolved.** Main advanced `8797566e2d → 40b138a11e → 14e35a1987` via **direct-to-main bot commits** (`40b138a11e feat(tree)… PAN-2487 follow-up`, `14e35a1987 test(routes): add ship-log to no-loss route matrix (PAN-2490 red-main fix)`) — an operator-adjacent bypass-orchestration flow landing PAN-2487 fixes directly, racing my strike.
