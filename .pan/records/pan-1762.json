@@ -139,8 +139,8 @@
       "markdownBody": "VERIFICATION STUCK for PAN-1762 (attempt 3/3):\n\nFailed check: sync-target-branch\n\nSync with main FAILED:\n\nSync with main FAILED:\nerror: Your local changes to the following files would be overwritten by merge:\n\t.pan/records/pan-1762.json\nPlease commit your changes or stash them before you merge.\nAborting\nMerge with strategy ort failed.\n\n\n## NEEDS-YOU: Verification stuck\n\nThis was the final allowed verification attempt. The work agent is paused so it does not keep spending cycles on the same failing gate.\n\nAn operator needs to inspect PAN-1762, decide whether to fix-forward manually, restart the agent with new instructions, or move the issue through the normal pipeline. Do not re-request review automatically."
     }
   ],
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-opus-4-8",
   "pipeline": {
     "issueId": "PAN-1762",
     "reviewStatus": "pending",
@@ -236,7 +236,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-30T17:39:33.566Z",
-  "updated": "2026-07-07T03:00:37.216Z",
+  "updated": "2026-07-08T16:01:27.631Z",
   "statusOverrides": {
     "foreman-e2e": "completed",
     "foreman-e2e.ac1": "completed",

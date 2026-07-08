@@ -172,8 +172,8 @@
     ],
     "recordedAt": "2026-07-03T23:39:21.820Z"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-opus-4-8",
   "statusOverrides": {
     "app-rest-helpers": "completed",
     "app-rest-helpers.ac1": "completed",
@@ -302,5 +302,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T17:40:19.407Z",
-  "updated": "2026-07-07T03:11:11.908Z"
+  "updated": "2026-07-08T16:01:27.621Z"
 }

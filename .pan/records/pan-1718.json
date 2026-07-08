@@ -190,7 +190,7 @@
     }
   ],
   "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "model": "claude-opus-4-8",
   "pipeline": {
     "issueId": "PAN-1718",
     "reviewStatus": "passed",
@@ -292,7 +292,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-27T15:46:20.441Z",
-  "updated": "2026-07-07T03:17:30.447Z",
+  "updated": "2026-07-08T16:01:27.594Z",
   "statusOverrides": {
     "reload-lock-first": "completed",
     "reload-lock-first.ac1": "completed",

@@ -36,7 +36,7 @@
   ],
   "feedback": [],
   "created": "2026-06-29T14:57:37.612Z",
-  "updated": "2026-07-07T03:05:06.367Z",
+  "updated": "2026-07-08T16:01:27.629Z",
   "pipeline": {
     "issueId": "PAN-2076",
     "reviewStatus": "pending",
@@ -108,8 +108,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-opus-4-8",
   "statusOverrides": {
     "durable-decision": "completed",
     "durable-decision.ac1": "completed",

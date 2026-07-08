@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-03T16:26:56.719Z",
-  "updated": "2026-07-07T03:11:44.691Z",
+  "updated": "2026-07-08T16:01:27.622Z",
   "pipeline": {
     "issueId": "PAN-2310",
     "reviewStatus": "pending",
@@ -64,8 +64,8 @@
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-opus-4-8",
   "statusOverrides": {
     "inverse-done-merged-reconciliation": "completed",
     "inverse-done-merged-reconciliation.ac1": "completed",

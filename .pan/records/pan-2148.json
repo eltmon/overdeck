@@ -207,7 +207,7 @@
     "recordedAt": "2026-07-03T12:29:10.111Z"
   },
   "created": "2026-07-03T02:32:35.471Z",
-  "updated": "2026-07-07T03:05:56.194Z",
+  "updated": "2026-07-08T16:01:27.603Z",
   "pipeline": {
     "issueId": "PAN-2148",
     "reviewStatus": "pending",
@@ -363,8 +363,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-fable-5",
   "statusOverrides": {
     "wi-9-no-loss-audit": "completed",
     "wi-9-no-loss-audit.ac1": "completed",

@@ -2,8 +2,8 @@
   "issueId": "PAN-2151",
   "schemaVersion": 2,
   "feedback": [],
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-opus-4-8",
   "statusOverrides": {
     "barrel-finalize": "completed",
     "barrel-finalize.ac1": "completed",
@@ -139,5 +139,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-02T21:13:43.617Z",
-  "updated": "2026-07-07T03:06:03.197Z"
+  "updated": "2026-07-08T16:01:27.604Z"
 }

@@ -45,7 +45,7 @@
     "auto-start.ac3": "completed"
   },
   "created": "2026-06-26T03:33:27.321Z",
-  "updated": "2026-07-07T02:58:30.324Z",
+  "updated": "2026-07-08T16:01:27.627Z",
   "pipeline": {
     "issueId": "PAN-1084",
     "reviewStatus": "passed",
@@ -133,5 +133,5 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "kimi-k2.7-code"
+  "model": "claude-opus-4-8"
 }

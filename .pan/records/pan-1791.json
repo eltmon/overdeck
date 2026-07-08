@@ -2,8 +2,8 @@
   "issueId": "PAN-1791",
   "schemaVersion": 2,
   "feedback": [],
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-opus-4-8",
   "statusOverrides": {
     "tier-table-config": "completed",
     "per-issue-tier-override": "completed",
@@ -207,5 +207,5 @@
     "slotAssignments": []
   },
   "created": "2026-07-02T13:40:03.128Z",
-  "updated": "2026-07-07T03:00:43.379Z"
+  "updated": "2026-07-08T16:01:27.632Z"
 }

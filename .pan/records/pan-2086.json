@@ -178,7 +178,7 @@
   ],
   "feedback": [],
   "created": "2026-06-27T03:24:50.930Z",
-  "updated": "2026-07-06T14:15:10.041Z",
+  "updated": "2026-07-08T16:01:27.595Z",
   "pipeline": {
     "issueId": "PAN-2086",
     "reviewStatus": "pending",
@@ -284,8 +284,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-opus-4-8",
   "statusOverrides": {
     "traefik-readiness-gate": "completed",
     "traefik-readiness-gate.ac1": "completed",

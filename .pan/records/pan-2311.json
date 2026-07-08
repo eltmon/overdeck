@@ -142,8 +142,8 @@
     ],
     "recordedAt": "2026-07-04T14:36:30.293Z"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-opus-4-8",
   "statusOverrides": {
     "cli-reconcile-merges": "completed",
     "cli-reconcile-merges.ac1": "completed",
@@ -258,5 +258,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T18:03:53.979Z",
-  "updated": "2026-07-07T03:17:47.784Z"
+  "updated": "2026-07-08T16:01:27.622Z"
 }

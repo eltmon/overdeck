@@ -56,7 +56,7 @@
     "recordedAt": "2026-07-02T23:53:34.525Z"
   },
   "created": "2026-06-30T01:25:48.391Z",
-  "updated": "2026-07-07T03:06:10.542Z",
+  "updated": "2026-07-08T16:01:27.615Z",
   "pipeline": {
     "issueId": "PAN-2153",
     "reviewStatus": "pending",
@@ -169,8 +169,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-opus-4-8",
   "statusOverrides": {
     "extract-project-routes": "completed",
     "extract-project-routes.ac1": "completed",

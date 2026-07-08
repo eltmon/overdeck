@@ -48,7 +48,7 @@
   ],
   "feedback": [],
   "created": "2026-06-30T01:20:28.481Z",
-  "updated": "2026-07-07T03:06:17.049Z",
+  "updated": "2026-07-08T16:01:27.599Z",
   "pipeline": {
     "issueId": "PAN-2154",
     "reviewStatus": "pending",
@@ -134,8 +134,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-opus-4-8",
   "statusOverrides": {
     "wi-8-barrel-trim": "completed",
     "wi-8-barrel-trim.ac1": "completed",

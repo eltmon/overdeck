@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-03T16:48:06.323Z",
-  "updated": "2026-07-07T03:11:51.568Z",
+  "updated": "2026-07-08T16:01:27.623Z",
   "pipeline": {
     "issueId": "PAN-2312",
     "reviewStatus": "pending",
@@ -64,8 +64,8 @@
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-opus-4-8",
   "statusOverrides": {
     "test-init-nonfatal": "completed",
     "test-init-nonfatal.ac1": "completed",

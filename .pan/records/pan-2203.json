@@ -2,8 +2,8 @@
   "issueId": "PAN-2203",
   "schemaVersion": 2,
   "feedback": [],
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-opus-4-8",
   "pipeline": {
     "issueId": "PAN-2203",
     "reviewStatus": "passed",
@@ -232,5 +232,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-01T16:34:27.639Z",
-  "updated": "2026-07-07T03:09:07.268Z"
+  "updated": "2026-07-08T16:01:27.635Z"
 }

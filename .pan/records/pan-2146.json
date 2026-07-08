@@ -85,7 +85,7 @@
     }
   ],
   "created": "2026-06-29T17:48:06.928Z",
-  "updated": "2026-07-07T03:05:43.791Z",
+  "updated": "2026-07-08T16:01:27.597Z",
   "pipeline": {
     "issueId": "PAN-2146",
     "reviewStatus": "blocked",
@@ -176,8 +176,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-opus-4-8",
   "statusOverrides": {
     "wi-1-agent-state": "completed",
     "wi-1-agent-state.ac1": "completed",

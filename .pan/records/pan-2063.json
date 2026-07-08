@@ -44,8 +44,8 @@
     }
   ],
   "feedback": [],
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-opus-4-8",
   "pipeline": {
     "issueId": "PAN-2063",
     "reviewStatus": "passed",
@@ -134,7 +134,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-27T18:34:19.239Z",
-  "updated": "2026-07-07T03:04:59.082Z",
+  "updated": "2026-07-08T16:01:27.629Z",
   "statusOverrides": {
     "collapse-uat-panel": "completed",
     "collapse-uat-panel.ac1": "completed",

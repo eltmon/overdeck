@@ -29,8 +29,8 @@
     }
   ],
   "feedback": [],
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-opus-4-8",
   "statusOverrides": {
     "finalize-baseline": "completed",
     "finalize-baseline.ac1": "completed",
@@ -153,5 +153,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-02T19:43:33.248Z",
-  "updated": "2026-07-07T03:21:10.846Z"
+  "updated": "2026-07-08T16:01:27.600Z"
 }
