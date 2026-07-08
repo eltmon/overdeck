@@ -56,10 +56,30 @@ export interface GovernorReserves {
 }
 
 let governorMode: GovernorMode = 'admitting';
+let cachedVerdict: MemoryVerdict | null = null;
 
 /** Test-only: reset the module-level hysteresis state between test cases. */
 export function resetGovernorModeForTests(): void {
   governorMode = 'admitting';
+  cachedVerdict = null;
+}
+
+/**
+ * The verdict from the most recent assessMemoryPressure() call, or null before
+ * any patrol has run one. Synchronous — no I/O — so synchronous call sites
+ * (PAN-2500 specialist-budget: canDispatchAdvancing/tryReserveAdvancingSlot in
+ * concurrency.ts, called from many places across deacon.ts/deacon-review-status.ts)
+ * can consult live-ish memory pressure without becoming async themselves. At
+ * most one patrol cycle stale; wire-deacon-gate already calls
+ * assessMemoryPressure every patrol before advancing dispatch runs.
+ */
+export function getCachedMemoryVerdict(): MemoryVerdict | null {
+  return cachedVerdict;
+}
+
+/** Test-only. */
+export function setCachedMemoryVerdictForTests(verdict: MemoryVerdict | null): void {
+  cachedVerdict = verdict;
 }
 
 export function readGovernorReserves(): GovernorReserves {
@@ -108,11 +128,13 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
   const reserves = readGovernorReserves();
   const snapshot = await readProcMemory();
   governorMode = nextGovernorMode(snapshot.memAvailable, reserves, governorMode);
-  return {
+  const verdict: MemoryVerdict = {
     band: bandForGovernorMode(governorMode),
     availableBytes: snapshot.memAvailable,
     thresholds: { warningBytes: reserves.softBytes, criticalBytes: reserves.hardBytes },
   };
+  cachedVerdict = verdict;
+  return verdict;
 }
 
 // --- PAN-2500 footprint-budget ----------------------------------------------

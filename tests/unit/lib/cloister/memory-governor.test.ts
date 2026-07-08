@@ -29,6 +29,7 @@ import {
   computeLearnedFootprintBytes,
   estimateFootprint,
   canAdmit,
+  getCachedMemoryVerdict,
   type GovernorReserves,
 } from '../../../../src/lib/cloister/memory-governor.js';
 import { getResourceStacks, type ResourceStack, type StackContainerResource } from '../../../../src/dashboard/server/routes/resources/stacks.js';
@@ -130,6 +131,13 @@ describe('assessMemoryPressure', () => {
     expect((await assessMemoryPressure()).band).toBe('soft'); // still holding, not ok
     readProcMemoryMock.mockResolvedValue({ memAvailable: 13 * GIB }); // above recovery
     expect((await assessMemoryPressure()).band).toBe('ok');
+  });
+
+  it('caches the verdict for synchronous consumers (PAN-2500 specialist-budget)', async () => {
+    expect(getCachedMemoryVerdict()).toBeNull();
+    readProcMemoryMock.mockResolvedValue({ memAvailable: 2 * GIB });
+    const verdict = await assessMemoryPressure();
+    expect(getCachedMemoryVerdict()).toEqual(verdict);
   });
 });
 
