@@ -34,6 +34,8 @@ npx @overdeck/core
 
 No install step required. `npx @overdeck/core` starts Command Deck and opens the dashboard in your browser. Use `overdeck` or `pan` after `npm install -g @overdeck/core`. The packaged desktop app is published separately as `@overdeck/desktop`.
 
+**Requires Node.js 22+.** If your shell's default Node is older, Overdeck automatically relaunches under an installed Node 22+ (Homebrew `node@22`, nvm, fnm, volta, or asdf) — no manual switching needed. If no compatible Node is found, it prints the exact install command for your setup.
+
 Dashboard runs at https://pan.localhost (or http://localhost:3011 if you skip HTTPS setup).
 
 See the [full documentation](https://docs.overdeck.ai) for detailed setup, configuration, and usage guides.

@@ -3,6 +3,12 @@ import { Effect } from 'effect';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { ensureCompatibleNode } from './node-preflight.js';
+
+// Relaunch under a compatible Node (>=22) before anything else runs. If the
+// current runtime is already Node 22+ this is a no-op; otherwise it re-execs the
+// CLI under an installed Node 22+, or exits with a specific fix command.
+ensureCompatibleNode();
 
 // Load ~/.overdeck.env before any other imports
 // This makes API keys and other env vars available to all commands
@@ -1391,19 +1397,9 @@ program
     const { fileURLToPath } = await import('url');
     const { existsSync } = await import('fs');
 
-    // Check Node.js version — dashboard requires Node 22+ (node-pty, Effect.js)
+    // Node 22+ is guaranteed here: ensureCompatibleNode() at CLI startup
+    // relaunches under a compatible Node (or exits) before any command runs.
     const nodeVersion = process.versions.node;
-    const major = parseInt(nodeVersion.split('.')[0]!, 10);
-    if (major < 22) {
-      console.error(chalk.red(`Error: Overdeck dashboard requires Node.js 22 or later.`));
-      console.error(chalk.dim(`You are running Node.js ${nodeVersion}.`));
-      console.error('');
-      console.error('Install Node 22:');
-      console.error(chalk.dim('  nvm install 22 && nvm use 22'));
-      console.error(chalk.dim('  # or: brew install node@22'));
-      console.error(chalk.dim('  # or: https://nodejs.org/en/download'));
-      process.exit(1);
-    }
 
     const __dirname = dirname(fileURLToPath(import.meta.url));
     const bundledServer = join(__dirname, '..', 'dashboard', 'server.js');
