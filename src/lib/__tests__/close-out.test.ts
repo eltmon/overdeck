@@ -10,6 +10,9 @@ const mocks = vi.hoisted(() => ({
   loadReviewStatuses: vi.fn(() => ({})),
   markRecordPipelineClosedOutSync: vi.fn(),
   stopWorkspaceDocker: vi.fn(() => Effect.void),
+  teardownWorkspaceDockerByNamePromise: vi.fn(() =>
+    Promise.resolve({ networkRemoved: true, steps: ['Stopped Docker stack'] }),
+  ),
 }));
 
 vi.mock('child_process', async (importOriginal) => {
@@ -38,6 +41,10 @@ vi.mock('../review-status.js', () => ({
 
 vi.mock('../pan-dir/records.js', () => ({
   markRecordPipelineClosedOutSync: mocks.markRecordPipelineClosedOutSync,
+}));
+
+vi.mock('../workspace-manager/docker.js', () => ({
+  teardownWorkspaceDockerByNamePromise: mocks.teardownWorkspaceDockerByNamePromise,
 }));
 
 vi.mock('../workspace-manager.js', () => ({
@@ -126,6 +133,10 @@ describe('executeCloseOut workspace resolution (PAN-2510)', () => {
     vi.clearAllMocks();
     mocks.loadReviewStatuses.mockReturnValue({});
     mocks.stopWorkspaceDocker.mockReturnValue(Effect.void);
+    mocks.teardownWorkspaceDockerByNamePromise.mockResolvedValue({
+      networkRemoved: true,
+      steps: ['Stopped Docker stack'],
+    });
     mocks.exec.mockImplementation((command: string, _opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
       const cb = typeof _opts === 'function' ? _opts : callback;
       cb?.(null, { stdout: '', stderr: '' });
@@ -155,10 +166,10 @@ describe('executeCloseOut workspace resolution (PAN-2510)', () => {
     expect(result.success).toBe(true);
     const cleanupStep = result.steps.find((step) => step.name === 'Clean up workspace');
     expect(cleanupStep?.status).toBe('passed');
-    expect(mocks.stopWorkspaceDocker).toHaveBeenCalledWith(workspacePath, issueLower);
+    expect(mocks.teardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith(issueLower);
   });
 
-  it('records skipped cleanup when no workspace exists on disk', async () => {
+  it('still invokes name-based Docker teardown when no workspace exists on disk', async () => {
     const issueId = 'PAN-2510';
     mocks.exec.mockImplementation((command: string, _opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
       const cb = typeof _opts === 'function' ? _opts : callback;
@@ -180,9 +191,65 @@ describe('executeCloseOut workspace resolution (PAN-2510)', () => {
     }));
 
     expect(result.success).toBe(true);
-    const cleanupStep = result.steps.find((step) => step.name === 'Clean up workspace');
-    expect(cleanupStep?.status).toBe('skipped');
-    expect(mocks.stopWorkspaceDocker).not.toHaveBeenCalled();
+    expect(mocks.teardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith(issueId.toLowerCase());
+    const dockerStep = result.steps.find((step) => step.name === 'Docker stack removed');
+    expect(dockerStep?.status).toBe('passed');
+  });
+
+  it('records a warning but does not abort when network removal cannot be verified', async () => {
+    const issueId = 'PAN-2510';
+    mocks.teardownWorkspaceDockerByNamePromise.mockResolvedValue({
+      networkRemoved: false,
+      steps: ['compose down attempted', 'network still present'],
+    });
+
+    const result = await Effect.runPromise(executeCloseOut({
+      issueId,
+      projectPath,
+      isGitHub: true,
+      owner: 'eltmon',
+      repo: 'overdeck',
+      number: 2510,
+    }));
+
+    expect(result.success).toBe(true);
+    const dockerStep = result.steps.find((step) => step.name === 'Docker stack removed');
+    expect(dockerStep?.status).toBe('skipped');
+    expect(dockerStep?.message).toContain('overdeck-feature-pan-2510_devnet');
+  });
+
+  it('runs Docker teardown before git worktree removal', async () => {
+    const issueId = 'PAN-2510';
+    const issueLower = issueId.toLowerCase();
+    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+    mkdirSync(workspacePath, { recursive: true });
+
+    let teardownCallIndex = -1;
+    let worktreeCallIndex = -1;
+    mocks.teardownWorkspaceDockerByNamePromise.mockImplementation(async () => {
+      teardownCallIndex = mocks.exec.mock.calls.length;
+      return { networkRemoved: true, steps: [] };
+    });
+    mocks.exec.mockImplementation((command: string, _opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
+      const cb = typeof _opts === 'function' ? _opts : callback;
+      if (command.includes('git worktree remove')) {
+        worktreeCallIndex = mocks.exec.mock.calls.length;
+      }
+      cb?.(null, { stdout: '', stderr: '' });
+      return { on: vi.fn() };
+    });
+
+    await Effect.runPromise(executeCloseOut({
+      issueId,
+      projectPath,
+      isGitHub: true,
+      owner: 'eltmon',
+      repo: 'overdeck',
+      number: 2510,
+    }));
+
+    expect(teardownCallIndex).toBeGreaterThanOrEqual(0);
+    expect(worktreeCallIndex).toBeGreaterThan(teardownCallIndex);
   });
 
   it('imports findWorkspacePath from archive-planning and has no local definition', async () => {
