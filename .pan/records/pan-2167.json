@@ -22,17 +22,34 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-08T23:21:29.827Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-08T23:21:29Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2167\n\nSource-to-state renames are misclassified as state-plane-only and can bypass clean-tree gates\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2167 -m \"Fixed review issues\"`"
+      "timestamp": "2026-07-08T23:32:29.136Z",
+      "reason": "end",
+      "note": "Anomalies: full npm suite intentionally not rerun; sandbox denies git subprocess tests with spawnSync git EPERM, and operator directed targeted review-pipeline tests only. Rework: source-to-state renames and source deletions now trip the dirty-tree gate because rename/copy porcelain records parse both old and new paths, and pan done filters whole status lines. Verification: npx vitest run src/dashboard/server/routes/workspaces/__tests__/review-pipeline-dirty-gate.test.ts passed (5 tests)."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T23:32:32.263Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-08T23:33Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-08T23:33:49.803Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T23:33:49.872Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T23:35:27.030Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/drafts/pan-2167.md",
@@ -66,24 +83,26 @@
       "src/lib/work/done-preflight.ts",
       "tests/lib/work/checkUncommittedChanges.test.ts"
     ],
-    "recordedAt": "2026-07-08T23:19:36.558Z"
+    "recordedAt": "2026-07-08T23:32:23.025Z"
   },
   "created": "2026-07-08T21:36:56.346Z",
-  "updated": "2026-07-08T23:22:37.234Z",
+  "updated": "2026-07-08T23:36:38.572Z",
   "pipeline": {
     "issueId": "PAN-2167",
     "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-08T23:22:37.127Z",
-    "reviewNotes": "Source-to-state renames are misclassified as state-plane-only and can bypass clean-tree gates",
+    "updatedAt": "2026-07-08T23:36:38.524Z",
+    "reviewNotes": "pan done still misclassifies leading-space state-plane porcelain as source dirt",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "inspectNotes": "Bead state-plane-status-predicate ack: isStatePlaneOnlyStatus/parsePorcelainStatusPaths added to src/lib/state-plane.ts satisfy all 4 ACs (MM/untracked in-plane true, non-plane path false, empty clean true+[], rename dest resolution both directions); 13/13 tests pass independently verified; no any/execSync/oversized files.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2512",
-    "lastVerifiedCommit": "9b14f53e674b86a123a436d6710bfe0b8ad94e1f",
-    "reviewRequestedAt": "2026-07-08T23:19:44.913Z",
+    "lastVerifiedCommit": "92316efa32996c18de60f89b273a2502570c640f",
+    "reviewRequestedAt": "2026-07-08T23:32:29.138Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/drafts/pan-2167.md",
@@ -117,7 +136,7 @@
         "src/lib/work/done-preflight.ts",
         "tests/lib/work/checkUncommittedChanges.test.ts"
       ],
-      "recordedAt": "2026-07-08T23:19:36.558Z"
+      "recordedAt": "2026-07-08T23:32:23.025Z"
     }
   },
   "closeOut": {
@@ -125,15 +144,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 2541668,
-            "output": 2859,
-            "cacheRead": 2251520,
+            "input": 2734130,
+            "output": 3389,
+            "cacheRead": 2414464,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 18489139,
-            "output": 34430,
-            "cacheRead": 18183936,
+            "input": 26607245,
+            "output": 46267,
+            "cacheRead": 26050048,
             "cacheWrite": 0
           }
         },
@@ -156,15 +175,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 2541668,
-          "output": 2859,
-          "cacheRead": 2251520,
+          "input": 2734130,
+          "output": 3389,
+          "cacheRead": 2414464,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 18489139,
-          "output": 34430,
-          "cacheRead": 18183936,
+          "input": 26607245,
+          "output": 46267,
+          "cacheRead": 26050048,
           "cacheWrite": 0
         },
         "anthropic/claude-opus-4-8": {
@@ -181,8 +200,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 16.377463,
-        "pricingAsOf": "2026-07-08T23:22:37.164Z"
+        "usd": 21.925599000000002,
+        "pricingAsOf": "2026-07-08T23:36:38.572Z"
       }
     },
     "merges": [
