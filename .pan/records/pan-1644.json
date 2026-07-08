@@ -31,17 +31,14 @@
       "reason": "resume",
       "agentModel": "kimi-k2.7-code",
       "timestamp": "2026-07-08T01:20:45.444Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "failed",
-      "timestamp": "2026-07-08T01:20:44Z",
-      "markdownBody": "# Review FAILED for PAN-1644\n\nReview role spawn failed: CLIProxyAPI sidecar is not running. GPT subscription role runs route through a local cliproxy process managed by `pan up`. Run `pan up` (or restart the dashboard) before spawning a GPT role run.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1644 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T01:22:37.257Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/records/pan-1644.json",
@@ -111,8 +108,8 @@
     ],
     "recordedAt": "2026-07-08T01:18:05.387Z"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "title-source-ai-explicit": "completed",
     "hook-script-stop": "completed",
@@ -159,13 +156,13 @@
   },
   "pipeline": {
     "issueId": "PAN-1644",
-    "reviewStatus": "failed",
+    "reviewStatus": "reviewing",
     "testStatus": "failed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-08T01:20:43.141Z",
+    "updatedAt": "2026-07-08T01:22:35.239Z",
     "reviewNotes": "Review role spawn failed: CLIProxyAPI sidecar is not running. GPT subscription role runs route through a local cliproxy process managed by `pan up`. Run `pan up` (or restart the dashboard) before spawning a GPT role run.",
     "testNotes": "typecheck passed; lint passed; npm test failed. Blocking failures: (1) tests/unit/lib/overdeck/no-loss-matrix.test.ts requires matrix entries for new PAN-1644 routes: POST /api/admin/conversations/backfill-titles, POST /api/hooks/user-prompt-submit, POST /api/hooks/turn-complete. (2) tests/integration/agent-spawning.test.ts > resumeAgent marks kickoff redelivered only after the redelivery lands timed out at 30000ms. Browser UAT not exercised because automated gates failed; acceptance criteria require the conversation list to update from conversation.title_changed, so UAT would be needed after gate fixes.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -249,9 +246,9 @@
       "byStage": {
         "codex": {
           "openai/gpt-5.5": {
-            "input": 9754164,
-            "output": 19324,
-            "cacheRead": 8972800,
+            "input": 9858904,
+            "output": 20290,
+            "cacheRead": 9074816,
             "cacheWrite": 0
           }
         },
@@ -289,18 +286,18 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 4127984,
-            "output": 288851,
-            "cacheRead": 143529728,
+            "input": 4333010,
+            "output": 290389,
+            "cacheRead": 145440512,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 9754164,
-          "output": 19324,
-          "cacheRead": 8972800,
+          "input": 9858904,
+          "output": 20290,
+          "cacheRead": 9074816,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -322,15 +319,15 @@
           "cacheWrite": 86241
         },
         "custom/kimi-k2.7-code": {
-          "input": 4501855,
-          "output": 298047,
-          "cacheRead": 146503424,
+          "input": 4706881,
+          "output": 299585,
+          "cacheRead": 148414208,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 56.062409,
-        "pricingAsOf": "2026-07-08T01:20:43.221Z"
+        "usd": 56.719993,
+        "pricingAsOf": "2026-07-08T01:22:35.434Z"
       }
     },
     "merges": [
@@ -357,5 +354,5 @@
     }
   },
   "created": "2026-07-08T01:13:35.614Z",
-  "updated": "2026-07-08T01:20:45.686Z"
+  "updated": "2026-07-08T01:22:37.440Z"
 }
