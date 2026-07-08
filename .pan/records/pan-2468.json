@@ -215,15 +215,15 @@
     "recordedAt": "2026-07-08T03:26:46.995Z"
   },
   "created": "2026-07-07T15:47:12.301Z",
-  "updated": "2026-07-08T03:53:21.033Z",
+  "updated": "2026-07-08T03:56:53.707Z",
   "pipeline": {
     "issueId": "PAN-2468",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-08T03:53:20.947Z",
+    "updatedAt": "2026-07-08T03:56:53.659Z",
     "reviewNotes": "Previous FR-18/FR-19 blockers remain unresolved: installers still unwired and Ollama ensure still never starts a stopped server",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2488",
     "lastVerifiedCommit": "7198e3adfcadf9f93d36b97b6ffd7d95d9cac314",
@@ -405,15 +405,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 41202099,
-            "output": 20126,
-            "cacheRead": 38386816,
+            "input": 41317847,
+            "output": 20260,
+            "cacheRead": 38491648,
             "cacheWrite": 0
           },
           "openai/gpt-5.4-mini": {
-            "input": 35581393,
-            "output": 82528,
-            "cacheRead": 34004608,
+            "input": 37244564,
+            "output": 89370,
+            "cacheRead": 35640064,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
@@ -434,15 +434,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 41202099,
-          "output": 20126,
-          "cacheRead": 38386816,
+          "input": 41317847,
+          "output": 20260,
+          "cacheRead": 38491648,
           "cacheWrite": 0
         },
         "openai/gpt-5.4-mini": {
-          "input": 35581393,
-          "output": 82528,
-          "cacheRead": 34004608,
+          "input": 37244564,
+          "output": 89370,
+          "cacheRead": 35640064,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
@@ -459,8 +459,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 93.18730835,
-        "pricingAsOf": "2026-07-08T03:53:20.996Z"
+        "usd": 93.3615428,
+        "pricingAsOf": "2026-07-08T03:56:53.705Z"
       }
     },
     "merges": [
