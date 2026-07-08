@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ActivityTab } from '../../CommandDeck/ZoneCOverviewTabs/ActivityTab'
+import { ShipTab } from './ShipTab'
 import { BeadsTab } from '../../CommandDeck/ZoneCOverviewTabs/BeadsTab'
 import { CostsTab } from '../../CommandDeck/ZoneCOverviewTabs/CostsTab'
 import { DiscussionsTab } from '../../CommandDeck/ZoneCOverviewTabs/DiscussionsTab'
@@ -61,6 +62,7 @@ type MissionTab =
   | 'discussion'
   | 'costs'
   | 'artifacts'
+  | 'ship'         // PAN-2487: Ship & Merge view — live merge-door progress + log
   | 'conversation' // tool — relocates to a pane in #10
   | 'files'        // tool — #10
   | 'terminal'     // tool — #10
@@ -79,6 +81,7 @@ const TABS: Array<{ id: MissionTab; label: string }> = [
   { id: 'discussion', label: 'Discussion' },
   { id: 'costs', label: 'Costs' },
   { id: 'artifacts', label: 'Artifacts' },
+  { id: 'ship', label: 'Ship' },
   { id: 'conversation', label: 'Conversation' },
   { id: 'files', label: 'Files' },
   { id: 'terminal', label: 'Terminal' },
@@ -851,7 +854,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     if (phase === 'test') { if (!openAgentByType('test')) selectTab('overview'); return }
     if (phase === 'plan') { selectTab('plan'); return }
     if (phase === 'ci') { selectTab('code'); return }
-    selectTab('overview') // ship / merge — until the Ship & Merge view (later item)
+    selectTab('ship') // PAN-2487: ship / merge phases open the Ship & Merge view
   }
   const recordTreeSessions = useCallback((sessions: readonly SessionNode[]) => {
     setTreeSessions(sessions)
@@ -977,6 +980,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             {activeTab === 'discussion' && <DiscussionsTab issueId={issueId} />}
             {activeTab === 'costs' && <CostsTab issueId={issueId} />}
             {activeTab === 'artifacts' && <DrawerArtifactsPanel issueId={issueId} />}
+            {activeTab === 'ship' && <ShipTab issueId={issueId} />}
             {activeTab === 'conversation' && <ConversationTab launcher={launcher} agentDock={agentDock} actionDock={actionDock} timeline={timeline} />}
             {activeTab === 'files' && <OpenPaneCard title="Files" description="Open the issue-scoped workspace file browser in a deck pane." action="Open files pane" onOpen={() => onOpenPane('files')} />}
             {activeTab === 'terminal' && <OpenPaneCard title="Terminal" description="Open the issue terminal drawer for the current workspace." action="Open terminal" onOpen={() => onOpenPane('terminal')} />}

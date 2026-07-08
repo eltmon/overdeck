@@ -238,6 +238,33 @@ const getIssueAnalyzeRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: GET /api/issues/:id/ship-log ─────────────────────────────────────
+// PAN-2487: live Ship-phase progress — door steps + quality-gate lines for the
+// cockpit's Ship panel (the merge runs server-side; no agent session to open).
+const getIssueShipLogRoute = HttpRouter.add(
+  'GET',
+  '/api/issues/:id/ship-log',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    if (!parseIssueIdSync(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
+    return yield* Effect.promise(async () => {
+      const { getShipLog } = await import('../../../lib/cloister/ship-log.js');
+      const { getReviewStatusSync } = await import('../../../lib/review-status.js');
+      const log = getShipLog(id);
+      const rs = getReviewStatusSync(id);
+      return jsonResponse({
+        issueId: id.toUpperCase(),
+        mergeStatus: rs?.mergeStatus ?? null,
+        mergeStep: rs?.mergeStep ?? null,
+        log,
+      });
+    });
+  })),
+);
+
 // ─── Route: POST /api/issues/:issueId/close ──────────────────────────────────
 
 const postIssueCloseRoute = HttpRouter.add(
@@ -785,6 +812,7 @@ const getIssueResourceDetailsRoute = HttpRouter.add(
 export const issuesRouteLayer = Layer.mergeAll(
   getIssuesRoute,
   getIssueAnalyzeRoute,
+  getIssueShipLogRoute,
   postIssueCloseRoute,
   postIssueStartPlanningRoute,
   postIssueAbortPlanningRoute,

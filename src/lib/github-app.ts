@@ -467,7 +467,7 @@ function summarizeCiCheckRuns(
   };
 }
 
-async function getCiCheckRunsStatePromise(
+export async function getCiCheckRunsStatePromise(
   owner: string,
   repo: string,
   sha: string,

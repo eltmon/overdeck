@@ -43,6 +43,8 @@ export interface WorkspaceInfo {
 
 export interface VerificationRunnerOptions {
   syncTargetBranch?: boolean;
+  /** PAN-2487: receives human-readable gate progress lines (ship-log mirror). */
+  onGateLog?: (line: string) => void;
 }
 
 interface SyncResult {
@@ -475,6 +477,7 @@ async function runVerificationForIssuePromise(
       isRemote: workspaceInfo.isRemote,
       vmName: workspaceInfo.vmName,
       placeholders,
+      ...(options.onGateLog ? { onLog: options.onGateLog } : {}),
     }));
 
     const failedGate = gateResults.find(r => !r.passed && r.required !== false);

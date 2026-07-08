@@ -1,0 +1,31 @@
+/* ShipTab (PAN-2487) — progress indicator above the live merge-door log. */
+.wrap { display: flex; flex-direction: column; gap: 12px; height: 100%; min-height: 0; padding: 12px; }
+.header { display: flex; align-items: center; justify-content: space-between; }
+.title { font-size: 13px; font-weight: 600; }
+.badge { font-size: 10px; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge.ok { background: color-mix(in srgb, var(--success, #34d399) 15%, transparent); color: var(--success, #34d399); }
+.badge.bad { background: color-mix(in srgb, var(--destructive, #ef4444) 15%, transparent); color: var(--destructive, #ef4444); }
+.badge.run { background: color-mix(in srgb, var(--info-foreground, #3b82f6) 15%, transparent); color: var(--info-foreground, #3b82f6); }
+.badge.idle { background: var(--muted); color: var(--muted-foreground); }
+
+.steps { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.step { display: flex; align-items: center; gap: 6px; }
+.stepIcon { display: inline-flex; }
+.stepLabel { font-size: 11px; color: var(--muted-foreground); white-space: nowrap; }
+.stepCurrent { color: var(--foreground); font-weight: 600; }
+.stepBar { width: 22px; height: 1px; background: var(--border); margin: 0 2px; }
+.okIcon { color: var(--success, #34d399); }
+.badIcon { color: var(--destructive, #ef4444); }
+.idleIcon { color: var(--muted-foreground); opacity: 0.5; }
+.spin { color: var(--info-foreground, #3b82f6); animation: shipSpin 1s linear infinite; }
+@keyframes shipSpin { to { transform: rotate(360deg); } }
+
+.log {
+  flex: 1; min-height: 0; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--card, var(--background)); padding: 8px 10px;
+  font-family: ui-monospace, monospace; font-size: 11px; line-height: 1.55;
+}
+.logLine { display: flex; gap: 8px; }
+.logTs { color: var(--muted-foreground); flex: none; }
+.logText { white-space: pre-wrap; word-break: break-word; }
+.empty { color: var(--muted-foreground); font-size: 11.5px; font-family: inherit; padding: 8px 2px; }

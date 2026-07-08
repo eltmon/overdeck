@@ -40,7 +40,7 @@
 .body { flex: 1; min-width: 0; }
 .l1 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .name { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.status { font-size: 10px; white-space: nowrap; flex: none; }
+.status { font-size: 10px; white-space: nowrap; flex: none; display: inline-flex; align-items: center; gap: 3px; }
 .status.info { color: var(--info-foreground); }
 .status.ok { color: var(--success-foreground); }
 .status.bad { color: var(--destructive-foreground); }
@@ -81,3 +81,8 @@
 .resBtn:hover { background: var(--accent); }
 .resBtn:disabled { opacity: 0.5; cursor: default; }
 .resSub { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); padding: 7px 6px 2px; }
+
+/* PAN-2487: active-node spinner — restores the pre-PAN-1991 affordance that an
+   info-tone (running/reviewing/testing/verifying) row is visibly alive. */
+.spin { animation: laneSpin 1s linear infinite; vertical-align: -1px; margin-right: 3px; }
+@keyframes laneSpin { to { transform: rotate(360deg); } }

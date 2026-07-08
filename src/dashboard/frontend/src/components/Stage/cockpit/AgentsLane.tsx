@@ -3,7 +3,7 @@ import {
   Compass, Code2, Eye, FlaskConical, GitMerge, Zap, Archive,
   ShieldCheck, Lock, Gauge, ClipboardList, Layers, BadgeCheck,
   ChevronRight, ChevronDown, GitPullRequest, GitBranch,
-  CircleCheck, CircleX, Circle, type LucideIcon,
+  CircleCheck, CircleX, Circle, Loader2, type LucideIcon,
 } from 'lucide-react'
 import { useIssueCostsQuery, useReviewStatusQuery, useWorkspaceQuery, type ReviewStatusData } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import { useIssueActions, type IssueActionView } from '../../IssueActionMenu/useIssueActions'
@@ -171,7 +171,10 @@ function Row({
       <span className={styles.body}>
         <span className={styles.l1}>
           <span className={styles.name}>{name}</span>
-          <span className={`${styles.status} ${styles[status.tone]}`}>{status.label}</span>
+          <span className={`${styles.status} ${styles[status.tone]}`}>
+            {status.tone === 'info' ? <Loader2 size={9} className={styles.spin} /> : null}
+            {status.label}
+          </span>
         </span>
         {(model || sub) ? (
           <span className={styles.l2}>
