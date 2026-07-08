@@ -1,0 +1,408 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-08T21:45:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2167: pipeline-written .pan/records + .pan/test/result.json dirty the worktree and block the review clean-tree gate",
+    "updated": "2026-07-08T21:48:27.533Z"
+  },
+  "plan": {
+    "id": "pan-2167",
+    "title": "State-plane-only worktree dirt must not trip the review->merge clean-tree gates",
+    "status": "proposed",
+    "uid": "7b3e1c2a-9f4d-4e6b-8a1c-2d5f6e7a8b90",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-07-08T21:45:00.000Z",
+    "updated": "2026-07-08T21:48:27.533Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2167",
+        "label": "PAN-2167",
+        "type": "issue"
+      },
+      {
+        "uri": "docs/STATE-PLANE-COMMIT-POLICY.md",
+        "label": "State-Plane Commit Policy",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "pipeline",
+      "review",
+      "state-plane",
+      "clean-tree-gate",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "The pipeline writes state-plane files (.pan/records/<id>.json, .pan/test/result.json) into the feature workspace, but the record auto-committer is main-only, so on a feature branch these pipeline-owned files sit dirty and are never committed. Three clean-tree gates on the review->merge path each run a raw `git status --porcelain` and treat any non-empty result as agent work: `pan review request` (getDirtyWorkspaceErrorForReviewRequest), `pan done` preflight (checkUncommittedChangesPromise), and the approve/merge pre-push gate (merge-ops.ts). An issue that is genuinely ready cannot re-enter review or reach merge; the operator/flywheel must `pan review restart` repeatedly and unattended agents stall.",
+      "Proposal": "Per docs/STATE-PLANE-COMMIT-POLICY.md rule 3/6, add a pure working-tree companion to the existing shared predicate in src/lib/state-plane.ts (parsePorcelainStatusPaths + isStatePlaneOnlyStatus) that reuses the single isStatePlanePath list, then make all three feature-workspace clean-tree gates treat a tree dirty with ONLY state-plane paths as clean. Any non-state-plane dirt still fails every gate exactly as today (rule 4). Do NOT gitignore records (rule 1) and do NOT commit-on-write on feature branches (contraindicated by this issue's manifestations 3/4, where committing bookkeeping onto a feature branch re-triggers PR CI and deadlocks readyForMerge).",
+      "NonGoals": "- Gitignoring .pan/records/ or any permanent-plane path (policy rule 1 forbids it)\n- Making records commit-on-write on feature branches (contraindicated by manifestations 3/4)\n- The auto-start / spawn dirty-workspace guard in routes/agents/spawn.ts (owned by PAN-2386)\n- verify-merged record-only-delta rejection (owned by PAN-2406)\n- Verdict-reset on state-only commits (owned by PAN-2417)\n- The sync-main add/add conflict on a sibling issue's record, manifestation 2 (distinct conflict-resolution bug; file separately)\n- The readyForMerge CI re-trigger + DIRTY/rebase deadlock, manifestations 3 and 4 (distinct push-policy/rebase-latch bugs; file separately)\n- The pan-unstick main-repo git-repair gate (checkProjectGitRepairState) which inspects project main, not the feature workspace"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix via gate-side shared predicate (rule 3), not commit-on-write for records (rule 2).",
+        "rationale": "The policy permits either, but this issue's manifestations 3/4 prove that committing pipeline bookkeeping onto a feature branch re-triggers PR CI and deadlocks readyForMerge. Gate tolerance is the safe, least-surprising fix; commit-on-write is contraindicated for feature branches."
+      },
+      {
+        "summary": "Scope = all three feature-workspace clean-tree gates on the review->merge path.",
+        "rationale": "review-request, pan-done preflight, and approve/merge pre-push are mechanically identical; fixing only the first leaves the same bug one step later. Auto-start guard/verify-merged/verdict-reset are explicitly other cluster issues."
+      },
+      {
+        "summary": "Working-tree predicate is a pure function over the `git status --porcelain` string.",
+        "rationale": "Lets the remote (fly-exec) review gate reuse it without a second git call, and reuses the single isStatePlanePath list (rule 6) instead of a parallel path list."
+      },
+      {
+        "summary": "Manifestations 2/3/4 are out of scope for this issue.",
+        "rationale": "Same root family but distinct mechanisms (conflict resolution, CI re-trigger, rebase latch). Bundling them would violate tracer-bullet slicing; recorded as NonGoals to file separately."
+      }
+    ],
+    "items": [
+      {
+        "id": "state-plane-status-predicate",
+        "title": "Add pure working-tree state-plane predicate to src/lib/state-plane.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-08T21:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2167",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "wire-review-request-gate",
+            "wire-done-preflight-gate",
+            "wire-approve-merge-gate"
+          ],
+          "files_scope": [
+            "src/lib/state-plane.ts",
+            "src/lib/__tests__/state-plane.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/state-plane.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "state-plane.test.ts passes including new parsePorcelainStatusPaths and isStatePlaneOnlyStatus cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Beside the existing isStatePlaneOnlyDiff in src/lib/state-plane.ts, add two pure exports that reuse isStatePlanePath (the single path source, policy rule 6): parsePorcelainStatusPaths(porcelain: string): string[] which strips the 2-char XY status prefix, resolves rename lines (`R  orig -> new`) to the NEW path, and unquotes git C-quoted paths; and isStatePlaneOnlyStatus(porcelain: string): boolean = parsePorcelainStatusPaths(porcelain).every(isStatePlanePath) (vacuously true for empty/clean input). Do not introduce a second path list. Add unit tests."
+        },
+        "items": [
+          {
+            "id": "state-plane-status-predicate.ac1",
+            "title": "Given a porcelain status of only `.pan/records/` and `.pan/test/` lines (including `MM` staged+unstaged and `?? ` untracked), isStatePlaneOnlyStatus returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-plane-status-predicate.ac2",
+            "title": "Given a porcelain status containing any non-state-plane path (e.g. ` M src/foo.ts`), isStatePlaneOnlyStatus returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-plane-status-predicate.ac3",
+            "title": "Given empty (clean) porcelain output, isStatePlaneOnlyStatus returns true and parsePorcelainStatusPaths returns an empty array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-plane-status-predicate.ac4",
+            "title": "Given a rename line `R  .pan/records/a.json -> .pan/records/b.json` parsePorcelainStatusPaths resolves to the new path and isStatePlaneOnlyStatus returns true; a rename of a source path returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-review-request-gate",
+        "title": "Make the `pan review request` clean-tree gate tolerate state-plane-only dirt",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-08T21:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2167",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/review-pipeline.ts",
+            "src/dashboard/server/routes/workspaces/__tests__/review-pipeline-dirty-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/routes/workspaces/__tests__/review-pipeline-dirty-gate.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "new review-pipeline dirty-gate test passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/workspaces/review-pipeline.ts, import isStatePlaneOnlyStatus from ../../../../lib/state-plane.js and change the decision in getDirtyWorkspaceErrorForReviewRequest (the `if (!status.trim()) return null;` around line 73) to `if (!status.trim() || isStatePlaneOnlyStatus(status)) return null;`. Apply to the already-fetched `status` string so both call sites (rerun and first-request) and the remote fly-exec path get the fix from one edit. Add a code comment referencing STATE-PLANE-COMMIT-POLICY rule 3/6. Add a test that exercises the helper (or an extracted testable form) for both a state-plane-only status and a source-dirty status."
+        },
+        "items": [
+          {
+            "id": "wire-review-request-gate.ac1",
+            "title": "Given a workspace whose git status is only state-plane paths, getDirtyWorkspaceErrorForReviewRequest returns null (gate passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-review-request-gate.ac2",
+            "title": "Given a workspace with a dirty source file (alone or mixed with state-plane paths), getDirtyWorkspaceErrorForReviewRequest returns the 'uncommitted changes' error string (gate still blocks)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-review-request-gate.ac3",
+            "title": "Given a re-review request via the rerun path, the gate applies the same tolerance and returns null for state-plane-only dirt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-done-preflight-gate",
+        "title": "Make the `pan done` preflight uncommitted-changes check tolerate state-plane-only dirt",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-08T21:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2167",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/work/done-preflight.ts",
+            "tests/lib/work/checkUncommittedChanges.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/work/checkUncommittedChanges.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "checkUncommittedChanges.test.ts passes including new state-plane cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/work/done-preflight.ts, in checkUncommittedChangesPromise (line 130) for BOTH the monorepo and polyrepo branches, filter the porcelain lines to non-state-plane paths using isStatePlanePath (import from ../state-plane.js) before building the 'Uncommitted changes:' failure list. Return [] when no non-state lines remain; otherwise list only the remaining source lines. Note the preflight uses plain `git status --porcelain` (includes untracked `??`), so a brand-new untracked `?? .pan/records/<id>.json` must be tolerated. Extend tests/lib/work/checkUncommittedChanges.test.ts."
+        },
+        "items": [
+          {
+            "id": "wire-done-preflight-gate.ac1",
+            "title": "Given a porcelain status of only state-plane paths (including an untracked `?? .pan/records/<id>.json` and an `MM .pan/test/result.json`), checkUncommittedChanges returns an empty array (preflight passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-done-preflight-gate.ac2",
+            "title": "Given a mix of a source file and state-plane files, checkUncommittedChanges returns failure lines that name the source file and omit the state-plane paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-done-preflight-gate.ac3",
+            "title": "Given a clean tree or an unavailable git, checkUncommittedChanges returns an empty array (existing behavior preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-approve-merge-gate",
+        "title": "Make the approve/merge pre-push clean-tree gate tolerate state-plane-only dirt",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-08T21:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2167",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/merge-ops.ts",
+            "src/dashboard/server/routes/workspaces/__tests__/merge-ops-dirty-gate.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/routes/workspaces/__tests__/merge-ops-dirty-gate.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "new merge-ops dirty-gate test passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/workspaces/merge-ops.ts, in the POST /api/issues/:issueId/approve route's pre-push clean-tree check (around line 1643), import isStatePlaneOnlyStatus and change `if (status.trim()) { ... }` to `if (status.trim() && !isStatePlaneOnlyStatus(status)) { ... }`. Add a code comment referencing STATE-PLANE-COMMIT-POLICY rule 3/6. If the decision logic is not directly unit-testable in place, extract a small pure helper (e.g. reuse isStatePlaneOnlyStatus) and test that plus a focused test of the gate branch."
+        },
+        "items": [
+          {
+            "id": "wire-approve-merge-gate.ac1",
+            "title": "Given a workspace whose git status is only state-plane paths, the approve route does NOT return the 'uncommitted changes' 400 and proceeds to the push step",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-approve-merge-gate.ac2",
+            "title": "Given a workspace with a dirty source path, the approve route still returns the 'uncommitted changes' error (gate blocks)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-approve-merge-gate.ac3",
+            "title": "Given a workspace dirty with both a `.pan/records/` file and a modified source file, the approve route returns the uncommitted-changes error (mixed dirt still blocks)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-state-plane-gates-wired",
+        "title": "Document that PAN-2167's clean-tree gates consume the shared state-plane predicate",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-08T21:45:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-2167",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/STATE-PLANE-COMMIT-POLICY.md",
+            "docs/AGENT-STATE-PLANES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Update docs/STATE-PLANE-COMMIT-POLICY.md 'Acceptance for the cluster' section to record that PAN-2167's three clean-tree gates (review request, pan done preflight, approve/merge pre-push) now consume the shared isStatePlaneOnlyStatus predicate (rule 3/6). If docs/AGENT-STATE-PLANES.md describes clean-tree gate behavior, add a sentence noting state-plane-only dirt is invisible to those gates. Keep edits to the wired-gate facts only."
+        },
+        "items": [
+          {
+            "id": "docs-state-plane-gates-wired.ac1",
+            "title": "docs/STATE-PLANE-COMMIT-POLICY.md contains a note that PAN-2167's three clean-tree gates now consume the shared isStatePlaneOnlyStatus predicate (rule 3/6)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-state-plane-gates-wired.ac2",
+            "title": "The updated policy doc contains the three wired gate file paths (review-pipeline.ts, done-preflight.ts, merge-ops.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "state-plane-status-predicate",
+        "to": "wire-review-request-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "state-plane-status-predicate",
+        "to": "wire-done-preflight-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "state-plane-status-predicate",
+        "to": "wire-approve-merge-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-review-request-gate",
+        "to": "docs-state-plane-gates-wired",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-done-preflight-gate",
+        "to": "docs-state-plane-gates-wired",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-approve-merge-gate",
+        "to": "docs-state-plane-gates-wired",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-08-PAN-2167-state-plane-only-worktree-dirt-must-not-trip-the-review-merge-clean-tree-gates.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
