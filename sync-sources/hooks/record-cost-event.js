@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { appendFileSync, chmodSync, closeSync, copyFileSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, statSync, writeFileSync } from "fs";
 import { exec, execFile, execFileSync } from "child_process";
 import { dirname, join, sep } from "path";
-import { homedir } from "os";
+import { homedir, totalmem } from "os";
 import { fileURLToPath } from "url";
 import * as NFS from "node:fs";
 import { appendFileSync as appendFileSync$1, existsSync as existsSync$1, mkdirSync as mkdirSync$1, readFileSync as readFileSync$1, writeFileSync as writeFileSync$1 } from "node:fs";
@@ -27513,6 +27513,20 @@ function validateTieredExecutionConfig(rawConfig, context = {}) {
 }
 //#endregion
 //#region ../../src/lib/config-yaml/defaults.ts
+/**
+* PAN-2500: default deacon memory-governor reserves as fractions of total RAM,
+* with absolute floors (small boxes still get a workable reserve). Computed
+* once at module load — totalmem() is stable for the process lifetime.
+*/
+function computeGovernorReserveDefaultsGb() {
+	const totalGb = totalmem() / 1024 ** 3;
+	return {
+		soft: Math.max(.15 * totalGb, 8),
+		hard: Math.max(.08 * totalGb, 4),
+		recovery: Math.max(.25 * totalGb, 12)
+	};
+}
+const GOVERNOR_RESERVE_DEFAULTS_GB = computeGovernorReserveDefaultsGb();
 const DEFAULT_DOCS_TRIGGER_REGEXES = [
 	"pan",
 	"overdeck",
@@ -27667,7 +27681,13 @@ const DEFAULT_CONFIG = {
 		memoryWarnGb: 4,
 		memoryBlockGb: 2,
 		agentWarnCount: 8,
-		agentBlockCount: 10
+		agentBlockCount: 10,
+		governorSoftReserveGb: GOVERNOR_RESERVE_DEFAULTS_GB.soft,
+		governorHardReserveGb: GOVERNOR_RESERVE_DEFAULTS_GB.hard,
+		governorRecoveryReserveGb: GOVERNOR_RESERVE_DEFAULTS_GB.recovery,
+		governorFootprintDefaultWorkGb: 2,
+		governorFootprintDefaultReviewGb: 1,
+		governorFootprintDefaultTestGb: 1
 	},
 	issues: { closedWindowDays: 14 },
 	experimental: {
@@ -27951,7 +27971,13 @@ function mergeConfigs(...configs) {
 			memoryWarnGb: DEFAULT_CONFIG.resources.memoryWarnGb,
 			memoryBlockGb: DEFAULT_CONFIG.resources.memoryBlockGb,
 			agentWarnCount: DEFAULT_CONFIG.resources.agentWarnCount,
-			agentBlockCount: DEFAULT_CONFIG.resources.agentBlockCount
+			agentBlockCount: DEFAULT_CONFIG.resources.agentBlockCount,
+			governorSoftReserveGb: DEFAULT_CONFIG.resources.governorSoftReserveGb,
+			governorHardReserveGb: DEFAULT_CONFIG.resources.governorHardReserveGb,
+			governorRecoveryReserveGb: DEFAULT_CONFIG.resources.governorRecoveryReserveGb,
+			governorFootprintDefaultWorkGb: DEFAULT_CONFIG.resources.governorFootprintDefaultWorkGb,
+			governorFootprintDefaultReviewGb: DEFAULT_CONFIG.resources.governorFootprintDefaultReviewGb,
+			governorFootprintDefaultTestGb: DEFAULT_CONFIG.resources.governorFootprintDefaultTestGb
 		},
 		issues: { closedWindowDays: DEFAULT_CONFIG.issues.closedWindowDays },
 		experimental: {
@@ -28172,6 +28198,13 @@ function mergeConfigs(...configs) {
 			if (typeof config.resources.memory_block_gb === "number") result.resources.memoryBlockGb = config.resources.memory_block_gb;
 			if (typeof config.resources.agent_warn_count === "number") result.resources.agentWarnCount = config.resources.agent_warn_count;
 			if (typeof config.resources.agent_block_count === "number") result.resources.agentBlockCount = config.resources.agent_block_count;
+			if (typeof config.resources.governor_soft_reserve_gb === "number") result.resources.governorSoftReserveGb = config.resources.governor_soft_reserve_gb;
+			if (typeof config.resources.governor_hard_reserve_gb === "number") result.resources.governorHardReserveGb = config.resources.governor_hard_reserve_gb;
+			if (typeof config.resources.governor_recovery_reserve_gb === "number") result.resources.governorRecoveryReserveGb = config.resources.governor_recovery_reserve_gb;
+			if (typeof config.resources.governor_footprint_default_work_gb === "number") result.resources.governorFootprintDefaultWorkGb = config.resources.governor_footprint_default_work_gb;
+			if (typeof config.resources.governor_footprint_default_review_gb === "number") result.resources.governorFootprintDefaultReviewGb = config.resources.governor_footprint_default_review_gb;
+			if (typeof config.resources.governor_footprint_default_test_gb === "number") result.resources.governorFootprintDefaultTestGb = config.resources.governor_footprint_default_test_gb;
+			if (result.resources.governorRecoveryReserveGb <= result.resources.governorSoftReserveGb) result.resources.governorRecoveryReserveGb = result.resources.governorSoftReserveGb + 1;
 		}
 		if (config.issues) {
 			if (typeof config.issues.closed_window_days === "number") result.issues.closedWindowDays = config.issues.closed_window_days;
@@ -30733,6 +30766,7 @@ function ensureOverdeckTmuxServerSync(cleanEnv) {
 				"--collect",
 				"--quiet",
 				"--service-type=forking",
+				"--property=ManagedOOMPreference=avoid",
 				"tmux",
 				...args
 			], {

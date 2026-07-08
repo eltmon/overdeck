@@ -10,7 +10,8 @@ export type BootReconciliationOutcomeReason =
   | 'resumed'
   | 'no-resumable-session'
   | 'deferred-concurrency'
-  | 'deferred-load';
+  | 'deferred-load'
+  | 'deferred-memory';
 
 export interface BootReconciliationOutcome {
   id: string;
@@ -102,6 +103,8 @@ function formatOutcomeReason(reason: string): string {
       return 'deferred by concurrency limit';
     case 'deferred-load':
       return 'deferred by load gate';
+    case 'deferred-memory':
+      return 'deferred by memory gate';
     case 'resumed':
       return 'resumed';
     default:

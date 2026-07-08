@@ -1,9 +1,25 @@
 import { join } from 'path';
-import { homedir } from 'os';
+import { homedir, totalmem } from 'os';
 import { defaultBackgroundAiFeatures } from '../background-ai/registry.js';
 import { DEFAULT_TIERED_EXECUTION_CONFIG } from '../agents/tier-table.js';
 import { cloneRoles, DEFAULT_ROLES, DEFAULT_WORKHORSES } from './roles.js';
 import type { NormalizedConfig } from './schema.js';
+
+/**
+ * PAN-2500: default deacon memory-governor reserves as fractions of total RAM,
+ * with absolute floors (small boxes still get a workable reserve). Computed
+ * once at module load — totalmem() is stable for the process lifetime.
+ */
+function computeGovernorReserveDefaultsGb(): { soft: number; hard: number; recovery: number } {
+  const totalGb = totalmem() / (1024 ** 3);
+  return {
+    soft: Math.max(0.15 * totalGb, 8),
+    hard: Math.max(0.08 * totalGb, 4),
+    recovery: Math.max(0.25 * totalGb, 12),
+  };
+}
+
+const GOVERNOR_RESERVE_DEFAULTS_GB = computeGovernorReserveDefaultsGb();
 
 export const DEFAULT_DOCS_TRIGGER_REGEXES = [
   'pan',
@@ -177,6 +193,14 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     memoryBlockGb: 2,
     agentWarnCount: 8,
     agentBlockCount: 10,
+    governorSoftReserveGb: GOVERNOR_RESERVE_DEFAULTS_GB.soft,
+    governorHardReserveGb: GOVERNOR_RESERVE_DEFAULTS_GB.hard,
+    governorRecoveryReserveGb: GOVERNOR_RESERVE_DEFAULTS_GB.recovery,
+    // PAN-2500: cold-start footprint defaults — work agents carry a docker
+    // workspace stack + build tooling, review/test specialists are lighter.
+    governorFootprintDefaultWorkGb: 2,
+    governorFootprintDefaultReviewGb: 1,
+    governorFootprintDefaultTestGb: 1,
   },
   issues: {
     closedWindowDays: 14,

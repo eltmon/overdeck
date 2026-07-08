@@ -192,8 +192,8 @@
     ],
     "recordedAt": "2026-07-07T18:14:45.688Z"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "codex-fixtures": "completed",
     "reconcile-route-sources": "completed",
@@ -246,11 +246,10 @@
     "issueId": "PAN-2388",
     "reviewStatus": "passed",
     "testStatus": "testing",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T18:15:44.015Z",
+    "updatedAt": "2026-07-07T23:00:10.963Z",
     "reviewNotes": "Reviewed d26bfb48; no blocking findings",
     "testNotes": "typecheck passed; npm test passed (896 test files passed, 4 skipped; 8762 tests passed, 52 skipped; frontend 3/3 passed); npm run lint failed at lint:circular — new cycle src/lib/agents.ts > src/lib/agents/resume.ts > src/lib/review-status.ts > src/lib/cloister/feedback-target.ts. The cycle files are outside the PAN-2388 cost-parser working set (no agents/resume/review-status/feedback-target changes in the branch diff). Browser UAT not required: vBRIEF NonGoals explicitly excludes dashboard UI changes and labels the live-server check as evidence, not a blocking gate.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -366,7 +365,9 @@
         "tests/unit/lib/overdeck/cost.test.ts"
       ],
       "recordedAt": "2026-07-07T18:14:45.688Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-07T23:00:10.963Z"
   },
   "closeOut": {
     "usage": {
@@ -516,5 +517,5 @@
     }
   },
   "created": "2026-07-07T17:32:25.282Z",
-  "updated": "2026-07-07T18:15:44.038Z"
+  "updated": "2026-07-07T23:00:10.963Z"
 }

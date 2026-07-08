@@ -123,7 +123,18 @@ export function fallbackTranscriptTitle(transcript: string): string {
     ?? lines[0]?.replace(/^(User|Assistant):\s*/i, '').trim()
     ?? '';
 
-  const compact = source
+  return derivePromptTitle(source);
+}
+
+/**
+ * Generate a deterministic title directly from a raw prompt string.
+ * Zero model calls; returns '' only for empty/whitespace-only input.
+ */
+export function derivePromptTitle(prompt: string): string {
+  const trimmed = prompt.trim();
+  if (!trimmed) return '';
+
+  const compact = trimmed
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/`([^`]+)`/g, '$1')
     .replace(/\b(?:please|can you|could you|would you)\b/gi, ' ')
@@ -133,14 +144,20 @@ export function fallbackTranscriptTitle(transcript: string): string {
     .replace(/\s+/g, ' ')
     .trim();
 
-  if (!compact) return '';
+  const MAX_TITLE_LEN = 60;
+
+  if (!compact) {
+    return trimmed.slice(0, MAX_TITLE_LEN) + (trimmed.length > MAX_TITLE_LEN ? '…' : '');
+  }
 
   const words = compact.split(/\s+/).slice(0, 8);
   const title = words
     .join(' ')
     .replace(/\s+(?:and|or|to|for|with)$/i, '')
     .replace(/[.,:;!?]+$/g, '');
-  return sanitizeTitle(title);
+  const sanitized = sanitizeTitle(title);
+  if (sanitized.length <= MAX_TITLE_LEN) return sanitized;
+  return sanitized.slice(0, MAX_TITLE_LEN) + '…';
 }
 
 /**

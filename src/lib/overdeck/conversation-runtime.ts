@@ -224,9 +224,15 @@ async function waitForClaudeReady(tmuxSession: string): Promise<void> {
 }
 function isPiTuiInputReady(snapshot: string): boolean {
   return /^\s*[❯›>]\s/m.test(snapshot)
-    || /(?:^|\s)0(?:\.\d+)?%\s+context\s+used\b/i.test(snapshot);
+    || /(?:^|\s)0(?:\.\d+)?%\s+context\s+used\b/i.test(snapshot)
+    // Current omp/Pi footer bar, e.g. "╭── π  > ⬢ Qwen3.6 Plus · ◕ high > ...".
+    // It renders within ~1s of spawn — well before MCP servers finish connecting —
+    // and is the actual signal that Pi's TUI is accepting input. The two patterns
+    // above matched an older Pi build's chrome and no longer appear at all, which
+    // is why this check previously ran to its full timeout on every ohmypi spawn.
+    || /⬢[^\n]*◕/.test(snapshot);
 }
-export async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 30_000): Promise<boolean> {
+export async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 60_000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const snapshot = await Effect.runPromise(
@@ -287,7 +293,14 @@ function shouldUseSupervisorForConversation(harness: RuntimeName): boolean {
 }
 export async function waitForConversationRuntimeReady(tmuxSession: string, harness: RuntimeName, mode: 'spawn' | 'respawn'): Promise<void> {
   const transcriptKind = getHarnessBehavior(harness).transcriptKind;
-  if (transcriptKind === 'ohmypi-jsonl') await waitForPiTuiReady(tmuxSession);
+  if (transcriptKind === 'ohmypi-jsonl') {
+    const ready = await waitForPiTuiReady(tmuxSession);
+    if (!ready) {
+      throw new Error(
+        `Pi (ohmypi) did not become interactive in ${tmuxSession} within the startup window — MCP server connections are likely still in progress. Retry once MCP servers finish connecting, or check ~/.claude/mcp.json for a slow/hanging server.`,
+      );
+    }
+  }
   else if (transcriptKind !== 'codex-rollout-jsonl' && mode === 'spawn') {
     await waitForClaudeReady(tmuxSession);
     console.log(`[conversations] Claude ready in ${tmuxSession}`);

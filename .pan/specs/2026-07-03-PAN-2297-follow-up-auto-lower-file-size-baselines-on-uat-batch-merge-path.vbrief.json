@@ -4,17 +4,17 @@
     "created": "2026-07-03T12:46:14.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2297: Follow-up: auto-lower file-size baselines on UAT batch merge path",
-    "updated": "2026-07-07T23:34:08.884Z"
+    "updated": "2026-07-08T02:42:33.028Z"
   },
   "plan": {
     "id": "pan-2297",
     "title": "Follow-up: auto-lower file-size baselines on UAT batch merge path",
-    "status": "running",
+    "status": "completed",
     "uid": "88b4dc9a-4794-48d7-a612-c001ba650bea",
     "author": "agent:claude-opus-4-8",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-03T12:46:14.000Z",
-    "updated": "2026-07-07T23:34:08.884Z",
+    "updated": "2026-07-08T02:42:33.028Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2297",
@@ -282,5 +282,5 @@
       "canonicalFilename": "2026-07-03-PAN-2297-follow-up-auto-lower-file-size-baselines-on-uat-batch-merge-path.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }

@@ -1,6 +1,6 @@
 {
   "name": "@overdeck/contracts",
-  "version": "0.43.0",
+  "version": "0.44.0",
   "type": "module",
   "publishConfig": {
     "access": "public"
@@ -24,7 +24,7 @@
   },
   "scripts": {
     "dev": "tsdown --watch",
-    "build": "NODE_OPTIONS=--max-old-space-size=16384 tsdown",
+    "build": "cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown",
     "test": "vitest run --configLoader runner --config vitest.config.ts",
     "run": "bun run",
     "typecheck": "tsc --noEmit"

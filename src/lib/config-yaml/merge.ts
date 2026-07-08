@@ -177,6 +177,12 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       memoryBlockGb: DEFAULT_CONFIG.resources.memoryBlockGb,
       agentWarnCount: DEFAULT_CONFIG.resources.agentWarnCount,
       agentBlockCount: DEFAULT_CONFIG.resources.agentBlockCount,
+      governorSoftReserveGb: DEFAULT_CONFIG.resources.governorSoftReserveGb,
+      governorHardReserveGb: DEFAULT_CONFIG.resources.governorHardReserveGb,
+      governorRecoveryReserveGb: DEFAULT_CONFIG.resources.governorRecoveryReserveGb,
+      governorFootprintDefaultWorkGb: DEFAULT_CONFIG.resources.governorFootprintDefaultWorkGb,
+      governorFootprintDefaultReviewGb: DEFAULT_CONFIG.resources.governorFootprintDefaultReviewGb,
+      governorFootprintDefaultTestGb: DEFAULT_CONFIG.resources.governorFootprintDefaultTestGb,
     },
     issues: {
       closedWindowDays: DEFAULT_CONFIG.issues.closedWindowDays,
@@ -620,6 +626,29 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       }
       if (typeof config.resources.agent_block_count === 'number') {
         result.resources.agentBlockCount = config.resources.agent_block_count;
+      }
+      if (typeof config.resources.governor_soft_reserve_gb === 'number') {
+        result.resources.governorSoftReserveGb = config.resources.governor_soft_reserve_gb;
+      }
+      if (typeof config.resources.governor_hard_reserve_gb === 'number') {
+        result.resources.governorHardReserveGb = config.resources.governor_hard_reserve_gb;
+      }
+      if (typeof config.resources.governor_recovery_reserve_gb === 'number') {
+        result.resources.governorRecoveryReserveGb = config.resources.governor_recovery_reserve_gb;
+      }
+      if (typeof config.resources.governor_footprint_default_work_gb === 'number') {
+        result.resources.governorFootprintDefaultWorkGb = config.resources.governor_footprint_default_work_gb;
+      }
+      if (typeof config.resources.governor_footprint_default_review_gb === 'number') {
+        result.resources.governorFootprintDefaultReviewGb = config.resources.governor_footprint_default_review_gb;
+      }
+      if (typeof config.resources.governor_footprint_default_test_gb === 'number') {
+        result.resources.governorFootprintDefaultTestGb = config.resources.governor_footprint_default_test_gb;
+      }
+      // PAN-2500: RECOVERY must exceed SOFT or hysteresis can never re-admit.
+      // Normalize rather than throw — a misconfigured reserve shouldn't crash config load.
+      if (result.resources.governorRecoveryReserveGb <= result.resources.governorSoftReserveGb) {
+        result.resources.governorRecoveryReserveGb = result.resources.governorSoftReserveGb + 1;
       }
     }
 

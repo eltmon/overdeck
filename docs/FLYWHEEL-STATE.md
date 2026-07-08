@@ -217,6 +217,75 @@ Operator: primary local main diverged (20 bot chore(state) commits ahead / 6 beh
 - **LOOSE ENDS for operator:** (1) PAN-1644 draft untracked; (2) scratch has the primary's lifecycle-restart.ts alt-implementation if worth comparing; (3) freshly-dirty beads = normal ongoing bot writes.
 - REUSABLE: flywheel CANNOT commit/push code even via merge — `guard-flywheel-orchestrator-commit.sh` (pre-commit + pre-push) gates on OVERDECK_AGENT_ID; for an operator-directed reconcile merge, `env -u OVERDECK_AGENT_ID git commit/push` lets the guard pass on its own context-check (never `--no-verify`).
 
+## RUN-58 tick 157 (2026-07-08) — 🟢 RED MAIN #2 RESOLVED: #2497 green + admin-merged (cfebb2f9df, ship-log count→1); PAN-2496 closing; commented PAN-2495; filed swarm-gap PAN-2498
+
+**🟢 RED MAIN #2 RESOLVED.** PR #2497 (dup-removal) went fully green (test pass 8m36s, CLEAN) → **admin-merged** → main `cfebb2f9df Fix duplicate ship-log no-loss matrix entry (#2497)`; ship-log count on main = **1**. Main CI queued on the merge commit — confirm green next tick. PAN-2496 close backgrounded. Commented PAN-2495 with the UAT-assembler-verify-vs-main-tip finding.
+- **RECOVERY COST (red main #2):** e51dd2defe→cfebb2f9df, ~1 strike (clean, no wedge), PR #2497. Root = UAT batch promoted PAN-1644 (green in isolation) onto post-PAN-2490 main → duplicate matrix entry.
+- **SWARM SUBSTRATE GAP filed PAN-2498** (from operator Q on PAN-399): failed WORK slots (dead agent) are never auto-redispatched OR surfaced. `coordinateSwarmSlots` (deacon-swarm.ts:330-346) handles running/stalled/ready-to-merge/pending but does NOTHING with `failed` — only logs it. `recordStalledSlotRecovery` handles only `stalled`; the only reset-to-pending (line 658) is the manual `pan swarm recover` failed-MERGE path. PAN-399 stuck 1/3 (slots 1+2 dead-session, never redispatched, never surfaced). Fix: auto-redispatch failed work slots (retry cap + backoff) + escalate to operator instead of silent log. Operator chose NOT to restart PAN-399 — left as-is.
+- **Substrate priorities (unauthorized):** PAN-2495 (ci-green-skip) + PAN-2498 (swarm failed-slot gap) + B3/PAN-2167 (record-push churn).
+- PAN-2468/2485/2322 in flight (PAN-2468 stalled on a codex rate-limit model-switch dialog, not red main). MIN-865/861 rfm report-only.
+
+## RUN-58 tick 156 (2026-07-08) — 🔴→🟡 RED MAIN: strike PAN-2496 pushed clean dup-removal (count→1) → PR #2497 MERGEABLE, CI running → admin-merge on green
+
+**Strike PAN-2496 executed cleanly (no wedge).** Pushed `strike/pan-2496 = 8fd0b02c38 Fix duplicate ship-log no-loss matrix entry` on top of current main; ship-log count = **1** (dup removed). Faster than PAN-2490 (no re-tell needed).
+- **Opened PR #2497** (strike/pan-2496 → main). mergeable=MERGEABLE, mergeState=UNSTABLE (CI just started, all pending). **Next: wait #2497 CI green (esp. test) → `gh pr merge 2497 --squash --admin` (red-main unblock exception) → main green → `pan close PAN-2496 --force`.**
+- After green: comment PAN-2495 with the UAT-assembler-must-verify-against-main-tip finding (2 red mains in one hour from this class).
+- (Strike pane shows a codex rate-limit model-switch dialog — irrelevant; strike's work is done, flywheel owns the merge.)
+- PAN-2468/2485/2322 in flight. MIN-865/861 rfm report-only.
+
+## RUN-58 tick 155 (2026-07-08) — 🔴 RED MAIN: strike PAN-2496 WORKING (not wedged) — has fix locally (ahead 1), verifying typecheck+test before push
+
+**🔴 RED MAIN (`e51dd2defe`) — recovery in progress.** Strike PAN-2496 is actively working (6m+, not wedged like PAN-2490): "strike/pan-2496 is already a direct child of origin/main, nothing to rebase; running npm run typecheck, then the full test command." Branch `strike/pan-2496` is **ahead 1** (dup-removal commit made locally) but NOT pushed yet — it's verifying before push. Good behaviour; no re-tell needed.
+- **Next:** on push (ship-log count → 1) → flywheel `gh pr create --head strike/pan-2496` → `gh pr merge --squash --admin` on green → main green → close PAN-2496.
+- If it wedges (idle, ahead-1, unpushed, reported-only) → forceful `pan tell` EXECUTE-NOW+push-mandatory (PAN-2490 recipe).
+- PAN-2468 (work+review), PAN-2485 (strike), PAN-2322 (swarm slot-2) in flight. MIN-865/861 rfm report-only.
+
+## RUN-58 tick 154 (2026-07-08) — 🔴 RED MAIN P0: UAT merge collision — PAN-1644 + PAN-2490 both registered ship-log → DUPLICATE NO_LOSS_MATRIX entry → filed PAN-2496 + STRUCK
+
+**🔴 RED MAIN (`e51dd2defe`, test job = failure).** The UAT batch promotion (PAN-1644) collided with the PAN-2490 no-loss fix that landed ~10min earlier. BOTH registered `GET /api/issues/:id/ship-log` in NO_LOSS_MATRIX → duplicate surface key → `no-loss-matrix.test.ts:143 "matrix has no duplicate surface entries"` FAILS. Confirmed on main: two entries (line 277 `door: Ship log / ship view surface` from PAN-2490/#2494; line 280 `door: getShipLog + ReviewStatusResolver` from PAN-1644).
+- **ACTION: filed PAN-2496 + `pan strike PAN-2496`** (branch strike/pan-2496, codex/gpt-5.5). Fix = remove ONE duplicate (keep line 280, delete 277). On push → flywheel PR + admin-merge on green → close.
+- **LESSON (record):** when two in-flight branches both touch a locked no-loss ledger, promoting one on top of the other's just-landed fix collides. The UAT batch assembler should rebase-verify each member's `test` job against the CURRENT main tip, not the member's own green PR (PAN-1644's #2480 was green in isolation but red merged onto post-PAN-2490 main). Candidate substrate follow-up (relates to PAN-2495 ci-green-skip).
+- **CORRECTION to tick 153/152 wording:** "no PAN work in flight" was inaccurate — verified via read model: PAN-2468 (work+review), PAN-2485 (strike), PAN-2322 (swarm slot-2), PAN-399 (work) are HEALTHY/in-flight. What was empty is the merge-DRAIN queue (no PAN at ready-for-merge after PAN-1644). Drain posture (auto_pickup_backlog=false) = drain in-flight + pull critical substrate only.
+- **PAN-1644 closed-out** (before the red surfaced). MIN-865/861 rfm report-only. PAN-2495 + B3/PAN-2167 substrate priorities unauthorized.
+
+## RUN-58 tick 153 (2026-07-08) — operator promoted UAT batch uat/pan-cedar-0708 (PAN-1644) → main; fresh Observe→Act: PAN-1644 excluded+closing, clean batch has no new PAN members
+
+**Operator-directed fresh Observe→Act.** Operator promoted UAT generation `uat/pan-cedar-0708` to main at `e51dd2defe Merge UAT batch uat/pan-cedar-0708 (PAN-1644)`. Re-derived from current source of truth:
+- **PAN-1644 (#2480) MERGED (04:47:11) via the promotion** — EXCLUDED from activePipeline; `pan close PAN-1644 --force` backgrounded. (The auto-merge id 37 I'd scheduled for 04:51 was pre-empted by the operator's UAT promotion at 04:47 — same outcome, PAN-1644 landed.)
+- **Clean re-assembled batch: NO new PAN members** — fresh `pan review pending --ready` shows only MIN-865/861 (UAT-held GitLab MRs, report-only). PAN-2468 not ready. So there is nothing to auto-merge; the clean batch excludes the promoted PAN-1644 and contains no fresh PAN.
+- Main CI in_progress on the UAT merge commit e51dd2defe (verifying a merge of already-green PAN-1644 — low risk; confirm green next tick).
+- **Substrate priorities still surfaced (unauthorized):** PAN-2495 (ci-green-skip buried a red main) + B3/PAN-2167 (record-push churn). M7/MIN-729 verifying.
+
+## RUN-58 tick 152 (2026-07-08) — 🟢 MAIN GREEN confirmed (release 0.44.0); PAN-2490 closed; resumed drains → PAN-1644 scheduled id 37
+
+**🟢 MAIN GREEN confirmed** — head `9d1c736917 chore: release 0.44.0`, CI **success**. Red main fully resolved and main advanced to release 0.44.0. **PAN-2490 closed-out.** Recovery done; back to normal ops.
+- **PAN-1644 (#2480) converged + green** — mergeState CLEAN, all CI green (test pass 8m11s), newest commit is the 04:20 post-merge-main record (no newer push). Scheduled auto-merge id **37**, mergeAt **04:51:36** (routine PAN drain; no operator countermand on the operator-owned-draft question).
+- MIN-865/861 rfm — report only (UAT-held). M7/MIN-729 verifying.
+- **Substrate priorities surfaced (need operator authorization):** PAN-2495 (ci-green-skip that buried a red main) + B3/PAN-2167 (record-push churn slipping every PAN merge). Both unauthorized — the two highest-value substrate fixes this run surfaced.
+
+## RUN-58 tick 151 (2026-07-08) — 🟢 RED MAIN RESOLVED: PR #2494 green + admin-merged (ad58ee3283); PAN-2490 closing; filed ci-green-skip follow-up PAN-2495
+
+**🟢 RED MAIN RESOLVED.** PR #2494 (strike matrix fix) went fully green — **test pass 8m10s**, all checks pass, CLEAN — and **admin-merged** (red-main unblock exception). Main head `ad58ee3283 fix(no-loss): register ship-log route in no_loss_matrix (pan-2490) (#2494)`; matrix entry confirmed on main (no-loss-matrix.ts:274). Both no-loss surfaces now fixed. Main CI queued on the merge commit — confirm green next tick.
+- **PAN-2490 close** backgrounded (`pan close --force`).
+- **Filed PAN-2495** (ci-green-skip follow-up): PAN-2487's `ci-green merge skip` let a PR with a red REQUIRED check (the no-loss `test` job) land on main. Root-fix: skip may only apply to non-required checks; the no-loss audit is a required blocking gate; add a regression test that an unregistered issues route is mergeStateStatus-blocked.
+- **RECOVERY COST:** red main `8797566e2d`→`ad58ee3283`, ~45min, 3 ticks, strike PAN-2490 (+ one wedged→re-activate cycle), PR #2494. Root = PAN-2487 unregistered route + ci-green-skip bypass.
+- **RESUME (next tick, after main green):** PAN drains (PAN-1644 #2480, `pan review pending --ready`), MIN report, PAN-2445 watch, B3/PAN-2167 status.
+
+## RUN-58 tick 150 (2026-07-08) — 🔴→🟡 RED MAIN: strike PUSHED the matrix fix → PR #2494 created (MERGEABLE), CI running → admin-merge on green
+
+**Strike PAN-2490 PUSHED the fix.** `strike/pan-2490` HEAD = `cec0b95ae8 fix(no-loss): register ship-log route in no_loss_matrix (pan-2490)`; matrix entry confirmed (`no-loss-matrix.ts:274 { surface: 'GET /api/issues/:id/ship-log', … door: 'Ship log / ship view surface' }`). Strike replied "pushed strike/pan-2490".
+- Current main (`bc7d23f985`) still lacks the matrix entry → still red (test job). The bypass flow kept moving main (PAN-2491 transformers migration `297f625798`, merge `bc7d23f985`) — strike branch is behind-2/ahead-1 but the fix is one additive line (MERGEABLE, no conflict).
+- **Opened PR #2494** (strike/pan-2490 → main). mergeable=MERGEABLE, mergeState=UNSTABLE (CI just started: build/lint/test/clean-install pending). **Next: wait for #2494 CI green (esp. the `test` job) → `gh pr merge 2494 --squash --admin` (red-main unblock exception) → main green → `pan close PAN-2490 --force`.** Do NOT merge while CI pending.
+- After green: file PAN-2487 ci-green-merge-skip follow-up. Drains/MIN-report DEFERRED until main green.
+
+## RUN-58 tick 149 (2026-07-08) — 🔴 RED MAIN: strike was wedged (reported, didn't act) → forceful re-tell RE-ACTIVATED it; now adding the NO_LOSS_MATRIX ship-log entry
+
+**🔴 RED MAIN (`14e35a1987`, still failing).** First `pan tell` got acknowledged but the strike ENDED its turn without acting ("I did not push it", idle 14m) — a wedged strike on a trivial one-line fix.
+- **RECOVERY: forceful action-forcing re-tell** (`pan tell pan-2490` — numbered EXECUTE-NOW commands: `git reset --hard origin/main` to drop its duplicate ahead-commit, add the NO_LOSS_MATRIX ship-log entry, `npm test -- no-loss-matrix issues-no-loss`, commit, **`git push -u origin strike/pan-2490` — push mandatory**, reply 'pushed'). **Worked** — strike re-activated, reset clean to origin/main, now "adding the new route ledger entry with the same shape as neighboring issue GET rows."
+- **LESSON:** a codex strike can acknowledge a directive and still end its turn without executing; the fix is an imperative "EXECUTE NOW … push is mandatory … reply exactly X" message that removes the should-I-push ambiguity. A reporting-only strike on a red-main P0 needs re-activation, not patience.
+- **Next:** on push → flywheel `gh pr create --head strike/pan-2490` → `gh pr merge --squash --admin` on green (red-main unblock exception) → main green → `pan close PAN-2490 --force` → file PAN-2487 ci-green-skip follow-up.
+- All drains/MIN-report DEFERRED until main green. M7/MIN-729 verifying; PAN-1644 UNSTABLE (secondary).
+
 ## RUN-58 tick 148 (2026-07-08) — 🔴 RED MAIN: confirmed test-job fail (run 28916303552); strike PAN-2490 directed to land the missing NO_LOSS_MATRIX entry (operator-engaged)
 
 **🔴 RED MAIN (`14e35a1987`, CI test job = failure, run 28916303552).** Operator confirmed my tick-147 read: the direct-to-main partial fix did NOT green CI — `NO_LOSS_MATRIX` still missing `GET /api/issues/:id/ship-log`.

@@ -6,6 +6,7 @@ import { isStartingWithinGrace } from './agent-grace.js';
 import { resumedBootReconciliationOutcome, skippedBootReconciliationOutcome, skippedBootReconciliationOutcomes, type BootReconciliationApplyResult, type BootReconciliationOutcome } from './boot-reconciliation-outcomes.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { getConcurrencyLimits, countRunningAgents, workResumeSlotsAvailable } from './concurrency.js';
+import { assessMemoryPressure } from './memory-governor.js';
 import {
   getBootReconciliationHeldResumeSet,
   getBootReconciliationPendingHoldSet,
@@ -601,6 +602,11 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
 const RESUME_LOAD_FACTOR = 1.5;
 // Pause between consecutive resume spawns so the herd is spread across the cycle.
 const RESUME_STAGGER_MS = 150;
+// PAN-2500 memory-paced-boot: after a boot-reconciliation resume, wait for the
+// newly-spawned process's RSS to become visible in /proc before re-assessing
+// memory pressure for the next candidate — otherwise the next check reads
+// stale pre-resume MemAvailable and over-admits before the OS catches up.
+const RSS_SETTLE_MS = 2000;
 
 function shouldRetryUndeliveredKickoff(state: AgentState): boolean {
   return state.role === 'work' && state.kickoffDelivered === false;
@@ -754,6 +760,11 @@ export async function handleAgentStoppedEvent(
       logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} deferred — load gate tripped (load1=${load1.toFixed(2)} > ${loadCeiling.toFixed(2)})`);
       return null;
     }
+    const memVerdict = await assessMemoryPressure();
+    if (memVerdict.band !== 'ok') {
+      logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} deferred — memory gate (${memVerdict.band}), availMB=${Math.round(memVerdict.availableBytes / 1048576)}`);
+      return null;
+    }
   }
 
   const runtimeStateForLog = getAgentRuntimeStateSync(agentId);
@@ -855,6 +866,11 @@ export async function autoResumeStoppedWorkAgents(deps: AutoResumeNotifierDeps):
       logDeaconEventSync(`autoResumeStoppedWorkAgents: load gate tripped (load1=${load1.toFixed(2)} > ${loadCeiling.toFixed(2)} = ${cores} cores * ${RESUME_LOAD_FACTOR}); deferring remaining candidates to next patrol`);
       break;
     }
+    const memVerdict = await assessMemoryPressure();
+    if (memVerdict.band !== 'ok') {
+      logDeaconEventSync(`autoResumeStoppedWorkAgents: memory gate (${memVerdict.band}), availMB=${Math.round(memVerdict.availableBytes / 1048576)}; deferring remaining candidates to next patrol`);
+      break;
+    }
     // Stagger spawns so the scheduler can absorb each `claude` before the next.
     if (resumeAttempts > 0) {
       await new Promise(r => setTimeout(r, RESUME_STAGGER_MS));
@@ -932,6 +948,14 @@ export async function applyBootReconciliationDecision(
       outcomes.push(...skippedBootReconciliationOutcomes(deferredAgents, 'deferred-load'));
       break;
     }
+    const memVerdict = await assessMemoryPressure();
+    if (memVerdict.band !== 'ok') {
+      logDeaconEventSync(`applyBootReconciliationDecision: memory gate (${memVerdict.band}), availMB=${Math.round(memVerdict.availableBytes / 1048576)}; deferring remaining candidates`);
+      const deferredAgents = candidates.slice(index);
+      deferred += deferredAgents.length;
+      outcomes.push(...skippedBootReconciliationOutcomes(deferredAgents, 'deferred-memory'));
+      break;
+    }
     if (resumeAttempts > 0) {
       await new Promise(r => setTimeout(r, RESUME_STAGGER_MS));
     }
@@ -945,6 +969,9 @@ export async function applyBootReconciliationDecision(
       resumed.push(result);
       outcomes.push(resumedBootReconciliationOutcome(agent));
       resumeAttempts++;
+      // PAN-2500 memory-paced-boot: let RSS settle before the next candidate's
+      // memory check (top of the next loop iteration) re-assesses.
+      await new Promise(r => setTimeout(r, RSS_SETTLE_MS));
     } else {
       const skipReason = bootReconciliationSkipReason(agent) ?? 'other';
       skipped[skipReason]++;

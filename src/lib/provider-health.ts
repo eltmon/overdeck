@@ -23,7 +23,8 @@ interface CacheEntry {
   expires: number;
 }
 
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes — for durable results (ok, auth, quota)
+const TRANSIENT_CACHE_TTL_MS = 15 * 1000; // timeout/network/server/unknown are often a one-off blip
 const PROBE_TIMEOUT_MS = 8000;
 const cache = new Map<string, CacheEntry>();
 
@@ -81,7 +82,14 @@ export function buildAnthropicMessagesUrl(baseUrl: string): string {
 
   const result = await doProbe(provider, apiKey, model);
 
-  cache.set(key, { result, expires: Date.now() + CACHE_TTL_MS });
+  // Auth/quota failures are durable (a bad key or exhausted quota won't
+  // resolve itself in seconds) and are worth caching for the full TTL.
+  // timeout/network/server/unknown are frequently a one-off blip — caching
+  // those for 5 minutes would keep telling the user a healthy provider is
+  // down for the full window, blocking every retry with a stale verdict.
+  const isTransientFailure = !result.ok && (result.kind === 'timeout' || result.kind === 'network' || result.kind === 'server' || result.kind === 'unknown');
+  const ttl = isTransientFailure ? TRANSIENT_CACHE_TTL_MS : CACHE_TTL_MS;
+  cache.set(key, { result, expires: Date.now() + ttl });
   return result;
 }
 

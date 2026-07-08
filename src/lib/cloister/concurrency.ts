@@ -25,6 +25,7 @@ import {
   getAgentRuntimeStateSync,
 } from '../agents.js';
 import { countAgentsByStatus } from '../overdeck/agents.js';
+import { getCachedMemoryVerdict } from './memory-verdict-cache.js';
 
 const DEFAULT_MAX_WORK_AGENTS = 6;
 const DEFAULT_RESERVED_ADVANCING_SLOTS = 3;
@@ -142,25 +143,70 @@ export function countRunningAgents(): RunningCounts {
   return { work, advancing, swarm, total: work + advancing };
 }
 
+const GIB = 1024 ** 3;
+
+/**
+ * PAN-2504: additional work-agent admissions permitted by the *memory* budget,
+ * rather than the fixed `max_work_agents` count. This is what makes the box fill
+ * toward its RAM instead of idling at a hardcoded 6.
+ *
+ *   additional = floor((availableBytes - softReserve) / work_footprint)
+ *   capped by (memory_driven_max_work_agents - runningWork)
+ *
+ * The SOFT reserve is read from the cached memory verdict's
+ * `thresholds.warningBytes` — the governor already publishes it there, so this
+ * needs no import of memory-governor.ts (which would close a real dependency
+ * cycle; see memory-verdict-cache.ts).
+ *
+ * Returns null — meaning "use the count-based cap" — when memory-driven mode is
+ * off OR the governor has not published a verdict yet (fail safe to the fixed
+ * cap rather than admitting blind). availableBytes already reflects the RSS of
+ * currently-running agents, so `additional` is genuinely how many *more* fit;
+ * the per-iteration `assessMemoryPressure()` brake in the deacon loops still
+ * catches an under-estimated footprint mid-fill.
+ */
+export function memoryDrivenWorkSlots(runningWork: number): number | null {
+  const c = loadCloisterConfigSync().concurrency;
+  if (c?.memory_driven !== true) return null;
+  const verdict = getCachedMemoryVerdict();
+  if (!verdict) return null;
+  const perAgentBytes = Math.max(0.25, c?.work_footprint_gb ?? 2) * GIB;
+  const budgetBytes = verdict.availableBytes - verdict.thresholds.warningBytes;
+  const fits = budgetBytes > 0 ? Math.floor(budgetBytes / perAgentBytes) : 0;
+  const ceiling = normalizeCount(c?.memory_driven_max_work_agents, 24, 1);
+  return Math.max(0, Math.min(fits, ceiling - runningWork));
+}
+
 /**
  * How many work agents the deacon may resume/spawn this patrol. Zero when already
  * at or over the cap — the deacon then resumes nothing and lets attrition drain.
+ *
+ * PAN-2504: when `concurrency.memory_driven` is on and the governor has a cached
+ * verdict, the ceiling is the memory budget (`memoryDrivenWorkSlots`) instead of
+ * the fixed count cap.
  */
 export function workResumeSlotsAvailable(
   counts: RunningCounts = countRunningAgents(),
   limits: ConcurrencyLimits = getConcurrencyLimits(),
 ): number {
+  const memSlots = memoryDrivenWorkSlots(counts.work);
+  if (memSlots !== null) return memSlots;
   return Math.max(0, limits.maxWorkAgents - counts.work);
 }
 
 /**
  * Whether an advancing-role (review/test/ship) dispatch is allowed. Gated on the
- * overall ceiling so review/test/ship can always claim their reserved headroom.
+ * overall ceiling so review/test/ship can always claim their reserved headroom —
+ * and, per PAN-2500 specialist-budget, on the memory governor: don't reserve GB
+ * for a specialist under memory pressure. Count-slot semantics are UNCHANGED
+ * when the cached band is 'ok' (or no patrol has assessed memory yet).
  */
 export function canDispatchAdvancing(
   counts: RunningCounts = countRunningAgents(),
   limits: ConcurrencyLimits = getConcurrencyLimits(),
 ): boolean {
+  const verdict = getCachedMemoryVerdict();
+  if (verdict && verdict.band !== 'ok') return false;
   return counts.total < limits.totalCeiling;
 }
 
@@ -186,14 +232,17 @@ export function resetPatrolDispatchBudget(): void {
 
 /**
  * Claim one advancing-role (review/test/ship) dispatch slot for this patrol.
- * Returns false when the total ceiling is reached — the caller must DEFER (leave
- * status untouched so a later patrol retries), never fail. Counts both tmux-alive
- * agents and advancing dispatches already reserved this patrol.
+ * Returns false when the total ceiling is reached, or (PAN-2500 specialist-budget)
+ * when the memory governor's cached band is not 'ok' — the caller must DEFER
+ * (leave status untouched so a later patrol retries), never fail. Counts both
+ * tmux-alive agents and advancing dispatches already reserved this patrol.
  */
 export function tryReserveAdvancingSlot(
   counts: RunningCounts = countRunningAgents(),
   limits: ConcurrencyLimits = getConcurrencyLimits(),
 ): boolean {
+  const verdict = getCachedMemoryVerdict();
+  if (verdict && verdict.band !== 'ok') return false;
   if (counts.total + advancingReservedThisPatrol >= limits.totalCeiling) return false;
   advancingReservedThisPatrol++;
   return true;

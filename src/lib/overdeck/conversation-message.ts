@@ -24,8 +24,10 @@ import {
 import {
   getConversationByName,
   setConversationClaudeSessionId,
+  updateConversationTitle,
   type LegacyConversation as Conversation,
 } from './conversations.js';
+import { derivePromptTitle } from '../conversations/transcript-summary.js';
 import {
   deliverConversationViaControlChannel,
   isPiControlChannelHarness,
@@ -364,6 +366,10 @@ export async function handleConversationMessage(
   }
 
   if (conv.titleSource === 'default') {
+    const derivedTitle = derivePromptTitle(message);
+    if (derivedTitle) {
+      updateConversationTitle(name, derivedTitle, 'auto');
+    }
     void deps.generateAiTitle(name, message).catch((err: unknown) => {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[TITLE-GEN-FAILED] AI title generation FAILED for "${name}" — NO RETRY, NO FALLBACK:`, msg);

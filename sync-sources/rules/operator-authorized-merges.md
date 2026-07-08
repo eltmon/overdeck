@@ -20,6 +20,15 @@ prompts or machinery), reviews the result itself, and lands it. For that flow:
   a commit that can be reverted and destroys nothing. Permission decisions
   should treat it accordingly. The same applies to `git push` of new commits
   to a branch the operator directed work onto.
+- **Mechanically enforced (PAN-2500, 2026-07-08, operator-confirmed):**
+  `scripts/guard-agent-main-push.sh` (wired into `.husky/pre-push`) exempts
+  `OVERDECK_AGENT_ID` values prefixed `conv-` — the standing marker for a
+  conversation (`src/lib/conversations/current.ts`, `AGENT_PREFIXES` in
+  `src/lib/agents/identity.ts`) — from its code-path block. A conversation's
+  own push to main no longer needs `OVERDECK_OPERATOR_PUSH=1`. Pipeline-role
+  agent ids (`agent-*`, `flywheel-orchestrator`, etc.) are unaffected and
+  still require the escape hatch — PAN-2194 (the incident this guard exists
+  for) was the *unsupervised flywheel orchestrator*, not a conversation.
 
 **The general principle — recoverable vs. one-way doors:**
 

@@ -36,7 +36,8 @@ export interface MatrixEntry {
 export const NO_LOSS_MATRIX: MatrixEntry[] = [
 
   // ── admin.ts ──────────────────────────────────────────────────────────────
-  { surface: 'GET /api/admin/tldr/:issueId',              kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'TLDR admin helper; outside 8 remodel domains' },
+  { surface: 'GET /api/admin/tldr/:issueId',                       kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'TLDR admin helper; outside 8 remodel domains' },
+  { surface: 'POST /api/admin/conversations/backfill-titles',    kind: 'http', disposition: 'WRITE',      door: 'ConversationWriter.retitle (deterministic backfill)' },
 
   // ── artifacts.ts (actual paths from codebase) ─────────────────────────────
   { surface: 'GET /a/:slug',                              kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Artifacts short-URL redirect; outside 8 remodel domains' },
@@ -264,6 +265,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/memory/session/start',            kind: 'http', disposition: 'WRITE',       door: 'MemoryWriter.claimRange (kickoff)' },
   { surface: 'POST /api/memory/turn',                     kind: 'http', disposition: 'WRITE',       door: 'MemoryWriter.extractDelta' },
   { surface: 'POST /api/hooks/permission-event',          kind: 'http', disposition: 'RELOCATE',    door: 'AgentPermissionsWriter' },
+  { surface: 'POST /api/hooks/user-prompt-submit',        kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.retitle (derivePromptTitle)' },
+  { surface: 'POST /api/hooks/turn-complete',             kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.retitle + title-refinement service' },
 
   // ── http-handler.ts ───────────────────────────────────────────────────────
   { surface: 'GET /api/foo',                              kind: 'http', disposition: 'DELETE',      door: 'debug/test stub; no production caller' },
@@ -273,6 +276,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/issues/:id/analyze',                         kind: 'http', disposition: 'DELETE',      door: 'ad-hoc analysis helper; no pipeline branch reads it' },
   { surface: 'GET /api/issues/:id/beads',                           kind: 'http', disposition: 'RELOCATE',    door: 'Beads (out of remodel scope)' },
   { surface: 'GET /api/issues/:id/planning-state',                  kind: 'http', disposition: 'READ',        door: 'IssuesResolver.get (stage + planRef)' },
+  { surface: 'GET /api/issues/:id/ship-log',                        kind: 'http', disposition: 'READ',        door: 'getShipLog + ReviewStatusResolver (merge progress)' },
   { surface: 'GET /api/issues/:id/pr',                              kind: 'http', disposition: 'READ',        door: 'IssuesResolver.get(.pr) + live GitHub for CI' },
   { surface: 'GET /api/issues/:id/pr/diff',                         kind: 'http', disposition: 'RELOCATE',    door: 'Diffs / live GitHub' },
   { surface: 'GET /api/issues/:id/pr/details',                      kind: 'http', disposition: 'RELOCATE',    door: 'Diffs / live GitHub' },

@@ -3,14 +3,14 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-07T22:52:35.014Z",
-  "updated": "2026-07-08T00:56:16.428Z",
+  "updated": "2026-07-08T02:38:47.311Z",
   "pipeline": {
     "issueId": "PAN-2479",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-08T00:56:16.403Z",
+    "updatedAt": "2026-07-08T02:38:47.271Z",
     "testNotes": "Skipped: issue is already merged"
   },
   "closeOut": {
@@ -18,36 +18,36 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 908428,
-            "output": 2778,
-            "cacheRead": 765696,
+            "input": 1139711,
+            "output": 3138,
+            "cacheRead": 908928,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 11626513,
-            "output": 15460,
-            "cacheRead": 10950400,
+            "input": 13544880,
+            "output": 17189,
+            "cacheRead": 12659328,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 908428,
-          "output": 2778,
-          "cacheRead": 765696,
+          "input": 1139711,
+          "output": 3138,
+          "cacheRead": 908928,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 11626513,
-          "output": 15460,
-          "cacheRead": 10950400,
+          "input": 13544880,
+          "output": 17189,
+          "cacheRead": 12659328,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 9.434765,
-        "pricingAsOf": "2026-07-08T00:56:16.428Z"
+        "usd": 11.388294,
+        "pricingAsOf": "2026-07-08T02:38:47.310Z"
       }
     },
     "merges": [],
