@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { Effect } from 'effect';
 
 const assessMemoryPressureMock = vi.fn();
@@ -17,6 +17,7 @@ const getAgentRuntimeStateSyncMock = vi.fn();
 const getConcurrencyLimitsMock = vi.fn();
 const countRunningAgentsMock = vi.fn();
 const workResumeSlotsAvailableMock = vi.fn();
+const resumeAgentMock = vi.fn();
 
 vi.mock('node:os', () => ({
   cpus: () => Array.from({ length: 8 }, () => ({})),
@@ -81,7 +82,7 @@ vi.mock('../../../../src/lib/agents.js', () => ({
   markAgentRunningState: vi.fn(),
   recordAgentFailure: vi.fn(() => Effect.succeed(null)),
   resetAgentFailureCount: vi.fn(),
-  resumeAgent: vi.fn(async () => ({ success: false, error: 'not reached' })),
+  resumeAgent: (...args: unknown[]) => resumeAgentMock(...args),
   saveAgentState: vi.fn(async () => {}),
   saveAgentStateSync: vi.fn(),
   buildDefaultResumeContinueMessage: vi.fn(),
@@ -143,6 +144,7 @@ beforeEach(() => {
   sessionExistsMock.mockReturnValue(Effect.succeed(false));
   getReviewStatusSyncMock.mockReturnValue(undefined);
   getAgentRuntimeStateSyncMock.mockReturnValue({ state: 'running' });
+  resumeAgentMock.mockResolvedValue({ success: false, error: 'not reached' });
 });
 
 describe('autoResumeStoppedWorkAgents — memory gate (PAN-2500 wire-deacon-gate)', () => {
@@ -181,6 +183,57 @@ describe('applyBootReconciliationDecision — memory gate (PAN-2500 wire-deacon-
     expect(result.resumed).toEqual([]);
     expect(result.deferred).toBe(1);
     expect(result.outcomes.some((o) => o.reason === 'deferred-memory')).toBe(true);
+  });
+});
+
+describe('applyBootReconciliationDecision — memory-paced trickle (PAN-2500 memory-paced-boot)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('admits exactly 3 of 20 candidates when MemAvailable drops below SOFT after 3 resumes — not a resume_all burst (PRD AC-6)', async () => {
+    const candidates = Array.from({ length: 20 }, (_, i) => ({ id: `agent-boot-${i}`, issueId: `PAN-${9000 + i}` }));
+    getBootReconciliationStateMock.mockReturnValue({ decision: 'resume_all', bootId: 'boot-trickle-1', perAgent: {} });
+    listBootReconciliationCandidatesMock.mockReturnValue(candidates);
+    getAgentStateSyncMock.mockImplementation((id: string) => stoppedWorkAgent(id));
+    resumeAgentMock.mockResolvedValue({ success: true });
+
+    const ok = { band: 'ok' as const, availableBytes: 20 * GIB, thresholds: { warningBytes: 4 * GIB, criticalBytes: 2 * GIB } };
+    const soft = { band: 'soft' as const, availableBytes: 3 * GIB, thresholds: { warningBytes: 4 * GIB, criticalBytes: 2 * GIB } };
+    assessMemoryPressureMock
+      .mockResolvedValueOnce(ok)
+      .mockResolvedValueOnce(ok)
+      .mockResolvedValueOnce(ok)
+      .mockResolvedValue(soft);
+
+    const resultPromise = applyBootReconciliationDecision(deps);
+    await vi.advanceTimersByTimeAsync(30000); // settle windows + staggers for the 3 admitted resumes
+    const result = await resultPromise;
+
+    expect(result.resumed).toHaveLength(3);
+    expect(result.deferred).toBe(17);
+    const memoryDeferred = result.outcomes.filter((o) => o.reason === 'deferred-memory');
+    expect(memoryDeferred).toHaveLength(17);
+  });
+
+  it('re-checks assessMemoryPressure between each admit and exits without spinning when MemAvailable never clears', async () => {
+    const candidates = Array.from({ length: 5 }, (_, i) => ({ id: `agent-boot-${i}`, issueId: `PAN-${9000 + i}` }));
+    getBootReconciliationStateMock.mockReturnValue({ decision: 'resume_all', bootId: 'boot-trickle-2', perAgent: {} });
+    listBootReconciliationCandidatesMock.mockReturnValue(candidates);
+    getAgentStateSyncMock.mockImplementation((id: string) => stoppedWorkAgent(id));
+
+    assessMemoryPressureMock.mockResolvedValue({ band: 'hard', availableBytes: 1 * GIB, thresholds: { warningBytes: 4 * GIB, criticalBytes: 2 * GIB } });
+
+    const resultPromise = applyBootReconciliationDecision(deps);
+    await vi.advanceTimersByTimeAsync(30000);
+    const result = await resultPromise;
+
+    expect(result.resumed).toEqual([]);
+    expect(result.deferred).toBe(5);
+    expect(resumeAgentMock).not.toHaveBeenCalled();
   });
 });
 

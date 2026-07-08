@@ -602,6 +602,11 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
 const RESUME_LOAD_FACTOR = 1.5;
 // Pause between consecutive resume spawns so the herd is spread across the cycle.
 const RESUME_STAGGER_MS = 150;
+// PAN-2500 memory-paced-boot: after a boot-reconciliation resume, wait for the
+// newly-spawned process's RSS to become visible in /proc before re-assessing
+// memory pressure for the next candidate — otherwise the next check reads
+// stale pre-resume MemAvailable and over-admits before the OS catches up.
+const RSS_SETTLE_MS = 2000;
 
 function shouldRetryUndeliveredKickoff(state: AgentState): boolean {
   return state.role === 'work' && state.kickoffDelivered === false;
@@ -964,6 +969,9 @@ export async function applyBootReconciliationDecision(
       resumed.push(result);
       outcomes.push(resumedBootReconciliationOutcome(agent));
       resumeAttempts++;
+      // PAN-2500 memory-paced-boot: let RSS settle before the next candidate's
+      // memory check (top of the next loop iteration) re-assesses.
+      await new Promise(r => setTimeout(r, RSS_SETTLE_MS));
     } else {
       const skipReason = bootReconciliationSkipReason(agent) ?? 'other';
       skipped[skipReason]++;
