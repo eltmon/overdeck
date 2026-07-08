@@ -32,6 +32,7 @@ import { extractNumberSync, extractPrefixSync, parseIssueIdSync } from '../../..
 import { enqueueMerge, getCurrentMerge, markMergeProcessing, dequeueMerge, getAllActiveQueues } from '../../../../lib/overdeck/merge.js';
 import { findProjectByTeamSync } from '../../../../lib/projects.js';
 import { getReviewStatusSync, markWorkspaceStuck, setReviewStatusSync as setReviewStatusBase, type ReviewStatus } from '../../../../lib/review-status.js';
+import { isStatePlaneOnlyStatus } from '../../../../lib/state-plane.js';
 import { getWorkAgentLifecycleStateSync } from '../../../../lib/work-agent-lifecycle.js';
 import { findPlan } from '../../../../lib/vbrief/io.js';
 import { isIntegrationPermissionError, verifyAppCanMerge } from '../../../../lib/github-app.js';
@@ -47,6 +48,19 @@ import { buildLocalMainRecoveryError } from './git-recovery-advice.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
+
+export function getApproveDirtyWorkspaceErrorForStatus(
+  status: string,
+  workspacePath: string,
+): string | null {
+  // STATE-PLANE-COMMIT-POLICY rules 3/6: pipeline-owned state-plane dirt is
+  // not agent work, and the path list must come from src/lib/state-plane.ts.
+  if (!status.trim() || isStatePlaneOnlyStatus(status)) {
+    return null;
+  }
+
+  return `Workspace has uncommitted changes. Please commit the changes, explicitly discard them, or surface them to the operator first:\ncd ${workspacePath}\ngit status`;
+}
 
 async function ensureWorkAgentReadyForMerge(
   issueId: string,
@@ -1639,8 +1653,8 @@ const postWorkspaceApproveRoute = HttpRouter.add(
             'git status --porcelain -uno',
             { cwd: workspacePath, encoding: 'utf-8' }
           );
-          if (status.trim()) {
-            const error = `Workspace has uncommitted changes. Please commit the changes, explicitly discard them, or surface them to the operator first:\ncd ${workspacePath}\ngit status`;
+          const error = getApproveDirtyWorkspaceErrorForStatus(status, workspacePath);
+          if (error) {
             completePendingOperation(issueId, error);
             return jsonResponse({ error }, { status: 400 });
           }
