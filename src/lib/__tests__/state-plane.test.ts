@@ -3,7 +3,12 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { getMainDivergence, isStatePlaneOnlyDiff } from '../state-plane.js';
+import {
+  getMainDivergence,
+  isStatePlaneOnlyDiff,
+  isStatePlaneOnlyStatus,
+  parsePorcelainStatusPaths,
+} from '../state-plane.js';
 
 function git(root: string, args: string[]): string {
   return execFileSync('git', args, { cwd: root, encoding: 'utf-8' }).trim();
@@ -76,6 +81,64 @@ describe('isStatePlaneOnlyDiff', () => {
 
   it('returns true for an empty diff between identical SHAs', async () => {
     await expect(isStatePlaneOnlyDiff(base, base, root)).resolves.toBe(true);
+  });
+});
+
+describe('parsePorcelainStatusPaths', () => {
+  it('returns an empty path list for clean porcelain output', () => {
+    expect(parsePorcelainStatusPaths('')).toEqual([]);
+    expect(isStatePlaneOnlyStatus('')).toBe(true);
+  });
+
+  it('extracts paths from staged, unstaged, and untracked state-plane status lines', () => {
+    const porcelain = [
+      'MM .pan/records/pan-1982.json',
+      ' M .pan/test/result.json',
+      '?? .pan/feedback/review.json',
+    ].join('\n');
+
+    expect(parsePorcelainStatusPaths(porcelain)).toEqual([
+      '.pan/records/pan-1982.json',
+      '.pan/test/result.json',
+      '.pan/feedback/review.json',
+    ]);
+    expect(isStatePlaneOnlyStatus(porcelain)).toBe(true);
+  });
+
+  it('returns false when any porcelain status path is outside the state plane', () => {
+    const porcelain = [
+      ' M .pan/records/pan-1982.json',
+      ' M src/foo.ts',
+    ].join('\n');
+
+    expect(isStatePlaneOnlyStatus(porcelain)).toBe(false);
+  });
+
+  it('uses the destination path for state-plane renames', () => {
+    const porcelain = 'R  .pan/records/a.json -> .pan/records/b.json';
+
+    expect(parsePorcelainStatusPaths(porcelain)).toEqual(['.pan/records/b.json']);
+    expect(isStatePlaneOnlyStatus(porcelain)).toBe(true);
+  });
+
+  it('returns false for a rename destination outside the state plane', () => {
+    const porcelain = 'R  .pan/records/a.json -> src/a.json';
+
+    expect(parsePorcelainStatusPaths(porcelain)).toEqual(['src/a.json']);
+    expect(isStatePlaneOnlyStatus(porcelain)).toBe(false);
+  });
+
+  it('unquotes git C-quoted porcelain paths', () => {
+    const porcelain = [
+      ' M ".pan/records/pan\\040quoted.json"',
+      '?? ".pan/test/result\\011copy.json"',
+    ].join('\n');
+
+    expect(parsePorcelainStatusPaths(porcelain)).toEqual([
+      '.pan/records/pan quoted.json',
+      '.pan/test/result\tcopy.json',
+    ]);
+    expect(isStatePlaneOnlyStatus(porcelain)).toBe(true);
   });
 });
 
