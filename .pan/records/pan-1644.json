@@ -6,11 +6,16 @@
       "reason": "resume",
       "agentModel": "kimi-k2.7-code",
       "timestamp": "2026-07-08T03:36:53.778Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T04:08:43.112Z"
     }
   ],
   "feedback": [],
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "title-source-ai-explicit": "completed",
     "hook-script-stop": "completed",
@@ -63,13 +68,13 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": true,
-    "updatedAt": "2026-07-08T03:41:58.843Z",
+    "updatedAt": "2026-07-08T03:42:41.736Z",
     "reviewNotes": "No blocking findings; focused title hook tests passed",
     "testNotes": "typecheck passed; lint passed (skills/prompts/file-size/source-introspection/circular/ratchet/quarantine); PAN-1644 targeted tests passed (91 tests across 9 files). Full npm test FAILED: tests/unit/dashboard/routes/issues-no-loss.test.ts reports unexpected route GET /api/issues/:id/ship-log not in EXPECTED_ISSUES_ROUTES (29-route lock). 8878 tests passed, 1 failed, 52 skipped. No browser UAT exercised; automated gate failure is conclusive.",
     "inspectNotes": "Bead title-changed-event ack: ConversationTitleChangedEvent schema added to DomainEvent union with {conversationName,title,titleSource} payload, reducer case bumps conversationsListRevision by 1 (test confirms 7->8), and updateConversationTitle() emits via getEventStore().emitOnly() (sequence auto-assigned by Omit<DomainEvent,\"sequence\"> signature) wrapped in try/catch so persistence never throws when the event store is uninitialized (both paths unit-tested). All 3 ACs met.",
     "mergeNotes": "Post-rebase verification failed at test",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2480",
-    "reviewedAtCommit": "db1a8e02df0dca4e7d1a11b659b6cede4768a248",
+    "reviewedAtCommit": "d776293a5ac207b1b5d83a6c95d13a39a9c664bf",
     "lastVerifiedCommit": "db1a8e02df0dca4e7d1a11b659b6cede4768a248",
     "reviewRequestedAt": "2026-07-08T03:35:33.134Z",
     "scopeDrift": {
@@ -181,17 +186,17 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 2750021,
-            "output": 58018,
-            "cacheRead": 28481002,
+            "input": 2750737,
+            "output": 58192,
+            "cacheRead": 28708330,
             "cacheWrite": 0
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 5824854,
-            "output": 363997,
-            "cacheRead": 190745856,
+            "input": 5827294,
+            "output": 364549,
+            "cacheRead": 191291648,
             "cacheWrite": 0
           }
         }
@@ -222,15 +227,15 @@
           "cacheWrite": 86241
         },
         "custom/kimi-k2.7-code": {
-          "input": 8574875,
-          "output": 422015,
-          "cacheRead": 219226858,
+          "input": 8578031,
+          "output": 422741,
+          "cacheRead": 219999978,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 79.474098,
-        "pricingAsOf": "2026-07-08T03:41:59.111Z"
+        "usd": 79.626892,
+        "pricingAsOf": "2026-07-08T03:42:41.760Z"
       }
     },
     "merges": [
@@ -257,5 +262,5 @@
     }
   },
   "created": "2026-07-08T03:36:53.748Z",
-  "updated": "2026-07-08T03:41:59.127Z"
+  "updated": "2026-07-08T04:08:43.491Z"
 }
