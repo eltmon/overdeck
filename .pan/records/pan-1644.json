@@ -147,14 +147,14 @@
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-08T04:11:39.735Z",
+    "mergeStatus": "failed",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-08T05:05:06.649Z",
     "reviewNotes": "No blocking findings; focused title hook tests passed",
     "testNotes": "npm run typecheck passed; npm run lint passed (skills/prompts/file-size/source-introspection/circular/ratchet/quarantine/state-writes/permissions/overdeck-boundaries); npm test passed (8879 tests passed, 52 skipped, 0 failed); frontend tests passed (32 passed). No browser UAT required — all PAN-1644 acceptance criteria are covered by unit tests for title sources, title-changed event, derivePromptTitle, hook endpoints, hook scripts, refinement service, HTTP message deterministic title, and backfill endpoint/CLI.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Bead title-changed-event ack: ConversationTitleChangedEvent schema added to DomainEvent union with {conversationName,title,titleSource} payload, reducer case bumps conversationsListRevision by 1 (test confirms 7->8), and updateConversationTitle() emits via getEventStore().emitOnly() (sequence auto-assigned by Omit<DomainEvent,\"sequence\"> signature) wrapped in try/catch so persistence never throws when the event store is uninitialized (both paths unit-tested). All 3 ACs met.",
-    "mergeNotes": "Post-rebase verification failed at test",
+    "mergeNotes": "Workspace does not exist",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2480",
     "reviewedAtCommit": "e955f37345b9232380b5d2e9a493850bf03a85e7",
     "lastVerifiedCommit": "db1a8e02df0dca4e7d1a11b659b6cede4768a248",
@@ -236,9 +236,9 @@
       "byStage": {
         "codex": {
           "openai/gpt-5.5": {
-            "input": 17165095,
-            "output": 39297,
-            "cacheRead": 15629568,
+            "input": 17825808,
+            "output": 40351,
+            "cacheRead": 16288128,
             "cacheWrite": 0
           }
         },
@@ -276,18 +276,18 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 6073362,
-            "output": 365225,
-            "cacheRead": 192149760,
+            "input": 6321632,
+            "output": 365671,
+            "cacheRead": 193014016,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 17165095,
-          "output": 39297,
-          "cacheRead": 15629568,
+          "input": 17825808,
+          "output": 40351,
+          "cacheRead": 16288128,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -309,15 +309,15 @@
           "cacheWrite": 86241
         },
         "custom/kimi-k2.7-code": {
-          "input": 8824099,
-          "output": 423417,
-          "cacheRead": 220858090,
+          "input": 9072369,
+          "output": 423863,
+          "cacheRead": 221722346,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 82.495777,
-        "pricingAsOf": "2026-07-08T04:11:39.830Z"
+        "usd": 83.26929200000001,
+        "pricingAsOf": "2026-07-08T05:05:06.690Z"
       }
     },
     "merges": [
@@ -344,5 +344,5 @@
     }
   },
   "created": "2026-07-08T03:36:53.748Z",
-  "updated": "2026-07-08T04:11:39.863Z"
+  "updated": "2026-07-08T05:05:06.690Z"
 }
