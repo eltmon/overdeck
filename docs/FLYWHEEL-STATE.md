@@ -217,6 +217,14 @@ Operator: primary local main diverged (20 bot chore(state) commits ahead / 6 beh
 - **LOOSE ENDS for operator:** (1) PAN-1644 draft untracked; (2) scratch has the primary's lifecycle-restart.ts alt-implementation if worth comparing; (3) freshly-dirty beads = normal ongoing bot writes.
 - REUSABLE: flywheel CANNOT commit/push code even via merge — `guard-flywheel-orchestrator-commit.sh` (pre-commit + pre-push) gates on OVERDECK_AGENT_ID; for an operator-directed reconcile merge, `env -u OVERDECK_AGENT_ID git commit/push` lets the guard pass on its own context-check (never `--no-verify`).
 
+## RUN-58 tick 157 (2026-07-08) — 🟢 RED MAIN #2 RESOLVED: #2497 green + admin-merged (cfebb2f9df, ship-log count→1); PAN-2496 closing; commented PAN-2495; filed swarm-gap PAN-2498
+
+**🟢 RED MAIN #2 RESOLVED.** PR #2497 (dup-removal) went fully green (test pass 8m36s, CLEAN) → **admin-merged** → main `cfebb2f9df Fix duplicate ship-log no-loss matrix entry (#2497)`; ship-log count on main = **1**. Main CI queued on the merge commit — confirm green next tick. PAN-2496 close backgrounded. Commented PAN-2495 with the UAT-assembler-verify-vs-main-tip finding.
+- **RECOVERY COST (red main #2):** e51dd2defe→cfebb2f9df, ~1 strike (clean, no wedge), PR #2497. Root = UAT batch promoted PAN-1644 (green in isolation) onto post-PAN-2490 main → duplicate matrix entry.
+- **SWARM SUBSTRATE GAP filed PAN-2498** (from operator Q on PAN-399): failed WORK slots (dead agent) are never auto-redispatched OR surfaced. `coordinateSwarmSlots` (deacon-swarm.ts:330-346) handles running/stalled/ready-to-merge/pending but does NOTHING with `failed` — only logs it. `recordStalledSlotRecovery` handles only `stalled`; the only reset-to-pending (line 658) is the manual `pan swarm recover` failed-MERGE path. PAN-399 stuck 1/3 (slots 1+2 dead-session, never redispatched, never surfaced). Fix: auto-redispatch failed work slots (retry cap + backoff) + escalate to operator instead of silent log. Operator chose NOT to restart PAN-399 — left as-is.
+- **Substrate priorities (unauthorized):** PAN-2495 (ci-green-skip) + PAN-2498 (swarm failed-slot gap) + B3/PAN-2167 (record-push churn).
+- PAN-2468/2485/2322 in flight (PAN-2468 stalled on a codex rate-limit model-switch dialog, not red main). MIN-865/861 rfm report-only.
+
 ## RUN-58 tick 156 (2026-07-08) — 🔴→🟡 RED MAIN: strike PAN-2496 pushed clean dup-removal (count→1) → PR #2497 MERGEABLE, CI running → admin-merge on green
 
 **Strike PAN-2496 executed cleanly (no wedge).** Pushed `strike/pan-2496 = 8fd0b02c38 Fix duplicate ship-log no-loss matrix entry` on top of current main; ship-log count = **1** (dup removed). Faster than PAN-2490 (no re-tell needed).
