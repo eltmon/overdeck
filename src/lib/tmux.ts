@@ -296,7 +296,14 @@ export function ensureOverdeckTmuxServerSync(cleanEnv: NodeJS.ProcessEnv): void 
       // the cgroup kill murders the forked server (PAN-1798, 5 dead foundings/boot).
       execFileSync(
         'systemd-run',
-        ['--user', '--unit', MANAGED_TMUX_SERVER_UNIT, '--collect', '--quiet', '--service-type=forking', 'tmux', ...args],
+        [
+          '--user', '--unit', MANAGED_TMUX_SERVER_UNIT, '--collect', '--quiet', '--service-type=forking',
+          // PAN-2500 kernel-oom-net: deprioritize the tmux server for systemd-oomd
+          // so a memory-governor miss degrades gracefully instead of wiping every
+          // agent process at once (#2390).
+          '--property=ManagedOOMPreference=avoid',
+          'tmux', ...args,
+        ],
         { stdio: 'ignore', env: cleanEnv },
       );
       return true;
