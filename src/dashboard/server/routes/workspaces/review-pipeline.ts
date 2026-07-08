@@ -20,6 +20,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { parseIssueIdSync, extractPrefixSync } from '../../../../lib/issue-id.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
+import { isStatePlaneOnlyStatus } from '../../../../lib/state-plane.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { getReviewStatusSync, type ReviewStatus } from '../../../../lib/review-status.js';
 import { getCachedConflictGateMergeability } from '../../../../lib/cloister/conflict-gate.js';
@@ -53,6 +54,20 @@ function shouldTreatAsRerun(status: Pick<ReviewStatus, 'readyForMerge' | 'review
     || status.testStatus === 'passed'
     || status.mergeStatus === 'failed';
 }
+
+export function getDirtyWorkspaceErrorForReviewRequestStatus(
+  status: string,
+  workspacePath: string,
+): string | null {
+  // STATE-PLANE-COMMIT-POLICY rules 3/6: pipeline-owned state-plane dirt is
+  // not agent work, and the path list must come from src/lib/state-plane.ts.
+  if (!status.trim() || isStatePlaneOnlyStatus(status)) {
+    return null;
+  }
+
+  return `Workspace has uncommitted changes. Commit the changes, explicitly discard them, or surface them to the operator before requesting review:\ncd ${workspacePath}\ngit status`;
+}
+
 async function getDirtyWorkspaceErrorForReviewRequest(
   workspacePath: string,
   workspaceInfo: WorkspaceInfo,
@@ -70,11 +85,7 @@ async function getDirtyWorkspaceErrorForReviewRequest(
         )).stdout
       : (await execAsync(statusCmd, { cwd: workspacePath, encoding: 'utf-8' })).stdout;
 
-    if (!status.trim()) {
-      return null;
-    }
-
-    return `Workspace has uncommitted changes. Commit the changes, explicitly discard them, or surface them to the operator before requesting review:\ncd ${workspacePath}\ngit status`;
+    return getDirtyWorkspaceErrorForReviewRequestStatus(status, workspacePath);
   } catch {
     return null;
   }

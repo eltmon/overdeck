@@ -67,3 +67,14 @@ Every fix for these MUST land against the rules below — not another local answ
 Each cluster issue closes only when its gate consumes the shared predicate (rule 3/6)
 or its writer honors commit-on-write (rule 2/5). A follow-up sweep verifies no
 `.gitignore` in any template or scaffold covers a permanent-plane path (rule 1).
+
+PAN-2167's working-tree clean gates consume the shared `isStatePlaneOnlyStatus`
+predicate, the porcelain-status companion to `isStatePlaneOnlyDiff`, so
+state-plane-only dirt does not block review or merge flow while mixed/source dirt
+still blocks. The wired gates are:
+
+- `src/dashboard/server/routes/workspaces/review-pipeline.ts` — `pan review request`
+  dirty-workspace gate.
+- `src/lib/work/done-preflight.ts` — `pan done` preflight uncommitted-changes gate.
+- `src/dashboard/server/routes/workspaces/merge-ops.ts` — approve/merge pre-push
+  dirty-workspace gate.
