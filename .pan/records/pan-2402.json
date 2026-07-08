@@ -61,16 +61,17 @@
     "issueId": "PAN-2402",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
-    "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-06T17:45:47.930Z",
+    "mergeStatus": "merged",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-08T00:04:46.397Z",
     "reviewNotes": "Approved: no blocking findings across correctness, security, requirements, or performance.",
     "testNotes": "Gates run from workspace /home/eltmon/Projects/overdeck/workspaces/feature-pan-2402 on branch feature/pan-2402. npm run typecheck: passed. npm run lint: passed (effect pinning, permissions, state-writes, overdeck-boundaries, skills, prompts, file-size, source-introspection, ratchet-audit all green). npm test: passed (848 test files passed / 4 skipped; 8485 tests passed / 52 skipped; frontend 3 files / 32 tests passed). Browser UAT not required: PAN-2402 is a backend cost-limit attribution/windowing fix with no UI/dashboard acceptance criteria; coverage is via unit tests including tests/lib/cloister/service-cost-alerts.test.ts for the (unattributed) fallback and the existing cost-monitor regression tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2411",
     "reviewedAtCommit": "4bd3e7197e83c40a23db3338f302b08d0804d1b1",
     "lastVerifiedCommit": "4bd3e7197e83c40a23db3338f302b08d0804d1b1",
-    "reviewRequestedAt": "2026-07-06T17:36:04.568Z"
+    "reviewRequestedAt": "2026-07-06T17:36:04.568Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-08T00:04:46.397Z"
   },
   "closeOut": {
     "usage": {
@@ -140,5 +141,5 @@
     "finalizedAt": "2026-07-06T16:45:16.460Z"
   },
   "created": "2026-07-06T16:52:52.528Z",
-  "updated": "2026-07-06T17:45:48.221Z"
+  "updated": "2026-07-08T00:04:46.397Z"
 }

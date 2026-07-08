@@ -176,11 +176,10 @@
     "issueId": "PAN-2464",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "skipped",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T21:34:30.398Z",
+    "updatedAt": "2026-07-08T00:04:54.853Z",
     "reviewNotes": "Per-line reclaim action buttons still do nothing",
     "verificationNotes": "Verification FAILED at test (104780ms):\n\ns-container-verbs.test.ts > container verb resources routes > pause and unpause invoke docker and return refreshed container markers\n FAIL  |root| tests/unit/dashboard/routes/resources-container-verbs.test.ts > container verb resources routes > pause and unpause invoke docker and return refreshed container markers\nAssertionError: expected 1st \"vi.fn()\" call to have been called with [ 'docker pause \"abc\"', …(1) ]\n\n- Expected\n+ Received\n\n  [\n-   \"docker pause \\\"abc\\\"\",\n+   \"docker\",\n+   [\n+     \"pause\",\n+     \"abc\",\n+   ],\n    {\n      \"encoding\": \"utf-8\",\n      \"timeout\": 10000,\n    },\n  ]\n\n ❯ tests/unit/dashboard/routes/resources-container-verbs.test.ts:50:18\n     48|     const unpaused = await runAction('abc', 'unpause');\n     49|\n     50|     expect(exec).toHaveBeenNthCalledWith(1, 'docker', ['pause', 'abc']…\n       |                  ^\n     51|       encoding: 'utf-8',\n     52|       timeout: 10000,\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯\n\n FAIL  |root| tests/unit/dashboard/routes/resources-teardown.test.ts > stack teardown resources routes > tears down only docker resources and emits reclaim activity\n FAIL  |root| tests/unit/dashboard/routes/resources-teardown.test.ts > stack teardown resources routes > tears down only docker resources and emits reclaim activity\nAssertionError: expected { ok: true, issueId: 'PAN-2464', …(6) } to match object { ok: true, issueId: 'PAN-2464', …(6) }\n\n- Expected\n+ Received\n\n@@ -6,12 +6,8 @@\n    \"ramBytes\": 500,\n    \"removedContainers\": [\n      \"c-api\",\n      \"c-worker\",\n    ],\n-   \"removedNetworks\": [\n-     \"feature-pan-2464_default\",\n-   ],\n-   \"removedVolumes\": [\n-     \"feature-pan-2464_data\",\n-   ],\n+   \"removedNetworks\": [],\n+   \"removedVolumes\": [],\n  }\n\n ❯ tests/unit/dashboard/routes/resources-teardown.test.ts:134:18\n    132|\n    133|     expect(response.status).toBe(200);\n    134|     expect(body).toMatchObject({\n       |                  ^\n    135|       ok: true,\n    136|       issueId: 'PAN-2464',\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯\n\n",
     "inspectNotes": "Bead stacks-grouping ack: commit d63984e1 is purely additive (new Playwright visual spec + screenshot for the whole Machine Room UI), does not modify stacks.ts/snapshot.ts, and does not regress the grouping/phase/aggregation logic already verified and passed under 0d3408ac21. The spec mocks /api/resources with a hand-authored fixture rather than exercising the real server, so it supplements but does not independently re-verify AC1/2/4 at the server level; no new violations.",
@@ -331,7 +330,9 @@
         "tests/unit/dashboard/routes/resources-teardown.test.ts"
       ],
       "recordedAt": "2026-07-07T21:06:20.422Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-08T00:04:54.853Z"
   },
   "closeOut": {
     "usage": {
@@ -432,5 +433,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-07T21:13:55.080Z",
-  "updated": "2026-07-07T22:59:08.294Z"
+  "updated": "2026-07-08T00:04:54.853Z"
 }

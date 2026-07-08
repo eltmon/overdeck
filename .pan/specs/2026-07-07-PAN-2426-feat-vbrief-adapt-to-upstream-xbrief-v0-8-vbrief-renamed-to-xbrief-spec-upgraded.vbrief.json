@@ -4,17 +4,17 @@
     "created": "2026-07-07T16:05:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2426: feat(vbrief): adapt to upstream xBRIEF v0.8 (vBRIEF renamed to xBRIEF; spec upgraded)",
-    "updated": "2026-07-07T22:34:21.937Z"
+    "updated": "2026-07-08T01:36:36.908Z"
   },
   "plan": {
     "id": "pan-2426",
     "title": "feat(vbrief): adapt to upstream xBRIEF v0.8 (vBRIEF renamed to xBRIEF; spec upgraded)",
-    "status": "running",
+    "status": "completed",
     "uid": "d0c4b944-4140-47a4-84c8-7b6735272630",
     "author": "agent:claude-fable-5",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-07-07T16:05:00.000Z",
-    "updated": "2026-07-07T22:34:21.937Z",
+    "updated": "2026-07-08T01:36:36.908Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2426",
@@ -483,5 +483,5 @@
       }
     ]
   },
-  "status": "active"
+  "status": "completed"
 }

@@ -1,17 +1,14 @@
 {
-  "issueId": "PAN-2440",
+  "issueId": "PAN-2485",
   "schemaVersion": 2,
-  "created": "2026-07-06T23:21:29.861Z",
-  "updated": "2026-07-08T00:09:38.491Z",
+  "created": "2026-07-08T01:02:53.046Z",
+  "updated": "2026-07-08T01:02:53.046Z",
   "pipeline": {
-    "issueId": "PAN-2440",
+    "issueId": "PAN-2485",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-08T00:09:38.491Z",
-    "closedOut": true,
-    "closedOutAt": "2026-07-08T00:09:38.491Z",
-    "mergeStatus": "merged"
+    "updatedAt": "2026-07-08T01:02:53.046Z"
   },
   "closeOut": {
     "usage": {
