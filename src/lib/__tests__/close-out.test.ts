@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Effect } from 'effect';
@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   clearReviewStatus: vi.fn(),
   loadReviewStatuses: vi.fn(() => ({})),
   markRecordPipelineClosedOutSync: vi.fn(),
+  stopWorkspaceDocker: vi.fn(() => Effect.void),
 }));
 
 vi.mock('child_process', async (importOriginal) => {
@@ -37,6 +38,10 @@ vi.mock('../review-status.js', () => ({
 
 vi.mock('../pan-dir/records.js', () => ({
   markRecordPipelineClosedOutSync: mocks.markRecordPipelineClosedOutSync,
+}));
+
+vi.mock('../workspace-manager.js', () => ({
+  stopWorkspaceDocker: mocks.stopWorkspaceDocker,
 }));
 
 import { executeCloseOut } from '../close-out.js';
@@ -110,5 +115,82 @@ describe('executeCloseOut terminal journal marker (PAN-2054)', () => {
       message: 'Warning: record write failed',
     });
     expect(mocks.clearReviewStatus).toHaveBeenCalledWith('PAN-2054');
+  });
+});
+
+describe('executeCloseOut workspace resolution (PAN-2510)', () => {
+  let projectPath: string;
+
+  beforeEach(() => {
+    projectPath = mkdtempSync(join(tmpdir(), 'pan-close-out-'));
+    vi.clearAllMocks();
+    mocks.loadReviewStatuses.mockReturnValue({});
+    mocks.stopWorkspaceDocker.mockReturnValue(Effect.void);
+    mocks.exec.mockImplementation((command: string, _opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
+      const cb = typeof _opts === 'function' ? _opts : callback;
+      cb?.(null, { stdout: '', stderr: '' });
+      return { on: vi.fn() };
+    });
+  });
+
+  afterEach(() => {
+    rmSync(projectPath, { recursive: true, force: true });
+  });
+
+  it('resolves the workspace path to workspaces/feature-<issue> and invokes Docker stop', async () => {
+    const issueId = 'PAN-2510';
+    const issueLower = issueId.toLowerCase();
+    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+    mkdirSync(workspacePath, { recursive: true });
+
+    const result = await Effect.runPromise(executeCloseOut({
+      issueId,
+      projectPath,
+      isGitHub: true,
+      owner: 'eltmon',
+      repo: 'overdeck',
+      number: 2510,
+    }));
+
+    expect(result.success).toBe(true);
+    const cleanupStep = result.steps.find((step) => step.name === 'Clean up workspace');
+    expect(cleanupStep?.status).toBe('passed');
+    expect(mocks.stopWorkspaceDocker).toHaveBeenCalledWith(workspacePath, issueLower);
+  });
+
+  it('records skipped cleanup when no workspace exists on disk', async () => {
+    const issueId = 'PAN-2510';
+    mocks.exec.mockImplementation((command: string, _opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
+      const cb = typeof _opts === 'function' ? _opts : callback;
+      if (command.includes('git branch -D') || command.includes('git push origin --delete')) {
+        cb?.(new Error('branch not found'), { stdout: '', stderr: '' });
+      } else {
+        cb?.(null, { stdout: '', stderr: '' });
+      }
+      return { on: vi.fn() };
+    });
+
+    const result = await Effect.runPromise(executeCloseOut({
+      issueId,
+      projectPath,
+      isGitHub: true,
+      owner: 'eltmon',
+      repo: 'overdeck',
+      number: 2510,
+    }));
+
+    expect(result.success).toBe(true);
+    const cleanupStep = result.steps.find((step) => step.name === 'Clean up workspace');
+    expect(cleanupStep?.status).toBe('skipped');
+    expect(mocks.stopWorkspaceDocker).not.toHaveBeenCalled();
+  });
+
+  it('imports findWorkspacePath from archive-planning and has no local definition', async () => {
+    const { readFileSync } = await import('node:fs');
+    const source = readFileSync(join(__dirname, '../close-out.ts'), 'utf-8');
+
+    expect(source).toContain("from './lifecycle/archive-planning.js'");
+    expect(source).toContain('findWorkspacePath');
+    expect(source).not.toMatch(/function findWorkspacePath\s*\(/);
   });
 });

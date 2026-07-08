@@ -23,6 +23,7 @@ import { killSession, sessionExistsSync, listSessionNames } from './tmux.js';
 import { loadReviewStatuses } from './review-status.js';
 import { getLinearApiKey } from './lifecycle/types.js';
 import { POST_MERGE_RESIDUE_LABELS, WORKFLOW_LABELS } from './lifecycle/close-issue.js';
+import { findWorkspacePath } from './lifecycle/archive-planning.js';
 import { extractNumberSync, extractPrefixSync, normalizeIssueIdSync } from './issue-id.js';
 
 const execAsync = promisify(exec);
@@ -549,24 +550,6 @@ const CLOSED_OUT_COLOR = '1d4ed8';async function executeCloseOutPromise(ctx: Clo
   }
 
   return { success: true, issueId: ctx.issueId, steps };
-}
-
-/**
- * Find the workspace path for an issue.
- */
-function findWorkspacePath(projectPath: string, issueLower: string): string | null {
-  const workspacePath = join(projectPath, 'workspaces', issueLower);
-  if (existsSync(workspacePath)) return workspacePath;
-
-  // Try worktree-based path
-  const worktreePath = join(projectPath, '.worktrees', issueLower);
-  if (existsSync(worktreePath)) return worktreePath;
-
-  // Try feature branch naming convention
-  const featurePath = join(dirname(projectPath), `feature-${issueLower}`);
-  if (existsSync(featurePath)) return featurePath;
-
-  return null;
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
