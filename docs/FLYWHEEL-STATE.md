@@ -217,6 +217,14 @@ Operator: primary local main diverged (20 bot chore(state) commits ahead / 6 beh
 - **LOOSE ENDS for operator:** (1) PAN-1644 draft untracked; (2) scratch has the primary's lifecycle-restart.ts alt-implementation if worth comparing; (3) freshly-dirty beads = normal ongoing bot writes.
 - REUSABLE: flywheel CANNOT commit/push code even via merge — `guard-flywheel-orchestrator-commit.sh` (pre-commit + pre-push) gates on OVERDECK_AGENT_ID; for an operator-directed reconcile merge, `env -u OVERDECK_AGENT_ID git commit/push` lets the guard pass on its own context-check (never `--no-verify`).
 
+## RUN-58 tick 154 (2026-07-08) — 🔴 RED MAIN P0: UAT merge collision — PAN-1644 + PAN-2490 both registered ship-log → DUPLICATE NO_LOSS_MATRIX entry → filed PAN-2496 + STRUCK
+
+**🔴 RED MAIN (`e51dd2defe`, test job = failure).** The UAT batch promotion (PAN-1644) collided with the PAN-2490 no-loss fix that landed ~10min earlier. BOTH registered `GET /api/issues/:id/ship-log` in NO_LOSS_MATRIX → duplicate surface key → `no-loss-matrix.test.ts:143 "matrix has no duplicate surface entries"` FAILS. Confirmed on main: two entries (line 277 `door: Ship log / ship view surface` from PAN-2490/#2494; line 280 `door: getShipLog + ReviewStatusResolver` from PAN-1644).
+- **ACTION: filed PAN-2496 + `pan strike PAN-2496`** (branch strike/pan-2496, codex/gpt-5.5). Fix = remove ONE duplicate (keep line 280, delete 277). On push → flywheel PR + admin-merge on green → close.
+- **LESSON (record):** when two in-flight branches both touch a locked no-loss ledger, promoting one on top of the other's just-landed fix collides. The UAT batch assembler should rebase-verify each member's `test` job against the CURRENT main tip, not the member's own green PR (PAN-1644's #2480 was green in isolation but red merged onto post-PAN-2490 main). Candidate substrate follow-up (relates to PAN-2495 ci-green-skip).
+- **CORRECTION to tick 153/152 wording:** "no PAN work in flight" was inaccurate — verified via read model: PAN-2468 (work+review), PAN-2485 (strike), PAN-2322 (swarm slot-2), PAN-399 (work) are HEALTHY/in-flight. What was empty is the merge-DRAIN queue (no PAN at ready-for-merge after PAN-1644). Drain posture (auto_pickup_backlog=false) = drain in-flight + pull critical substrate only.
+- **PAN-1644 closed-out** (before the red surfaced). MIN-865/861 rfm report-only. PAN-2495 + B3/PAN-2167 substrate priorities unauthorized.
+
 ## RUN-58 tick 153 (2026-07-08) — operator promoted UAT batch uat/pan-cedar-0708 (PAN-1644) → main; fresh Observe→Act: PAN-1644 excluded+closing, clean batch has no new PAN members
 
 **Operator-directed fresh Observe→Act.** Operator promoted UAT generation `uat/pan-cedar-0708` to main at `e51dd2defe Merge UAT batch uat/pan-cedar-0708 (PAN-1644)`. Re-derived from current source of truth:
