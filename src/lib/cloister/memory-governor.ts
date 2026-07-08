@@ -1,5 +1,5 @@
 import { readProcMemory } from '../../dashboard/server/services/system-health-service.js';
-import { getResourceConfig } from '../../dashboard/server/services/system-health-service.js';
+import { loadConfigSync } from '../config-yaml/load.js';
 
 const GIB = 1024 ** 3;
 
@@ -20,6 +20,11 @@ export interface MemoryVerdict {
  * Shared memory-pressure predicate — the single source of truth for both the
  * HTTP spawn path (evaluateSpawnGuardrails) and the deacon's autonomous
  * resume/dispatch path (PAN-2500). Never fork this comparison.
+ *
+ * This is the HTTP path's threshold pair (memoryWarnGb/memoryBlockGb, read
+ * via the dashboard's getResourceConfig() cache) — stateless and unrelated to
+ * the governor's own hysteresis bands below. evaluateSpawnGuardrails must stay
+ * behavior-preserving, so this function is never touched by the governor.
  */
 export function classifyMemoryPressure(
   availableBytes: number,
@@ -30,22 +35,79 @@ export function classifyMemoryPressure(
   return 'ok';
 }
 
+// --- PAN-2500 hysteresis-bands ---------------------------------------------
+//
+// The deacon governor uses its OWN three reserve thresholds (config-yaml
+// resources.governor{Soft,Hard,Recovery}ReserveGb — NOT memoryWarnGb/
+// memoryBlockGb, which belong to the unrelated HTTP-path predicate above) and
+// a small state machine so it never oscillates: once below SOFT it holds
+// (admits nothing new); once below HARD it sheds; it never re-admits until
+// MemAvailable clears RECOVERY, which is always > SOFT.
+
+export type GovernorMode = 'admitting' | 'holding' | 'shedding';
+
+export interface GovernorReserves {
+  softBytes: number;
+  hardBytes: number;
+  recoveryBytes: number;
+}
+
+let governorMode: GovernorMode = 'admitting';
+
+/** Test-only: reset the module-level hysteresis state between test cases. */
+export function resetGovernorModeForTests(): void {
+  governorMode = 'admitting';
+}
+
+export function readGovernorReserves(): GovernorReserves {
+  const resources = loadConfigSync().config.resources;
+  return {
+    softBytes: resources.governorSoftReserveGb * GIB,
+    hardBytes: resources.governorHardReserveGb * GIB,
+    recoveryBytes: resources.governorRecoveryReserveGb * GIB,
+  };
+}
+
 /**
- * Read live MemAvailable via the existing async /proc parser and classify it.
- * `ok` maps to the resume/dispatch gates' pre-PAN-2500 count+load-only behavior;
- * `soft`/`hard` gate admission (wire-deacon-gate) and drive eviction
- * (tiered-eviction).
+ * Pure hysteresis transition: given the current MemAvailable, the governor's
+ * three reserves, and the previous mode, decide the next mode. RECOVERY only
+ * re-admits from a held/shedding state; HARD sheds; between HARD and RECOVERY
+ * a previously-admitting governor holds once it crosses SOFT, and a
+ * previously-held/shedding governor never re-admits early (no oscillation).
+ */
+export function nextGovernorMode(
+  availableBytes: number,
+  reserves: GovernorReserves,
+  previousMode: GovernorMode,
+): GovernorMode {
+  if (availableBytes >= reserves.recoveryBytes) return 'admitting';
+  if (availableBytes < reserves.hardBytes) return 'shedding';
+  if (previousMode === 'admitting') {
+    return availableBytes < reserves.softBytes ? 'holding' : 'admitting';
+  }
+  return 'holding';
+}
+
+function bandForGovernorMode(mode: GovernorMode): MemoryPressureBand {
+  if (mode === 'shedding') return 'hard';
+  if (mode === 'holding') return 'soft';
+  return 'ok';
+}
+
+/**
+ * Read live MemAvailable via the existing async /proc parser and run it
+ * through the governor's hysteresis state machine. `band` mirrors the mode
+ * ('admitting'->'ok', 'holding'->'soft', 'shedding'->'hard') so existing
+ * consumers (wire-deacon-gate) are unaffected by the upgrade from the
+ * mem-governor-module placeholder thresholds to these dedicated reserves.
  */
 export async function assessMemoryPressure(): Promise<MemoryVerdict> {
-  const resources = getResourceConfig();
-  const thresholds: MemoryPressureThresholds = {
-    warningBytes: resources.memoryWarnGb * GIB,
-    criticalBytes: resources.memoryBlockGb * GIB,
-  };
+  const reserves = readGovernorReserves();
   const snapshot = await readProcMemory();
+  governorMode = nextGovernorMode(snapshot.memAvailable, reserves, governorMode);
   return {
-    band: classifyMemoryPressure(snapshot.memAvailable, thresholds),
+    band: bandForGovernorMode(governorMode),
     availableBytes: snapshot.memAvailable,
-    thresholds,
+    thresholds: { warningBytes: reserves.softBytes, criticalBytes: reserves.hardBytes },
   };
 }

@@ -383,6 +383,12 @@ export interface ResourcesConfig {
   agent_warn_count?: number;
   /** Work-agent count threshold that blocks new spawns */
   agent_block_count?: number;
+  /** PAN-2500: deacon memory governor — stop admitting new resumes (GiB reserve) */
+  governor_soft_reserve_gb?: number;
+  /** PAN-2500: deacon memory governor — start shedding (GiB reserve) */
+  governor_hard_reserve_gb?: number;
+  /** PAN-2500: deacon memory governor — re-admit only past this reserve; must exceed governor_soft_reserve_gb */
+  governor_recovery_reserve_gb?: number;
 }
 
 export interface IssuesConfig {
@@ -812,6 +818,10 @@ export interface NormalizedConfig {
     memoryBlockGb: number;
     agentWarnCount: number;
     agentBlockCount: number;
+    /** PAN-2500: deacon memory governor reserves, GiB. recoveryReserveGb > softReserveGb always. */
+    governorSoftReserveGb: number;
+    governorHardReserveGb: number;
+    governorRecoveryReserveGb: number;
   };
 
   /** Dashboard issue-fetch behavior, normalised (always defined). */
