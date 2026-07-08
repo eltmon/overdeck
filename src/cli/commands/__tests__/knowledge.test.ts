@@ -113,4 +113,18 @@ describe('knowledgeCommand', () => {
     expect(agentMocks.spawnRun.mock.calls[0][2].prompt).toContain('/okf retro');
     expect(agentMocks.spawnRun.mock.calls[0][2].prompt).toContain('/okf sync --topic "billing flows"');
   });
+
+  it('still spawns when mnemos is unavailable', async () => {
+    installerMocks.ensureMnemos.mockRejectedValue(new Error('release fetch failed'));
+
+    await knowledgeCommand('pan-2468');
+
+    expect(installerMocks.ensureMnemos).toHaveBeenCalledWith({
+      bundlePath: '/repo/overdeck/knowledge',
+    });
+    expect(agentMocks.spawnRun).toHaveBeenCalledWith('PAN-2468', 'knowledge', expect.objectContaining({
+      workspace: '/repo/overdeck',
+      prompt: expect.stringContaining('/okf sync'),
+    }));
+  });
 });

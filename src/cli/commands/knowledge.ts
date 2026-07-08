@@ -106,7 +106,12 @@ export async function knowledgeCommand(issueId: string, options: KnowledgeOption
     }
 
     const bundlePath = await resolveKnowledgeBundlePath(project.projectKey, project.projectPath);
-    await ensureMnemos({ bundlePath: bundlePath ?? undefined });
+    try {
+      await ensureMnemos({ bundlePath: bundlePath ?? undefined });
+    } catch (error: unknown) {
+      spinner.warn(`mnemos unavailable; spawning knowledge agent with built-in OKF search: ${errorMessage(error)}`);
+      spinner.start(`Spawning knowledge agent for ${normalized}...`);
+    }
 
     const agent = await spawnRun(normalized, 'knowledge', {
       workspace: project.projectPath,
