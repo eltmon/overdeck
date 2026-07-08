@@ -32,17 +32,14 @@
       "reason": "feedback",
       "note": "[2026-07-08T03:44Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-08T03:44:05.413Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-08T03:44:05Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2468\n\nPrevious FR-18/FR-19 blockers remain unresolved: installers still unwired and Ollama ensure still never starts a stopped server\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2468 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T04:00:06.860Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/records/pan-2468.json",
@@ -215,18 +212,18 @@
     "recordedAt": "2026-07-08T03:26:46.995Z"
   },
   "created": "2026-07-07T15:47:12.301Z",
-  "updated": "2026-07-08T03:56:53.707Z",
+  "updated": "2026-07-08T04:00:09.144Z",
   "pipeline": {
     "issueId": "PAN-2468",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-08T03:56:53.659Z",
-    "reviewNotes": "Previous FR-18/FR-19 blockers remain unresolved: installers still unwired and Ollama ensure still never starts a stopped server",
+    "updatedAt": "2026-07-08T04:00:09.110Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2488",
-    "lastVerifiedCommit": "7198e3adfcadf9f93d36b97b6ffd7d95d9cac314",
+    "lastVerifiedCommit": "25edc27e2668e9aacc149b4fecf66bf909426b59",
     "reviewRequestedAt": "2026-07-08T03:42:42.522Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -405,15 +402,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 41317847,
-            "output": 20260,
-            "cacheRead": 38491648,
+            "input": 41676704,
+            "output": 20495,
+            "cacheRead": 38845056,
             "cacheWrite": 0
           },
           "openai/gpt-5.4-mini": {
-            "input": 37244564,
-            "output": 89370,
-            "cacheRead": 35640064,
+            "input": 38357002,
+            "output": 90826,
+            "cacheRead": 36696192,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
@@ -434,15 +431,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 41317847,
-          "output": 20260,
-          "cacheRead": 38491648,
+          "input": 41676704,
+          "output": 20495,
+          "cacheRead": 38845056,
           "cacheWrite": 0
         },
         "openai/gpt-5.4-mini": {
-          "input": 37244564,
-          "output": 89370,
-          "cacheRead": 35640064,
+          "input": 38357002,
+          "output": 90826,
+          "cacheRead": 36696192,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
@@ -459,8 +456,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 93.3615428,
-        "pricingAsOf": "2026-07-08T03:56:53.705Z"
+        "usd": 93.4895369,
+        "pricingAsOf": "2026-07-08T04:00:09.142Z"
       }
     },
     "merges": [
