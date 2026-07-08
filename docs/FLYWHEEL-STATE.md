@@ -217,6 +217,12 @@ Operator: primary local main diverged (20 bot chore(state) commits ahead / 6 beh
 - **LOOSE ENDS for operator:** (1) PAN-1644 draft untracked; (2) scratch has the primary's lifecycle-restart.ts alt-implementation if worth comparing; (3) freshly-dirty beads = normal ongoing bot writes.
 - REUSABLE: flywheel CANNOT commit/push code even via merge — `guard-flywheel-orchestrator-commit.sh` (pre-commit + pre-push) gates on OVERDECK_AGENT_ID; for an operator-directed reconcile merge, `env -u OVERDECK_AGENT_ID git commit/push` lets the guard pass on its own context-check (never `--no-verify`).
 
+## RUN-58 tick 141 (2026-07-07) — ★★ A8/PAN-2297 MERGED (4f71893371, 02:41) — escaped the PAN-2167 loop via the convergence bet after 3 slips; closing; main CI verifying
+
+**A8/PAN-2297 MERGED (#2482 → main `4f71893371`, 02:41:06).** The convergence bet paid off exactly like B2/PAN-2426: once the record stopped changing (no push after 02:17), the merge worker found it fresh → no new push → landed. **The escape recipe for the PAN-2167 merge-worker loop is now proven: wait until mergeState CLEAN + all-CI-green + newest commit is the record itself with NO newer chore push (record converged), THEN schedule once.** Scheduling into a pending/UNSTABLE PR is what regenerates the churn. `pan close PAN-2297 --force` backgrounded (close-out running). Main CI in_progress on the merge commit — red-main watch (A8 = file-size baseline auto-lower, low risk).
+- **PAN-1644 (#2480, branch feature/pan-1644)** entered the ready set (review+test passed) but is **UNSTABLE** — re-CI'ing on a `chore: sync planning artifacts` push (02:37), same PAN-2167 churn. NOT schedulable this tick. ⚠ Standing hold list flagged "PAN-1644-draft operator-owned" — that referred to an untracked *draft file* from the reconcile; #2480 is a normal pipeline work PR. **OPEN QUESTION: auto-drain #2480 once it converges, or is PAN-1644 operator-held?** Wait-settle either way (UNSTABLE now).
+- PAN-2468 (OKF) working not-ready. M7/MIN-729 verifying. MIN-865/861 rfm — report only (UAT-held). B3/PAN-2167 still the root fix (A8's escape proves the manual workaround, but B3 removes the churn entirely).
+
 ## RUN-58 tick 140 (2026-07-07) — A8/PAN-2297 record CONVERGED (CLEAN + all-green, no new push since 02:17) → scheduled id 35, mergeAt 02:38 (the B2-escape bet); main green
 
 **MAIN GREEN.** No red main.
