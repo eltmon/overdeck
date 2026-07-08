@@ -217,6 +217,14 @@ Operator: primary local main diverged (20 bot chore(state) commits ahead / 6 beh
 - **LOOSE ENDS for operator:** (1) PAN-1644 draft untracked; (2) scratch has the primary's lifecycle-restart.ts alt-implementation if worth comparing; (3) freshly-dirty beads = normal ongoing bot writes.
 - REUSABLE: flywheel CANNOT commit/push code even via merge — `guard-flywheel-orchestrator-commit.sh` (pre-commit + pre-push) gates on OVERDECK_AGENT_ID; for an operator-directed reconcile merge, `env -u OVERDECK_AGENT_ID git commit/push` lets the guard pass on its own context-check (never `--no-verify`).
 
+## RUN-58 tick 149 (2026-07-08) — 🔴 RED MAIN: strike was wedged (reported, didn't act) → forceful re-tell RE-ACTIVATED it; now adding the NO_LOSS_MATRIX ship-log entry
+
+**🔴 RED MAIN (`14e35a1987`, still failing).** First `pan tell` got acknowledged but the strike ENDED its turn without acting ("I did not push it", idle 14m) — a wedged strike on a trivial one-line fix.
+- **RECOVERY: forceful action-forcing re-tell** (`pan tell pan-2490` — numbered EXECUTE-NOW commands: `git reset --hard origin/main` to drop its duplicate ahead-commit, add the NO_LOSS_MATRIX ship-log entry, `npm test -- no-loss-matrix issues-no-loss`, commit, **`git push -u origin strike/pan-2490` — push mandatory**, reply 'pushed'). **Worked** — strike re-activated, reset clean to origin/main, now "adding the new route ledger entry with the same shape as neighboring issue GET rows."
+- **LESSON:** a codex strike can acknowledge a directive and still end its turn without executing; the fix is an imperative "EXECUTE NOW … push is mandatory … reply exactly X" message that removes the should-I-push ambiguity. A reporting-only strike on a red-main P0 needs re-activation, not patience.
+- **Next:** on push → flywheel `gh pr create --head strike/pan-2490` → `gh pr merge --squash --admin` on green (red-main unblock exception) → main green → `pan close PAN-2490 --force` → file PAN-2487 ci-green-skip follow-up.
+- All drains/MIN-report DEFERRED until main green. M7/MIN-729 verifying; PAN-1644 UNSTABLE (secondary).
+
 ## RUN-58 tick 148 (2026-07-08) — 🔴 RED MAIN: confirmed test-job fail (run 28916303552); strike PAN-2490 directed to land the missing NO_LOSS_MATRIX entry (operator-engaged)
 
 **🔴 RED MAIN (`14e35a1987`, CI test job = failure, run 28916303552).** Operator confirmed my tick-147 read: the direct-to-main partial fix did NOT green CI — `NO_LOSS_MATRIX` still missing `GET /api/issues/:id/ship-log`.
