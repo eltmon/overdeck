@@ -17,7 +17,7 @@
   ],
   "feedback": [],
   "created": "2026-07-08T23:07:44.941Z",
-  "updated": "2026-07-08T23:30:54.574Z",
+  "updated": "2026-07-08T23:54:17.780Z",
   "pipeline": {
     "issueId": "PAN-2510",
     "reviewStatus": "pending",
@@ -56,5 +56,8 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "kimi-k2.7-code"
+  "model": "kimi-k2.7-code",
+  "statusOverrides": {
+    "rebuild-terminal-guard": "completed"
+  }
 }
