@@ -217,6 +217,12 @@ Operator: primary local main diverged (20 bot chore(state) commits ahead / 6 beh
 - **LOOSE ENDS for operator:** (1) PAN-1644 draft untracked; (2) scratch has the primary's lifecycle-restart.ts alt-implementation if worth comparing; (3) freshly-dirty beads = normal ongoing bot writes.
 - REUSABLE: flywheel CANNOT commit/push code even via merge — `guard-flywheel-orchestrator-commit.sh` (pre-commit + pre-push) gates on OVERDECK_AGENT_ID; for an operator-directed reconcile merge, `env -u OVERDECK_AGENT_ID git commit/push` lets the guard pass on its own context-check (never `--no-verify`).
 
+## RUN-58 tick 144 (2026-07-07) — PAN-1644 slipped 03:16 (self-generated merge-verification record push, PAN-2167) → wait re-converge; PAN-2487 landed on main (CI verifying)
+
+**Main advanced `4f71893371 → 867d33ac58`** (`chore(ratchet): accept merge-ops.ts 1984→2029 for the PAN-2487 ci-green skip + ship-log instrumentation` — PAN-2487 landed via pipeline). CI in_progress on 867d33ac58 — red-main watch. No red yet.
+- **PAN-1644 (#2480) slipped its 03:16 window** — the merge worker wrote `chore: sync pan-1644 merge verification st…` (03:17:31) → UNSTABLE, re-CI'ing. Same PAN-2167 merge-worker slip A8 hit; dropped out of the ready set while UNSTABLE. Recipe: wait re-converge (CLEAN+all-green+no newer chore push), then re-schedule ONCE. Not schedulable this tick.
+- PAN-2468 (OKF) working not-ready. M7/MIN-729 verifying. MIN-865/861 rfm — report only (UAT-held). **B3/PAN-2167** unauthorized — now 2 issues have demonstrably slipped merge windows on self-generated record pushes; the fix ends it.
+
 ## RUN-58 tick 143 (2026-07-07) — PAN-1644 converged (CLEAN+all-green) → scheduled id 36 mergeAt 03:16; main green
 
 **MAIN GREEN (`4f71893371`, CI success).** No red main.
