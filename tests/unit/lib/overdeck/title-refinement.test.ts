@@ -194,6 +194,46 @@ describe('handleTurnComplete', () => {
     expect(getConversationByName('refine-later')?.title).toBe('Second Refined Title');
   });
 
+  it('does not exploit missing cadence after restart for existing ai-refined conversations', async () => {
+    const deps = makeDeps({
+      messages: [
+        { role: 'user', text: 'hello' },
+        { role: 'assistant', text: 'hi there', completedAt: '2026-07-07T12:00:00Z' },
+      ],
+      summarizeResult: 'Post-Restart Refined Title',
+    });
+
+    createConversation({
+      name: 'refine-restart',
+      tmuxSession: 'tmux-refine-restart',
+      cwd: '/tmp',
+      title: 'First Refined Title',
+      titleSource: 'ai-refined',
+    });
+
+    // Simulate a process restart: the module-level cadence map is empty, but
+    // the wall clock has advanced by an hour. Missing cadence must not be
+    // treated as "last refined at epoch".
+    vi.setSystemTime(60 * 60 * 1000);
+
+    const conv = getConversationByName('refine-restart');
+
+    for (let i = 0; i < 4; i++) {
+      await handleTurnComplete(conv!, deps);
+    }
+    expect(getConversationByName('refine-restart')?.title).toBe('First Refined Title');
+
+    // 5th turn is still inside the 10-minute interval seeded at the first call.
+    await handleTurnComplete(conv!, deps);
+    expect(getConversationByName('refine-restart')?.title).toBe('First Refined Title');
+
+    // Advance past the 10-minute debounce from the first post-restart call.
+    vi.setSystemTime(60 * 60 * 1000 + 10 * 60 * 1000 + 1);
+    await handleTurnComplete(conv!, deps);
+
+    expect(getConversationByName('refine-restart')?.title).toBe('Post-Restart Refined Title');
+  });
+
   it('skips non-refinable title sources', async () => {
     const deps = makeDeps({
       messages: [{ role: 'assistant', text: 'hi', completedAt: '2026-07-07T12:00:00Z' }],

@@ -55,7 +55,13 @@ export async function handleTurnComplete(
 
   let cadence = cadenceByConversation.get(name);
   if (!cadence) {
-    cadence = { turnsSinceRefine: 0, lastRefinedAtMs: 0 };
+    // For an already-ai-refined conversation (e.g. after a dashboard restart),
+    // seed the cadence from now so that the 10-minute debounce is not satisfied
+    // immediately by Date.now() - 0.
+    cadence = {
+      turnsSinceRefine: 0,
+      lastRefinedAtMs: conv.titleSource === 'ai-refined' ? Date.now() : 0,
+    };
     cadenceByConversation.set(name, cadence);
   }
   cadence.turnsSinceRefine += 1;

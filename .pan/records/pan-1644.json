@@ -31,6 +31,16 @@
       "reason": "feedback",
       "note": "[2026-07-08T00:19Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-08T00:19:43.355Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T00:28:49.842Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-08T00:29Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-08T00:29:48.443Z"
     }
   ],
   "feedback": [
@@ -38,8 +48,8 @@
       "seq": 2,
       "specialist": "review-agent",
       "outcome": "changes-requested",
-      "timestamp": "2026-07-08T00:19:43Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1644\n\nBackfill still has stale-snapshot overwrite race\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1644 -m \"Fixed review issues\"`"
+      "timestamp": "2026-07-08T00:29:48Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1644\n\nTitle refinement debounce and API-error Stop hook blockers remain\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1644 -m \"Fixed review issues\"`"
     }
   ],
   "scopeDrift": {
@@ -165,13 +175,13 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-08T00:19:39.483Z",
-    "reviewNotes": "Backfill still has stale-snapshot overwrite race",
+    "updatedAt": "2026-07-08T00:29:44.200Z",
+    "reviewNotes": "Title refinement debounce and API-error Stop hook blockers remain",
     "testNotes": "typecheck passed; lint passed; npm test failed. Blocking failures: (1) tests/unit/lib/overdeck/no-loss-matrix.test.ts requires matrix entries for new PAN-1644 routes: POST /api/admin/conversations/backfill-titles, POST /api/hooks/user-prompt-submit, POST /api/hooks/turn-complete. (2) tests/integration/agent-spawning.test.ts resumeAgent redelivery timed out at 30000ms. Browser UAT not exercised because automated gates failed.",
     "inspectNotes": "Bead title-changed-event ack: ConversationTitleChangedEvent schema added to DomainEvent union with {conversationName,title,titleSource} payload, reducer case bumps conversationsListRevision by 1 (test confirms 7->8), and updateConversationTitle() emits via getEventStore().emitOnly() (sequence auto-assigned by Omit<DomainEvent,\"sequence\"> signature) wrapped in try/catch so persistence never throws when the event store is uninitialized (both paths unit-tested). All 3 ACs met.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2480",
     "reviewedAtCommit": "11f9b9c0b7690f83777ffd740354f913f60e5a0a",
-    "lastVerifiedCommit": "1784dc2b293de79f8471aec1fc28055909c99d73",
+    "lastVerifiedCommit": "bfac0a4fb83cac050de2c672db8cf904c0882ade",
     "reviewRequestedAt": "2026-07-08T00:07:22.385Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -248,9 +258,9 @@
       "byStage": {
         "codex": {
           "openai/gpt-5.5": {
-            "input": 3300263,
-            "output": 10258,
-            "cacheRead": 2836608,
+            "input": 4416957,
+            "output": 11978,
+            "cacheRead": 3757440,
             "cacheWrite": 0
           }
         },
@@ -288,18 +298,18 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 2983712,
-            "output": 252194,
-            "cacheRead": 123108608,
+            "input": 3021580,
+            "output": 260286,
+            "cacheRead": 129299456,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 3300263,
-          "output": 10258,
-          "cacheRead": 2836608,
+          "input": 4416957,
+          "output": 11978,
+          "cacheRead": 3757440,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -321,15 +331,15 @@
           "cacheWrite": 86241
         },
         "custom/kimi-k2.7-code": {
-          "input": 3357583,
-          "output": 261390,
-          "cacheRead": 126082304,
+          "input": 3395451,
+          "output": 269482,
+          "cacheRead": 132273152,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 46.02008,
-        "pricingAsOf": "2026-07-08T00:19:39.545Z"
+        "usd": 48.756013,
+        "pricingAsOf": "2026-07-08T00:29:44.238Z"
       }
     },
     "merges": [
@@ -356,5 +366,5 @@
     }
   },
   "created": "2026-07-07T23:49:56.919Z",
-  "updated": "2026-07-08T00:19:43.355Z"
+  "updated": "2026-07-08T00:29:48.443Z"
 }
