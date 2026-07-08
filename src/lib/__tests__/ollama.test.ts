@@ -8,12 +8,13 @@ function response(ok: boolean): Response {
 }
 
 describe('ensureOllama', () => {
-  it('returns without installing or pulling when localhost Ollama is healthy', async () => {
+  it('pulls the model when localhost Ollama is healthy', async () => {
     const fetchImpl = vi.fn(async () => response(true));
     const runCommand = vi.fn(async () => {});
     const installOllama = vi.fn(async () => {});
+    const startServer = vi.fn(async () => {});
 
-    const result = await ensureOllama({ fetchImpl, runCommand, installOllama });
+    const result = await ensureOllama({ fetchImpl, runCommand, installOllama, startServer });
 
     expect(result).toEqual({
       status: 'already-running',
@@ -21,16 +22,18 @@ describe('ensureOllama', () => {
       model: DEFAULT_OLLAMA_MODEL,
     });
     expect(fetchImpl).toHaveBeenCalledWith('http://localhost:11434/api/tags', { method: 'GET' });
-    expect(runCommand).not.toHaveBeenCalled();
+    expect(runCommand).toHaveBeenCalledWith('ollama', ['pull', DEFAULT_OLLAMA_MODEL]);
+    expect(startServer).not.toHaveBeenCalled();
     expect(installOllama).not.toHaveBeenCalled();
   });
 
-  it('installs, pulls nomic-embed-text, and resolves after the health check passes', async () => {
+  it('installs, starts a stopped server, pulls nomic-embed-text, and resolves after the health check passes', async () => {
     vi.useFakeTimers();
     try {
       const health = [false, false, true];
       const fetchImpl = vi.fn(async () => response(health.shift() ?? true));
       const installOllama = vi.fn(async () => {});
+      const startServer = vi.fn(async () => {});
       const runCommand = vi.fn(async (_command: string, args: string[]) => {
         if (args[0] === '--version') throw new Error('missing binary');
       });
@@ -42,9 +45,10 @@ describe('ensureOllama', () => {
         fetchImpl,
         runCommand,
         installOllama,
+        startServer,
       });
 
-      await vi.advanceTimersByTimeAsync(100);
+      await vi.advanceTimersByTimeAsync(200);
       const result = await resultPromise;
 
       expect(result).toEqual({
@@ -53,11 +57,49 @@ describe('ensureOllama', () => {
         model: 'nomic-embed-text',
       });
       expect(installOllama).toHaveBeenCalledOnce();
+      expect(startServer).toHaveBeenCalledOnce();
       expect(runCommand.mock.calls).toEqual([
         ['ollama', ['--version']],
         ['ollama', ['pull', 'nomic-embed-text']],
       ]);
       expect(fetchImpl).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('starts a stopped server without auto-install when the binary already exists', async () => {
+    vi.useFakeTimers();
+    try {
+      const health = [false, true, true];
+      const fetchImpl = vi.fn(async () => response(health.shift() ?? true));
+      const startServer = vi.fn(async () => {});
+      const runCommand = vi.fn(async (_command: string, args: string[]) => {
+        if (args[0] === '--version') return;
+      });
+
+      const resultPromise = ensureOllama({
+        retryDelayMs: 100,
+        maxHealthAttempts: 3,
+        fetchImpl,
+        runCommand,
+        startServer,
+      });
+
+      await vi.advanceTimersByTimeAsync(100);
+      const result = await resultPromise;
+
+      expect(result).toEqual({
+        status: 'started',
+        baseUrl: 'http://localhost:11434',
+        model: DEFAULT_OLLAMA_MODEL,
+      });
+      expect(startServer).toHaveBeenCalledOnce();
+      expect(runCommand.mock.calls).toEqual([
+        ['ollama', ['--version']],
+        ['ollama', ['pull', 'nomic-embed-text']],
+      ]);
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
     } finally {
       vi.useRealTimers();
     }

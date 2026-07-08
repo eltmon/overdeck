@@ -14,6 +14,7 @@ export interface EnsureOllamaOptions {
   maxHealthAttempts?: number;
   fetchImpl?: typeof fetch;
   runCommand?: CommandRunner;
+  startServer?: () => Promise<void>;
   installOllama?: () => Promise<void>;
   sleep?: (ms: number) => Promise<void>;
 }
@@ -42,25 +43,28 @@ export async function ensureOllama(options: EnsureOllamaOptions = {}): Promise<E
   const model = options.model ?? DEFAULT_OLLAMA_MODEL;
   const fetchImpl = options.fetchImpl ?? fetch;
   const runCommand = options.runCommand ?? runCommandWithSpawn;
+  const startServer = options.startServer ?? startOllamaServerWithSpawn;
   const sleep = options.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const retryDelayMs = options.retryDelayMs ?? 1_000;
   const maxHealthAttempts = options.maxHealthAttempts ?? 30;
 
-  if (await isOllamaHealthy(baseUrl, fetchImpl)) {
-    return { status: 'already-running', baseUrl, model };
-  }
+  const alreadyHealthy = await isOllamaHealthy(baseUrl, fetchImpl);
 
-  const binaryExists = await hasOllamaBinary(runCommand);
-  if (!binaryExists) {
-    if (!options.autoInstall) {
-      throw new OllamaEnsureError('Ollama is not installed. Re-run with autoInstall enabled or install it manually from https://ollama.com/download.');
+  if (!alreadyHealthy) {
+    const binaryExists = await hasOllamaBinary(runCommand);
+    if (!binaryExists) {
+      if (!options.autoInstall) {
+        throw new OllamaEnsureError('Ollama is not installed. Re-run with autoInstall enabled or install it manually from https://ollama.com/download.');
+      }
+      await (options.installOllama ?? installOllamaWithPlatformCommand)();
     }
-    await (options.installOllama ?? installOllamaWithPlatformCommand)();
+
+    await startServer();
+    await waitForOllamaHealth(baseUrl, fetchImpl, sleep, retryDelayMs, maxHealthAttempts);
   }
 
   await runCommand('ollama', ['pull', model]);
-  await waitForOllamaHealth(baseUrl, fetchImpl, sleep, retryDelayMs, maxHealthAttempts);
-  return { status: 'started', baseUrl, model };
+  return { status: alreadyHealthy ? 'already-running' : 'started', baseUrl, model };
 }
 
 async function hasOllamaBinary(runCommand: CommandRunner): Promise<boolean> {
@@ -110,6 +114,17 @@ async function runCommandWithSpawn(command: string, args: string[]): Promise<voi
     child.on('exit', (code) => {
       if (code === 0) resolve();
       else reject(new OllamaEnsureError(`${command} ${args.join(' ')} exited with code ${code}`));
+    });
+  });
+}
+
+async function startOllamaServerWithSpawn(): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn('ollama', ['serve'], { stdio: 'ignore', detached: true });
+    child.once('error', reject);
+    child.once('spawn', () => {
+      child.unref();
+      resolve();
     });
   });
 }

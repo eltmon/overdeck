@@ -7,14 +7,24 @@ const agentMocks = vi.hoisted(() => ({
 
 const projectMocks = vi.hoisted(() => ({
   resolveProjectFromIssueSync: vi.fn(),
+  loadProjectsConfigSync: vi.fn(),
+}));
+
+const installerMocks = vi.hoisted(() => ({
+  ensureMnemos: vi.fn(),
 }));
 
 vi.mock('../../../lib/agents.js', () => ({
   spawnRun: agentMocks.spawnRun,
 }));
 
+vi.mock('../../../lib/installers/mnemos.js', () => ({
+  ensureMnemos: installerMocks.ensureMnemos,
+}));
+
 vi.mock('../../../lib/projects.js', () => ({
   resolveProjectFromIssueSync: projectMocks.resolveProjectFromIssueSync,
+  loadProjectsConfigSync: projectMocks.loadProjectsConfigSync,
 }));
 
 import { buildKnowledgePrompt, configureKnowledgeCommand, knowledgeCommand } from '../knowledge.js';
@@ -23,11 +33,26 @@ describe('knowledgeCommand', () => {
   beforeEach(() => {
     agentMocks.spawnRun.mockReset();
     projectMocks.resolveProjectFromIssueSync.mockReset();
+    projectMocks.loadProjectsConfigSync.mockReset();
+    installerMocks.ensureMnemos.mockReset();
     projectMocks.resolveProjectFromIssueSync.mockReturnValue({
       projectKey: 'overdeck',
       projectName: 'Overdeck',
       projectPath: '/repo/overdeck',
       linearTeam: 'PAN',
+    });
+    projectMocks.loadProjectsConfigSync.mockReturnValue({
+      projects: {
+        overdeck: {
+          name: 'Overdeck',
+          path: '/repo/overdeck',
+          knowledge_repo: 'knowledge',
+        },
+      },
+    });
+    installerMocks.ensureMnemos.mockResolvedValue({
+      status: 'already-installed',
+      path: '/home/eltmon/.overdeck/bin/mnemos',
     });
     agentMocks.spawnRun.mockResolvedValue({
       id: 'agent-pan-2468-knowledge',
@@ -75,6 +100,9 @@ describe('knowledgeCommand', () => {
     });
 
     expect(projectMocks.resolveProjectFromIssueSync).toHaveBeenCalledWith('PAN-2468');
+    expect(installerMocks.ensureMnemos).toHaveBeenCalledWith({
+      bundlePath: '/repo/overdeck/knowledge',
+    });
     expect(agentMocks.spawnRun).toHaveBeenCalledWith('PAN-2468', 'knowledge', {
       workspace: '/repo/overdeck',
       model: 'gpt-5.5',

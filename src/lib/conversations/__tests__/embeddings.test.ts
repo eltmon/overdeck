@@ -237,10 +237,16 @@ describe('embedSessions', () => {
     const embedFn = vi.fn((_provider: unknown, opts: { model: string }): Effect.Effect<EmbeddingResult> =>
       Effect.succeed({ embedding: new Float32Array(768).fill(0.1), model: opts.model }),
     );
+    const ensureOllamaFn = vi.fn(async () => ({
+      status: 'already-running' as const,
+      baseUrl: 'http://localhost:11434',
+      model: 'nomic-embed-text',
+    }));
 
     const result = await embedSessions({
       provider: 'ollama',
       embedFn: embedFn as typeof import('../embeddings/providers.js').embed,
+      ensureOllamaFn,
       maxParallel: 1,
       config: {
         compactionModel: 'claude-haiku-4-5',
@@ -258,6 +264,10 @@ describe('embedSessions', () => {
     });
 
     expect(result.embedded).toBe(1);
+    expect(ensureOllamaFn).toHaveBeenCalledWith({
+      baseUrl: undefined,
+      model: 'nomic-embed-text',
+    });
     expect(embedFn).toHaveBeenCalledWith('ollama', expect.objectContaining({ model: 'nomic-embed-text' }));
     expect(getEmbedding(session!.id, 'nomic-embed-text')?.length).toBe(768);
   });

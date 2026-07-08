@@ -1,9 +1,13 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import type { Command } from 'commander';
+import { readFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+import { parse as parseYaml } from 'yaml';
 
 import { spawnRun } from '../../lib/agents.js';
-import { resolveProjectFromIssueSync } from '../../lib/projects.js';
+import { ensureMnemos } from '../../lib/installers/mnemos.js';
+import { loadProjectsConfigSync, resolveProjectFromIssueSync } from '../../lib/projects.js';
 import type { RoleEffort } from '../../lib/config-yaml.js';
 
 export interface KnowledgeOptions {
@@ -23,6 +27,35 @@ function quoteShellText(value: string): string {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function resolveBundlePath(projectPath: string, bundlePath: string): string {
+  return resolve(projectPath, bundlePath);
+}
+
+async function resolveKnowledgeBundlePath(projectKey: string, projectPath: string): Promise<string | null> {
+  const projectConfig = loadProjectsConfigSync().projects[projectKey];
+  if (typeof projectConfig?.knowledge_repo === 'string' && projectConfig.knowledge_repo.trim()) {
+    return resolveBundlePath(projectPath, projectConfig.knowledge_repo);
+  }
+
+  try {
+    const pointer = parseYaml(await readFile(join(projectPath, '.okf.yml'), 'utf8'));
+    if (isRecord(pointer) && typeof pointer.bundle === 'string' && pointer.bundle.trim()) {
+      return resolveBundlePath(projectPath, pointer.bundle);
+    }
+  } catch (error: unknown) {
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+
+  return null;
 }
 
 export function buildKnowledgePrompt(issueId: string, options: KnowledgeOptions = {}): string {
@@ -71,6 +104,9 @@ export async function knowledgeCommand(issueId: string, options: KnowledgeOption
     if (!project) {
       throw new Error(`No Overdeck project is configured for issue prefix in "${normalized}". Add the project to projects.yaml first.`);
     }
+
+    const bundlePath = await resolveKnowledgeBundlePath(project.projectKey, project.projectPath);
+    await ensureMnemos({ bundlePath: bundlePath ?? undefined });
 
     const agent = await spawnRun(normalized, 'knowledge', {
       workspace: project.projectPath,
