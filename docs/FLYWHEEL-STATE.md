@@ -217,6 +217,12 @@ Operator: primary local main diverged (20 bot chore(state) commits ahead / 6 beh
 - **LOOSE ENDS for operator:** (1) PAN-1644 draft untracked; (2) scratch has the primary's lifecycle-restart.ts alt-implementation if worth comparing; (3) freshly-dirty beads = normal ongoing bot writes.
 - REUSABLE: flywheel CANNOT commit/push code even via merge — `guard-flywheel-orchestrator-commit.sh` (pre-commit + pre-push) gates on OVERDECK_AGENT_ID; for an operator-directed reconcile merge, `env -u OVERDECK_AGENT_ID git commit/push` lets the guard pass on its own context-check (never `--no-verify`).
 
+## RUN-58 tick 145 (2026-07-07) — PAN-1644 got NEW code (ship-log endpoint) — back in flight, not just record churn → wait CI; main advancing green (11d0b8ba4d)
+
+**Main advancing normally** (`867d33ac58 → 11d0b8ba4d` chore(state) batch; PAN-2487 went green + superseded). CI in_progress on 11d0b8ba4d — no red.
+- **PAN-1644 (#2480) is back in flight, not merge-slipping** — newest commit is a real code change `fix: add GET /api/issues/:id/ship-log` (03:22), test re-CI pending, mergeState UNKNOWN. Correlates with PAN-2487 ship-log instrumentation. This is genuine new work on the branch, NOT the self-generated record loop → do NOT schedule; wait for CI on the new code and re-evaluate when it returns to the ready set. Dropped out of ready (UNKNOWN/pending).
+- No PAN in the ready set this tick. PAN-2468 (OKF) working not-ready. M7/MIN-729 verifying. MIN-865/861 rfm — report only (UAT-held). B3/PAN-2167 unauthorized.
+
 ## RUN-58 tick 144 (2026-07-07) — PAN-1644 slipped 03:16 (self-generated merge-verification record push, PAN-2167) → wait re-converge; PAN-2487 landed on main (CI verifying)
 
 **Main advanced `4f71893371 → 867d33ac58`** (`chore(ratchet): accept merge-ops.ts 1984→2029 for the PAN-2487 ci-green skip + ship-log instrumentation` — PAN-2487 landed via pipeline). CI in_progress on 867d33ac58 — red-main watch. No red yet.
