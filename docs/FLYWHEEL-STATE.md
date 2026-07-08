@@ -217,6 +217,12 @@ Operator: primary local main diverged (20 bot chore(state) commits ahead / 6 beh
 - **LOOSE ENDS for operator:** (1) PAN-1644 draft untracked; (2) scratch has the primary's lifecycle-restart.ts alt-implementation if worth comparing; (3) freshly-dirty beads = normal ongoing bot writes.
 - REUSABLE: flywheel CANNOT commit/push code even via merge — `guard-flywheel-orchestrator-commit.sh` (pre-commit + pre-push) gates on OVERDECK_AGENT_ID; for an operator-directed reconcile merge, `env -u OVERDECK_AGENT_ID git commit/push` lets the guard pass on its own context-check (never `--no-verify`).
 
+## RUN-58 tick 140 (2026-07-07) — A8/PAN-2297 record CONVERGED (CLEAN + all-green, no new push since 02:17) → scheduled id 35, mergeAt 02:38 (the B2-escape bet); main green
+
+**MAIN GREEN.** No red main.
+- **A8/PAN-2297 (#2482) reached the converged state** — mergeState CLEAN, ALL CI green, newest commit is the 02:17:23 record itself (CI'd green, no newer chore push). This is the exact condition B2/PAN-2426 escaped on: record converged → next merge attempt should find nothing to update → no push → merge. Scheduled auto-merge id **35**, mergeAt **02:38:26**. **If it slips a 4th time on a self-generated record push → STOP scheduling, surface hard for operator hand-merge / B3-PAN-2167 authorization (do not churn further).**
+- PAN-2468 (OKF) working not-ready. M7/MIN-729 verifying. MIN-865/861 rfm — report only (UAT-held). B3/PAN-2167 unauthorized (urgent — ends the churn). PAN-2445 clean.
+
 ## RUN-58 tick 139 (2026-07-07) — A8/PAN-2297 slipped a 3rd time — merge-worker self-writes the record that blocks it (PAN-2167 core deadlock); main green; escalated
 
 **MAIN GREEN (`1d6a7a12a7`).** No red main.
