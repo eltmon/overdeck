@@ -217,6 +217,14 @@ Operator: primary local main diverged (20 bot chore(state) commits ahead / 6 beh
 - **LOOSE ENDS for operator:** (1) PAN-1644 draft untracked; (2) scratch has the primary's lifecycle-restart.ts alt-implementation if worth comparing; (3) freshly-dirty beads = normal ongoing bot writes.
 - REUSABLE: flywheel CANNOT commit/push code even via merge — `guard-flywheel-orchestrator-commit.sh` (pre-commit + pre-push) gates on OVERDECK_AGENT_ID; for an operator-directed reconcile merge, `env -u OVERDECK_AGENT_ID git commit/push` lets the guard pass on its own context-check (never `--no-verify`).
 
+## RUN-58 tick 151 (2026-07-08) — 🟢 RED MAIN RESOLVED: PR #2494 green + admin-merged (ad58ee3283); PAN-2490 closing; filed ci-green-skip follow-up PAN-2495
+
+**🟢 RED MAIN RESOLVED.** PR #2494 (strike matrix fix) went fully green — **test pass 8m10s**, all checks pass, CLEAN — and **admin-merged** (red-main unblock exception). Main head `ad58ee3283 fix(no-loss): register ship-log route in no_loss_matrix (pan-2490) (#2494)`; matrix entry confirmed on main (no-loss-matrix.ts:274). Both no-loss surfaces now fixed. Main CI queued on the merge commit — confirm green next tick.
+- **PAN-2490 close** backgrounded (`pan close --force`).
+- **Filed PAN-2495** (ci-green-skip follow-up): PAN-2487's `ci-green merge skip` let a PR with a red REQUIRED check (the no-loss `test` job) land on main. Root-fix: skip may only apply to non-required checks; the no-loss audit is a required blocking gate; add a regression test that an unregistered issues route is mergeStateStatus-blocked.
+- **RECOVERY COST:** red main `8797566e2d`→`ad58ee3283`, ~45min, 3 ticks, strike PAN-2490 (+ one wedged→re-activate cycle), PR #2494. Root = PAN-2487 unregistered route + ci-green-skip bypass.
+- **RESUME (next tick, after main green):** PAN drains (PAN-1644 #2480, `pan review pending --ready`), MIN report, PAN-2445 watch, B3/PAN-2167 status.
+
 ## RUN-58 tick 150 (2026-07-08) — 🔴→🟡 RED MAIN: strike PUSHED the matrix fix → PR #2494 created (MERGEABLE), CI running → admin-merge on green
 
 **Strike PAN-2490 PUSHED the fix.** `strike/pan-2490` HEAD = `cec0b95ae8 fix(no-loss): register ship-log route in no_loss_matrix (pan-2490)`; matrix entry confirmed (`no-loss-matrix.ts:274 { surface: 'GET /api/issues/:id/ship-log', … door: 'Ship log / ship view surface' }`). Strike replied "pushed strike/pan-2490".
