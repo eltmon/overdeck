@@ -7,8 +7,8 @@ The gate is deterministic and scriptable. It decides whether a bundle is OKF-con
 | Exit | Meaning |
 | --- | --- |
 | 0 | No conformance errors. |
-| 1 | Lint findings only, or strict mode promoted lint findings. |
-| 2 | Conformance errors. |
+| 1 | Lint findings only. |
+| 2 | Conformance errors, or strict mode promoted lint findings. |
 
 ## ERROR Codes
 
@@ -29,4 +29,4 @@ The gate is deterministic and scriptable. It decides whether a bundle is OKF-con
 
 ## Diff-Lint Rule
 
-`diff_lint.py` compares base and head. Pre-existing lint findings do not block. New conformance errors always block. New lint findings block only when the caller asks for strict behavior.
+`diff_lint.py` compares base and head. Pre-existing findings do not block. New lint findings exit 1. New conformance errors exit 2.
