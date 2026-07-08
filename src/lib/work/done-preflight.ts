@@ -132,7 +132,6 @@ async function listBeadsByStatus(
 
 function getNonStatePlaneStatusLines(porcelain: string): string[] {
   return porcelain
-    .trim()
     .split('\n')
     .map((line) => line.trimEnd())
     .filter(Boolean)

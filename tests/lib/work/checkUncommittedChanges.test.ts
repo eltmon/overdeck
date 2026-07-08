@@ -73,7 +73,7 @@ describe('checkUncommittedChanges', () => {
     mkdirSync(join(tempDir, '.git'));
     mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
       cb(null, {
-        stdout: '?? .pan/records/pan-2167.json\nMM .pan/test/result.json\n',
+        stdout: ' M .pan/records/pan-2167.json\nMM .pan/test/result.json\n',
         stderr: '',
       });
     });
