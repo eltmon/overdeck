@@ -217,6 +217,14 @@ Operator: primary local main diverged (20 bot chore(state) commits ahead / 6 beh
 - **LOOSE ENDS for operator:** (1) PAN-1644 draft untracked; (2) scratch has the primary's lifecycle-restart.ts alt-implementation if worth comparing; (3) freshly-dirty beads = normal ongoing bot writes.
 - REUSABLE: flywheel CANNOT commit/push code even via merge — `guard-flywheel-orchestrator-commit.sh` (pre-commit + pre-push) gates on OVERDECK_AGENT_ID; for an operator-directed reconcile merge, `env -u OVERDECK_AGENT_ID git commit/push` lets the guard pass on its own context-check (never `--no-verify`).
 
+## RUN-58 tick 139 (2026-07-07) — A8/PAN-2297 slipped a 3rd time — merge-worker self-writes the record that blocks it (PAN-2167 core deadlock); main green; escalated
+
+**MAIN GREEN (`1d6a7a12a7`).** No red main.
+- **A8/PAN-2297 (#2482) slipped again at the 02:15 window** — the auto-merge worker fired, found the PR ready, and **wrote `chore: update PAN-2297 review record` (02:17:23)** to refresh review status; that re-triggered CI (lint+test pending) → UNSTABLE → merge couldn't complete. **This is the PAN-2167 deadlock in its purest form: the act of attempting the merge pushes the record that blocks the merge.** #2482 now carries 6 record-pushes (01:31 ×2, 01:33, 01:51, 01:55, 02:17). build/clean-install/flake already green on the 02:17 commit; lint+test re-running (~02:26).
+- **DISCIPLINE learned:** do NOT re-schedule while CI is pending — scheduling fires the worker into an UNSTABLE PR, which regenerates the record push. Wait for FULL green + converged record (no pending write), then schedule ONCE. B2/PAN-2426 escaped this identical loop only when the record finally converged (nothing left to update → merge attempt found it fresh → landed ~40min). A8 is losing that race; each of my schedules has been the churn engine.
+- **ESCALATED to operator (openQuestion):** A8 is provably clean-underneath (all real CI green every cycle) — the ONLY blocker is self-inflicted record-push re-CI. Two clean escapes: (a) authorize **B3/PAN-2167** (permanent fix — stops record pushes onto rfm PR branches) or (b) operator hand-merge #2482 now. I will keep the convergence bet running (wait-green → schedule once) but this is the dominant cost of the run.
+- PAN-2468 (OKF) working not-ready. M7/MIN-729 verifying. MIN-865/861 rfm — report only (UAT-held). PAN-2445 clean.
+
 ## RUN-58 tick 138 (2026-07-07) — ★ A8/PAN-2297 settled CLEAN + all-CI-green → SCHEDULED again (#2482, id 34, mergeAt 02:15); main green
 
 **MAIN GREEN (`1d6a7a12a7`).** No red main.
