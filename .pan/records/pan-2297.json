@@ -29,13 +29,13 @@
   },
   "pipeline": {
     "issueId": "PAN-2297",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-08T01:09:33.352Z",
+    "updatedAt": "2026-07-08T01:11:51.569Z",
     "blockerReasons": [
       {
         "type": "merge_conflict",
@@ -49,7 +49,6 @@
       }
     ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2482",
-    "reviewedAtCommit": "f10d394daf193102f72494a95069720ae1f3c7ee",
     "lastVerifiedCommit": "f10d394daf193102f72494a95069720ae1f3c7ee"
   },
   "closeOut": {
@@ -57,15 +56,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 4932757,
-            "output": 8223,
-            "cacheRead": 4359552,
+            "input": 5196800,
+            "output": 8560,
+            "cacheRead": 4537856,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 23394490,
-            "output": 52071,
-            "cacheRead": 22121728,
+            "input": 24709345,
+            "output": 54108,
+            "cacheRead": 23418112,
             "cacheWrite": 0
           },
           "unknown": {
@@ -124,15 +123,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 4932757,
-          "output": 8223,
-          "cacheRead": 4359552,
+          "input": 5196800,
+          "output": 8560,
+          "cacheRead": 4537856,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 23715140,
-          "output": 59888,
-          "cacheRead": 23099648,
+          "input": 25029995,
+          "output": 61925,
+          "cacheRead": 24396032,
           "cacheWrite": 0
         },
         "unknown": {
@@ -167,8 +166,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 55.61669,
-        "pricingAsOf": "2026-07-08T01:09:33.490Z"
+        "usd": 56.418347000000004,
+        "pricingAsOf": "2026-07-08T01:11:51.624Z"
       }
     },
     "merges": [],
@@ -178,5 +177,5 @@
     "slotAssignments": []
   },
   "created": "2026-07-07T23:25:44.874Z",
-  "updated": "2026-07-08T01:09:33.499Z"
+  "updated": "2026-07-08T01:11:51.630Z"
 }
