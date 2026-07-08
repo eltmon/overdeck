@@ -217,6 +217,14 @@ Operator: primary local main diverged (20 bot chore(state) commits ahead / 6 beh
 - **LOOSE ENDS for operator:** (1) PAN-1644 draft untracked; (2) scratch has the primary's lifecycle-restart.ts alt-implementation if worth comparing; (3) freshly-dirty beads = normal ongoing bot writes.
 - REUSABLE: flywheel CANNOT commit/push code even via merge — `guard-flywheel-orchestrator-commit.sh` (pre-commit + pre-push) gates on OVERDECK_AGENT_ID; for an operator-directed reconcile merge, `env -u OVERDECK_AGENT_ID git commit/push` lets the guard pass on its own context-check (never `--no-verify`).
 
+## RUN-58 tick 156 (2026-07-08) — 🔴→🟡 RED MAIN: strike PAN-2496 pushed clean dup-removal (count→1) → PR #2497 MERGEABLE, CI running → admin-merge on green
+
+**Strike PAN-2496 executed cleanly (no wedge).** Pushed `strike/pan-2496 = 8fd0b02c38 Fix duplicate ship-log no-loss matrix entry` on top of current main; ship-log count = **1** (dup removed). Faster than PAN-2490 (no re-tell needed).
+- **Opened PR #2497** (strike/pan-2496 → main). mergeable=MERGEABLE, mergeState=UNSTABLE (CI just started, all pending). **Next: wait #2497 CI green (esp. test) → `gh pr merge 2497 --squash --admin` (red-main unblock exception) → main green → `pan close PAN-2496 --force`.**
+- After green: comment PAN-2495 with the UAT-assembler-must-verify-against-main-tip finding (2 red mains in one hour from this class).
+- (Strike pane shows a codex rate-limit model-switch dialog — irrelevant; strike's work is done, flywheel owns the merge.)
+- PAN-2468/2485/2322 in flight. MIN-865/861 rfm report-only.
+
 ## RUN-58 tick 155 (2026-07-08) — 🔴 RED MAIN: strike PAN-2496 WORKING (not wedged) — has fix locally (ahead 1), verifying typecheck+test before push
 
 **🔴 RED MAIN (`e51dd2defe`) — recovery in progress.** Strike PAN-2496 is actively working (6m+, not wedged like PAN-2490): "strike/pan-2496 is already a direct child of origin/main, nothing to rebase; running npm run typecheck, then the full test command." Branch `strike/pan-2496` is **ahead 1** (dup-removal commit made locally) but NOT pushed yet — it's verifying before push. Good behaviour; no re-tell needed.
