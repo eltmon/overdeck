@@ -30,7 +30,7 @@ const GLOBAL_CONFIG_PATH = join(homedir(), '.overdeck', 'config.yaml');
 
 type SystemHealthSeverity = 'normal' | 'warning' | 'critical';
 
-interface SystemHealthThresholds {
+export interface SystemHealthThresholds {
   memoryAvailableWarningBytes: number;
   memoryAvailableCriticalBytes: number;
   swapUsedWarningPercent: number;
@@ -41,7 +41,7 @@ interface SystemHealthThresholds {
   overcommitCriticalPercent: number;
 }
 
-interface ProcMemorySnapshot {
+export interface ProcMemorySnapshot {
   memTotal: number;
   memAvailable: number;
   memFree: number;
@@ -329,7 +329,7 @@ async function readProcMemoryDarwin(): Promise<ProcMemorySnapshot> {
   };
 }
 
-async function readProcMemory(): Promise<ProcMemorySnapshot> {
+export async function readProcMemory(): Promise<ProcMemorySnapshot> {
   return platform() === 'darwin' ? readProcMemoryDarwin() : readProcMemoryLinux();
 }
 
