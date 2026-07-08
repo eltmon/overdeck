@@ -183,22 +183,42 @@ export class VBriefMergeConflictError extends Error {
   }
 }
 
+export function normalizeVBriefEnvelope<T>(parsed: T): T {
+  if (!parsed || typeof parsed !== 'object') return parsed;
+  const candidate = parsed as Record<string, unknown>;
+  if ('xBRIEFInfo' in candidate && !('vBRIEFInfo' in candidate)) {
+    const { xBRIEFInfo, ...rest } = candidate;
+    return { vBRIEFInfo: xBRIEFInfo, ...rest } as T;
+  }
+  return parsed;
+}
+
+export function serializeVBriefDocument(doc: { vBRIEFInfo: { version: string } }): string {
+  const version = Number.parseFloat(doc.vBRIEFInfo.version);
+  if (Number.isFinite(version) && version >= 0.7) {
+    const { vBRIEFInfo, ...rest } = doc;
+    return JSON.stringify({ xBRIEFInfo: vBRIEFInfo, ...rest }, null, 2);
+  }
+  const legacyDocument = doc;
+  return JSON.stringify(legacyDocument, null, 2);
+}
+
 export function readPlanSync(planPath: string): VBriefDocument {
   const raw = readFileSync(planPath, 'utf-8');
   if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {
     throw new VBriefMergeConflictError(planPath);
   }
-  const parsed = JSON.parse(raw);
+  const parsed = normalizeVBriefEnvelope(JSON.parse(raw));
 
-  // vBRIEF v0.5/v0.6 requires exactly two top-level keys: vBRIEFInfo and plan
+  // vBRIEF/xBRIEF requires an info envelope and plan top-level key.
   if (parsed.vBRIEFInfo && parsed.plan) {
     return parsed as VBriefDocument;
   }
 
   // Non-spec format — reject with helpful error
   throw new Error(
-    `Invalid vBRIEF format in ${planPath}: missing 'vBRIEFInfo' and/or 'plan' top-level keys. ` +
-    `vBRIEF v0.5/v0.6 requires exactly { "vBRIEFInfo": { "version": "0.5" or "0.6" }, "plan": { ... } }. ` +
+    `Invalid vBRIEF format in ${planPath}: missing 'vBRIEFInfo' or 'xBRIEFInfo' and/or 'plan' top-level keys. ` +
+    `vBRIEF/xBRIEF v0.5-v0.8 requires { "vBRIEFInfo" or "xBRIEFInfo": { "version": "0.5" through "0.8" }, "plan": { ... } }. ` +
     `See docs/VBRIEF.md for the correct format.`
   );
 }
@@ -462,12 +482,12 @@ export const readPlan = (
         new VBriefInvalidFormatError({ planPath, reason: `invalid JSON: ${(cause as Error).message}` }),
       );
     }
-    const obj = parsed as { vBRIEFInfo?: unknown; plan?: unknown };
+    const obj = normalizeVBriefEnvelope(parsed) as { vBRIEFInfo?: unknown; plan?: unknown };
     if (!obj || !obj.vBRIEFInfo || !obj.plan) {
       return yield* Effect.fail(
         new VBriefInvalidFormatError({
           planPath,
-          reason: `missing 'vBRIEFInfo' and/or 'plan' top-level keys`,
+          reason: `missing 'vBRIEFInfo' or 'xBRIEFInfo' and/or 'plan' top-level keys`,
         }),
       );
     }

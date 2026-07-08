@@ -17,7 +17,7 @@ import {
   type VBriefLifecycleDir,
 } from './lifecycle.js';
 import type { VBriefDocument } from './types.js';
-import { VBriefInvalidFormatError, VBriefMergeConflictTaggedError, type VBriefReadError } from './io.js';
+import { normalizeVBriefEnvelope, VBriefInvalidFormatError, VBriefMergeConflictTaggedError, type VBriefReadError } from './io.js';
 import { FsError } from '../errors.js';
 import { PAN_DIRNAME, PAN_SPECS_DIRNAME, isPanSpecStatus } from '../pan-dir/types.js';
 
@@ -185,7 +185,7 @@ export const readVBriefDocument = (
     }
     let parsed: unknown;
     try {
-      parsed = JSON.parse(raw);
+      parsed = normalizeVBriefEnvelope(JSON.parse(raw));
     } catch (cause) {
       return yield* Effect.fail(
         new VBriefInvalidFormatError({ planPath: path, reason: `invalid JSON: ${(cause as Error).message}` }),
@@ -196,7 +196,7 @@ export const readVBriefDocument = (
       return yield* Effect.fail(
         new VBriefInvalidFormatError({
           planPath: path,
-          reason: `missing 'vBRIEFInfo' and/or 'plan' top-level keys`,
+          reason: `missing 'vBRIEFInfo' or 'xBRIEFInfo' and/or 'plan' top-level keys`,
         }),
       );
     }

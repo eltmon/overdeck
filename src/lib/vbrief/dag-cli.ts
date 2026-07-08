@@ -25,7 +25,7 @@ import {
   type TaskCommandOptions,
   type TaskOperationResult,
 } from './dag.js';
-import { findPlanSync, readWorkspacePlanSync } from './io.js';
+import { findPlanSync, normalizeVBriefEnvelope, readWorkspacePlanSync, serializeVBriefDocument } from './io.js';
 import {
   getProjectConfigFromWorkspacePath,
   resolveProjectForIssue,
@@ -95,13 +95,13 @@ function releasePlanWriter(planPath: string, writerId: string): void {
 }
 
 function readPlanFile(planPath: string): VBriefDocument {
-  return JSON.parse(readFileSync(planPath, 'utf-8')) as VBriefDocument;
+  return normalizeVBriefEnvelope(JSON.parse(readFileSync(planPath, 'utf-8'))) as VBriefDocument;
 }
 
 function writePlanFileAtomic(planPath: string, doc: VBriefDocument): void {
   mkdirSync(dirname(planPath), { recursive: true });
   const tmp = `${planPath}.${process.pid}.${Date.now()}.tmp`;
-  writeFileSync(tmp, JSON.stringify(doc, null, 2), 'utf-8');
+  writeFileSync(tmp, serializeVBriefDocument(doc), 'utf-8');
   renameSync(tmp, planPath);
 }
 

@@ -287,13 +287,13 @@ When discovery is complete:
 
 ### vBRIEF Plan Format (REQUIRED)
 
-The plan file MUST conform to vBRIEF v0.6 spec (https://github.com/deftai/vBRIEF).
-It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
+The plan file MUST conform to xBRIEF v0.8 spec (https://github.com/deftai/xBRIEF).
+It MUST have exactly two top-level keys: `xBRIEFInfo` and `plan`.
 
 ```json
 {
-  "vBRIEFInfo": {
-    "version": "0.6",
+  "xBRIEFInfo": {
+    "version": "0.8",
     "created": "<ISO 8601 timestamp>",
     "author": "overdeck/{{VERSION}}",
     "description": "Plan for {{ISSUE_ID}}: <issue title>"
@@ -305,7 +305,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
     "uid": "<generate a UUID v4>",
     "author": "{{MODEL_AUTHOR}}",
     "sequence": 1,
-    "created": "<ISO 8601 timestamp — same as vBRIEFInfo.created>",
+    "created": "<ISO 8601 timestamp — same as xBRIEFInfo.created>",
     "updated": "<ISO 8601 timestamp — same as created>",
     "references": [
       { "uri": "{{ISSUE_URL}}", "label": "{{ISSUE_ID}}", "type": "issue" }{{PRD_REFERENCES}}
@@ -358,7 +358,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
 ```
 
 **CRITICAL vBRIEF rules:**
-- The file MUST have `vBRIEFInfo` and `plan` as the ONLY top-level keys
+- The file MUST have `xBRIEFInfo` and `plan` as the ONLY top-level keys
 - `plan.id` MUST be the issue ID in lowercase (e.g., "{{ISSUE_ID_LOWER}}")
 - `plan.uid` MUST be a freshly generated UUID v4
 - Do NOT use `issue`, `issueId`, or `issue_id` — use `plan.id`
