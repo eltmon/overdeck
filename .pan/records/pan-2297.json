@@ -83,9 +83,9 @@
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "verifying",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-08T02:17:16.832Z",
+    "updatedAt": "2026-07-08T03:57:09.409Z",
     "testNotes": "typecheck passed; lint passed (skills, prompts, file-size, source-introspection, no-coderabbit-merge-gate, circular, ratchet-audit, quarantine-audit); tests passed: file-size-reconcile.test.ts (3/3), uat-promote.test.ts (10/10), uat-promote-baseline.test.ts (1/1 real-git integration reproducing PAN-2296). No browser UAT required — acceptance criteria are backend/git/CI only.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2482",
     "reviewedAtCommit": "272061e8ce421bc5984ef00abbc8501c5ab78341",
@@ -97,15 +97,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 7779459,
-            "output": 11408,
-            "cacheRead": 6915456,
+            "input": 7957645,
+            "output": 12037,
+            "cacheRead": 7053312,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 36390557,
-            "output": 71918,
-            "cacheRead": 34365952,
+            "input": 37011301,
+            "output": 75911,
+            "cacheRead": 34975104,
             "cacheWrite": 0
           },
           "unknown": {
@@ -164,15 +164,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 7779459,
-          "output": 11408,
-          "cacheRead": 6915456,
+          "input": 7957645,
+          "output": 12037,
+          "cacheRead": 7053312,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 36711207,
-          "output": 79735,
-          "cacheRead": 35343872,
+          "input": 37331951,
+          "output": 83728,
+          "cacheRead": 35953024,
           "cacheWrite": 0
         },
         "unknown": {
@@ -207,8 +207,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 66.093427,
-        "pricingAsOf": "2026-07-08T02:17:16.990Z"
+        "usd": 66.575753,
+        "pricingAsOf": "2026-07-08T03:57:09.432Z"
       }
     },
     "merges": [
@@ -221,5 +221,5 @@
     "finalizedAt": "2026-07-08T01:15:23.672Z"
   },
   "created": "2026-07-07T23:25:44.874Z",
-  "updated": "2026-07-08T02:17:17.026Z"
+  "updated": "2026-07-08T03:57:09.433Z"
 }

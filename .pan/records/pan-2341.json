@@ -93,9 +93,9 @@
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "failed",
-    "mergeStatus": "verifying",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T11:46:16.047Z",
+    "updatedAt": "2026-07-08T03:57:07.404Z",
     "reviewNotes": "review passed; committed dynamic import fix verified",
     "testNotes": "typecheck PASSED, lint PASSED, focused PAN-2341 tests PASSED (6 files, 24 tests). Full npm test FAILED: 12 test files failed / 8 tests failed. Four failures are deterministic regressions introduced by PAN-2341: src/lib/cloister/advancing-selfheal.ts imports loadReviewStatuses from ../review-status.js and logDeaconEventSync from ../persistent-logger.js at the top level, and src/lib/cloister/deacon.ts imports advancing-selfheal.ts at the top level. Existing tests that partially mock those modules now fail to load with 'No <export> export is defined on the ... mock'. Affected files: src/lib/cloister/__tests__/deacon-auto-closeout.test.ts, tests/unit/lib/cloister/guard-advancing-dispatch.test.ts, tests/unit/dashboard/server/routes/merge-reconciliation.test.ts. Eight additional tests timed out under full-suite parallel load but pass in isolation, indicating resource contention rather than code defects. UAT not required: PRD explicitly states 'Browser/Playwright verification — backend-only change.' Fix: either update the partial mocks to include loadReviewStatuses/logDeaconEventSync, or make advancing-selfheal.ts imports lazy inside the patrol/boot call sites.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -186,9 +186,9 @@
         },
         "work": {
           "unknown": {
-            "input": 42819746,
-            "output": 85569,
-            "cacheRead": 40600704,
+            "input": 43622156,
+            "output": 85815,
+            "cacheRead": 41227520,
             "cacheWrite": 0
           }
         }
@@ -207,9 +207,9 @@
           "cacheWrite": 544156
         },
         "unknown": {
-          "input": 50582505,
-          "output": 102906,
-          "cacheRead": 47835520,
+          "input": 51384915,
+          "output": 103152,
+          "cacheRead": 48462336,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -226,8 +226,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 50.027563,
-        "pricingAsOf": "2026-07-07T11:46:16.104Z"
+        "usd": 51.086457,
+        "pricingAsOf": "2026-07-08T03:57:07.434Z"
       }
     },
     "merges": [
@@ -236,5 +236,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-07T10:53:20.710Z",
-  "updated": "2026-07-07T11:46:16.121Z"
+  "updated": "2026-07-08T03:57:07.434Z"
 }

@@ -217,6 +217,32 @@ Operator: primary local main diverged (20 bot chore(state) commits ahead / 6 beh
 - **LOOSE ENDS for operator:** (1) PAN-1644 draft untracked; (2) scratch has the primary's lifecycle-restart.ts alt-implementation if worth comparing; (3) freshly-dirty beads = normal ongoing bot writes.
 - REUSABLE: flywheel CANNOT commit/push code even via merge — `guard-flywheel-orchestrator-commit.sh` (pre-commit + pre-push) gates on OVERDECK_AGENT_ID; for an operator-directed reconcile merge, `env -u OVERDECK_AGENT_ID git commit/push` lets the guard pass on its own context-check (never `--no-verify`).
 
+## RUN-58 tick 148 (2026-07-08) — 🔴 RED MAIN: confirmed test-job fail (run 28916303552); strike PAN-2490 directed to land the missing NO_LOSS_MATRIX entry (operator-engaged)
+
+**🔴 RED MAIN (`14e35a1987`, CI test job = failure, run 28916303552).** Operator confirmed my tick-147 read: the direct-to-main partial fix did NOT green CI — `NO_LOSS_MATRIX` still missing `GET /api/issues/:id/ship-log`.
+- **State:** main has the `issues-no-loss.test.ts` half (via bypass-flow commit 14e35a1987). Strike `strike/pan-2490` is ahead-1/behind-1, unpushed, and was about to hand off WITHOUT the matrix entry (it correctly refused to close). The ONLY remaining failure: no `NO_LOSS_MATRIX` entry in `tests/unit/lib/overdeck/no-loss-matrix.ts`.
+- **ACTION (P0 red-main exception to the no-pan-tell norm — sanctioned delivery door, operator-engaged):** `pan tell pan-2490` with the exact remaining step — rebase onto origin/main, add ONLY the `NO_LOSS_MATRIX[GET /api/issues/:id/ship-log]` entry, `npm test -- no-loss-matrix issues-no-loss` green, commit + push `strike/pan-2490`, reply to flywheel. Strike was already independently re-pulling the failure when the message landed.
+- **Next:** on strike push → flywheel `gh pr create --head strike/pan-2490 --base main` → merge on green → close PAN-2490 → main green. Then file the PAN-2487 ci-green-merge-skip bypass follow-up.
+- All drains/MIN-report/PAN-2445-watch DEFERRED until main green. M7/MIN-729 verifying; PAN-1644 UNSTABLE (secondary).
+
+## RUN-58 tick 147 (2026-07-08) — 🔴 RED MAIN still: fix on main (14e35a1987) is PARTIAL — only issues-no-loss.test.ts, no-loss-matrix.ts entry MISSING → will re-red; strike polling; direct-to-main bypass actor racing
+
+**🔴 RED MAIN not yet resolved.** Main advanced `8797566e2d → 40b138a11e → 14e35a1987` via **direct-to-main bot commits** (`40b138a11e feat(tree)… PAN-2487 follow-up`, `14e35a1987 test(routes): add ship-log to no-loss route matrix (PAN-2490 red-main fix)`) — an operator-adjacent bypass-orchestration flow landing PAN-2487 fixes directly, racing my strike.
+- **The fix is INCOMPLETE.** `14e35a1987` touched only `tests/unit/dashboard/routes/issues-no-loss.test.ts` (3 lines: expectedRoutes + 29→30). The SECOND failing test — `tests/unit/lib/overdeck/no-loss-matrix.test.ts:95` — needs a `NO_LOSS_MATRIX` entry in `tests/unit/lib/overdeck/no-loss-matrix.ts`. **Verified: ship-log is NOT in that matrix on main.** So the `test` job will FAIL again on 14e35a1987 → main stays red.
+- **Strike PAN-2490 (codex/gpt-5.5) is only polling CI** — never pushed to `strike/pan-2490`, believes its fix is complete. It made the partial fix (or the bypass flow did) and is waiting for a green that won't come until the matrix entry lands.
+- **Plan:** watch short. When `test` fails on 14e35a1987, the strike (live agent) should re-engage and add the matrix entry — OR the bypass flow lands it. If neither adds `NO_LOSS_MATRIX[ship-log]` within a cycle, escalate (the red-main fix is stuck half-done). Not PRing/admin-merging (fix already on main path); not micro-managing the strike.
+- PAN-1644 (#2480) UNSTABLE (secondary). M7/MIN-729 verifying. MIN-865/861 rfm report-only. B3/PAN-2167 unauthorized.
+
+## RUN-58 tick 146 (2026-07-07) — 🔴 RED MAIN P0: PAN-2487 ship-log route broke no-loss audit (29→30 routes) → filed PAN-2490 + STRUCK
+
+**🔴 RED MAIN (`8797566e2d`, CI test job = failure).** Real failure, not a flake. Two **no-loss audit** tests fail deterministically:
+- `tests/unit/dashboard/routes/issues-no-loss.test.ts:73` — keeps all 29 issuesRouteLayer registrations (now 30, new route `unexpected`).
+- `tests/unit/lib/overdeck/no-loss-matrix.test.ts:95` — every HTTP route present in matrix (new route `missing`).
+- **Root cause:** PAN-2487 (`a0675fcd98 feat(dashboard): ship view … ci-green merge skip …`) added `GET /api/issues/:id/ship-log` (`src/dashboard/server/routes/issues.ts:246`) WITHOUT registering it in the two locked no-loss surfaces. Fix is purely additive: add the route to `expectedRoutes` + bump `toBe(29)→toBe(30)` in issues-no-loss.test.ts, and add a `NO_LOSS_MATRIX` entry in no-loss-matrix.ts.
+- **ACTION: filed PAN-2490 + `pan strike PAN-2490`** (branch `strike/pan-2490`, codex/gpt-5.5). Strike fixes + pushes → flywheel `gh pr create --head strike/pan-2490 --base main` → merge when green.
+- **⚠ META-CONCERN (follow-up, not P0):** PAN-2487 introduced a `ci-green merge skip` and likely used it to merge itself while these no-loss tests were red — a gate bypassing its own CI-green requirement landed a red-main change. File separately once main is green.
+- PAN-1644 (#2480) back to UNSTABLE on record churn (`chore: sync pan-1644 passed test status` 03:42) — secondary to red-main. M7/MIN-729 verifying. MIN-865/861 rfm report-only. B3/PAN-2167 unauthorized.
+
 ## RUN-58 tick 145 (2026-07-07) — PAN-1644 got NEW code (ship-log endpoint) — back in flight, not just record churn → wait CI; main advancing green (11d0b8ba4d)
 
 **Main advancing normally** (`867d33ac58 → 11d0b8ba4d` chore(state) batch; PAN-2487 went green + superseded). CI in_progress on 11d0b8ba4d — no red.
