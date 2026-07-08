@@ -37,6 +37,7 @@ const EXPECTED_ISSUES_ROUTES = [
   'GET /api/issues/:id/check-runs',
   'GET /api/issues/:id/discussions',
   'GET /api/issues/:id/costs',
+  'GET /api/issues/:id/ship-log',
   'GET /api/issues/resource-allocated',
   'GET /api/issues/:id/resource-details',
 ] as const;

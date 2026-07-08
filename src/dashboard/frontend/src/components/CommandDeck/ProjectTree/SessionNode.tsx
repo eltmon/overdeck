@@ -137,6 +137,19 @@ const PHASE_COLOR: Record<WorkingPhase, string> = {
 function PhaseIcon({ runtime, dotStatus }: { runtime: AgentRuntimeSnapshot | undefined; dotStatus: StatusDotStatus }) {
   const phase = runtime?.currentTool ? toolNameToPhase(runtime.currentTool) : undefined;
   if (!phase) {
+    // PAN-2487 follow-up (operator ask): a running session must visibly MOVE even
+    // when no per-tool telemetry is flowing — a static dot on an active/thinking
+    // row reads as "not doing anything". Spin a generic loader; the richer
+    // per-phase icon below still wins whenever currentTool is known.
+    if (dotStatus === 'active' || dotStatus === 'thinking') {
+      return (
+        <Loader2
+          size={12}
+          className="animate-spin"
+          style={{ color: 'var(--primary)', flexShrink: 0 }}
+        />
+      );
+    }
     return <StatusDot status={dotStatus} size="sm" />;
   }
   const Icon = PHASE_ICON[phase];
