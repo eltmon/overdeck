@@ -2,10 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   classifyInFlightSlots,
   getFailedMergeBlock,
-  recordStalledSlotRecovery,
+  recordFailedMergeBlock,
   resetSwarmLoopSafetyForTests,
   type CoordinateSwarmSlotsDeps,
 } from '../../../../src/lib/cloister/deacon-swarm.js';
+import { recordStalledSlotRecovery } from '../../../../src/lib/cloister/deacon-swarm-failed-slot-recovery.js';
 import type { ReconciledSlotItem } from '../../../../src/lib/agents/slot-reconcile.js';
 import type { AgentRuntimeSnapshot } from '@overdeck/contracts';
 
@@ -260,7 +261,7 @@ describe('deacon-swarm completion classification', () => {
       stallThresholdMs: 10_000,
     });
 
-    expect(recordStalledSlotRecovery('PAN-2203', classified)).toEqual([]);
+    expect(recordStalledSlotRecovery('PAN-2203', classified, { getFailedMergeBlock, recordFailedMergeBlock })).toEqual([]);
     expect(getFailedMergeBlock('PAN-2203')).toBeUndefined();
   });
 

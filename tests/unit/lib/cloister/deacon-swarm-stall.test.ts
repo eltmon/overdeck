@@ -1,12 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   classifyInFlightSlots,
   dispatchNextWave,
   getFailedMergeBlock,
-  recordStalledSlotRecovery,
+  recordFailedMergeBlock,
   resetSwarmLoopSafetyForTests,
   type CoordinateSwarmSlotsDeps,
 } from '../../../../src/lib/cloister/deacon-swarm.js';
+import {
+  recoverFailedWorkSlots,
+  recordStalledSlotRecovery,
+} from '../../../../src/lib/cloister/deacon-swarm-failed-slot-recovery.js';
 import type { ReconciledSlotItem, SlotReconcileResult } from '../../../../src/lib/agents/slot-reconcile.js';
 import { analyzeSwarmReadiness } from '../../../../src/lib/vbrief/swarm-readiness.js';
 import type { VBriefDocument, VBriefItem } from '../../../../src/lib/vbrief/types.js';
@@ -91,6 +98,8 @@ type StallDispatchDeps = Pick<
   | 'listSlotAssignments'
   | 'listSessionNames'
   | 'slotWorktreeExists'
+  | 'runGitCommand'
+  | 'getSlotBranchAheadCount'
 >;
 
 function dispatchDeps(overrides: Partial<StallDispatchDeps> = {}): StallDispatchDeps {
@@ -107,6 +116,8 @@ function dispatchDeps(overrides: Partial<StallDispatchDeps> = {}): StallDispatch
     listSlotAssignments: vi.fn(() => []),
     listSessionNames: vi.fn(async () => []),
     slotWorktreeExists: vi.fn(() => false),
+    runGitCommand: vi.fn(async () => undefined),
+    getSlotBranchAheadCount: vi.fn(async () => 0),
     ...overrides,
   };
 }
@@ -124,6 +135,8 @@ function reconciled(overrides: Partial<SlotReconcileResult> = {}): SlotReconcile
 }
 
 describe('deacon-swarm stalled-slot detection and duplicate-spawn guard', () => {
+  let tempWorkspace: string | undefined;
+
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-01T00:00:00.000Z'));
@@ -132,6 +145,8 @@ describe('deacon-swarm stalled-slot detection and duplicate-spawn guard', () => 
 
   afterEach(() => {
     resetSwarmLoopSafetyForTests();
+    if (tempWorkspace) rmSync(tempWorkspace, { recursive: true, force: true });
+    tempWorkspace = undefined;
     vi.useRealTimers();
   });
 
@@ -159,7 +174,7 @@ describe('deacon-swarm stalled-slot detection and duplicate-spawn guard', () => 
         stalledForMs: STALL_THRESHOLD_MS + 1,
       }),
     ]);
-    expect(recordStalledSlotRecovery('PAN-2203', classified)).toEqual([
+    expect(recordStalledSlotRecovery('PAN-2203', classified, { getFailedMergeBlock, recordFailedMergeBlock })).toEqual([
       '[swarm] stalled slot 1 (item wi-a) for PAN-2203: recovery required',
     ]);
     expect(getFailedMergeBlock('PAN-2203')).toEqual(expect.objectContaining({
@@ -184,6 +199,88 @@ describe('deacon-swarm stalled-slot detection and duplicate-spawn guard', () => 
     })).resolves.toEqual([
       expect.objectContaining({ lifecycle: 'running' }),
     ]);
+  });
+
+  it('unblocks and redispatches a failed dead-session work slot instead of leaving the swarm stalled', async () => {
+    const plan = doc([{ ...item('wi-a'), status: 'running' }]);
+    const failedSlot = {
+      ...slot(),
+      lifecycle: 'failed' as const,
+      reason: 'vanished-session' as const,
+    };
+    const startingReconcile = reconciled({
+      inFlight: [slot()],
+      branches: [{ slotIndex: 1, branch: 'feature/pan-2203-slot-1', merged: false }],
+      agents: [{ slotIndex: 1, agentId: 'agent-pan-2203-slot-1', status: 'failed', slotItemId: 'wi-a' }],
+    });
+    const fakeDeps = dispatchDeps();
+
+    const recovery = await recoverFailedWorkSlots(
+      'PAN-2203',
+      '/workspace',
+      plan,
+      startingReconcile,
+      analyzeSwarmReadiness(plan),
+      [failedSlot],
+      fakeDeps,
+      { getFailedMergeBlock, recordFailedMergeBlock },
+    );
+
+    expect(recovery.actions).toContain(
+      '[swarm] redispatching failed slot 1 (item wi-a) for PAN-2203: vanished-session',
+    );
+    expect(fakeDeps.applyTaskOperationToPlanFile).toHaveBeenCalledWith(
+      '/workspace/.pan/spec.vbrief.json',
+      {
+        type: 'unblock',
+        itemId: 'wi-a',
+        writerId: 'deacon-swarm',
+        reason: 'Retrying failed swarm slot after vanished-session',
+      },
+      '/workspace',
+    );
+    expect(fakeDeps.clearSlotAssignment).toHaveBeenCalledWith('/workspace', 'PAN-2203', 1, 'wi-a');
+    expect(fakeDeps.runGitCommand).toHaveBeenCalledWith('git worktree remove --force "/workspace-slot-1"', '/workspace');
+    expect(fakeDeps.runGitCommand).toHaveBeenCalledWith('git branch -D "feature/pan-2203-slot-1"', '/workspace');
+
+    await expect(dispatchNextWave(
+      'PAN-2203',
+      '/workspace',
+      recovery.doc ?? plan,
+      recovery.reconciled ?? startingReconcile,
+      analyzeSwarmReadiness(recovery.doc ?? plan),
+      fakeDeps,
+    )).resolves.toEqual(['[swarm] dispatched implementation slot 1 (item wi-a) for PAN-2203']);
+  });
+
+  it('surfaces a failed dead-session slot with unmerged commits instead of deleting its branch', async () => {
+    const plan = doc([{ ...item('wi-a'), status: 'running' }]);
+    tempWorkspace = mkdtempSync(join(tmpdir(), 'pan-2203-failed-slot-'));
+    const fakeDeps = dispatchDeps({
+      getSlotBranchAheadCount: vi.fn(async () => 2),
+    });
+
+    const recovery = await recoverFailedWorkSlots(
+      'PAN-2203',
+      tempWorkspace,
+      plan,
+      reconciled({ inFlight: [slot()] }),
+      analyzeSwarmReadiness(plan),
+      [{ ...slot(), lifecycle: 'failed', reason: 'vanished-session' }],
+      fakeDeps,
+      { getFailedMergeBlock, recordFailedMergeBlock },
+    );
+
+    expect(recovery.actions).toEqual([
+      '[swarm] failed slot 1 (item wi-a) for PAN-2203: dead branch feature/pan-2203-slot-1 has 2 unmerged commit(s) — needs operator attention',
+    ]);
+    expect(fakeDeps.applyTaskOperationToPlanFile).not.toHaveBeenCalled();
+    expect(fakeDeps.runGitCommand).not.toHaveBeenCalled();
+    expect(getFailedMergeBlock('PAN-2203', tempWorkspace)).toEqual(expect.objectContaining({
+      itemId: 'wi-a',
+      slotIndex: 1,
+      note: expect.stringContaining('unmerged commit'),
+    }));
   });
 
   it('advances past a live slot session the registry missed and spawns on the next index (PAN-2213)', async () => {

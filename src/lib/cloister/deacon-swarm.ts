@@ -59,6 +59,11 @@ import {
   type RequestIssueReviewResult,
 } from './deacon-swarm-finalization.js';
 import { gcMergedSlots } from './deacon-swarm-gc.js';
+import {
+  recordStalledSlotRecovery,
+  recoverFailedWorkSlots,
+  resetFailedSlotRecoveryForTests,
+} from './deacon-swarm-failed-slot-recovery.js';
 import { createMinimalIssueRecord, writeSwarmFinalizedAt } from './deacon-swarm-record.js';
 import { fireTieredCommitHooks } from './swarm-tiered-hooks.js';
 
@@ -336,13 +341,24 @@ export async function coordinateSwarmSlots(
         actions.push(`[swarm] ${issueId} slot ${slot.slotIndex} ${slot.lifecycle}${slot.signal ? ` signal: ${slot.signal}` : ''}`);
         if (slot.actions) actions.push(...slot.actions);
       }
-      actions.push(...recordStalledSlotRecovery(issueId, classified, workspace.workspacePath));
-      actions.push(...await mergeReadySlots(issueId, workspace.workspacePath, doc, classified, deps));
-      actions.push(...await gcMergedSlots(issueId, workspace.workspacePath, reconciled.merged, deps));
-      actions.push(...await gcOrphanedSlots(issueId, workspace.workspacePath, reconciled, deps));
+      const failedSlotRecovery = await recoverFailedWorkSlots(issueId, workspace.workspacePath, doc, reconciled, readiness, classified, deps, {
+        getFailedMergeBlock,
+        recordFailedMergeBlock,
+      });
+      actions.push(...failedSlotRecovery.actions);
+      const dispatchReconciled = failedSlotRecovery.reconciled ?? reconciled;
+      const dispatchDoc = failedSlotRecovery.doc ?? doc;
+      const dispatchReadiness = failedSlotRecovery.doc ? analyzeSwarmReadiness(dispatchDoc) : readiness;
+      actions.push(...recordStalledSlotRecovery(issueId, classified, {
+        getFailedMergeBlock,
+        recordFailedMergeBlock,
+      }, workspace.workspacePath));
+      actions.push(...await mergeReadySlots(issueId, workspace.workspacePath, dispatchDoc, classified, deps));
+      actions.push(...await gcMergedSlots(issueId, workspace.workspacePath, dispatchReconciled.merged, deps));
+      actions.push(...await gcOrphanedSlots(issueId, workspace.workspacePath, dispatchReconciled, deps));
       actions.push(...await finalizeSwarmIssueIfComplete(issueId, workspace.workspacePath, spec.document, deps));
       if (dispatchEligible) {
-        actions.push(...await dispatchNextWave(issueId, workspace.workspacePath, doc, reconciled, readiness, deps));
+        actions.push(...await dispatchNextWave(issueId, workspace.workspacePath, dispatchDoc, dispatchReconciled, dispatchReadiness, deps));
       }
       recordSwarmAdvanceSuccess(issueId);
     } catch (err) {
@@ -548,6 +564,7 @@ export function resetSwarmLoopSafetyForTests(): void {
   issueAdvanceFailures.clear();
   failedMergeBlocks.clear();
   slotProgressObservations.clear();
+  resetFailedSlotRecoveryForTests();
   resetSwarmCompletionInferenceForTests();
 }
 
@@ -670,25 +687,6 @@ export async function recoverFailedMergeSlot(
       agents: [],
     }, analyzeSwarmReadiness(retryDoc), deps),
   ];
-}
-
-export function recordStalledSlotRecovery(issueId: string, slots: ClassifiedSwarmSlot[], workspacePath?: string): string[] {
-  const actions: string[] = [];
-  const normalizedIssueId = issueId.toUpperCase();
-  if (getFailedMergeBlock(normalizedIssueId, workspacePath)) return actions;
-
-  const stalled = slots.find(slot => slot.lifecycle === 'stalled');
-  if (!stalled) return actions;
-
-  recordFailedMergeBlock({
-    issueId: normalizedIssueId,
-    itemId: stalled.itemId,
-    slotIndex: stalled.slotIndex,
-    branch: stalled.branch,
-    note: `Slot ${stalled.slotIndex} stalled with no branch commit or pane output progress`,
-  }, workspacePath);
-  actions.push(`[swarm] stalled slot ${stalled.slotIndex} (item ${stalled.itemId}) for ${normalizedIssueId}: recovery required`);
-  return actions;
 }
 
 function writeSwarmFailedMergeBlock(
