@@ -70,6 +70,8 @@ export {
   saveAgentStateSync,
   setAgentPaused,
   setAgentPausedSync,
+  setAgentYieldedSync,
+  clearYieldForResumeSync,
   wipeAgentStateDirs,
   writeAgentStateJsonSync,
   type AgentState,

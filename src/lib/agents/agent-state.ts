@@ -454,6 +454,40 @@ export const setAgentPaused = (
     return state;
   });
 
+/**
+ * PAN-2507: pause an agent as a scheduler YIELD (distinct from an operator
+ * pause). Reuses the pause write path so every no-resume gate protects the
+ * yielded agent, and stamps the yield attribution used for oldest-first resume.
+ */
+function applyAgentYielded(state: AgentState, reason: string): void {
+  applyAgentPaused(state, reason, true);
+  state.yieldedByScheduler = true;
+  state.yieldedAt = new Date().toISOString();
+}
+
+/** PAN-2507: set the yield gate (pause + scheduler attribution) in one write. */
+export function setAgentYieldedSync(agentId: string, reason: string): boolean {
+  const state = getAgentStateSync(agentId);
+  if (!state) return false;
+  applyAgentYielded(state, reason);
+  saveAgentStateSync(state);
+  return true;
+}
+
+/**
+ * PAN-2507: clear a scheduler yield ahead of a resume — drops the pause + yield
+ * attribution (so `resumeAgent`'s pause gate passes) and stamps
+ * `lastYieldResumeAt` to arm the re-yield cooldown, in a single write.
+ */
+export function clearYieldForResumeSync(agentId: string): boolean {
+  const state = getAgentStateSync(agentId);
+  if (!state) return false;
+  applyAgentUnpaused(state);
+  state.lastYieldResumeAt = new Date().toISOString();
+  saveAgentStateSync(state);
+  return true;
+}
+
 function applyAgentUnpaused(state: AgentState): void {
   if (state.stoppedByPause === true) {
     delete state.stoppedByUser;
