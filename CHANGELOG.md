@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Editable per-issue Standing Crew toggle on the issue view (PAN-2383). Operators can turn tiered execution on or off for a single issue after planning; the override is persisted to the per-issue record (`.pan/records/<issue>.json`) and takes precedence over `plan.metadata.tiered_execution` and the global project flag.
+
 ### Changed
 
 - OpenAI model routing now requires Codex/ChatGPT subscription auth through CLIProxy; direct OpenAI API-key fallback is deprecated because api.openai.com is not Anthropic-compatible.
