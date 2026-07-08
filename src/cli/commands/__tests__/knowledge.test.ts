@@ -107,6 +107,7 @@ describe('knowledgeCommand', () => {
       workspace: '/repo/overdeck',
       model: 'gpt-5.5',
       effort: 'high',
+      extraEnvExports: ['export PATH="$HOME/.overdeck/bin:$PATH"'],
       prompt: expect.stringContaining('/okf study "billing flows"'),
     });
     expect(agentMocks.spawnRun.mock.calls[0][2].prompt).toContain('/okf retro');

@@ -37,9 +37,32 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-08T04:00:06.860Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-08T04:01Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-08T04:01:43.849Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T04:05:14.745Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-08T04:06Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-08T04:06:07.519Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-08T04:06:07Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2468\n\nNo production code changed since prior review; mnemos hard dependency and Ollama auto-install blockers remain unresolved\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2468 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/records/pan-2468.json",
@@ -212,18 +235,18 @@
     "recordedAt": "2026-07-08T03:26:46.995Z"
   },
   "created": "2026-07-07T15:47:12.301Z",
-  "updated": "2026-07-08T04:00:53.224Z",
+  "updated": "2026-07-08T04:11:06.593Z",
   "pipeline": {
     "issueId": "PAN-2468",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-08T04:00:53.185Z",
-    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
+    "updatedAt": "2026-07-08T04:11:06.537Z",
+    "reviewNotes": "No production code changed since prior review; mnemos hard dependency and Ollama auto-install blockers remain unresolved",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2488",
-    "lastVerifiedCommit": "25edc27e2668e9aacc149b4fecf66bf909426b59",
+    "lastVerifiedCommit": "e9214f9d087c128a72a6f5a31500de0c60a2364a",
     "reviewRequestedAt": "2026-07-08T03:42:42.522Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -402,21 +425,21 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 42051864,
-            "output": 20763,
-            "cacheRead": 39183104,
+            "input": 43254710,
+            "output": 21589,
+            "cacheRead": 40370816,
             "cacheWrite": 0
           },
           "openai/gpt-5.4-mini": {
-            "input": 39141484,
-            "output": 93819,
-            "cacheRead": 37469568,
+            "input": 43739523,
+            "output": 107919,
+            "cacheRead": 41724928,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 94259471,
-            "output": 209192,
-            "cacheRead": 91252352,
+            "input": 97483034,
+            "output": 214978,
+            "cacheRead": 94202624,
             "cacheWrite": 0
           }
         },
@@ -431,21 +454,21 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 42051864,
-          "output": 20763,
-          "cacheRead": 39183104,
+          "input": 43254710,
+          "output": 21589,
+          "cacheRead": 40370816,
           "cacheWrite": 0
         },
         "openai/gpt-5.4-mini": {
-          "input": 39141484,
-          "output": 93819,
-          "cacheRead": 37469568,
+          "input": 43739523,
+          "output": 107919,
+          "cacheRead": 41724928,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 94259471,
-          "output": 209192,
-          "cacheRead": 91252352,
+          "input": 97483034,
+          "output": 214978,
+          "cacheRead": 94202624,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -456,8 +479,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 93.8908701,
-        "pricingAsOf": "2026-07-08T04:00:53.222Z"
+        "usd": 97.54565235,
+        "pricingAsOf": "2026-07-08T04:11:06.572Z"
       }
     },
     "merges": [

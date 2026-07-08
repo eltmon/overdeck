@@ -123,6 +123,7 @@ export interface SpawnRunOptions {
   allowHost?: boolean;
   registerConversation?: boolean;
   effort?: RoleEffort;
+  extraEnvExports?: string[];
   resumeSessionId?: string;
   flywheelRunId?: string;
   /** 1-based registered slot index for per-item work-agent spawning. */

@@ -112,6 +112,7 @@ export async function knowledgeCommand(issueId: string, options: KnowledgeOption
       workspace: project.projectPath,
       model: options.model,
       effort: options.effort,
+      extraEnvExports: ['export PATH="$HOME/.overdeck/bin:$PATH"'],
       prompt: buildKnowledgePrompt(normalized, options),
     });
 

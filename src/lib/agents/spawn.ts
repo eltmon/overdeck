@@ -297,7 +297,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     promptFile: shouldDeliverPromptViaTmux ? undefined : promptFile,
     promptFileMode: undefined,
     overdeckEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
-    extraEnvExports: flywheelEnvExports(flywheelEnv),
+    extraEnvExports: [...flywheelEnvExports(flywheelEnv), ...(options.extraEnvExports ?? [])],
     baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole, options.effort),
     appendSystemPromptFiles: await claudeSystemPromptFiles(workspace, resolvedHarness),
     sessionId,
