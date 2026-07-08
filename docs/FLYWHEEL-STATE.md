@@ -207,6 +207,16 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-60 tick 7 (2026-07-08) — B3 review BLOCKED (real bug caught 👍) + both B3 agents WEDGED on codex rate-limit modal → nudged (kept gpt-5.5) → reworking; filed PAN-2513; started PAN-2510 (auto-start gap)
+
+**Two things on B3/PAN-2167, not one stall:**
+1. **Review returned BLOCKED with a REAL correctness finding** (review did its job): "source-to-state renames are misclassified as state-plane-only, so a source-file deletion/rename FROM a source path can bypass the clean-tree gate." Review file `.pan/review/agent-pan-2167-review-9b14f53e/review.md`; verdict signaled. So B3 was NOT mergeable — tick-6 deferral to the gate was correct.
+2. **THE STALL:** both work + review gpt-5.5/codex agents were simultaneously wedged on codex's soft "Approaching rate limits → switch to gpt-5.4-mini?" modal — highlighted DEFAULT = downgrade. Agent does no work while it sits there; an unattended stretch = silent indefinite wedge (exactly the operator's "sitting" complaint).
+- **ACTION — unblocked via sanctioned path:** `pan tell agent-pan-2167` delivered the rework scope AND dismissed the modal keeping **gpt-5.5** (footer confirmed `gpt-5.5 default`, NOT mini). Agent immediately went to `Working` on the rework (fix classifier so a rename whose OLD path is a source file + any source deletion still trips the dirty gate; add source→state-rename + source-deletion tests; targeted tests only — full suite fails on sandbox git-EPERM; then pan done for re-review).
+- **Filed PAN-2513** (substrate/velocity): codex rate-limit downgrade modal silently wedges agents; default is a model downgrade the agent can't safely answer. Root fix = suppress/pre-answer the prompt at spawn so codex agents never wedge and never get offered a downgrade. Manual recovery = pan tell (works, not durable).
+- **PAN-2510 STARTED** (`agent-pan-2510` @ 19:30): finalize did NOT auto-start the work agent (finalize→autostart gap) — kicked it manually. Operator-directed docker-leak close-out fix; parallel-safe (not a Lane-B order-book item, so no Lane-B-serial violation).
+- **B4/PAN-2359 still HELD** (spec proposed bab2c75b33; one-Lane-B-in-flight until B3 merges). Main GREEN (66efb00675 CI in_progress; 3554af0af7 + prior greens). HOLDS + 2 operator questions (PAN-1520) unchanged.
+
 ## RUN-60 tick 6 (2026-07-08) — OPERATOR: "handle IN-PIPELINE issues MUCH faster" (dispatch is fine); B3 near-done (healthy multi-bead); started PAN-2510 parallel; MIN pile is the real sitting-work
 
 **OPERATOR PACE FEEDBACK (2026-07-08, ×2):** "be much more aggressive, slow pace unacceptable" → clarified: "NOT about how you put things in the pipeline (dispatch fine) — issues ALREADY IN THE PIPELINE should be handled MUCH faster." So the concern is per-issue CYCLE TIME / stalls, not throughput. My response: tightened cadence 1000s→450s; drive live items straight through; census'd the pipeline.
