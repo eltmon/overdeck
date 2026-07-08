@@ -379,6 +379,12 @@ export interface ResourcesConfig {
   memory_warn_gb?: number;
   /** Available RAM threshold that blocks spawns / marks critical state (GiB) */
   memory_block_gb?: number;
+  /** Available RAM soft reserve used by the memory governor (GiB). */
+  governor_soft_reserve_gb?: number;
+  /** Available RAM hard reserve used by the memory governor (GiB). */
+  governor_hard_reserve_gb?: number;
+  /** Available RAM recovery reserve used by the memory governor (GiB). Must exceed the soft reserve. */
+  governor_recovery_reserve_gb?: number;
   /** Work-agent count threshold that triggers a warning */
   agent_warn_count?: number;
   /** Work-agent count threshold that blocks new spawns */
@@ -810,6 +816,9 @@ export interface NormalizedConfig {
   resources: {
     memoryWarnGb: number;
     memoryBlockGb: number;
+    governorSoftReserveGb: number;
+    governorHardReserveGb: number;
+    governorRecoveryReserveGb: number;
     agentWarnCount: number;
     agentBlockCount: number;
   };

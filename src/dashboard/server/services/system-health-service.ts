@@ -14,6 +14,7 @@ import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { isSmeeConfiguredSync, isSmeeProcessRunningSync } from '../../../lib/smee.js';
 import { listPaneValues } from '../../../lib/tmux.js';
 import { DockerStatsCollector, type ContainerStats } from '../../../lib/docker-stats.js';
+import { defaultGovernorReserveConfig, normalizeGovernorReserveConfig } from '../../../lib/resource-governor.js';
 import { initEventStore } from '../event-store.js';
 
 const execAsync = promisify(exec);
@@ -21,6 +22,7 @@ const DEFAULT_HEALTH_POLL_SECONDS = 15;
 const DEFAULT_RESOURCE_CONFIG = {
   memoryWarnGb: 4,
   memoryBlockGb: 2,
+  ...defaultGovernorReserveConfig(),
   agentWarnCount: 8,
   agentBlockCount: 10,
 };
@@ -208,13 +210,25 @@ export async function readGlobalResourceConfig(): Promise<void> {
     const raw = await readFile(GLOBAL_CONFIG_PATH, 'utf-8');
     const memoryWarnMatch = raw.match(/^\s*memory_warn_gb:\s*(\d+(?:\.\d+)?)\s*$/m);
     const memoryBlockMatch = raw.match(/^\s*memory_block_gb:\s*(\d+(?:\.\d+)?)\s*$/m);
+    const governorSoftReserveMatch = raw.match(/^\s*governor_soft_reserve_gb:\s*(\d+(?:\.\d+)?)\s*$/m);
+    const governorHardReserveMatch = raw.match(/^\s*governor_hard_reserve_gb:\s*(\d+(?:\.\d+)?)\s*$/m);
+    const governorRecoveryReserveMatch = raw.match(/^\s*governor_recovery_reserve_gb:\s*(\d+(?:\.\d+)?)\s*$/m);
     const agentWarnMatch = raw.match(/^\s*agent_warn_count:\s*(\d+(?:\.\d+)?)\s*$/m);
     const agentBlockMatch = raw.match(/^\s*agent_block_count:\s*(\d+(?:\.\d+)?)\s*$/m);
     const pollSecondsMatch = raw.match(/^\s*poll_seconds:\s*(\d+(?:\.\d+)?)\s*$/m);
 
+    const governorReserves = normalizeGovernorReserveConfig({
+      governorSoftReserveGb: resolveFiniteNumber(governorSoftReserveMatch?.[1], DEFAULT_RESOURCE_CONFIG.governorSoftReserveGb),
+      governorHardReserveGb: resolveFiniteNumber(governorHardReserveMatch?.[1], DEFAULT_RESOURCE_CONFIG.governorHardReserveGb),
+      governorRecoveryReserveGb: resolveFiniteNumber(governorRecoveryReserveMatch?.[1], DEFAULT_RESOURCE_CONFIG.governorRecoveryReserveGb),
+    });
+
     next = {
       memoryWarnGb: resolveFiniteNumber(memoryWarnMatch?.[1], DEFAULT_RESOURCE_CONFIG.memoryWarnGb),
       memoryBlockGb: resolveFiniteNumber(memoryBlockMatch?.[1], DEFAULT_RESOURCE_CONFIG.memoryBlockGb),
+      governorSoftReserveGb: governorReserves.governorSoftReserveGb,
+      governorHardReserveGb: governorReserves.governorHardReserveGb,
+      governorRecoveryReserveGb: governorReserves.governorRecoveryReserveGb,
       agentWarnCount: Math.max(1, Math.floor(resolveFiniteNumber(agentWarnMatch?.[1], DEFAULT_RESOURCE_CONFIG.agentWarnCount))),
       agentBlockCount: Math.max(1, Math.floor(resolveFiniteNumber(agentBlockMatch?.[1], DEFAULT_RESOURCE_CONFIG.agentBlockCount))),
     };
@@ -226,6 +240,9 @@ export async function readGlobalResourceConfig(): Promise<void> {
   cachedResourceConfig = {
     memoryWarnGb: resolveFiniteNumber(process.env['PAN_MEMORY_WARN_GB'], next.memoryWarnGb),
     memoryBlockGb: resolveFiniteNumber(process.env['PAN_MEMORY_BLOCK_GB'], next.memoryBlockGb),
+    governorSoftReserveGb: next.governorSoftReserveGb,
+    governorHardReserveGb: next.governorHardReserveGb,
+    governorRecoveryReserveGb: next.governorRecoveryReserveGb,
     agentWarnCount: Math.max(1, Math.floor(resolveFiniteNumber(process.env['PAN_AGENT_WARN_COUNT'], next.agentWarnCount))),
     agentBlockCount: Math.max(1, Math.floor(resolveFiniteNumber(process.env['PAN_AGENT_BLOCK_COUNT'], next.agentBlockCount))),
   };

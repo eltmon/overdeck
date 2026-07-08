@@ -2,6 +2,7 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { defaultBackgroundAiFeatures } from '../background-ai/registry.js';
 import { DEFAULT_TIERED_EXECUTION_CONFIG } from '../agents/tier-table.js';
+import { defaultGovernorReserveConfig } from '../resource-governor.js';
 import { cloneRoles, DEFAULT_ROLES, DEFAULT_WORKHORSES } from './roles.js';
 import type { NormalizedConfig } from './schema.js';
 
@@ -175,6 +176,7 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   resources: {
     memoryWarnGb: 4,
     memoryBlockGb: 2,
+    ...defaultGovernorReserveConfig(),
     agentWarnCount: 8,
     agentBlockCount: 10,
   },

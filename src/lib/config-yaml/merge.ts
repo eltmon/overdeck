@@ -5,6 +5,7 @@ import { resolveModelIdSync } from '../model-capabilities.js';
 import type { ModelId } from '../settings.js';
 import { BACKGROUND_AI_FEATURES } from '../background-ai/registry.js';
 import { DEFAULT_TIERED_EXECUTION_CONFIG, TieredExecutionConfigError, validateTieredExecutionConfig } from '../agents/tier-table.js';
+import { normalizeGovernorReserveConfig } from '../resource-governor.js';
 import { DEFAULT_CONFIG } from './defaults.js';
 import { cloneRoles, DEFAULT_ROLES, DEFAULT_WORKHORSES, mergeRoleConfig, validateRoleModelRefs } from './roles.js';
 import {
@@ -175,6 +176,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     resources: {
       memoryWarnGb: DEFAULT_CONFIG.resources.memoryWarnGb,
       memoryBlockGb: DEFAULT_CONFIG.resources.memoryBlockGb,
+      governorSoftReserveGb: DEFAULT_CONFIG.resources.governorSoftReserveGb,
+      governorHardReserveGb: DEFAULT_CONFIG.resources.governorHardReserveGb,
+      governorRecoveryReserveGb: DEFAULT_CONFIG.resources.governorRecoveryReserveGb,
       agentWarnCount: DEFAULT_CONFIG.resources.agentWarnCount,
       agentBlockCount: DEFAULT_CONFIG.resources.agentBlockCount,
     },
@@ -615,6 +619,14 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       if (typeof config.resources.memory_block_gb === 'number') {
         result.resources.memoryBlockGb = config.resources.memory_block_gb;
       }
+      const governorReserves = normalizeGovernorReserveConfig({
+        governorSoftReserveGb: typeof config.resources.governor_soft_reserve_gb === 'number' ? config.resources.governor_soft_reserve_gb : undefined,
+        governorHardReserveGb: typeof config.resources.governor_hard_reserve_gb === 'number' ? config.resources.governor_hard_reserve_gb : undefined,
+        governorRecoveryReserveGb: typeof config.resources.governor_recovery_reserve_gb === 'number' ? config.resources.governor_recovery_reserve_gb : undefined,
+      });
+      result.resources.governorSoftReserveGb = governorReserves.governorSoftReserveGb;
+      result.resources.governorHardReserveGb = governorReserves.governorHardReserveGb;
+      result.resources.governorRecoveryReserveGb = governorReserves.governorRecoveryReserveGb;
       if (typeof config.resources.agent_warn_count === 'number') {
         result.resources.agentWarnCount = config.resources.agent_warn_count;
       }
