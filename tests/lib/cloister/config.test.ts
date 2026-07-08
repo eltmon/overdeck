@@ -94,6 +94,13 @@ describe('Cloister Configuration', () => {
       expect(intervalSeconds).toBeGreaterThanOrEqual(10);
     });
 
+    it('should default the PAN-2507 preemptive scheduler off with safe anti-thrash bounds', () => {
+      // Opt-in: unset installs keep the static defer-until-attrition behavior.
+      expect(DEFAULT_CLOISTER_CONFIG.concurrency.preemption).toBe(false);
+      expect(DEFAULT_CLOISTER_CONFIG.concurrency.max_yielded).toBe(3);
+      expect(DEFAULT_CLOISTER_CONFIG.concurrency.yield_cooldown_secs).toBe(600);
+    });
+
     it('should have specialist agents configured', () => {
       expect(DEFAULT_CLOISTER_CONFIG.specialists).toBeDefined();
       expect(DEFAULT_CLOISTER_CONFIG.specialists?.merge_agent).toBeDefined();
