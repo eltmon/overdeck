@@ -661,106 +661,6 @@ export async function generateAiTitle(
 
   updateConversationTitle(conversationName, sanitized, 'ai');
   console.log(`[claude-invoke] SUCCESS purpose=conversation-title | model=${CONVERSATION_TITLE_MODEL} | conversation=${conversationName} | outputChars=${sanitized.length}`);
-  scheduleTitleRefinement(conversationName, deps);
-}
-
-const refinementScheduled = new Set<string>();
-
-export function scheduleTitleRefinement(
-  conversationName: string,
-  deps: Pick<ConversationReadDependencies, 'resolveSessionFile'>,
-): void {
-  if (!isBackgroundFeatureEnabled('titleRefinement')) return;
-  if (refinementScheduled.has(conversationName)) return;
-  refinementScheduled.add(conversationName);
-
-  const TIMEOUT_MS = 10 * 60 * 1000;
-  const POLL_INTERVAL_MS = 1500;
-  const startedAt = Date.now();
-
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  let running = false;
-  let done = false;
-
-  const stop = () => {
-    done = true;
-    if (timer) clearTimeout(timer);
-    refinementScheduled.delete(conversationName);
-  };
-
-  async function tick(): Promise<void> {
-    if (done) return;
-    if (running) {
-      timer = setTimeout(tick, POLL_INTERVAL_MS);
-      return;
-    }
-    running = true;
-    try {
-      if (Date.now() - startedAt > TIMEOUT_MS) {
-        console.log(`[title-refine] Timed out waiting for first assistant response in "${conversationName}"`);
-        stop();
-        return;
-      }
-
-      const conv = getConversationByName(conversationName);
-      if (!conv) {
-        stop();
-        return;
-      }
-      if (conv.titleSource !== 'ai') {
-        stop();
-        return;
-      }
-
-      const sessionFile = await deps.resolveSessionFile(conv);
-      if (!sessionFile || !existsSync(sessionFile)) {
-        timer = setTimeout(tick, POLL_INTERVAL_MS);
-        return;
-      }
-
-      const { messages } = await getCachedMessages(sessionFile, false);
-      const firstCompleteAssistant = messages.find(
-        (m) => m.role === 'assistant' && m.completedAt,
-      );
-      if (!firstCompleteAssistant) {
-        timer = setTimeout(tick, POLL_INTERVAL_MS);
-        return;
-      }
-
-      const transcript = serializeConversationTranscript(messages);
-      if (!transcript.trim()) {
-        timer = setTimeout(tick, POLL_INTERVAL_MS);
-        return;
-      }
-
-      console.log(`[claude-invoke] purpose=conversation-title-refine | model=${CONVERSATION_TITLE_MODEL} | conversation=${conversationName} | transcriptChars=${transcript.length}`);
-      const refined = await summarizeTranscriptTitle(transcript, configuredTitleModel());
-      if (!refined) {
-        console.warn(`[title-refine] Model returned empty refined title for "${conversationName}"`);
-        stop();
-        return;
-      }
-
-      const freshConv = getConversationByName(conversationName);
-      if (!freshConv || freshConv.titleSource !== 'ai') {
-        console.log(`[title-refine] Conversation "${conversationName}" no longer eligible (source=${freshConv?.titleSource ?? 'missing'}); skipping`);
-        stop();
-        return;
-      }
-
-      updateConversationTitle(conversationName, refined, 'ai-refined');
-      console.log(`[claude-invoke] SUCCESS purpose=conversation-title-refine | conversation=${conversationName} | title="${refined}"`);
-      stop();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[title-refine] failed for "${conversationName}":`, msg);
-      stop();
-    } finally {
-      running = false;
-    }
-  }
-
-  timer = setTimeout(tick, POLL_INTERVAL_MS);
 }
 
 const MAX_TITLE_LENGTH = 200;
@@ -833,7 +733,7 @@ export async function retitleConversation(
         console.warn(`[conversations] retitle timed out for "${name}"; using deterministic fallback title "${title}"`);
       }
       if (!title) return result({ error: 'Title model returned an empty result' }, 502);
-      updateConversationTitle(name, title, 'ai');
+      updateConversationTitle(name, title, 'ai-explicit');
       console.log(`[claude-invoke] SUCCESS purpose=conversation-retitle | conversation=${name} | title="${title}"`);
       return result({ title });
     } finally {

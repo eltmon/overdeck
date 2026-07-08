@@ -29,6 +29,7 @@ const EXPECTED_ISSUES_ROUTES = [
   'GET /api/issues/:id/beads',
   'POST /api/issues/:id/beads/:beadId/inspect',
   'GET /api/issues/:id/planning-state',
+  'GET /api/issues/:id/ship-log',
   'POST /api/issues/:id/generate-tasks',
   'GET /api/issues/:id/pr',
   'GET /api/issues/:id/pr/diff',
