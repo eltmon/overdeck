@@ -83,12 +83,12 @@
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-08T01:55:16.596Z",
+    "mergeStatus": "verifying",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-08T02:17:16.832Z",
     "testNotes": "typecheck passed; lint passed (skills, prompts, file-size, source-introspection, no-coderabbit-merge-gate, circular, ratchet-audit, quarantine-audit); tests passed: file-size-reconcile.test.ts (3/3), uat-promote.test.ts (10/10), uat-promote-baseline.test.ts (1/1 real-git integration reproducing PAN-2296). No browser UAT required — acceptance criteria are backend/git/CI only.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2482",
-    "reviewedAtCommit": "43fa0a7bd34b6bd90ef9a040d7c2e8f8a69523fb",
+    "reviewedAtCommit": "272061e8ce421bc5984ef00abbc8501c5ab78341",
     "lastVerifiedCommit": "f10d394daf193102f72494a95069720ae1f3c7ee",
     "reviewRequestedAt": "2026-07-08T01:32:20.693Z"
   },
@@ -97,15 +97,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 7664657,
-            "output": 11236,
-            "cacheRead": 6832896,
+            "input": 7779459,
+            "output": 11408,
+            "cacheRead": 6915456,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 35949341,
-            "output": 70212,
-            "cacheRead": 33935744,
+            "input": 36390557,
+            "output": 71918,
+            "cacheRead": 34365952,
             "cacheWrite": 0
           },
           "unknown": {
@@ -164,15 +164,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 7664657,
-          "output": 11236,
-          "cacheRead": 6832896,
+          "input": 7779459,
+          "output": 11408,
+          "cacheRead": 6915456,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 36269991,
-          "output": 78029,
-          "cacheRead": 34913664,
+          "input": 36711207,
+          "output": 79735,
+          "cacheRead": 35343872,
           "cacheWrite": 0
         },
         "unknown": {
@@ -207,8 +207,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 65.772103,
-        "pricingAsOf": "2026-07-08T01:55:16.621Z"
+        "usd": 66.093427,
+        "pricingAsOf": "2026-07-08T02:17:16.990Z"
       }
     },
     "merges": [
@@ -221,5 +221,5 @@
     "finalizedAt": "2026-07-08T01:15:23.672Z"
   },
   "created": "2026-07-07T23:25:44.874Z",
-  "updated": "2026-07-08T01:55:16.626Z"
+  "updated": "2026-07-08T02:17:17.026Z"
 }
