@@ -135,14 +135,14 @@
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-08T02:48:09.922Z",
+    "mergeStatus": "merging",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-08T03:16:17.553Z",
     "reviewNotes": "No blocking findings; focused title hook tests passed",
     "testNotes": "typecheck passed; lint passed (including skills, prompts, file-size, source-introspection, circular, ratchet, quarantine audits); npm test passed (921 test files passed, 8875 tests passed, 4/52 skipped; frontend issueActions tests passed). Browser UAT exercised on workspace dashboard (port 3020): loaded dashboard, opened conversation 20260707-2531, retitled from 'Conversation retitle history and status' to 'PAN-1644 UAT Test Title', and verified the new title propagated to both the conversation header and the left sidebar conversation list.",
     "inspectNotes": "Bead title-changed-event ack: ConversationTitleChangedEvent schema added to DomainEvent union with {conversationName,title,titleSource} payload, reducer case bumps conversationsListRevision by 1 (test confirms 7->8), and updateConversationTitle() emits via getEventStore().emitOnly() (sequence auto-assigned by Omit<DomainEvent,\"sequence\"> signature) wrapped in try/catch so persistence never throws when the event store is uninitialized (both paths unit-tested). All 3 ACs met.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2480",
-    "reviewedAtCommit": "f06ffc23535f605dc4002bfd08bb954afa05caff",
+    "reviewedAtCommit": "8c3b35dacab3848fd5a3c2b20f7f93a5b9ef7abf",
     "lastVerifiedCommit": "c9df3272408f6beb50a1981f57e455335c229a3b",
     "reviewRequestedAt": "2026-07-08T02:07:59.245Z",
     "scopeDrift": {
@@ -260,9 +260,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 5113616,
-            "output": 343207,
-            "cacheRead": 175281408,
+            "input": 5118752,
+            "output": 344155,
+            "cacheRead": 176048384,
             "cacheWrite": 0
           }
         }
@@ -293,15 +293,15 @@
           "cacheWrite": 86241
         },
         "custom/kimi-k2.7-code": {
-          "input": 6237679,
-          "output": 383272,
-          "cacheRead": 196392426,
+          "input": 6242815,
+          "output": 384220,
+          "cacheRead": 197159402,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 69.331206,
-        "pricingAsOf": "2026-07-08T02:48:09.953Z"
+        "usd": 69.485602,
+        "pricingAsOf": "2026-07-08T03:16:17.587Z"
       }
     },
     "merges": [
@@ -328,5 +328,5 @@
     }
   },
   "created": "2026-07-08T02:09:12.766Z",
-  "updated": "2026-07-08T02:48:09.972Z"
+  "updated": "2026-07-08T03:16:17.600Z"
 }
