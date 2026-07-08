@@ -50,27 +50,26 @@
   },
   "pipeline": {
     "issueId": "PAN-1644",
-    "reviewStatus": "pending",
-    "testStatus": "testing",
+    "reviewStatus": "failed",
+    "testStatus": "failed",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
-    "mergeStatus": "failed",
+    "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-08T03:21:28.726Z",
-    "reviewNotes": "No blocking findings; focused title hook tests passed",
-    "testNotes": "typecheck passed; lint passed (including skills, prompts, file-size, source-introspection, circular, ratchet, quarantine audits); npm test passed (921 test files passed, 8875 tests passed, 4/52 skipped; frontend issueActions tests passed). Browser UAT exercised on workspace dashboard (port 3020): loaded dashboard, opened conversation 20260707-2531, retitled from 'Conversation retitle history and status' to 'PAN-1644 UAT Test Title', and verified the new title propagated to both the conversation header and the left sidebar conversation list.",
-    "verificationNotes": "Verification FAILED at test (121785ms):\n\nitial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| tests/unit/lib/overdeck/no-loss-matrix.test.ts > G3 no-loss matrix > AC1/AC2: every enumerated HTTP route is present in the matrix\n FAIL  |root| tests/unit/lib/overdeck/no-loss-matrix.test.ts > G3 no-loss matrix > AC1/AC2: every enumerated HTTP route is present in the matrix\nAssertionError: The following HTTP routes exist in the codebase but have no entry in the\nNO_LOSS_MATRIX.  Add each one to tests/unit/lib/overdeck/no-loss-matrix.ts\nwith an explicit disposition (READ/WRITE/AGGREGATE/RELOCATE/DELETE/OUT_OF_SCOPE)\nand a non-empty door/reason string.\n  missing: GET /api/issues/:id/ship-log: expected [ 'GET /api/issues/:id/ship-log' ] to deeply equal []\n\n- Expected\n+ Received\n\n- []\n+ [\n+   \"GET /api/issues/:id/ship-log\",\n+ ]\n\n ❯ tests/unit/lib/overdeck/no-loss-matrix.test.ts:95:19\n     93|       'and a non-empty door/reason string.',\n     94|       ...missing.map(r => `  missing: ${r}`),\n     95|     ].join('\\n')).toEqual([]);\n       |                   ^\n     96|   });\n     97|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n",
+    "updatedAt": "2026-07-08T03:31:10.151Z",
+    "reviewNotes": "Verification failed at test",
+    "testNotes": "typecheck passed; lint passed; PAN-1644 targeted tests passed (91/91). Full npm test FAILED: tests/unit/dashboard/routes/issues-no-loss.test.ts unexpected route GET /api/issues/:id/ship-log not in EXPECTED_ISSUES_ROUTES. 8878 passed, 1 failed, 52 skipped. No UAT exercised.",
+    "verificationNotes": "Verification FAILED at test (123428ms):\n\n> {\n     51|     expect(() => execFileSync('node', [CLI, 'done', 'PAN-1501', '--tes…\n       |                                                                                    ^\n     52|       /error: option '--test-waived <reason>' argument missing/i,\n     53|     );\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  |root| src/cli/commands/__tests__/done.test.ts > pan done CLI options > rejects --test-waived without a reason (AC4)\nAssertionError: expected [Function] to throw error matching /error: option '--test-waived <reason…/i but got 'Command failed: node /home/eltmon/Pro…'\n\n- Expected:\n/error: option '--test-waived <reason>' argument missing/i\n\n+ Received:\n\"Command failed: node /home/eltmon/Projects/overdeck/workspaces/feature-pan-1644/dist/cli/index.js done PAN-1501 --test-waived\nnode:internal/modules/cjs/loader:1386\n  throw err;\n  ^\n\nError: Cannot find module '/home/eltmon/Projects/overdeck/workspaces/feature-pan-1644/dist/cli/index.js'\n    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)\n    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)\n    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)\n    at Function._load (node:internal/modules/cjs/loader:1192:37)\n    at TracingChannel.traceSync (node:diagnostics_channel:328:14)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)\n    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)\n    at node:internal/main/run_main_module:36:49 {\n  code: 'MODULE_NOT_FOUND',\n  requireStack: []\n}\n\nNode.js v22.22.0\n\"\n\n ❯ src/cli/commands/__tests__/done.test.ts:51:84\n     49|\n     50|   it('rejects --test-waived without a reason (AC4)', () => {\n     51|     expect(() => execFileSync('node', [CLI, 'done', 'PAN-1501', '--tes…\n       |                                                                                    ^\n     52|       /error: option '--test-waived <reason>' argument missing/i,\n     53|     );\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n",
     "inspectNotes": "Bead title-changed-event ack: ConversationTitleChangedEvent schema added to DomainEvent union with {conversationName,title,titleSource} payload, reducer case bumps conversationsListRevision by 1 (test confirms 7->8), and updateConversationTitle() emits via getEventStore().emitOnly() (sequence auto-assigned by Omit<DomainEvent,\"sequence\"> signature) wrapped in try/catch so persistence never throws when the event store is uninitialized (both paths unit-tested). All 3 ACs met.",
     "mergeNotes": "Post-rebase verification failed at test",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2480",
-    "reviewedAtCommit": "0efacfa8890236c2f2af44166156ab093663491a",
+    "reviewedAtCommit": "cc30407ba3efb1b77dedb9182ca041366c0a6699",
     "lastVerifiedCommit": "c9df3272408f6beb50a1981f57e455335c229a3b",
-    "reviewRequestedAt": "2026-07-08T03:18:18.049Z",
+    "reviewRequestedAt": "2026-07-08T03:23:00.572Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/records/pan-1644.json",
         "scripts/file-size-baseline.txt",
-        "sync-sources/hooks/record-cost-event.js.map",
         "tests/unit/lib/overdeck/no-loss-matrix.ts"
       ],
       "declaredScopeUntouched": [
@@ -122,7 +121,6 @@
         "src/lib/overdeck/conversation-reads.ts",
         "src/lib/overdeck/conversations.ts",
         "src/lib/overdeck/title-refinement.ts",
-        "sync-sources/hooks/record-cost-event.js.map",
         "sync-sources/hooks/stop-hook",
         "sync-sources/hooks/user-prompt-submit-hook",
         "tests/dashboard/event-reducers.test.ts",
@@ -133,7 +131,7 @@
         "tests/unit/lib/overdeck/title-refinement.test.ts",
         "tests/unit/lib/overdeck/title-sources.test.ts"
       ],
-      "recordedAt": "2026-07-08T02:07:52.384Z"
+      "recordedAt": "2026-07-08T03:22:52.430Z"
     }
   },
   "closeOut": {
@@ -141,9 +139,9 @@
       "byStage": {
         "codex": {
           "openai/gpt-5.5": {
-            "input": 12457001,
-            "output": 29814,
-            "cacheRead": 11389056,
+            "input": 13603038,
+            "output": 32247,
+            "cacheRead": 12386432,
             "cacheWrite": 0
           }
         },
@@ -173,26 +171,26 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 1901128,
-            "output": 44141,
-            "cacheRead": 22011626,
+            "input": 2468793,
+            "output": 52223,
+            "cacheRead": 25299946,
             "cacheWrite": 0
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 5290296,
-            "output": 345951,
-            "cacheRead": 177849088,
+            "input": 5439548,
+            "output": 350501,
+            "cacheRead": 181989632,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 12457001,
-          "output": 29814,
-          "cacheRead": 11389056,
+          "input": 13603038,
+          "output": 32247,
+          "cacheRead": 12386432,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -214,15 +212,15 @@
           "cacheWrite": 86241
         },
         "custom/kimi-k2.7-code": {
-          "input": 7191424,
-          "output": 390092,
-          "cacheRead": 199860714,
+          "input": 7908341,
+          "output": 402724,
+          "cacheRead": 207289578,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 72.079286,
-        "pricingAsOf": "2026-07-08T03:21:28.831Z"
+        "usd": 75.537349,
+        "pricingAsOf": "2026-07-08T03:31:10.233Z"
       }
     },
     "merges": [
@@ -248,6 +246,6 @@
       "note": "Slot branch feature/pan-1644-slot-1 did not merge cleanly"
     }
   },
-  "created": "2026-07-08T03:21:23.034Z",
-  "updated": "2026-07-08T03:21:28.843Z"
+  "created": "2026-07-08T03:31:10.266Z",
+  "updated": "2026-07-08T03:31:10.266Z"
 }

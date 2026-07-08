@@ -35,11 +35,14 @@ async function createStrikeRepo(issueId = 'PAN-2013'): Promise<{ projectPath: st
 }
 
 describe('pan done CLI options', () => {
-  beforeAll(async () => {
+  beforeAll(() => {
     if (!existsSync(CLI)) {
-      await execFileAsync('npm', ['run', 'build:cli'], { cwd: process.cwd(), timeout: 120_000 });
+      execSync('npm run build:cli', { cwd: process.cwd(), stdio: 'pipe', timeout: 300_000 });
     }
-  }, 130_000);
+    if (!existsSync(CLI)) {
+      throw new Error(`CLI dist missing after build:cli: ${CLI}`);
+    }
+  }, 310_000);
 
   it('lists --test-waived in pan done --help (AC1)', () => {
     const output = execFileSync('node', [CLI, 'done', '--help'], { encoding: 'utf8' });
