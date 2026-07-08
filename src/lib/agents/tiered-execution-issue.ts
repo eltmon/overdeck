@@ -15,7 +15,25 @@
 
 import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
 import { readIssueRecordSync, resolveProjectForIssue } from '../pan-dir/record.js';
-import { resolveTieredExecutionEnabled } from './tier-table.js';
+import {
+  resolveTieredExecutionEnabled,
+  TieredExecutionConfigError,
+  type TieredExecutionIssueOverride,
+} from './tier-table.js';
+
+export function readTieredExecutionOverrideForIssue(
+  issueId: string,
+): TieredExecutionIssueOverride | null {
+  const project = resolveProjectForIssue(issueId);
+  const override = project
+    ? readIssueRecordSync(project, issueId)?.tieredExecutionOverride
+    : undefined;
+  if (override === undefined || override === null) return null;
+  if (override === 'on' || override === 'off') return override;
+  throw new TieredExecutionConfigError(
+    `record tieredExecutionOverride must be one of on, off; got ${JSON.stringify(override)}`,
+  );
+}
 
 /**
  * Is tiered execution (Standing Crew) enabled for this issue, honoring the
@@ -27,10 +45,7 @@ export function resolveTieredExecutionEnabledForIssue(
   issueId: string,
   planMetadata?: { [key: string]: unknown },
 ): boolean {
-  const project = resolveProjectForIssue(issueId);
-  const recordOverride = project
-    ? readIssueRecordSync(project, issueId)?.tieredExecutionOverride
-    : undefined;
+  const recordOverride = readTieredExecutionOverrideForIssue(issueId);
   const config = loadYamlConfig().config.tieredExecution ?? { enabled: false };
   return resolveTieredExecutionEnabled(config, planMetadata, recordOverride);
 }

@@ -23,6 +23,7 @@ import { getDispatchableItems } from '../vbrief/dag.js';
 import { type Role } from './agent-state.js';
 import { assignDispatchTier, type TierAssignment } from './dispatch-tier.js';
 import { resolveTieredExecutionEnabled } from './tier-table.js';
+import { resolveTieredExecutionEnabledForIssue } from './tiered-execution-issue.js';
 import {
   buildCavemanExports,
   getProviderEnvForModel,
@@ -193,6 +194,12 @@ export interface SlotTierSpawnParams {
   tierName?: string;
 }
 
+function issueIdFromWorkspacePath(workspacePath: string): string | undefined {
+  const name = basename(workspacePath);
+  const match = name.match(/^feature-([a-z]+-\d+)$/i);
+  return match ? match[1].toUpperCase() : undefined;
+}
+
 /**
  * Tiered-execution model resolution for a registered slot spawn (PAN-1791,
  * fixing PAN-1196's "difficulty captured and ignored"). When tiered execution
@@ -222,7 +229,11 @@ export function resolveSlotTierSpawnParams(
   const doc = readWorkspacePlanSync(baseWorkspace);
   if (!doc) return {};
   const planMetadata = doc?.plan?.metadata;
-  if (!resolveTieredExecutionEnabled(tiered, planMetadata)) return {};
+  const issueId = issueIdFromWorkspacePath(baseWorkspace);
+  const enabled = issueId
+    ? resolveTieredExecutionEnabledForIssue(issueId, planMetadata)
+    : resolveTieredExecutionEnabled(tiered, planMetadata);
+  if (!enabled) return {};
   if (explicitModel) return {};
   const item = doc.plan.items.find((candidate) => candidate.id === slotItemId);
   if (!item) {
@@ -231,7 +242,7 @@ export function resolveSlotTierSpawnParams(
     );
   }
   if (!item.metadata?.difficulty && !item.metadata?.model) return {};
-  const assignment = assignDispatchTier(item, tiered, planMetadata);
+  const assignment = assignDispatchTier(item, tiered, planMetadata, issueId);
   return { model: assignment.model, harness: assignment.harness, tierName: assignment.tierName };
 }
 
@@ -254,13 +265,17 @@ export function resolveSingleWorkTierSpawnParams(
   const doc = readWorkspacePlanSync(workspace);
   if (!doc) return {};
   const planMetadata = doc?.plan?.metadata;
-  if (!resolveTieredExecutionEnabled(tiered, planMetadata)) return {};
+  const issueId = issueIdFromWorkspacePath(workspace);
+  const enabled = issueId
+    ? resolveTieredExecutionEnabledForIssue(issueId, planMetadata)
+    : resolveTieredExecutionEnabled(tiered, planMetadata);
+  if (!enabled) return {};
 
   const item = getDispatchableItems(doc, new Set())[0];
   if (!item) return {};
   if (!item.metadata?.difficulty && !item.metadata?.model) return {};
 
-  const assignment = assignDispatchTier(item, tiered, planMetadata);
+  const assignment = assignDispatchTier(item, tiered, planMetadata, issueId);
   return { model: assignment.model, harness: assignment.harness, tierName: assignment.tierName };
 }
 

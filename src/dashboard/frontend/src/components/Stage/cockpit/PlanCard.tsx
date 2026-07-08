@@ -1,9 +1,11 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, Circle } from 'lucide-react'
 import {
   usePlanningSummaryQuery,
-  useSettingsQuery,
   useWorkspacePlanQuery,
+  updateWorkspaceTieredExecution,
+  type TieredExecutionOverride,
+  type WorkspacePlanTieredExecution,
 } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import { CockpitCard } from './CockpitCard'
 
@@ -18,10 +20,22 @@ interface BeadsResponse {
   tasks: BeadTask[]
 }
 
-function tieredChipLabel(override: unknown, globalEnabled: boolean | undefined): string {
-  if (override === 'on') return 'tiered: on (issue override)'
-  if (override === 'off') return 'tiered: off (issue override)'
-  return `tiered: ${globalEnabled ? 'on' : 'off'} (global)`
+const TIERED_EXECUTION_DOCS_URL = 'https://github.com/eltmon/overdeck/blob/main/docs/TIERED-EXECUTION.md'
+
+function tieredSourceLabel(source: WorkspacePlanTieredExecution['source']): string {
+  if (source === 'issue-override') return 'issue override'
+  if (source === 'plan-metadata') return 'plan metadata'
+  return 'global'
+}
+
+function tieredChipLabel(tiered: WorkspacePlanTieredExecution | undefined): string {
+  if (!tiered) return 'tiered: loading'
+  return `tiered: ${tiered.effective ? 'on' : 'off'} (${tieredSourceLabel(tiered.source)})`
+}
+
+function selectValueToOverride(value: string): TieredExecutionOverride {
+  if (value === 'on' || value === 'off') return value
+  return null
 }
 
 /**
@@ -31,12 +45,19 @@ function tieredChipLabel(override: unknown, globalEnabled: boolean | undefined):
  * here — it lives in the vBRIEF dig tab. (Command Deck remodel S3.)
  */
 export function PlanCard({ issueId }: { issueId: string }) {
+  const queryClient = useQueryClient()
   const planning = usePlanningSummaryQuery(issueId)
   const workspacePlan = useWorkspacePlanQuery(issueId)
-  const settings = useSettingsQuery()
   const ac = planning.data?.acceptanceProgress
-  const tieredOverride = workspacePlan.data?.plan?.metadata?.tiered_execution
-  const tieredLabel = tieredChipLabel(tieredOverride, settings.data?.tiered_execution?.enabled)
+  const tieredExecution = workspacePlan.data?.tieredExecution
+  const tieredLabel = tieredChipLabel(tieredExecution)
+  const tieredOverrideValue = tieredExecution?.override ?? 'inherit'
+  const updateTieredExecution = useMutation({
+    mutationFn: (override: TieredExecutionOverride) => updateWorkspaceTieredExecution(issueId, override),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['workspace-plan', issueId], updated)
+    },
+  })
 
   const beadsQuery = useQuery<BeadsResponse>({
     queryKey: ['beads', issueId],
@@ -64,13 +85,32 @@ export function PlanCard({ issueId }: { issueId: string }) {
       }
     >
       <div className="mb-3 flex flex-wrap items-center gap-2">
+        <label htmlFor={`tiered-execution-${issueId}`} className="sr-only">
+          Standing Crew override
+        </label>
+        <select
+          id={`tiered-execution-${issueId}`}
+          aria-label="Standing Crew override"
+          value={tieredOverrideValue}
+          disabled={!workspacePlan.data || updateTieredExecution.isPending}
+          onChange={(event) => updateTieredExecution.mutate(selectValueToOverride(event.target.value))}
+          className="h-6 rounded-md border border-border bg-muted/20 px-2 font-mono text-[11px] text-muted-foreground hover:bg-muted/40 disabled:opacity-60"
+        >
+          <option value="inherit">inherit</option>
+          <option value="on">on</option>
+          <option value="off">off</option>
+        </select>
+        <span className="inline-flex h-6 items-center rounded-md border border-border bg-muted/20 px-2 font-mono text-[11px] text-muted-foreground">
+          {tieredLabel}
+        </span>
         <a
-          href="https://github.com/eltmon/overdeck/blob/main/docs/TIERED-EXECUTION.md"
+          href={TIERED_EXECUTION_DOCS_URL}
           target="_blank"
           rel="noreferrer"
+          aria-label="Tiered execution documentation"
           className="inline-flex h-6 items-center rounded-md border border-border bg-muted/20 px-2 font-mono text-[11px] text-muted-foreground hover:bg-muted/40"
         >
-          {tieredLabel}
+          docs
         </a>
       </div>
 

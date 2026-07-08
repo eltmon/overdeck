@@ -8,6 +8,7 @@
  *   GET    /api/workspaces/:issueId/plan
  *   GET    /api/workspaces/:issueId/uat-context
  *   PATCH  /api/workspaces/:issueId/plan/inspection-policy
+ *   PATCH  /api/workspaces/:issueId/tiered-execution
  *   GET    /api/workspaces/:issueId/tldr
  *
  * Shared singletons (project path, workspace info, container status, pending ops,
@@ -49,6 +50,11 @@ import { criticalPath, actionableDoc } from '../../../../lib/vbrief/dag.js';
 import { findVBriefByIssue, readVBriefDocument } from '../../../../lib/vbrief/vbrief-index.js';
 import { VBRIEF_INSPECTION_POLICIES } from '../../../../lib/vbrief/types.js';
 import type { VBriefDocument, VBriefInspectionPolicy } from '../../../../lib/vbrief/types.js';
+import {
+  readTieredExecutionOverrideForIssue,
+  resolveTieredExecutionEnabledForIssue,
+} from '../../../../lib/agents/tiered-execution-issue.js';
+import type { TieredExecutionIssueOverride } from '../../../../lib/agents/tier-table.js';
 import { getChangedFiles, getDiffBase, getDiffStat } from '../../../../lib/cloister/review-context.js';
 import type { ChangedFile } from '../../../../lib/cloister/review-context.js';
 import { getTldrDaemonServiceSync } from '../../../../lib/tldr-daemon.js';
@@ -64,6 +70,7 @@ import {
   requireTrustedMutationOrigin,
 } from '../workspaces.js';
 import { reconcileGitHubMergeStatus } from './merge-ops.js';
+import { createPatchWorkspaceTieredExecutionRoute } from './tiered-execution.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -235,6 +242,27 @@ interface UatContextGitFields {
   changedFilesOmitted: number;
   diffStat: { stat: string; truncated: boolean } | null;
   source: { files: 'git' | 'none' };
+}
+
+export interface WorkspacePlanTieredExecution {
+  effective: boolean;
+  source: 'issue-override' | 'plan-metadata' | 'global';
+  override: TieredExecutionIssueOverride | null;
+}
+
+export function assembleWorkspacePlanTieredExecution(
+  issueId: string,
+  planMetadata?: { [key: string]: unknown },
+): WorkspacePlanTieredExecution {
+  const override = readTieredExecutionOverrideForIssue(issueId);
+  const effective = resolveTieredExecutionEnabledForIssue(issueId, planMetadata);
+  const source = override !== null
+    ? 'issue-override'
+    : planMetadata?.tiered_execution !== undefined && planMetadata.tiered_execution !== null
+      ? 'plan-metadata'
+      : 'global';
+
+  return { effective, source, override };
 }
 
 const MAX_UAT_CONTEXT_CHANGED_FILES = 12;
@@ -781,7 +809,13 @@ const getWorkspacePlanRoute = HttpRouter.add(
     }
 
     const cp = criticalPath(actionableDoc(location.doc));
-    return jsonResponse({ ...location.doc, criticalPath: cp, lifecycleDir: location.lifecycleDir });
+    const tieredExecution = assembleWorkspacePlanTieredExecution(issueId, location.doc.plan.metadata);
+    return jsonResponse({
+      ...location.doc,
+      criticalPath: cp,
+      lifecycleDir: location.lifecycleDir,
+      tieredExecution,
+    });
   }))
 );
 const getWorkspaceUatContextRoute = HttpRouter.add(
@@ -868,6 +902,11 @@ const patchWorkspacePlanInspectionPolicyRoute = HttpRouter.add(
     return jsonResponse({ ...updated, criticalPath: cp, lifecycleDir: location.lifecycleDir });
   }))
 );
+
+const patchWorkspaceTieredExecutionRoute = createPatchWorkspaceTieredExecutionRoute({
+  resolvePlanLocation,
+  assembleWorkspacePlanTieredExecution,
+});
 // ─── Route: GET /api/workspaces/:issueId/tldr ─────────────────────────────────
 
 const getWorkspaceTldrRoute = HttpRouter.add(
@@ -921,6 +960,7 @@ export const workspaceDataRouteLayer = Layer.mergeAll(
   getWorkspacePlanRoute,
   getWorkspaceUatContextRoute,
   patchWorkspacePlanInspectionPolicyRoute,
+  patchWorkspaceTieredExecutionRoute,
   getWorkspaceTldrRoute,
 );
 

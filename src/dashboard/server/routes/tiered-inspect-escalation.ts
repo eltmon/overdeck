@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import { decideEscalation, type EscalationAction } from '../../../lib/agents/tier-escalation.js';
 import { resolveTieredExecutionEnabled } from '../../../lib/agents/tier-table.js';
+import { resolveTieredExecutionEnabledForIssue } from '../../../lib/agents/tiered-execution-issue.js';
 import { loadConfigSync } from '../../../lib/config-yaml.js';
 import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
@@ -18,6 +19,7 @@ export interface TieredInspectFailureEscalationDeps {
   exists?: typeof existsSync;
   readPlan?: typeof readWorkspacePlanSync;
   readOverrides?: typeof readTierOverrides;
+  resolveEnabled?: (issueId: string, planMetadata?: { [key: string]: unknown }) => boolean;
   decide?: typeof decideEscalation;
   recordPromotion?: typeof recordTierPromotion;
 }
@@ -32,6 +34,7 @@ export function handleTieredInspectFailureEscalation(
   const exists = deps.exists ?? existsSync;
   const readPlan = deps.readPlan ?? readWorkspacePlanSync;
   const readOverrides = deps.readOverrides ?? readTierOverrides;
+  const resolveEnabled = deps.resolveEnabled;
   const decide = deps.decide ?? decideEscalation;
   const recordPromotion = deps.recordPromotion ?? recordTierPromotion;
 
@@ -48,7 +51,12 @@ export function handleTieredInspectFailureEscalation(
   if (!exists(workspacePath)) return null;
 
   const doc = readPlan(workspacePath);
-  if (!resolveTieredExecutionEnabled(tiered, doc?.plan.metadata)) return null;
+  const enabled = resolveEnabled
+    ? resolveEnabled(issueId, doc?.plan.metadata)
+    : deps.loadConfig || deps.readPlan
+      ? resolveTieredExecutionEnabled(tiered, doc?.plan.metadata)
+      : resolveTieredExecutionEnabledForIssue(issueId, doc?.plan.metadata);
+  if (!enabled) return null;
 
   const beadId = notes?.match(/[Bb]ead\s+(\S+)/)?.[1];
   if (!doc || !beadId) return null;
