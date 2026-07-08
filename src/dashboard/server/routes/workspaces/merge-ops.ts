@@ -13,16 +13,13 @@
  * Shared singletons (pending operations, project path, workspace info, readJsonBody)
  * stay owned by ../workspaces.js and are imported here.
  */
-
 import { exec, execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { promisify } from 'node:util';
-
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-
 import { messageAgent, getAgentState, spawnAgent } from '../../../../lib/agents.js';
 import { queryBeadsForIssue, type BeadEntry } from '../../../../lib/beads-query.js';
 import { syncMainIntoWorkspace } from '../../../../lib/cloister/merge-agent.js';
@@ -45,22 +42,10 @@ import { httpHandler } from '../http-handler.js';
 import { _serverManagedMerges } from '../specialists.js';
 import { completePendingOperation, getPendingOperation, getProjectPath, getWorkspaceInfoForIssue, readJsonBody, setPendingOperation, setReviewStatus } from '../workspaces.js';
 import { buildLocalMainRecoveryError } from './git-recovery-advice.js';
-
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
-
-export function getApproveDirtyWorkspaceErrorForStatus(
-  status: string,
-  workspacePath: string,
-): string | null {
-  // STATE-PLANE-COMMIT-POLICY rules 3/6: pipeline-owned state-plane dirt is
-  // not agent work, and the path list must come from src/lib/state-plane.ts.
-  if (!status.trim() || isStatePlaneOnlyStatus(status)) {
-    return null;
-  }
-
-  return `Workspace has uncommitted changes. Please commit the changes, explicitly discard them, or surface them to the operator first:\ncd ${workspacePath}\ngit status`;
-}
+export const shouldBlockApproveForDirtyStatus = (status: string): boolean =>
+  status.trim() !== '' && !isStatePlaneOnlyStatus(status);
 
 async function ensureWorkAgentReadyForMerge(
   issueId: string,
@@ -1653,8 +1638,9 @@ const postWorkspaceApproveRoute = HttpRouter.add(
             'git status --porcelain -uno',
             { cwd: workspacePath, encoding: 'utf-8' }
           );
-          const error = getApproveDirtyWorkspaceErrorForStatus(status, workspacePath);
-          if (error) {
+          // STATE-PLANE-COMMIT-POLICY rules 3/6: state-plane-only dirt is not agent work.
+          if (shouldBlockApproveForDirtyStatus(status)) {
+            const error = `Workspace has uncommitted changes. Please commit the changes, explicitly discard them, or surface them to the operator first:\ncd ${workspacePath}\ngit status`;
             completePendingOperation(issueId, error);
             return jsonResponse({ error }, { status: 400 });
           }
