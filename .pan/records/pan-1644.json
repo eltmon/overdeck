@@ -1,7 +1,116 @@
 {
   "issueId": "PAN-1644",
   "schemaVersion": 2,
-  "feedback": [],
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-08T01:13:37.867Z"
+    },
+    {
+      "timestamp": "2026-07-08T01:18:38.181Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T01:18:49.216Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T01:20:43.100Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-08T01:20Z] review-agent → FAILED — seq 2",
+      "timestamp": "2026-07-08T01:20:44.905Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-08T01:20:45.444Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-07-08T01:20:44Z",
+      "markdownBody": "# Review FAILED for PAN-1644\n\nReview role spawn failed: CLIProxyAPI sidecar is not running. GPT subscription role runs route through a local cliproxy process managed by `pan up`. Run `pan up` (or restart the dashboard) before spawning a GPT role run.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1644 -m \"Fixed review issues\"`"
+    }
+  ],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/records/pan-1644.json",
+      "scripts/file-size-baseline.txt",
+      "sync-sources/hooks/record-cost-event.js.map",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts"
+    ],
+    "declaredScopeUntouched": [
+      "skills/pan-admin-config/SKILL.md",
+      "src/cli/index.ts"
+    ],
+    "declaredScope": [
+      "docs/SKILLS-CONVENTION.md",
+      "packages/contracts/src/event-reducers.ts",
+      "packages/contracts/src/events.ts",
+      "skills/pan-admin-config/SKILL.md",
+      "src/cli/commands/admin/conversations-handler.ts",
+      "src/cli/commands/admin/index.ts",
+      "src/cli/index.ts",
+      "src/dashboard/server/routes/__tests__/admin-backfill-titles.test.ts",
+      "src/dashboard/server/routes/__tests__/hooks-turn-complete.test.ts",
+      "src/dashboard/server/routes/__tests__/hooks-user-prompt.test.ts",
+      "src/dashboard/server/routes/admin.ts",
+      "src/dashboard/server/routes/hooks.ts",
+      "src/lib/conversations/transcript-summary.ts",
+      "src/lib/overdeck/conversation-message.ts",
+      "src/lib/overdeck/conversation-reads.ts",
+      "src/lib/overdeck/conversations.ts",
+      "src/lib/overdeck/title-refinement.ts",
+      "sync-sources/hooks/stop-hook*",
+      "sync-sources/hooks/user-prompt-submit-hook*",
+      "tests/dashboard/event-reducers.test.ts",
+      "tests/unit/lib/conversations/derive-prompt-title.test.ts",
+      "tests/unit/lib/overdeck/conversation-message-title.test.ts",
+      "tests/unit/lib/overdeck/title-events.test.ts",
+      "tests/unit/lib/overdeck/title-refinement.test.ts",
+      "tests/unit/lib/overdeck/title-sources.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".pan/records/pan-1644.json",
+      "docs/SKILLS-CONVENTION.md",
+      "packages/contracts/src/event-reducers.ts",
+      "packages/contracts/src/events.ts",
+      "scripts/file-size-baseline.txt",
+      "src/cli/commands/admin/conversations-handler.ts",
+      "src/cli/commands/admin/index.ts",
+      "src/dashboard/server/routes/__tests__/admin-backfill-titles.test.ts",
+      "src/dashboard/server/routes/__tests__/hooks-turn-complete.test.ts",
+      "src/dashboard/server/routes/__tests__/hooks-user-prompt.test.ts",
+      "src/dashboard/server/routes/admin.ts",
+      "src/dashboard/server/routes/hooks.ts",
+      "src/lib/conversations/transcript-summary.ts",
+      "src/lib/overdeck/conversation-message.ts",
+      "src/lib/overdeck/conversation-reads.ts",
+      "src/lib/overdeck/conversations.ts",
+      "src/lib/overdeck/title-refinement.ts",
+      "sync-sources/hooks/record-cost-event.js.map",
+      "sync-sources/hooks/stop-hook",
+      "sync-sources/hooks/user-prompt-submit-hook",
+      "tests/dashboard/event-reducers.test.ts",
+      "tests/unit/lib/conversations/derive-prompt-title.test.ts",
+      "tests/unit/lib/overdeck/conversation-message-title.test.ts",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts",
+      "tests/unit/lib/overdeck/title-events.test.ts",
+      "tests/unit/lib/overdeck/title-refinement.test.ts",
+      "tests/unit/lib/overdeck/title-sources.test.ts"
+    ],
+    "recordedAt": "2026-07-08T01:18:05.387Z"
+  },
   "harness": "claude-code",
   "model": "kimi-k2.7-code",
   "statusOverrides": {
@@ -50,21 +159,21 @@
   },
   "pipeline": {
     "issueId": "PAN-1644",
-    "reviewStatus": "passed",
+    "reviewStatus": "failed",
     "testStatus": "failed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-08T01:13:33.807Z",
-    "reviewNotes": "No blocking findings; focused title hook tests passed",
+    "updatedAt": "2026-07-08T01:20:43.141Z",
+    "reviewNotes": "Review role spawn failed: CLIProxyAPI sidecar is not running. GPT subscription role runs route through a local cliproxy process managed by `pan up`. Run `pan up` (or restart the dashboard) before spawning a GPT role run.",
     "testNotes": "typecheck passed; lint passed; npm test failed. Blocking failures: (1) tests/unit/lib/overdeck/no-loss-matrix.test.ts requires matrix entries for new PAN-1644 routes: POST /api/admin/conversations/backfill-titles, POST /api/hooks/user-prompt-submit, POST /api/hooks/turn-complete. (2) tests/integration/agent-spawning.test.ts > resumeAgent marks kickoff redelivered only after the redelivery lands timed out at 30000ms. Browser UAT not exercised because automated gates failed; acceptance criteria require the conversation list to update from conversation.title_changed, so UAT would be needed after gate fixes.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Bead title-changed-event ack: ConversationTitleChangedEvent schema added to DomainEvent union with {conversationName,title,titleSource} payload, reducer case bumps conversationsListRevision by 1 (test confirms 7->8), and updateConversationTitle() emits via getEventStore().emitOnly() (sequence auto-assigned by Omit<DomainEvent,\"sequence\"> signature) wrapped in try/catch so persistence never throws when the event store is uninitialized (both paths unit-tested). All 3 ACs met.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2480",
-    "reviewedAtCommit": "a87706e111ea3512d40db661efc08ff6f0c79a5a",
-    "lastVerifiedCommit": "32701639ed82aa42456d74475f822d0a552ad401",
-    "reviewRequestedAt": "2026-07-08T01:12:10.842Z",
+    "reviewedAtCommit": "620ae5a74127409fc007aa7a208d743778ba99f4",
+    "lastVerifiedCommit": "620ae5a74127409fc007aa7a208d743778ba99f4",
+    "reviewRequestedAt": "2026-07-08T01:20:16.324Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/records/pan-1644.json",
@@ -140,9 +249,9 @@
       "byStage": {
         "codex": {
           "openai/gpt-5.5": {
-            "input": 8526660,
-            "output": 17818,
-            "cacheRead": 7800704,
+            "input": 9754164,
+            "output": 19324,
+            "cacheRead": 8972800,
             "cacheWrite": 0
           }
         },
@@ -180,18 +289,18 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 3926362,
-            "output": 287111,
-            "cacheRead": 140943104,
+            "input": 4127984,
+            "output": 288851,
+            "cacheRead": 143529728,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 8526660,
-          "output": 17818,
-          "cacheRead": 7800704,
+          "input": 9754164,
+          "output": 19324,
+          "cacheRead": 8972800,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -213,15 +322,15 @@
           "cacheWrite": 86241
         },
         "custom/kimi-k2.7-code": {
-          "input": 4300233,
-          "output": 296307,
-          "cacheRead": 143916800,
+          "input": 4501855,
+          "output": 298047,
+          "cacheRead": 146503424,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 54.464183,
-        "pricingAsOf": "2026-07-08T01:13:34.809Z"
+        "usd": 56.062409,
+        "pricingAsOf": "2026-07-08T01:20:43.221Z"
       }
     },
     "merges": [
@@ -248,12 +357,5 @@
     }
   },
   "created": "2026-07-08T01:13:35.614Z",
-  "updated": "2026-07-08T01:13:37.867Z",
-  "sessionHistory": [
-    {
-      "reason": "resume",
-      "agentModel": "kimi-k2.7-code",
-      "timestamp": "2026-07-08T01:13:37.867Z"
-    }
-  ]
+  "updated": "2026-07-08T01:20:45.686Z"
 }
