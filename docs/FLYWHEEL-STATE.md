@@ -217,6 +217,13 @@ Operator: primary local main diverged (20 bot chore(state) commits ahead / 6 beh
 - **LOOSE ENDS for operator:** (1) PAN-1644 draft untracked; (2) scratch has the primary's lifecycle-restart.ts alt-implementation if worth comparing; (3) freshly-dirty beads = normal ongoing bot writes.
 - REUSABLE: flywheel CANNOT commit/push code even via merge — `guard-flywheel-orchestrator-commit.sh` (pre-commit + pre-push) gates on OVERDECK_AGENT_ID; for an operator-directed reconcile merge, `env -u OVERDECK_AGENT_ID git commit/push` lets the guard pass on its own context-check (never `--no-verify`).
 
+## RUN-58 tick 152 (2026-07-08) — 🟢 MAIN GREEN confirmed (release 0.44.0); PAN-2490 closed; resumed drains → PAN-1644 scheduled id 37
+
+**🟢 MAIN GREEN confirmed** — head `9d1c736917 chore: release 0.44.0`, CI **success**. Red main fully resolved and main advanced to release 0.44.0. **PAN-2490 closed-out.** Recovery done; back to normal ops.
+- **PAN-1644 (#2480) converged + green** — mergeState CLEAN, all CI green (test pass 8m11s), newest commit is the 04:20 post-merge-main record (no newer push). Scheduled auto-merge id **37**, mergeAt **04:51:36** (routine PAN drain; no operator countermand on the operator-owned-draft question).
+- MIN-865/861 rfm — report only (UAT-held). M7/MIN-729 verifying.
+- **Substrate priorities surfaced (need operator authorization):** PAN-2495 (ci-green-skip that buried a red main) + B3/PAN-2167 (record-push churn slipping every PAN merge). Both unauthorized — the two highest-value substrate fixes this run surfaced.
+
 ## RUN-58 tick 151 (2026-07-08) — 🟢 RED MAIN RESOLVED: PR #2494 green + admin-merged (ad58ee3283); PAN-2490 closing; filed ci-green-skip follow-up PAN-2495
 
 **🟢 RED MAIN RESOLVED.** PR #2494 (strike matrix fix) went fully green — **test pass 8m10s**, all checks pass, CLEAN — and **admin-merged** (red-main unblock exception). Main head `ad58ee3283 fix(no-loss): register ship-log route in no_loss_matrix (pan-2490) (#2494)`; matrix entry confirmed on main (no-loss-matrix.ts:274). Both no-loss surfaces now fixed. Main CI queued on the merge commit — confirm green next tick.
