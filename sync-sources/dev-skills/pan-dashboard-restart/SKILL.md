@@ -74,6 +74,7 @@ readlink -f /proc/$NEW/cwd      # must be the primary repo path
 - **Keep the deacon OFF during stabilization** (e.g. while diagnosing churn): prefix the start with `OVERDECK_DISABLE_DEACON=1`, or use `pan restart --no-deacon`. No deacon = no auto-resume and no janitor while you settle things.
 - **Suppress auto-resume** (thundering-herd safety before the resume throttle is trusted, or right after a reboot): prefix `OVERDECK_NO_RESUME=1`.
 - **Re-freeze / trim** if a restart wakes too many agents: `pan admin cloister freeze` (global pause) or `pan admin cloister brake` (trim work agents to the cap).
+- **Operator-only override:** `OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY=1` lets a *non-workspace* peer boot bind the host dashboard port when the canonical dashboard is deliberately stopped. Boots from a `workspaces/feature-*` checkout are refused unconditionally — the env var does nothing there (PAN-2322). Never export it in an agent environment. The runtime refusal error intentionally no longer names this variable.
 
 ## Verify success
 
