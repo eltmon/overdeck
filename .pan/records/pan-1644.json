@@ -118,8 +118,8 @@
     ],
     "recordedAt": "2026-07-08T00:06:50.736Z"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "title-source-ai-explicit": "completed",
     "hook-script-stop": "completed",
@@ -364,5 +364,5 @@
     }
   },
   "created": "2026-07-07T23:49:56.919Z",
-  "updated": "2026-07-08T00:40:56.798Z"
+  "updated": "2026-07-08T01:01:47.763Z"
 }
