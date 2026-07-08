@@ -143,6 +143,26 @@ describe('handleBackfillTitlesBody', () => {
     expect(emittedEvents).toHaveLength(0);
   });
 
+  it('preserves a manual title that happens to be "New conversation"', async () => {
+    createConversation({
+      name: 'backfill-manual-new-conversation',
+      tmuxSession: 'tmux-backfill-manual-new-conversation',
+      cwd: '/tmp',
+      title: 'New conversation',
+      titleSource: 'manual',
+    });
+
+    const deps = makeDeps([{ role: 'user', text: 'anything' }]);
+    const result = await handleBackfillTitlesBody({ dryRun: false }, deps);
+
+    expect(result.updated).toHaveLength(0);
+    expect(result.skipped).toHaveLength(0);
+
+    const unchanged = getConversationByName('backfill-manual-new-conversation');
+    expect(unchanged?.title).toBe('New conversation');
+    expect(unchanged?.titleSource).toBe('manual');
+  });
+
   it('preserves non-stuck rows and archived rows', async () => {
     createConversation({
       name: 'backfill-preserved',

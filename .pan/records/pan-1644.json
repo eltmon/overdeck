@@ -1,7 +1,106 @@
 {
   "issueId": "PAN-1644",
   "schemaVersion": 2,
-  "feedback": [],
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-08T00:07:22.384Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T00:07:25.760Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-08T00:08Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-08T00:08:48.738Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-08T00:08:48.892Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-08T00:08:48Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1644\n\nBackfill can overwrite manual/explicit New conversation titles\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1644 -m \"Fixed review issues\"`"
+    }
+  ],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/records/pan-1644.json",
+      "scripts/file-size-baseline.txt",
+      "sync-sources/hooks/record-cost-event.js.map",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts"
+    ],
+    "declaredScopeUntouched": [
+      "skills/pan-admin-config/SKILL.md",
+      "src/cli/index.ts"
+    ],
+    "declaredScope": [
+      "docs/SKILLS-CONVENTION.md",
+      "packages/contracts/src/event-reducers.ts",
+      "packages/contracts/src/events.ts",
+      "skills/pan-admin-config/SKILL.md",
+      "src/cli/commands/admin/conversations-handler.ts",
+      "src/cli/commands/admin/index.ts",
+      "src/cli/index.ts",
+      "src/dashboard/server/routes/__tests__/admin-backfill-titles.test.ts",
+      "src/dashboard/server/routes/__tests__/hooks-turn-complete.test.ts",
+      "src/dashboard/server/routes/__tests__/hooks-user-prompt.test.ts",
+      "src/dashboard/server/routes/admin.ts",
+      "src/dashboard/server/routes/hooks.ts",
+      "src/lib/conversations/transcript-summary.ts",
+      "src/lib/overdeck/conversation-message.ts",
+      "src/lib/overdeck/conversation-reads.ts",
+      "src/lib/overdeck/conversations.ts",
+      "src/lib/overdeck/title-refinement.ts",
+      "sync-sources/hooks/stop-hook*",
+      "sync-sources/hooks/user-prompt-submit-hook*",
+      "tests/dashboard/event-reducers.test.ts",
+      "tests/unit/lib/conversations/derive-prompt-title.test.ts",
+      "tests/unit/lib/overdeck/conversation-message-title.test.ts",
+      "tests/unit/lib/overdeck/title-events.test.ts",
+      "tests/unit/lib/overdeck/title-refinement.test.ts",
+      "tests/unit/lib/overdeck/title-sources.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".pan/records/pan-1644.json",
+      "docs/SKILLS-CONVENTION.md",
+      "packages/contracts/src/event-reducers.ts",
+      "packages/contracts/src/events.ts",
+      "scripts/file-size-baseline.txt",
+      "src/cli/commands/admin/conversations-handler.ts",
+      "src/cli/commands/admin/index.ts",
+      "src/dashboard/server/routes/__tests__/admin-backfill-titles.test.ts",
+      "src/dashboard/server/routes/__tests__/hooks-turn-complete.test.ts",
+      "src/dashboard/server/routes/__tests__/hooks-user-prompt.test.ts",
+      "src/dashboard/server/routes/admin.ts",
+      "src/dashboard/server/routes/hooks.ts",
+      "src/lib/conversations/transcript-summary.ts",
+      "src/lib/overdeck/conversation-message.ts",
+      "src/lib/overdeck/conversation-reads.ts",
+      "src/lib/overdeck/conversations.ts",
+      "src/lib/overdeck/title-refinement.ts",
+      "sync-sources/hooks/record-cost-event.js.map",
+      "sync-sources/hooks/stop-hook",
+      "sync-sources/hooks/user-prompt-submit-hook",
+      "tests/dashboard/event-reducers.test.ts",
+      "tests/unit/lib/conversations/derive-prompt-title.test.ts",
+      "tests/unit/lib/overdeck/conversation-message-title.test.ts",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts",
+      "tests/unit/lib/overdeck/title-events.test.ts",
+      "tests/unit/lib/overdeck/title-refinement.test.ts",
+      "tests/unit/lib/overdeck/title-sources.test.ts"
+    ],
+    "recordedAt": "2026-07-08T00:06:50.736Z"
+  },
   "harness": "claude-code",
   "model": "kimi-k2.7-code",
   "statusOverrides": {
@@ -50,24 +149,26 @@
   },
   "pipeline": {
     "issueId": "PAN-1644",
-    "reviewStatus": "failed",
-    "testStatus": "failed",
-    "verificationStatus": "failed",
+    "reviewStatus": "reviewing",
+    "testStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T23:49:56.618Z",
-    "reviewNotes": "Verification failed at test",
+    "updatedAt": "2026-07-08T00:11:51.891Z",
+    "reviewNotes": "Backfill can overwrite manual/explicit New conversation titles",
     "testNotes": "typecheck passed; lint passed; npm test failed. Blocking failures: (1) tests/unit/lib/overdeck/no-loss-matrix.test.ts requires matrix entries for new PAN-1644 routes: POST /api/admin/conversations/backfill-titles, POST /api/hooks/user-prompt-submit, POST /api/hooks/turn-complete. (2) tests/integration/agent-spawning.test.ts resumeAgent redelivery timed out at 30000ms. Browser UAT not exercised because automated gates failed.",
-    "verificationNotes": "Verification FAILED at test (366696ms):\n\n1:3\n    249|   });\n    250|\n    251|   it('uses the handoff document as the fork seed and records source/ta…\n       |   ^\n    252|     const home = join(tmpdir(), `pan-handoff-fork-${Date.now()}`);\n    253|     // Set up a fresh overdeck.db at this test's home directory.\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯\n\n FAIL  |root| src/lib/conversations/__tests__/summary-fork-handoff.test.ts > handoff fork handshake > falls back to summary fork on handshake timeout using fake timers\n FAIL  |root| src/lib/conversations/__tests__/summary-fork-handoff.test.ts > handoff fork handshake > falls back to summary fork on handshake timeout using fake timers\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/lib/conversations/__tests__/summary-fork-handoff.test.ts:323:3\n    321|   });\n    322|\n    323|   it('falls back to summary fork on handshake timeout using fake timer…\n       |   ^\n    324|     vi.useFakeTimers();\n    325|     const home = join(tmpdir(), `pan-handoff-fallback-timeout-${Date.n…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯\n\n FAIL  |root| src/lib/conversations/__tests__/summary-fork-handoff.test.ts > handoff fork handshake > falls back to summary fork when the handoff document fails validation\n FAIL  |root| src/lib/conversations/__tests__/summary-fork-handoff.test.ts > handoff fork handshake > falls back to summary fork when the handoff document fails validation\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/lib/conversations/__tests__/summary-fork-handoff.test.ts:378:3\n    376|   }, 15_000);\n    377|\n    378|   it('falls back to summary fork when the handoff document fails valid…\n       |   ^\n    379|     const home = join(tmpdir(), `pan-handoff-validation-fallback-${Dat…\n    380|     const source = await createSourceConversation(home);\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯\n\n",
     "inspectNotes": "Bead title-changed-event ack: ConversationTitleChangedEvent schema added to DomainEvent union with {conversationName,title,titleSource} payload, reducer case bumps conversationsListRevision by 1 (test confirms 7->8), and updateConversationTitle() emits via getEventStore().emitOnly() (sequence auto-assigned by Omit<DomainEvent,\"sequence\"> signature) wrapped in try/catch so persistence never throws when the event store is uninitialized (both paths unit-tested). All 3 ACs met.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2480",
     "reviewedAtCommit": "11f9b9c0b7690f83777ffd740354f913f60e5a0a",
-    "reviewRequestedAt": "2026-07-07T23:35:12.359Z",
+    "lastVerifiedCommit": "23178cc277772c7306812c61a56aa1251b9e6c9f",
+    "reviewRequestedAt": "2026-07-08T00:07:22.385Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/records/pan-1644.json",
-        "scripts/file-size-baseline.txt"
+        "scripts/file-size-baseline.txt",
+        "sync-sources/hooks/record-cost-event.js.map",
+        "tests/unit/lib/overdeck/no-loss-matrix.ts"
       ],
       "declaredScopeUntouched": [
         "skills/pan-admin-config/SKILL.md",
@@ -118,16 +219,18 @@
         "src/lib/overdeck/conversation-reads.ts",
         "src/lib/overdeck/conversations.ts",
         "src/lib/overdeck/title-refinement.ts",
+        "sync-sources/hooks/record-cost-event.js.map",
         "sync-sources/hooks/stop-hook",
         "sync-sources/hooks/user-prompt-submit-hook",
         "tests/dashboard/event-reducers.test.ts",
         "tests/unit/lib/conversations/derive-prompt-title.test.ts",
         "tests/unit/lib/overdeck/conversation-message-title.test.ts",
+        "tests/unit/lib/overdeck/no-loss-matrix.ts",
         "tests/unit/lib/overdeck/title-events.test.ts",
         "tests/unit/lib/overdeck/title-refinement.test.ts",
         "tests/unit/lib/overdeck/title-sources.test.ts"
       ],
-      "recordedAt": "2026-07-07T23:34:12.710Z"
+      "recordedAt": "2026-07-08T00:06:50.736Z"
     }
   },
   "closeOut": {
@@ -135,9 +238,9 @@
       "byStage": {
         "codex": {
           "openai/gpt-5.5": {
-            "input": 1657980,
-            "output": 6444,
-            "cacheRead": 1514880,
+            "input": 2944721,
+            "output": 9753,
+            "cacheRead": 2655616,
             "cacheWrite": 0
           }
         },
@@ -167,26 +270,26 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 372865,
-            "output": 8802,
-            "cacheRead": 2705408,
+            "input": 373871,
+            "output": 9196,
+            "cacheRead": 2973696,
             "cacheWrite": 0
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 2148326,
-            "output": 221373,
-            "cacheRead": 101025280,
+            "input": 2960530,
+            "output": 245848,
+            "cacheRead": 118161664,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 1657980,
-          "output": 6444,
-          "cacheRead": 1514880,
+          "input": 2944721,
+          "output": 9753,
+          "cacheRead": 2655616,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -208,15 +311,15 @@
           "cacheWrite": 86241
         },
         "custom/kimi-k2.7-code": {
-          "input": 2521191,
-          "output": 230175,
-          "cacheRead": 103730688,
+          "input": 3334401,
+          "output": 255044,
+          "cacheRead": 121135360,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 38.475777,
-        "pricingAsOf": "2026-07-07T23:49:56.773Z"
+        "usd": 44.054358,
+        "pricingAsOf": "2026-07-08T00:11:51.926Z"
       }
     },
     "merges": [
@@ -243,5 +346,5 @@
     }
   },
   "created": "2026-07-07T23:49:56.919Z",
-  "updated": "2026-07-07T23:56:25.573Z"
+  "updated": "2026-07-08T00:11:51.953Z"
 }

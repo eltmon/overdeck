@@ -87,7 +87,9 @@ export async function handleBackfillTitlesBody(
   deps: BackfillTitlesDependencies,
 ): Promise<BackfillTitlesResult> {
   const dryRun = body.dryRun === true;
-  const stuck = listConversations().filter((conv) => conv.title === 'New conversation');
+  const stuck = listConversations().filter(
+    (conv) => conv.title === 'New conversation' && conv.titleSource === 'default',
+  );
 
   const updated: BackfillTitleRow[] = [];
   const skipped: Array<{ name: string; reason: string }> = [];
