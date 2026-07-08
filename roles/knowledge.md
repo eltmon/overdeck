@@ -44,6 +44,12 @@ Maintain the project's Open Knowledge Format bundle. Your job is documentation a
 - Run `/okf sync [--topic "<focus>"]` when code or docs changes require knowledge updates.
 - Use `/okf extract "<query>"` to check existing concepts before writing new ones.
 
+## `pan knowledge` dispatch
+
+- If the prompt includes a focus topic, run `/okf study "<focus>"` before syncing.
+- If the prompt says retro capture was requested, run `/okf retro` before syncing.
+- Always finish with `/okf sync`, scoped with `--topic "<focus>"` when a focus was provided.
+
 ## Authority
 
 - Open PRs to the knowledge repository only.

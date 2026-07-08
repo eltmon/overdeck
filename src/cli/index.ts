@@ -109,6 +109,7 @@ import { createRegistryCommand } from './commands/registry.js';
 import { createDocsCommand } from './commands/docs.js';
 import { planCommand } from './commands/plan.js';
 import { strikeCommand } from './commands/strike.js';
+import { configureKnowledgeCommand } from './commands/knowledge.js';
 import { planFinalizeCommand } from './commands/plan-finalize.js';
 import { planDoneCommand } from './commands/plan-done.js';
 import { registerCavemanCommands } from './commands/caveman.js';
@@ -584,10 +585,8 @@ program
   .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex (defaults to role/provider settings)')
   .option('--effort <level>', 'Strike effort: low | medium | high | xhigh | max (default medium)')
   .option('--dry-run', 'Print what would happen without spawning')
-  .action((ids: string[], options: { model?: string; harness?: RuntimeName; effort?: RoleEffort; dryRun?: boolean }) =>
-    strikeCommand(ids, options),
-  );
-
+  .action((ids: string[], options: { model?: string; harness?: RuntimeName; effort?: RoleEffort; dryRun?: boolean }) => strikeCommand(ids, options));
+configureKnowledgeCommand(program);
 registerSwarmCommands(program);
 registerWorkspaceCommands(program);
 registerTestCommands(program);
