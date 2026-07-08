@@ -151,6 +151,7 @@ export { nudgeStalledResumeWorkAgents, redeliverUndeliveredKickoffs, nudgeIdleWo
 import { OVERDECK_HOME, AGENTS_DIR, sessionFilePath } from '../paths.js';
 import { loadCloisterConfigSync, loadCloisterConfig } from './config.js';
 import { workResumeSlotsAvailable, getConcurrencyLimits, countRunningAgents, resetPatrolDispatchBudget, tryReserveAdvancingSlot, releaseAdvancingSlot, describeRunningAgents } from './concurrency.js';
+import { tryYieldForAdvancingDispatch } from './preemption.js';
 import { setReviewStatusSync, loadReviewStatuses, getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { needsReviewDispatch } from '../review-dispatch-decision.js';
 import { readIssueRecordSync, ensureIssueRecordSync, writeIssueRecordSync } from '../pan-dir/record.js';
@@ -1304,7 +1305,8 @@ export async function checkPendingTestDispatch(): Promise<string[]> {
 
       // PAN-1665: defer at the advancing-role concurrency ceiling; status stays
       // pending/dispatch_failed so a later patrol retries once a slot frees.
-      if (!tryReserveAdvancingSlot()) {
+      // PAN-2507: first try to yield an idle work agent to free the slot.
+      if (!tryReserveAdvancingSlot() && !(await tryYieldForAdvancingDispatch('test', issueId))) {
         actions.push(`Deferred test retry for ${issueId} — advancing-role concurrency ceiling reached`);
         logDeaconEventSync(`checkPendingTestDispatch: deferred test for ${issueId} — advancing ceiling reached (PAN-1665) — ${describeRunningAgents()}`);
         continue;
@@ -1655,7 +1657,10 @@ export async function checkPostReviewCommits(): Promise<string[]> {
       // with other dispatch paths (HTTP request-review, manual CLI) that may have
       // already picked up the work between the reset above and now.
       const freshStatus = getReviewStatusSync(issueId);
-      if (freshStatus?.reviewStatus === 'pending' && !tryReserveAdvancingSlot()) {
+      // PAN-2507: also a blocked advancing (review) dispatch — try to yield an
+      // idle work agent before deferring. (This 7th site was not in the PRD's
+      // six-site enumeration but is the same `!tryReserveAdvancingSlot()` shape.)
+      if (freshStatus?.reviewStatus === 'pending' && !tryReserveAdvancingSlot() && !(await tryYieldForAdvancingDispatch('review', issueId))) {
         // PAN-1665: at the ceiling — status is already reset to pending above, so
         // the orphan-review path will re-dispatch on a later patrol once a slot frees.
         actions.push(`Deferred post-review re-dispatch for ${issueId} — advancing-role concurrency ceiling reached`);

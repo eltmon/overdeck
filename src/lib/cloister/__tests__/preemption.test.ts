@@ -14,6 +14,7 @@ import {
   selectYieldVictim,
   yieldWorkAgentFor,
   resumeYieldedAgents,
+  tryYieldForAdvancingDispatch,
   type YieldCandidate,
 } from '../preemption.js';
 
@@ -31,6 +32,7 @@ const mocks = vi.hoisted(() => ({
   assessMemoryPressure: vi.fn(),
   emitActivityEntrySync: vi.fn(),
   logDeaconEventSync: vi.fn(),
+  tryReserveAdvancingSlot: vi.fn(),
 }));
 
 vi.mock('../../agents.js', () => ({
@@ -68,6 +70,10 @@ vi.mock('../agent-idle.js', () => ({
 
 vi.mock('../memory-governor.js', () => ({
   assessMemoryPressure: mocks.assessMemoryPressure,
+}));
+
+vi.mock('../concurrency.js', () => ({
+  tryReserveAdvancingSlot: mocks.tryReserveAdvancingSlot,
 }));
 
 function candidate(overrides: Partial<YieldCandidate> = {}): YieldCandidate {
@@ -188,6 +194,49 @@ describe('yieldWorkAgentFor', () => {
     const outcome = await yieldWorkAgentFor('review', 'PAN-5678');
     expect(outcome.yielded).toBe(false);
     expect(mocks.setAgentYieldedSync).not.toHaveBeenCalled();
+  });
+});
+
+describe('tryYieldForAdvancingDispatch', () => {
+  beforeEach(() => {
+    mocks.listRunningAgentsSync.mockReturnValue([
+      { id: 'agent-pan-1000', issueId: 'PAN-1000', role: 'work', status: 'running', lastActivity: '2026-07-08T00:00:00.000Z' },
+    ]);
+    mocks.isAgentIdleForNudge.mockReturnValue(true);
+  });
+
+  it('returns false without yielding when no victim is available', async () => {
+    mocks.isAgentIdleForNudge.mockReturnValue(false);
+    const ok = await tryYieldForAdvancingDispatch('review', 'PAN-5678');
+    expect(ok).toBe(false);
+    expect(mocks.tryReserveAdvancingSlot).not.toHaveBeenCalled();
+  });
+
+  it('returns true immediately when the freed slot lets the count-gated retry reserve', async () => {
+    mocks.tryReserveAdvancingSlot.mockReturnValueOnce(true);
+    const ok = await tryYieldForAdvancingDispatch('review', 'PAN-5678');
+    expect(ok).toBe(true);
+    expect(mocks.stopAgent).toHaveBeenCalledWith('agent-pan-1000');
+    expect(mocks.assessMemoryPressure).not.toHaveBeenCalled();
+    expect(mocks.clearYieldForResumeSync).not.toHaveBeenCalled();
+  });
+
+  it('resumes the victim (FR-6c) and returns false when the retry still fails', async () => {
+    // Both reservation attempts fail ⇒ settle path runs (fake timers).
+    vi.useFakeTimers();
+    try {
+      mocks.tryReserveAdvancingSlot.mockReturnValue(false);
+      const pending = tryYieldForAdvancingDispatch('review', 'PAN-5678');
+      await vi.runAllTimersAsync();
+      const ok = await pending;
+      expect(ok).toBe(false);
+      expect(mocks.assessMemoryPressure).toHaveBeenCalled();
+      // FR-6c: victim put back.
+      expect(mocks.clearYieldForResumeSync).toHaveBeenCalledWith('agent-pan-1000');
+      expect(mocks.resumeAgent).toHaveBeenCalledWith('agent-pan-1000');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
