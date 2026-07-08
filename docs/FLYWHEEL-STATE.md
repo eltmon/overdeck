@@ -207,6 +207,21 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-60 tick 1 (2026-07-08) — 🔴 RED MAIN P0 at run start (PAN-2507 regression) → filed PAN-2508 + STRUCK; PAN-2108 closed-out; B3/PAN-2167 planned (start gated on green)
+
+**Run start was NOT clean — main is RED.** The brief asserted a clean/green pipeline, but CI on HEAD-1 `5e8728d834` (last PAN-2507 commit) = FAILURE on the `test` job, and the docs-only HEAD `1a58c36850` inherited it (CI run 28977123021 = failure). PAN-2507 (preemptive scheduler, landed direct-to-main this session) desynced FOUR lock-tests/fixtures. Root-caused at code level + reproduced locally:
+- `agents-db.test.ts` (11 tests): SQLite param 25 = `yielded_at`. `agentToParams` (agents-db.ts:165-166) binds `agent.yieldedAt`/`agent.lastYieldResumeAt` **directly, no `?? null`** unlike every other nullable field (prod mapper agent-mappers.ts:39 DOES coerce). Fixture `makeAgent` (agents-db.test.ts:42) never set the 3 new fields → `undefined` → SQLite can't bind.
+- `agents-barrel-exports.test.ts`: 2 new exports (`clearYieldForResumeSync`, `setAgentYieldedSync`) not added to EXPECTED_EXPORTS lock (91→93).
+- `pending-auto-merges-schema.test.ts`: `SCHEMA_VERSION` migration bumped 58→59, assertion still 58.
+- `deacon-auto-resume.test.ts` (suite fail): `node:os` mock missing `homedir` export (paths.ts:53 → cloister/config.ts).
+- **ACTION:** filed [PAN-2508](https://github.com/eltmon/overdeck/issues/2508) (blocks-main) with the full 4-group diagnosis + fixes → `pan strike PAN-2508` (session strike-pan-2508 live 17:44). On ready: review diff, full suite green (no `--changed`), `gh pr create` + `gh pr merge --squash --admin` on green, `pan close --strike`.
+- **PATTERN (record):** direct-to-main pipeline-machinery landings (PAN-2507) that add exports/columns/schema-version/new-`os`-call-paths routinely desync lock-tests + fixtures. This is the 3rd red-main class this stretch (cf RUN-58 no-loss-matrix dup t146/t154). Substrate candidate: a pre-merge "impl-vs-lock-test drift" gate, or run the affected lock-tests in the direct-push guard. NOT yet filed as its own issue — surfaced.
+- **TAIL:** A11/PAN-2108 (dead-recipient recovery) was `merged`+`verifying-on-main`, code present on main (recovery.ts/reap-terminal-sessions.ts), sibling A12/PAN-2436 already closed-out → **`pan close PAN-2108 --force` DONE** (issue closed, review-status cleared).
+- **B3/PAN-2167 (clean-tree gate):** PRD re-verified FRESH (review-pipeline.ts + done.ts zero drift since Verified-Against `6681632bfe`; anchors 49/56/82 match). `pan plan PAN-2167 --auto` DONE → now `planned`. **`pan start` GATED until main green** (Lane B rule: main green before dispatch).
+- **Lane A remainder:** A9/PAN-2229 `needs-handoff` (surface, no autonomous start); A13/PAN-2445 no labels/not-ready (surface). A10/2420 + A12/2436 CLOSED. B0-B2 CLOSED.
+- **MIN rfm (report-only, UAT-held):** MIN-867/862/729/865/861 review+test passed — operator merges. No merge verbs emitted (per-project hold).
+- Pipeline otherwise clean (only 2 operator convs + orchestrator at start).
+
 ## RUN-58 — OPERATOR DIRECTIVE (post-t122): reconciled primary main (20 ahead/6 behind + dirty) → merged origin/main + pushed (b6535028fa); fully synced
 
 Operator: primary local main diverged (20 bot chore(state) commits ahead / 6 behind = PAN-2464/1872/2405/2388 + 2 fixes), auto-push deferring on non-fast-forward + dirty tree. Directed: commit state, resolve tsx, merge origin/main, push.
