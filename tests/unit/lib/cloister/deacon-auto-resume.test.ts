@@ -19,10 +19,14 @@ const countRunningAgentsMock = vi.fn();
 const workResumeSlotsAvailableMock = vi.fn();
 const resumeAgentMock = vi.fn();
 
-vi.mock('node:os', () => ({
-  cpus: () => Array.from({ length: 8 }, () => ({})),
-  loadavg: () => [0.5, 0.5, 0.5],
-}));
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  return {
+    ...actual,
+    cpus: () => Array.from({ length: 8 }, () => ({})),
+    loadavg: () => [0.5, 0.5, 0.5],
+  };
+});
 
 vi.mock('../../../../src/lib/cloister/memory-governor.js', () => ({
   assessMemoryPressure: (...args: unknown[]) => assessMemoryPressureMock(...args),
