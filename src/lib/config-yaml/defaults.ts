@@ -196,6 +196,11 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     governorSoftReserveGb: GOVERNOR_RESERVE_DEFAULTS_GB.soft,
     governorHardReserveGb: GOVERNOR_RESERVE_DEFAULTS_GB.hard,
     governorRecoveryReserveGb: GOVERNOR_RESERVE_DEFAULTS_GB.recovery,
+    // PAN-2500: cold-start footprint defaults — work agents carry a docker
+    // workspace stack + build tooling, review/test specialists are lighter.
+    governorFootprintDefaultWorkGb: 2,
+    governorFootprintDefaultReviewGb: 1,
+    governorFootprintDefaultTestGb: 1,
   },
   issues: {
     closedWindowDays: 14,
