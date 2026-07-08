@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-2167",
   "schemaVersion": 2,
-  "created": "2026-07-08T21:36:56.346Z",
-  "updated": "2026-07-08T21:36:56.663Z",
-  "pipeline": {
-    "issueId": "PAN-2167",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-08T21:36:56.346Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -26,6 +9,88 @@
       "timestamp": "2026-07-08T21:36:56.345Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-08T21:36:56.346Z",
+  "updated": "2026-07-08T23:02:52.183Z",
+  "pipeline": {
+    "issueId": "PAN-2167",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-08T23:02:52.127Z",
+    "inspectNotes": "Bead state-plane-status-predicate ack: isStatePlaneOnlyStatus/parsePorcelainStatusPaths added to src/lib/state-plane.ts satisfy all 4 ACs (MM/untracked in-plane true, non-plane path false, empty clean true+[], rename dest resolution both directions); 13/13 tests pass independently verified; no any/execSync/oversized files."
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 496592,
+            "output": 1085,
+            "cacheRead": 450048,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.5": {
+            "input": 2383024,
+            "output": 8042,
+            "cacheRead": 2277632,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 18185,
+            "output": 41201,
+            "cacheRead": 4096356,
+            "cacheWrite": 159563
+          }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 14353,
+            "output": 4441,
+            "cacheRead": 816569,
+            "cacheWrite": 90850
+          }
+        }
+      },
+      "totals": {
+        "openai/codex-auto-review": {
+          "input": 496592,
+          "output": 1085,
+          "cacheRead": 450048,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.5": {
+          "input": 2383024,
+          "output": 8042,
+          "cacheRead": 2277632,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 18185,
+          "output": 41201,
+          "cacheRead": 4096356,
+          "cacheWrite": 159563
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 14353,
+          "output": 4441,
+          "cacheRead": 816569,
+          "cacheWrite": 90850
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 6.53699,
+        "pricingAsOf": "2026-07-08T23:02:52.182Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "model": "claude-sonnet-5"
 }
