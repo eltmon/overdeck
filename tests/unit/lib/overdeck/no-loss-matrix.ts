@@ -274,6 +274,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   // ── issues.ts ─────────────────────────────────────────────────────────────
   { surface: 'GET /api/issues',                                     kind: 'http', disposition: 'READ',        door: 'IssuesResolver.list' },
   { surface: 'GET /api/issues/:id/analyze',                         kind: 'http', disposition: 'DELETE',      door: 'ad-hoc analysis helper; no pipeline branch reads it' },
+  { surface: 'GET /api/issues/:id/ship-log',                        kind: 'http', disposition: 'AGGREGATE',   door: 'ShipLog runtime ring buffer + ReviewStatus merge state' },
   { surface: 'GET /api/issues/:id/beads',                           kind: 'http', disposition: 'RELOCATE',    door: 'Beads (out of remodel scope)' },
   { surface: 'GET /api/issues/:id/planning-state',                  kind: 'http', disposition: 'READ',        door: 'IssuesResolver.get (stage + planRef)' },
   { surface: 'GET /api/issues/:id/ship-log',                        kind: 'http', disposition: 'READ',        door: 'getShipLog + ReviewStatusResolver (merge progress)' },
