@@ -21,9 +21,44 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-08T01:32:33.593Z"
+    },
+    {
+      "timestamp": "2026-07-08T01:52:29.009Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".beads/export-state.json",
+      ".beads/issues.jsonl",
+      ".pan/drafts/pan-2297.md",
+      ".pan/records/pan-2296.json",
+      ".pan/records/pan-2297.json",
+      "sync-sources/hooks/record-cost-event.js.map"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "src/lib/cloister/file-size-reconcile.ts",
+      "src/lib/cloister/uat-promote.ts",
+      "tests/unit/lib/cloister/file-size-reconcile.test.ts",
+      "tests/unit/lib/cloister/uat-promote-baseline.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".beads/export-state.json",
+      ".beads/issues.jsonl",
+      ".pan/drafts/pan-2297.md",
+      ".pan/records/pan-2296.json",
+      ".pan/records/pan-2297.json",
+      "src/lib/cloister/file-size-reconcile.ts",
+      "src/lib/cloister/uat-promote.ts",
+      "sync-sources/hooks/record-cost-event.js.map",
+      "tests/unit/lib/cloister/file-size-reconcile.test.ts",
+      "tests/unit/lib/cloister/uat-promote-baseline.test.ts"
+    ],
+    "recordedAt": "2026-07-08T01:52:00.005Z"
+  },
   "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
@@ -50,10 +85,10 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": true,
-    "updatedAt": "2026-07-08T01:34:16.537Z",
+    "updatedAt": "2026-07-08T01:55:16.596Z",
     "testNotes": "typecheck passed; lint passed (skills, prompts, file-size, source-introspection, no-coderabbit-merge-gate, circular, ratchet-audit, quarantine-audit); tests passed: file-size-reconcile.test.ts (3/3), uat-promote.test.ts (10/10), uat-promote-baseline.test.ts (1/1 real-git integration reproducing PAN-2296). No browser UAT required — acceptance criteria are backend/git/CI only.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2482",
-    "reviewedAtCommit": "39930d20cf3ca4ec890033539ab22a2d291037d8",
+    "reviewedAtCommit": "43fa0a7bd34b6bd90ef9a040d7c2e8f8a69523fb",
     "lastVerifiedCommit": "f10d394daf193102f72494a95069720ae1f3c7ee",
     "reviewRequestedAt": "2026-07-08T01:32:20.693Z"
   },
@@ -62,15 +97,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 6955727,
-            "output": 10397,
-            "cacheRead": 6177664,
+            "input": 7664657,
+            "output": 11236,
+            "cacheRead": 6832896,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 33391952,
-            "output": 64207,
-            "cacheRead": 31704192,
+            "input": 35949341,
+            "output": 70212,
+            "cacheRead": 33935744,
             "cacheWrite": 0
           },
           "unknown": {
@@ -129,15 +164,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 6955727,
-          "output": 10397,
-          "cacheRead": 6177664,
+          "input": 7664657,
+          "output": 11236,
+          "cacheRead": 6832896,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 33712602,
-          "output": 72024,
-          "cacheRead": 32682112,
+          "input": 36269991,
+          "output": 78029,
+          "cacheRead": 34913664,
           "cacheWrite": 0
         },
         "unknown": {
@@ -172,11 +207,13 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 62.846992,
-        "pricingAsOf": "2026-07-08T01:34:16.600Z"
+        "usd": 65.772103,
+        "pricingAsOf": "2026-07-08T01:55:16.621Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2482"
+    ],
     "ranOn": "eltmon-z790"
   },
   "swarm": {
@@ -184,5 +221,5 @@
     "finalizedAt": "2026-07-08T01:15:23.672Z"
   },
   "created": "2026-07-07T23:25:44.874Z",
-  "updated": "2026-07-08T01:34:16.612Z"
+  "updated": "2026-07-08T01:55:16.626Z"
 }
