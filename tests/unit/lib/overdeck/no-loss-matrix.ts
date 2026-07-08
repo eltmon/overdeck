@@ -276,6 +276,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/issues/:id/analyze',                         kind: 'http', disposition: 'DELETE',      door: 'ad-hoc analysis helper; no pipeline branch reads it' },
   { surface: 'GET /api/issues/:id/beads',                           kind: 'http', disposition: 'RELOCATE',    door: 'Beads (out of remodel scope)' },
   { surface: 'GET /api/issues/:id/planning-state',                  kind: 'http', disposition: 'READ',        door: 'IssuesResolver.get (stage + planRef)' },
+  { surface: 'GET /api/issues/:id/ship-log',                        kind: 'http', disposition: 'READ',        door: 'getShipLog + ReviewStatusResolver (merge progress)' },
   { surface: 'GET /api/issues/:id/pr',                              kind: 'http', disposition: 'READ',        door: 'IssuesResolver.get(.pr) + live GitHub for CI' },
   { surface: 'GET /api/issues/:id/pr/diff',                         kind: 'http', disposition: 'RELOCATE',    door: 'Diffs / live GitHub' },
   { surface: 'GET /api/issues/:id/pr/details',                      kind: 'http', disposition: 'RELOCATE',    door: 'Diffs / live GitHub' },

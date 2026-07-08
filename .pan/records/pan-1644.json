@@ -1,88 +1,7 @@
 {
   "issueId": "PAN-1644",
   "schemaVersion": 2,
-  "sessionHistory": [
-    {
-      "reason": "resume",
-      "agentModel": "kimi-k2.7-code",
-      "timestamp": "2026-07-08T02:09:12.953Z"
-    },
-    {
-      "timestamp": "2026-07-08T02:37:28.340Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    }
-  ],
   "feedback": [],
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      ".pan/records/pan-1644.json",
-      "scripts/file-size-baseline.txt",
-      "sync-sources/hooks/record-cost-event.js.map",
-      "tests/unit/lib/overdeck/no-loss-matrix.ts"
-    ],
-    "declaredScopeUntouched": [
-      "skills/pan-admin-config/SKILL.md",
-      "src/cli/index.ts"
-    ],
-    "declaredScope": [
-      "docs/SKILLS-CONVENTION.md",
-      "packages/contracts/src/event-reducers.ts",
-      "packages/contracts/src/events.ts",
-      "skills/pan-admin-config/SKILL.md",
-      "src/cli/commands/admin/conversations-handler.ts",
-      "src/cli/commands/admin/index.ts",
-      "src/cli/index.ts",
-      "src/dashboard/server/routes/__tests__/admin-backfill-titles.test.ts",
-      "src/dashboard/server/routes/__tests__/hooks-turn-complete.test.ts",
-      "src/dashboard/server/routes/__tests__/hooks-user-prompt.test.ts",
-      "src/dashboard/server/routes/admin.ts",
-      "src/dashboard/server/routes/hooks.ts",
-      "src/lib/conversations/transcript-summary.ts",
-      "src/lib/overdeck/conversation-message.ts",
-      "src/lib/overdeck/conversation-reads.ts",
-      "src/lib/overdeck/conversations.ts",
-      "src/lib/overdeck/title-refinement.ts",
-      "sync-sources/hooks/stop-hook*",
-      "sync-sources/hooks/user-prompt-submit-hook*",
-      "tests/dashboard/event-reducers.test.ts",
-      "tests/unit/lib/conversations/derive-prompt-title.test.ts",
-      "tests/unit/lib/overdeck/conversation-message-title.test.ts",
-      "tests/unit/lib/overdeck/title-events.test.ts",
-      "tests/unit/lib/overdeck/title-refinement.test.ts",
-      "tests/unit/lib/overdeck/title-sources.test.ts"
-    ],
-    "actualChangedFiles": [
-      ".pan/records/pan-1644.json",
-      "docs/SKILLS-CONVENTION.md",
-      "packages/contracts/src/event-reducers.ts",
-      "packages/contracts/src/events.ts",
-      "scripts/file-size-baseline.txt",
-      "src/cli/commands/admin/conversations-handler.ts",
-      "src/cli/commands/admin/index.ts",
-      "src/dashboard/server/routes/__tests__/admin-backfill-titles.test.ts",
-      "src/dashboard/server/routes/__tests__/hooks-turn-complete.test.ts",
-      "src/dashboard/server/routes/__tests__/hooks-user-prompt.test.ts",
-      "src/dashboard/server/routes/admin.ts",
-      "src/dashboard/server/routes/hooks.ts",
-      "src/lib/conversations/transcript-summary.ts",
-      "src/lib/overdeck/conversation-message.ts",
-      "src/lib/overdeck/conversation-reads.ts",
-      "src/lib/overdeck/conversations.ts",
-      "src/lib/overdeck/title-refinement.ts",
-      "sync-sources/hooks/record-cost-event.js.map",
-      "sync-sources/hooks/stop-hook",
-      "sync-sources/hooks/user-prompt-submit-hook",
-      "tests/dashboard/event-reducers.test.ts",
-      "tests/unit/lib/conversations/derive-prompt-title.test.ts",
-      "tests/unit/lib/overdeck/conversation-message-title.test.ts",
-      "tests/unit/lib/overdeck/no-loss-matrix.ts",
-      "tests/unit/lib/overdeck/title-events.test.ts",
-      "tests/unit/lib/overdeck/title-refinement.test.ts",
-      "tests/unit/lib/overdeck/title-sources.test.ts"
-    ],
-    "recordedAt": "2026-07-08T02:37:17.830Z"
-  },
   "harness": "claude-code",
   "model": "kimi-k2.7-code",
   "statusOverrides": {
@@ -131,20 +50,22 @@
   },
   "pipeline": {
     "issueId": "PAN-1644",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
-    "verificationStatus": "running",
+    "reviewStatus": "pending",
+    "testStatus": "testing",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
-    "mergeStatus": "verifying",
+    "mergeStatus": "failed",
     "readyForMerge": false,
-    "updatedAt": "2026-07-08T03:17:11.769Z",
+    "updatedAt": "2026-07-08T03:21:28.726Z",
     "reviewNotes": "No blocking findings; focused title hook tests passed",
     "testNotes": "typecheck passed; lint passed (including skills, prompts, file-size, source-introspection, circular, ratchet, quarantine audits); npm test passed (921 test files passed, 8875 tests passed, 4/52 skipped; frontend issueActions tests passed). Browser UAT exercised on workspace dashboard (port 3020): loaded dashboard, opened conversation 20260707-2531, retitled from 'Conversation retitle history and status' to 'PAN-1644 UAT Test Title', and verified the new title propagated to both the conversation header and the left sidebar conversation list.",
+    "verificationNotes": "Verification FAILED at test (121785ms):\n\nitial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| tests/unit/lib/overdeck/no-loss-matrix.test.ts > G3 no-loss matrix > AC1/AC2: every enumerated HTTP route is present in the matrix\n FAIL  |root| tests/unit/lib/overdeck/no-loss-matrix.test.ts > G3 no-loss matrix > AC1/AC2: every enumerated HTTP route is present in the matrix\nAssertionError: The following HTTP routes exist in the codebase but have no entry in the\nNO_LOSS_MATRIX.  Add each one to tests/unit/lib/overdeck/no-loss-matrix.ts\nwith an explicit disposition (READ/WRITE/AGGREGATE/RELOCATE/DELETE/OUT_OF_SCOPE)\nand a non-empty door/reason string.\n  missing: GET /api/issues/:id/ship-log: expected [ 'GET /api/issues/:id/ship-log' ] to deeply equal []\n\n- Expected\n+ Received\n\n- []\n+ [\n+   \"GET /api/issues/:id/ship-log\",\n+ ]\n\n ❯ tests/unit/lib/overdeck/no-loss-matrix.test.ts:95:19\n     93|       'and a non-empty door/reason string.',\n     94|       ...missing.map(r => `  missing: ${r}`),\n     95|     ].join('\\n')).toEqual([]);\n       |                   ^\n     96|   });\n     97|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n",
     "inspectNotes": "Bead title-changed-event ack: ConversationTitleChangedEvent schema added to DomainEvent union with {conversationName,title,titleSource} payload, reducer case bumps conversationsListRevision by 1 (test confirms 7->8), and updateConversationTitle() emits via getEventStore().emitOnly() (sequence auto-assigned by Omit<DomainEvent,\"sequence\"> signature) wrapped in try/catch so persistence never throws when the event store is uninitialized (both paths unit-tested). All 3 ACs met.",
+    "mergeNotes": "Post-rebase verification failed at test",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2480",
-    "reviewedAtCommit": "8c3b35dacab3848fd5a3c2b20f7f93a5b9ef7abf",
+    "reviewedAtCommit": "0efacfa8890236c2f2af44166156ab093663491a",
     "lastVerifiedCommit": "c9df3272408f6beb50a1981f57e455335c229a3b",
-    "reviewRequestedAt": "2026-07-08T02:07:59.245Z",
+    "reviewRequestedAt": "2026-07-08T03:18:18.049Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/records/pan-1644.json",
@@ -220,9 +141,9 @@
       "byStage": {
         "codex": {
           "openai/gpt-5.5": {
-            "input": 11472734,
-            "output": 27384,
-            "cacheRead": 10536064,
+            "input": 12457001,
+            "output": 29814,
+            "cacheRead": 11389056,
             "cacheWrite": 0
           }
         },
@@ -252,26 +173,26 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 1124063,
-            "output": 40065,
-            "cacheRead": 21111018,
+            "input": 1901128,
+            "output": 44141,
+            "cacheRead": 22011626,
             "cacheWrite": 0
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 5285932,
-            "output": 345097,
-            "cacheRead": 177056512,
+            "input": 5290296,
+            "output": 345951,
+            "cacheRead": 177849088,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 11472734,
-          "output": 27384,
-          "cacheRead": 10536064,
+          "input": 12457001,
+          "output": 29814,
+          "cacheRead": 11389056,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -293,15 +214,15 @@
           "cacheWrite": 86241
         },
         "custom/kimi-k2.7-code": {
-          "input": 6409995,
-          "output": 385162,
-          "cacheRead": 198167530,
+          "input": 7191424,
+          "output": 390092,
+          "cacheRead": 199860714,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 69.839734,
-        "pricingAsOf": "2026-07-08T03:17:11.857Z"
+        "usd": 72.079286,
+        "pricingAsOf": "2026-07-08T03:21:28.831Z"
       }
     },
     "merges": [
@@ -327,6 +248,6 @@
       "note": "Slot branch feature/pan-1644-slot-1 did not merge cleanly"
     }
   },
-  "created": "2026-07-08T02:09:12.766Z",
-  "updated": "2026-07-08T03:17:11.858Z"
+  "created": "2026-07-08T03:21:23.034Z",
+  "updated": "2026-07-08T03:21:28.843Z"
 }
