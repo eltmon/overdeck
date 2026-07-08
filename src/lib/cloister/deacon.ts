@@ -178,7 +178,7 @@ import {
   getAllProjectSpecialistStatuses,
   parseReviewerSessionName,
 } from './specialists.js';
-import { getAgentRuntimeStateSync, saveAgentRuntimeState, saveSessionId, listRunningAgentsSync, listRunningAgents, listAgentStates, getAgentDir, getAgentStateSync, getAgentState, saveAgentStateSync, saveAgentState, resumeAgent, recordAgentFailure, resetAgentFailureCount, markAgentRunningState, buildDefaultResumeContinueMessage, type AgentState } from '../agents.js';
+import { getAgentRuntimeStateSync, saveAgentRuntimeState, saveSessionId, listRunningAgentsSync, listRunningAgents, listAgentStates, getAgentDir, getAgentStateSync, getAgentState, saveAgentStateSync, saveAgentState, resumeAgent, recordAgentFailure, resetAgentFailureCount, markAgentRunningState, buildDefaultResumeContinueMessage, clearAgentTroubledSync, type AgentState } from '../agents.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { buildTmuxCommandString, capturePane, createSession, isPaneDead, killSessionSync, killSession, listPaneValuesSync, listPaneValues, listSessionNames, sessionExistsSync, sessionExists, sendKeys } from '../tmux.js';
 import { withConcurrencyLimit } from '../concurrency.js';
@@ -187,7 +187,7 @@ import { isAgentIdleForNudge } from './agent-idle.js';
 import { checkStuckAgentRemediation } from './stuck-remediation.js';
 import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
-import { reconcileOrphanProposedSpecs } from './orphan-proposed-reconciler.js';
+import { reconcileOrphanProposedSpecs, spawnWorkAgentThroughAgentsEndpoint } from './orphan-proposed-reconciler.js';
 import { reconcileTestStatusFromGreenCiWithDeps } from './test-status-green-ci-reconciler.js';
 import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
 import { reconcileIdleWorkspaceStacks } from './idle-stack-reaper.js';
@@ -1924,18 +1924,8 @@ export async function checkDeadEndAgents(): Promise<string[]> {
       const issueId = key;
       const agentSessionName = `agent-${issueId.toLowerCase()}`;
 
-      if (!sessionExistsSync(agentSessionName)) {
-        // No agent session — nothing to recover
-        continue;
-      }
-
-      // Check if agent is idle via Stop hook state (authoritative idle signal)
-      if (!isAgentIdleForNudge(agentSessionName)) {
-        // Agent is still working or has no hook state — let it finish
-        continue;
-      }
-
-      // Agent is idle with a blocked/failed status — this is a dead end
+      // Human-readable status type — computed up front so both the
+      // respawn-on-dead-agent path (PAN-2209) and the nudge-on-idle path can use it.
       let statusType: string;
       if (isReviewBlocked) {
         statusType = status.reviewStatus === 'failed' ? 'review failed' : 'review blocked';
@@ -1948,6 +1938,59 @@ export async function checkDeadEndAgents(): Promise<string[]> {
       } else {
         statusType = 'merge CI blocked';
       }
+
+      if (!sessionExistsSync(agentSessionName)) {
+        // PAN-2209: the work agent's session is gone (context-exhausted, crashed,
+        // or resume-failed after completion) but a review/test rework is needed.
+        // Nothing else respawns it, so the issue stalls indefinitely and an
+        // operator has to hand-recover. For the rework classes (review
+        // blocked/failed, verification failed, tests failed) respawn a fresh work
+        // agent — its kickoff prompt (work-agent-prompt.ts) drains the pending
+        // `.pan/feedback` so it addresses the review. Merge-CI dead-ends need no
+        // work session and keep their prior no-session behavior (they fall through
+        // to `continue`; the merge-CI branch below requires a live session).
+        if (isReviewBlocked || isVerificationFailed || isTestFailed) {
+          const agentState = getAgentStateSync(agentSessionName);
+          if (agentState?.paused === true) {
+            // A deliberate pause (operator, burn-guard, verify-hold) parked this
+            // agent. Respect it — never override an intentional pause to respawn.
+            console.log(`[deacon] PAN-2209: ${issueId} (${statusType}) has a dead session but is paused (${agentState.pausedReason ?? 'no reason'}) — respecting pause`);
+          } else {
+            deadEndCooldowns.set(key, now);
+            // Engage the shared circuit breaker so a chronically-dying agent
+            // cannot be respawned forever (>=25 requeues halts, checked above).
+            setReviewStatusSync(issueId, { autoRequeueCount: autoRequeueCount + 1 });
+            // Clear only the system-set `troubled` gate (resume-failure counter
+            // after completion) — the false state that strands the rework, per
+            // PAN-2209 evidence. Paused agents were already excluded above.
+            clearAgentTroubledSync(agentSessionName);
+            try {
+              const spawn = await spawnWorkAgentThroughAgentsEndpoint(issueId);
+              if (spawn.spawned) {
+                actions.push(`Dead-end recovery (PAN-2209): respawned dead work agent for ${issueId} (${statusType}) to address feedback`);
+                console.log(`[deacon] PAN-2209: respawned dead work agent for ${issueId} (${statusType})`);
+              } else {
+                actions.push(`Dead-end recovery (PAN-2209): respawn of ${issueId} deferred — ${spawn.skippedReason ?? spawn.error}`);
+                console.log(`[deacon] PAN-2209: respawn of ${issueId} deferred: ${spawn.skippedReason ?? spawn.error}`);
+              }
+            } catch (err: unknown) {
+              const msg = err instanceof Error ? err.message : String(err);
+              console.error(`[deacon] PAN-2209: respawn failed for ${issueId}: ${msg}`);
+              actions.push(`Dead-end recovery (PAN-2209): respawn failed for ${issueId}: ${msg}`);
+            }
+          }
+        }
+        // No live session to nudge — done with this issue this cycle.
+        continue;
+      }
+
+      // Check if agent is idle via Stop hook state (authoritative idle signal)
+      if (!isAgentIdleForNudge(agentSessionName)) {
+        // Agent is still working or has no hook state — let it finish
+        continue;
+      }
+
+      // Agent is idle with a blocked/failed status — this is a dead end
       console.log(`[deacon] Dead-end detected: ${key} (${statusType}) with idle agent ${agentSessionName}`);
 
       // Record cooldown before taking action
