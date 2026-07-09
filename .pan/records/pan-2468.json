@@ -81,17 +81,14 @@
       "reason": "feedback",
       "note": "[2026-07-09T07:34Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-09T07:34:59.649Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-09T07:34:59Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2468\n\nGenerated OKF conformance workflow calls ../code-repo scripts that are absent in a knowledge-repo checkout\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2468 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-09T07:55:17.745Z"
     }
   ],
+  "feedback": [],
   "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
@@ -196,16 +193,17 @@
   },
   "pipeline": {
     "issueId": "PAN-2468",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-09T07:34:54.348Z",
-    "reviewNotes": "Generated OKF conformance workflow calls ../code-repo scripts that are absent in a knowledge-repo checkout",
+    "updatedAt": "2026-07-09T07:55:20.108Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: OKF conformance workflow now checks out overdeck as sibling code-repo; Command Deck renders knowledge agents; closed all beads.",
     "inspectNotes": "Bead ollama-ensure ack: curl|sh auto-install replaced with macOS-only Homebrew path + explicit manual-install error on other platforms; verified the change is isolated to installOllamaWithPlatformCommand() and does not affect AC1/AC2 test paths (both go through the injectable options.installOllama hook), and AC3 PAN-1641 note test at ollama.test.ts:131 is untouched.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2488",
+    "lastVerifiedCommit": "c7bec972a163b7bcf97b82f8419b7b637ff2977e",
     "reviewRequestedAt": "2026-07-09T07:32:36.230Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -420,9 +418,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 120975253,
-            "output": 253337,
-            "cacheRead": 116268672,
+            "input": 122052192,
+            "output": 255059,
+            "cacheRead": 117338496,
             "cacheWrite": 0
           }
         },
@@ -476,9 +474,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1932649,
-            "output": 198767,
-            "cacheRead": 105521684,
+            "input": 2000104,
+            "output": 215772,
+            "cacheRead": 119697940,
             "cacheWrite": 0
           }
         }
@@ -497,9 +495,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 120975253,
-          "output": 253337,
-          "cacheRead": 116268672,
+          "input": 122052192,
+          "output": 255059,
+          "cacheRead": 117338496,
           "cacheWrite": 0
         },
         "anthropic/claude-opus-4-8": {
@@ -527,15 +525,15 @@
           "cacheWrite": 231255
         },
         "custom/kimi-k2.7-code": {
-          "input": 2603467,
-          "output": 216988,
-          "cacheRead": 113015060,
+          "input": 2670922,
+          "output": 233993,
+          "cacheRead": 127191316,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 148.71123825,
-        "pricingAsOf": "2026-07-09T07:34:54.414Z"
+        "usd": 152.15898225,
+        "pricingAsOf": "2026-07-09T07:55:20.161Z"
       }
     },
     "merges": [
@@ -544,5 +542,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-08T05:17:37.055Z",
-  "updated": "2026-07-09T07:34:59.649Z"
+  "updated": "2026-07-09T07:55:20.175Z"
 }
