@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-09T00:37:52.092Z",
-  "updated": "2026-07-09T00:52:30.805Z",
+  "updated": "2026-07-09T00:59:16.389Z",
   "pipeline": {
     "issueId": "PAN-2360",
     "reviewStatus": "pending",
@@ -50,5 +50,16 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "kimi-k2.7-code"
+  "model": "kimi-k2.7-code",
+  "statusOverrides": {
+    "update-roles-doc": "completed",
+    "update-roles-doc.ac1": "completed",
+    "update-roles-doc.ac2": "completed",
+    "fix-kickoff-prompt": "completed",
+    "fix-kickoff-prompt.ac1": "completed",
+    "fix-kickoff-prompt.ac2": "completed",
+    "fix-kickoff-prompt.ac3": "completed",
+    "fix-kickoff-prompt.ac4": "completed",
+    "fix-kickoff-prompt.ac5": "completed"
+  }
 }
