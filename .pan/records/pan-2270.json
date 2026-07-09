@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-09T02:50:24.144Z",
-  "updated": "2026-07-09T03:04:15.830Z",
+  "updated": "2026-07-09T03:24:27.654Z",
   "pipeline": {
     "issueId": "PAN-2270",
     "reviewStatus": "pending",
@@ -50,5 +50,22 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "kimi-k2.7-code"
+  "model": "kimi-k2.7-code",
+  "statusOverrides": {
+    "review-control": "completed",
+    "review-control.ac1": "completed",
+    "review-control.ac2": "completed",
+    "review-control.ac3": "completed",
+    "deacon-sites": "completed",
+    "deacon-sites.ac1": "completed",
+    "deacon-sites.ac2": "completed",
+    "deacon-sites.ac3": "completed",
+    "docs": "completed",
+    "docs.ac1": "completed",
+    "docs.ac2": "completed",
+    "helper": "completed",
+    "helper.ac1": "completed",
+    "helper.ac2": "completed",
+    "helper.ac3": "completed"
+  }
 }
