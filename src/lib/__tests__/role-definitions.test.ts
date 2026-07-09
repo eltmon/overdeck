@@ -152,6 +152,14 @@ describe('role definitions', () => {
     expect(body).toContain('TESTS FAILED');
   });
 
+  it('prohibits work, review, and test roles from controlling host dashboard processes', () => {
+    for (const role of ['work', 'review', 'test']) {
+      const { body } = splitFrontmatter(readRepoFile(`roles/${role}.md`));
+      expect(body).toContain('Never start, stop, kill, or restart the host-level Overdeck dashboard');
+      expect(body).toContain('https://api-feature-<issue>.pan.localhost');
+    }
+  });
+
   it('defines the knowledge role as OKF maintenance with no merge or pan done authority', () => {
     const { frontmatter, body } = splitFrontmatter(readRepoFile('roles/knowledge.md'));
 

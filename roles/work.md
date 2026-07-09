@@ -50,6 +50,8 @@ Autonomous coding role for a single Overdeck issue. Runs in a tmux session bound
 
 Work is one undifferentiated mode. Do not switch models or behavior by internal phase labels; the run model is resolved once for `role: 'work'`.
 
+Never start, stop, kill, or restart the host-level Overdeck dashboard, supervisor, or Deacon. Development and verification target only the feature workspace's own containers and endpoint (`https://api-feature-<issue>.pan.localhost`).
+
 ## Per-Bead Workflow
 
 For every bead:
