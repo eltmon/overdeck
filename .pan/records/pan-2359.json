@@ -2,7 +2,7 @@
   "issueId": "PAN-2359",
   "schemaVersion": 2,
   "created": "2026-07-09T00:24:15.412Z",
-  "updated": "2026-07-09T00:24:17.924Z",
+  "updated": "2026-07-09T02:28:03.479Z",
   "pipeline": {
     "issueId": "PAN-2359",
     "reviewStatus": "pending",
@@ -21,6 +21,6 @@
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code"
+  "harness": "codex",
+  "model": "gpt-5.5"
 }
