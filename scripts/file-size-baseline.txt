@@ -1,7 +1,7 @@
+1013 src/cli/commands/doctor.ts
 1039 src/cli/commands/done.ts
 1575 src/cli/commands/start.ts
-1013 src/cli/commands/doctor.ts
-    1455 src/cli/index.ts
+1455 src/cli/index.ts
 1012 src/dashboard/frontend/src/components/AwaitingMergePage.tsx
 1373 src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx
 1540 src/dashboard/frontend/src/components/CommandDeck/index.tsx
