@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-07-08T07:52:11.752370Z · model: zai/glm-5.2 · open: 573_
+_Last sequenced: 2026-07-09T08:38:02.226Z · model: zai/glm-5.2 · open: 592_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -9,29 +9,36 @@ _Last sequenced: 2026-07-08T07:52:11.752370Z · model: zai/glm-5.2 · open: 573_
 | 9 | PAN-2395 | M | critical | ok |  |  | One invalid tiered_execution enum poisons every config read — live conversations falsely marked ended, resume/new-conversation blocked. |
 | 11 | PAN-1560 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 11 | PAN-2500 | XL | critical | ok |  |  | Memory-aware resource governor — autonomous resume skips the RAM admission gate the HTTP spawn path enforces; OOM root cause (host reboot... |
-| 12 | PAN-2270 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 12 | PAN-2372 | M | critical | ok |  |  | Swarm slot finishes its beads but never runs pan done — deacon can't converge it; permanent stall in the default nudge mode. |
 | 12 | PAN-2469 | L | critical | ok |  |  | Swarm has no issue-level assembly owner — finished swarm work sits invisible-to-every-patrol; root cause of PAN-2388/2383/399 stalls. |
+| 12 | PAN-2536 | M | critical | ok |  |  | stoppedByUser flag poisons every autonomous recovery path — deacon rebuilds the workspace stack forever (infinite Docker churn). |
+| 12 | PAN-2538 | M | critical | ok |  |  | pan inspect mis-resolves bd bead-id vs vBRIEF item-id; a dead inspect session silently skips the gate — un-inspected beads pass. |
 | 13 | PAN-2186 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 13 | PAN-2473 | M | critical | ok |  |  | State-only verdict commits invalidate fresh review/test verdicts — convoys force-respawn in a churn loop (state-plane policy violation). |
 | 13 | PAN-2417 | M | critical | ok |  |  | Self-feeding verdict loop — recording a review/test pass as a chore(state) commit invalidates the pass it records; readyForMerge never ho... |
+| 13 | PAN-2519 | M | critical | ok |  |  | Wedged-but-alive work agents parked as troubled instead of killed+respawned — the recovery-net liveness gap underlying every wedge class. |
+| 13 | PAN-2524 | M | critical | ok |  |  | Review verdict signal hangs after emitting — review.approved never reconciles, so a passed review blocks merge indefinitely. |
 | 14 | PAN-2179 | M | critical | ok |  |  | Prevents inert agents that look healthy but do no work. |
-| 14 | PAN-2359 | M | critical | ok |  |  | reapMergedStrikeWorkspaces reaps FRESH strike workspaces — a 0-commit branch looks 'merged', dumping the agent onto main mid-spawn. |
 | 14 | PAN-2461 | L | critical | ok |  |  | Verification-gate needs-you pause + feedback_delivery_needs_you deadlock — the gate pauses the only delivery target, then parks the issue... |
+| 14 | PAN-2537 | M | critical | ok |  |  | ~90 issues look 'in pipeline' only because stale labels were never cleared; a reconciliation patrol restores true signal. |
 | 15 | PAN-2169 | M | critical | ok |  |  | Prevents inert agents that look healthy but do no work. |
-| 15 | PAN-2363 | M | critical | ok |  |  | gcMergedSlots reaps a just-spawned swarm slot — fresh 0-commit branch classifies as 'merged' before the agent boots. |
 | 15 | PAN-2486 | M | critical | ok |  |  | Codex rate-limit model-switch dialog wedges agents AND its default silently downgrades to gpt-5.4-mini (~3h silent fleet stall). |
 | 15 | PAN-2498 | M | critical | ok |  |  | Swarm failed WORK slots (dead agent) are never auto-redispatched OR surfaced — swarms silently stall at partial completion. |
+| 15 | PAN-2534 | M | critical | ok |  |  | Re-review request after rework doesn't dispatch while the prior review agent lingers idle — re-review stalls, merges stick. |
+| 15 | PAN-2522 | M | critical | ok |  |  | pan start auto-plan finalizes spec+beads but never auto-spawns the work agent — every auto-planned issue stalls a full tick. |
 | 16 | PAN-2381 | M | critical | ok |  |  | Three event types missing from the DomainEvent schema union poison the RPC stream — permanent 'Reconnecting…' loop for every tab. |
 | 16 | PAN-2285 | M | critical | ok |  |  | Per-agent codex auth.json rots, wedging agents in a silent 401 token_revoked loop; substrate liveness fix. |
 | 16 | PAN-2467 | M | critical | ok |  |  | Multi-repo merge train merges only one repo — strands sibling repos branches; silent partial delivery of a multi-repo feature to prod. |
 | 16 | PAN-2485 | M | critical | ok |  | PAN-2469 | Dead-session swarm slot (failed, session dead) has NO automatic recovery — coordinator never requeues and pan swarm recover refuses non-m... |
-| 17 | PAN-2108 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
-| 17 | PAN-2360 | M | critical | ok |  |  | Strike kickoff instructs the agent to merge/push main, contradicting roles/strike.md — the PAN-2204 unreviewed-direct-to-main hazard. |
+| 16 | PAN-2520 | M | critical | ok |  |  | PAN-2209 dead-end respawn defers forever on stack-unhealthy; Deacon never auto-rebuilds the stack, so the issue never recovers. |
+| 16 | PAN-2516 | M | critical | ok |  |  | Spec plan.status flips are left uncommitted in the shared primary worktree — spec-vs-record drift and blocks the flywheel push loop. |
 | 17 | PAN-2422 | M | critical | ok |  |  | Rebuilding dist under a live server breaks lazy chunk imports — first click on a not-yet-loaded path crashes with module-not-found. |
 | 17 | PAN-2409 | L | critical | ok |  |  | Enforce the workspace boundary — work agents edited the PRIMARY checkout by absolute path (PAN-2204 class, reproduced 3x on 2026-07-06). |
+| 17 | PAN-2518 | M | critical | ok |  |  | pan specialists done hangs forever when the completion-comment POST fails — no timeout/exit; issue stalls in-review with a live agent. |
 | 18 | PAN-2495 | M | critical | ok |  |  | PAN-2487 ci-green merge skip bypassed the CI-green gate and landed a red-required-check change on main. |
 | 18 | PAN-2466 | M | critical | ok |  |  | Close-out/record writer clobbers closeOut.usage with EMPTY data — local cost history lost on the recurring close path. |
+| 18 | PAN-2511 | M | critical | ok |  |  | Work agents burn 20+ min on false test failures — sandbox denies spawnSync git (EPERM); local full-suite verify is redundant with the gate. |
+| 18 | PAN-2502 | M | critical | ok |  |  | Boot reconciliation dialog skipped on full reboot — an empty-candidate race terminally commits resume_all, ungating crashed-agent resume. |
 | 19 | PAN-1491 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 20 | PAN-2364 | M | high | ok |  |  | Per-slot failure isolation — one failed-merge slot freezes the ENTIRE issue's swarm behind a manual pan swarm recover. |
 | 20 | PAN-2479 | S | high | ok |  |  | claude-code work-agent launcher passes a role file path to --agent (which wants a registered name) — every claude-code work agent exits b... |
@@ -68,28 +75,31 @@ _Last sequenced: 2026-07-08T07:52:11.752370Z · model: zai/glm-5.2 · open: 573_
 | 30 | PAN-2465 | S | high | ok |  | PAN-2461 | pan done PR lookup fails at MYN polyrepo root — "no git remotes found" makes completion exit nonzero. |
 | 30 | PAN-2421 | M | high | ok |  |  | Dashboard server route tests flake under full-suite verification load (timeouts/assert mismatches) but pass in isolation. |
 | 31 | PAN-1520 | L | critical | needs-refinement |  |  | Substrate work; improves the foundation required for reliable shipping. |
-| 31 | PAN-2300 | M | high | ok |  |  | pan done --strike verifies squash-merge via branch ancestry (always fails) — red-main strikes can't complete their handoff. |
 | 32 | PAN-1497 | M | critical | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 32 | PAN-2383 | M | high | ok |  |  | Editable per-issue Standing Crew toggle on the issue view — upgrade PAN-2378's read-only chip; first tiered-execution dogfood issue. |
 | 33 | PAN-1650 | L | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 34 | PAN-1557 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 35 | PAN-1452 | M | critical | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 35 | PAN-2390 | M | high | ok |  |  | systemd-oomd killed overdeck-tmux-server (all 55 agent processes) under host memory pressure — set ManagedOOMPreference=avoid. |
+| 35 | PAN-2503 | M | high | ok |  |  | Runtime agents table accumulates 700+ closed-issue rows forever — terminal detection is broken and nothing prunes; hot patrol paths bloat. |
 | 36 | PAN-804 | L | critical | needs-refinement |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 38 | PAN-1113 | M | high | ok |  |  | Restores conversation/session visibility across non-Claude harnesses. |
 | 40 | PAN-2170 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 40 | PAN-2376 | XL | high | ok | ✓ |  | Epic: CI/CD reliability — flake policy, verify-to-merge convergence, strike/swarm merge hardening, deploy hygiene, review automation. |
 | 40 | PAN-2324 | M | high | ok |  |  | Close-out label transition fails atomically on missing 'in-planning' label — closed issues keep stale labels. |
-| 41 | PAN-2167 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
+| 40 | PAN-2526 | L | high | ok |  |  | deacon.ts is a 3615-line god file above its baseline; shrink it so the file-size ratchet can move down again (red-main trap). |
+| 40 | PAN-2505 | M | high | ok |  |  | lint:circular is red on main — new frontend cycles + stale baseline; the lint quality gate fails independent of any feature work. |
 | 42 | PAN-2106 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 43 | PAN-1770 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 44 | PAN-1766 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 45 | PAN-2308 | M | high | ok |  | PAN-2292 | Migrate stale generated compose files off PORT=3011 + deacon quarantine for deterministic boot refusals. |
+| 45 | PAN-2521 | S | high | ok |  |  | Pipeline agents wedge on the harness 'switch to gpt-5.4-mini?' rate-limit dialog; disable that reminder at launch so the pane never freezes. |
 | 47 | PAN-1416 | M | high | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 47 | PAN-2499 | XL | medium | ok |  | PAN-2487, PAN-2493 | Unify the three issue views into one progressive-density IssueView (rail/cockpit/console) — operator-reviewed mockup, no-loss. |
 | 48 | PAN-955 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 48 | PAN-2377 | M | high | ok |  |  | First-class 'special orders' runs — operator-supplied order book executed with lane semantics (proven manually on RUN-56). |
 | 50 | PAN-2493 | M | medium | ok |  | PAN-2487 | Align the cockpit Agents-lane and sidebar issue-tree feature sets (two-way gaps) — parity pass. |
+| 50 | PAN-2507 | L | high | ok |  |  | Preemptive scheduler: yield idle work agents to free capacity for blocked review/test/merge dispatch — a pipeline-throughput multiplier. |
 | 51 | PAN-2075 | XL | high | ok | ✓ |  | Container; ranks by child impact, not directly pickable. |
 | 52 | PAN-2492 | M | medium | ok |  | PAN-2486 | Pane-detected waits (rate-limit/session-resume) surface as needs-you but cannot be answered from the dashboard — only the terminal. |
 | 53 | PAN-2233 | L | high | ok |  |  | Shrinks oversized substrate files so future changes stay tractable. |
@@ -101,6 +111,7 @@ _Last sequenced: 2026-07-08T07:52:11.752370Z · model: zai/glm-5.2 · open: 573_
 | 58 | PAN-2491 | S | medium | ok |  |  | Migrate @xenova/transformers to @huggingface/transformers — eliminates silent npx install failures from sharp 0.32 postinstall. |
 | 60 | PAN-2006 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 60 | PAN-2350 | XL | medium | ok | ✓ |  | Epic: Overdeck Anywhere — remote access, Hermes bridge, mobile, and the shared relay backbone (PRD-backed, phased). |
+| 60 | PAN-2535 | S | medium | ok |  |  | POST /api/agents returns an opaque 500 (not the designed 422) when `bd list` exits non-zero — an inert try/catch around a failing Effect. |
 | 62 | PAN-933 | M | high | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 63 | PAN-334 | M | high | ok |  |  | Prevents inert agents that look healthy but do no work. |
 | 65 | PAN-2080 | M | high | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
@@ -108,6 +119,7 @@ _Last sequenced: 2026-07-08T07:52:11.752370Z · model: zai/glm-5.2 · open: 573_
 | 68 | PAN-1207 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 69 | PAN-1198 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 70 | PAN-2468 | L | medium | ok |  |  | OKF knowledge skill v1 — Karpathy-loop wiki + okf-embeddings vector extension (/okf). |
+| 70 | PAN-2533 | M | medium | ok |  |  | UAT workspace magic-link login 502s — Traefik picks an unreachable multi-homed IP (regression from PAN-2428); blocks UAT verification. |
 | 71 | PAN-1767 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 72 | PAN-2189 | L | high | ok |  |  | Shrinks oversized substrate files so future changes stay tractable. |
 | 72 | PAN-2443 | L | medium | ok |  | PAN-2388 | OpenTelemetry GenAI semconv — OTLP ingestion layer for cross-harness telemetry (tokens/latency/tools). |
@@ -120,6 +132,7 @@ _Last sequenced: 2026-07-08T07:52:11.752370Z · model: zai/glm-5.2 · open: 573_
 | 78 | PAN-1209 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 78 | PAN-2424 | XL | medium | ok | ✓ |  | Epic: the Order Book — first-class operator priority queue (markdown-authored, backlog-exempt, load-governed, flywheel-integrated). |
 | 80 | PAN-2353 | M | medium | ok |  | PAN-2351 | Overdeck Anywhere P1b: Hermes external-agent bridge — scoped API over Fly 6PN (first external-service integration). |
+| 80 | PAN-2528 | M | medium | ok |  |  | Harness picker offers ohmypi for Anthropic+subscription combos it rejects at spawn (ToS) — prevent the invalid choice up front. |
 | 81 | PAN-2188 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 84 | PAN-1246 | M | high | ok |  |  | Prevents workspace servers from impersonating production dashboard. |
 | 85 | PAN-1219 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
@@ -140,6 +153,7 @@ _Last sequenced: 2026-07-08T07:52:11.752370Z · model: zai/glm-5.2 · open: 573_
 | 99 | PAN-1433 | M | high | ok |  |  | Bug fix with direct operator or pipeline reliability impact. |
 | 100 | PAN-1330 | M | high | ok |  |  | Restores conversation/session visibility across non-Claude harnesses. |
 | 100 | PAN-2334 | M | medium | ok |  |  | Write a Definition of Ready + wire it into the pickup gate to catch junk issues before an agent is spawned. |
+| 100 | PAN-2527 | M | medium | needs-refinement |  |  | Harness selector should offer only the ToS-correct native harness per model; today invalid choices are selectable then fail at runtime. |
 | 101 | PAN-675 | M | high | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 102 | PAN-629 | M | high | ok |  |  | GitHub quota failures block close, edit, and orchestration paths. |
 | 105 | PAN-2392 | M | medium | ok |  | PAN-2387, PAN-2388, PAN-2385 | Standing Crew cost panel — per-member roster with cost, tokens, verdicts, escalations (mockup included). |
@@ -157,6 +171,7 @@ _Last sequenced: 2026-07-08T07:52:11.752370Z · model: zai/glm-5.2 · open: 573_
 | 118 | PAN-2077 | L | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 119 | PAN-1451 | L | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 120 | PAN-1218 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
+| 120 | PAN-2514 | XL | medium | needs-refinement |  |  | Dashboard Observability page intercepts model API traffic as collapsible blocks — see exactly what eats each request's context. |
 | 121 | PAN-1561 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
 | 122 | PAN-1538 | M | high | ok |  |  | Restores conversation/session visibility across non-Claude harnesses. |
 | 123 | PAN-1357 | M | high | ok |  |  | Substrate work; improves the foundation required for reliable shipping. |
@@ -317,6 +332,7 @@ _Last sequenced: 2026-07-08T07:52:11.752370Z · model: zai/glm-5.2 · open: 573_
 | 294 | PAN-1656 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 298 | PAN-1581 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 299 | PAN-1542 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
+| 300 | PAN-2504 | M | low | ok |  |  | npx @overdeck/core fails on old Node after a slow install; auto-relaunch under a detected Node 22+ to remove first-run friction. |
 | 301 | PAN-1432 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 302 | PAN-1244 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 303 | PAN-1165 | M | medium | needs-refinement |  |  | Hardens the pipeline paths that ship all other work. |
@@ -361,6 +377,7 @@ _Last sequenced: 2026-07-08T07:52:11.752370Z · model: zai/glm-5.2 · open: 573_
 | 347 | PAN-1488 | M | medium | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 349 | PAN-2282 | M | medium | ok |  |  | Restores conversation/session visibility across non-Claude harnesses. |
 | 350 | PAN-2084 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
+| 350 | PAN-2501 | S | low | ok |  |  | deleteResourceVenvEffect's HttpRouter.schemaParams call fails root-tsconfig typecheck (masked by src/dashboard exclusion) — latent. |
 | 351 | PAN-2046 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 352 | PAN-2034 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 353 | PAN-2024 | M | medium | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
@@ -406,6 +423,7 @@ _Last sequenced: 2026-07-08T07:52:11.752370Z · model: zai/glm-5.2 · open: 573_
 | 399 | PAN-663 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 400 | PAN-589 | M | low | ok |  |  | Hardens the pipeline paths that ship all other work. |
 | 400 | PAN-2335 | M | low | ok |  |  | Find-only categorized junk-backlog review document; operator-gated, keep on backlog (do NOT action). |
+| 400 | PAN-2506 | XS | low | ok |  |  | flywheel-primary-root.test.ts fails on macOS — /var vs /private/var symlink not canonicalized; CI (Linux) is green. |
 | 401 | PAN-454 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 402 | PAN-407 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 403 | PAN-2266 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
@@ -449,6 +467,7 @@ _Last sequenced: 2026-07-08T07:52:11.752370Z · model: zai/glm-5.2 · open: 573_
 | 448 | PAN-1489 | M | low | needs-refinement |  |  | Hardens the pipeline paths that ship all other work. |
 | 449 | PAN-1481 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 450 | PAN-1480 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
+| 450 | PAN-2532 | S | low | ok |  |  | Pipeline rows truncate the title early while horizontal space sits empty — reclaim width for the title without adding height. |
 | 451 | PAN-1479 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
 | 452 | PAN-1474 | S | low | ok |  |  | Documentation improvement; useful but lower shipping leverage. |
 | 453 | PAN-1442 | M | low | ok |  |  | Routine backlog item; rank reflects current shipping leverage. |
@@ -597,10 +616,6 @@ Substrate or architecture work ranks high because stable orchestration is the pr
 
 Root cause of two host OOM/reboot events: the autonomous resume/dispatch path skips the memory admission gate the HTTP spawn path enforces. A data-corrupting + liveness-killing substrate fix for the shipping pipeline itself; epic PAN-1666 child. Now in-pipeline.
 
-### PAN-2270 (rank 12)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
 ### PAN-2372 (rank 12)
 
 Still the PAN-2357-family durable-completion swarm gap (empty continue.json) — rank preserved.
@@ -608,6 +623,14 @@ Still the PAN-2357-family durable-completion swarm gap (empty continue.json) —
 ### PAN-2469 (rank 12)
 
 5-whys root cause: swarm slots complete individually but nothing owns the all-slots-done transition to assemble/verify/review. Days lost to this; the deacon logs a spammed symptom every 60s. Critical substrate for swarm convergence.
+
+### PAN-2536 (rank 12)
+
+Live on PAN-2468 (2026-07-09): a review-failed work agent carrying stoppedByUser=true can never be autonomously recovered — every recovery path respects the flag, so the deacon spins on rebuild-and-start, reaps the idle stack after 15m, and rebuilds again, indefinitely. Data-wasting + liveness-killing substrate defect; unblocks the operator's manual recovery and the broader recovery net.
+
+### PAN-2538 (rank 12)
+
+Live on PAN-2468 (2026-07-09): pan inspect --bead <bd-bead-id> fails because the bd-assigned bead id is not the vBRIEF item id, and the fallback inspect session exited before emitting a verdict — the failure was swallowed as 'infrastructure failure', so the bead passed un-inspected. A silent inspection-gate skip lets uninspected work advance; critical substrate-integrity fix.
 
 ### PAN-2186 (rank 13)
 
@@ -621,25 +644,29 @@ Every verdict write lands a state-plane commit, HEAD moves, staleness machinery 
 
 Sibling of PAN-2473: PAN-2402 earned review+test+readyForMerge three times in 90 min and lost it within seconds each time. The verdict-recording commit is itself the staleness trigger. Critical merge-readiness blocker. In-pipeline (merged/verifying).
 
+### PAN-2519 (rank 13)
+
+The unifying recovery-net gap: the pipeline trusts 'session exists?' (PAN-2209 respawn only fires when the session is gone) and 'hooks say idle?' (stuck-remediation parks the agent as troubled). A wedged-but-alive agent (context-death, hung call, blocking dialog) defeats both and stalls invisibly to respawn. Fixing it (kill+respawn for rework-holding wedged agents, circuit-breaker guarded) closes the whole wedge cluster.
+
+### PAN-2524 (rank 13)
+
+Live RUN-60 on PAN-2360: the review agent printed '✓ Review passed' then the signal CLI hung and had to be interrupted; review.approved never reconciled (not spontaneously, not on the stop-event), stranding a clean, mergeable PR. Every occurrence forces a redundant manual pan review request re-run. Critical merge-velocity defect.
+
 ### PAN-2179 (rank 14)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-2359 (rank 14)
-
-Destructive silent loss of fresh strike work (observed 2026-07-04): ahead==0 ambiguity eats a just-spawned strike before it commits. Same provably-merged-guard family as PAN-2363.
 
 ### PAN-2461 (rank 14)
 
 The gate creates the condition (agent paused) that makes feedback delivery impossible; nothing resumes or re-verifies when the env heals. Six issues parked simultaneously. Plus no local flake tolerance and container-down gates mislabel as lint failures. Critical pipeline-flow blocker.
 
+### PAN-2537 (rank 14)
+
+Of 107 issues carrying a pipeline label, only ~5 have a live agent; 52 carry a frozen verifying-on-main label (merged long ago, never closed-out) and 40 a stale planning label. Close-out is the durable label owner but these merged during incidents and bypassed it, so the dashboard/kanban drown the active handful. A label/read-model reconciliation patrol is the substrate fix for truthful pipeline signal — operator's primary visibility surface.
+
 ### PAN-2169 (rank 15)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-2363 (rank 15)
-
-Swarm variant of PAN-2359: every swarm dispatch rolls the dice on a silent destructive reap. Destructive-patrols-need-durable-proof rule; critical.
 
 ### PAN-2486 (rank 15)
 
@@ -648,6 +675,14 @@ strike + 2 work agents wedged 1-3h on an interactive dialog no automation dismis
 ### PAN-2498 (rank 15)
 
 A failed work slot (missing-agent/vanished-session) is only logged then dropped; its item is never reset to pending and its dead branch holds the slot index, so dispatchNextWave can never refill. Permanent silent stall (PAN-399 sat 1/3 for a day). Critical swarm-liveness gap.
+
+### PAN-2534 (rank 15)
+
+Live RUN-60 on PAN-2270: pan review request after rework spawned no new review for ~6 minutes because dispatch keys off the prior review agent stopping, and it never stops on its own after writing its verdict. Re-review stalls until an operator force-kills the lingering agent. Critical in-pipeline velocity / stuck-merge defect.
+
+### PAN-2522 (rank 15)
+
+Live RUN-60 (twice): pan start's auto-plan completed cleanly (spec written, beads materialized, committed on main) but the promised 'work agent will start automatically after planning finalizes' never fired; the issue sat with no work agent for 7+ minutes until a manual second pan start spawned it from the ready spec. Every auto-planned start loses a full orchestration tick. Critical pipeline-velocity defect.
 
 ### PAN-2381 (rank 16)
 
@@ -665,13 +700,13 @@ MIN-857 was treated as merged/done after only the frontend repo merged; the api 
 
 A dead-session failed slot is a terminal classification with no consumer; recover only handles FailedMergeBlock. Required: coordinator owns failed slots (requeue + gc dead branch), recover covers non-merge failures, gcMergedSlots reaps promptly. Part of PAN-2469 state machine.
 
-### PAN-2108 (rank 17)
+### PAN-2520 (rank 16)
 
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
+Live on PAN-2468: PAN-2209's dead-end respawn returns 'stack-unhealthy' when the workspace Docker stack is down, and the deacon logs 'respawn deferred — stack-unhealthy' forever — nothing invokes the existing manual-only rebuild-and-start recovery. The issue is stuck in-review with zero automated path forward. Wiring the deacon to rebuild-and-start on this skip (circuit-breaker guarded) closes the dead-end.
 
-### PAN-2360 (rank 17)
+### PAN-2516 (rank 16)
 
-Observed: a codex strike pushed its fix straight to origin/main. Contract contradiction between kickoff template and strike role; direct-to-main hazard, critical.
+Live RUN-60 on the primary main worktree: pan close/pan start/merge-reconcile flip spec plan.status in the working tree but never commit/push it, so origin/main's spec mirror goes permanently stale for terminal issues (PAN-1124 invariant violation) and the uncommitted tree blocks the flywheel's own push. Critical substrate drift + flywheel-blocking defect.
 
 ### PAN-2422 (rank 17)
 
@@ -681,6 +716,10 @@ Intervening npm run build deletes old hashed chunks the live server still resolv
 
 Nothing blocks a work agent from writing outside its workspace; three Haiku agents put real implementation into primary, so review evaluated an incomplete branch. The standing write-to-main hazard, now reproduced. Needs a hard write-boundary.
 
+### PAN-2518 (rank 17)
+
+Live on PAN-2510: pan admin specialists done persists the verdict locally first (durable), then makes an advisory comment POST with no hard timeout and no guaranteed exit; when it stalls, the review/test agent that shelled out waits on it forever and the issue stalls in-review with a live-but-wedged agent. Bounding the advisory call (non-fatal, always exits) is the substrate fix. Recovery-net wedge-gap cluster sibling.
+
 ### PAN-2495 (rank 18)
 
 A merge path that can skip CI-green let a PR with a red required test check land on main, reddening main (RUN-58: ~45 min P0 recovery). A skip may only apply to non-required checks; the no-loss audit must be a required blocking gate. Critical gate-integrity fix.
@@ -688,6 +727,14 @@ A merge path that can skip CI-green let a PR with a red required test check land
 ### PAN-2466 (rank 18)
 
 Twice in a day the local per-issue records for just-closed issues were rewritten with empty byStage/totals/merges while the remote carried real usage. Silently destroys exactly the data the cost-visibility program (PAN-2387/2388) builds. Writer must read-modify-write closeOut.
+
+### PAN-2511 (rank 18)
+
+Live RUN-60 on PAN-2167: the work agent ran the full npm test as a self-check, hit spawnSync git EPERM (the sandbox blocks git subprocesses), misread it as a regression, and burned 21+ min waiting to re-run a step that can never pass in its sandbox — redundant with the PAN-174 verification gate that runs in the correct environment. A per-issue cycle-time sink on the metric the operator cares about (in-pipeline velocity).
+
+### PAN-2502 (rank 18)
+
+Live 2026-07-08 boot: on a full box reboot the dashboard stamps the boot-reconciliation snapshot before the deacon child reconciles liveness ~1s later, so the candidate list is empty; the PAN-2076 empty→resume_all fast path terminally commits, skipping the operator dialog AND leaving crashed agents to auto-resume ungated — the exact post-reboot safety problem the dialog exists to prevent. Critical boot-reliability/safety substrate fix.
 
 ### PAN-1491 (rank 19)
 
@@ -833,10 +880,6 @@ Five server route/integration tests time out or assert wrong under the verificat
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
-### PAN-2300 (rank 31)
-
-Re-scoped under epic PAN-2376 to defect 1 only (squash-merge ancestry check always fails); defect 2 moved to PAN-2360. Strike-completion impact unchanged, rank held.
-
 ### PAN-1497 (rank 32)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
@@ -861,6 +904,10 @@ Substrate or architecture work ranks high because stable orchestration is the pr
 
 A host-wide memory spike mass-killed every agent session; narrow infra fix (one systemd-run property) with a clear evidence trail. High resilience.
 
+### PAN-2503 (rank 35)
+
+listAllAgentsSync returns 729 rows (only 3 running); closed-issue rows are disposable (their durable state lives in .pan/records) but terminal detection returns 0 terminal issues, so nothing prunes them and the boot-reconciliation + auto-resume hot paths carry dead weight. High substrate-hygiene/perf fix.
+
 ### PAN-804 (rank 36)
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
@@ -873,34 +920,6 @@ Top-tier item because it has near-term operator value and a clear path to verifi
 
 Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
 
-### PAN-2376 (rank 40)
-
-Substrate epic (labeled substrate-improvement). The RUN-55/56 drains proved delivery machinery is the bottleneck; its children are the critical strike/swarm/flake/verify work ranked high above. Container — not directly pickable.
-
-### PAN-2324 (rank 40)
-
-A non-idempotent label transition aborts the whole close-out relabel when an expected label is absent, stranding stale in-review/merged labels on closed issues. Make the transition tolerant/atomic.
-
-### PAN-2167 (rank 41)
-
-Body unchanged in substance; still the state-plane clean-tree gate blocker for pan review request — rank preserved.
-
-### PAN-2106 (rank 42)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-1770 (rank 43)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-1766 (rank 44)
-
-Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.
-
-### PAN-2308 (rank 45)
-
-Follow-up hardening to PAN-2292: live workspaces still carry PORT=3011, and the deacon burns restart attempts on deterministic ServerConfig refusals. Migration pass + quarantine stop the churn.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -908,10 +927,10 @@ Follow-up hardening to PAN-2292: live workspaces still carry PORT=3011, and the 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-07-08T07:52:11.752370Z",
+  "generatedAt": "2026-07-09T08:38:02.226Z",
   "model": "zai/glm-5.2",
   "pass": "incremental",
-  "openCount": 573,
+  "openCount": 592,
   "nodes": [
     {
       "issue": "PAN-806",
@@ -945,19 +964,6 @@ Follow-up hardening to PAN-2292: live workspaces still carry PORT=3011, and the 
       "size": "M",
       "importance": "critical",
       "score": 99,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
-      "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2270",
-      "rank": 12,
-      "size": "M",
-      "importance": "critical",
-      "score": 97,
       "condition": "ok",
       "dependsOn": [],
       "why": "Hardens the pipeline paths that ship all other work.",
@@ -1005,19 +1011,6 @@ Follow-up hardening to PAN-2292: live workspaces still carry PORT=3011, and the 
       "planning": "auto"
     },
     {
-      "issue": "PAN-2359",
-      "rank": 14,
-      "size": "M",
-      "importance": "critical",
-      "score": 92,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "reapMergedStrikeWorkspaces reaps FRESH strike workspaces — a 0-commit branch looks 'merged', dumping the agent onto main mid-spawn.",
-      "rationale": "Destructive silent loss of fresh strike work (observed 2026-07-04): ahead==0 ambiguity eats a just-spawned strike before it commits. Same provably-merged-guard family as PAN-2363.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2169",
       "rank": 15,
       "size": "M",
@@ -1027,19 +1020,6 @@ Follow-up hardening to PAN-2292: live workspaces still carry PORT=3011, and the 
       "dependsOn": [],
       "why": "Prevents inert agents that look healthy but do no work.",
       "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2363",
-      "rank": 15,
-      "size": "M",
-      "importance": "critical",
-      "score": 91,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "gcMergedSlots reaps a just-spawned swarm slot — fresh 0-commit branch classifies as 'merged' before the agent boots.",
-      "rationale": "Swarm variant of PAN-2359: every swarm dispatch rolls the dice on a silent destructive reap. Destructive-patrols-need-durable-proof rule; critical.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1066,32 +1046,6 @@ Follow-up hardening to PAN-2292: live workspaces still carry PORT=3011, and the 
       "dependsOn": [],
       "why": "Per-agent codex auth.json rots, wedging agents in a silent 401 token_revoked loop; substrate liveness fix.",
       "rationale": "A stale seed-once copy of ~/.codex/auth.json forks the OAuth refresh chain, so respawned codex agents wedge permanently in a 401 retry loop while looking healthy on every surface — the same liveness-illusion class as PAN-2172. A staleness re-seed at spawn plus a troubled-gate trip on repeated token_revoked restores reliable codex dispatch, which is a prerequisite for shipping any gpt-5.5-routed work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2108",
-      "rank": 17,
-      "size": "M",
-      "importance": "critical",
-      "score": 97,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
-      "rationale": "Substrate or architecture work ranks high because stable orchestration is the prerequisite for shipping other backlog items.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2360",
-      "rank": 17,
-      "size": "M",
-      "importance": "critical",
-      "score": 89,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Strike kickoff instructs the agent to merge/push main, contradicting roles/strike.md — the PAN-2204 unreviewed-direct-to-main hazard.",
-      "rationale": "Observed: a codex strike pushed its fix straight to origin/main. Contract contradiction between kickoff template and strike role; direct-to-main hazard, critical.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1358,19 +1312,6 @@ Follow-up hardening to PAN-2292: live workspaces still carry PORT=3011, and the 
       "planning": "interactive"
     },
     {
-      "issue": "PAN-2300",
-      "rank": 31,
-      "size": "M",
-      "importance": "high",
-      "score": 79,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan done --strike verifies squash-merge via branch ancestry (always fails) — red-main strikes can't complete their handoff.",
-      "rationale": "Re-scoped under epic PAN-2376 to defect 1 only (squash-merge ancestry check always fails); defect 2 moved to PAN-2360. Strike-completion impact unchanged, rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1497",
       "rank": 32,
       "size": "M",
@@ -1511,19 +1452,6 @@ Follow-up hardening to PAN-2292: live workspaces still carry PORT=3011, and the 
       "dependsOn": [],
       "why": "Close-out label transition fails atomically on missing 'in-planning' label — closed issues keep stale labels.",
       "rationale": "A non-idempotent label transition aborts the whole close-out relabel when an expected label is absent, stranding stale in-review/merged labels on closed issues. Make the transition tolerant/atomic.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2167",
-      "rank": 41,
-      "size": "M",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Hardens the pipeline paths that ship all other work.",
-      "rationale": "Body unchanged in substance; still the state-plane clean-tree gate blocker for pan review request — rank preserved.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5615,6 +5543,7 @@ Follow-up hardening to PAN-2292: live workspaces still carry PORT=3011, and the 
       "condition": "ok",
       "dependsOn": [],
       "why": "Routine backlog item; rank reflects current shipping leverage.",
+      "rationale": "Re-verified on updatedAt tick; body still self-declares low-priority cleanup ('not blocking anything'), so rank/score are unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7979,6 +7908,344 @@ Follow-up hardening to PAN-2292: live workspaces still carry PORT=3011, and the 
       "rationale": "Research-stage: SageOx was removed in May; upstream has since shipped the equivalents and attribution concerns are superseded. Optional per-project opt-in, no clear pull yet. Needs refinement on whether/how to re-integrate.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-2536",
+      "rank": 12,
+      "size": "M",
+      "importance": "critical",
+      "score": 92,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "stoppedByUser flag poisons every autonomous recovery path — deacon rebuilds the workspace stack forever (infinite Docker churn).",
+      "rationale": "Live on PAN-2468 (2026-07-09): a review-failed work agent carrying stoppedByUser=true can never be autonomously recovered — every recovery path respects the flag, so the deacon spins on rebuild-and-start, reaps the idle stack after 15m, and rebuilds again, indefinitely. Data-wasting + liveness-killing substrate defect; unblocks the operator's manual recovery and the broader recovery net.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2538",
+      "rank": 12,
+      "size": "M",
+      "importance": "critical",
+      "score": 91,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan inspect mis-resolves bd bead-id vs vBRIEF item-id; a dead inspect session silently skips the gate — un-inspected beads pass.",
+      "rationale": "Live on PAN-2468 (2026-07-09): pan inspect --bead <bd-bead-id> fails because the bd-assigned bead id is not the vBRIEF item id, and the fallback inspect session exited before emitting a verdict — the failure was swallowed as 'infrastructure failure', so the bead passed un-inspected. A silent inspection-gate skip lets uninspected work advance; critical substrate-integrity fix.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2519",
+      "rank": 13,
+      "size": "M",
+      "importance": "critical",
+      "score": 91,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Wedged-but-alive work agents parked as troubled instead of killed+respawned — the recovery-net liveness gap underlying every wedge class.",
+      "rationale": "The unifying recovery-net gap: the pipeline trusts 'session exists?' (PAN-2209 respawn only fires when the session is gone) and 'hooks say idle?' (stuck-remediation parks the agent as troubled). A wedged-but-alive agent (context-death, hung call, blocking dialog) defeats both and stalls invisibly to respawn. Fixing it (kill+respawn for rework-holding wedged agents, circuit-breaker guarded) closes the whole wedge cluster.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2524",
+      "rank": 13,
+      "size": "M",
+      "importance": "critical",
+      "score": 90,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Review verdict signal hangs after emitting — review.approved never reconciles, so a passed review blocks merge indefinitely.",
+      "rationale": "Live RUN-60 on PAN-2360: the review agent printed '✓ Review passed' then the signal CLI hung and had to be interrupted; review.approved never reconciled (not spontaneously, not on the stop-event), stranding a clean, mergeable PR. Every occurrence forces a redundant manual pan review request re-run. Critical merge-velocity defect.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2537",
+      "rank": 14,
+      "size": "M",
+      "importance": "critical",
+      "score": 90,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "~90 issues look 'in pipeline' only because stale labels were never cleared; a reconciliation patrol restores true signal.",
+      "rationale": "Of 107 issues carrying a pipeline label, only ~5 have a live agent; 52 carry a frozen verifying-on-main label (merged long ago, never closed-out) and 40 a stale planning label. Close-out is the durable label owner but these merged during incidents and bypassed it, so the dashboard/kanban drown the active handful. A label/read-model reconciliation patrol is the substrate fix for truthful pipeline signal — operator's primary visibility surface.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2534",
+      "rank": 15,
+      "size": "M",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Re-review request after rework doesn't dispatch while the prior review agent lingers idle — re-review stalls, merges stick.",
+      "rationale": "Live RUN-60 on PAN-2270: pan review request after rework spawned no new review for ~6 minutes because dispatch keys off the prior review agent stopping, and it never stops on its own after writing its verdict. Re-review stalls until an operator force-kills the lingering agent. Critical in-pipeline velocity / stuck-merge defect.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2522",
+      "rank": 15,
+      "size": "M",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan start auto-plan finalizes spec+beads but never auto-spawns the work agent — every auto-planned issue stalls a full tick.",
+      "rationale": "Live RUN-60 (twice): pan start's auto-plan completed cleanly (spec written, beads materialized, committed on main) but the promised 'work agent will start automatically after planning finalizes' never fired; the issue sat with no work agent for 7+ minutes until a manual second pan start spawned it from the ready spec. Every auto-planned start loses a full orchestration tick. Critical pipeline-velocity defect.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2520",
+      "rank": 16,
+      "size": "M",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "PAN-2209 dead-end respawn defers forever on stack-unhealthy; Deacon never auto-rebuilds the stack, so the issue never recovers.",
+      "rationale": "Live on PAN-2468: PAN-2209's dead-end respawn returns 'stack-unhealthy' when the workspace Docker stack is down, and the deacon logs 'respawn deferred — stack-unhealthy' forever — nothing invokes the existing manual-only rebuild-and-start recovery. The issue is stuck in-review with zero automated path forward. Wiring the deacon to rebuild-and-start on this skip (circuit-breaker guarded) closes the dead-end.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2516",
+      "rank": 16,
+      "size": "M",
+      "importance": "critical",
+      "score": 87,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Spec plan.status flips are left uncommitted in the shared primary worktree — spec-vs-record drift and blocks the flywheel push loop.",
+      "rationale": "Live RUN-60 on the primary main worktree: pan close/pan start/merge-reconcile flip spec plan.status in the working tree but never commit/push it, so origin/main's spec mirror goes permanently stale for terminal issues (PAN-1124 invariant violation) and the uncommitted tree blocks the flywheel's own push. Critical substrate drift + flywheel-blocking defect.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2518",
+      "rank": 17,
+      "size": "M",
+      "importance": "critical",
+      "score": 87,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan specialists done hangs forever when the completion-comment POST fails — no timeout/exit; issue stalls in-review with a live agent.",
+      "rationale": "Live on PAN-2510: pan admin specialists done persists the verdict locally first (durable), then makes an advisory comment POST with no hard timeout and no guaranteed exit; when it stalls, the review/test agent that shelled out waits on it forever and the issue stalls in-review with a live-but-wedged agent. Bounding the advisory call (non-fatal, always exits) is the substrate fix. Recovery-net wedge-gap cluster sibling.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2511",
+      "rank": 18,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Work agents burn 20+ min on false test failures — sandbox denies spawnSync git (EPERM); local full-suite verify is redundant with the gate.",
+      "rationale": "Live RUN-60 on PAN-2167: the work agent ran the full npm test as a self-check, hit spawnSync git EPERM (the sandbox blocks git subprocesses), misread it as a regression, and burned 21+ min waiting to re-run a step that can never pass in its sandbox — redundant with the PAN-174 verification gate that runs in the correct environment. A per-issue cycle-time sink on the metric the operator cares about (in-pipeline velocity).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2502",
+      "rank": 18,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Boot reconciliation dialog skipped on full reboot — an empty-candidate race terminally commits resume_all, ungating crashed-agent resume.",
+      "rationale": "Live 2026-07-08 boot: on a full box reboot the dashboard stamps the boot-reconciliation snapshot before the deacon child reconciles liveness ~1s later, so the candidate list is empty; the PAN-2076 empty→resume_all fast path terminally commits, skipping the operator dialog AND leaving crashed agents to auto-resume ungated — the exact post-reboot safety problem the dialog exists to prevent. Critical boot-reliability/safety substrate fix.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2503",
+      "rank": 35,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Runtime agents table accumulates 700+ closed-issue rows forever — terminal detection is broken and nothing prunes; hot patrol paths bloat.",
+      "rationale": "listAllAgentsSync returns 729 rows (only 3 running); closed-issue rows are disposable (their durable state lives in .pan/records) but terminal detection returns 0 terminal issues, so nothing prunes them and the boot-reconciliation + auto-resume hot paths carry dead weight. High substrate-hygiene/perf fix.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2526",
+      "rank": 40,
+      "size": "L",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "deacon.ts is a 3615-line god file above its baseline; shrink it so the file-size ratchet can move down again (red-main trap).",
+      "rationale": "Follow-up to PAN-2525: main was unblocked by rebaselining deacon.ts to 3615 lines, but it remains a god file. Shrinking it below baseline lets the file-size ratchet move down again — the same baseline mechanism that gates red-main. High substrate debt.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2505",
+      "rank": 40,
+      "size": "M",
+      "importance": "high",
+      "score": 68,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "lint:circular is red on main — new frontend cycles + stale baseline; the lint quality gate fails independent of any feature work.",
+      "rationale": "npm run lint → lint:circular fails on main with new circular deps in chat/conversations components plus stale baseline entries. It is a quality gate, so every PR/CI run and every local lint hits a red that isn't theirs. High (red gate); fix is to break the cycles, not rebaseline.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2521",
+      "rank": 45,
+      "size": "S",
+      "importance": "high",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Pipeline agents wedge on the harness 'switch to gpt-5.4-mini?' rate-limit dialog; disable that reminder at launch so the pane never freezes.",
+      "rationale": "Codex/Claude surface an interactive rate-limit model-switch dialog inside the agent TUI that blocks the pane (no tool calls fire, session wedges; observed on PAN-2359's review). Disabling the reminder at the launcher layer removes the cause for this wedge class — defense-in-depth alongside the kill+respawn recovery fix.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2507",
+      "rank": 50,
+      "size": "L",
+      "importance": "high",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Preemptive scheduler: yield idle work agents to free capacity for blocked review/test/merge dispatch — a pipeline-throughput multiplier.",
+      "rationale": "PRD-backed feature: when an advancing (review/test/merge) dispatch can't reserve capacity, the deacon defers forever; a preemptive scheduler yields an idle work agent (pause, resumable) to free the slot, then auto-resumes oldest-first. Opt-in, complements the critical PAN-2500 memory governor. High-impact throughput feature (not a bug), so ranks below the live substrate defects.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2535",
+      "rank": 60,
+      "size": "S",
+      "importance": "medium",
+      "score": 55,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "POST /api/agents returns an opaque 500 (not the designed 422) when `bd list` exits non-zero — an inert try/catch around a failing Effect.",
+      "rationale": "Scoped to the work-agent start path: a JS try/catch around a failing Effect yield is inert, so a bd-list non-zero exit escapes as an unhandled 500 instead of the designed 422. Medium — correct error semantics on one route, no live-agent impact.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2533",
+      "rank": 70,
+      "size": "M",
+      "importance": "medium",
+      "score": 52,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "UAT workspace magic-link login 502s — Traefik picks an unreachable multi-homed IP (regression from PAN-2428); blocks UAT verification.",
+      "rationale": "Regression from PAN-2428: a multi-homed Traefik-routed container with no traefik.docker.network label gets an arbitrary backend IP; when it draws the panopticon IP, the gateway 502/504s. Blocks MYN UAT login (verification flow), non-deterministic per workspace. Medium, UAT-scoped.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2528",
+      "rank": 80,
+      "size": "M",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Harness picker offers ohmypi for Anthropic+subscription combos it rejects at spawn (ToS) — prevent the invalid choice up front.",
+      "rationale": "The ToS gate (Anthropic model under Claude Code subscription auth via ohmypi) is enforced only at spawn; the picker still offers the blocked combination with inconsistent UX. Medium — move the ToS gate earlier and explain it; no runtime correctness change.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2527",
+      "rank": 100,
+      "size": "M",
+      "importance": "medium",
+      "score": 45,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Harness selector should offer only the ToS-correct native harness per model; today invalid choices are selectable then fail at runtime.",
+      "rationale": "Needs refinement: the title says 'restrict OpenAI models to Claude Code only', but actual correct routing is GPT→Codex / Kimi→OMP / Anthropic→Claude Code (per harness-policy.ts), so the title's prescription contradicts the system's intended routing. Intent (offer only the ToS-correct native harness, fail upfront) is sound; scope/title must be reconciled before work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2514",
+      "rank": 120,
+      "size": "XL",
+      "importance": "medium",
+      "score": 42,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Dashboard Observability page intercepts model API traffic as collapsible blocks — see exactly what eats each request's context.",
+      "rationale": "Concept issue with a draft PRD and mockup: a new dashboard page passively capturing the model API traffic Overdeck already proxies, rendered as collapsible context blocks (system prompt, tool schemas, history, usage). Useful observability, but a concept awaiting scope/UX sign-off — not substrate and not blocking; needs-refinement until the approach is approved.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2504",
+      "rank": 300,
+      "size": "M",
+      "importance": "low",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "npx @overdeck/core fails on old Node after a slow install; auto-relaunch under a detected Node 22+ to remove first-run friction.",
+      "rationale": "DX improvement: probe common Node-22+ install locations and re-exec under them when the shell default is old, instead of failing late in serve. Low — first-run friction only; most users already have a compatible Node somewhere.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2501",
+      "rank": 350,
+      "size": "S",
+      "importance": "low",
+      "score": 28,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "deleteResourceVenvEffect's HttpRouter.schemaParams call fails root-tsconfig typecheck (masked by src/dashboard exclusion) — latent.",
+      "rationale": "Latent typecheck bug: a single-generic schemaParams call fails under the root tsconfig (which resolves effect differently) but is masked because root excludes src/dashboard/**. Low — not currently breaking anything; surfaced only when a src/lib module imports from that file.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2506",
+      "rank": 400,
+      "size": "XS",
+      "importance": "low",
+      "score": 25,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "flywheel-primary-root.test.ts fails on macOS — /var vs /private/var symlink not canonicalized; CI (Linux) is green.",
+      "rationale": "Dev-only portability bug: macOS tmpdir (/var → /private/var symlink) breaks 3 of 4 assertions; CI on Linux is green. Low — affects only macOS local runs; fix is canonicalizing the expected path in the test.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2532",
+      "rank": 450,
+      "size": "S",
+      "importance": "low",
+      "score": 22,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Pipeline rows truncate the title early while horizontal space sits empty — reclaim width for the title without adding height.",
+      "rationale": "Cosmetic dashboard tweak: collapse the fixed 200px status column into a title-first 4-column layout so the issue title gets ~440px instead of ~120px, at no extra height. Low — UI polish, no functional impact.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -8145,48 +8412,6 @@ Follow-up hardening to PAN-2292: live workspaces still carry PORT=3011, and the 
     },
     {
       "from": "PAN-2376",
-      "to": "PAN-2167",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2376",
-      "to": "PAN-2359",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2376",
-      "to": "PAN-2363",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2376",
-      "to": "PAN-2360",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2376",
-      "to": "PAN-2300",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2376",
-      "to": "PAN-2270",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2376",
       "to": "PAN-2372",
       "type": "contains",
       "source": "github-ref",
@@ -8268,20 +8493,6 @@ Follow-up hardening to PAN-2292: live workspaces still carry PORT=3011, and the 
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.7
-    },
-    {
-      "from": "PAN-2359",
-      "to": "PAN-2363",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-2300",
-      "to": "PAN-2360",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.85
     },
     {
       "from": "PAN-1666",
@@ -8382,13 +8593,6 @@ Follow-up hardening to PAN-2292: live workspaces still carry PORT=3011, and the 
       "confidence": 0.6
     },
     {
-      "from": "PAN-2489",
-      "to": "PAN-2270",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.7
-    },
-    {
       "from": "PAN-2465",
       "to": "PAN-2461",
       "type": "informs",
@@ -8401,6 +8605,69 @@ Follow-up hardening to PAN-2292: live workspaces still carry PORT=3011, and the 
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.55
+    },
+    {
+      "from": "PAN-2538",
+      "to": "PAN-2468",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-2536",
+      "to": "PAN-2468",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-2536",
+      "to": "PAN-2520",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-2520",
+      "to": "PAN-2468",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-2519",
+      "to": "PAN-2520",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.75
+    },
+    {
+      "from": "PAN-2518",
+      "to": "PAN-2519",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-2507",
+      "to": "PAN-2500",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-2501",
+      "to": "PAN-2500",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-2521",
+      "to": "PAN-2486",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.7
     }
   ]
 }

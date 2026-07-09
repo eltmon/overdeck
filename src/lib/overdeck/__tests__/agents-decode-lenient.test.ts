@@ -32,18 +32,17 @@ const validRow = {
 
 describe('decodeAgentRowsLenient (boot-critical list decode)', () => {
   it('skips a row whose role main does not know (e.g. a feature-branch role) instead of throwing', () => {
-    // A feature-branch agent (PAN-2468 `knowledge`, which lives only on
-    // feature/pan-2468) registers in the shared overdeck.db; main must not brick
-    // boot decoding it.
-    const knowledgeRow = { ...validRow, id: 'agent-pan-2468-knowledge', role: 'knowledge' };
+    // A feature-branch agent with a role main does not yet know registers in the
+    // shared overdeck.db; main must not brick boot decoding it.
+    const unknownRoleRow = { ...validRow, id: 'agent-pan-9999-future', role: 'future-feature-role' };
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    const decoded = decodeAgentRowsLenient([validRow, knowledgeRow]);
+    const decoded = decodeAgentRowsLenient([validRow, unknownRoleRow]);
 
     expect(decoded).toHaveLength(1);
     expect(decoded[0]?.id).toBe('agent-pan-1-work');
     expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('agent-pan-2468-knowledge'),
+      expect.stringContaining('agent-pan-9999-future'),
     );
     warn.mockRestore();
   });

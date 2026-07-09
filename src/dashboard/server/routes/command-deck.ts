@@ -275,11 +275,12 @@ export async function fetchActivityDataWithContext(
 
   const agentId = `agent-${issueLower}`;
   const planningAgentId = `planning-${issueLower}`;
+  const knowledgeAgentId = `agent-${issueLower}-knowledge`;
   const agentsDir = join(homedir(), '.overdeck', 'agents');
 
   let hasPlanningSection = false;
 
-  for (const checkId of [planningAgentId, agentId]) {
+  for (const checkId of [planningAgentId, agentId, knowledgeAgentId]) {
     const agentDir = join(agentsDir, checkId);
     if (!await pathExists(agentDir)) continue;
 
@@ -288,7 +289,7 @@ export async function fetchActivityDataWithContext(
 
     try {
       const isPlanning = checkId.startsWith('planning-');
-      const sectionType = isPlanning ? 'planning' : 'work';
+      const sectionType = isPlanning ? 'planning' : checkId.endsWith('-knowledge') ? 'knowledge' : 'work';
       if (isPlanning) hasPlanningSection = true;
 
       let transcript = '';

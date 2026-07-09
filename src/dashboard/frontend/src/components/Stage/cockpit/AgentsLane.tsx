@@ -3,7 +3,7 @@ import {
   Compass, Code2, Eye, FlaskConical, GitMerge, Zap, Archive,
   ShieldCheck, Lock, Gauge, ClipboardList, Layers, BadgeCheck,
   ChevronRight, ChevronDown, GitPullRequest, GitBranch,
-  CircleCheck, CircleX, Circle, Loader2, type LucideIcon,
+  CircleCheck, CircleX, Circle, Loader2, Brain, type LucideIcon,
 } from 'lucide-react'
 import { useIssueCostsQuery, useReviewStatusQuery, useWorkspaceQuery, type ReviewStatusData } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import { useIssueActions, type IssueActionView } from '../../IssueActionMenu/useIssueActions'
@@ -34,6 +34,7 @@ function typeIcon(session: SessionNode): LucideIcon {
     case 'strike': return Zap
     case 'planning': return Compass
     case 'legacy': return Archive
+    case 'knowledge': return Brain
     case 'review': return Eye
     case 'reviewer': return (session.role && REVIEWER_ROLE_ICON[session.role]) || ShieldCheck
     case 'test': return FlaskConical
@@ -49,6 +50,7 @@ function sessionLabel(session: SessionNode): string {
   switch (session.type) {
     case 'planning':
     case 'legacy': return 'Plan'
+    case 'knowledge': return 'Knowledge'
     case 'work': return 'Work'
     case 'strike': return 'Strike'
     case 'review': return 'Review'
@@ -332,6 +334,7 @@ export function AgentsLane({
   const costOf = useSessionCostLookup(issueId)
   const plan = sessions.find((s) => s.type === 'planning' || s.type === 'legacy')
   const works = sessions.filter((s) => s.type === 'work' || s.type === 'strike')
+  const knowledges = sessions.filter((s) => s.type === 'knowledge')
   const reviewParent = sessions.find((s) => s.type === 'review')
   const reviewers = sessions.filter((s) => s.type === 'reviewer')
   const testSession = sessions.find((s) => s.type === 'test')
@@ -342,7 +345,7 @@ export function AgentsLane({
   const verFailed = rs?.verificationStatus === 'failed'
 
   // count = real agent rows + verification step (+ synthetic test if no session)
-  const count = [plan, ...works, reviewParent, testSession, ...ships].filter(Boolean).length + 1 + (testSession ? 0 : 1)
+  const count = [plan, ...works, ...knowledges, reviewParent, testSession, ...ships].filter(Boolean).length + 1 + (testSession ? 0 : 1)
 
   return (
     <div>
@@ -358,6 +361,12 @@ export function AgentsLane({
         <Row key={w.sessionId} icon={typeIcon(w)} tileClass={styles.work}
           name={sessionLabel(w)} status={sessionStatus(w)} model={shortModel(w.model)} sub={[formatDur(w.duration), costOf(w)].filter(Boolean).join(' · ')}
           selected={w.sessionId === selectedSessionId} onClick={() => onSelectSession(w)} />
+      ))}
+
+      {knowledges.map((k) => (
+        <Row key={k.sessionId} icon={typeIcon(k)} tileClass={styles.work}
+          name={sessionLabel(k)} status={sessionStatus(k)} model={shortModel(k.model)} sub={[formatDur(k.duration), costOf(k)].filter(Boolean).join(' · ')}
+          selected={k.sessionId === selectedSessionId} onClick={() => onSelectSession(k)} />
       ))}
 
       {reviewParent && (

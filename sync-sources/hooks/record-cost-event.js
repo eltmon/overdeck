@@ -26660,6 +26660,7 @@ const DEFAULT_ROLES = {
 	ship: { model: "workhorse:mid" },
 	strike: { model: "workhorse:expensive" },
 	sequencer: { model: "workhorse:expensive" },
+	knowledge: { model: "workhorse:expensive" },
 	flywheel: {
 		model: "claude-opus-4-8",
 		effort: "high",
@@ -27620,6 +27621,7 @@ const DEFAULT_CONFIG = {
 		extraction: { fallbackChain: [] },
 		observationsEnabled: true,
 		promptTimeInjectionEnabled: true,
+		knowledgeIndexEnabled: true,
 		rollupPendingThreshold: 4,
 		sidebarRefreshIntervalMs: 1e4,
 		workerConcurrency: 4
@@ -27635,6 +27637,7 @@ const DEFAULT_CONFIG = {
 		model: "gpt-4.1-nano",
 		perDayCostCapUsd: 1
 	} },
+	knowledge: { postMergeAutoRetro: false },
 	shadow: {
 		enabled: false,
 		trackers: {
@@ -27924,6 +27927,7 @@ function mergeConfigs(...configs) {
 			},
 			observationsEnabled: DEFAULT_CONFIG.memory.observationsEnabled,
 			promptTimeInjectionEnabled: DEFAULT_CONFIG.memory.promptTimeInjectionEnabled,
+			knowledgeIndexEnabled: DEFAULT_CONFIG.memory.knowledgeIndexEnabled,
 			rollupPendingThreshold: DEFAULT_CONFIG.memory.rollupPendingThreshold,
 			sidebarRefreshIntervalMs: DEFAULT_CONFIG.memory.sidebarRefreshIntervalMs,
 			workerConcurrency: DEFAULT_CONFIG.memory.workerConcurrency
@@ -27934,6 +27938,7 @@ function mergeConfigs(...configs) {
 		},
 		compliance: { mode: DEFAULT_CONFIG.compliance.mode },
 		registry: { classification: { ...DEFAULT_CONFIG.registry.classification } },
+		knowledge: { ...DEFAULT_CONFIG.knowledge },
 		shadow: {
 			enabled: DEFAULT_CONFIG.shadow.enabled,
 			trackers: { ...DEFAULT_CONFIG.shadow.trackers }
@@ -28093,6 +28098,7 @@ function mergeConfigs(...configs) {
 			};
 			if (config.memory.features?.observations !== void 0) result.memory.observationsEnabled = config.memory.features.observations;
 			if (config.memory.features?.prompt_time_injection !== void 0) result.memory.promptTimeInjectionEnabled = config.memory.features.prompt_time_injection;
+			if (config.memory.features?.knowledge_index !== void 0) result.memory.knowledgeIndexEnabled = config.memory.features.knowledge_index;
 			if (config.memory.rollup_pending_threshold !== void 0) result.memory.rollupPendingThreshold = config.memory.rollup_pending_threshold;
 			if (config.memory.sidebar_refresh_interval_ms !== void 0) result.memory.sidebarRefreshIntervalMs = config.memory.sidebar_refresh_interval_ms;
 			if (config.memory.worker_concurrency !== void 0) result.memory.workerConcurrency = config.memory.worker_concurrency;
@@ -28208,6 +28214,9 @@ function mergeConfigs(...configs) {
 		}
 		if (config.issues) {
 			if (typeof config.issues.closed_window_days === "number") result.issues.closedWindowDays = config.issues.closed_window_days;
+		}
+		if (config.knowledge) {
+			if (typeof config.knowledge.post_merge_auto_retro === "boolean") result.knowledge.postMergeAutoRetro = config.knowledge.post_merge_auto_retro;
 		}
 		if (config.experimental) {
 			if (typeof config.experimental.experimentalFeatures === "boolean") result.experimental.experimentalFeatures = config.experimental.experimentalFeatures;
