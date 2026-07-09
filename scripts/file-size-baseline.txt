@@ -17,7 +17,7 @@
 1321 src/dashboard/server/ws-rpc.ts
 1035 src/lib/cloister/deacon-auto-resume.ts
 1016 src/lib/cloister/deacon-swarm.ts
-3593 src/lib/cloister/deacon.ts
+3615 src/lib/cloister/deacon.ts
 1374 src/lib/cloister/merge-agent.ts
 2135 src/lib/cloister/service.ts
 1749 src/lib/cloister/specialists.ts

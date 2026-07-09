@@ -6,11 +6,20 @@ import { tmpdir } from 'node:os';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockMessageAgent, mockResolveProjectFromIssue, mockGetReviewStatus, mockWriteFeedbackFile } = vi.hoisted(() => ({
+const {
+  mockMessageAgent,
+  mockResolveProjectFromIssue,
+  mockGetReviewStatus,
+  mockWriteFeedbackFile,
+  mockResolveIssueFeedbackTarget,
+  mockSurfaceIssueFeedbackNeedsYou,
+} = vi.hoisted(() => ({
   mockMessageAgent: vi.fn(),
   mockResolveProjectFromIssue: vi.fn(),
   mockGetReviewStatus: vi.fn(),
   mockWriteFeedbackFile: vi.fn(),
+  mockResolveIssueFeedbackTarget: vi.fn(),
+  mockSurfaceIssueFeedbackNeedsYou: vi.fn(),
 }));
 
 vi.mock('node:child_process', () => ({
@@ -35,6 +44,11 @@ vi.mock('../../../src/lib/cloister/feedback-writer.js', () => ({
   writeFeedbackFile: mockWriteFeedbackFile,
 }));
 
+vi.mock('../../../src/lib/cloister/feedback-target.js', () => ({
+  resolveIssueFeedbackTarget: mockResolveIssueFeedbackTarget,
+  surfaceIssueFeedbackNeedsYou: mockSurfaceIssueFeedbackNeedsYou,
+}));
+
 vi.mock('../../../src/lib/agents/slot-reconcile.js', () => ({
   listSlotOwnership: vi.fn(() => []),
 }));
@@ -49,6 +63,7 @@ describe('deliverReviewVerdictFeedback', () => {
       filePath: '/tmp/workspace/.pan/feedback/001-review-agent-changes-requested.md',
       relativePath: '.pan/feedback/001-review-agent-changes-requested.md',
     }));
+    mockResolveIssueFeedbackTarget.mockResolvedValue({ agentId: 'agent-pan-1059' });
   });
 
   it('posts synthesis to the PR, writes feedback, and messages the work agent', async () => {
@@ -74,9 +89,9 @@ describe('deliverReviewVerdictFeedback', () => {
         'api',
         'repos/eltmon/overdeck/issues/1059/comments',
         '--field',
-        expect.stringContaining('Request changes for correctness.'),
+        expect.stringContaining('body=# Review CHANGES REQUESTED for PAN-1059'),
       ],
-      { encoding: 'utf-8' },
+      expect.objectContaining({ encoding: 'utf-8', timeout: 15_000 }),
       expect.any(Function),
     );
     expect(mockWriteFeedbackFile).toHaveBeenCalledWith(expect.objectContaining({
