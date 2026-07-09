@@ -6,6 +6,7 @@ import { acquireRestartLock } from '../lib/restart-lock.js';
 import { writeRestartStatus } from '../lib/restart-status.js';
 import { getOverdeckHome } from '../lib/paths.js';
 import { getBootReconciliationState } from '../lib/overdeck/control-settings.js';
+import { evictPortHolders, type PortEvictionResult } from './port-eviction.js';
 
 export interface SupervisorWatchdogConfig {
   enabled: boolean;
@@ -61,7 +62,10 @@ interface SupervisorWatchdogDeps {
   now?: () => number;
   setIntervalFn?: typeof setInterval;
   clearIntervalFn?: typeof clearInterval;
+  evictPortHoldersFn?: (port: number) => Promise<PortEvictionResult>;
 }
+
+class ForeignDashboardIdentityError extends Error {}
 
 interface InternalState {
   healthy: boolean;
@@ -155,6 +159,7 @@ export class SupervisorWatchdog {
   private readonly now: () => number;
   private readonly setIntervalFn: typeof setInterval;
   private readonly clearIntervalFn: typeof clearInterval;
+  private readonly evictPortHoldersFn: (port: number) => Promise<PortEvictionResult>;
   private timer: ReturnType<typeof setInterval> | null = null;
   private runningCheck: Promise<void> | null = null;
   private readonly state: InternalState;
@@ -168,6 +173,7 @@ export class SupervisorWatchdog {
     this.now = deps.now ?? Date.now;
     this.setIntervalFn = deps.setIntervalFn ?? setInterval;
     this.clearIntervalFn = deps.clearIntervalFn ?? clearInterval;
+    this.evictPortHoldersFn = deps.evictPortHoldersFn ?? evictPortHolders;
     this.state = {
       healthy: true,
       lastCheck: null,
@@ -223,6 +229,7 @@ export class SupervisorWatchdog {
     let restartReason: string | null = null;
     let restartLogReason: string | null = null;
     let restartEligibleForBootGrace = false;
+    let foreignDashboard = false;
     try {
       const response = await this.fetchFn(url, {
         signal: AbortSignal.timeout(this.config.requestTimeoutMs),
@@ -277,11 +284,12 @@ export class SupervisorWatchdog {
       this.state.consecutiveFailures += 1;
       this.state.consecutiveHardFailures = isTimeoutError(error) ? 0 : this.state.consecutiveHardFailures + 1;
       this.state.lastError = message;
+      foreignDashboard = error instanceof ForeignDashboardIdentityError;
 
       // Dead vs busy: hard failures (refused/reset/non-OK) restart at
       // failThreshold; timeout-only streaks wait for busyFailThreshold so a
       // server starved by verification gates isn't killed mid-pipeline.
-      const hardDown = this.state.consecutiveHardFailures >= this.config.failThreshold;
+      const hardDown = foreignDashboard || this.state.consecutiveHardFailures >= this.config.failThreshold;
       const busyStarved = this.state.consecutiveFailures >= this.config.busyFailThreshold;
       if (!hardDown && !busyStarved) {
         if (this.state.consecutiveFailures === this.config.failThreshold) {
@@ -297,6 +305,32 @@ export class SupervisorWatchdog {
         : `sustained health-probe timeouts: ${this.state.lastError ?? 'health check timed out'}`;
       restartLogReason = hardDown ? 'dashboard unreachable' : 'sustained timeouts — dashboard starved';
       restartEligibleForBootGrace = hardDown;
+    }
+
+    if (foreignDashboard) {
+      const eviction = await this.evictPortHoldersFn(this.config.dashboardApiPort);
+      if (eviction.error) {
+        const error = `NEEDS YOU: watchdog verified a foreign dashboard on port ${this.config.dashboardApiPort} but could not evict it (${eviction.error})`;
+        this.state.gaveUp = true;
+        this.state.lastError = error;
+        await this.persistState();
+        await this.log(error);
+        await Effect.runPromise(writeRestartStatus({
+          ts: new Date(startedAt).toISOString(),
+          trigger: 'watchdog',
+          success: false,
+          error,
+          durationMs: this.now() - startedAt,
+          attempts: this.state.restartAttempts.length,
+          gaveUp: true,
+          reason: restartReason ?? 'foreign dashboard eviction failed',
+          pid: process.pid,
+        }));
+        return;
+      }
+      await this.log(`watchdog evicted foreign dashboard PID(s) ${eviction.pids.join(', ')} from port ${this.config.dashboardApiPort} with SIGTERM`);
+      restartEligibleForBootGrace = false;
+      this.state.gaveUp = false;
     }
 
     if (
@@ -316,7 +350,7 @@ export class SupervisorWatchdog {
     await this.persistState();
     if (this.state.gaveUp) return;
 
-    if (this.state.restartAttempts.length >= this.config.maxRestarts) {
+    if (!foreignDashboard && this.state.restartAttempts.length >= this.config.maxRestarts) {
       this.state.gaveUp = true;
       await this.persistState();
       const error = `WATCHDOG GIVING UP — manual intervention required: ${this.state.lastError ?? 'dashboard health check failed'}`;
@@ -337,6 +371,25 @@ export class SupervisorWatchdog {
 
     const lock = await Effect.runPromise(acquireRestartLock('supervisor watchdog'));
     if (!lock) {
+      if (foreignDashboard) {
+        const error = 'NEEDS YOU: watchdog evicted a foreign dashboard but could not restart the primary because the restart lock is held';
+        this.state.gaveUp = true;
+        this.state.lastError = error;
+        await this.persistState();
+        await this.log(error);
+        await Effect.runPromise(writeRestartStatus({
+          ts: new Date(startedAt).toISOString(),
+          trigger: 'watchdog',
+          success: false,
+          error,
+          durationMs: this.now() - startedAt,
+          attempts: this.state.restartAttempts.length,
+          gaveUp: true,
+          reason: restartReason ?? 'foreign dashboard restart lock held',
+          pid: process.pid,
+        }));
+        return;
+      }
       await this.log('watchdog restart skipped: restart lock held');
       return;
     }
@@ -409,7 +462,7 @@ export class SupervisorWatchdog {
     const mode = typeof payload.mode === 'string' ? payload.mode : '(missing)';
     if (repoRoot === expectedIdentity.repoRoot && mode === expectedIdentity.mode) return;
 
-    throw new Error(`port held by non-${expectedIdentity.mode} server (cwd=${repoRoot}, mode=${mode})`);
+    throw new ForeignDashboardIdentityError(`port held by non-${expectedIdentity.mode} server (cwd=${repoRoot}, mode=${mode})`);
   }
 
   private async assessDeaconPatrol(
