@@ -24,7 +24,7 @@
 1194 src/lib/conversations/smart-compaction.ts
 1660 src/lib/database/schema.ts
 1295 src/lib/model-capabilities.ts
-1075 src/lib/overdeck/agents.ts
+1104 src/lib/overdeck/agents.ts
 1539 src/lib/overdeck/conversations.ts
 1050 src/lib/overdeck/memory.ts
 1001 src/lib/overdeck/merge.ts
