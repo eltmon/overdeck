@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { chmod, mkdir, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { getOverdeckHome } from '../paths.js';
 
 const MNEMOS_REPO_API = 'https://api.github.com/repos/arhuman/mnemos/releases/latest';
@@ -11,6 +12,7 @@ export interface EnsureMnemosOptions {
   bundlePath?: string;
   fetchImpl?: typeof fetch;
   runCommand?: CommandRunner;
+  extractArchive?: ExtractArchiveFn;
   platform?: NodeJS.Platform;
   arch?: NodeJS.Architecture;
 }
@@ -21,6 +23,7 @@ export interface EnsureMnemosResult {
 }
 
 export type CommandRunner = (command: string, args: string[]) => Promise<void>;
+export type ExtractArchiveFn = (archivePath: string, extractDir: string) => Promise<void>;
 
 interface GithubRelease {
   assets?: Array<{ name?: string; browser_download_url?: string }>;
@@ -50,6 +53,7 @@ export async function ensureMnemos(options: EnsureMnemosOptions = {}): Promise<E
   await installMnemos({
     binPath,
     fetchImpl: options.fetchImpl ?? fetch,
+    extractArchive: options.extractArchive ?? extractArchiveWithSpawn,
     platform: options.platform ?? process.platform,
     arch: options.arch ?? process.arch,
   });
@@ -70,6 +74,7 @@ async function existingBinaryWorks(binPath: string, runCommand: CommandRunner): 
 async function installMnemos(input: {
   binPath: string;
   fetchImpl: typeof fetch;
+  extractArchive: ExtractArchiveFn;
   platform: NodeJS.Platform;
   arch: NodeJS.Architecture;
 }): Promise<void> {
@@ -77,22 +82,47 @@ async function installMnemos(input: {
   const assets = normalizeAssets(release);
   const binaryAsset = selectBinaryAsset(assets, input.platform, input.arch);
   const checksumAsset = selectChecksumAsset(assets);
-  const [binary, checksumText] = await Promise.all([
+  const [archiveBytes, checksumText] = await Promise.all([
     fetchBytes(input.fetchImpl, binaryAsset.url),
     fetchText(input.fetchImpl, checksumAsset.url),
   ]);
 
-  verifyChecksum(binary, checksumText, binaryAsset.name);
+  verifyChecksum(archiveBytes, checksumText, binaryAsset.name);
   await mkdir(dirname(input.binPath), { recursive: true });
 
+  if (!isArchive(binaryAsset.name)) {
+    // Release is a raw binary; write it directly.
+    const tmpPath = `${input.binPath}.tmp-${process.pid}`;
+    try {
+      await writeFile(tmpPath, archiveBytes, { mode: 0o755 });
+      await chmod(tmpPath, 0o755);
+      await rename(tmpPath, input.binPath);
+    } catch (error) {
+      await rm(tmpPath, { force: true }).catch(() => undefined);
+      throw error;
+    }
+    return;
+  }
+
+  // Release is an archive; extract the binary before installing it.
+  const extractDir = await mkdtemp(join(tmpdir(), 'mnemos-extract-'));
+  const archivePath = join(extractDir, binaryAsset.name);
+  const binaryName = input.platform === 'win32' ? 'mnemos.exe' : 'mnemos';
+  const extractedPath = join(extractDir, binaryName);
   const tmpPath = `${input.binPath}.tmp-${process.pid}`;
+
   try {
-    await writeFile(tmpPath, binary, { mode: 0o755 });
+    await writeFile(archivePath, archiveBytes);
+    await input.extractArchive(archivePath, extractDir);
+    await stat(extractedPath);
+    await rename(extractedPath, tmpPath);
     await chmod(tmpPath, 0o755);
     await rename(tmpPath, input.binPath);
   } catch (error) {
     await rm(tmpPath, { force: true }).catch(() => undefined);
     throw error;
+  } finally {
+    await rm(extractDir, { recursive: true, force: true }).catch(() => undefined);
   }
 }
 
@@ -158,6 +188,31 @@ function expectedChecksumForAsset(checksumText: string, assetName: string): stri
   const fallback = checksumText.match(/\b[a-fA-F0-9]{64}\b/);
   if (fallback) return fallback[0].toLowerCase();
   throw new MnemosInstallError(`No sha256 checksum found for ${assetName}`);
+}
+
+function isArchive(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower.endsWith('.tar.gz') || lower.endsWith('.tgz') || lower.endsWith('.zip');
+}
+
+async function extractArchiveWithSpawn(archivePath: string, extractDir: string): Promise<void> {
+  const lower = archivePath.toLowerCase();
+  if (lower.endsWith('.tar.gz') || lower.endsWith('.tgz')) {
+    await runCommandWithSpawn('tar', ['-xzf', archivePath, '-C', extractDir]);
+    return;
+  }
+  if (lower.endsWith('.zip')) {
+    if (process.platform === 'win32') {
+      await runCommandWithSpawn('powershell', [
+        '-Command',
+        `Expand-Archive -Path '${archivePath}' -DestinationPath '${extractDir}'`,
+      ]);
+      return;
+    }
+    await runCommandWithSpawn('unzip', ['-q', archivePath, '-d', extractDir]);
+    return;
+  }
+  throw new MnemosInstallError(`Unsupported archive format: ${archivePath}`);
 }
 
 async function runCommandWithSpawn(command: string, args: string[]): Promise<void> {
