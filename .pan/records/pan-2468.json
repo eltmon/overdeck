@@ -11,17 +11,14 @@
       "reason": "feedback",
       "note": "[2026-07-09T13:47Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-09T13:47:59.463Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-09T13:47:59Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2468\n\npan knowledge spawns without any configured OKF bundle instead of a clear /okf init error\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2468 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-09T13:58:23.199Z"
     }
   ],
+  "feedback": [],
   "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
@@ -126,18 +123,18 @@
   },
   "pipeline": {
     "issueId": "PAN-2468",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-09T13:47:54.207Z",
-    "reviewNotes": "pan knowledge spawns without any configured OKF bundle instead of a clear /okf init error",
+    "updatedAt": "2026-07-09T13:58:24.919Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "testNotes": "Role-based verification for PAN-2468 completed. Track A self-test, TypeScript typecheck, and ESLint lint all passed. The vitest project gate failed with two fixture/matrix omissions: (1) the synced-skills fixture is missing the pan-knowledge skill added by WI-17, and (2) the G3 no-loss matrix is missing the GET /api/issues/:id/ship-log route present in src/dashboard/server/routes/issues.ts. Both failures require updates to test fixtures/matrix files. Because the instructions prohibit editing code, tests, fixtures, snapshots, or configuration, the verdict is TESTS FAILED.",
     "inspectNotes": "Bead ollama-ensure ack: curl|sh auto-install replaced with macOS-only Homebrew path + explicit manual-install error on other platforms; verified the change is isolated to installOllamaWithPlatformCommand() and does not affect AC1/AC2 test paths (both go through the injectable options.installOllama hook), and AC3 PAN-1641 note test at ollama.test.ts:131 is untouched.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2488",
-    "lastVerifiedCommit": "97164383f190b1cc63cf11c731a1751693a12456",
+    "lastVerifiedCommit": "097e1cf5085230887d2dc55b73af4fb5b8266f1a",
     "reviewRequestedAt": "2026-07-09T08:04:54.567Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -356,9 +353,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 127900859,
-            "output": 274737,
-            "cacheRead": 122647424,
+            "input": 128177141,
+            "output": 274992,
+            "cacheRead": 122921600,
             "cacheWrite": 0
           }
         },
@@ -412,9 +409,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 2987705,
-            "output": 270341,
-            "cacheRead": 142087956,
+            "input": 3033905,
+            "output": 284101,
+            "cacheRead": 150048020,
             "cacheWrite": 0
           }
         }
@@ -433,9 +430,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 127900859,
-          "output": 274737,
-          "cacheRead": 122647424,
+          "input": 128177141,
+          "output": 274992,
+          "cacheRead": 122921600,
           "cacheWrite": 0
         },
         "anthropic/claude-opus-4-8": {
@@ -463,15 +460,15 @@
           "cacheWrite": 231255
         },
         "custom/kimi-k2.7-code": {
-          "input": 4402515,
-          "output": 306751,
-          "cacheRead": 165828116,
+          "input": 4448715,
+          "output": 320511,
+          "cacheRead": 173788180,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 167.37953625,
-        "pricingAsOf": "2026-07-09T13:47:54.243Z"
+        "usd": 169.14615425,
+        "pricingAsOf": "2026-07-09T13:58:24.951Z"
       }
     },
     "merges": [
@@ -480,5 +477,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-09T08:06:45.604Z",
-  "updated": "2026-07-09T13:47:59.463Z"
+  "updated": "2026-07-09T13:58:24.957Z"
 }
