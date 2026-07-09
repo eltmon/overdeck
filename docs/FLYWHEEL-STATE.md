@@ -207,6 +207,16 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-60 tick 22 (2026-07-09) — 🔴 RED MAIN P0 on a347e4949e (deacon.ts god-file baseline 3615>3593 + review-verdict-feedback test flake) → filed PAN-2525 + STRUCK; B5 review+test APPROVED but HELD (no merge onto red main)
+
+- **🔴 RED MAIN (P0)** — `CI | failure | a347e4949e` (PAN-2521 merge; prior 5485236776 was green). Two failing jobs:
+  - **lint (REAL):** `✖ src/lib/cloister/deacon.ts grew to 3615 lines (baseline 3593)` — file-size-baseline red-main trap. deacon.ts grew via B4/PAN-2359 + PAN-2510 merges (both touch deacon.ts); PAN-2521 branched from older main w/ baseline 3593 → squash left baseline behind the actual file. Fix = reconcile baseline to 3615 (ratchet audit) or shrink deacon.ts.
+  - **test (likely FLAKE):** `tests/lib/cloister/review-verdict-feedback.test.ts:71` mock mismatch (expected gh-comment call, got tmux has-session) — delivery-branch depends on has-session mock state (test-isolation). No recent change touches this logic. Fix = pin the mock or quarantine (PAN-2373).
+  - **→ Filed PAN-2525 + `pan strike PAN-2525`** (background) to green main fast.
+- **B5/PAN-2360 review.approved RECONCILED ✓ + test.passed ✓** (clean re-review after PAN-2524 hung-signal loss; new review agent did NOT wedge — PAN-2521 working). PR #2523 UNSTABLE (CI re-running post main-sync). **HELD: do NOT merge onto RED main.** Merge only after PAN-2525 strike greens main + PR #2523 CI CLEAN.
+- **B6/PAN-2270 held** (B5 not merged + red main).
+- Push blocked (PAN-2516; ~20 ahead). HOLDS + 2 operator questions (PAN-1520) unchanged.
+
 ## RUN-60 tick 21 (2026-07-09) — B5 verdict lost to hung signal → RE-REQUESTED review (clean re-run); rate-limit modal FIX landed on main (PAN-2521); filed PAN-2524, closed PAN-2513 as dup
 
 - **B5/PAN-2360 unblocked via re-request.** review.approved never reconciled (verdict lost to the hung `pan review` signal, even after killing the review agent). → `pan review request PAN-2360` → synced latest main into feature-pan-2360 + verification gate re-running [install,typecheck,frontend-typecheck,lint,build,test]. Clean re-review cycle in progress; fresh review agent will spawn after gate passes.
