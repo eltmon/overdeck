@@ -207,6 +207,15 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-60 tick 25 (2026-07-09) — ⏸️ DRAIN PAUSED: main GREEN + B5 merge-ready, but live :3011 server is STALE (pre-PAN-2510) → merging/closing-out through it would leak docker + run old lifecycle. Held pending operator reconcile-primary→origin + fresh deploy (operator owns it).
+
+- **P0 RESOLVED — main GREEN.** strike `998a343132` CI = `completed | success`. Red main fixed (deacon.ts baseline 3593→3615 + review-verdict-feedback stale-mock). B5's rebase landed: PR #2523 = MERGEABLE (UNSTABLE = PR CI finishing), conflict gone.
+- **⏸️ DRAIN PAUSED (operator drift discovery).** Operator caught that the PRIMARY worktree is badly drifted and ABORTED their build+restart (would deploy stale dist → regress merged work). I confirmed the **live :3011 server (PID 1051993, started 19:59 EDT) is stale** — predates PAN-2510 (20:44), the strike (21:42), and all recent merges. So PAN-2510 (docker close-out leak fix), the operator's 4 fixes (PAN-2518/2519/2520/2521), and the strike are **merged to origin but NOT RUNNING**. Merging/closing-out B5/B6/PAN-2525 through this server runs **old close-out → docker network leak** (the exact PAN-2510 regression). HELD: B5 merge, B6 start, PAN-2525 close-out.
+- **Also: 2 orphaned server.js PIDs** — :3011=1051993 (stale), orphan=2475324 (21:29). Fold into the clean redeploy.
+- **Primary drift facts (for operator reconcile — HUMAN-OWNED, I will NOT touch):** `origin/main...HEAD` = **23 ↔ 24** (not FF). Operator's 4 fixes duplicated on both sides w/ different SHAs. Local-only work to preserve: FLYWHEEL-STATE docs, PAN-2514 PRD+mockup (`d9b1fda`/`6222f6c`), PAN-2360 spec/vBRIEF. Dirty: `.pan/records/pan-2525.json`. Constraints: NEVER stash/reset --hard/force-push/--autostash — commit dirty file, then `git rebase origin/main` (git drops patch-equiv dups).
+- **READY-TO-GO on deploy:** the instant operator reconciles primary→origin + builds fresh dist + redeploys ONE clean server → I merge B5 (green + mergeable) immediately, close + paired PAN-2300, close out PAN-2525, start B6/PAN-2270.
+- Note: PAN-2518 (bounded review-verdict POST/delivery) likely supersedes the hang-portion of my PAN-2524 — reconcile/close later (not now; keep pause clean).
+
 ## RUN-60 tick 24 (2026-07-09) — strike LANDED fix on main (998a343132, CI in_progress); B5/PAN-2360 now CONFLICTS with main (strike + B5 both fixed same flake) → dispatched B5 agent to rebase-resolve (take main's canonical version)
 
 - **RED MAIN fix LANDED.** strike-pan-2525 pushed `998a343132 fix: restore PAN-2525 red main gates` direct to main (strike contract, `pan done --strike`) and greened lint locally. Main CI now `in_progress` on 998a343132 (was `failure` on a347e4949e). Watching for `CI | success`.
