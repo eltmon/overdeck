@@ -276,8 +276,12 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
     }
     const body = yield* readJsonBody;
 
+    const issueLower = issueId.toLowerCase();
+    const resolved = resolveProjectFromIssueSync(issueId);
     const workspaceInfo = getWorkspaceInfoForIssue(issueId);
-    const result = processResetReviewPipeline(issueId, workspaceInfo.exists);
+    const workspacePath = resolved ? findWorkspacePath(resolved.projectPath, issueLower) : null;
+    const workspaceExists = workspaceInfo.exists || workspacePath !== null;
+    const result = processResetReviewPipeline(issueId, workspaceExists);
     if (result.httpStatus !== 200) {
       return jsonResponse(result.body, { status: result.httpStatus });
     }
