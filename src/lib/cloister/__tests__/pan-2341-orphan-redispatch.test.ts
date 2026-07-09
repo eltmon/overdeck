@@ -71,6 +71,8 @@ vi.mock('../concurrency.js', () => ({
 
 vi.mock('../../lifecycle/archive-planning.js', () => ({
   findWorkspacePath: mocks.findWorkspacePath,
+  inferBranchFromWorkspace: (workspacePath: string, issueLower: string) =>
+    workspacePath.endsWith('-strike') ? `strike/${issueLower}` : `feature/${issueLower}`,
 }));
 
 vi.mock('../issue-closed.js', () => ({
