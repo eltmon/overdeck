@@ -17,7 +17,7 @@
   ],
   "feedback": [],
   "created": "2026-07-08T23:07:44.941Z",
-  "updated": "2026-07-08T23:59:25.164Z",
+  "updated": "2026-07-09T00:16:15.518Z",
   "pipeline": {
     "issueId": "PAN-2510",
     "reviewStatus": "pending",
@@ -60,6 +60,24 @@
   "statusOverrides": {
     "rebuild-terminal-guard": "completed",
     "doctor-pool-advisory": "completed",
-    "docs-update": "completed"
+    "docs-update": "completed",
+    "closeout-verified-teardown": "completed",
+    "closeout-verified-teardown.ac1": "completed",
+    "closeout-verified-teardown.ac2": "completed",
+    "closeout-verified-teardown.ac3": "completed",
+    "closeout-verified-teardown.ac4": "completed",
+    "reaper-teardown": "completed",
+    "reaper-teardown.ac1": "completed",
+    "reaper-teardown.ac2": "completed",
+    "reaper-teardown.ac3": "completed",
+    "closeout-resolver-fix": "completed",
+    "closeout-resolver-fix.ac1": "completed",
+    "closeout-resolver-fix.ac2": "completed",
+    "closeout-resolver-fix.ac3": "completed",
+    "teardown-primitive": "completed",
+    "teardown-primitive.ac1": "completed",
+    "teardown-primitive.ac2": "completed",
+    "teardown-primitive.ac3": "completed",
+    "teardown-primitive.ac4": "completed"
   }
 }
