@@ -158,6 +158,32 @@ export function resolveResetWorkspace(
     localPath: workspaceInfo.localPath || workspacePath,
   };
 }
+
+/**
+ * Build the workspace/branch pair for a review re-dispatch, handling
+ * strike workspaces (feature-<id>-strike -> strike/<id>) and preserving the
+ * existing feature/<numeric> convention for non-strike workspaces.
+ * PAN-2270 regression test hook.
+ */
+export function buildReviewRedispatchArgs(
+  issueId: string,
+  resetWorkspace: { localPath: string | null },
+  workspaceInfo: { localPath?: string },
+  resolved: { projectPath: string } | null,
+): { workspace: string; branch: string } | null {
+  if (!resolved) return null;
+  const issueLower = issueId.toLowerCase();
+  const numericSuffix = issueLower.replace(/^[a-z]+-/, '');
+  const wsPath =
+    resetWorkspace.localPath ||
+    workspaceInfo.localPath ||
+    findWorkspacePath(resolved.projectPath, issueLower) ||
+    join(resolved.projectPath, 'workspaces', `feature-${numericSuffix}`);
+  const branchName = wsPath.endsWith('-strike')
+    ? `strike/${issueLower}`
+    : `feature/${numericSuffix}`;
+  return { workspace: wsPath, branch: branchName };
+}
 export type UnstickResult =
   | { httpStatus: 404; body: { success: false; error: string } }
   | { httpStatus: 400; body: { success: false; error: string } }
@@ -320,23 +346,12 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
       try {
         yield* Effect.promise(async () => {
           const { spawnReviewRoleForIssue } = await import('../../../../lib/cloister/review-agent.js');
-          if (resolved) {
-            const wsInfo = getWorkspaceInfoForIssue(issueId);
-            const issueLower = issueId.toLowerCase();
-            const numericSuffix = issueLower.replace(/^[a-z]+-/, '');
-            const wsPath =
-              resetWorkspace.localPath ||
-              wsInfo.localPath ||
-              findWorkspacePath(resolved.projectPath, issueLower) ||
-              join(resolved.projectPath, 'workspaces', `feature-${numericSuffix}`);
-            const branchName = wsPath.endsWith('-strike')
-              ? `strike/${issueLower}`
-              : `feature/${numericSuffix}`;
-
+          const dispatchArgs = buildReviewRedispatchArgs(issueId, resetWorkspace, workspaceInfo, resolved);
+          if (dispatchArgs) {
             const result = await Effect.runPromise(spawnReviewRoleForIssue({
               issueId,
-              workspace: wsPath,
-              branch: branchName,
+              workspace: dispatchArgs.workspace,
+              branch: dispatchArgs.branch,
               prUrl: getReviewStatusSync(issueId)?.prUrl,
             }));
 

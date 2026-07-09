@@ -92,7 +92,7 @@ afterEach(() => {
 
 // ─── Import under test (after mocks) ──────────────────────────────────────────
 
-import { processResetReviewPipeline, resolveResetWorkspace } from '../../../../../src/dashboard/server/routes/workspaces/review-control.js';
+import { processResetReviewPipeline, resolveResetWorkspace, buildReviewRedispatchArgs } from '../../../../../src/dashboard/server/routes/workspaces/review-control.js';
 import { setReviewStatusSync, getReviewStatusSync } from '../../../../../src/lib/review-status.js';
 
 // ─── Route-contract tests ─────────────────────────────────────────────────────
@@ -273,5 +273,69 @@ describe('resolveResetWorkspace — PAN-2270 strike-workspace recognition', () =
     expect(result.exists).toBe(false);
     expect(result.localPath).toBeNull();
     expect(findWorkspacePathMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('buildReviewRedispatchArgs — PAN-2270 strike dispatch branch assertion', () => {
+  beforeEach(() => {
+    findWorkspacePathMock.mockReset();
+  });
+
+  it('selects strike/<id> branch when the resolved workspace ends in -strike', () => {
+    findWorkspacePathMock.mockReturnValue('/project/workspaces/feature-pan-2270-strike');
+
+    const result = buildReviewRedispatchArgs(
+      'PAN-2270',
+      { localPath: null },
+      { localPath: undefined },
+      { projectPath: '/project' },
+    );
+
+    expect(result).toEqual({
+      workspace: '/project/workspaces/feature-pan-2270-strike',
+      branch: 'strike/pan-2270',
+    });
+  });
+
+  it('preserves feature/<numeric> branch for non-strike workspaces', () => {
+    findWorkspacePathMock.mockReturnValue('/project/workspaces/feature-pan-2270');
+
+    const result = buildReviewRedispatchArgs(
+      'PAN-2270',
+      { localPath: null },
+      { localPath: undefined },
+      { projectPath: '/project' },
+    );
+
+    expect(result).toEqual({
+      workspace: '/project/workspaces/feature-pan-2270',
+      branch: 'feature/2270',
+    });
+  });
+
+  it('prefers resetWorkspace.localPath and derives branch from it', () => {
+    const result = buildReviewRedispatchArgs(
+      'PAN-2270',
+      { localPath: '/project/workspaces/feature-pan-2270-strike' },
+      { localPath: '/project/workspaces/feature-pan-2270' },
+      { projectPath: '/project' },
+    );
+
+    expect(result).toEqual({
+      workspace: '/project/workspaces/feature-pan-2270-strike',
+      branch: 'strike/pan-2270',
+    });
+    expect(findWorkspacePathMock).not.toHaveBeenCalled();
+  });
+
+  it('returns null when project cannot be resolved', () => {
+    const result = buildReviewRedispatchArgs(
+      'PAN-2270',
+      { localPath: null },
+      { localPath: undefined },
+      null,
+    );
+
+    expect(result).toBeNull();
   });
 });
