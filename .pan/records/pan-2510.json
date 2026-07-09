@@ -59,6 +59,7 @@
   "model": "kimi-k2.7-code",
   "statusOverrides": {
     "rebuild-terminal-guard": "completed",
-    "doctor-pool-advisory": "completed"
+    "doctor-pool-advisory": "completed",
+    "docs-update": "completed"
   }
 }
