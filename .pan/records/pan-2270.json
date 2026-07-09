@@ -91,15 +91,15 @@
     "recordedAt": "2026-07-09T03:24:34.172Z"
   },
   "created": "2026-07-09T02:50:24.144Z",
-  "updated": "2026-07-09T04:13:44.772Z",
+  "updated": "2026-07-09T06:55:37.762Z",
   "pipeline": {
     "issueId": "PAN-2270",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "merging",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-09T04:13:44.700Z",
+    "updatedAt": "2026-07-09T06:55:37.687Z",
     "reviewNotes": "strike review dispatch workspace and branch handling approved",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2531",
     "reviewedAtCommit": "6d839b731c506e5465765b8dfeaeacd3efb65cbc",
@@ -141,9 +141,9 @@
       "byStage": {
         "codex": {
           "openai/gpt-5.5": {
-            "input": 4364842,
-            "output": 15305,
-            "cacheRead": 4040448,
+            "input": 5419450,
+            "output": 16819,
+            "cacheRead": 5079552,
             "cacheWrite": 0
           }
         },
@@ -165,18 +165,18 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 741763,
-            "output": 60314,
-            "cacheRead": 35672064,
+            "input": 778981,
+            "output": 66082,
+            "cacheRead": 36882944,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 4364842,
-          "output": 15305,
-          "cacheRead": 4040448,
+          "input": 5419450,
+          "output": 16819,
+          "cacheRead": 5079552,
           "cacheWrite": 0
         },
         "anthropic/claude-opus-4-8": {
@@ -186,15 +186,15 @@
           "cacheWrite": 149151
         },
         "custom/kimi-k2.7-code": {
-          "input": 1101327,
-          "output": 64043,
-          "cacheRead": 38019584,
+          "input": 1138545,
+          "output": 69811,
+          "cacheRead": 39230464,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 16.561927999999998,
-        "pricingAsOf": "2026-07-09T04:13:44.745Z"
+        "usd": 17.492916,
+        "pricingAsOf": "2026-07-09T06:55:37.762Z"
       }
     },
     "merges": [
