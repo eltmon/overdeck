@@ -207,6 +207,15 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-60 tick 17 (2026-07-09) — PAN-2510 CLOSED ✓; B5/PAN-2360 finalize→autostart GAP (2nd occurrence) → re-started work agent; push still blocked
+
+- **PAN-2510 fully CLOSED** ✓ (closed-out label, journal terminal, review cleared). Operator docker-leak fix done end-to-end.
+- **B5/PAN-2360 finalize→autostart GAP (RECURRING, 2nd time after PAN-2510).** Planning completed cleanly (dashboard.log 00:44: "Wrote pan spec", "Materialized 2 beads", "Committed pan spec on main") and `planning-pan-2360` stopped — BUT the work agent NEVER auto-started (7+ min later, no agent-pan-2360), despite `pan start`'s promise "work agent will start automatically after planning finalizes." RE-STARTED via `pan start PAN-2360` (background, spinning up). This is a velocity substrate gap — every auto-planned Lane-B item stalls ~a tick until a manual restart. Confirm next tick the restart spawns a WORK agent (not a re-plan) → then FILE it.
+- **Main not red** — 5485236776 CI in_progress (no-planning passed; PAN-2510 merge commit). 56f228b2fb green.
+- **Flywheel push still BLOCKED (PAN-2516)** — 3 specs dirty (2167/2359/2510 closed-issue completed-flips uncommitted); PAN-2360 spec DID commit ("Committed pan spec on main"). 9 FLYWHEEL-STATE commits durable-local. Not forcing.
+- **Zombies:** agent-pan-2359-review/test + agent-pan-2510-test linger from closed issues (harmless).
+- HOLDS + 2 operator questions (PAN-1520) unchanged. B6/PAN-2270 queued behind B5.
+
 ## RUN-60 tick 16 (2026-07-09) — ✅ PAN-2510 MERGED (operator docker-leak close-out fix!); closing out; B5/PAN-2360 planning; 3 PRs merged this session
 
 - **✅ PAN-2510 MERGED** — operator-directed docker-leak close-out teardown fix. CI `test` went green (8m41s) → PR #2517 CLEAN → `POST /api/issues/PAN-2510/merge` HTTP 200 `mergeStatus:merged`. Main HEAD now **5485236776 PAN-2510 (#2517)**. Closing out (`pan close PAN-2510 --force`, background — SLOW ~min). Full self-heal arc: implement → review-blocked → auto-feedback → rework → re-review+test passed → merged, with only one harmless orchestrator nudge. **The docker-network leak that blocked B3's spawn early in RUN-60 now has its root-cause fix landed.**
