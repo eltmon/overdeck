@@ -15,17 +15,18 @@ import styles from '../CommandDeck/styles/command-deck.module.css';
 const EFFORT_LEVELS = [
   { id: 'low', label: 'Low' },
   { id: 'medium', label: 'Medium' },
-  { id: 'high', label: 'High' },
-  { id: 'xhigh', label: 'Extra High (default)' },
+  { id: 'high', label: 'High (default)' },
+  { id: 'xhigh', label: 'Extra High' },
   { id: 'max', label: 'Max' },
 ] as const;
 
 export type EffortLevel = (typeof EFFORT_LEVELS)[number]['id'];
 
 const EFFORT_STORAGE_KEY = 'conv-composer-effort';
-// Matches Claude Code's own /model default. Models that don't list 'xhigh' in
+// Operator default: 'high' — xhigh/max cost far more for almost no extra ROI
+// (operator decision 2026-07-09). Models that don't list 'high' in
 // MODEL_EFFORT_SUPPORT fall back to 'medium' in the selected= lookup below.
-const DEFAULT_EFFORT: EffortLevel = 'xhigh';
+const DEFAULT_EFFORT: EffortLevel = 'high';
 
 export function loadStoredEffort(): EffortLevel {
   try {
