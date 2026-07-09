@@ -207,6 +207,16 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-60 tick 24 (2026-07-09) — strike LANDED fix on main (998a343132, CI in_progress); B5/PAN-2360 now CONFLICTS with main (strike + B5 both fixed same flake) → dispatched B5 agent to rebase-resolve (take main's canonical version)
+
+- **RED MAIN fix LANDED.** strike-pan-2525 pushed `998a343132 fix: restore PAN-2525 red main gates` direct to main (strike contract, `pan done --strike`) and greened lint locally. Main CI now `in_progress` on 998a343132 (was `failure` on a347e4949e). Watching for `CI | success`.
+- **Root of the red confirmed** (from B5 agent's own note): review-verdict-feedback.test.ts was a **stale mock** — production moved to promisified `execFileAsync` + `resolveIssueFeedbackTarget/sessionExists`, test still expected callback-style execFile + gh-only. Not a pure ordering flake. Strike updated the mock + assertion (`body=# Review CHANGES REQUESTED for PAN-1059`) + `timeout: 15_000`.
+- **B5/PAN-2360 CONFLICTS with the strike.** B5 (strike-contract work) ALSO touched `scripts/file-size-baseline.txt` (IDENTICAL → trivial) and `tests/lib/cloister/review-verdict-feedback.test.ts` (both fixed the same flake, divergently) → PR #2523 = DIRTY/CONFLICTING. Confirmed via `git merge-tree`: "changed in both".
+- **Merge endpoint can't auto-resolve** — read `src/lib/cloister/merge-rebase.ts`: `rebaseFeatureBranch()` does plain `git rebase origin/main`; on conflict it ABORTS + returns failure. So B5 must be conflict-free BEFORE merge.
+- **Dispatched B5 rebase** — B5 agent is kimi-k2.7-code at 195/200k ctx (tight), idle+done. Sent precise `pan tell`: branch-guard, then `git rebase origin/main`, resolve both files with `git checkout --ours` (take MAIN's canonical version — both redundant), `--force-with-lease` push; NO full-suite, NO pan done. Awaiting "rebase done".
+- **Next:** once main green AND B5 rebased-clean (PR #2523 CLEAN) → merge B5 via POST /api/issues/PAN-2360/merge (backgrounded) → close + paired PAN-2300 → start B6/PAN-2270. Close out PAN-2525.
+- Push blocked (PAN-2516; 22 ahead). HOLDS + 2 operator questions (PAN-1520) unchanged.
+
 ## RUN-60 tick 23 (2026-07-09) — RED MAIN strike-pan-2525 LIVE + working (typecheck green, on lint chain); main still red; B5 approved+held; B6 held
 
 - **RED MAIN P0 — strike in flight, healthy.** strike-pan-2525 (gpt-5.5, 5min, "Typecheck green, running full lint chain next") — it will hit the deacon.ts baseline (3615>3593) in lint and reconcile it, plus address the review-verdict-feedback test flake. Live, not wedged. Main still `CI | failure | a347e4949e` (strike hasn't pushed yet). ETA to green ~10-15min (fix + push + CI re-run).
