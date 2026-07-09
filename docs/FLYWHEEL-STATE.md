@@ -207,6 +207,13 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-60 tick 19 (2026-07-09) — B5/PAN-2360 fast to review→BLOCKED→reworking (live, PR #2523); main GREEN; push divergence growing (16 ahead, PAN-2516)
+
+- **B5/PAN-2360 in rework cycle** — implemented → pan done → verification passed (HEAD e4c7d4be) → review CHANGES-REQUESTED (feedback auto-delivered `.pan/feedback/002`, PR #2523) → work agent (agent-pan-2360, respawned 21:01) reworking. LIVE (cost $1.70→$2.85 between ticks; +26/-8 unchanged = still analyzing feedback, not yet writing fixes). Not wedged. WATCH next tick: if +26/-8 unchanged AND cost flat → wedged, nudge; else let it rework.
+- **Main GREEN** (5485236776 CI success). P0 ✓.
+- **Push divergence GROWING (PAN-2516)** — now **16 commits ahead** of origin (my FLYWHEEL-STATE commits + local pipeline spec/beads/planning commits that share the block), 3 closed-issue specs still dirty. The merges themselves DO reach origin (main HEAD current), so critical state travels; but the primary worktree accumulating 16 unpushed commits + dirty tree is a growing hygiene risk. PAN-2516 fix (commit spec-status flips) unblocks a rebase+push of everything. Still not forcing (no stash/reset/discard).
+- HOLDS + 2 operator questions (PAN-1520) unchanged. B6/PAN-2270 queued.
+
 ## RUN-60 tick 18 (2026-07-09) — quiet: main GREEN on PAN-2510 merge; B5/PAN-2360 implementing (healthy); filed PAN-2522 (finalize→autostart gap); push still blocked
 
 - **Main GREEN** — `CI | success | 5485236776` (PAN-2510 merge commit). P0 ✓.
