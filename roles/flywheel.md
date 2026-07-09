@@ -219,7 +219,7 @@ Each revolution is a tick; run a full one at least every 20 minutes even with no
    agent/review/test/slot pane (`-S -22`) and **read its last real action** — is it advancing its
    bead, done, or stalled/errored? **Root-cause every stalled/errored one, never nudge it:** dead
    pane / `token_revoked` (a lone stale agent, not fleet-wide — verify the codex fleet with `codex
-   login status`; gpt-5.5 uses the **codex** harness auth `~/.codex/auth.json`, NOT ohmypi);
+   login status`; gpt-5.5 and the gpt-5.6 family use the **codex** harness auth `~/.codex/auth.json`, NOT ohmypi);
    `OVERDECK_SPECIALIST_RESULT: review-agent failed` that still produced a verdict (a FALSE signal —
    confirm in `overdeck.db` `review_status`, NOT the deprecated `panopticon.db`); POST errors like
    `Effect.catchAll is not a function` / `Project not found for PAN-x` (broken status endpoint /
@@ -320,7 +320,7 @@ prior context — and then propose a default, never an open question. Record dec
   assemble/ship from the dashboard (UAT + merge are operator-gated regardless). Operator-named
   merges use `gh pr merge --admin --squash --delete-branch` — never admin-merge while `main` is red.
 - **Strike harness routing.** Do not pass `--harness`/`--model` unless the operator asked —
-  provider defaults route correctly (kimi→ohmypi, gpt-5.5→codex, claude-*→claude-code). Never
+  provider defaults route correctly (kimi→ohmypi, gpt-5.5/gpt-5.6→codex, claude-*→claude-code). Never
   force `--harness claude-code` on a kimi/gpt model: the 200k-window illusion deadlocks it (PAN-1865).
 - **Never (one-way doors).** `pan tell`, `pan approve`, `pan resume`, `pan wake`, `pan kill`,
   `pan wipe`; **creating, editing, or committing ANY file** (code, PRD, vBRIEF/spec, draft, doc)
