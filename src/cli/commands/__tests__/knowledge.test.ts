@@ -114,6 +114,23 @@ describe('knowledgeCommand', () => {
     expect(agentMocks.spawnRun.mock.calls[0][2].prompt).toContain('/okf sync --topic "billing flows"');
   });
 
+  it('throws a clear /okf init error when no knowledge bundle is configured', async () => {
+    projectMocks.loadProjectsConfigSync.mockReturnValue({
+      projects: {
+        overdeck: {
+          name: 'Overdeck',
+          path: '/repo/overdeck',
+        },
+      },
+    });
+
+    await expect(knowledgeCommand('pan-2468')).rejects.toThrow(
+      /Run `\/okf init`/,
+    );
+
+    expect(agentMocks.spawnRun).not.toHaveBeenCalled();
+  });
+
   it('still spawns when mnemos is unavailable', async () => {
     installerMocks.ensureMnemos.mockRejectedValue(new Error('release fetch failed'));
 

@@ -106,8 +106,15 @@ export async function knowledgeCommand(issueId: string, options: KnowledgeOption
     }
 
     const bundlePath = await resolveKnowledgeBundlePath(project.projectKey, project.projectPath);
+    if (!bundlePath) {
+      throw new Error(
+        `No OKF bundle is configured for ${project.projectName}. ` +
+          `Run \`/okf init\` in this workspace to create or connect a knowledge bundle, ` +
+          `then retry \`pan knowledge ${normalized}\`.`,
+      );
+    }
     try {
-      await ensureMnemos({ bundlePath: bundlePath ?? undefined });
+      await ensureMnemos({ bundlePath });
     } catch (error: unknown) {
       spinner.warn(`mnemos unavailable; spawning knowledge agent with built-in OKF search: ${errorMessage(error)}`);
       spinner.start(`Spawning knowledge agent for ${normalized}...`);
