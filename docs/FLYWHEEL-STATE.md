@@ -207,6 +207,15 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-60 tick 27 (2026-07-09) — B5/PAN-2360 MERGED via operator UAT-promote (uat/pan-flint-0709 @ a066820751); closed out + pair PAN-2300; reaped PAN-2359 zombie; clean UAT batch = EMPTY; B6/PAN-2270 held (server still stale)
+
+- **B5/PAN-2360 MERGED** (3rd order-book/Lane-B item). Operator promoted UAT batch `uat/pan-flint-0709` → main HEAD `a066820751 Merge UAT batch uat/pan-flint-0709 (PAN-2360)`; `feature/pan-2360` is ancestor of main. Closed out (`pan close --force`, bg task b88w5evl7) + paired **PAN-2300 gh-closed** (shared PRD, Lane-B rule 5).
+- **Re-derived clean UAT batch = EMPTY.** merge-blockers clean. No fresh review+test-passed drain members remain (B6 not started). `pan review pending` shows only old non-drain cruft (PAN-1976/1978/1996/1997, planning-pan-806) — excluded. Excluded merged PAN-2360 per operator.
+- **Reaped zombie:** `agent-pan-2359-review` (running 140min on B4/PAN-2359 which merged+closed hours ago) — killed, freed a review slot. PAN-2360 work+review agents should stop via close-out (verify next tick).
+- **Live server STILL STALE** — same 2 PIDs (:3011=1051993, 19:59 EDT), no fresh deploy. Origin-only divergence GREW 23→**42** (operator advanced origin with the batch; primary local main unchanged at 25 local commits). **Primary reconcile+redeploy still pending — operator-owned + now more overdue.**
+- **B6/PAN-2270 HELD** (last Lane-B order-book item). Not started: operator didn't direct new work, and starting through the stale server runs old spawn/lifecycle + deepens the 42-commit divergence. Resume B6 the instant a fresh single server is deployed OR operator explicitly says go.
+- Docker-leak note: the leak is in `postMergeLifecycle` at MERGE time (operator's promote already ran it) — the close-out ceremony I ran is the lower-risk part.
+
 ## RUN-60 tick 25 (2026-07-09) — ⏸️ DRAIN PAUSED: main GREEN + B5 merge-ready, but live :3011 server is STALE (pre-PAN-2510) → merging/closing-out through it would leak docker + run old lifecycle. Held pending operator reconcile-primary→origin + fresh deploy (operator owns it).
 
 - **P0 RESOLVED — main GREEN.** strike `998a343132` CI = `completed | success`. Red main fixed (deacon.ts baseline 3593→3615 + review-verdict-feedback stale-mock). B5's rebase landed: PR #2523 = MERGEABLE (UNSTABLE = PR CI finishing), conflict gone.
