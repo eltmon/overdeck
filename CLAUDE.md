@@ -427,6 +427,13 @@ workspaces accumulate and eventually block new workspace creation with "all pred
 address pools have been fully subnetted". Docker's default pool only supports ~31 bridge
 networks. NEVER remove this cleanup step.
 
+The durable, verified teardown owner is **close-out**: `pan close <id>` / dashboard
+Close Out stops and removes the workspace Docker stack (including the
+`overdeck-feature-<issue>_devnet` network) and verifies the network is gone. The deacon's
+closed-issue reaper (`reapIssueResidue`) is the backstop that tears down any terminal
+issue's leaked stack by name. The single `rebuildWorkspaceStack` chokepoint no-ops for
+closed/merged issues, so patrols never recreate a terminal stack.
+
 The destructive/non-reversible completion steps are owned by close-out, not merge:
 `pan close <id>` / dashboard Close Out completes the vBRIEF, archives planning artifacts,
 optionally tears down the workspace or deletes feature branches according to `close_out`
@@ -549,7 +556,7 @@ If you see an agent referencing `.planning/`, `docs/prds/planned/*.vbrief.json`,
 - `complete-planning` writes the vBRIEF to `<projectRoot>/.pan/specs/...` with `plan.status: "proposed"`.
 - `start-agent` flips the main-side status field. Work agents read the spec from main via `findPlan()`.
 - `postMergeLifecycle` marks merged work as `verifying_on_main` and preserves the vBRIEF in its running/active state.
-- `closeOut` flips the main-side `plan.status` to `"completed"` after post-merge verification.
+- `closeOut` flips the main-side `plan.status` to `"completed"` after post-merge verification, and runs verified Docker stack + `_devnet` network teardown (with the closed-issue reaper as a backstop).
 - `findPlan(workspacePath)` resolves main-side spec via `findSpecByIssue(projectRoot, issueId)`, with fallback to workspace-local `.pan/spec.vbrief.json` for migration compat.
 
 ### Dashboard Viewer
