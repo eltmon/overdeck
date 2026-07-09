@@ -1,6 +1,13 @@
 {
   "issueId": "PAN-2360",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-09T01:43:45.272Z"
+    }
+  ],
   "feedback": [],
   "harness": "claude-code",
   "model": "kimi-k2.7-code",
@@ -18,22 +25,24 @@
   "pipeline": {
     "issueId": "PAN-2360",
     "reviewStatus": "passed",
-    "testStatus": "failed",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-09T01:37:04.295Z",
-    "reviewNotes": "PAN-2360 review passed; kickoff contract and baseline verification fix are acceptable",
-    "testNotes": "typecheck passed; lint passed; npm test failed with 1 unrelated pre-existing failure in tests/lib/cloister/review-verdict-feedback.test.ts (stale mock: expects callback-style execFile and only gh calls, but source now uses promisified execFileAsync and calls tmux via resolveIssueFeedbackTarget/sessionExists). PAN-2360 strike tests pass: src/cli/commands/__tests__/strike.test.ts 7/7 passed. No browser UAT required.",
+    "updatedAt": "2026-07-09T01:43:52.608Z",
+    "reviewNotes": "PAN-2360 review passed; prompt contract and verification-support fixes are acceptable",
+    "testNotes": "typecheck passed; lint passed; npm test failed with 1 unrelated pre-existing failure in tests/lib/cloister/review-verdict-feedback.test.ts (stale mock: expects callback-style execFile and only gh calls, but source now uses promisified execFileAsync and calls tmux via resolveIssueFeedbackTarget/sessionExists). PAN-2360 strike tests pass: src/cli/commands/__tests__/strike.test.ts 7/7 passed. No browser UAT required — issue is CLI kickoff contract only.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2523",
-    "reviewedAtCommit": "1ac17f2c4be562f96d81016166f8eabd3ac78e47",
+    "reviewedAtCommit": "dde20ff07846164600c574b78cb20f333c0d53f4",
     "lastVerifiedCommit": "1ac17f2c4be562f96d81016166f8eabd3ac78e47",
-    "reviewRequestedAt": "2026-07-09T01:27:16.202Z",
+    "reviewRequestedAt": "2026-07-09T01:42:29.941Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/drafts/PAN-2360.md",
         ".pan/records/pan-2360.json",
-        "scripts/file-size-baseline.txt"
+        "scripts/file-size-baseline.txt",
+        "tests/lib/cloister/review-verdict-feedback.test.ts"
       ],
       "declaredScopeUntouched": [],
       "declaredScope": [
@@ -47,9 +56,10 @@
         "docs/ROLES.md",
         "scripts/file-size-baseline.txt",
         "src/cli/commands/__tests__/strike.test.ts",
-        "src/cli/commands/strike.ts"
+        "src/cli/commands/strike.ts",
+        "tests/lib/cloister/review-verdict-feedback.test.ts"
       ],
-      "recordedAt": "2026-07-09T01:27:08.795Z"
+      "recordedAt": "2026-07-09T01:42:23.070Z"
     }
   },
   "closeOut": {
@@ -57,9 +67,9 @@
       "byStage": {
         "codex": {
           "openai/gpt-5.5": {
-            "input": 3176950,
-            "output": 11245,
-            "cacheRead": 2994176,
+            "input": 3538608,
+            "output": 12052,
+            "cacheRead": 3329664,
             "cacheWrite": 0
           }
         },
@@ -73,26 +83,26 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 247030,
-            "output": 10020,
-            "cacheRead": 4373760,
+            "input": 248596,
+            "output": 11036,
+            "cacheRead": 4818176,
             "cacheWrite": 0
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 555016,
-            "output": 29817,
-            "cacheRead": 12540928,
+            "input": 794306,
+            "output": 38485,
+            "cacheRead": 16391936,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 3176950,
-          "output": 11245,
-          "cacheRead": 2994176,
+          "input": 3538608,
+          "output": 12052,
+          "cacheRead": 3329664,
           "cacheWrite": 0
         },
         "anthropic/claude-opus-4-8": {
@@ -102,15 +112,15 @@
           "cacheWrite": 131630
         },
         "custom/kimi-k2.7-code": {
-          "input": 802046,
-          "output": 39837,
-          "cacheRead": 16914688,
+          "input": 1042902,
+          "output": 49521,
+          "cacheRead": 21210112,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 9.430093,
-        "pricingAsOf": "2026-07-09T01:37:04.344Z"
+        "usd": 10.836576,
+        "pricingAsOf": "2026-07-09T01:43:52.633Z"
       }
     },
     "merges": [
@@ -118,13 +128,6 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "created": "2026-07-09T01:37:04.407Z",
-  "updated": "2026-07-09T01:37:04.477Z",
-  "sessionHistory": [
-    {
-      "reason": "resume",
-      "agentModel": "kimi-k2.7-code",
-      "timestamp": "2026-07-09T01:37:04.477Z"
-    }
-  ]
+  "created": "2026-07-09T01:43:45.217Z",
+  "updated": "2026-07-09T01:43:52.634Z"
 }
