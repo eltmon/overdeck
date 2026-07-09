@@ -165,6 +165,25 @@ stale Settings selection cannot bypass it. When the pipeline routes a role run
 into the blocked cell, it falls back to `claude-code` and emits a `console.warn`
 rather than failing the whole pipeline.
 
+### What you see in the pickers
+
+The pickers consult the same `canUseHarness(harness, model, authMode)` policy as
+the spawn entry points, so the blocked combination is caught before you click
+**Start**. The UI surfaces the block in two places:
+
+- **Model list:** when the selected harness cannot run a model, that model row
+  is disabled (locked) and its tooltip shows the reason.
+- **Harness list:** when the current model is blocked for a harness, the harness
+  option shows the reason inline and, if clicked, auto-flips the model to the
+  first compatible model instead of switching to the blocked combination.
+
+The inline reason names the restriction as a **Claude Code subscription Terms of
+Service** rule, and tells you how to proceed: switch Anthropic to API-key auth,
+or pick a non-Anthropic model for ohmypi.
+
+This behavior applies in the plan kickoff dialog, work-agent start menu,
+conversation panel, and Settings per-role harness selectors.
+
 ### Auth mode is exclusive
 
 Anthropic auth is exclusively subscription **or** API key, never both. If you log
