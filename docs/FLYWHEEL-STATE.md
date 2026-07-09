@@ -207,6 +207,15 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-60 tick 21 (2026-07-09) — B5 verdict lost to hung signal → RE-REQUESTED review (clean re-run); rate-limit modal FIX landed on main (PAN-2521); filed PAN-2524, closed PAN-2513 as dup
+
+- **B5/PAN-2360 unblocked via re-request.** review.approved never reconciled (verdict lost to the hung `pan review` signal, even after killing the review agent). → `pan review request PAN-2360` → synced latest main into feature-pan-2360 + verification gate re-running [install,typecheck,frontend-typecheck,lint,build,test]. Clean re-review cycle in progress; fresh review agent will spawn after gate passes.
+- **🎉 Rate-limit modal FIX LANDED on main** — `a347e4949e fix(agents): disable Codex rate-limit model-switch nudge for pipeline agents (PAN-2521)`. This is the fix for the codex "Approaching rate limits → gpt-5.4-mini?" wedge. **Future pipeline agents launch with the reminder disabled → no more modal wedges.** My PAN-2513 was a duplicate → CLOSED as dup of PAN-2521.
+- **Filed PAN-2524** — `pan review` verdict signal hangs after emitting → review.approved never reconciles → merge blocked despite review passing (this exact B5 stall). FR: durable journal write before CLI returns + reconcile-on-force-kill + a stranded-verdict patrol.
+- **Main not red** — a347e4949e CI in_progress (PAN-2521 fix); 5485236776 green. Push blocked (PAN-2516; 19 ahead).
+- **Substrate scorecard:** PAN-2510 (MERGED, docker leak), PAN-2521 (MERGED on main, rate-limit modal), PAN-2511 (git-EPERM), PAN-2516 (spec-commit drift), PAN-2522 (finalize→autostart), PAN-2524 (review-signal hang). PAN-2513 closed as dup.
+- HOLDS + 2 operator questions (PAN-1520) unchanged. B6/PAN-2270 queued.
+
 ## RUN-60 tick 20 (2026-07-09) — B5/PAN-2360 rework PASSED re-review+test but VERDICT-RECONCILE STUCK (pan review signal hung); pan tell unwedge DOWNGRADED review agent (PAN-2513 harm confirmed)
 
 - **B5/PAN-2360 one step from merge but STUCK on verdict reconcile.** Rework committed (34dcd21d) → verification passed → test PASSED (reconciled) → re-review PASSED (agent stated "✓ Review passed, no code drift"; review.md written). PR #2523 CLEAN + MERGEABLE, merge-blockers clean. BUT the pipeline has NOT reconciled `review.approved` — the review agent's `pan review` SIGNAL CLI HUNG after emitting the verdict (finalize-hang pattern), so the verdict may not have reached the durable journal.
