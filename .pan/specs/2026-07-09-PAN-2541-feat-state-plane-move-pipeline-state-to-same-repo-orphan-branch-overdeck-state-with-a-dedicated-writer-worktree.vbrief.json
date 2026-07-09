@@ -1,0 +1,1355 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-09T20:58:40.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2541: move pipeline state to same-repo orphan branch overdeck-state with a dedicated writer worktree",
+    "updated": "2026-07-09T21:13:57.276Z"
+  },
+  "plan": {
+    "id": "pan-2541",
+    "title": "feat(state-plane): move pipeline state to same-repo orphan branch overdeck-state with a dedicated writer worktree",
+    "status": "proposed",
+    "uid": "0e640473-c79a-436f-a168-92199315ced3",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-07-09T20:58:40.000Z",
+    "updated": "2026-07-09T21:13:57.276Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2541",
+        "label": "PAN-2541",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-2541.md",
+        "label": "PRD PAN-2541",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "state-plane",
+      "git",
+      "infra",
+      "migration",
+      "orphan-branch",
+      "beads"
+    ],
+    "narratives": {
+      "Problem": "The deacon and pipeline mirror the durable state plane (records, continues, specs, drafts, review/test/feedback artifacts, backlog, and the beads DB) into git by committing to the same branch and worktree as the code. That single design causes three incident classes seen on 2026-07-09 alone: (1) the PAN-2468 review-reset loop, where high-frequency state commits on main force constant feature-branch rebases that rewrite every SHA and make a passed review look like new code; (2) writer races where the deacon's chore(state) auto-commit in the primary worktree is silently absorbed by a concurrent human/agent git commit --amend; and (3) history and CI pollution, where git log main interleaves state noise, state pushes trigger CI, and code exists (pipeline-state-paths.ts, state-plane.ts) largely to discriminate state commits from code commits after the fact.",
+      "Proposal": "Move the state plane off code branches onto a same-repo orphan branch named overdeck-state, written ONLY through a dedicated writer worktree at ${OVERDECK_HOME}/state/<projectKey>. The orphan branch's tree is flat (records/ continues/ specs/ drafts/ review/ test/ feedback/ backlog/ notes/ .beads/ at its root, no .pan/ wrapper); main gitignores those paths; CI guards fail either branch on a violation. Migration detection is repo-derived (the overdeck-state branch exists on origin), never machine-local config, so every clone resolves correctly with zero per-machine setup. Everything resolves through a new resolveStateHome() chokepoint that extends resolveInfraRepo(); read doors, the write door, and project-scope beads all resolve through it, with read-only legacy .pan/ fallback during migration. The context layer moves out of state entirely to .overdeck/context/ on main (code-owned, reviewable). Every behavior change is gated per project on isStateMigrated(), so unmigrated projects are untouched; overdeck dogfoods first via an idempotent pan admin state migrate command, and the multi-project rollout is the same one command per repo (plain git, works on GitLab too).",
+      "NonGoals": "- Renaming the pan CLI, the src/lib/pan-dir/ module, or issue prefixes (D7; PAN-1952 naming policy keeps prefixes).\n- Removing the checkPostReviewCommits benign-move guards (D11 keeps them as backstops until telemetry shows they no longer fire).\n- Extending multi-tenant / separate-repo state homes: the pan_records.repo polyrepo path keeps working as the documented escape hatch but is not extended here.\n- Any bd-internal changes: the redirect retarget (D13) is a one-path-string change in Overdeck's own initializeWorkspaceBeads, not a beads modification.\n- Remote (Fly) state sync for migrated projects: D14 blocks remote spawns on migrated projects; the redesign is a named follow-up issue, not part of this delivery.\n- History rewrite on main: migration makes only ordinary, revertible commits (NFR-1)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Adopted every design decision D1-D14 from the PRD (.pan/drafts/pan-2541.md) as authoritative without re-litigating.",
+        "rationale": "The PRD was operator-directed and pre-decided branch name (overdeck-state), flat tree layout, no symlinks, repo-derived migration detection, redirect retarget, and the Fly D14 block. Auto-planning rule: when the issue/PRD documents the recommended option, choose it and record it rather than asking."
+      },
+      {
+        "summary": "Split WI-7 into four beads (STATE_BRANCH_PATHS constant, CI guards, stray-write lint, recreation tripwire) and WI-11 into five beads (spawn/done, compact/checkpoint, planning-promotion, Fly D14 block, roles refs+lint).",
+        "rationale": "Each is an independently reviewable, independently testable change touching distinct files; the aggressive-decomposition rule prefers many small beads, and the constant split is a genuine cross-cutting foundation the guards depend on."
+      },
+      {
+        "summary": "Marked exactly three beads requiresInspection:true (STATE_BRANCH_PATHS constant, resolveStateHome, migrate-command) at inspectionDepth:deep.",
+        "rationale": "These are the plan's true foundations: the constant is consumed by four downstream beads; resolveStateHome is the resolution chokepoint every door depends on; the migration is the one-time data cutover on main. Every other bead's defects surface immediately at typecheck/lint/its named test."
+      },
+      {
+        "summary": "Classified nearly all beads readiness:sequential rather than ready.",
+        "rationale": "The PRD's execution mode is a single operator-supervised agent working directly on main (not the parallel swarm), and the beads have real ordering dependencies (foundation -> doors -> migration -> remediation). Sequential is the honest classification and avoids false parallel-safety claims."
+      }
+    ],
+    "items": [
+      {
+        "id": "state-branch-paths",
+        "title": "Split STATE_PLANE_PATHS into authoritative STATE_BRANCH_PATHS (full D2 set)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-09T20:58:40.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-2541",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "migrate-command",
+            "ci-guards",
+            "stray-write-lint",
+            "no-loss-audit",
+            "recreation-tripwire"
+          ],
+          "files_scope": [
+            "src/lib/state-plane.ts",
+            "src/lib/pipeline-state-paths.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/state-plane.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "the state-plane constant test asserts all ten D2 directories are present"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Introduce STATE_BRANCH_PATHS in src/lib/state-plane.ts as the single authoritative D2 set (records/, continues/, specs/, drafts/, review/, test/, feedback/, backlog/, notes/, .beads/) that the migration mapping, both CI guards, the stray-write lint, and the no-loss audit all import; today's STATE_PLANE_PATHS is missing drafts/, backlog/, and notes/. Keep the existing diff-classification predicate that retains workspace-local .pan/continue.json as ignore-this-diff runtime state, distinct from branch content, so nothing hand-copies a path list."
+        },
+        "items": [
+          {
+            "id": "state-branch-paths.ac1",
+            "title": "Given the D2 layout, STATE_BRANCH_PATHS contains records/, continues/, specs/, drafts/, review/, test/, feedback/, backlog/, notes/, and .beads/, adding the three previously-missing drafts/backlog/notes entries.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-branch-paths.ac2",
+            "title": "The diff-classification predicate still marks .pan/continue.json as workspace-local runtime and excludes it from STATE_BRANCH_PATHS.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-branch-paths.ac3",
+            "title": "A unit test validates that STATE_BRANCH_PATHS covers all ten D2 directories and that guards import it rather than a hand-copied list.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resolve-state-home",
+        "title": "Add resolveStateHome(), isStateMigrated(), and the state worktree manager with doctor self-heal",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-09T20:58:40.000Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-2541",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "read-doors",
+            "write-door",
+            "beads-relocation",
+            "migrate-command",
+            "release-snapshot",
+            "remediate-spawn-done",
+            "fly-remote-d14-block"
+          ],
+          "files_scope": [
+            "src/lib/projects.ts",
+            "src/lib/state-home.ts",
+            "src/cli/commands/doctor.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/state-home.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "state-home.test.ts asserts worktree creation, wrong-branch detection, idempotent re-ensure, and migration detection before/after the branch exists"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/state-home.ts implementing isStateMigrated(project) per D12 (true iff the overdeck-state branch exists on origin via git ls-remote or a local ref after fetch, result cached per process, no config-file flag), ensureStateWorktree(project) that runs git worktree add ${OVERDECK_HOME}/state/<key> overdeck-state, and resolveStateHome(project) returning { worktreePath, migrated }. Extend resolveInfraRepo in src/lib/projects.ts:353 so migrated projects resolve to the state worktree with recordsPath '.'; add a doctor self-heal hook that repairs a missing/dirty/wrong-branch worktree."
+        },
+        "items": [
+          {
+            "id": "resolve-state-home.ac1",
+            "title": "isStateMigrated(project) returns true only when the overdeck-state branch exists on origin and returns false before it exists, caching the result per process.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolve-state-home.ac2",
+            "title": "ensureStateWorktree creates a git worktree at ${OVERDECK_HOME}/state/<key> checked out on overdeck-state, and re-running it on a healthy worktree exits without error (idempotent).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolve-state-home.ac3",
+            "title": "resolveStateHome returns the state worktree path with recordsPath '.' for a migrated project and falls back to the legacy .pan values otherwise.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolve-state-home.ac4",
+            "title": "pan doctor shows a missing or wrong-branch state worktree and recreates it as a clean overdeck-state checkout.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "context-runtime-rename",
+        "title": "Move context layer to .overdeck/context/ and rename workspace runtime dir with read fallback",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-09T20:58:40.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2541",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/project.ts",
+            "src/lib/pan-dir/context.ts",
+            ".gitignore",
+            "docs/CONTEXT-LAYERS.md",
+            "configuration/context-layers.mdx",
+            ".claude/rules/context-nomenclature.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run context"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "context-resolution tests cover new-path, legacy fallback, and both-present cases"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Resolve the context layer from <root>/.overdeck/context/ with a read fallback to .pan/context/ (FR-5, D5), and rename the workspace-local runtime dir constants from .pan/ to .overdeck/ with a read-compat fallback (D6). Update src/lib/pan-dir/context.ts, the context readers/renderers, and the .overdeck workspace-runtime .gitignore entries, and update the context-nomenclature rule table plus docs/CONTEXT-LAYERS.md and configuration/context-layers.mdx in the same commit per the rule-authoring requirement."
+        },
+        "items": [
+          {
+            "id": "context-runtime-rename.ac1",
+            "title": "Context renders identically when served from .overdeck/context/ on a repo where the files have moved there.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-runtime-rename.ac2",
+            "title": "A repo containing only legacy .pan/context/ still renders context through the read fallback.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-runtime-rename.ac3",
+            "title": "Each workspace-local runtime lookup resolves .overdeck/ first and falls back to .pan/ for read compatibility.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-command",
+        "title": "Add idempotent pan admin state migrate <project> cutover command",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-09T20:58:40.000Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "infra",
+          "issueLabel": "pan-2541",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "read-doors",
+            "no-loss-audit",
+            "ci-guards"
+          ],
+          "files_scope": [
+            "src/cli/commands/admin/state-migrate.ts",
+            "src/cli/commands/admin/index.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/integration/state-migrate.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "integration test asserts the migrated tree matches D2, main carries no state paths, and re-run is a no-op"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement pan admin state migrate <project> as a single idempotent command: create the orphan branch overdeck-state seeded from main's tracked tree via a temp index (git read-tree/commit-tree, no primary-worktree checkout gymnastics) applying the WI-2 path mapping (.pan/records -> records, ... , .beads -> .beads, .pan/context NOT migrated); copy the verified untracked stray .pan-root files into notes/ and commit them; push the branch and create the state worktree; then in one ordinary commit on main git rm -r --cached the migrated paths, git mv .pan/context .overdeck/context, and rewrite the state-path .gitignore entries. Provide a --dry-run plan and require a throwaway-clone checkpoint before any write; recovery from failure is git revert on main plus branch deletion."
+        },
+        "items": [
+          {
+            "id": "migrate-command.ac1",
+            "title": "After running on a fixture repo, git ls-tree overdeck-state contains records/, continues/, specs/, drafts/, review/, test/, feedback/, backlog/, notes/, and .beads/ at its root and no .pan/ wrapper.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-command.ac2",
+            "title": "After migration git ls-tree main contains no .pan/ path and no .beads/ path, and .pan/context has moved to .overdeck/context.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-command.ac3",
+            "title": "Re-running the command on an already-migrated project exits 0 and prints 'already migrated' without creating a second commit.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-command.ac4",
+            "title": "The command commits the verified untracked stray .pan-root files into notes/ and removes them from the primary checkout.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-command.ac5",
+            "title": "Under --dry-run the command prints a full plan and makes no writes, and otherwise commits only ordinary revertible commits with no history rewrite on main.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "read-doors",
+        "title": "Repoint read doors through resolveStateHome with legacy .pan fallback",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-09T20:58:40.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2541",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pan-dir/specs.ts",
+            "src/lib/pan-dir/records.ts",
+            "src/lib/pan-dir/continue.ts",
+            "src/lib/pan-dir/drafts.ts",
+            "src/lib/pan-dir/feedback.ts",
+            "src/lib/backlog/sequence-io.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/pan-dir/__tests__"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "per-domain read-door tests cover resolve-from-state-worktree and legacy-fallback"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Route each read door (specs.ts findSpecByIssue at line 216, records.ts, continue.ts, drafts.ts, feedback.ts, and backlog/sequence-io.ts) to resolve its base directory through resolveStateHome, keeping the D9 read-only legacy .pan/ fallback when the project is unmigrated. Audit the remaining direct .pan/ references and route state reads through the doors; workspace-local runtime references stay in the context-runtime-rename bead's scope, not this one."
+        },
+        "items": [
+          {
+            "id": "read-doors.ac1",
+            "title": "findSpecByIssue resolves a spec that exists only on overdeck-state in the state worktree for a migrated project.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "read-doors.ac2",
+            "title": "With the state worktree absent, findSpecByIssue falls back to and resolves the same spec from legacy .pan/specs/.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "read-doors.ac3",
+            "title": "Each read door (records, continue, drafts, feedback, backlog sequence) resolves its base directory through resolveStateHome, verified by a per-domain unit test.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "write-door",
+        "title": "Harden the write door to commit only in the state worktree on overdeck-state",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-09T20:58:40.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2541",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pan-dir/auto-commit.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/pan-dir/__tests__/auto-commit.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "auto-commit.test.ts asserts state commits land on overdeck-state, branch-assertion blocks a bad commit, and the fake-timer retry loop runs"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-10",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Harden queueAutoCommit (line 189) and flushAutoCommits (line 241) in src/lib/pan-dir/auto-commit.ts so state-path commits route to the state worktree only, assert git branch --show-current equals overdeck-state before every commit, and push after flush with the D10 fetch/rebase/retry loop (bounded 3 attempts, re-reading the canonical value through the read door on conflict). When the worktree is missing, refuse the write with a log and surface rather than discarding it. Per NFR-3, every retry/delay test uses vi.useFakeTimers() and vi.advanceTimersByTimeAsync(), never real timers."
+        },
+        "items": [
+          {
+            "id": "write-door.ac1",
+            "title": "A queued state write on a migrated project produces a commit on overdeck-state inside the state worktree and never on main.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "write-door.ac2",
+            "title": "The write door asserts the current branch is overdeck-state and blocks the commit when the assertion fails.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "write-door.ac3",
+            "title": "The bounded rebase-retry loop applies the queued write after re-reading the canonical value, exercised with vi.useFakeTimers() and no real waits.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "write-door.ac4",
+            "title": "When the state worktree is missing, the write door refuses the commit, logs the failure, and surfaces it rather than discarding the write.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "beads-relocation",
+        "title": "Relocate beads to the state worktree via redirect retarget and -C flag",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-09T20:58:40.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2541",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/workspace-beads.ts",
+            "src/cli/commands/beads.ts",
+            "src/cli/commands/sync.ts",
+            "src/lib/pan-dir/auto-commit.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run workspace-beads"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "unit tests assert the redirect target and -C flag on migrated vs unmigrated projects"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Per D13, retarget the gitignored .beads/redirect that initializeWorkspaceBeads writes: on a migrated project it records the state worktree's absolute .beads path (from resolveStateHome) and its existsSync precondition checks the state worktree; unmigrated projects keep writing ../../.beads gated on isStateMigrated(). Add -C <state worktree> to project-scope bd invocations, target queueBeadsAutoCommit (auto-commit.ts:227) at the state worktree, and key the 422 beads-missing gate off the redirect/shared DB rather than a committed workspace issues.jsonl."
+        },
+        "items": [
+          {
+            "id": "beads-relocation.ac1",
+            "title": "initializeWorkspaceBeads records the redirect target as the state worktree's absolute .beads path on a migrated project and falls back to ../../.beads on an unmigrated project.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "beads-relocation.ac2",
+            "title": "Project-scope bd command construction contains -C <state worktree>, so bd ready resolves the state worktree's .beads database.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "beads-relocation.ac3",
+            "title": "The 422 beads-missing gate still blocks agent start when no beads exist for the issue, now keyed off the shared DB via the redirect, and existing workspace beads tests stay green.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-guards",
+        "title": "Add bidirectional CI/pre-push guards for state-plane branch separation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-09T20:58:40.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-2541",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/guard-state-plane-branches.sh",
+            ".github/workflows/ci.yml",
+            ".github/workflows/no-planning-on-main.yml"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "bash scripts/guard-state-plane-branches.sh --self-test",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the guard fixture test fails a state path on main and a code path on overdeck-state",
+            "typecheck completes with no errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add scripts/guard-state-plane-branches.sh consuming STATE_BRANCH_PATHS, wired into CI and beside scripts/guard-agent-main-push.sh in the pre-push hook: on code branches it fails when the diff/tree contains any state-plane path (FR-2), and on overdeck-state it fails when the tree contains any path outside the D2 layout (FR-3). Add branch filters in .github/workflows/*.yml so overdeck-state pushes run only the state-tree guard and no other workflow (NFR-2)."
+        },
+        "items": [
+          {
+            "id": "ci-guards.ac1",
+            "title": "CI fails a synthetic PR that adds a records/x.json state path to main.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-guards.ac2",
+            "title": "CI fails a synthetic push to overdeck-state that contains src/anything.ts outside the D2 layout.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-guards.ac3",
+            "title": "A push to overdeck-state produces only the state-tree guard workflow run and no code CI workflow run.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stray-write-lint",
+        "title": "Add source-level stray-state-write lint (FR-12a)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-09T20:58:40.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-2541",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-state-writes.sh",
+            "package.json"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "bash scripts/lint-state-writes.sh --self-test",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "the lint fails a synthetic offending file and passes the sanctioned doors",
+            "npm run lint completes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Add scripts/lint-state-writes.sh wired into npm run lint like scripts/lint-skills.sh: it fails any src/** or scripts/** code outside the doors (src/lib/pan-dir/ and src/lib/state-home.ts, maintained in an explicit reviewed allowlist file) that constructs a write path under a project state-plane location (.pan/{records,continues,specs,drafts,review,test,feedback,backlog,notes} or .beads). The forbidden path set is derived from STATE_BRANCH_PATHS, not a hand-copied list."
+        },
+        "items": [
+          {
+            "id": "stray-write-lint.ac1",
+            "title": "npm run lint fails when a synthetic src/ file outside the doors constructs a writeFileSync path under <projectRoot>/.pan/records/.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stray-write-lint.ac2",
+            "title": "npm run lint passes for the sanctioned doors (src/lib/pan-dir/, src/lib/state-home.ts) listed in the explicit allowlist.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stray-write-lint.ac3",
+            "title": "The lint covers every STATE_BRANCH_PATHS directory in its forbidden-write set.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "recreation-tripwire",
+        "title": "Add doctor + deacon-patrol tripwire for recreated state dirs (FR-12b)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-09T20:58:40.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-2541",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor.ts",
+            "src/lib/cloister/deacon.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run doctor"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "doctor test flags a fixture with a recreated .pan/records/ and passes on a clean migrated checkout"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-12",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a pan doctor check (src/cli/commands/doctor.ts) and a deacon patrol check (src/lib/cloister/deacon.ts) that flag a migrated project whose primary checkout contains any STATE_BRANCH_PATHS directory on disk (evidence a stray writer bypassed the lint at runtime). Report and surface, never delete, per the surface-don't-destroy rule; keep doctor's check CLI-only and the patrol check async-only (no execSync in server-reachable code)."
+        },
+        "items": [
+          {
+            "id": "recreation-tripwire.ac1",
+            "title": "pan doctor on a migrated fixture whose checkout contains a recreated .pan/records/ directory shows the tripwire warning.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "recreation-tripwire.ac2",
+            "title": "The deacon patrol logs a warning when a migrated project's checkout regrows a state-plane directory and deletes nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "recreation-tripwire.ac3",
+            "title": "On a clean migrated checkout with no state directories present, the doctor tripwire check passes silently.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "release-snapshot",
+        "title": "Record overdeck-state HEAD SHA in pan release stable notes",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-09T20:58:40.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2541",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/release.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run release"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "release-notes test asserts the overdeck-state section renders when a state worktree exists"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "In the pan release stable implementation (src/cli/commands/release.ts), append an ## overdeck-state section to .release/<tag>.md that records each registered project's overdeck-state HEAD SHA (FR-9, D8). When no state worktree exists, omit the section and still produce valid release notes."
+        },
+        "items": [
+          {
+            "id": "release-snapshot.ac1",
+            "title": "pan release stable run on a machine with a state worktree records the overdeck-state HEAD SHA in an ## overdeck-state section of .release/<tag>.md.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "release-snapshot.ac2",
+            "title": "The section renders one line per registered project that has a state worktree.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "release-snapshot.ac3",
+            "title": "When no state worktree exists, release-notes generation omits the section and still produces valid notes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "no-loss-audit",
+        "title": "Add no-loss audit gate blocking migration until every state surface has a read path",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-09T20:58:40.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-2541",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/integration/state-branch-no-loss.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/integration/state-branch-no-loss.test.ts"
+          ],
+          "expected_outputs": [
+            "the suite passes against a migrated fixture and fails when a legacy surface loses its read path"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Add tests/integration/state-branch-no-loss.test.ts implementing the no-loss-audit rule: enumerate every state surface the old layout exposed (each STATE_BRANCH_PATHS entry plus context, drafts, backlog, and beads exports) and assert each has a working read path in the migrated layout or an explicitly documented retirement marker. The overdeck dogfood migration is gated on this suite passing against a migrated fixture."
+        },
+        "items": [
+          {
+            "id": "no-loss-audit.ac1",
+            "title": "The suite enumerates every STATE_BRANCH_PATHS surface plus context, drafts, backlog, and beads exports and asserts each resolves through a read door on a migrated fixture.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-audit.ac2",
+            "title": "The suite fails if any legacy state surface loses its read path in the migrated layout.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-audit.ac3",
+            "title": "A retired surface passes only when accompanied by an explicit documented-retirement marker in the test.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remediate-spawn-done",
+        "title": "Skip planning-artifact commits at agent spawn and pan done on migrated projects (FR-11)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-09T20:58:40.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2541",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/spawn.ts",
+            "src/cli/commands/done.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run spawn"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "spawn-path test asserts no git add .pan/ execs on a migrated project"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Gate on isStateMigrated() the pre-agent-start planning-artifact commit block in src/dashboard/server/routes/agents/spawn.ts (lines 515-535, which git add .pan/ + .beads/, commit chore: planning artifacts, and push) and both pan done sync-planning-artifacts commit sites in src/cli/commands/done.ts (lines 605-606 and 638-639). On migrated projects both are skipped because artifacts already live on overdeck-state; unmigrated projects keep the current behavior."
+        },
+        "items": [
+          {
+            "id": "remediate-spawn-done.ac1",
+            "title": "Starting an agent on a migrated project produces no chore: planning artifacts commit on the feature branch.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remediate-spawn-done.ac2",
+            "title": "pan done on a migrated project produces no sync planning artifacts commit at either site.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remediate-spawn-done.ac3",
+            "title": "On an unmigrated project the spawn flow still creates its chore: planning artifacts commit and pan done still creates its sync commit, preserving current behavior.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remediate-compact-checkpoint",
+        "title": "Reroute beads compaction and extend checkpoint exclusion on migrated projects (FR-11)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-09T20:58:40.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2541",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/compact-beads.ts",
+            "src/lib/checkpoint/checkpoint-manager.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run compact-beads"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "compaction test asserts no git add .beads/ in a feature branch on a migrated project"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "On migrated projects, reroute the git add .beads/ at src/lib/lifecycle/compact-beads.ts:82 to operate in the state worktree through the write door instead of the feature branch; unmigrated projects keep current behavior. Separately extend src/lib/checkpoint/checkpoint-manager.ts (lines 122-133, which today only excludes continue.json and spec.vbrief.json) so it excludes the full STATE_BRANCH_PATHS set as defense in depth using the pattern already established there."
+        },
+        "items": [
+          {
+            "id": "remediate-compact-checkpoint.ac1",
+            "title": "Beads compaction on a migrated project commits through the write door into the state worktree and never git-adds .beads/ in a feature branch.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remediate-compact-checkpoint.ac2",
+            "title": "The checkpoint exclusion covers every STATE_BRANCH_PATHS directory.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remediate-compact-checkpoint.ac3",
+            "title": "On an unmigrated project compaction preserves its current git add .beads/ behavior.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remediate-planning-promotion",
+        "title": "Route complete-planning canonical spec/record commits through the write door (FR-11, FR-10)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-09T20:58:40.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2541",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/planning-promotion.ts",
+            "src/dashboard/server/routes/__tests__/complete-planning.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run complete-planning"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "complete-planning test asserts state-worktree routing on migrated and .pan/ staging on unmigrated"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-11",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "On migrated projects, route completePlanningWorkspaceGitAddCommands and the promotion commits in src/lib/overdeck/planning-promotion.ts (lines 224, 227 which stage .pan/ and .beads/ and commit the canonical spec on main, and line 246 commitWorkspaceRecordBeforeAutoSpawn which commits .pan/records/<issue>.json) through the write door into the state worktree, since the spec's new home is specs/ on overdeck-state. Preserve the PAN-1124 invariant (spec immutable except plan.status via updateSpecStatus). Update complete-planning.test.ts (lines 142-143) to assert the new routing on migrated projects while keeping the ['add','.pan/'] staging on unmigrated."
+        },
+        "items": [
+          {
+            "id": "remediate-planning-promotion.ac1",
+            "title": "complete-planning on a migrated project commits the canonical spec to overdeck-state via the write door and never commits it to main.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remediate-planning-promotion.ac2",
+            "title": "commitWorkspaceRecordBeforeAutoSpawn routes the per-issue record commit to the state worktree on a migrated project.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remediate-planning-promotion.ac3",
+            "title": "The PAN-1124 invariant survives: the promoted spec stays immutable except plan.status via updateSpecStatus().",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remediate-planning-promotion.ac4",
+            "title": "On an unmigrated project complete-planning preserves the ['add','.pan/'] and ['add','.beads/'] staging.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fly-remote-d14-block",
+        "title": "Block Fly remote spawn on migrated projects with a D14 fail-fast error (FR-11)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-09T20:58:40.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2541",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/remote/fly-provider.ts",
+            "src/lib/remote/remote-agents.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run fly-provider"
+          ],
+          "expected_outputs": [
+            "typecheck completes with no errors",
+            "test asserts a migrated Fly spawn fails fast citing D14 and an unmigrated spawn is unaffected"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Block Fly remote workspace spawn on migrated projects with a fail-fast error whose message names D14 and the remote-state-sync follow-up issue (filed during implementation). Make the fly-provider.ts:694 git add .beads/ commit-and-push site unreachable on migrated projects (it is what FR-11 removes); unmigrated projects keep the current remote behavior since Fly remote is experimental and work-phase-only."
+        },
+        "items": [
+          {
+            "id": "fly-remote-d14-block.ac1",
+            "title": "A Fly remote spawn on a migrated project fails fast with an error message naming D14 and the remote-state-sync follow-up issue.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fly-remote-d14-block.ac2",
+            "title": "A Fly remote spawn on an unmigrated project still spawns with current behavior.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fly-remote-d14-block.ac3",
+            "title": "On a migrated project the fly-provider never commits .beads/ to the feature branch.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "roles-refs-and-lint",
+        "title": "Update role-doc state path references and add a commit-state regression lint (FR-11)",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-09T20:58:40.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-2541",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/plan.md",
+            "roles/work.md",
+            "roles/review.md",
+            "roles/test.md",
+            "roles/sequencer.md",
+            "scripts/lint-skills.sh"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "bash scripts/lint-skills.sh",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "the lint fails a synthetic roles/*.md with a commit-state instruction and passes the existing role docs"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Update the path references in roles/plan.md, roles/work.md, roles/review.md, roles/test.md, and roles/sequencer.md where they name state locations (.pan/specs/ etc.) so they point at the overdeck-state branch layout, without any behavioral rewrite (verified 2026-07-09: none instruct committing state paths). Add a grep-based regression lint extending the scripts/lint-skills.sh pattern that fails any roles/*.md instructing a commit of .pan/ or .beads/ paths, so a future edit cannot reintroduce the hazard."
+        },
+        "items": [
+          {
+            "id": "roles-refs-and-lint.ac1",
+            "title": "npm run lint fails a roles/*.md file that instructs committing .pan/ or .beads/ paths.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "roles-refs-and-lint.ac2",
+            "title": "Each roles/*.md reference to a state location contains the overdeck-state branch path rather than .pan/.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "roles-refs-and-lint.ac3",
+            "title": "Running the regression lint on the existing roles/*.md passes with no commit-state instruction found.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Update all docs to the overdeck-state and .overdeck/context locations",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-09T20:58:40.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-2541",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/AGENT-STATE-PLANES.md",
+            "docs/STATE-PLANE-COMMIT-POLICY.md",
+            "docs/CONTEXT-LAYERS.md",
+            "configuration/context-layers.mdx",
+            "docs/VBRIEF.md",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "git grep -l \"\\.pan/records\\|\\.pan/specs\\|\\.pan/drafts\" docs/"
+          ],
+          "expected_outputs": [
+            "the grep returns only files that describe the legacy or migration state"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Update the docs the change touches so every relocated path appears with its new location: docs/AGENT-STATE-PLANES.md (git home), docs/STATE-PLANE-COMMIT-POLICY.md (rewritten around the write door + state worktree), docs/CONTEXT-LAYERS.md and configuration/context-layers.mdx (context's new .overdeck/context home), docs/VBRIEF.md (artifact locations table), and root CLAUDE.md (vBRIEF/lifecycle path references, PRD-link convention pointing at blob/overdeck-state/drafts/<issue>.md, and the working-on-main state-branch note)."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "git grep for .pan/records|.pan/specs|.pan/drafts across docs/ returns only files that describe the legacy or migration state.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "docs/STATE-PLANE-COMMIT-POLICY.md records the write door plus state worktree as the only state commit path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "The context-nomenclature routing table shows .overdeck/context/ as the context layer's location on main.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "state-branch-paths",
+        "to": "migrate-command",
+        "type": "blocks"
+      },
+      {
+        "from": "state-branch-paths",
+        "to": "ci-guards",
+        "type": "blocks"
+      },
+      {
+        "from": "state-branch-paths",
+        "to": "stray-write-lint",
+        "type": "blocks"
+      },
+      {
+        "from": "state-branch-paths",
+        "to": "recreation-tripwire",
+        "type": "blocks"
+      },
+      {
+        "from": "state-branch-paths",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "state-branch-paths",
+        "to": "remediate-compact-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "state-branch-paths",
+        "to": "roles-refs-and-lint",
+        "type": "blocks"
+      },
+      {
+        "from": "resolve-state-home",
+        "to": "migrate-command",
+        "type": "blocks"
+      },
+      {
+        "from": "resolve-state-home",
+        "to": "read-doors",
+        "type": "blocks"
+      },
+      {
+        "from": "resolve-state-home",
+        "to": "write-door",
+        "type": "blocks"
+      },
+      {
+        "from": "resolve-state-home",
+        "to": "beads-relocation",
+        "type": "blocks"
+      },
+      {
+        "from": "resolve-state-home",
+        "to": "stray-write-lint",
+        "type": "blocks"
+      },
+      {
+        "from": "resolve-state-home",
+        "to": "recreation-tripwire",
+        "type": "blocks"
+      },
+      {
+        "from": "resolve-state-home",
+        "to": "release-snapshot",
+        "type": "blocks"
+      },
+      {
+        "from": "resolve-state-home",
+        "to": "remediate-spawn-done",
+        "type": "blocks"
+      },
+      {
+        "from": "resolve-state-home",
+        "to": "remediate-planning-promotion",
+        "type": "blocks"
+      },
+      {
+        "from": "resolve-state-home",
+        "to": "fly-remote-d14-block",
+        "type": "blocks"
+      },
+      {
+        "from": "context-runtime-rename",
+        "to": "migrate-command",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-command",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "read-doors",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "write-door",
+        "to": "remediate-compact-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "write-door",
+        "to": "remediate-planning-promotion",
+        "type": "blocks"
+      },
+      {
+        "from": "write-door",
+        "to": "beads-relocation",
+        "type": "blocks"
+      },
+      {
+        "from": "context-runtime-rename",
+        "to": "docs",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-09-PAN-2541-feat-state-plane-move-pipeline-state-to-same-repo-orphan-branch-overdeck-state-with-a-dedicated-writer-worktree.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
