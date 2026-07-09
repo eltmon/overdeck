@@ -28,6 +28,9 @@ describe('canUseHarness', () => {
     expect(decision.reason!.length).toBeGreaterThan(20)
     expect(decision.reason!.toLowerCase()).toContain('ohmypi')
     expect(decision.reason!.toLowerCase()).toContain('anthropic')
+    expect(decision.reason!.toLowerCase()).toContain('terms of service')
+    expect(decision.reason!.toLowerCase()).toContain('api-key auth')
+    expect(decision.reason!.toLowerCase()).toContain('non-anthropic model')
   })
 
   it('allows ohmypi + Anthropic + api-key', () => {

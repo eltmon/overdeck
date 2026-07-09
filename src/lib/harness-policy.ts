@@ -37,7 +37,8 @@ const ALLOWED: HarnessPolicyDecision = { allowed: true }
 const OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK: HarnessPolicyDecision = {
   allowed: false,
   reason:
-    'ohmypi cannot run Anthropic models when authenticated via Claude Code subscription. ' +
+    'ohmypi cannot run Anthropic models under a Claude Code subscription because Claude Code subscription Terms of Service ' +
+    'restrict using that subscription with non-Anthropic harnesses. ' +
     'Switch the Anthropic provider to API-key auth, or pick a non-Anthropic model for ohmypi.',
 }
 
