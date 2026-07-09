@@ -207,6 +207,16 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-60 tick 13 (2026-07-09) — ✅ B4/PAN-2359 MERGED (2nd order-book item!) via POST endpoint; paired PAN-2363 closed; PAN-2510 review-blocked→self-reworking; B5 gate not yet met
+
+- **✅ B4/PAN-2359 MERGED** (2nd order-book item) — `POST /api/issues/PAN-2359/merge` returned HTTP 200 `mergeStatus:merged` in ~6s (fast: `[merge] CI is green on 3176e7b7 (5/6) — skipping redundant local verification (PAN-2487)`). Main HEAD now **56f228b2fb PAN-2359 (#2515)**. Paired issue **PAN-2363 CLOSED** via `gh issue close` (delivered by PR #2515; shared 'provably-merged guard' PRD — master-plan B4 paired rule 5). **The POST merge path works cleanly and backgrounded.**
+- **B4 close-out INCOMPLETE** — `pan close PAN-2359 --force` produced no output and PAN-2359 is still OPEN/in-review (not `closed-out`). Not blocking (code is on main). Retry + verify next tick.
+- **B5 (PAN-2360+PAN-2300) GATE NOT MET** — master-plan Lane-B rule 2 requires main GREEN on origin + previous item closed out. Main CI on 56f228b2fb is **in_progress**, and PAN-2359 isn't closed. So B5 HELD (correctly). Next tick: once main green + PAN-2359 closed → `pan start PAN-2360` (plan under 2360, close paired 2300).
+- **PAN-2510 self-healing** — review returned BLOCKED (1 finding; reviewer correctly refused the flaky broad-suite failures as evidence). Feedback auto-delivered (`.pan/feedback/002-review-agent-changes-requested.md`) → work agent (agent-pan-2510) is REWORKING on PR #2517 (ctx 67%, healthy, NOT wedged). Pipeline handled the review→rework handoff itself — no nudge needed.
+- **Flywheel push still BLOCKED (PAN-2516)** — PAN-2359 spec DID get committed by the pipeline this tick (good), but PAN-2167 + PAN-2510 specs remain uncommitted in the primary worktree. Durable-local (3 FLYWHEEL-STATE commits ahead); not forcing.
+- **Master-plan Lane B (authoritative):** B4=PAN-2359+2363 ✅merged, B5=PAN-2360+2300, B6=PAN-2270. Paired: start under primary (2360), close paired (2300). Gate between items: main green + prev closed.
+- HOLDS + 2 operator questions (PAN-1520) unchanged.
+
 ## RUN-60 tick 12 (2026-07-09) — main CI GREEN on merge (P0 ✓); B4/PAN-2359 + PAN-2510 both healthy-working; flywheel PUSH BLOCKED by spec-commit drift → filed PAN-2516 (durable-local per operator "don't force")
 
 - **Main GREEN** — `CI | completed | success | 5fb71d3bab` (the UAT-batch merge commit passed). P0 satisfied.
