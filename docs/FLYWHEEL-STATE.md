@@ -207,6 +207,13 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-60 tick 23 (2026-07-09) — RED MAIN strike-pan-2525 LIVE + working (typecheck green, on lint chain); main still red; B5 approved+held; B6 held
+
+- **RED MAIN P0 — strike in flight, healthy.** strike-pan-2525 (gpt-5.5, 5min, "Typecheck green, running full lint chain next") — it will hit the deacon.ts baseline (3615>3593) in lint and reconcile it, plus address the review-verdict-feedback test flake. Live, not wedged. Main still `CI | failure | a347e4949e` (strike hasn't pushed yet). ETA to green ~10-15min (fix + push + CI re-run).
+- **B5/PAN-2360 approved + HELD** — review.approved + test.passed (PR #2523), but no merge onto red main. Merge the instant strike greens main + PR #2523 CLEAN → then close + paired PAN-2300 + start B6/PAN-2270.
+- **B6/PAN-2270 held** (B5 + red main).
+- Push blocked (PAN-2516; ~21 ahead). HOLDS + 2 operator questions (PAN-1520) unchanged.
+
 ## RUN-60 tick 22 (2026-07-09) — 🔴 RED MAIN P0 on a347e4949e (deacon.ts god-file baseline 3615>3593 + review-verdict-feedback test flake) → filed PAN-2525 + STRUCK; B5 review+test APPROVED but HELD (no merge onto red main)
 
 - **🔴 RED MAIN (P0)** — `CI | failure | a347e4949e` (PAN-2521 merge; prior 5485236776 was green). Two failing jobs:
