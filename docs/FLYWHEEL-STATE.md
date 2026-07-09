@@ -207,6 +207,15 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-60 tick 28 (2026-07-09) — ✅ RECONCILE+DEPLOY DONE (fresh server 3062648, 0/0 divergence, PAN-2518/19/20/21 live); DRAIN RESUMED — B6/PAN-2270 (LAST order-book item) auto-planning started; PAN-2525 closing out
+
+- **Operator completed reconcile+deploy.** Primary merged to origin (`778c83fe04`), 4 closed-issue record conflicts resolved to richer origin versions; typecheck + 98 tests green (incl. review-verdict test); fresh build + healthy restart. Verified: **single server PID 3062648 (22:46 EDT) owns :3011, health 200**; old stale PIDs (1051993/2475324) gone; **divergence 0/0**; deacon ACTIVE on new code (PAN-2510 docker close-out + PAN-2518/2519/2520/2521 + state-plane dirty-gates now LIVE). Lifecycle ops safe again.
+- **B5/PAN-2360 + PAN-2300 confirmed already CLOSED** (done last cycle via operator UAT-promote a066820751) — did NOT re-merge/re-close despite the operator's stale resume list.
+- **PAN-2525 (strike) closing out** — was still OPEN; `pan close --force` bg task bf3nwbzzy.
+- **B6/PAN-2270 STARTED** (last Lane-B order-book item; gate met: main green + PAN-2360 closed + fresh server). `pan start` → auto-planning `planning-pan-2270` (22:50 EDT); work agent auto-starts on finalize. Watch for PAN-2522 finalize-autostart gap → 2nd `pan start` if needed. Drive review+test→merge like B3–B5.
+- **Order-book Lane-B: 3/4 merged, B6 in flight = FINAL item.** After B6 merges+closes, the CI/CD-x-refactor order-book drain is COMPLETE.
+- Divergence reset to 0/0 → flywheel push may finally succeed (PAN-2516 symptom); pipeline may still re-dirty .pan/specs on plan/close (PAN-2516 root not in operator's 4 fixes) — watch.
+
 ## RUN-60 tick 27 (2026-07-09) — B5/PAN-2360 MERGED via operator UAT-promote (uat/pan-flint-0709 @ a066820751); closed out + pair PAN-2300; reaped PAN-2359 zombie; clean UAT batch = EMPTY; B6/PAN-2270 held (server still stale)
 
 - **B5/PAN-2360 MERGED** (3rd order-book/Lane-B item). Operator promoted UAT batch `uat/pan-flint-0709` → main HEAD `a066820751 Merge UAT batch uat/pan-flint-0709 (PAN-2360)`; `feature/pan-2360` is ancestor of main. Closed out (`pan close --force`, bg task b88w5evl7) + paired **PAN-2300 gh-closed** (shared PRD, Lane-B rule 5).
