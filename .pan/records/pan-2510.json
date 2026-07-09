@@ -28,17 +28,14 @@
       "reason": "resume",
       "agentModel": "kimi-k2.7-code",
       "timestamp": "2026-07-09T00:22:53.008Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-09T00:22:52Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2510\n\nName-based Docker teardown does not remove attached containers when workspace compose files are gone\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2510 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-09T00:30:07.958Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/drafts/pan-2510.md",
@@ -87,18 +84,20 @@
     "recordedAt": "2026-07-09T00:19:08.915Z"
   },
   "created": "2026-07-08T23:07:44.941Z",
-  "updated": "2026-07-09T00:22:56.802Z",
+  "updated": "2026-07-09T00:31:16.120Z",
   "pipeline": {
     "issueId": "PAN-2510",
     "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-09T00:22:56.740Z",
-    "reviewNotes": "Name-based Docker teardown does not remove attached containers when workspace compose files are gone",
+    "updatedAt": "2026-07-09T00:31:16.071Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2517",
-    "lastVerifiedCommit": "a9ddb1354660657486e5b77e3518b006c25c814f",
+    "lastVerifiedCommit": "b5bb90edeef819449d5ac7500bede19f0c3cd998",
     "reviewRequestedAt": "2026-07-09T00:19:18.035Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -153,9 +152,9 @@
       "byStage": {
         "codex": {
           "openai/gpt-5.5": {
-            "input": 1112544,
-            "output": 5522,
-            "cacheRead": 1003648,
+            "input": 3082931,
+            "output": 9599,
+            "cacheRead": 2675968,
             "cacheWrite": 0
           }
         },
@@ -169,18 +168,18 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 917299,
-            "output": 121671,
-            "cacheRead": 66377216,
+            "input": 1204133,
+            "output": 130461,
+            "cacheRead": 74088704,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 1112544,
-          "output": 5522,
-          "cacheRead": 1003648,
+          "input": 3082931,
+          "output": 9599,
+          "cacheRead": 2675968,
           "cacheWrite": 0
         },
         "anthropic/claude-opus-4-8": {
@@ -190,15 +189,15 @@
           "cacheWrite": 308697
         },
         "custom/kimi-k2.7-code": {
-          "input": 917299,
-          "output": 121671,
-          "cacheRead": 66377216,
+          "input": 1204133,
+          "output": 130461,
+          "cacheRead": 74088704,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 22.875927,
-        "pricingAsOf": "2026-07-09T00:22:56.777Z"
+        "usd": 27.09757,
+        "pricingAsOf": "2026-07-09T00:31:16.120Z"
       }
     },
     "merges": [
@@ -206,8 +205,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "rebuild-terminal-guard": "completed",
     "doctor-pool-advisory": "completed",
