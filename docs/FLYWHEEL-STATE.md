@@ -207,6 +207,14 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-60 tick 16 (2026-07-09) — ✅ PAN-2510 MERGED (operator docker-leak close-out fix!); closing out; B5/PAN-2360 planning; 3 PRs merged this session
+
+- **✅ PAN-2510 MERGED** — operator-directed docker-leak close-out teardown fix. CI `test` went green (8m41s) → PR #2517 CLEAN → `POST /api/issues/PAN-2510/merge` HTTP 200 `mergeStatus:merged`. Main HEAD now **5485236776 PAN-2510 (#2517)**. Closing out (`pan close PAN-2510 --force`, background — SLOW ~min). Full self-heal arc: implement → review-blocked → auto-feedback → rework → re-review+test passed → merged, with only one harmless orchestrator nudge. **The docker-network leak that blocked B3's spawn early in RUN-60 now has its root-cause fix landed.**
+- **3 PRs merged this session:** B3/PAN-2167, B4/PAN-2359, PAN-2510 (operator-priority). 2 red-main strikes fixed earlier (PAN-2508/2509).
+- **B5/PAN-2360 planning** (planning-pan-2360; work agent auto-starts after finalize; paired PAN-2300 to close on merge). One-Lane-B-in-flight preserved.
+- **Flywheel push still BLOCKED (PAN-2516)** — 4 specs dirty (2167+2359+2510 + likely 2360 now); 7 FLYWHEEL-STATE commits durable-local. Not forcing.
+- Main not red (5485236776 CI in_progress; 56f228b2fb green). HOLDS + 2 operator questions (PAN-1520) unchanged.
+
 ## RUN-60 tick 15 (2026-07-09) — B5/PAN-2360 STARTED (gate met: main green + PAN-2359 closed); PAN-2510 rework PASSED re-review+test → merge-ready, waiting on CI test job
 
 - **B5/PAN-2360 STARTED** — main CI on 56f228b2fb went GREEN → Lane-B rule 2 gate met (PAN-2359 closed ✓ + main green ✓) → `pan start PAN-2360` (background; workspace/planning spinning up, session pending — pan start is slow). Paired PAN-2300 to close when it merges (rule 5). One-Lane-B-in-flight preserved (PAN-2510 is operator-priority, off-slot).
