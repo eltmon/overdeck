@@ -1,0 +1,191 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-09T00:40:41Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2360: reconcile strike .pan/kickoff.md template with roles/strike.md (stop instructing merge/push main + pan done)",
+    "updated": "2026-07-09T00:43:41.002Z"
+  },
+  "plan": {
+    "id": "pan-2360",
+    "title": "bug(strike): .pan/kickoff.md contract conflicts with roles/strike.md (merge/push main + pan done vs forbidden)",
+    "status": "proposed",
+    "uid": "15b33ea0-c80d-4f28-ae41-154484e1f442",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-07-09T00:40:41Z",
+    "updated": "2026-07-09T00:43:41.002Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2360",
+        "label": "PAN-2360",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2227",
+        "label": "PAN-2227 (corrected roles/strike.md)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "strike",
+      "kickoff",
+      "contract",
+      "flywheel"
+    ],
+    "narratives": {
+      "Problem": "A strike agent's generated .pan/kickoff.md (from buildStrikePrompt() in src/cli/commands/strike.ts:122-146) instructs it to 'Rebase onto origin/main, then merge fast-forward to main and push' (step 4) and 'Run pan done <id> --strike' (step 6). roles/strike.md:63-75 forbids exactly those: the strike agent must never switch to/merge into/push main, and must NOT call pan done or pan done <id> --strike. A strike agent that reads both (as it should) hits a direct contract contradiction and stalls/escalates (observed strike-pan-2357 2026-07-04; strike-pan-2508 actually pushed a failing commit to main). roles/strike.md was corrected in PAN-2227 (commit 131e09fbda) but buildStrikePrompt was never updated. docs/ROLES.md:17 carries the same stale 'merges directly to main' description.",
+      "Proposal": "Rewrite the '## What to do' steps in buildStrikePrompt to mirror roles/strike.md verbatim: (1) read issue, (2) implement, (3) commit on strike branch, (4) rebase onto origin/main, (5) run gates 'npm run typecheck && npm run lint && npm test', (6) push ONLY the strike branch, (7) signal readiness via 'pan tell flywheel-orchestrator' then stop. Add explicit prohibitions: never switch/merge/push main; never call pan done or pan done <id> --strike. The spawner (Flywheel/operator) owns review + merge. Update the existing test that asserts the old prompt content, and update docs/ROLES.md:17 to describe the push-branch-and-signal contract. roles/strike.md is already correct and is NOT changed.",
+      "NonGoals": "- Do NOT modify roles/strike.md — it is the authoritative, already-correct contract.\n- Do NOT change the pan done --strike CLI command or its squash-merge verification (that is PAN-2300, a separate issue/record).\n- Do NOT instruct the strike agent to create a pull request — roles/strike.md uses a pan tell signal, not PR creation.\n- Do NOT change the flywheel/orchestrator merge flow.\n- Do NOT address PAN-2359 (fresh strikes reaped) — related but separate.\n- Do NOT alter the strike spawn/worktree machinery in strike.ts (ensureStrikeWorktree, runOne, strikeCommand)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Plan PAN-2360 only; exclude PAN-2300 (pan done --strike squash-merge verification) despite the bundled two-issue PRD.",
+        "rationale": "One issue -> one vBRIEF; PAN-2300 has its own record and plans separately."
+      },
+      {
+        "summary": "Mirror roles/strike.md verbatim (push strike branch + pan tell signal); do NOT instruct PR creation as the bundled PRD proposed.",
+        "rationale": "The fix's purpose is to make the kickoff MATCH the authoritative roles/strike.md; adding PR creation would introduce a fresh divergence."
+      },
+      {
+        "summary": "Land the buildStrikePrompt rewrite and the strike.test.ts assertion update in one bead.",
+        "rationale": "The existing test asserts the old prompt strings and goes red the instant the prompt changes, so code and test are inseparable and must ship together to keep the tree green."
+      }
+    ],
+    "items": [
+      {
+        "id": "fix-kickoff-prompt",
+        "title": "Rewrite buildStrikePrompt to mirror roles/strike.md (no merge/push main, no pan done) and update its test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-09T00:40:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2360",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/strike.ts",
+            "src/cli/commands/__tests__/strike.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/strike.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "strike.test.ts passes with the updated prompt assertions",
+            "typecheck completes without errors",
+            "lint passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/strike.ts, rewrite the '## What to do' steps inside buildStrikePrompt (currently strike.ts:134-144) so they mirror roles/strike.md's workflow (roles/strike.md:49-75). Replace the current steps 4-7 ('4. Rebase onto origin/main, then merge fast-forward to main and push.', '5. Verify ON main with npm run typecheck && npm test.', '6. Run pan done <id> --strike ...', '7. Report the result. Do NOT call plain pan done ...') with: (4) 'Rebase onto origin/main: git fetch origin main && git rebase origin/main.', (5) 'Run the full workspace quality gates: npm run typecheck && npm run lint && npm test.', (6) 'Push ONLY the strike branch: git push origin <branch>.', (7) 'Signal readiness to the spawner, then stop: pan tell flywheel-orchestrator \"strike <id>: fix ready on <branch>, gates green — review and land\". If the tell fails, post the same message as a durable issue comment.' Then add a prohibitions block: 'The spawner (Flywheel or operator) owns reviewing the strike branch, merging it, and the post-merge handoff. Do NOT switch to main. Do NOT merge into main. Do NOT push origin main. Do NOT call pan done. Do NOT call pan done <id> --strike.' Keep the existing 'If mid-strike ...' abort paragraph. Use plan.branch and plan.issueId interpolation as the existing array does. Do NOT change any other function in the file. Then update src/cli/commands/__tests__/strike.test.ts (the 'buildStrikePrompt includes the issue id, branch, and workspace' test, currently ~line 75-90): remove the assertions expect(prompt).toContain('merge fast-forward to `main`') and expect(prompt).toContain('pan done PAN-1234 --strike'); add assertions that the prompt does NOT instruct merging to main (expect(prompt).not.toMatch(/merge fast-forward/) and expect(prompt).not.toMatch(/push\\s+origin\\s+main/)) and DOES contain the push-only + signal steps (expect(prompt).toContain('git push origin strike/pan-1234') and expect(prompt).toContain('pan tell flywheel-orchestrator')); keep expect(prompt).toContain('Do NOT call `pan done`')."
+        },
+        "items": [
+          {
+            "id": "fix-kickoff-prompt.ac1",
+            "title": "Given a StrikePlan, buildStrikePrompt returns a string that contains no instruction to merge or push to main: it does not match /merge fast-forward/ and does not match /push\\s+origin\\s+main/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-kickoff-prompt.ac2",
+            "title": "buildStrikePrompt output instructs pushing only the strike branch (contains 'git push origin ' + plan.branch) and signalling the spawner (contains 'pan tell flywheel-orchestrator'), mirroring roles/strike.md steps 6-7",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-kickoff-prompt.ac3",
+            "title": "buildStrikePrompt output contains the explicit prohibition 'Do NOT call `pan done`' and does not instruct running 'pan done <id> --strike' as an action step",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-kickoff-prompt.ac4",
+            "title": "buildStrikePrompt gate step includes 'npm run lint' (contains 'npm run typecheck && npm run lint && npm test'), matching roles/strike.md:61 so the file-size ratchet is not bypassed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-kickoff-prompt.ac5",
+            "title": "The updated strike.test.ts passes: npx vitest run src/cli/commands/__tests__/strike.test.ts exits 0 with the old merge-to-main / pan-done-strike assertions removed and the new push-branch / signal / prohibition assertions present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "update-roles-doc",
+        "title": "Update docs/ROLES.md strike row to the push-branch-and-signal contract",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-09T00:40:41Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-2360",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ROLES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"strike\" docs/ROLES.md"
+          ],
+          "expected_outputs": [
+            "the strike row no longer says 'merges directly to main' and describes pushing the strike branch for the spawner to land"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In docs/ROLES.md, update the strike table row (currently line 17: '| `strike` | `roles/strike.md` | Precision drop-in. Implements an isolated fix and merges directly to main, then verifies on main. Bypasses the plan/work/review/test pipeline and server-side shipping. |') so the description matches the current contract: the strike agent implements an isolated fix on strike/<id>, runs gates, pushes ONLY the strike branch, and signals the spawner (Flywheel or operator) who owns reviewing, merging, and the post-merge handoff. Remove the stale 'merges directly to main, then verifies on main' wording. Keep the row format and the 'Bypasses the plan/work/review/test pipeline and server-side shipping' clause."
+        },
+        "items": [
+          {
+            "id": "update-roles-doc.ac1",
+            "title": "docs/ROLES.md strike row no longer contains the substring 'merges directly to main' (grep for it returns no match on the strike row)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-roles-doc.ac2",
+            "title": "docs/ROLES.md strike row describes pushing the strike branch and the spawner owning the merge (contains 'strike branch' / 'push' and 'spawner' or 'Flywheel or operator'), consistent with roles/strike.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-07-09-PAN-2360-bug-strike-pan-kickoff-md-contract-conflicts-with-roles-strike-md-merge-push-main-pan-done-vs-forbidden.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
