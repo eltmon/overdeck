@@ -47,7 +47,7 @@ import { createInFlightGuard } from './in-flight-guard.js';
 import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
 import { isContextOverflowTail } from '../context-overflow.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
-import { haveSameEffectiveCodeCommit } from '../pipeline-state-paths.js';
+import { haveSameEffectiveCodeCommit, haveSameCodeContribution } from '../pipeline-state-paths.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -1617,14 +1617,21 @@ export async function checkPostReviewCommits(): Promise<string[]> {
         // Fall through to reset if we can't read tree SHAs — safer than skipping
       }
 
+      // State-plane-only commits (same effective code commit) and rebases onto a
+      // newer main (same non-state contribution by patch-id, despite rewritten
+      // SHAs — PAN-2468) move HEAD without changing the branch's own work.
+      // Preserve the verdicts and advance the snapshot rather than re-reviewing.
       try {
-        if (await haveSameEffectiveCodeCommit(workspacePath, status.reviewedAtCommit, currentHead)) {
+        const sameContribution =
+          (await haveSameEffectiveCodeCommit(workspacePath, status.reviewedAtCommit, currentHead)) ||
+          (await haveSameCodeContribution(workspacePath, status.reviewedAtCommit, currentHead));
+        if (sameContribution) {
           setReviewStatusSync(issueId, { reviewedAtCommit: currentHead });
-          console.log(`[deacon] State-only post-review commit for ${issueId}: ${status.reviewedAtCommit.substring(0, 8)} → ${currentHead.substring(0, 8)} — review/test preserved`);
+          console.log(`[deacon] Benign post-review HEAD move for ${issueId}: ${status.reviewedAtCommit.substring(0, 8)} → ${currentHead.substring(0, 8)} — review/test preserved`);
           continue;
         }
       } catch {
-        // Fall through to reset if the diff cannot be inspected.
+        // Fall through to reset if the move cannot be inspected.
       }
 
       // HEAD moved with a real tree change — new commits since review. Reset review pipeline.
