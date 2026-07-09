@@ -207,6 +207,13 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-60 tick 15 (2026-07-09) — B5/PAN-2360 STARTED (gate met: main green + PAN-2359 closed); PAN-2510 rework PASSED re-review+test → merge-ready, waiting on CI test job
+
+- **B5/PAN-2360 STARTED** — main CI on 56f228b2fb went GREEN → Lane-B rule 2 gate met (PAN-2359 closed ✓ + main green ✓) → `pan start PAN-2360` (background; workspace/planning spinning up, session pending — pan start is slow). Paired PAN-2300 to close when it merges (rule 5). One-Lane-B-in-flight preserved (PAN-2510 is operator-priority, off-slot).
+- **PAN-2510 rework SUCCEEDED** — re-review APPROVED (00:33) + test PASSED (00:31) → `[review-status] PAN-2510 marked ready for merge after test=passed` (00:37). PR #2517 MERGEABLE. BUT mergeStateStatus=**UNSTABLE** — GitHub CI `test` job still pending (all other checks pass: build/lint/flake/smoke/CodeRabbit/overdeck-review/overdeck-test). MERGE when CI `test` goes green (NEVER --admin over pending — red-main trap). The self-heal worked: review-blocked → auto-feedback → work-agent rework → re-review passed, no orchestrator merge intervention needed beyond one harmless nudge.
+- **Flywheel push still BLOCKED (PAN-2516)** — 3 specs dirty (PAN-2167+2359+2510); 6 FLYWHEEL-STATE commits durable-local. Not forcing.
+- Main GREEN (56f228b2fb CI success). HOLDS + 2 operator questions (PAN-1520) unchanged.
+
 ## RUN-60 tick 14 (2026-07-09) — B5 still gated on main-CI-green (56f228b2fb in_progress); PAN-2510 reworking (live — cost advancing); push still blocked (PAN-2516)
 
 - **B5 (PAN-2360+2300) HELD** — Lane-B rule 2 gate: PAN-2359 CLOSED ✓ but main CI on 56f228b2fb still **in_progress** (not green yet, not red). Start B5 the instant it goes green.
