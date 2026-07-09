@@ -17,7 +17,7 @@
   ],
   "feedback": [],
   "created": "2026-07-08T23:07:44.941Z",
-  "updated": "2026-07-09T00:16:15.518Z",
+  "updated": "2026-07-09T00:17:47.251Z",
   "pipeline": {
     "issueId": "PAN-2510",
     "reviewStatus": "pending",
@@ -78,6 +78,15 @@
     "teardown-primitive.ac1": "completed",
     "teardown-primitive.ac2": "completed",
     "teardown-primitive.ac3": "completed",
-    "teardown-primitive.ac4": "completed"
+    "teardown-primitive.ac4": "completed",
+    "docs-update.ac1": "completed",
+    "docs-update.ac2": "completed",
+    "docs-update.ac3": "completed",
+    "doctor-pool-advisory.ac1": "completed",
+    "doctor-pool-advisory.ac2": "completed",
+    "doctor-pool-advisory.ac3": "completed",
+    "rebuild-terminal-guard.ac1": "completed",
+    "rebuild-terminal-guard.ac2": "completed",
+    "rebuild-terminal-guard.ac3": "completed"
   }
 }
