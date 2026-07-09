@@ -104,7 +104,10 @@ async function installOllamaWithPlatformCommand(): Promise<void> {
     await runCommandWithSpawn('brew', ['install', 'ollama']);
     return;
   }
-  await runCommandWithSpawn('sh', ['-c', 'curl -fsSL https://ollama.com/install.sh | sh']);
+  throw new OllamaEnsureError(
+    'Automatic Ollama installation is only available on macOS via Homebrew. ' +
+      'On this platform, install Ollama manually from https://ollama.com/download and re-run.',
+  );
 }
 
 async function runCommandWithSpawn(command: string, args: string[]): Promise<void> {

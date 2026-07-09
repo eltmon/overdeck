@@ -1,7 +1,12 @@
 import { readFile } from 'node:fs/promises';
+import { platform } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_OLLAMA_MODEL, ensureOllama, OllamaEnsureError } from '../ollama.js';
+
+vi.mock('node:os', () => ({
+  platform: vi.fn(() => 'linux'),
+}));
 
 function response(ok: boolean): Response {
   return { ok } as Response;
@@ -103,6 +108,17 @@ describe('ensureOllama', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('refuses unsafe curl|sh auto-install on Linux and points to manual install', async () => {
+    vi.mocked(platform).mockReturnValue('linux');
+    const fetchImpl = vi.fn(async () => response(false));
+    const runCommand = vi.fn(async (_command: string, args: string[]) => {
+      if (args[0] === '--version') throw new Error('missing binary');
+    });
+
+    await expect(ensureOllama({ autoInstall: true, fetchImpl, runCommand })).rejects.toBeInstanceOf(OllamaEnsureError);
+    expect(runCommand).toHaveBeenCalledWith('ollama', ['--version']);
   });
 
   it('rejects non-localhost base URLs before command execution', async () => {
