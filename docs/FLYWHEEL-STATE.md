@@ -207,6 +207,14 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-60 tick 12 (2026-07-09) — main CI GREEN on merge (P0 ✓); B4/PAN-2359 + PAN-2510 both healthy-working; flywheel PUSH BLOCKED by spec-commit drift → filed PAN-2516 (durable-local per operator "don't force")
+
+- **Main GREEN** — `CI | completed | success | 5fb71d3bab` (the UAT-batch merge commit passed). P0 satisfied.
+- **B4/PAN-2359 healthy** (Noodling, 11m, 53% ctx, +75/-11, gpt-5.5, no wedge). **PAN-2510 healthy** (implementing Docker teardown, 42m, +838/-57, $16.84, no wedge — big change). Neither wedged; no intervention.
+- **FLYWHEEL PUSH BLOCKED — root-caused + filed PAN-2516.** My tick-11 commit (68a93b6864) can't push: primary worktree is persistently dirty with pipeline-owned `.pan/specs/*` (+records/beads) that the pipeline flipped but NEVER committed. Proof: `origin:.../PAN-2167.vbrief.json` `plan.status="proposed"` (stale) vs working tree `"completed"` (correct, uncommitted) — working tree is NEWER than origin. So `git checkout origin` would REVERT the flip (lose it); committing specs is guard-blocked (flywheel may only commit FLYWHEEL-STATE.md/records/continues/backlog/beads). Per operator "if it can't be cleanly resolved, surface it and leave the commit durable locally — do NOT force it": NOT stashing/reset/discarding. tick-11 (and this tick-12) FLYWHEEL-STATE commits stay durable-local; divergence grows until PAN-2516 fixed or a janitor commits the specs, then rebase+push all at once. FLYWHEEL-STATE.md content is on disk + emitted status → durable regardless.
+- **Substrate filed this session:** PAN-2510 (docker leak, operator-directed, in progress), PAN-2511 (git-EPERM verify sink), PAN-2513 (rate-limit modal wedge), **PAN-2516 (spec-status commit drift)**.
+- HOLDS + 2 operator questions (PAN-1520) unchanged. B5 (PAN-2360/2300) stays queued behind B4.
+
 ## RUN-60 tick 11 (2026-07-08) — ✅ B3/PAN-2167 MERGED (first order-book item!) via operator UAT-promote uat/pan-cedar-0708 (5fb71d3bab); closing out; B4/PAN-2359 STARTED; ready set re-derived clean
 
 Operator promoted UAT batch `uat/pan-cedar-0708` (single member PAN-2167) to main @ **5fb71d3bab** and nudged a fresh Observe→Act.
