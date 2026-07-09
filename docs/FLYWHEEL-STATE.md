@@ -207,6 +207,16 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-60 tick 11 (2026-07-08) — ✅ B3/PAN-2167 MERGED (first order-book item!) via operator UAT-promote uat/pan-cedar-0708 (5fb71d3bab); closing out; B4/PAN-2359 STARTED; ready set re-derived clean
+
+Operator promoted UAT batch `uat/pan-cedar-0708` (single member PAN-2167) to main @ **5fb71d3bab** and nudged a fresh Observe→Act.
+- **B3/PAN-2167 MERGED** — PR #2512 MERGED (mergeCommit 91922e19, 23:59:29Z); `[merge-agent] ✓ mergeStatus=merged` + `[merge] post-merge lifecycle completed` (Docker teardown + labels done server-side). uat-train already **excluded** it (`not merge-eligible (already merged)`). **THE FIRST ORDER-BOOK ITEM IS MERGED.**
+- **Close-out:** `pan close PAN-2167` is INTERACTIVE ([y/N]) — a backgrounded run defaults to no; must use **`pan close --force`** (running now). postMergeLifecycle already did the destructive teardown; close-out just completes vBRIEF + closes the issue + clears review status.
+- **B4/PAN-2359 STARTED** (`agent-pan-2359` @ 20:01, label in-progress) — one-Lane-B rule satisfied (B3 merged). Spec was already proposed (bab2c75b33) so `pan start` spawned the work agent directly (no re-plan).
+- **Ready set re-derived CLEAN (no stale reuse):** merge-blockers clean; the uat-train batch is empty after excluding PAN-2167 (no other PAN member is currently review+test-passed — PAN-2510 & PAN-2359 still implementing). NOTE: `auto-merge/pending` still lists 3 entries (PAN-2174/2325/2318) all `status=merging` scheduled Jun-30/Jul-04 — all issues **CLOSED** → stale scheduler cruft (train skips already-merged); worth a janitor sweep, NOT current members.
+- **MIN siblings:** `[merge-train] reconciled 5 sibling(s): MIN-867/862/729/865/861 = error` — the known GitLab/polyrepo train gap (PAN-1696/2467); operator-held, not actioned.
+- Main HEAD 5fb71d3bab; main CI in_progress (no-planning passed). Watch it green next tick.
+
 ## RUN-60 tick 10 (2026-07-08) — B3 MERGE TRIGGERED + IN PROGRESS (server-side rebase→verify→squash running). Learned real merge path: POST /api/issues/:id/merge (pan approve REMOVED). PAN-2510 implementing.
 
 - **B3/PAN-2167 merge IN PROGRESS.** CI went fully green (test 9m6s pass, `mergeStateStatus=CLEAN`), PR #2512 MERGEABLE, no blockers — but uat-train did NOT auto-merge. dashboard.log now shows **`[merge] Rebasing feature/pan-2167 onto main for PAN-2167 (agent=running)...`** → server-side merge orchestration is running (rebase → post-rebase verify typecheck/lint/test → squash → postMergeLifecycle). Main HEAD still efc8c5d192 / PR still OPEN because mid-flight. Do NOT re-trigger.
