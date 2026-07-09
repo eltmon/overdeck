@@ -119,6 +119,9 @@ export function getFriendlyModelName(fullModel: string | undefined | null): stri
   if (backingModel.includes('haiku')) return 'Haiku 4.5';
 
   // OpenAI models
+  if (backingModel.includes('gpt-5.6-sol')) return 'GPT-5.6 Sol';
+  if (backingModel.includes('gpt-5.6-terra')) return 'GPT-5.6 Terra';
+  if (backingModel.includes('gpt-5.6-luna')) return 'GPT-5.6 Luna';
   if (backingModel.includes('gpt-5.5-pro')) return 'GPT-5.5 Pro';
   if (backingModel.includes('gpt-5.5')) return 'GPT-5.5';
   if (backingModel.includes('gpt-5.4-pro')) return 'GPT-5.4 Pro';
