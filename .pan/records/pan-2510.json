@@ -17,7 +17,7 @@
   ],
   "feedback": [],
   "created": "2026-07-08T23:07:44.941Z",
-  "updated": "2026-07-08T23:54:17.780Z",
+  "updated": "2026-07-08T23:59:25.164Z",
   "pipeline": {
     "issueId": "PAN-2510",
     "reviewStatus": "pending",
@@ -58,6 +58,7 @@
   "harness": "claude-code",
   "model": "kimi-k2.7-code",
   "statusOverrides": {
-    "rebuild-terminal-guard": "completed"
+    "rebuild-terminal-guard": "completed",
+    "doctor-pool-advisory": "completed"
   }
 }
