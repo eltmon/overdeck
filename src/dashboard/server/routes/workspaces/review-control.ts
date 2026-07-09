@@ -23,6 +23,7 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { parseIssueIdSync, extractPrefixSync } from '../../../../lib/issue-id.js';
+import { findWorkspacePath } from '../../../../lib/lifecycle/archive-planning.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import {
   getReviewStatusSync,
@@ -138,6 +139,50 @@ export function processResetReviewPipeline(
         : undefined,
     },
   };
+}
+
+/**
+ * Resolve whether a workspace exists for the reset endpoint, including
+ * strike workspaces (feature-<id>-strike) that getWorkspaceInfoForIssue does
+ * not yet know about. PAN-2270 regression test hook.
+ */
+export function resolveResetWorkspace(
+  issueId: string,
+  workspaceInfo: { exists: boolean; localPath?: string },
+  resolved: { projectPath: string } | null,
+): { exists: boolean; localPath: string | null } {
+  const issueLower = issueId.toLowerCase();
+  const workspacePath = resolved ? findWorkspacePath(resolved.projectPath, issueLower) : null;
+  return {
+    exists: workspaceInfo.exists || workspacePath !== null,
+    localPath: workspaceInfo.localPath || workspacePath,
+  };
+}
+
+/**
+ * Build the workspace/branch pair for a review re-dispatch, handling
+ * strike workspaces (feature-<id>-strike -> strike/<id>) and preserving the
+ * existing feature/<numeric> convention for non-strike workspaces.
+ * PAN-2270 regression test hook.
+ */
+export function buildReviewRedispatchArgs(
+  issueId: string,
+  resetWorkspace: { localPath: string | null },
+  workspaceInfo: { localPath?: string },
+  resolved: { projectPath: string } | null,
+): { workspace: string; branch: string } | null {
+  if (!resolved) return null;
+  const issueLower = issueId.toLowerCase();
+  const numericSuffix = issueLower.replace(/^[a-z]+-/, '');
+  const wsPath =
+    resetWorkspace.localPath ||
+    workspaceInfo.localPath ||
+    findWorkspacePath(resolved.projectPath, issueLower) ||
+    join(resolved.projectPath, 'workspaces', `feature-${numericSuffix}`);
+  const branchName = wsPath.endsWith('-strike')
+    ? `strike/${issueLower}`
+    : `feature/${numericSuffix}`;
+  return { workspace: wsPath, branch: branchName };
 }
 export type UnstickResult =
   | { httpStatus: 404; body: { success: false; error: string } }
@@ -276,7 +321,9 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
     const body = yield* readJsonBody;
 
     const workspaceInfo = getWorkspaceInfoForIssue(issueId);
-    const result = processResetReviewPipeline(issueId, workspaceInfo.exists);
+    const resolved = resolveProjectFromIssueSync(issueId);
+    const resetWorkspace = resolveResetWorkspace(issueId, workspaceInfo, resolved);
+    const result = processResetReviewPipeline(issueId, resetWorkspace.exists);
     if (result.httpStatus !== 200) {
       return jsonResponse(result.body, { status: result.httpStatus });
     }
@@ -299,21 +346,12 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
       try {
         yield* Effect.promise(async () => {
           const { spawnReviewRoleForIssue } = await import('../../../../lib/cloister/review-agent.js');
-          const resolved = resolveProjectFromIssueSync(issueId);
-          if (resolved) {
-            const wsInfo = getWorkspaceInfoForIssue(issueId);
-            const issueLower = issueId.toLowerCase();
-            const numericSuffix = issueLower.replace(/^[a-z]+-/, '');
-            // Use numeric-suffix form (feature/1034) as canonical branch name
-            const branchName = `feature/${numericSuffix}`;
-            const wsPath =
-              wsInfo.localPath ||
-              join(resolved.projectPath, 'workspaces', `feature-${numericSuffix}`);
-
+          const dispatchArgs = buildReviewRedispatchArgs(issueId, resetWorkspace, workspaceInfo, resolved);
+          if (dispatchArgs) {
             const result = await Effect.runPromise(spawnReviewRoleForIssue({
               issueId,
-              workspace: wsPath,
-              branch: branchName,
+              workspace: dispatchArgs.workspace,
+              branch: dispatchArgs.branch,
               prUrl: getReviewStatusSync(issueId)?.prUrl,
             }));
 

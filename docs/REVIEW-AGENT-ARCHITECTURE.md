@@ -55,6 +55,12 @@ The dashboard displays the current review status from persisted review state and
 
 ---
 
+## Strike-origin PR review support
+
+A strike agent works in `workspaces/feature-<id>-strike` on branch `strike/<id>` and opens its PR against that branch. Review dispatch must follow the workspace, not assume the conventional `feature/<id>` branch. All Deacon review-dispatch sites in `src/lib/cloister/deacon-review-status.ts` derive the branch from the resolved workspace path via `inferBranchFromWorkspace()` in `src/lib/lifecycle/archive-planning.ts`: paths ending in `-strike` map to `strike/<id>`, otherwise `feature/<id>`. The dashboard's `pan review restart --rerun` path resolves the workspace the same way. This makes strike-origin PRs reviewable without a manual `pan workspace create` (PAN-2270).
+
+---
+
 ## Instruction layout
 
 Two distinct on-disk shapes drive review behavior:
