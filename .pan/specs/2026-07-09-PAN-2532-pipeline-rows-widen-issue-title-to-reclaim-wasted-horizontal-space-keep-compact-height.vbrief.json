@@ -1,0 +1,138 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-09T04:48:37.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2532: Pipeline rows — widen issue title to reclaim wasted horizontal space (keep compact height)",
+    "updated": "2026-07-09T04:51:07.858Z"
+  },
+  "plan": {
+    "id": "pan-2532",
+    "title": "Pipeline rows: widen issue title to reclaim wasted horizontal space (keep compact height)",
+    "status": "proposed",
+    "uid": "98a77f20-87f0-49dc-873c-a93ba8cc1a84",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-07-09T04:48:37.000Z",
+    "updated": "2026-07-09T04:51:07.858Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2532",
+        "label": "PAN-2532",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "command-deck",
+      "ui-layout"
+    ],
+    "narratives": {
+      "Problem": "Pipeline rows on the Command Deck / Project Overview truncate the issue title far too early (e.g. 'Review pipeline strande…') while leaving empty horizontal space. PipelineRow uses a fixed 5-column grid ('88px 1fr 200px 90px 34px', PipelineRow.tsx:44); at the typical container width (~580px) the fixed 200px status column starves the 1fr title column down to ~120px, causing the early ellipsis with whitespace to its right.",
+      "Proposal": "Adopt Proposal B: collapse the 5-column grid into a title-first 4-column grid '78px 1fr 74px 34px'. Line 1 is the full-width title (truncate). Line 2 is a single inline metadata row: the status chip (colored dot + label, shrink-0) followed by sublineFor(entry) and whoLineFor(entry) joined by ' · ', truncating as one unit. Cost ($X.XX) + 'N sessions' keep their own right-aligned column. The colored status dot and the avatar ring are unchanged. Row height stays exactly two text lines. Single file: PipelineRow.tsx. Helpers pipelineChipFor / sublineFor / whoLineFor / sessionCountFor / formatPipelineCost are reused as-is (no signature changes).",
+      "NonGoals": "- No changes to pipeline-helpers.ts logic (chip/subline/whoLine/cost/session-count content is untouched).\n- No changes to grouping, sorting, or section headers ('Being reviewed', 'Being built', etc.).\n- No new vertical height per row (must remain exactly two text lines).\n- No new tests are authored; the existing ProjectOverview.test.tsx must stay green.\n- No user-facing docs change (no Mintlify/docs page describes this row's column layout)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Implement exactly Proposal B from the issue body (4-column grid, merged title+metadata stack), not an alternative layout.",
+        "rationale": "The issue body names Proposal B as the operator-selected design and supplies the full before/after code; --auto planning must choose the documented recommended option rather than invent a variant."
+      },
+      {
+        "summary": "Ship as a single bead rather than decomposing.",
+        "rationale": "The change is one atomic JSX rewrite in one file; a partially-migrated grid (4-col template with 5-col children, or vice versa) leaves a visually broken row, so the work is genuinely indivisible and cannot be split into independently-mergeable slices."
+      },
+      {
+        "summary": "Author no new test; rely on the existing ProjectOverview.test.tsx staying green.",
+        "rationale": "The issue reuses helpers with no signature changes and its acceptance criteria only require the existing test to keep passing; adding speculative snapshot tests is out of the requested scope (simplicity-first)."
+      }
+    ],
+    "items": [
+      {
+        "id": "widen-title-grid",
+        "title": "Collapse PipelineRow to a title-first 4-column grid (Proposal B)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-09T04:48:37.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2532",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/PipelineRow.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectOverview.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without new errors",
+            "ProjectOverview.test.tsx passes with all assertions green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/CommandDeck/PipelineRow.tsx, change the grid template on the row container (currently PipelineRow.tsx:44, style={{ gridTemplateColumns: '88px 1fr 200px 90px 34px' }}) to '78px 1fr 74px 34px'. Remove the standalone 200px status column (current lines 53-65: the flex-col wrapping the chip and whoLine). Restructure the title column (current lines 48-51) into a two-line stack: line 1 keeps the full-width truncating title (block truncate text-[13px] font-semibold text-foreground); line 2 becomes a single inline metadata row — a flex container with 'mt-[3px] flex min-w-0 items-center gap-1.5 overflow-hidden text-[10.5px] text-muted-foreground' holding (a) the status chip as an inline-flex shrink-0 rounded-full badge (px-2 py-0.5 text-[10px], chip.bgClass, chip.textClass) containing the existing colored dot span (h-[7px] w-[7px] shrink-0 rounded-full, chip.dotClass, chip.animate && 'animate-pulse') and chip.label, and (b) an inner truncate span rendering [sublineFor(entry), whoLineFor(entry)].filter(Boolean).join(' · '). Keep the cost column (block truncate cost + '{sessionCountFor(feature)} sessions') exactly as-is but it is now the 3rd grid column, and keep the avatar span (current lines 72-79) unchanged as the 4th column. Truncation contract: chip is shrink-0, the flex container carries min-w-0 overflow-hidden, and only the inner text span carries truncate — do NOT put truncate on the flex container itself. The .filter(Boolean) is required because whoLineFor returns string | null (pipeline-helpers.ts:242) and a null must not produce a dangling ' · '."
+        },
+        "items": [
+          {
+            "id": "widen-title-grid.ac1",
+            "title": "Given the pipeline row, the container renders gridTemplateColumns '78px 1fr 74px 34px' and no 200px status column remains in the markup.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "widen-title-grid.ac2",
+            "title": "Given a long title (e.g. 'Review pipeline stranded in review-blocked state after specialist convoy timeout'), the title span occupies the full width between the issueId and cost columns and only ellipsizes when the text genuinely exceeds that width — rendering far more characters than the prior ~120px column.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "widen-title-grid.ac3",
+            "title": "Given an entry, the status chip (colored dot + label), sublineFor text, and whoLineFor line render on ONE metadata line beneath the title, joined by ' · ', and the sublineFor/whoLineFor tail truncates as a single unit.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "widen-title-grid.ac4",
+            "title": "Given whoLineFor(entry) returns null, the metadata line renders no trailing ' · ' separator; and the cost ($X.XX) plus 'N sessions' remain in a right-aligned column with row height preserved at exactly two text lines.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "widen-title-grid.ac5",
+            "title": "npm run typecheck and npm run lint complete without new errors and ProjectOverview.test.tsx passes green (its title, stuck-reason subline, cost, and session-count assertions all still satisfied).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-07-09-PAN-2532-pipeline-rows-widen-issue-title-to-reclaim-wasted-horizontal-space-keep-compact-height.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
