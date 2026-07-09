@@ -4,17 +4,17 @@
     "created": "2026-07-08T23:18:27Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2510: merged/closed workspaces leak Docker containers+networks → 'all predefined address pools fully subnetted' blocks new spawns",
-    "updated": "2026-07-08T23:23:16.914Z"
+    "updated": "2026-07-09T00:45:00.168Z"
   },
   "plan": {
     "id": "pan-2510",
     "title": "Close-out owns verified Docker teardown; reaper backstop; terminal-state rebuild guard; pool advisory",
-    "status": "proposed",
+    "status": "completed",
     "uid": "110dce80-47ea-48dd-8b63-23ba04907fc3",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-07-08T23:18:27Z",
-    "updated": "2026-07-08T23:23:16.914Z",
+    "updated": "2026-07-09T00:45:00.168Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2510",
@@ -543,5 +543,5 @@
       "canonicalFilename": "2026-07-08-PAN-2510-close-out-owns-verified-docker-teardown-reaper-backstop-terminal-state-rebuild-guard-pool-advisory.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

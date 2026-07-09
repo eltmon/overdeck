@@ -3,14 +3,16 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-08T21:44:03.903Z",
-  "updated": "2026-07-08T22:00:27.413Z",
+  "updated": "2026-07-08T22:59:59.970Z",
   "pipeline": {
     "issueId": "PAN-2508",
     "reviewStatus": "passed",
     "testStatus": "pending",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-08T22:00:27.385Z"
+    "updatedAt": "2026-07-08T22:59:59.970Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-08T22:59:59.970Z"
   },
   "closeOut": {
     "usage": {

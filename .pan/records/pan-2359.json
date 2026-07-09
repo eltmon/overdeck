@@ -1,0 +1,26 @@
+{
+  "issueId": "PAN-2359",
+  "schemaVersion": 2,
+  "created": "2026-07-09T00:24:15.412Z",
+  "updated": "2026-07-09T00:24:17.924Z",
+  "pipeline": {
+    "issueId": "PAN-2359",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-09T00:24:17.924Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-09T00:24:17.924Z",
+    "mergeStatus": "merged"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {}
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code"
+}

@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>The Three Issue Views — sections & naming</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0e14;--card:#11151f;--card2:#0e1219;--panel:#141a24;--border:#1e2430;--border-hi:#2c3547;
+    --fg:#e6e9ef;--muted:#8b93a5;--faint:#5b6373;
+    --teal:#2dd4bf;--blue:#3b82f6;--violet:#8b5cf6;--amber:#f59e0b;--red:#ef4444;--green:#34d399;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--fg);font:14px/1.5 "DM Sans",system-ui,sans-serif;margin:0;padding:24px 28px;max-width:1640px}
+  h1{font:600 20px "Space Grotesk";margin:0 0 3px}
+  .sub{color:var(--muted);font-size:12.5px;margin-bottom:20px}
+  .mono{font-family:"DM Mono",monospace}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:start}
+
+  /* section name-tag */
+  .sec{position:relative;border:1px solid var(--border);border-radius:9px;background:var(--card2);padding:10px 10px 10px 12px;margin-bottom:9px}
+  .sectag{display:inline-flex;align-items:center;gap:5px;font:600 9px "DM Mono";letter-spacing:.05em;text-transform:uppercase;padding:2px 7px;border-radius:99px;margin-bottom:7px}
+  .t-blue{background:rgba(59,130,246,.16);color:#93c5fd}
+  .t-violet{background:rgba(139,92,246,.16);color:#c4b5fd}
+  .t-teal{background:rgba(45,212,191,.16);color:#7ff0e0}
+  .t-amber{background:rgba(245,158,11,.16);color:#fcd34d}
+  .love{margin-left:6px;font-size:9px;color:var(--amber)}
+
+  /* column headers */
+  .vhdr{border-radius:12px 12px 0 0;padding:12px 14px;margin-bottom:10px}
+  .vhdr.v1{background:linear-gradient(180deg,rgba(59,130,246,.12),transparent);border:1px solid rgba(59,130,246,.4)}
+  .vhdr.v2{background:linear-gradient(180deg,rgba(139,92,246,.12),transparent);border:1px solid rgba(139,92,246,.4)}
+  .vhdr.v3{background:linear-gradient(180deg,rgba(45,212,191,.12),transparent);border:1px solid rgba(45,212,191,.4)}
+  .vhdr .k{font:600 10px "DM Mono";letter-spacing:.08em;text-transform:uppercase;opacity:.8}
+  .vhdr .n{font:600 18px "Space Grotesk";margin:5px 0 2px}
+  .vhdr .c{font-family:"DM Mono";font-size:10.5px;color:var(--faint)}
+  .vhdr .w{font-size:11px;color:var(--muted);margin-top:6px}
+
+  /* faithful mini widgets */
+  .tabs{display:flex;flex-wrap:wrap;gap:7px;font-size:9.5px;color:var(--muted)}
+  .tabs .on{color:var(--fg);font-weight:600;border-bottom:2px solid currentColor;padding-bottom:2px}
+  .band{display:flex;gap:4px}
+  .band div{flex:1;text-align:center;font-size:8px;color:var(--faint);border-top:3px solid #1a2130;padding-top:4px}
+  .band div.on{border-top-color:var(--blue);color:var(--muted)}
+  .btnrow{display:flex;gap:6px;margin:2px 0 6px}
+  .btn{font-size:10px;padding:4px 10px;border-radius:7px;border:1px solid var(--border-hi)}
+  .btn.p{background:var(--blue);border-color:var(--blue);color:#fff}
+  .togg{display:flex;justify-content:space-between;align-items:center;font-size:10.5px;padding:3px 0}
+  .togg small{color:var(--faint);font-size:8.5px;display:block}
+  .sw{width:26px;height:14px;border-radius:99px;background:#1a2130;position:relative;flex:none}
+  .sw::after{content:"";position:absolute;width:10px;height:10px;border-radius:99px;background:var(--faint);top:2px;left:2px}
+  .term{background:#0a0d12;border:1px solid var(--border);border-radius:7px;padding:7px;font-family:"DM Mono";font-size:8.5px;color:#9fe7d4;line-height:1.6}
+  .tellbox{border:1px solid var(--border);border-radius:7px;padding:5px 7px;font-size:9px;color:var(--faint);margin-top:6px;display:flex;justify-content:space-between;align-items:center}
+  .tellbox b{background:var(--blue);color:#fff;font-size:8.5px;padding:2px 8px;border-radius:5px}
+  .gate{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+  .gate div{border:1px solid var(--border);border-radius:6px;padding:5px 3px;font-size:8.5px;text-align:center}
+  .g-ok{color:var(--green)} .g-wait{color:var(--muted)}
+  .agentrow{display:flex;align-items:center;gap:6px;font-size:10px;padding:3px 5px;border:1px solid var(--border);border-radius:6px;margin-bottom:4px;background:rgba(255,255,255,.012)}
+  .dot{width:6px;height:6px;border-radius:99px;flex:none}
+  .spin{width:9px;height:9px;border:1.5px solid var(--blue);border-top-color:transparent;border-radius:99px;animation:s 1s linear infinite;flex:none}
+  @keyframes s{to{transform:rotate(360deg)}}
+  .dag{display:flex;gap:6px;font-size:8px}
+  .dag div{flex:1;border:1px solid var(--border);border-radius:6px;padding:5px;text-align:center;color:var(--muted);background:var(--panel)}
+  .feed div{font-size:8.5px;color:var(--muted);padding-left:9px;border-left:2px solid var(--border);margin-bottom:4px}
+  .chips{display:flex;flex-wrap:wrap;gap:4px}
+  .chips span{font-size:8px;padding:1px 6px;border-radius:99px;background:#1a2130;color:var(--muted)}
+  .filter{display:flex;gap:4px}
+  .filter span{font-size:9px;padding:2px 8px;border-radius:6px;border:1px solid var(--border);color:var(--muted)}
+  .filter span.on{background:#1a2130;color:var(--fg)}
+  .irow{display:flex;align-items:center;gap:6px;font-size:10px}
+  .child{margin-left:12px}
+  .narr{font-size:11px}.narr b{font-weight:600}
+
+  /* legend table */
+  .legend{margin-top:26px}
+  .legend h2{font:600 15px "Space Grotesk";margin:0 0 10px}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border)}
+  th{font:600 10px "Space Grotesk";text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  td .nm{font-weight:600}
+  td .desc{color:var(--muted);font-size:11px}
+  .yes{color:var(--green);font-weight:600}.no{color:var(--faint)}
+  .lovecell{color:var(--amber)}
+
+  /* proposal */
+  .prop{margin-top:28px;border:1px solid rgba(45,212,191,.35);border-radius:16px;background:linear-gradient(180deg,rgba(45,212,191,.05),transparent);padding:20px 22px}
+  .prop h2{font:600 16px "Space Grotesk";margin:0 0 4px;color:var(--teal)}
+  .prop .lead{color:var(--muted);font-size:12.5px;margin-bottom:16px;max-width:1150px}
+  .prop .lead b{color:var(--fg)}
+  .densities{display:grid;grid-template-columns:1fr 1fr 1.3fr;gap:14px;margin-bottom:14px}
+  .density{border:1px solid var(--border-hi);border-radius:12px;padding:12px;background:var(--card)}
+  .density h3{font:600 12px "Space Grotesk";margin:0 0 4px}
+  .density .tag{font-family:"DM Mono";font-size:9.5px;color:var(--faint)}
+  .density p{font-size:11px;color:var(--muted);margin:6px 0 0}
+  .arrows{text-align:center;color:var(--faint);font-size:11px;margin:4px 0 16px;font-family:"DM Mono"}
+  .opts{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .opt{border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+  .opt h4{font:600 12px "Space Grotesk";margin:0 0 5px}
+  .opt.rec{border-color:rgba(45,212,191,.5);background:rgba(45,212,191,.04)}
+  .opt .rectag{font-size:9px;color:var(--teal);font-weight:600;letter-spacing:.06em}
+  .opt p{font-size:11px;color:var(--muted);margin:5px 0}
+  .opt .pro{color:#7ff0e0} .opt .con{color:#fcd34d}
+  .pnote{font-size:11.5px;color:var(--faint);margin-top:14px;border-top:1px dashed var(--border-hi);padding-top:12px}
+  .pnote b{color:var(--fg)}
+</style>
+</head>
+<body>
+
+<h1>The Three Issue Views — every section, named</h1>
+<div class="sub">Each column is a faithful (compact) redraw of that view, top-to-bottom. Every block wears its <span class="mono">SECTION NAME</span> tag so you can match what you're looking at to where it lives. ★ = the live-agent panel you love.</div>
+
+<div class="grid3">
+
+  <!-- ═══════════ VIEW 1 — CONSOLE ═══════════ -->
+  <div>
+    <div class="vhdr v1"><div class="k">View 1</div><div class="n">Issue Console</div><div class="c">full page · own window</div><div class="w">The operator control room. Opens as its own page.</div></div>
+
+    <div class="sec"><span class="sectag t-blue">A · Detail Tabs</span>
+      <div class="tabs"><span class="on">Overview</span><span>Plan</span><span>Beads</span><span>Conversation</span><span>Terminal</span><span>Activity</span><span>Files</span><span>Artifacts</span></div>
+    </div>
+    <div class="sec"><span class="sectag t-blue">B · Lifecycle Band</span>
+      <div class="band"><div class="on">Triaged<br>07/08</div><div class="on">Planned<br>07/08</div><div class="on">Implemented</div><div>Reviewed</div><div>Shipping</div><div>Merged</div></div>
+    </div>
+    <div class="sec"><span class="sectag t-blue">C · Plan &amp; Release panel</span>
+      <div style="font-size:8.5px;color:var(--faint)">PLAN → RELEASE · OPERATOR</div>
+      <div class="btnrow"><span class="btn p">Plan (Auto)</span><span class="btn">⚑ Plan (Interactive)</span></div>
+      <div style="font-size:8.5px;color:var(--muted)">Generates vBRIEF + beads. Must be Released before pickup.</div>
+    </div>
+    <div class="sec"><span class="sectag t-blue">D · Operator Gates</span>
+      <div style="font-size:8.5px;color:var(--faint)">PIPELINE STATE · OPERATOR CONTROLS</div>
+      <div class="togg"><div>Ready<small>the entry gate</small></div><span class="sw"></span></div>
+      <div class="togg"><div>Blocks main 🔴</div><span class="sw"></span></div>
+      <div class="togg"><div>Park<small>defer, reversible</small></div><span class="sw"></span></div>
+    </div>
+    <div class="sec" style="border-color:rgba(139,92,246,.4)"><span class="sectag t-violet">E · Active Agent panel<span class="love">★ the one you love</span></span>
+      <div style="font-size:9px;color:#c4b5fd;margin-bottom:4px">strike-pan-2498 · <span style="color:var(--green)">work running</span></div>
+      <div class="term">?? src/lib/cloister/…failed-slot-recovery.ts<br>• Lint still running; no failures yet…<br>• Working (11m 48s · esc to interrupt)</div>
+      <div class="tellbox"><span>Tell this agent…</span><b>Send</b></div>
+    </div>
+    <div class="sec"><span class="sectag t-blue">F · Verification Gates</span>
+      <div class="gate"><div class="g-wait">◷ typecheck</div><div class="g-wait">◷ lint</div><div class="g-wait">◷ test</div><div class="g-wait">◷ uat</div></div>
+    </div>
+    <div class="sec"><span class="sectag t-blue">G · Beads panel</span>
+      <div style="font-size:9px;color:var(--muted)">No beads yet · Tell agent · Recover agent</div>
+    </div>
+    <div class="sec"><span class="sectag t-teal">H · Live Activity rail</span>
+      <div class="feed"><div>● Work agent started · 01:29</div><div>● Agent created strike-pan-2498 · 01:29</div></div>
+    </div>
+  </div>
+
+  <!-- ═══════════ VIEW 2 — COCKPIT ═══════════ -->
+  <div>
+    <div class="vhdr v2"><div class="k">View 2</div><div class="n">Issue Cockpit</div><div class="c">IssueMissionControl.tsx · Command Deck tab</div><div class="w">Deep work on one issue. Opens as a tab in the top strip.</div></div>
+
+    <div class="sec"><span class="sectag t-violet">H0 · Header bar</span>
+      <div style="font-size:8px;color:var(--faint)">panopticon-cli / Issues · PAN-1491</div>
+      <div style="font-size:10px;font-weight:600;margin:2px 0">feat(flywheel): metric-aware prioritization… <span style="font-size:8px;color:var(--amber);border:1px solid var(--amber);border-radius:4px;padding:0 4px">PENDING</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+        <span style="font-size:8px;color:var(--muted)">branch feature/pan-1491 · PR #1636 · CI 4/5 · <b style="color:var(--fg)">$61.71</b></span>
+        <span style="display:flex;gap:4px"><span class="btn" style="font-size:8px;padding:2px 6px">Merge — review pending</span><span class="btn" style="font-size:8px;padding:2px 6px">⚙ Actions ▾</span></span>
+      </div>
+    </div>
+    <div class="sec"><span class="sectag t-violet">I · Status Narrative</span>
+      <div class="narr"><b>The crew is writing code — 2 of 10 tasks done</b> <span style="float:right;color:var(--faint);font-size:9px">$61.71 spent</span><br><span style="color:var(--muted);font-size:9.5px">Up next: the reviewer checks the work. Nothing needs you.</span></div>
+    </div>
+    <div class="sec"><span class="sectag t-violet">J · Pipeline Band</span>
+      <div class="band"><div class="on">Planned<br><small style="font-size:7px">what to build</small></div><div class="on">Building<br><small style="font-size:7px">2 of 10</small></div><div>Reviewing</div><div>Testing</div><div>Shipping</div></div>
+      <div style="font-size:7.5px;color:var(--faint);margin-top:4px">review not started · tests not run · checks 4/5 ✓ · PR has conflicts · not cleared to ship</div>
+    </div>
+
+    <div style="font-size:8px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em;margin:10px 0 5px">↓ 3-pane body (left · center · right)</div>
+
+    <div class="sec"><span class="sectag t-violet">K · Agents &amp; Steps lane <span style="color:var(--faint);font-weight:400">(left pane)</span></span>
+      <div class="agentrow"><span class="dot" style="background:var(--muted)"></span>Verification<span style="margin-left:auto;color:var(--faint)">not run</span></div>
+      <div class="agentrow"><span class="dot" style="background:var(--muted)"></span>Test<span style="margin-left:auto;color:var(--faint)">not run</span></div>
+      <div class="agentrow"><span class="dot" style="background:var(--green)"></span>Ship<span style="margin-left:auto;color:var(--faint)">done</span></div>
+      <div style="font-size:8px;color:var(--faint);margin-top:4px">▸ Stack · 4 ctr · 0 PR &nbsp;<span class="sectag t-violet" style="font-size:7px;padding:1px 5px">N · Stack drawer</span></div>
+    </div>
+
+    <div class="sec"><span class="sectag t-violet">L · Detail Tabs <span style="color:var(--faint);font-weight:400">(center pane)</span></span>
+      <div class="tabs"><span class="on">Overview</span><span>Code ✓</span><span>PRD</span><span>Timeline</span><span>Discussion</span><span>Costs</span><span>Artifacts</span><span>Ship</span><span>Conversation</span><span>Files</span><span>Terminal</span></div>
+    </div>
+    <div class="sec" style="margin-left:8px;border-left:2px solid var(--violet)"><span class="sectag t-violet">L0 · Overview tab → "The crew" (CrewStage)</span>
+      <div style="font-size:8px;color:var(--faint);margin-bottom:4px">glow = actively spending · teal ring = reading the stream · faded = finished</div>
+      <div style="display:flex;gap:8px;margin-bottom:4px">
+        <span style="width:26px;height:26px;border-radius:8px;border:1.5px solid var(--teal);display:grid;place-items:center;font-size:9px;font-weight:600">K</span>
+        <span style="width:26px;height:26px;border-radius:8px;border:1.5px solid var(--teal);display:grid;place-items:center;font-size:9px;font-weight:600">K</span>
+        <span style="font-size:8px;color:var(--muted);align-self:center">kimi · slot · <span style="color:var(--teal)">listening</span></span>
+      </div>
+      <div style="font-size:8px;color:var(--faint)">commit stream — every member reads every change · planning · fable-5</div>
+    </div>
+    <div class="sec" style="margin-left:8px;border-left:2px solid var(--violet)"><span class="sectag t-violet">L1 · Overview tab → "What just happened" (HappenedFeed)</span>
+      <div style="display:flex;justify-content:space-between;font-size:9px"><b>What just happened</b><span style="color:var(--faint)">1 OF 3 DONE</span></div>
+      <div style="font-size:8.5px;color:var(--muted);margin-top:3px">8:58 specialist started shipping · 5:56 fable-5 finished the plan</div>
+    </div>
+    <div class="sec" style="margin-left:8px;border-left:2px solid var(--violet)"><span class="sectag t-violet">M · Overview tab → "The plan, as a map" (PlanMapCard)</span>
+      <div style="font-size:8px;color:var(--faint);margin-bottom:4px">each box is one task — arrows show what waits on what</div>
+      <div class="dag"><div>Extend… ●</div><div>parseAC ✓</div><div>listWeights ◌</div></div>
+      <div style="font-size:7.5px;color:var(--faint);margin-top:4px">● done · ● happening now · ◌ waiting · 🔴 needs attention</div>
+    </div>
+    <div class="sec" style="margin-left:8px;border-left:2px solid var(--violet)"><span class="sectag t-violet">M1 · Overview tab → Blocker Spotlight (when blocked)</span>
+      <div style="font-size:8.5px;color:var(--muted)">Surfaces the current blocker + one-click resolution when the issue is stuck.</div>
+    </div>
+
+    <div class="sec"><span class="sectag t-violet">Beads panel <span style="color:var(--faint);font-weight:400">(right pane)</span></span>
+      <div style="display:flex;justify-content:space-between;font-size:9px"><b>Beads</b><span style="color:var(--faint)">0 open · 19 ✓</span></div>
+      <div style="height:4px;background:var(--green);border-radius:99px;margin:4px 0"></div>
+      <div style="font-size:8px;color:var(--muted)">Plan progress 19/19 · 100% · all planned beads complete</div>
+    </div>
+
+    <div class="sec"><span class="sectag t-teal">O · Awareness rail <span style="color:var(--faint);font-weight:400">(far right)</span></span>
+      <div style="font-size:9px;color:var(--amber);margin-bottom:3px">⚠ Needs you: 2</div>
+      <div class="feed"><div>● Work agent started PAN-2498</div><div>● Dashboard p99 delay…</div></div>
+    </div>
+  </div>
+
+  <!-- ═══════════ VIEW 3 — RAIL ═══════════ -->
+  <div>
+    <div class="vhdr v3"><div class="k">View 3</div><div class="n">Issue Rail</div><div class="c">ProjectTree / FeatureItem.tsx · left sidebar</div><div class="w">Always-on beside the conversation list. Your glance companion.</div></div>
+
+    <div class="sec"><span class="sectag t-teal">P · Filter bar</span>
+      <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:9px;color:var(--muted)">ISSUES · 7 ⚑</span></div>
+      <div class="filter" style="margin-top:5px"><span class="on">All</span><span>Alive</span><span>Failed</span></div>
+    </div>
+    <div class="sec"><span class="sectag t-teal">Q · Issue row</span>
+      <div class="irow"><span class="mono" style="font-size:8.5px;color:var(--muted)">PAN-1491</span><span style="font-size:9.5px">metric-aware…</span><span style="margin-left:auto;color:var(--faint);font-size:9px">$61</span></div>
+    </div>
+    <div class="sec"><span class="sectag t-teal">R · Resource chips</span>
+      <div class="chips"><span>workspace</span><span>branch l1·r3</span><span>vBRIEF</span><span>beads</span><span>stack 1</span></div>
+    </div>
+    <div class="sec"><span class="sectag t-teal">S · Session nodes</span>
+      <div class="agentrow child"><span class="spin"></span>Work<span style="margin-left:auto;color:var(--faint)">gpt-5.5</span></div>
+      <div class="agentrow child"><span class="dot" style="background:var(--muted)"></span>Ship</div>
+      <div class="agentrow child"><span class="spin"></span>Slot 1<span style="margin-left:auto;color:var(--amber)">waiting</span></div>
+      <div style="font-size:8px;color:var(--faint);margin-top:3px">right-click → stop · pause · restart · wipe · view JSONL</div>
+    </div>
+    <div class="sec" style="border-style:dashed;opacity:.75"><span class="sectag t-amber">— has NO Active-Agent panel</span>
+      <div style="font-size:9px;color:var(--muted)">Clicking a session opens its conversation <i>elsewhere</i> — the live stream + "Tell this agent" box (★ section E) is not here.</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════ LEGEND ═══════════ -->
+<div class="legend">
+  <h2>Section dictionary — what each is, and which view has it</h2>
+  <table>
+    <thead><tr><th style="width:190px">Section</th><th>What it is</th><th style="width:80px">Console</th><th style="width:80px">Cockpit</th><th style="width:80px">Rail</th></tr></thead>
+    <tbody>
+      <tr><td><span class="nm">Lifecycle Band</span></td><td class="desc">Dated stages Triaged→Merged</td><td class="yes">B ✓</td><td class="no">— (undated Pipeline Band J)</td><td class="no">—</td></tr>
+      <tr><td><span class="nm">Plan &amp; Release panel</span></td><td class="desc">Plan (Auto/Interactive) + release-before-pickup</td><td class="yes">C ✓</td><td class="no">—</td><td class="no">—</td></tr>
+      <tr><td><span class="nm">Operator Gates</span></td><td class="desc">Ready / Blocks-main / Park toggles</td><td class="yes">D ✓</td><td class="no">—</td><td class="no">—</td></tr>
+      <tr><td><span class="nm lovecell">★ Active Agent panel</span></td><td class="desc lovecell">Live running-output stream + "Tell this agent" box</td><td class="yes">E ✓</td><td class="no">~ (Conversation tab)</td><td class="no">— (opens elsewhere)</td></tr>
+      <tr><td><span class="nm">Verification Gates</span></td><td class="desc">typecheck / lint / test / uat cards</td><td class="yes">F ✓</td><td class="yes">via Verification node</td><td class="no">—</td></tr>
+      <tr><td><span class="nm">Agents &amp; Steps lane</span></td><td class="desc">Plan/Work/Review/Verify/Ship rows w/ verdicts</td><td class="no">~ (embedded agent only)</td><td class="yes">K ✓</td><td class="yes">S ✓ (as session nodes)</td></tr>
+      <tr><td><span class="nm">Plan Map (DAG)</span></td><td class="desc">Task graph, "the plan as a map"</td><td class="no">— (Plan tab)</td><td class="yes">M ✓</td><td class="no">—</td></tr>
+      <tr><td><span class="nm">Detail Tabs</span></td><td class="desc">Overview/Code/PRD/Costs/… content tabs</td><td class="yes">A ✓ (8 tabs)</td><td class="yes">L ✓ (10 tabs)</td><td class="no">—</td></tr>
+      <tr><td><span class="nm">Resource chips</span></td><td class="desc">workspace/branch/vBRIEF/beads/stack</td><td class="no">— (Workspace line)</td><td class="no">— (Stack drawer N)</td><td class="yes">R ✓</td></tr>
+      <tr><td><span class="nm">Session context actions</span></td><td class="desc">stop/pause/restart/wipe per agent</td><td class="no">~</td><td class="no">—</td><td class="yes">S ✓</td></tr>
+      <tr><td><span class="nm">Activity feed</span></td><td class="desc">Recent events for the issue</td><td class="yes">H · Live Activity</td><td class="yes">O · Awareness</td><td class="no">—</td></tr>
+      <tr><td><span class="nm">Status Narrative</span></td><td class="desc">Plain-English "what's happening" line</td><td class="no">—</td><td class="yes">I ✓</td><td class="no">—</td></tr>
+      <tr><td><span class="nm">Header bar</span></td><td class="desc">Title, branch/PR/CI, cost, Merge button, Actions menu</td><td class="no">~ (title only)</td><td class="yes">H0 ✓</td><td class="no">—</td></tr>
+      <tr><td><span class="nm">Overview tab</span></td><td class="desc">Default tab: "What just happened" card + the Plan Map</td><td class="no">—</td><td class="yes">L1 + M ✓</td><td class="no">—</td></tr>
+      <tr><td><span class="nm">Beads panel (progress)</span></td><td class="desc">Bead plan progress bar + completed list</td><td class="no">~ (bare)</td><td class="yes">✓ right pane</td><td class="no">— (beads chip only)</td></tr>
+    </tbody>
+  </table>
+  <div style="font-size:11.5px;color:var(--muted);margin-top:14px">
+    <b style="color:var(--fg)">Read it like this:</b> the section you pointed at — the live agent output + "Tell this agent" (★ <span class="mono">E · Active Agent panel</span>) and the backlog/planning controls above it (<span class="mono">C · Plan &amp; Release</span> + <span class="mono">D · Operator Gates</span>) — all live in <b>View 1, the Console</b>. The Cockpit and Rail don't have them today. That's exactly the kind of gap the unification proposal below is meant to close.
+  </div>
+</div>
+
+<!-- ═══════════ EXHAUSTIVE INVENTORY ═══════════ -->
+<div class="legend" style="margin-top:26px">
+  <h2>Complete component inventory — the no-loss checklist</h2>
+  <div style="font-size:12px;color:var(--muted);margin-bottom:14px;max-width:1150px">Every rendered sub-component in each view, read straight from source. This is the list that must be fully accounted for before unifying — nothing here may silently disappear.</div>
+
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:start">
+
+    <!-- Console inventory -->
+    <div style="border:1px solid rgba(59,130,246,.35);border-radius:12px;padding:14px 16px">
+      <div style="font:600 13px 'Space Grotesk';color:#93c5fd;margin-bottom:2px">View 1 · Issue Console</div>
+      <div class="mono" style="font-size:10px;color:var(--faint);margin-bottom:10px">drawer/IssueDrawer.tsx · a closable drawer/panel</div>
+      <ul style="margin:0;padding-left:15px;font-size:11.5px;line-height:1.8">
+        <li><b>DrawerActionBar</b> — Issue↗ link, close ✕, Actions</li>
+        <li><b>PhaseTimeline</b> — dated Triaged→Merged band</li>
+        <li><b>DrawerTabs</b> — Overview·Plan·Beads·Conversation·Terminal·Activity·Files·Artifacts</li>
+        <li><b>DrawerPickupSection / PickupGateControls</b> — Plan→Release, Ready/Blocks-main/Park (PAN-2059)</li>
+        <li><b>DrawerWorkspaceSection</b> — workspace path + open-in picker</li>
+        <li class="lovecell"><b>★ DrawerActiveAgent</b> — live output stream + "Tell this agent"/Resume</li>
+        <li><b>DrawerPausedBanner</b> — paused/needs-you banner</li>
+        <li><b>DrawerVerificationGates</b> — typecheck/lint/test/uat cards</li>
+        <li><b>DrawerReviewSpecialists</b> — review convoy sub-agents</li>
+        <li><b>DrawerBeadsList</b> — beads</li>
+        <li><b>DrawerPlanPanel / VBriefViewer</b> — the vBRIEF plan</li>
+        <li><b>DrawerArtifactsPanel</b> — artifacts</li>
+        <li><b>DrawerActivityRail / DrawerActivityPanel</b> — Live Activity feed</li>
+        <li><b>DrawerAgentSession</b> — agent session detail</li>
+      </ul>
+    </div>
+
+    <!-- Cockpit inventory -->
+    <div style="border:1px solid rgba(139,92,246,.35);border-radius:12px;padding:14px 16px">
+      <div style="font:600 13px 'Space Grotesk';color:#c4b5fd;margin-bottom:2px">View 2 · Issue Cockpit</div>
+      <div class="mono" style="font-size:10px;color:var(--faint);margin-bottom:10px">Stage/cockpit/IssueMissionControl.tsx · a Command Deck tab</div>
+      <ul style="margin:0;padding-left:15px;font-size:11.5px;line-height:1.8">
+        <li><b>Header bar</b> — title, PENDING badge, HeaderStat (branch/PR/CI/cost), Merge button, IssueActionMegaMenu (Actions)</li>
+        <li><b>StatusNarrative</b> — plain-English "what's happening" + $ spent</li>
+        <li><b>Pipeline Band</b> — Planned/Building/Reviewing/Testing/Shipping + substatus line</li>
+        <li><b>AgentsLane</b> (left) — Plan·Work·Review·Verification·Test·Ship rows w/ spinner+verdict+cost</li>
+        <li><b>StackDrawer</b> (left, collapsed) — containers, PRs, git ahead/behind, actions</li>
+        <li><b>Tabs</b>: Overview·Code·PRD/Plan·Timeline·Discussion·Costs·Artifacts·Ship·Conversation·Files·Terminal</li>
+        <li>Overview → <b>CrewStage</b> ("The crew" avatars + spend-glow + commit stream)</li>
+        <li>Overview → <b>HappenedFeed</b> ("What just happened")</li>
+        <li>Overview → <b>PlanMapCard</b> ("the plan, as a map" DAG)</li>
+        <li>Overview → <b>IssueBlockerSpotlight</b> (when blocked)</li>
+        <li>Code → <b>GitHubCiPanel + ChangedFilesView</b> (PR, CI checks, diff)</li>
+        <li>PRD → <b>PlanMissionTab</b> · Timeline → <b>ActivityTab</b> · Discussion → <b>DiscussionsTab</b></li>
+        <li>Costs → <b>CostsTab</b> · Artifacts → <b>DrawerArtifactsPanel</b> · Ship → <b>ShipTab</b> (live door log)</li>
+        <li>Conversation → <b>ConversationTab</b> · Files/Terminal → open-pane cards</li>
+        <li><b>BeadsRail / BeadsTab</b> (right) — plan progress bar + completed list</li>
+        <li><b>Awareness rail</b> (far right) — Needs-you + activity feed</li>
+      </ul>
+    </div>
+
+    <!-- Rail inventory -->
+    <div style="border:1px solid rgba(45,212,191,.35);border-radius:12px;padding:14px 16px">
+      <div style="font:600 13px 'Space Grotesk';color:#7ff0e0;margin-bottom:2px">View 3 · Issue Rail</div>
+      <div class="mono" style="font-size:10px;color:var(--faint);margin-bottom:10px">CommandDeck/ProjectTree/FeatureItem.tsx + SessionNode.tsx · sidebar</div>
+      <ul style="margin:0;padding-left:15px;font-size:11.5px;line-height:1.8">
+        <li><b>Filter bar</b> — All / Alive / Failed</li>
+        <li><b>Feature (issue) row</b> — id, title, cost, state badge</li>
+        <li>Badges — <b>Ready·awaiting-merge</b>, 🚆 merge-train, UAT-stack, TroubledBadges</li>
+        <li><b>MergeButton</b> — inline merge when ready</li>
+        <li><b>Pipeline pips</b> — plan·work·review·test·ship mini-strip</li>
+        <li><b>ResourceStrip</b> — workspace·branch·tmux·vBRIEF·beads·PR·docker chips (+ detail popover)</li>
+        <li><b>SessionNode</b> (per agent) — icon tile, PhaseIcon spinner, model, cost, duration, reviewer verdict tick</li>
+        <li><b>SessionNode context menu</b> — Stop·Pause·Unpause·Resume·Restart(model/harness)·Deep-wipe·Open state dir·View JSONL·View terminal</li>
+        <li><b>ReviewGroup</b> — nested review convoy sub-agents</li>
+        <li><b>ShipDoorTreeRow</b> — live server-side merge (PAN-2487)</li>
+        <li><b>StackDrawer / UatStackTreeGroup</b> — workspace stack, per-container status, URLs, actions</li>
+        <li><b>ResourcesGroup</b> — orphaned-resource cleanup</li>
+        <li><b>ModelResolutionCard</b> — resolved model + harness (on expand)</li>
+      </ul>
+    </div>
+
+  </div>
+  <div style="font-size:11px;color:var(--faint);margin-top:12px">~ = a lighter equivalent exists · Source-read 2026-07-08 · if a component ships after this date, add it here before any unify work begins (this is the surface-lock).</div>
+</div>
+
+<!-- ═══════════ PROBLEM & WAY OUT ═══════════ -->
+<div class="prop">
+  <h2>The problem, and a way out</h2>
+  <div class="lead">
+    All three answer the same question — "what is happening on this issue right now?" — but each was built separately, so each grew sections the others lack (that's why the spinner and Ship row went missing from one but not another, and why the ★ Active Agent panel lives only in the Console). The fix isn't to sync them by hand forever. It's <b>one data model + one component family, rendered at three densities.</b>
+  </div>
+
+  <div class="densities">
+    <div class="density">
+      <h3>Rail density</h3>
+      <div class="tag">= today's View 3</div>
+      <p>Compact, always-on beside the conversation. Collapsed session nodes, chips, filter. The 90%-of-the-time glance.</p>
+    </div>
+    <div class="density">
+      <h3>Cockpit density</h3>
+      <div class="tag">= today's View 2 (docked tab)</div>
+      <p>Medium. Agents&amp;Steps lane, plan-map, detail tabs. Opened when you want to <i>work</i> an issue.</p>
+    </div>
+    <div class="density">
+      <h3>Console density</h3>
+      <div class="tag">= today's View 1 (full page)</div>
+      <p>Large. Everything cockpit has + operator gates + dated lifecycle + the ★ Active Agent panel + full activity rail. The control room.</p>
+    </div>
+  </div>
+  <div class="arrows">one &lt;IssueView density="rail | cockpit | console" /&gt; · same store, same row component, same verdicts · a section added once shows in all three</div>
+
+  <div class="opts">
+    <div class="opt rec">
+      <div class="rectag">RECOMMENDED</div>
+      <h4>A. Progressive-density unify</h4>
+      <p>Extract shared pieces (issue-state store, the agent/step Row, the verification node, the ★ Active Agent panel, the Ship-door row, cost) into one family; each of the 3 views becomes a thin density wrapper.</p>
+      <p class="pro">✓ One source of truth — drift becomes impossible</p>
+      <p class="pro">✓ Keeps all 3 locations you already use</p>
+      <p class="con">— Biggest refactor of the three</p>
+    </div>
+    <div class="opt">
+      <h4>B. Rail ⇄ Cockpit expand</h4>
+      <p>Keep the Rail as home base; clicking an issue <i>expands the same component in place</i> into the cockpit rather than opening a separate tab. Console becomes "cockpit, full-screen".</p>
+      <p class="pro">✓ Matches how you actually work (rail-first)</p>
+      <p class="con">— Still two codebases unless paired with A</p>
+    </div>
+    <div class="opt">
+      <h4>C. Shared-components only</h4>
+      <p>Leave the 3 shells, but force them to consume the same Row / verification / ship / Active-Agent sub-components (the PAN-2493 audit's plan).</p>
+      <p class="pro">✓ Smallest change, ships fastest</p>
+      <p class="con">— Layout still diverges; 3 shells to maintain</p>
+    </div>
+  </div>
+
+  <div class="pnote">
+    <b>The UX approach you might be missing:</b> you reach for the Rail most because it lives <i>next to the conversation</i> — the real need is "never lose sight of the issue while I talk to its agent." That argues for making the Rail the <b>primary</b> surface and letting it <b>grow in place</b> (option B) rather than sending you to a separate tab/page. Density-unify (A) is what makes B safe to build. My suggestion: <b>A as the foundation, B as the interaction model, and retire "3 separate views" as a concept</b> — one Issue View, always beside your conversation, that expands when you need more (and carries the ★ Active Agent panel everywhere, since that's the piece you live in).
+  </div>
+</div>
+
+</body>
+</html>
