@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-08T23:04:34.767Z",
-  "updated": "2026-07-09T00:01:25.033Z",
+  "updated": "2026-07-09T00:10:35.613Z",
   "pipeline": {
     "issueId": "PAN-2359",
     "reviewStatus": "pending",
@@ -50,5 +50,12 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "kimi-k2.7-code"
+  "model": "kimi-k2.7-code",
+  "statusOverrides": {
+    "guard-authored-commits": "completed",
+    "guard-authored-commits.ac1": "completed",
+    "guard-authored-commits.ac2": "completed",
+    "guard-authored-commits.ac3": "completed",
+    "guard-authored-commits.ac4": "completed"
+  }
 }
