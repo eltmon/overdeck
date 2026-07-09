@@ -49,6 +49,8 @@ vi.mock('../../../src/lib/projects.js', () => ({
 
 vi.mock('../../../src/lib/lifecycle/archive-planning.js', () => ({
   findWorkspacePath: (...args: unknown[]) => mocks.findWorkspacePath(...args),
+  inferBranchFromWorkspace: (workspacePath: string, issueLower: string) =>
+    workspacePath.endsWith('-strike') ? `strike/${issueLower}` : `feature/${issueLower}`,
 }));
 
 vi.mock('../../../src/lib/tmux.js', async () => {
