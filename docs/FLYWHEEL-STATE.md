@@ -207,6 +207,14 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-60 tick 18 (2026-07-09) — quiet: main GREEN on PAN-2510 merge; B5/PAN-2360 implementing (healthy); filed PAN-2522 (finalize→autostart gap); push still blocked
+
+- **Main GREEN** — `CI | success | 5485236776` (PAN-2510 merge commit). P0 ✓.
+- **B5/PAN-2360 implementing, healthy** — agent-pan-2360 "Orbiting, thinking high effort" (6m40s, 51% ctx, +26/-8, gpt-5.5). Early in the work; no pan done yet; not wedged. No intervention.
+- **PAN-2522 FILED** (finalize→autostart gap, confirmed 2× on PAN-2510+2360) — auto-plan finalizes (spec+beads committed) but the work agent doesn't auto-spawn; needs a manual 2nd `pan start`. FR: complete-planning must dispatch the work agent + a self-heal patrol.
+- **Flywheel push still BLOCKED (PAN-2516)** — 3 closed-issue specs (PAN-2167/2359/2510 completed-flips) uncommitted in primary worktree; 11 FLYWHEEL-STATE commits durable-local. They'll rebase cleanly when PAN-2516 is fixed or a janitor commits the specs. Not forcing.
+- HOLDS + 2 operator questions (PAN-1520) unchanged. B6/PAN-2270 queued behind B5.
+
 ## RUN-60 tick 17 (2026-07-09) — PAN-2510 CLOSED ✓; B5/PAN-2360 finalize→autostart GAP (2nd occurrence) → re-started work agent; push still blocked
 
 - **PAN-2510 fully CLOSED** ✓ (closed-out label, journal terminal, review cleared). Operator docker-leak fix done end-to-end.
