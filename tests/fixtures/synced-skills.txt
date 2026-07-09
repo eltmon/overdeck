@@ -49,6 +49,7 @@ pan-help
 pan-install
 pan-issues
 pan-kill
+pan-knowledge
 pan-logs
 pan-map
 pan-memory

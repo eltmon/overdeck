@@ -63,7 +63,7 @@ async function readOptional(p: string): Promise<string | null> {
 
 function mapSessionType(type: string): SessionNodeType {
   const validTypes: SessionNodeType[] = [
-    'planning', 'work', 'strike', 'review', 'reviewer', 'test', 'merge', 'legacy',
+    'planning', 'work', 'knowledge', 'strike', 'review', 'reviewer', 'test', 'merge', 'legacy',
   ];
   return (validTypes.includes(type as SessionNodeType) ? type : 'legacy') as SessionNodeType;
 }
@@ -206,11 +206,12 @@ async function collectSessionTreeNodes(
   const agentId = `agent-${issueLower}`;
   const planningAgentId = `planning-${issueLower}`;
   const strikeAgentId = `strike-${issueLower}`;
+  const knowledgeAgentId = `agent-${issueLower}-knowledge`;
   const slotWorkSessionPattern = getSlotWorkSessionPattern(issueLower);
   const sections: SessionNode[] = [];
   let hasPlanningSection = false;
 
-  const candidateSessionIds = new Set<string>([planningAgentId, agentId, strikeAgentId]);
+  const candidateSessionIds = new Set<string>([planningAgentId, agentId, strikeAgentId, knowledgeAgentId]);
   const agentEntries = await readdir(agentsDir, { withFileTypes: true }).catch(() => []);
 
   for (const entry of agentEntries) {
@@ -235,7 +236,13 @@ async function collectSessionTreeNodes(
     try {
       const isPlanning = checkId.startsWith('planning-');
       const isStrike = checkId.startsWith('strike-');
-      const sectionType = isPlanning ? 'planning' : isStrike ? 'strike' : 'work';
+      const sectionType: SessionNodeType = isPlanning
+        ? 'planning'
+        : isStrike
+          ? 'strike'
+          : state.role === 'knowledge'
+            ? 'knowledge'
+            : 'work';
       if (isPlanning) hasPlanningSection = true;
       const rtState = await Effect.runPromise(getAgentRuntimeState(checkId));
       const presence = await deriveSessionPresence(checkId, rtState, context.tmuxSessionNames);
@@ -250,7 +257,7 @@ async function collectSessionTreeNodes(
       sections.push({
         type: sectionType,
         sessionId: checkId,
-        tmuxSession: sectionType === 'work' || sectionType === 'planning' || sectionType === 'strike' ? checkId : undefined,
+        tmuxSession: sectionType === 'work' || sectionType === 'planning' || sectionType === 'strike' || sectionType === 'knowledge' ? checkId : undefined,
         model: state.model || 'unknown',
         startedAt: state.startedAt || new Date().toISOString(),
         endedAt: undefined,

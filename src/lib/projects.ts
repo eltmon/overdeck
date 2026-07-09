@@ -136,6 +136,8 @@ export interface ProjectConfig {
   specialists?: SpecialistConfig;
   /** Per-project auto-resume failure tracking and backoff overrides */
   autoResume?: Partial<AutoResumeConfig>;
+  /** Path to the project's OKF knowledge bundle. Relative paths resolve from the project path. */
+  knowledge_repo?: string;
   /** Per-project foreman/swarm settings. */
   swarm?: SwarmConfig;
   /**

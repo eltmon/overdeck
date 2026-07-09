@@ -228,7 +228,7 @@ function renderReadyForMergeFeature() {
 // ─── pickBestSession ──────────────────────────────────────────────────────────
 
 describe('isWorkOrSpecialistSession', () => {
-  it.each(['work', 'strike', 'planning', 'review', 'reviewer', 'test', 'ship', 'merge'])(
+  it.each(['work', 'knowledge', 'strike', 'planning', 'review', 'reviewer', 'test', 'ship', 'merge'])(
     'returns true for %s sessions',
     (type) => {
       expect(isWorkOrSpecialistSession({ type } as SessionNodeType)).toBe(true);

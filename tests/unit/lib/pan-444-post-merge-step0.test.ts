@@ -29,6 +29,7 @@ const { defaultExecAsync, mockExecAsync } = vi.hoisted(() => {
 });
 const mockCreateResetMarker = vi.hoisted(() => vi.fn(async (input: unknown) => ({ id: 'reset-1', ...(input as Record<string, unknown>) })));
 const mockSetReviewStatusSync = vi.hoisted(() => vi.fn());
+const mockLoadConfigSync = vi.hoisted(() => vi.fn(() => ({ config: { knowledge: { postMergeAutoRetro: false } } })));
 const mockIsGitHubAppConfigured = vi.hoisted(() => vi.fn(() => false));
 const mockListPullRequestsForHead = vi.hoisted(() => vi.fn(() => Effect.succeed([])));
 const mockExec = vi.hoisted(() => vi.fn((cmd: string, optionsOrCb?: any, maybeCb?: any) => {
@@ -136,6 +137,10 @@ vi.mock('../../../src/lib/review-status.js', () => ({
   getReviewStatusSync: vi.fn().mockReturnValue(null),
   setReviewStatus: vi.fn(),
   setReviewStatusSync: mockSetReviewStatusSync,
+}));
+
+vi.mock('../../../src/lib/config-yaml.js', () => ({
+  loadConfigSync: mockLoadConfigSync,
 }));
 
 vi.mock('../../../src/lib/memory/cli.js', () => ({

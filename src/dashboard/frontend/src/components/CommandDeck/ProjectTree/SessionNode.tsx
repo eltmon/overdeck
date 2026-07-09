@@ -5,6 +5,7 @@ import {
   CircleCheck,
   CircleX,
   Code2,
+  BookOpenCheck,
   Compass,
   Eye,
   FlaskConical,
@@ -203,6 +204,7 @@ interface SessionNodeProps {
 
 const TYPE_ICON: Record<string, LucideIcon> = {
   work: Code2,
+  knowledge: BookOpenCheck,
   strike: Zap,
   planning: Compass,
   review: Eye,
@@ -270,6 +272,7 @@ function deriveSessionLabel(session: SessionNodeType, _resolvedModel?: string | 
     case 'review': return 'Review';
     case 'reviewer': return session.role ? capitalize(session.role) : 'Reviewer';
     case 'work': return 'Work';
+    case 'knowledge': return 'Knowledge';
     case 'strike': return 'Strike';
     case 'planning': return 'Planning';
     case 'legacy': return 'Planning state';
@@ -286,6 +289,8 @@ function describeSessionPurpose(session: SessionNodeType): string {
   switch (session.type) {
     case 'work':
       return 'Implementation agent for this issue.';
+    case 'knowledge':
+      return 'Knowledge agent maintaining the OKF bundle for this issue.';
     case 'strike':
       return 'Drop-in implement-and-merge agent for this issue.';
     case 'planning':

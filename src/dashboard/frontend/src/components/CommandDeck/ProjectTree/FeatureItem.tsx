@@ -326,6 +326,7 @@ function formatRoleList(roles: readonly string[]): string {
 
 export function isWorkOrSpecialistSession(session: SessionNodeType): boolean {
   return session.type === 'work'
+    || session.type === 'knowledge'
     || session.type === 'strike'
     || session.type === 'planning'
     || session.type === 'review'
