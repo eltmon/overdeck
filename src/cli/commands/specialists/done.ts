@@ -164,14 +164,34 @@ export async function doneCommand(
   const status = setReviewStatusSync(normalizedIssueId, update);
 
   if (specialist === 'review' && (options.status === 'blocked' || options.status === 'failed')) {
+    // PAN-2518: the verdict is already durable (setReviewStatusSync above). Feedback
+    // delivery (PR comment, agent messaging, needs-you surfacing) is advisory and
+    // shells out to network + tmux, any of which can STALL. `pan admin specialists
+    // done` is run from inside the review agent's own session, so a hung delivery
+    // leaves that agent waiting on a never-returning command and the issue stalls
+    // in-review. Bound the whole step in wall-clock time so the CLI always exits;
+    // a missed comment/message is recovered by the deacon feedback janitor.
+    const FEEDBACK_DELIVERY_TIMEOUT_MS = 30_000;
     try {
       const { deliverReviewVerdictFeedback } = await import('../../../lib/cloister/review-verdict-feedback.js');
-      await Effect.runPromise(deliverReviewVerdictFeedback({
+      const delivery = Effect.runPromise(deliverReviewVerdictFeedback({
         issueId: normalizedIssueId,
         verdict: options.status,
         notes: options.notes,
         prUrl: status.prUrl,
       }));
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`feedback delivery timed out after ${FEEDBACK_DELIVERY_TIMEOUT_MS}ms`)),
+          FEEDBACK_DELIVERY_TIMEOUT_MS,
+        );
+      });
+      try {
+        await Promise.race([delivery, timeout]);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.warn(chalk.yellow(`Could not deliver review feedback: ${message}`));
