@@ -23,6 +23,8 @@ import { killSession, sessionExistsSync, listSessionNames } from './tmux.js';
 import { loadReviewStatuses } from './review-status.js';
 import { getLinearApiKey } from './lifecycle/types.js';
 import { POST_MERGE_RESIDUE_LABELS, WORKFLOW_LABELS } from './lifecycle/close-issue.js';
+import { findWorkspacePath } from './lifecycle/archive-planning.js';
+import { teardownWorkspaceDockerByNamePromise } from './workspace-manager/docker.js';
 import { extractNumberSync, extractPrefixSync, normalizeIssueIdSync } from './issue-id.js';
 
 const execAsync = promisify(exec);
@@ -289,15 +291,33 @@ const CLOSED_OUT_COLOR = '1d4ed8';async function executeCloseOutPromise(ctx: Clo
       }
     } catch { /* tmux server may not be running */ }
 
-    // Stop Docker containers
-    if (workspacePath && existsSync(workspacePath)) {
-      try {
-        const { stopWorkspaceDocker } = await import('./workspace-manager.js');
-        await Effect.runPromise(stopWorkspaceDocker(workspacePath, issueLower));
+    // Stop Docker containers (name-based, works even if workspace dir is gone)
+    try {
+      const teardownResult = await teardownWorkspaceDockerByNamePromise(issueLower);
+      if (teardownResult.networkRemoved) {
         cleaned = true;
-      } catch { /* Docker may not be running */ }
+        steps.push({
+          name: 'Docker stack removed',
+          status: 'passed',
+          message: `Stopped and removed Docker stack for ${issueLower}`,
+        });
+      } else {
+        steps.push({
+          name: 'Docker stack removed',
+          status: 'skipped',
+          message: `Warning: Docker network overdeck-feature-${issueLower}_devnet is still present; the closed-issue reaper will retry`,
+        });
+      }
+    } catch (err) {
+      steps.push({
+        name: 'Docker stack removed',
+        status: 'skipped',
+        message: `Warning: Docker teardown failed: ${(err as Error).message}; the closed-issue reaper will retry`,
+      });
+    }
 
-      // Remove git worktree
+    // Remove git worktree
+    if (workspacePath && existsSync(workspacePath)) {
       try {
         await execAsync(`git worktree remove "${workspacePath}" --force`, { cwd: ctx.projectPath });
         cleaned = true;
@@ -549,24 +569,6 @@ const CLOSED_OUT_COLOR = '1d4ed8';async function executeCloseOutPromise(ctx: Clo
   }
 
   return { success: true, issueId: ctx.issueId, steps };
-}
-
-/**
- * Find the workspace path for an issue.
- */
-function findWorkspacePath(projectPath: string, issueLower: string): string | null {
-  const workspacePath = join(projectPath, 'workspaces', issueLower);
-  if (existsSync(workspacePath)) return workspacePath;
-
-  // Try worktree-based path
-  const worktreePath = join(projectPath, '.worktrees', issueLower);
-  if (existsSync(worktreePath)) return worktreePath;
-
-  // Try feature branch naming convention
-  const featurePath = join(dirname(projectPath), `feature-${issueLower}`);
-  if (existsSync(featurePath)) return featurePath;
-
-  return null;
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────

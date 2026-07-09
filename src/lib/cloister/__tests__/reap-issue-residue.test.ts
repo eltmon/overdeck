@@ -9,6 +9,9 @@ const mocks = vi.hoisted(() => ({
   isBranchMerged: vi.fn(),
   killSession: vi.fn(() => Effect.void),
   listSessionNames: vi.fn(() => Effect.succeed([])),
+  teardownWorkspaceDockerByNamePromise: vi.fn(() =>
+    Promise.resolve({ networkRemoved: true, steps: ['Stopped Docker stack'] }),
+  ),
   agentsDir: '',
 }));
 
@@ -27,6 +30,10 @@ vi.mock('../../close-out.js', () => ({
 vi.mock('../../tmux.js', () => ({
   killSession: mocks.killSession,
   listSessionNames: mocks.listSessionNames,
+}));
+
+vi.mock('../../workspace-manager/docker.js', () => ({
+  teardownWorkspaceDockerByNamePromise: mocks.teardownWorkspaceDockerByNamePromise,
 }));
 
 vi.mock('../../paths.js', () => ({
@@ -50,6 +57,10 @@ describe('reapIssueResidue', () => {
     vi.clearAllMocks();
     mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
     mocks.isBranchMerged.mockResolvedValue({ status: 'merged', message: 'merged' });
+    mocks.teardownWorkspaceDockerByNamePromise.mockResolvedValue({
+      networkRemoved: true,
+      steps: ['Stopped Docker stack'],
+    });
     mocks.exec.mockImplementation((command: string, opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
       const cb = typeof opts === 'function' ? opts : callback;
       if (command.startsWith('git worktree remove')) {
@@ -117,8 +128,38 @@ describe('reapIssueResidue', () => {
     const first = await reapIssueResidue(projectPath, 'PAN-2054');
     const second = await reapIssueResidue(projectPath, 'PAN-2054');
 
-    expect(first).toEqual([]);
-    expect(second).toEqual([]);
+    expect(first).toEqual(second);
+    expect(first).toContain('removed Docker stack overdeck-feature-pan-2054');
+  });
+
+  it('invokes name-based Docker teardown for a merged issue', async () => {
+    mocks.isBranchMerged.mockResolvedValue({ status: 'merged', message: 'merged' });
+
+    const actions = await reapIssueResidue(projectPath, 'PAN-2054');
+
+    expect(mocks.teardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith('pan-2054');
+    expect(actions.some((action) => action.includes('removed Docker stack overdeck-feature-pan-2054'))).toBe(true);
+  });
+
+  it('records a warning when the Docker network is still present', async () => {
+    mocks.isBranchMerged.mockResolvedValue({ status: 'merged', message: 'merged' });
+    mocks.teardownWorkspaceDockerByNamePromise.mockResolvedValue({
+      networkRemoved: false,
+      steps: ['network still present'],
+    });
+
+    const actions = await reapIssueResidue(projectPath, 'PAN-2054');
+
+    expect(actions.some((action) => action.includes('Docker network overdeck-feature-pan-2054_devnet still present'))).toBe(true);
+  });
+
+  it('does not invoke Docker teardown when the branch is unmerged', async () => {
+    mocks.isBranchMerged.mockResolvedValue({ status: 'unmerged', message: 'not merged' });
+
+    const actions = await reapIssueResidue(projectPath, 'PAN-2054');
+
+    expect(mocks.teardownWorkspaceDockerByNamePromise).not.toHaveBeenCalled();
+    expect(actions.some((action) => action.includes('unmerged'))).toBe(true);
   });
 
   it('does not use execSync', () => {

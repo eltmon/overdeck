@@ -6,6 +6,7 @@ import { promisify } from 'util';
 import chalk from 'chalk';
 import { Effect } from 'effect';
 import { ProcessSpawnError } from '../errors.js';
+import { isStatePlaneOnlyStatus } from '../state-plane.js';
 import { getVBriefACStatusSync, syncBeadStatusToVBrief } from '../vbrief/beads.js';
 import { runTestRequirementCheck } from './test-requirement-gate.js';
 
@@ -127,17 +128,28 @@ async function listBeadsByStatus(
     lines.push(`    - ${id} ${task}`);
   }
   return lines;
-}async function checkUncommittedChangesPromise(workspacePath: string): Promise<string[]> {
+}
+
+function getNonStatePlaneStatusLines(porcelain: string): string[] {
+  return porcelain
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .filter(Boolean)
+    .filter((line) => !isStatePlaneOnlyStatus(line));
+}
+
+async function checkUncommittedChangesPromise(workspacePath: string): Promise<string[]> {
   const hasTopLevelGit = existsSync(join(workspacePath, '.git'));
 
   if (hasTopLevelGit) {
     // Monorepo — single git status check
     try {
       const { stdout } = await execAsync('git status --porcelain', { cwd: workspacePath });
-      if (!stdout.trim()) return [];
+      const nonStatePlaneLines = getNonStatePlaneStatusLines(stdout);
+      if (nonStatePlaneLines.length === 0) return [];
 
       const lines: string[] = ['  Uncommitted changes:'];
-      for (const line of stdout.trim().split('\n')) {
+      for (const line of nonStatePlaneLines) {
         lines.push(`    ${line}`);
       }
       return lines;
@@ -156,9 +168,10 @@ async function listBeadsByStatus(
 
         try {
           const { stdout } = await execAsync('git status --porcelain', { cwd: subPath });
-          if (stdout.trim()) {
+          const nonStatePlaneLines = getNonStatePlaneStatusLines(stdout);
+          if (nonStatePlaneLines.length > 0) {
             failures.push(`  Uncommitted changes in ${entry.name}/:`);
-            for (const line of stdout.trim().split('\n')) {
+            for (const line of nonStatePlaneLines) {
               failures.push(`    ${line}`);
             }
           }

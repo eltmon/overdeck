@@ -7,6 +7,7 @@ import { Effect } from 'effect';
 import { isBranchMerged } from '../close-out.js';
 import { AGENTS_DIR } from '../paths.js';
 import { killSession, listSessionNames } from '../tmux.js';
+import { teardownWorkspaceDockerByNamePromise } from '../workspace-manager/docker.js';
 
 const execAsync = promisify(exec);
 
@@ -44,6 +45,18 @@ export async function reapIssueResidue(projectPath: string, issueId: string): Pr
   if (merged.status === 'unmerged') {
     actions.push(`skipped reap for ${issueId} — branch unmerged`);
     return actions;
+  }
+
+  // Remove Docker stack by name, independent of whether the workspace dir still exists.
+  try {
+    const teardownResult = await teardownWorkspaceDockerByNamePromise(issueLower);
+    if (teardownResult.networkRemoved) {
+      actions.push(`removed Docker stack overdeck-feature-${issueLower}`);
+    } else {
+      actions.push(`Docker network overdeck-feature-${issueLower}_devnet still present`);
+    }
+  } catch (err) {
+    actions.push(`Docker teardown failed for ${issueId}: ${(err as Error).message}`);
   }
 
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
