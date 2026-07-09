@@ -80,6 +80,43 @@ export function spawnGuardrailResourcesHint(hint?: string): string {
   return hint ? `${hint} ${resourcesHint}` : resourcesHint;
 }
 
+/**
+ * Count materialized beads for an issue by shelling out to `bd list`.
+ *
+ * Returns 0 on ANY bd failure — non-zero exit (e.g. bd refusing with "Linear
+ * data has never been pulled"), an unparseable JSON body, or the 10s timeout.
+ * The caller treats 0 as "no beads yet" and falls through to auto-recovery
+ * (createBeadsFromVBrief) and, failing that, a clean 422 `beads_required`.
+ *
+ * The failure is folded into the success channel with `Effect.matchCause`. A
+ * bare `try/catch` around `yield* withBdMutex(...)` does NOT work: withBdMutex
+ * converts the child-process rejection into an Effect error-channel failure
+ * (via its internal `Effect.tryPromise`), which short-circuits the fiber and is
+ * invisible to a JS `try/catch`. Before this helper, that escaped as an
+ * unhandled 500 on POST /api/agents instead of the designed 422.
+ */
+export const countBeadsForIssue = (
+  workspacePath: string,
+  issueLower: string,
+): Effect.Effect<number, never> =>
+  withBdMutex(() => Effect.promise(() => execFileAsync(
+    'bd',
+    ['list', '--json', '-l', issueLower, '--status', 'all', '--limit', '0'],
+    { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 },
+  ))).pipe(
+    Effect.matchCause({
+      onFailure: () => 0,
+      onSuccess: ({ stdout }) => {
+        try {
+          const bdTasks = JSON.parse(stdout.trim() || '[]');
+          return Array.isArray(bdTasks) ? bdTasks.length : 0;
+        } catch {
+          return 0;
+        }
+      },
+    }),
+  );
+
 // ─── Route: POST /api/agents (start agent) ───────────────────────────────────
 
 export const postAgentsRoute = HttpRouter.add(
@@ -276,21 +313,14 @@ export const postAgentsRoute = HttpRouter.add(
       }, { status: 422 });
     }
 
-    let hasBeads = false;
-    let beadCount = 0;
-    try {
-      const { stdout: bdOutput } = yield* withBdMutex(() => Effect.promise(() => execFileAsync(
-        'bd',
-        ['list', '--json', '-l', issueLower, '--status', 'all', '--limit', '0'],
-        { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 },
-      )));
-      const bdTasks = JSON.parse(bdOutput.trim() || '[]');
-      beadCount = Array.isArray(bdTasks) ? bdTasks.length : 0;
-      hasBeads = beadCount > 0;
-      if (planItemCount !== null && planItemCount > 0 && beadCount !== planItemCount) {
-        hasBeads = false;
-      }
-    } catch {}
+    // countBeadsForIssue swallows all bd failures into 0 — a bd error here (e.g.
+    // "Linear data has never been pulled" exiting non-zero) must fall through to
+    // auto-recovery + a clean 422, never escape as an unhandled 500.
+    let beadCount = yield* countBeadsForIssue(workspacePath, issueLower);
+    let hasBeads = beadCount > 0;
+    if (planItemCount !== null && planItemCount > 0 && beadCount !== planItemCount) {
+      hasBeads = false;
+    }
 
     let recoveryError: string | null = null;
     if (!hasBeads) {
