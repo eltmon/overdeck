@@ -29,7 +29,7 @@ import styles from '../CommandDeck/styles/command-deck.module.css';
  */
 const HARNESS_DEFAULT_MODEL: Record<Harness, string> = {
   'claude-code': 'claude-sonnet-5',
-  'ohmypi': 'gpt-5.5',
+  'ohmypi': 'gpt-5.6-sol',
   'codex': 'codex-4o',
 };
 
@@ -140,6 +140,9 @@ const FALLBACK_GROUPS: ModelGroup[] = [
     provider: 'openai',
     label: 'OpenAI',
     models: [
+      { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
+      { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
+      { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
       { id: 'gpt-5.5', label: 'GPT-5.5', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
       { id: 'gpt-5.4', label: 'GPT-5.4', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
     ],

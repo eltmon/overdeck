@@ -45,7 +45,7 @@ agent's last real action, and is it moving its bead forward?*
 | --- | --- | --- |
 | tool calls / edits / `Working (…)` advancing its bead | **progressing** | none |
 | `pan done … completed`, `Slot N work complete`, review "passed/blocked" verdict signaled | **done** | let it flow; if verdict blocked, its work agent should be fixing findings |
-| `Pane is dead (status …)` / `token_revoked` / `refresh token was revoked` | **dead** | one stale agent, not fleet-wide — confirm codex fleet with `codex login status` + `codex doctor` (gpt-5.5 = **codex** harness, auth `~/.codex/auth.json`, NOT ohmypi); then kill/restart the dead one |
+| `Pane is dead (status …)` / `token_revoked` / `refresh token was revoked` | **dead** | one stale agent, not fleet-wide — confirm codex fleet with `codex login status` + `codex doctor` (gpt-5.5 and the gpt-5.6 family = **codex** harness, auth `~/.codex/auth.json`, NOT ohmypi); then kill/restart the dead one |
 | `OVERDECK_SPECIALIST_RESULT: review-agent failed` **but** a verdict was produced | **FALSE failure** — verify in `overdeck.db` `review_status` (NOT stale `panopticon.db`) before believing it | fix the signal (substrate), don't re-dispatch blindly |
 | POST error e.g. `Effect.catchAll is not a function`, `Project not found for PAN-x`, `Dashboard POST failed` | **substrate bug** blocking status/verdict recording (verdict artifact may be journaled for recovery) | file + root-fix the endpoint/resolver |
 | looping on `Deacon: container … crashed and was auto-restarted (attempt 1/5)` duplicates | **container crash-loop and/or duplicate-notification spam** distracting the agent | root-cause the crashing workspace container + the notification dedup |

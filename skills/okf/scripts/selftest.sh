@@ -122,7 +122,7 @@ with tempfile.TemporaryDirectory() as tmp:
             "codex",
             "exec",
             "-m",
-            "gpt-5.5",
+            "gpt-5.6-sol",
             "--sandbox",
             "workspace-write",
             "--output-last-message",
@@ -140,7 +140,7 @@ with tempfile.TemporaryDirectory() as tmp:
     assert recorded == [[
         "exec",
         "-m",
-        "gpt-5.5",
+        "gpt-5.6-sol",
         "--sandbox",
         "workspace-write",
         "--output-last-message",

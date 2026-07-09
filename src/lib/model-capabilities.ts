@@ -482,6 +482,75 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     notes: 'Most advanced OpenAI model. Enhanced reasoning and agentic capabilities over GPT-5.4. Pro subscribers only.',
   },
 
+  'gpt-5.6-sol': {
+    model: 'gpt-5.6-sol',
+    provider: 'openai',
+    displayName: 'GPT-5.6 Sol',
+    costPer1MTokens: 17.5, // $5.00 in / $30.00 out
+    contextWindow: CLIPROXY_CODEX_CONTEXT_WINDOW,
+    minTier: 'plus',
+    skills: {
+      'code-generation': 98,
+      'code-review': 95,
+      debugging: 97,
+      planning: 96,
+      documentation: 93,
+      testing: 95,
+      security: 92,
+      performance: 93,
+      synthesis: 95,
+      speed: 65,
+      'context-length': 95,
+    },
+    notes: 'OpenAI flagship (July 2026). New default. Successor to GPT-5.5 with improved agentic/shell coding. Effective Claude Code/CLIProxy ceiling is 150K (CLIPROXY_CODEX_CONTEXT_WINDOW), 1M marketing context.',
+  },
+
+  'gpt-5.6-terra': {
+    model: 'gpt-5.6-terra',
+    provider: 'openai',
+    displayName: 'GPT-5.6 Terra',
+    costPer1MTokens: 8.75, // $2.50 in / $15.00 out
+    contextWindow: CLIPROXY_CODEX_CONTEXT_WINDOW,
+    minTier: 'plus',
+    skills: {
+      'code-generation': 97,
+      'code-review': 94,
+      debugging: 96,
+      planning: 95,
+      documentation: 92,
+      testing: 94,
+      security: 91,
+      performance: 92,
+      synthesis: 94,
+      speed: 70,
+      'context-length': 95,
+    },
+    notes: 'OpenAI balanced tier (July 2026). GPT-5.5-competitive at roughly half the cost. Effective Claude Code/CLIProxy ceiling is 150K (CLIPROXY_CODEX_CONTEXT_WINDOW), 1M marketing context.',
+  },
+
+  'gpt-5.6-luna': {
+    model: 'gpt-5.6-luna',
+    provider: 'openai',
+    displayName: 'GPT-5.6 Luna',
+    costPer1MTokens: 3.5, // $1.00 in / $6.00 out
+    contextWindow: CLIPROXY_CODEX_CONTEXT_WINDOW,
+    minTier: 'plus',
+    skills: {
+      'code-generation': 82,
+      'code-review': 78,
+      debugging: 76,
+      planning: 72,
+      documentation: 80,
+      testing: 76,
+      security: 68,
+      performance: 72,
+      synthesis: 75,
+      speed: 90,
+      'context-length': 90,
+    },
+    notes: "OpenAI fastest/cheapest tier (July 2026). Successor to GPT-5.4 Mini's market position. Effective Claude Code/CLIProxy ceiling is 150K (CLIPROXY_CODEX_CONTEXT_WINDOW), 1M marketing context.",
+  },
+
   'gpt-5.5': {
     model: 'gpt-5.5',
     provider: 'openai',

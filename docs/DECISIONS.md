@@ -79,8 +79,8 @@ pickup via `isAutoPickable` in `src/lib/backlog/pickup.ts`. This registry gives 
   Source: `docs/CODEBASE-HEALTH-ROADMAP.md` red-main incident; this session.
 
 - **TENET-11 — Harness routing.** Never force `--harness claude-code` on a CLIProxy-routed model
-  (kimi/gpt-5.5/glm); trust provider defaults (kimi→ohmypi, gpt-5.5→codex, claude-*→claude-code).
-  The 200k-window illusion deadlocks long sessions. Source: PAN-1865; `sync-sources/rules/`.
+  (kimi/gpt-5.5/gpt-5.6/glm); trust provider defaults (kimi→ohmypi, gpt-5.5/gpt-5.6→codex,
+  claude-*→claude-code). The 200k-window illusion deadlocks long sessions. Source: PAN-1865; `sync-sources/rules/`.
 
 - **TENET-12 — No hardcoded model fallback.** Model resolution comes from explicit settings or
   fails loudly — never a code-literal default. Source: `sync-sources/rules/` model-fallback rule.

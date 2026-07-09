@@ -22,7 +22,7 @@ Write or update one concept.
 
 ```bash
 /okf author "invoice status lifecycle"
-/okf author "retry policy" --model gpt-5.5
+/okf author "retry policy" --model gpt-5.6-sol
 ```
 
 - Uses the concept template.
@@ -50,7 +50,7 @@ Update concepts from diffs.
 ```bash
 /okf sync
 /okf sync --topic "billing retries"
-/okf sync --topic "billing retries" --model gpt-5.5
+/okf sync --topic "billing retries" --model gpt-5.6-sol
 ```
 
 - Derives a change range from log history, PR base, or user context.
@@ -77,7 +77,7 @@ Capture knowledge after implementation.
 
 ```bash
 /okf retro
-/okf retro --model gpt-5.5
+/okf retro --model gpt-5.6-sol
 ```
 
 - Reviews the diff and available session context.

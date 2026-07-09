@@ -522,7 +522,7 @@ export async function fetchActivityDataWithContext(
         const orchestratorJsonlPath = await resolveJsonlPath(orchestratorSessionName, workspacePath);
         // PAN-1832: surface the ACTUAL review agent's model/harness (e.g. after a
         // restart onto pi/glm-5.2) instead of a hardcoded 'specialist' label that
-        // the frontend then back-fills with the role-default model (gpt-5.5).
+        // the frontend then back-fills with the role-default model (gpt-5.6-sol).
         const orchestratorState = getAgentStateSync(orchestratorSessionName);
         sections.push({
           type: 'review',

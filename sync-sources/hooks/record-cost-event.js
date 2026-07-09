@@ -12736,6 +12736,30 @@ const DEFAULT_PRICING = [
 	},
 	{
 		provider: "openai",
+		model: "gpt-5.6-sol",
+		inputPer1k: .005,
+		outputPer1k: .03,
+		cacheReadPer1k: 5e-4,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
+		model: "gpt-5.6-terra",
+		inputPer1k: .0025,
+		outputPer1k: .015,
+		cacheReadPer1k: 25e-5,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
+		model: "gpt-5.6-luna",
+		inputPer1k: .001,
+		outputPer1k: .006,
+		cacheReadPer1k: 1e-4,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
 		model: "gpt-5.5",
 		inputPer1k: .005,
 		outputPer1k: .03,
@@ -25579,6 +25603,24 @@ function resolveModelIdSync(modelId) {
 	return MODEL_DEPRECATIONS[modelId] || modelId;
 }
 /**
+* Conservative effective ceiling for Codex/ChatGPT subscription models routed
+* through CLIProxy into Claude Code. Claude Code's native auto-compact path does
+* not know the proxied model's larger marketing window; the harness status line
+* reports a 200.0k budget for gpt-5.5 sessions, and PAN-1615 observed hard
+* `input exceeds the context window` 400s instead of a native pre-ceiling
+* compaction. See the context-overflow recovery note in
+* `src/lib/cloister/deacon.ts` for why the deacon owns this recovery path.
+*
+* PAN-1672: 200k is gpt-5.5's *marketing* window, not its effective one via
+* CLIProxy — the backend 400s with `input exceeds the context window` well
+* before 85% of 200k (≈170k) is reached, so proactive compaction (keyed to this
+* budget at CONTEXT_PROACTIVE_COMPACT_HIGH_WATER_PERCENT) never fires in time
+* and agents hard-wedge. Set a conservative effective ceiling so the 85%
+* high-water (≈127.5k) lands comfortably below the real failure zone. Tune up
+* if gpt-5.5's true CLIProxy window is later measured to be higher.
+*/
+const CLIPROXY_CODEX_CONTEXT_WINDOW = 15e4;
+/**
 * Master capability database
 *
 * Scores are based on:
@@ -25904,12 +25946,78 @@ const MODEL_CAPABILITIES = {
 		},
 		notes: "Most advanced OpenAI model. Enhanced reasoning and agentic capabilities over GPT-5.4. Pro subscribers only."
 	},
+	"gpt-5.6-sol": {
+		model: "gpt-5.6-sol",
+		provider: "openai",
+		displayName: "GPT-5.6 Sol",
+		costPer1MTokens: 17.5,
+		contextWindow: CLIPROXY_CODEX_CONTEXT_WINDOW,
+		minTier: "plus",
+		skills: {
+			"code-generation": 98,
+			"code-review": 95,
+			debugging: 97,
+			planning: 96,
+			documentation: 93,
+			testing: 95,
+			security: 92,
+			performance: 93,
+			synthesis: 95,
+			speed: 65,
+			"context-length": 95
+		},
+		notes: "OpenAI flagship (July 2026). New default. Successor to GPT-5.5 with improved agentic/shell coding. Effective Claude Code/CLIProxy ceiling is 150K (CLIPROXY_CODEX_CONTEXT_WINDOW), 1M marketing context."
+	},
+	"gpt-5.6-terra": {
+		model: "gpt-5.6-terra",
+		provider: "openai",
+		displayName: "GPT-5.6 Terra",
+		costPer1MTokens: 8.75,
+		contextWindow: CLIPROXY_CODEX_CONTEXT_WINDOW,
+		minTier: "plus",
+		skills: {
+			"code-generation": 97,
+			"code-review": 94,
+			debugging: 96,
+			planning: 95,
+			documentation: 92,
+			testing: 94,
+			security: 91,
+			performance: 92,
+			synthesis: 94,
+			speed: 70,
+			"context-length": 95
+		},
+		notes: "OpenAI balanced tier (July 2026). GPT-5.5-competitive at roughly half the cost. Effective Claude Code/CLIProxy ceiling is 150K (CLIPROXY_CODEX_CONTEXT_WINDOW), 1M marketing context."
+	},
+	"gpt-5.6-luna": {
+		model: "gpt-5.6-luna",
+		provider: "openai",
+		displayName: "GPT-5.6 Luna",
+		costPer1MTokens: 3.5,
+		contextWindow: CLIPROXY_CODEX_CONTEXT_WINDOW,
+		minTier: "plus",
+		skills: {
+			"code-generation": 82,
+			"code-review": 78,
+			debugging: 76,
+			planning: 72,
+			documentation: 80,
+			testing: 76,
+			security: 68,
+			performance: 72,
+			synthesis: 75,
+			speed: 90,
+			"context-length": 90
+		},
+		notes: "OpenAI fastest/cheapest tier (July 2026). Successor to GPT-5.4 Mini's market position. Effective Claude Code/CLIProxy ceiling is 150K (CLIPROXY_CODEX_CONTEXT_WINDOW), 1M marketing context."
+	},
 	"gpt-5.5": {
 		model: "gpt-5.5",
 		provider: "openai",
 		displayName: "GPT-5.5",
 		costPer1MTokens: 10.5,
-		contextWindow: 15e4,
+		contextWindow: CLIPROXY_CODEX_CONTEXT_WINDOW,
 		minTier: "plus",
 		skills: {
 			"code-generation": 97,
@@ -26896,6 +27004,9 @@ const PROVIDERS = {
 		compatibility: "direct",
 		defaultHarness: "codex",
 		models: [
+			"gpt-5.6-sol",
+			"gpt-5.6-terra",
+			"gpt-5.6-luna",
 			"gpt-5.5",
 			"gpt-5.4",
 			"gpt-5.4-mini",
@@ -26904,7 +27015,7 @@ const PROVIDERS = {
 			"gpt-5.2"
 		],
 		tierModels: {
-			opus: "gpt-5.5",
+			opus: "gpt-5.6-sol",
 			sonnet: "gpt-5.4",
 			haiku: "gpt-5.4-mini"
 		},
@@ -27178,6 +27289,9 @@ function getProviderForModelSync(modelId) {
 		"claude-haiku-4-5"
 	].includes(modelId)) return PROVIDERS.anthropic;
 	if ([
+		"gpt-5.6-sol",
+		"gpt-5.6-terra",
+		"gpt-5.6-luna",
 		"gpt-5.5",
 		"gpt-5.4",
 		"gpt-5.4-mini",
@@ -27245,18 +27359,23 @@ const OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK = {
 	allowed: false,
 	reason: "ohmypi cannot run Anthropic models when authenticated via Claude Code subscription. Switch the Anthropic provider to API-key auth, or pick a non-Anthropic model for ohmypi."
 };
-const GPT_5_5_API_KEY_BLOCK = {
+const SUBSCRIPTION_ONLY_MODEL_BLOCK = {
 	allowed: false,
-	reason: "GPT-5.5 needs a ChatGPT/Codex subscription sign-in — it is not served by the plain OpenAI API key. Run `codex login` on the host (workspace containers inherit the host sign-in), or pick a different model."
+	reason: "This OpenAI model needs a ChatGPT/Codex subscription sign-in — it is not served by the plain OpenAI API key. Run `codex login` on the host (workspace containers inherit the host sign-in), or pick a different model."
 };
 /** Models that are gated to ChatGPT subscription auth only (no API-key path). */
-const SUBSCRIPTION_ONLY_OPENAI_MODELS = new Set(["gpt-5.5"]);
+const SUBSCRIPTION_ONLY_OPENAI_MODELS = new Set([
+	"gpt-5.5",
+	"gpt-5.6-sol",
+	"gpt-5.6-terra",
+	"gpt-5.6-luna"
+]);
 /**
 * Check whether a (model, authMode) pair is allowed, independent of harness.
 * Use this in pickers to lock model options that the current auth setup can't reach.
 */
 function canUseModelWithAuthSync(model, authMode) {
-	if (getProviderForModelSync(model).name === "openai" && SUBSCRIPTION_ONLY_OPENAI_MODELS.has(model) && authMode === "api-key") return GPT_5_5_API_KEY_BLOCK;
+	if (getProviderForModelSync(model).name === "openai" && SUBSCRIPTION_ONLY_OPENAI_MODELS.has(model) && authMode === "api-key") return SUBSCRIPTION_ONLY_MODEL_BLOCK;
 	return ALLOWED;
 }
 function canUseHarnessSync(harness, model, authMode) {
