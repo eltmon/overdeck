@@ -23,6 +23,7 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { parseIssueIdSync, extractPrefixSync } from '../../../../lib/issue-id.js';
+import { findWorkspacePath } from '../../../../lib/lifecycle/archive-planning.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import {
   getReviewStatusSync,
@@ -304,11 +305,13 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
             const wsInfo = getWorkspaceInfoForIssue(issueId);
             const issueLower = issueId.toLowerCase();
             const numericSuffix = issueLower.replace(/^[a-z]+-/, '');
-            // Use numeric-suffix form (feature/1034) as canonical branch name
-            const branchName = `feature/${numericSuffix}`;
             const wsPath =
               wsInfo.localPath ||
+              findWorkspacePath(resolved.projectPath, issueLower) ||
               join(resolved.projectPath, 'workspaces', `feature-${numericSuffix}`);
+            const branchName = wsPath.endsWith('-strike')
+              ? `strike/${issueLower}`
+              : `feature/${numericSuffix}`;
 
             const result = await Effect.runPromise(spawnReviewRoleForIssue({
               issueId,
