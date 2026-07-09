@@ -103,4 +103,22 @@ describe('haveSameCodeContribution (PAN-2468 rebase-tolerant review guard)', () 
     const reviewedTip = makeFeature();
     expect(await haveSameCodeContribution(repo, reviewedTip, reviewedTip, 'origin/nonexistent')).toBe(false);
   });
+
+  it('treats two heads whose contributions are both state-only as identical', async () => {
+    // Branch with ONLY state-plane commits: the code contribution is empty on
+    // both sides — the empty-diff sentinel must compare equal, not null-out.
+    git(repo, 'checkout', '-b', 'feature/state-only', 'main');
+    mkdirSync(join(repo, '.pan', 'records'), { recursive: true });
+    writeFileSync(join(repo, '.pan', 'records', 'r.json'), '{"a":1}');
+    git(repo, 'add', '.pan');
+    git(repo, 'commit', '-m', 'chore: record state');
+    const tipA = git(repo, 'rev-parse', 'HEAD');
+
+    writeFileSync(join(repo, '.pan', 'records', 'r.json'), '{"a":2}');
+    git(repo, 'add', '.pan');
+    git(repo, 'commit', '-m', 'chore: record more state');
+    const tipB = git(repo, 'rev-parse', 'HEAD');
+
+    expect(await haveSameCodeContribution(repo, tipA, tipB, 'main')).toBe(true);
+  });
 });

@@ -156,7 +156,10 @@ async function gitStdout(workspacePath: string, args: string[]): Promise<string>
   const result = await execFileAsync(
     'git',
     args,
-    { cwd: workspacePath, encoding: 'utf-8' },
+    // 64 MiB: codeContributionPatchId feeds full contribution diffs through
+    // here; the 1 MiB default would throw on large branches and silently
+    // downgrade the benign-rebase guard to a reset (PAN-2468).
+    { cwd: workspacePath, encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 },
   ) as unknown;
   if (typeof result === 'string') return result;
   return String((result as { stdout?: unknown }).stdout ?? '');
