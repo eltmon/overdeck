@@ -4,17 +4,17 @@
     "created": "2026-07-09T00:40:41Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2360: reconcile strike .pan/kickoff.md template with roles/strike.md (stop instructing merge/push main + pan done)",
-    "updated": "2026-07-09T00:52:34.622Z"
+    "updated": "2026-07-09T02:33:01.980Z"
   },
   "plan": {
     "id": "pan-2360",
     "title": "bug(strike): .pan/kickoff.md contract conflicts with roles/strike.md (merge/push main + pan done vs forbidden)",
-    "status": "running",
+    "status": "completed",
     "uid": "15b33ea0-c80d-4f28-ae41-154484e1f442",
     "author": "agent:claude-opus-4-8",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-09T00:40:41Z",
-    "updated": "2026-07-09T00:52:34.622Z",
+    "updated": "2026-07-09T02:33:01.980Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2360",
@@ -187,5 +187,5 @@
       "canonicalFilename": "2026-07-09-PAN-2360-bug-strike-pan-kickoff-md-contract-conflicts-with-roles-strike-md-merge-push-main-pan-done-vs-forbidden.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
