@@ -207,6 +207,20 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-60 tick 44 (2026-07-09) — 🏁 ORDER-BOOK CI/CD×REFACTOR DRAIN COMPLETE — B6/PAN-2270 MERGED (e8569c0276); all four Lane-B items landed + closed
+
+- **B6/PAN-2270 MERGED** (`e8569c0276 PAN-2270 (#2531)`) — the final order-book item. Merge endpoint returned `{"mergeStatus":"merged"}`; rebase→verify(9042/9101 root + 32/32 frontend)→squash→postMergeLifecycle all clean. Closing out (bg task bbndhdxd8). Review converged in 4 rounds (R1 review-control.ts strike-only reject → R2/R3 FR-5 test iterations → R4 correct dispatch-branch assertion via buildReviewRedispatchArgs → APPROVED). Fix: `inferBranchFromWorkspace` helper applied at 4 hardcoded deacon review-dispatch sites + review-control rerun path, so strike-origin PRs become reviewable.
+- **🏁 ORDER-BOOK DRAIN COMPLETE (RUN-59 brief).** All four Lane-B items merged + closed:
+  - B3/PAN-2167 (state-plane dirty-gates) — merged via operator UAT-promote
+  - B4/PAN-2359 (+PAN-2363 pair) — merged
+  - B5/PAN-2360 (+PAN-2300 pair) — merged via operator UAT-promote
+  - B6/PAN-2270 — merged (this tick)
+- **Substrate fixes landed on main during the drain:** PAN-2510 (docker close-out leak), PAN-2518 (bounded review-verdict delivery), PAN-2519 (kill+respawn wedged rework agents), PAN-2520 (auto rebuild-and-start on stack-unhealthy), PAN-2521 (codex rate-limit nudge suppression), + strike PAN-2525 (red-main deacon.ts baseline + review-verdict-feedback stale mock).
+- **Substrate bugs FILED during the drain:** PAN-2511 (sandbox git-EPERM false test failures), PAN-2516 (primary-worktree spec/divergence drift — reconciled by operator via 778c83fe04), PAN-2522 (finalize→autostart gap, recurred on fresh server), PAN-2524 (review-verdict signal hang), PAN-2534 (re-review dispatch stalls on lingering idle review agent — NEW this drain).
+- **Mid-drain event:** operator caught the primary worktree 42-commit-diverged + live :3011 server STALE (pre-PAN-2510) → paused drain → operator reconciled primary→origin (778c83fe04) + fresh single-server redeploy (PID 3062648) → drain resumed on fresh substrate. Flywheel push restored (divergence 0/0).
+- **Main GREEN** (e8569c0276 CI in_progress at merge, expected green). Now HOLDING for operator direction (auto_pickup_backlog=false — NOT pulling backlog). Patrolling main-green + reaping zombies.
+- HOLD: 9-issue MIN pile (GitLab UAT hold, PAN-1696/2467) — operator-owned.
+
 ## RUN-60 tick 28 (2026-07-09) — ✅ RECONCILE+DEPLOY DONE (fresh server 3062648, 0/0 divergence, PAN-2518/19/20/21 live); DRAIN RESUMED — B6/PAN-2270 (LAST order-book item) auto-planning started; PAN-2525 closing out
 
 - **Operator completed reconcile+deploy.** Primary merged to origin (`778c83fe04`), 4 closed-issue record conflicts resolved to richer origin versions; typecheck + 98 tests green (incl. review-verdict test); fresh build + healthy restart. Verified: **single server PID 3062648 (22:46 EDT) owns :3011, health 200**; old stale PIDs (1051993/2475324) gone; **divergence 0/0**; deacon ACTIVE on new code (PAN-2510 docker close-out + PAN-2518/2519/2520/2521 + state-plane dirty-gates now LIVE). Lifecycle ops safe again.
