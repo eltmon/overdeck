@@ -5,6 +5,7 @@ import { Effect } from 'effect';
 import {
   buildSupervisorRestartArgs,
   createSupervisorRestartSpawner,
+  resolveBundledPanInvocation,
 } from '../restart-spawn.js';
 
 class FakeChild extends EventEmitter {
@@ -15,6 +16,15 @@ class FakeChild extends EventEmitter {
 }
 
 describe('supervisor restart spawner', () => {
+  it('resolves the bundled pan CLI without relying on daemon PATH', () => {
+    const invocation = resolveBundledPanInvocation('file:///opt/overdeck/dist/supervisor/restart-spawn.js');
+
+    expect(invocation).toEqual({
+      panBinary: process.execPath,
+      panArgsPrefix: ['/opt/overdeck/dist/cli/index.js'],
+    });
+  });
+
   it('spawns pan restart --dashboard with a 120s health timeout', async () => {
     const child = new FakeChild();
     const spawnFn = vi.fn(() => child as never);
