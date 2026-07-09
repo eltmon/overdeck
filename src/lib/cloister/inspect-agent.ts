@@ -61,7 +61,10 @@ export interface InspectContext {
   projectKey: string;
   projectPath: string;
   issueId: string;
+  /** Canonical vBRIEF item id being inspected. */
   beadId: string;
+  /** Original bd tracker id, when the caller passed one that differs from the vBRIEF item id. */
+  trackerBeadId?: string;
   workspace: string;
   branch?: string;
 }
@@ -116,7 +119,7 @@ async function buildInspectPromptPromise(context: InspectContext): Promise<strin
   const template = readFileSync(templatePath, 'utf-8');
 
   // Get bead description
-  const beadDescription = await getBeadDescription(context.beadId, context.workspace);
+  const beadDescription = await getBeadDescription(context.trackerBeadId ?? context.beadId, context.workspace);
 
   // Get diff scope
   const diffBase = await Effect.runPromise(getDiffBase(context.projectKey, context.issueId, context.workspace));
