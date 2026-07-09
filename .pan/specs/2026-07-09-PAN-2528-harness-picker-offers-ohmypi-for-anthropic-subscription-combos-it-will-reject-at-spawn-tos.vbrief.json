@@ -1,0 +1,396 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-09T03:39:03.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2528: Harness picker offers ohmypi for Anthropic+subscription combos it will reject at spawn (ToS)",
+    "updated": "2026-07-09T03:47:01.060Z"
+  },
+  "plan": {
+    "id": "pan-2528",
+    "title": "Harness picker offers ohmypi for Anthropic+subscription combos it will reject at spawn (ToS)",
+    "status": "proposed",
+    "uid": "a063c713-88d6-45f2-9d36-717897a129c7",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-07-09T03:39:03.000Z",
+    "updated": "2026-07-09T03:47:01.060Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2528",
+        "label": "PAN-2528",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "harness-policy",
+      "frontend",
+      "tos",
+      "model-picker"
+    ],
+    "narratives": {
+      "Problem": "The ohmypi + Anthropic-model + Claude-Code-subscription combination is forbidden by Claude Code subscription Terms of Service and is enforced only server-side at spawn time. No picker prevents the choice up front, and the client-side awareness that is wired is silently broken: GET /api/settings/harness-policy (src/dashboard/server/routes/settings.ts:1043-1047) keys the decision 'pi' computed via canUseHarnessSync('pi', model, authMode), but every picker looks up the 'ohmypi' key AND canUseHarnessSync('pi', ...) always returns ALLOWED (the ToS block lives only under harness==='ohmypi' in harness-policy.ts:86-92). So canUsePickerHarness('ohmypi', anthropicModel, policy) is always {allowed:true} and the auto-flip / 'ToS gated' branches never fire. Users can pick ohmypi for an Anthropic model under subscription in the pickers and get no visible feedback, or reach spawn and get a silent claude-code fallback with no explanation.",
+      "Proposal": "First fix the data contract: key the harness-policy decision 'ohmypi' and compute it with canUseHarnessSync('ohmypi', ...), extracting a pure testable helper. Then make each harness picker render a blocked ohmypi option as visibly disabled with an inline reason (not a hover-only title / silent auto-flip): chat/ModelPicker.tsx's harness section and the shared HarnessSelect. Reword the ToS block reason to plainly name a Claude Code subscription Terms of Service restriction (backend string surfaced via the API; frontend constant kept in sync). Document the up-front behavior in configuration/harnesses.mdx. Keep the spawn.ts server-side canUseHarnessSync check as defense-in-depth.",
+      "NonGoals": "- Do NOT weaken or change the semantics of canUseHarnessSync (the ToS gate) or remove the server-side spawn.ts check (defense-in-depth for the CLI --harness flag).\n- Do NOT restrict OpenAI/GPT models to claude-code; codex remains the intended default harness for GPT models and is unaffected.\n- Do NOT change PlanDialog.tsx code: post-PAN-1984 ModelHarnessPicker renders no harness selector and PlanDialog already shows an inline reason (:874-876) and falls back to claude-code (:200); its message improves automatically when the reason copy is reworded.\n- Do NOT change the chat picker model-list locking (it already disables locked models via pickerOptionLocked + Lock icon; Anthropic models under subscription default to the claude-code harness so they are never locked there).\n- Do NOT introduce a new policy or new blocked combinations."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Root cause is the harness-policy API emitting key 'pi' (always-allowed) instead of 'ohmypi'; fix the data first — the UI changes are inert without it.",
+        "rationale": "Verified at code level: canUsePickerHarness('ohmypi', …) reads decisions[model]['ohmypi'] which is undefined today, so it always returns {allowed:true}. This is bug-fixing the wiring the issue points to ('reuse the existing decision data'), not a new policy."
+      },
+      {
+        "summary": "Blocked harness options become disabled with a visible inline reason, replacing the prior auto-flip-the-model behavior (PAN-1067).",
+        "rationale": "The issue explicitly requires 'visibly disabled or hidden, not just a no-op click' and a visible (not hover-only) explanation. Disabling rather than hiding keeps the option discoverable so the user learns why it is unavailable."
+      },
+      {
+        "summary": "PlanDialog.tsx receives no code change.",
+        "rationale": "Post-PAN-1984 it renders no harness selector (ModelHarnessPicker shows only the model) and already renders an inline reason and falls effectivePlanningHarness back to claude-code; the reworded reason copy flows through automatically."
+      },
+      {
+        "summary": "The user-visible reason is the backend OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK.reason surfaced via the API; the frontend PI_TOS_BLOCK_REASON constant is kept in sync but is test-only today.",
+        "rationale": "canUsePickerHarness reads the reason out of the API response, not the frontend constant; rewording only the constant would not change what users see."
+      }
+    ],
+    "items": [
+      {
+        "id": "fix-harness-policy-api-key",
+        "title": "Fix /api/settings/harness-policy to emit the 'ohmypi' decision key",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-09T03:39:03.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-2528",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "disable-ohmypi-chat-picker",
+            "disable-ohmypi-harness-select"
+          ],
+          "files_scope": [
+            "src/dashboard/server/routes/settings.ts",
+            "tests/unit/dashboard/server/routes/settings-harness-policy.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --configLoader runner tests/unit/dashboard/server/routes/settings-harness-policy.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "settings-harness-policy test passes and asserts decisions[model].ohmypi.allowed === false for an Anthropic model under subscription auth"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/settings.ts (decision map at ~:1043-1047), replace the `pi: canUseHarnessSync('pi', model, authMode)` entry with `ohmypi: canUseHarnessSync('ohmypi', model, authMode)` so the returned key and evaluated harness both match what the pickers query. Extract the per-model decision-building loop into a pure exported helper — e.g. `buildHarnessPolicyDecisions(models, resolveAuthMode)` — that accepts an injected async auth-mode resolver, so it is unit-testable without a live Effect HTTP server. The route calls the helper with getProviderAuthMode. Add a unit test that stubs the resolver to return 'subscription' for the Anthropic provider and asserts the ohmypi decision is blocked. Note: 'pi' is no longer a member of RuntimeName ('claude-code' | 'ohmypi' | 'codex'), so passing 'ohmypi' is also the type-correct value; drop any 'pi' key/cast (no picker consumes it)."
+        },
+        "items": [
+          {
+            "id": "fix-harness-policy-api-key.ac1",
+            "title": "Given an Anthropic model with auth mode 'subscription', when the decision builder runs, then it returns decisions[model].ohmypi.allowed === false with a non-empty reason string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-harness-policy-api-key.ac2",
+            "title": "Given the harness-policy response for any model, then it contains an 'ohmypi' key (and no 'pi' key is required by callers)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-harness-policy-api-key.ac3",
+            "title": "Given a non-Anthropic model, or an Anthropic model with auth mode 'api-key', when the builder runs, then decisions[model].ohmypi.allowed === true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-harness-policy-api-key.ac4",
+            "title": "Given the extracted pure helper, when a unit test injects a stub auth-mode resolver, then the test produces the decision map without spawning a live server",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "disable-ohmypi-chat-picker",
+        "title": "Disable the blocked ohmypi option in chat/ModelPicker harness section with an inline reason",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-09T03:39:03.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2528",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/ModelPicker.test.tsx"
+          ],
+          "expected_outputs": [
+            "ModelPicker chat test passes, asserting a blocked ohmypi harness option is disabled and shows its reason inline"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/chat/ModelPicker.tsx harness section (~:471-542), when `!decision.allowed` for a harness option, render its <button> with `disabled` and skip the auto-flip/toast branch in handleClick (return early on a disabled option — no onHarnessChange, no onComboChange, no onChange, no toast.message). Keep the existing inline `harnessOptionNote` (~:533-535) that renders `decision.reason`. Preserve the allowed-path behavior (allowed harness click still fires onHarnessChange) and the experimental live-switch warning. The .harnessOption CSS already supports `:disabled` (`:hover:not(:disabled)`)."
+        },
+        "items": [
+          {
+            "id": "disable-ohmypi-chat-picker.ac1",
+            "title": "Given showHarnessModelPermutations enabled and a blocked ohmypi decision, when the harness section renders, then the ohmypi option button carries the disabled attribute",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disable-ohmypi-chat-picker.ac2",
+            "title": "Given a blocked ohmypi option, then its decision reason renders as visible inline text (harnessOptionNote), not only as a title attribute",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disable-ohmypi-chat-picker.ac3",
+            "title": "Given a blocked ohmypi option, when the user clicks it, then no toast is emitted, the model is not auto-flipped, and the harness is not changed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disable-ohmypi-chat-picker.ac4",
+            "title": "Given an allowed harness option, when the user clicks it, then onHarnessChange fires with that harness (allowed-path behavior preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "disable-ohmypi-harness-select",
+        "title": "Disable the blocked ohmypi option in shared HarnessSelect with an inline reason",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-09T03:39:03.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2528",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.tsx",
+            "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.render.test.tsx",
+            "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.module.css"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/shared/ModelPicker/ModelPicker.render.test.tsx"
+          ],
+          "expected_outputs": [
+            "HarnessSelect render test passes, asserting a blocked ohmypi option is disabled and shows its reason inline"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.tsx HarnessSelect (~:299-400), when `!decision.allowed` for an option in the dropdown, render its <button> with `disabled` and make handlePick a no-op for that option (return early — no onChange, no onModelChange auto-flip). Render `decision.reason` as visible inline text under/next to the disabled option (reuse an existing inline text class such as .pickerOptionCost or add a minimal reason class in ModelPicker.module.css), replacing the current hover-only `title` + 'ToS gated' badge as the sole signal. Also update the shared PI_TOS_BLOCK_REASON constant (~:24) to name a Claude Code subscription Terms of Service restriction, keeping it in sync with the backend reason. Preserve the allowed-path (allowed option click still fires onChange)."
+        },
+        "items": [
+          {
+            "id": "disable-ohmypi-harness-select.ac1",
+            "title": "Given a blocked ohmypi decision, when HarnessSelect opens its dropdown, then the ohmypi option button carries the disabled attribute",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disable-ohmypi-harness-select.ac2",
+            "title": "Given a blocked ohmypi option, then its decision reason renders as visible inline text (not only a title attribute)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disable-ohmypi-harness-select.ac3",
+            "title": "Given a blocked ohmypi option, when the user clicks it, then onChange does not fire and onModelChange does not auto-flip the model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disable-ohmypi-harness-select.ac4",
+            "title": "Given the shared PI_TOS_BLOCK_REASON constant, then it contains the phrase 'Terms of Service'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tos-reason-copy",
+        "title": "Reword the ToS block reason to name a Claude Code subscription Terms of Service restriction",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-09T03:39:03.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2528",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/harness-policy.ts",
+            "src/lib/__tests__/harness-policy.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/lib/__tests__/harness-policy.test.ts"
+          ],
+          "expected_outputs": [
+            "harness-policy test passes and asserts the ohmypi+Anthropic+subscription reason contains 'Terms of Service'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/harness-policy.ts, reword OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK.reason (~:37-42) so it plainly states this is a Claude Code subscription Terms of Service restriction (not a bug or missing feature) and still tells the user how to proceed (switch Anthropic to API-key auth, or pick a non-Anthropic model). Do NOT change the allow/deny logic — only the reason string. Add/extend a test in src/lib/__tests__/harness-policy.test.ts asserting canUseHarnessSync('ohmypi', <anthropic model>, 'subscription').reason contains 'Terms of Service' and allowed === false."
+        },
+        "items": [
+          {
+            "id": "tos-reason-copy.ac1",
+            "title": "Given canUseHarnessSync('ohmypi', <anthropic model>, 'subscription'), then it returns allowed === false with a reason that contains 'Terms of Service'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tos-reason-copy.ac2",
+            "title": "Given the reworded reason, then it still contains guidance to switch Anthropic to API-key auth or pick a non-Anthropic model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tos-reason-copy.ac3",
+            "title": "Given the allow/deny matrix (claude-code, codex, ohmypi+api-key, ohmypi+non-Anthropic), when canUseHarnessSync runs, then every previously-allowed combination still returns allowed === true (semantics preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-picker-tos-behavior",
+        "title": "Document the up-front picker ToS behavior in configuration/harnesses.mdx",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-09T03:39:03.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2528",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git diff --name-only origin/main -- configuration/harnesses.mdx"
+          ],
+          "expected_outputs": [
+            "configuration/harnesses.mdx appears in the diff with an updated '## ToS rules' section"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In configuration/harnesses.mdx, extend the '## ToS rules' section (~:142-160) to state that the dashboard harness pickers now render the ohmypi option disabled with an inline Terms of Service reason for the Anthropic-model + subscription-auth combination, so the restriction is surfaced up front rather than only at spawn time. Keep the existing allow/deny table."
+        },
+        "items": [
+          {
+            "id": "docs-picker-tos-behavior.ac1",
+            "title": "Given the '## ToS rules' section of configuration/harnesses.mdx, when read, then it contains a sentence stating the harness pickers render the ohmypi option disabled with an inline Terms of Service reason for Anthropic + subscription",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-picker-tos-behavior.ac2",
+            "title": "Given the updated section, then it preserves the existing harness allow/deny table",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "fix-harness-policy-api-key",
+        "to": "disable-ohmypi-chat-picker",
+        "type": "blocks"
+      },
+      {
+        "from": "fix-harness-policy-api-key",
+        "to": "disable-ohmypi-harness-select",
+        "type": "blocks"
+      },
+      {
+        "from": "tos-reason-copy",
+        "to": "disable-ohmypi-chat-picker",
+        "type": "informs"
+      },
+      {
+        "from": "tos-reason-copy",
+        "to": "disable-ohmypi-harness-select",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-09-PAN-2528-harness-picker-offers-ohmypi-for-anthropic-subscription-combos-it-will-reject-at-spawn-tos.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
