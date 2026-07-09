@@ -109,10 +109,57 @@ describe('teardownWorkspaceDockerByNamePromise', () => {
     );
 
     for (const command of commands) {
-      expect(command).toMatch(/docker (compose -p "overdeck-feature-pan-9999"|network (rm|ls))/);
+      expect(command).toMatch(
+        /docker (compose -p "overdeck-feature-pan-9999"|network (rm|ls)|ps -a --filter network|rm -f)/,
+      );
       expect(command).not.toMatch(/docker network prune/);
       expect(command).not.toMatch(/docker system prune/);
     }
+  });
+
+  it('force-removes containers still attached to the network when compose down fails', async () => {
+    const teardown = await loadTeardown();
+    mockExecAsync.mockImplementation(async (command: string) => {
+      if (command.includes('docker compose') && command.includes('down')) {
+        throw new Error('no configuration file provided: not found');
+      }
+      if (command.includes('docker ps -a --filter network')) {
+        return { stdout: 'abc123\ndef456\n', stderr: '' };
+      }
+      if (command.includes('docker network ls')) {
+        return { stdout: 'bridge\nhost\n', stderr: '' };
+      }
+      return { stdout: '', stderr: '' };
+    });
+
+    const result = await teardown('pan-9999');
+
+    const commands = mockExecAsync.mock.calls.map(([call]) =>
+      typeof call === 'string' ? call : call.cmd,
+    );
+    expect(commands).toContain('docker rm -f "abc123" "def456"');
+    expect(result.steps.some((s) => s.includes('Removed 2 container(s)'))).toBe(true);
+    expect(result.networkRemoved).toBe(true);
+  });
+
+  it('does not run docker rm when no containers are attached to the network', async () => {
+    const teardown = await loadTeardown();
+    mockExecAsync.mockImplementation(async (command: string) => {
+      if (command.includes('docker ps -a --filter network')) {
+        return { stdout: '', stderr: '' };
+      }
+      if (command.includes('docker network ls')) {
+        return { stdout: 'bridge\nhost\n', stderr: '' };
+      }
+      return { stdout: '', stderr: '' };
+    });
+
+    await teardown('pan-9999');
+
+    const commands = mockExecAsync.mock.calls.map(([call]) =>
+      typeof call === 'string' ? call : call.cmd,
+    );
+    expect(commands.some((c) => c.includes('docker rm'))).toBe(false);
   });
 
   it('includes a human-readable step log', async () => {

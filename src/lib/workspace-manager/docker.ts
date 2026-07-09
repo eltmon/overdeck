@@ -177,7 +177,36 @@ export async function teardownWorkspaceDockerByNamePromise(
     );
   }
 
-  // 2. Remove the bridge network; treat already-absent as success.
+  // 2. If containers are still attached to the network (compose files missing,
+  //    project label mismatch, etc.), remove them by force so the network can
+  //    be freed. This is the durable close-out fallback.
+  try {
+    const { stdout: containerStdout } = await execAsync(
+      `docker ps -a --filter network="${networkName}" --format '{{.ID}}'`,
+      { encoding: 'utf-8', timeout: 30000 },
+    );
+    const containerIds = containerStdout.trim().split('\n').filter(Boolean);
+    if (containerIds.length > 0) {
+      try {
+        await execAsync(`docker rm -f ${containerIds.map((id) => `"${id}"`).join(' ')}`, {
+          timeout: 30000,
+        });
+        result.steps.push(
+          `Removed ${containerIds.length} container(s) attached to ${networkName}`,
+        );
+      } catch (rmError: any) {
+        result.steps.push(
+          `Container removal attempted (${rmError.message?.split('\n')[0] || 'containers may be in use'})`,
+        );
+      }
+    }
+  } catch (error: any) {
+    result.steps.push(
+      `Container discovery attempted (${error.message?.split('\n')[0] || 'could not list containers'})`,
+    );
+  }
+
+  // 3. Remove the bridge network; treat already-absent as success.
   try {
     await execAsync(`docker network rm "${networkName}"`, { timeout: 30000 });
     result.steps.push(`Removed Docker network ${networkName}`);
