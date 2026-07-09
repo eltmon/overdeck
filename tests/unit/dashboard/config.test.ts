@@ -173,7 +173,7 @@ describe('ServerConfig', () => {
   });
 
   describe('workspace primary override identity gate', () => {
-    it.each(['agent-pan-2545', 'planning-pan-2545', 'flywheel-orchestrator'])(
+    it.each(['agent-pan-2545', 'planning-pan-2545', 'flywheel-orchestrator', 'strike-pan-2485', 'future-role-pan-1'])(
       'refuses the primary-port escape hatch for pipeline identity %s',
       async (agentId) => {
         process.env['OVERDECK_AGENT_ID'] = agentId;
