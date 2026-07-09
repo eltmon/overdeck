@@ -207,6 +207,13 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-60 tick 20 (2026-07-09) — B5/PAN-2360 rework PASSED re-review+test but VERDICT-RECONCILE STUCK (pan review signal hung); pan tell unwedge DOWNGRADED review agent (PAN-2513 harm confirmed)
+
+- **B5/PAN-2360 one step from merge but STUCK on verdict reconcile.** Rework committed (34dcd21d) → verification passed → test PASSED (reconciled) → re-review PASSED (agent stated "✓ Review passed, no code drift"; review.md written). PR #2523 CLEAN + MERGEABLE, merge-blockers clean. BUT the pipeline has NOT reconciled `review.approved` — the review agent's `pan review` SIGNAL CLI HUNG after emitting the verdict (finalize-hang pattern), so the verdict may not have reached the durable journal.
+- **The re-review agent was WEDGED on the codex rate-limit modal PRE-verdict** (blocking, unlike earlier post-verdict wedges). I `pan tell`'d it to unwedge — it dismissed the modal BUT **selected the downgrade default → review agent DOWNGRADED to gpt-5.4-mini** (Enter hit option 1). Harmless here (review was done) but a CONCRETE instance of PAN-2513's danger: pan-tell unwedge is NOT reliably model-preserving. Then I `pan kill agent-pan-2360-review --force` to fire the stop-event reconcile (how test.passed landed) — review verdict STILL not reconciled after stop.
+- **NEXT tick:** re-check `review.approved`; if reconciled → MERGE B5 (POST endpoint). If STILL not reconciled → the hung signal lost the verdict → `pan review request PAN-2360` to re-run a clean review cycle (rework already committed 34dcd21d), and FILE the hung-review-signal substrate bug.
+- **Main GREEN** (5485236776). Push blocked (PAN-2516; 17 ahead). HOLDS + 2 operator questions (PAN-1520) unchanged.
+
 ## RUN-60 tick 19 (2026-07-09) — B5/PAN-2360 fast to review→BLOCKED→reworking (live, PR #2523); main GREEN; push divergence growing (16 ahead, PAN-2516)
 
 - **B5/PAN-2360 in rework cycle** — implemented → pan done → verification passed (HEAD e4c7d4be) → review CHANGES-REQUESTED (feedback auto-delivered `.pan/feedback/002`, PR #2523) → work agent (agent-pan-2360, respawned 21:01) reworking. LIVE (cost $1.70→$2.85 between ticks; +26/-8 unchanged = still analyzing feedback, not yet writing fixes). Not wedged. WATCH next tick: if +26/-8 unchanged AND cost flat → wedged, nudge; else let it rework.
