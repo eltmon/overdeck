@@ -4,17 +4,17 @@
     "created": "2026-07-09T02:55:26.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2270: Review pipeline strands strike-originated PRs: auto-review trigger and pan review restart/request all require workspaces/feature-<id>",
-    "updated": "2026-07-09T03:04:19.848Z"
+    "updated": "2026-07-09T04:22:48.572Z"
   },
   "plan": {
     "id": "pan-2270",
     "title": "Review pipeline strands strike-originated PRs: resolve strike workspace + branch at every review-dispatch site",
-    "status": "running",
+    "status": "completed",
     "uid": "7c609658-ee8f-43ef-b0ee-383746f5564c",
     "author": "agent:claude-opus-4-8",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-09T02:55:26.000Z",
-    "updated": "2026-07-09T03:04:19.848Z",
+    "updated": "2026-07-09T04:22:48.572Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2270",
@@ -310,5 +310,5 @@
       "canonicalFilename": "2026-07-09-PAN-2270-review-pipeline-strands-strike-originated-prs-resolve-strike-workspace-branch-at-every-review-dispatch-site.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
