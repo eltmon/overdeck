@@ -1,109 +1,9 @@
 {
   "issueId": "PAN-2468",
   "schemaVersion": 2,
-  "sessionHistory": [
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-08T05:17:37.198Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-08T05:17Z] review-agent → FAILED — seq 2",
-      "timestamp": "2026-07-08T05:17:42.640Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-08T05:17:42.686Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-08T06:06:23.585Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-08T06:09:04.370Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-08T07:27:50.923Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-08T07:27:59.868Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-08T09:00:29.373Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-08T15:00:54.723Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-08T15:03Z] review-agent → CHANGES-REQUESTED — seq 1",
-      "timestamp": "2026-07-08T15:03:48.111Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-08T15:28Z] verification-gate → FAILED — seq 2",
-      "timestamp": "2026-07-08T15:28:03.075Z"
-    },
-    {
-      "timestamp": "2026-07-09T04:02:16.574Z",
-      "reason": "start",
-      "agentModel": "kimi-k2.7-code"
-    },
-    {
-      "timestamp": "2026-07-09T04:31:04.238Z",
-      "reason": "start",
-      "agentModel": "kimi-k2.7-code"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-09T04:54:46.205Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-09T07:32:54.301Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-09T07:34Z] review-agent → CHANGES-REQUESTED — seq 2",
-      "timestamp": "2026-07-09T07:34:59.649Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-09T07:55:17.745Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-09T07:56Z] review-agent → CHANGES-REQUESTED — seq 2",
-      "timestamp": "2026-07-09T07:56:15.679Z"
-    }
-  ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-09T07:56:15Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2468\n\nGenerated OKF conformance workflow checks out code-repo under ./code-repo but invokes ../code-repo scripts\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2468 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "okf-user-docs": "completed",
     "okf-user-docs.ac1": "completed",
@@ -206,18 +106,20 @@
   },
   "pipeline": {
     "issueId": "PAN-2468",
-    "reviewStatus": "blocked",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-09T07:56:11.779Z",
-    "reviewNotes": "Generated OKF conformance workflow checks out code-repo under ./code-repo but invokes ../code-repo scripts",
+    "updatedAt": "2026-07-09T08:08:17.545Z",
+    "reviewNotes": "No blocking findings; OKF conformance workflow path now matches the code-repo checkout",
+    "testNotes": "Role-based verification for PAN-2468 completed. Track A self-test, TypeScript typecheck, and ESLint lint all passed. The vitest project gate failed with two fixture/matrix omissions: (1) the synced-skills fixture is missing the pan-knowledge skill added by WI-17, and (2) the G3 no-loss matrix is missing the GET /api/issues/:id/ship-log route present in src/dashboard/server/routes/issues.ts. Both failures require updates to test fixtures/matrix files. Because the instructions prohibit editing code, tests, fixtures, snapshots, or configuration, the verdict is TESTS FAILED.",
     "inspectNotes": "Bead ollama-ensure ack: curl|sh auto-install replaced with macOS-only Homebrew path + explicit manual-install error on other platforms; verified the change is isolated to installOllamaWithPlatformCommand() and does not affect AC1/AC2 test paths (both go through the injectable options.installOllama hook), and AC3 PAN-1641 note test at ollama.test.ts:131 is untouched.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2488",
-    "lastVerifiedCommit": "c7bec972a163b7bcf97b82f8419b7b637ff2977e",
-    "reviewRequestedAt": "2026-07-09T07:32:36.230Z",
+    "reviewedAtCommit": "060ad2ece0886b0cfc710e4cfb48075b71b6bc30",
+    "lastVerifiedCommit": "060ad2ece0886b0cfc710e4cfb48075b71b6bc30",
+    "reviewRequestedAt": "2026-07-09T08:04:54.567Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/records/pan-2468.json",
@@ -233,13 +135,16 @@
         "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
         "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.tsx",
         "src/dashboard/frontend/src/components/CommandDeck/RoleBadge.tsx",
+        "src/dashboard/frontend/src/components/Stage/cockpit/AgentsLane.tsx",
         "src/dashboard/frontend/src/components/primitives/AgentCard.tsx",
         "src/dashboard/frontend/src/types.ts",
         "src/dashboard/server/read-model.ts",
+        "src/dashboard/server/routes/command-deck.ts",
         "src/dashboard/server/routes/projects.ts",
         "src/dashboard/server/services/conversation-lifecycle.ts",
         "src/dashboard/server/services/dashboard-db-task.ts",
         "src/dashboard/server/services/dashboard-db-worker.ts",
+        "src/lib/__tests__/agents-spawn-supervisor.test.ts",
         "src/lib/__tests__/settings-api.test.ts",
         "src/lib/agents/agent-state.ts",
         "src/lib/config-yaml/__tests__/knowledge-config.test.ts",
@@ -255,7 +160,6 @@
         "src/lib/router-config.ts",
         "src/lib/settings-api.ts",
         "sync-sources/hooks/record-cost-event.js",
-        "sync-sources/hooks/record-cost-event.js.map",
         "sync-sources/skills/pan-knowledge/SKILL.md",
         "tests/fixtures/synced-skills.txt",
         "tests/integration/agent-spawning.test.ts",
@@ -368,13 +272,16 @@
         "src/dashboard/frontend/src/components/CommandDeck/RoleBadge.tsx",
         "src/dashboard/frontend/src/components/CommandDeck/pipeline-helpers.test.ts",
         "src/dashboard/frontend/src/components/CommandDeck/pipeline-helpers.ts",
+        "src/dashboard/frontend/src/components/Stage/cockpit/AgentsLane.tsx",
         "src/dashboard/frontend/src/components/primitives/AgentCard.tsx",
         "src/dashboard/frontend/src/types.ts",
         "src/dashboard/server/read-model.ts",
+        "src/dashboard/server/routes/command-deck.ts",
         "src/dashboard/server/routes/projects.ts",
         "src/dashboard/server/services/conversation-lifecycle.ts",
         "src/dashboard/server/services/dashboard-db-task.ts",
         "src/dashboard/server/services/dashboard-db-worker.ts",
+        "src/lib/__tests__/agents-spawn-supervisor.test.ts",
         "src/lib/__tests__/config-yaml-roles.test.ts",
         "src/lib/__tests__/ollama.test.ts",
         "src/lib/__tests__/role-definitions.test.ts",
@@ -402,7 +309,6 @@
         "src/lib/router-config.ts",
         "src/lib/settings-api.ts",
         "sync-sources/hooks/record-cost-event.js",
-        "sync-sources/hooks/record-cost-event.js.map",
         "sync-sources/skills/pan-knowledge/SKILL.md",
         "tests/fixtures/synced-skills.txt",
         "tests/integration/agent-spawning.test.ts",
@@ -411,7 +317,7 @@
         "tests/unit/lib/overdeck/no-loss-matrix.ts",
         "tests/unit/lib/pan-444-post-merge-step0.test.ts"
       ],
-      "recordedAt": "2026-07-08T05:16:41.870Z"
+      "recordedAt": "2026-07-09T08:04:47.060Z"
     }
   },
   "closeOut": {
@@ -431,9 +337,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 122420466,
-            "output": 255551,
-            "cacheRead": 117523072,
+            "input": 124635216,
+            "output": 260660,
+            "cacheRead": 119648000,
             "cacheWrite": 0
           }
         },
@@ -479,17 +385,17 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 670818,
-            "output": 18221,
-            "cacheRead": 7493376,
+            "input": 1221826,
+            "output": 20316,
+            "cacheRead": 7793408,
             "cacheWrite": 0
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 2274900,
-            "output": 218068,
-            "cacheRead": 120373268,
+            "input": 2336650,
+            "output": 233211,
+            "cacheRead": 126607380,
             "cacheWrite": 0
           }
         }
@@ -508,9 +414,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 122420466,
-          "output": 255551,
-          "cacheRead": 117523072,
+          "input": 124635216,
+          "output": 260660,
+          "cacheRead": 119648000,
           "cacheWrite": 0
         },
         "anthropic/claude-opus-4-8": {
@@ -538,15 +444,15 @@
           "cacheWrite": 231255
         },
         "custom/kimi-k2.7-code": {
-          "input": 2945718,
-          "output": 236289,
-          "cacheRead": 127866644,
+          "input": 3558476,
+          "output": 253527,
+          "cacheRead": 134400788,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 153.58307225000001,
-        "pricingAsOf": "2026-07-09T07:56:11.833Z"
+        "usd": 157.14048025,
+        "pricingAsOf": "2026-07-09T08:08:17.634Z"
       }
     },
     "merges": [
@@ -554,6 +460,6 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "created": "2026-07-08T05:17:37.055Z",
-  "updated": "2026-07-09T07:57:58.434Z"
+  "created": "2026-07-09T08:06:45.604Z",
+  "updated": "2026-07-09T08:08:17.673Z"
 }
