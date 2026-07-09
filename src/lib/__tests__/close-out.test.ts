@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   teardownWorkspaceDockerByNamePromise: vi.fn(() =>
     Promise.resolve({ networkRemoved: true, steps: ['Stopped Docker stack'] }),
   ),
+  findWorkspacePath: vi.fn(),
 }));
 
 vi.mock('child_process', async (importOriginal) => {
@@ -49,6 +50,10 @@ vi.mock('../workspace-manager/docker.js', () => ({
 
 vi.mock('../workspace-manager.js', () => ({
   stopWorkspaceDocker: mocks.stopWorkspaceDocker,
+}));
+
+vi.mock('../lifecycle/archive-planning.js', () => ({
+  findWorkspacePath: mocks.findWorkspacePath,
 }));
 
 import { executeCloseOut } from '../close-out.js';
@@ -223,6 +228,7 @@ describe('executeCloseOut workspace resolution (PAN-2510)', () => {
     const issueLower = issueId.toLowerCase();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     mkdirSync(workspacePath, { recursive: true });
+    mocks.findWorkspacePath.mockReturnValue(workspacePath);
 
     let teardownCallIndex = -1;
     let worktreeCallIndex = -1;
@@ -252,12 +258,24 @@ describe('executeCloseOut workspace resolution (PAN-2510)', () => {
     expect(worktreeCallIndex).toBeGreaterThan(teardownCallIndex);
   });
 
-  it('imports findWorkspacePath from archive-planning and has no local definition', async () => {
-    const { readFileSync } = await import('node:fs');
-    const source = readFileSync(join(__dirname, '../close-out.ts'), 'utf-8');
+  it('resolves the workspace path through archive-planning findWorkspacePath', async () => {
+    const issueId = 'PAN-2510';
+    const issueLower = issueId.toLowerCase();
+    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+    mkdirSync(workspacePath, { recursive: true });
+    mocks.findWorkspacePath.mockReturnValue(workspacePath);
 
-    expect(source).toContain("from './lifecycle/archive-planning.js'");
-    expect(source).toContain('findWorkspacePath');
-    expect(source).not.toMatch(/function findWorkspacePath\s*\(/);
+    const result = await Effect.runPromise(executeCloseOut({
+      issueId,
+      projectPath,
+      isGitHub: true,
+      owner: 'eltmon',
+      repo: 'overdeck',
+      number: 2510,
+    }));
+
+    expect(result.success).toBe(true);
+    expect(mocks.findWorkspacePath).toHaveBeenCalledWith(projectPath, issueLower);
+    expect(mocks.teardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith(issueLower);
   });
 });
