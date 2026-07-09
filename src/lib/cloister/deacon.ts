@@ -1764,9 +1764,9 @@ export async function applyBootReconciliationDecision(): Promise<BootReconciliat
 }
 
 export async function reconcileAgentLiveness(): Promise<string[]> {
+  if (isDeaconGloballyPaused()) { logDeaconEventSync('reconcileAgentLiveness skipped — deacon globally paused'); return []; }
   return reconcileAgentLivenessWithDeps(autoResumeNotifierDeps());
 }
-
 // Callback set by the server layer to emit Socket.io merge:ready notifications.
 // Deacon is a library module and does not own the Socket.io instance directly.
 let mergeReadyNotifier: ((issueId: string) => void) | null = null;

@@ -19,7 +19,7 @@ import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 import { logDeaconEventSync, logAgentLifecycleSync } from '../persistent-logger.js';
 import { getReviewStatusSync } from '../review-status.js';
-import { getBootReconciliationState, isDeaconGloballyPaused } from '../overdeck/control-settings.js';
+import { getBootReconciliationState } from '../overdeck/control-settings.js';
 import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import {
   buildDefaultResumeContinueMessage,
@@ -1002,11 +1002,6 @@ export async function applyBootReconciliationDecision(
  * this is only a fallback.
  */
 export async function reconcileAgentLiveness(deps: AutoResumeNotifierDeps): Promise<string[]> {
-  if (isDeaconGloballyPaused()) {
-    logDeaconEventSync('reconcileAgentLiveness skipped — deacon globally paused');
-    return [];
-  }
-
   const actions: string[] = [];
   const agents = listAllAgents();
 
