@@ -207,6 +207,14 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
 
+## RUN-60 tick 14 (2026-07-09) — B5 still gated on main-CI-green (56f228b2fb in_progress); PAN-2510 reworking (live — cost advancing); push still blocked (PAN-2516)
+
+- **B5 (PAN-2360+2300) HELD** — Lane-B rule 2 gate: PAN-2359 CLOSED ✓ but main CI on 56f228b2fb still **in_progress** (not green yet, not red). Start B5 the instant it goes green.
+- **PAN-2510 reworking, LIVE** — pane showed a bare `❯` with the feedback-reminder banner and no "Working" line, which read as idle, BUT cost is advancing ($22.27→$22.89 in ~20s) → it's live/working, not wedged (per the codex/kimi live-vs-wedged rule: trust cost/token advance over the missing "Working" indicator). Nudged it once (harmless) to read `.pan/feedback/002` + fix all findings + targeted-tests-only + pan done. PR #2517.
+- **Flywheel push still BLOCKED (PAN-2516)** — 3 specs dirty again (PAN-2167 + PAN-2359 re-dirtied + PAN-2510); 5 FLYWHEEL-STATE commits ahead, durable-local. Not forcing.
+- **Zombie panes:** agent-pan-2359-review + agent-pan-2359-test linger from merged+closed B4 (harmless; close-out removed their state dirs, tmux sessions not reaped).
+- Main not red (5fb71d3bab green; 56f228b2fb CI running). HOLDS + 2 operator questions (PAN-1520) unchanged.
+
 ## RUN-60 tick 13 (2026-07-09) — ✅ B4/PAN-2359 MERGED (2nd order-book item!) via POST endpoint; paired PAN-2363 closed; PAN-2510 review-blocked→self-reworking; B5 gate not yet met
 
 - **✅ B4/PAN-2359 MERGED** (2nd order-book item) — `POST /api/issues/PAN-2359/merge` returned HTTP 200 `mergeStatus:merged` in ~6s (fast: `[merge] CI is green on 3176e7b7 (5/6) — skipping redundant local verification (PAN-2487)`). Main HEAD now **56f228b2fb PAN-2359 (#2515)**. Paired issue **PAN-2363 CLOSED** via `gh issue close` (delivered by PR #2515; shared 'provably-merged guard' PRD — master-plan B4 paired rule 5). **The POST merge path works cleanly and backgrounded.**
