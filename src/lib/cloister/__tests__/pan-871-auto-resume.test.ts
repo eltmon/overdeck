@@ -517,6 +517,17 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
     expect(mockResumeAgent).not.toHaveBeenCalled();
   });
 
+  it('frozen deacon adopts nothing during liveness reconciliation', async () => {
+    const { isDeaconGloballyPaused } = await import('../../overdeck/control-settings.js');
+    vi.mocked(isDeaconGloballyPaused).mockReturnValueOnce(true);
+
+    const actions = await reconcileAgentLiveness();
+
+    expect(actions).toEqual([]);
+    expect(mockResumeAgent).not.toHaveBeenCalled();
+    expect(listAllAgentsSync).not.toHaveBeenCalled();
+  });
+
   it('does not let liveness reconciliation resume per-agent hold decisions', async () => {
     vi.mocked(listAllAgentsSync).mockReturnValue([
       bootCandidateAgent('agent-pan-871', 'PAN-871'),
