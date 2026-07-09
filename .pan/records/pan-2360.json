@@ -66,16 +66,10 @@
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "failed",
     "readyForMerge": false,
-    "updatedAt": "2026-07-09T01:48:04.090Z",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Merge conflict with target branch",
-        "detectedAt": "2026-07-09T01:48:04.090Z"
-      }
-    ],
+    "updatedAt": "2026-07-09T03:38:24.464Z",
+    "mergeNotes": "Workspace does not exist",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2523",
     "reviewedAtCommit": "0914f0be2eff2c2d6f9ee2c32fd10f8a6c740418",
     "lastVerifiedCommit": "4043137cb9cf3fe3c9237f7b0fc7b7a310a8cc60"
@@ -109,9 +103,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1022472,
-            "output": 39115,
-            "cacheRead": 16990464,
+            "input": 1262484,
+            "output": 42259,
+            "cacheRead": 18983680,
             "cacheWrite": 0
           }
         }
@@ -130,15 +124,15 @@
           "cacheWrite": 131630
         },
         "custom/kimi-k2.7-code": {
-          "input": 1885828,
-          "output": 56284,
-          "cacheRead": 23007232,
+          "input": 2125840,
+          "output": 59428,
+          "cacheRead": 25000448,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 13.374598,
-        "pricingAsOf": "2026-07-09T01:48:04.121Z"
+        "usd": 13.993898,
+        "pricingAsOf": "2026-07-09T03:38:24.609Z"
       }
     },
     "merges": [
@@ -147,5 +141,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-09T01:43:45.217Z",
-  "updated": "2026-07-09T02:46:41.040Z"
+  "updated": "2026-07-09T03:38:24.609Z"
 }

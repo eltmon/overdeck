@@ -84,7 +84,7 @@
     "recordedAt": "2026-07-09T00:19:08.915Z"
   },
   "created": "2026-07-08T23:07:44.941Z",
-  "updated": "2026-07-09T00:31:16.120Z",
+  "updated": "2026-07-09T03:37:56.382Z",
   "pipeline": {
     "issueId": "PAN-2510",
     "reviewStatus": "reviewing",
@@ -205,8 +205,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "rebuild-terminal-guard": "completed",
     "doctor-pool-advisory": "completed",
