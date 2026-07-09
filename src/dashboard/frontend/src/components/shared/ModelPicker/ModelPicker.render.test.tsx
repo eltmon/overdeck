@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import { HarnessSelect, ModelSelect, type ModelGroup } from './ModelPicker';
+import { HarnessSelect, ModelSelect, type HarnessPolicyDecisions, type ModelGroup } from './ModelPicker';
 
 const groups: ModelGroup[] = [
   {
@@ -46,5 +46,29 @@ describe('shared ModelPicker branding', () => {
     expect(screen.getAllByLabelText('Claude Code logo').length).toBeGreaterThan(1);
     expect(screen.getByLabelText('oh-my-pi logo')).toBeInTheDocument();
     expect(screen.getByLabelText('Codex logo')).toBeInTheDocument();
+  });
+
+  it('disables the blocked ohmypi option and shows the reason inline', async () => {
+    const user = userEvent.setup();
+    const harnessPolicy: HarnessPolicyDecisions = {
+      'claude-sonnet-4-6': {
+        ohmypi: { allowed: false, reason: 'Blocked by Claude Code subscription Terms of Service' },
+      },
+    };
+    render(
+      <HarnessSelect
+        value="claude-code"
+        onChange={vi.fn()}
+        modelId="claude-sonnet-4-6"
+        groups={groups}
+        harnessPolicy={harnessPolicy}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /Claude Code/i }));
+
+    const blockedHarnessButton = screen.getByRole('button', { name: /oh-my-pi/i });
+    expect(blockedHarnessButton).toBeDisabled();
+    expect(blockedHarnessButton).toHaveTextContent('Blocked by Claude Code subscription Terms of Service');
   });
 });
