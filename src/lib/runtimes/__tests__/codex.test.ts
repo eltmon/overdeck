@@ -116,10 +116,14 @@ describe('initCodexHome', () => {
     const config = readNode(join(codexDir, 'config.toml'), 'utf8')
     // approval_policy is a flat top-level string, not an [approval] table.
     expect(config).toContain('approval_policy = "never"')
-    // No TOML table sections — Codex deserializes these keys as scalars, and a
-    // `[model]` table breaks config load with "invalid type: map, expected a
+    // No TOML table sections for scalar keys — Codex deserializes these as scalars,
+    // and a `[model]` table breaks config load with "invalid type: map, expected a
     // string in `model`" (PAN-1574 regression).
     expect(config).not.toMatch(/^\[(model|approval|notify)\]/m)
+    // PAN-2521: suppress the blocking "Approaching rate limits — switch model?" TUI
+    // nudge that freezes an unattended pipeline agent's pane.
+    expect(config).toContain('[notice]')
+    expect(config).toContain('hide_rate_limit_model_nudge = true')
   })
 
   it('pre-seeds folder trust and autonomy so the TUI skips its first-run wizard', () => {
