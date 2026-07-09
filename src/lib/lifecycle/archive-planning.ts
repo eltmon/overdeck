@@ -69,6 +69,17 @@ export function findWorkspacePath(projectPath: string, issueLower: string): stri
 }
 
 /**
+ * Infer the git branch for an issue from its resolved workspace path.
+ * Strike workspaces (path ends in `-strike`) use `strike/<id>`; every other
+ * workspace uses `feature/<id>`. PAN-2270: review-dispatch callers must derive
+ * the branch this way instead of hardcoding `feature/${issueLower}`.
+ */
+export function inferBranchFromWorkspace(workspacePath: string, issueLower: string): string {
+  if (workspacePath.endsWith('-strike')) return `strike/${issueLower}`;
+  return `feature/${issueLower}`;
+}
+
+/**
  * Move PRD from active/ to completed/ directory.
  * Uses git mv with fallback to plain copy. Idempotent — skips if already completed.
  */
