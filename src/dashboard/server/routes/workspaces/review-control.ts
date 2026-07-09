@@ -140,6 +140,24 @@ export function processResetReviewPipeline(
     },
   };
 }
+
+/**
+ * Resolve whether a workspace exists for the reset endpoint, including
+ * strike workspaces (feature-<id>-strike) that getWorkspaceInfoForIssue does
+ * not yet know about. PAN-2270 regression test hook.
+ */
+export function resolveResetWorkspace(
+  issueId: string,
+  workspaceInfo: { exists: boolean; localPath?: string },
+  resolved: { projectPath: string } | null,
+): { exists: boolean; localPath: string | null } {
+  const issueLower = issueId.toLowerCase();
+  const workspacePath = resolved ? findWorkspacePath(resolved.projectPath, issueLower) : null;
+  return {
+    exists: workspaceInfo.exists || workspacePath !== null,
+    localPath: workspaceInfo.localPath || workspacePath,
+  };
+}
 export type UnstickResult =
   | { httpStatus: 404; body: { success: false; error: string } }
   | { httpStatus: 400; body: { success: false; error: string } }
@@ -276,12 +294,10 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
     }
     const body = yield* readJsonBody;
 
-    const issueLower = issueId.toLowerCase();
-    const resolved = resolveProjectFromIssueSync(issueId);
     const workspaceInfo = getWorkspaceInfoForIssue(issueId);
-    const workspacePath = resolved ? findWorkspacePath(resolved.projectPath, issueLower) : null;
-    const workspaceExists = workspaceInfo.exists || workspacePath !== null;
-    const result = processResetReviewPipeline(issueId, workspaceExists);
+    const resolved = resolveProjectFromIssueSync(issueId);
+    const resetWorkspace = resolveResetWorkspace(issueId, workspaceInfo, resolved);
+    const result = processResetReviewPipeline(issueId, resetWorkspace.exists);
     if (result.httpStatus !== 200) {
       return jsonResponse(result.body, { status: result.httpStatus });
     }
@@ -304,12 +320,12 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
       try {
         yield* Effect.promise(async () => {
           const { spawnReviewRoleForIssue } = await import('../../../../lib/cloister/review-agent.js');
-          const resolved = resolveProjectFromIssueSync(issueId);
           if (resolved) {
             const wsInfo = getWorkspaceInfoForIssue(issueId);
             const issueLower = issueId.toLowerCase();
             const numericSuffix = issueLower.replace(/^[a-z]+-/, '');
             const wsPath =
+              resetWorkspace.localPath ||
               wsInfo.localPath ||
               findWorkspacePath(resolved.projectPath, issueLower) ||
               join(resolved.projectPath, 'workspaces', `feature-${numericSuffix}`);
