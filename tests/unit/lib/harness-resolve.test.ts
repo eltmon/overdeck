@@ -146,7 +146,7 @@ describe('resolveHarness', () => {
     mocks.getProviderAuthMode.mockResolvedValue('api-key');
     const { resolveHarness } = await loadSubject();
 
-    await expect(resolveHarness({ model: 'gpt-5.5' })).rejects.toThrow('GPT-5.5 needs a ChatGPT/Codex subscription sign-in');
+    await expect(resolveHarness({ model: 'gpt-5.5' })).rejects.toThrow('needs a ChatGPT/Codex subscription sign-in');
 
     expect(mocks.canUseHarnessSync).not.toHaveBeenCalled();
     expect(mocks.exec).not.toHaveBeenCalled();
