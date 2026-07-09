@@ -4,17 +4,17 @@
     "created": "2026-07-08T23:20:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2359: reapMergedStrikeWorkspaces reaps FRESH strike workspaces (0 commits ahead of main looks 'merged')",
-    "updated": "2026-07-08T23:14:11.953Z"
+    "updated": "2026-07-09T00:01:29.596Z"
   },
   "plan": {
     "id": "pan-2359",
     "title": "bug(deacon): reapMergedStrikeWorkspaces reaps FRESH strike workspaces (0 commits ahead of main looks 'merged')",
-    "status": "proposed",
+    "status": "running",
     "uid": "f73e5cdb-dd13-405c-9130-14ca640d80f3",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-07-08T23:20:00.000Z",
-    "updated": "2026-07-08T23:14:11.953Z",
+    "updated": "2026-07-09T00:01:29.596Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2359",
@@ -121,5 +121,5 @@
       "canonicalFilename": "2026-07-08-PAN-2359-bug-deacon-reapmergedstrikeworkspaces-reaps-fresh-strike-workspaces-0-commits-ahead-of-main-looks-merged.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
