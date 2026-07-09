@@ -188,7 +188,7 @@ import { isAgentIdleForNudge } from './agent-idle.js';
 import { checkStuckAgentRemediation } from './stuck-remediation.js';
 import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
-import { reconcileOrphanProposedSpecs, spawnWorkAgentThroughAgentsEndpoint } from './orphan-proposed-reconciler.js';
+import { reconcileOrphanProposedSpecs, spawnWorkAgentThroughAgentsEndpoint, triggerRebuildAndStart } from './orphan-proposed-reconciler.js';
 import { reconcileTestStatusFromGreenCiWithDeps } from './test-status-green-ci-reconciler.js';
 import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
 import { reconcileIdleWorkspaceStacks } from './idle-stack-reaper.js';
@@ -1974,6 +1974,28 @@ export async function checkDeadEndAgents(): Promise<string[]> {
               if (spawn.spawned) {
                 actions.push(`Dead-end recovery (PAN-2209): respawned dead work agent for ${issueId} (${statusType}) to address feedback`);
                 console.log(`[deacon] PAN-2209: respawned dead work agent for ${issueId} (${statusType})`);
+              } else if (spawn.skippedReason === 'stack-unhealthy') {
+                // PAN-2520: the respawn can't proceed because the workspace Docker
+                // stack is down. Deferring here loops forever — nothing else rebuilds
+                // the stack. Trigger the same rebuild-and-start recovery the dashboard
+                // button uses (rebuild stack → `pan start`). The per-issue dead-end
+                // cooldown and autoRequeueCount breaker (both set above) bound the
+                // retries, so a stack that can't be rebuilt still escalates instead
+                // of hammering.
+                try {
+                  const rebuild = await triggerRebuildAndStart(issueId);
+                  if (rebuild.triggered) {
+                    actions.push(`Dead-end recovery (PAN-2520): stack-unhealthy for ${issueId} (${statusType}) — triggered rebuild-and-start`);
+                    console.log(`[deacon] PAN-2520: triggered rebuild-and-start for ${issueId} (stack-unhealthy)`);
+                  } else {
+                    actions.push(`Dead-end recovery (PAN-2520): rebuild-and-start for ${issueId} failed — ${rebuild.error}`);
+                    console.log(`[deacon] PAN-2520: rebuild-and-start for ${issueId} failed: ${rebuild.error}`);
+                  }
+                } catch (err: unknown) {
+                  const msg = err instanceof Error ? err.message : String(err);
+                  console.error(`[deacon] PAN-2520: rebuild-and-start failed for ${issueId}: ${msg}`);
+                  actions.push(`Dead-end recovery (PAN-2520): rebuild-and-start failed for ${issueId}: ${msg}`);
+                }
               } else {
                 actions.push(`Dead-end recovery (PAN-2209): respawn of ${issueId} deferred — ${spawn.skippedReason ?? spawn.error}`);
                 console.log(`[deacon] PAN-2209: respawn of ${issueId} deferred: ${spawn.skippedReason ?? spawn.error}`);

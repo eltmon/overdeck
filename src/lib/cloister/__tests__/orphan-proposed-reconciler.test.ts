@@ -56,6 +56,7 @@ import {
   hasReviewPipelinePresence,
   reconcileOrphanProposedSpecs,
   spawnWorkAgentThroughAgentsEndpoint,
+  triggerRebuildAndStart,
 } from '../orphan-proposed-reconciler.js';
 
 let testDir: string;
@@ -566,5 +567,30 @@ describe('orphan proposed spec reconciler', () => {
     expect(init?.method).toBe('POST');
     expect(init?.headers).toMatchObject({ origin: 'http://127.0.0.1:3011' });
     expect(JSON.parse(String(init?.body))).toEqual({ issueId: 'PAN-3301', role: 'work' });
+  });
+
+  // PAN-2520: the deacon dead-end path invokes rebuild-and-start when a respawn
+  // defers on stack-unhealthy, so the stack gets rebuilt instead of looping forever.
+  it('posts to the rebuild-and-start endpoint on stack-unhealthy recovery', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ success: true, activityId: 'act-1' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(triggerRebuildAndStart('PAN-3301', 'http://127.0.0.1:3011')).resolves.toEqual({ triggered: true });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toBe('http://127.0.0.1:3011/api/workspaces/PAN-3301/rebuild-and-start');
+    expect(init?.method).toBe('POST');
+    expect(init?.headers).toMatchObject({ origin: 'http://127.0.0.1:3011' });
+  });
+
+  it('reports a failed rebuild-and-start without throwing', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ error: 'boom' }), { status: 500 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(triggerRebuildAndStart('PAN-3301', 'http://127.0.0.1:3011')).resolves.toEqual({
+      triggered: false,
+      error: 'boom',
+    });
   });
 });
