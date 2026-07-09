@@ -83,7 +83,11 @@ export function renderSupervisorUnit(options: RenderSupervisorUnitOptions = {}):
     '',
     '[Service]',
     'Type=simple',
-    `WorkingDirectory=${systemdQuote(workingDirectory)}`,
+    // WorkingDirectory= takes a single path that systemd does NOT unquote —
+    // a quoted value is read literally and rejected as "not absolute" (its
+    // first char is `"`, not `/`). ExecStart= (a command line) and Environment=
+    // (word-split assignments) DO support quoting, so those stay quoted.
+    `WorkingDirectory=${workingDirectory}`,
     `ExecStart=${systemdQuote(nodePath)} ${systemdQuote(supervisorBundle)}`,
     `Environment=${environment}`,
     'Restart=on-failure',
