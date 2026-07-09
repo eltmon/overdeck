@@ -1,0 +1,949 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-09T21:01:10.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2542: add GPT-5.6 (Sol/Terra/Luna) family, make gpt-5.6-sol the new OpenAI default",
+    "updated": "2026-07-09T21:22:20.712Z"
+  },
+  "plan": {
+    "id": "pan-2542",
+    "title": "feat(models): add GPT-5.6 (Sol/Terra/Luna) family, make gpt-5.6-sol the new OpenAI default",
+    "status": "proposed",
+    "uid": "f11093a1-e391-4136-8e8b-8a419cf7bd26",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-07-09T21:01:10.000Z",
+    "updated": "2026-07-09T21:22:20.712Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2542",
+        "label": "PAN-2542",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-2542.md",
+        "label": "PRD (fully-specified implementation brief)",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "models",
+      "openai",
+      "gpt-5.6",
+      "registry",
+      "additive"
+    ],
+    "narratives": {
+      "Problem": "OpenAI released the GPT-5.6 family on 2026-07-09 in three tiers — Sol (flagship), Terra (balanced), Luna (fast/cheap) — and names gpt-5.6-sol as its own recommended Codex default. Overdeck's model registry only knows the gpt-5.5 generation, so these models cannot be selected, priced, gated, or defaulted to.",
+      "Proposal": "Execute the pre-verified PRD at .pan/drafts/pan-2542.md verbatim. Register all three tiers everywhere gpt-5.5 is registered (type union, provider/router/fallback maps, capability matrix, pricing, subscription gating, dashboard pickers/catalog, MODEL_API_IDS), add automated tests locking in their context ceiling / subscription gating / list presence / cost parsing, and repoint exactly three defaults from gpt-5.5 to gpt-5.6-sol (providers.ts opus tier + the two dashboard picker preferred-model defaults). Every pricing/context/skill figure is dictated by the PRD's verified-reference table or its mechanical derivation rules — nothing is invented. The work is decomposed into 15 mostly-parallel beads over a small typing foundation.",
+      "NonGoals": "- Do not modify gpt-5.5, gpt-5.5-pro, or any gpt-5.4* entry VALUES; the only non-additive edits are the three explicit default pointers (providers.ts tierModels.opus, chat ModelPicker HARNESS_DEFAULT_MODEL.ohmypi, shared ModelPicker 'preferred' default).\n- Do not deprecate or remove gpt-5.5.\n- Do not 'fix' the pre-existing stale `$3/$18` comment on the gpt-5.5 capability entry (model-capabilities.ts:489) — it is out-of-scope pre-existing drift.\n- Do not change the sonnet/haiku tier pointers in providers.ts.\n- Do not invent a SWE-bench Verified score for any gpt-5.6 tier — none was published at launch; write 'not published at launch' in doc SWE-bench columns.\n- Do not run `pan sync` to regenerate the rendered ~/.claude/CLAUDE.md — that is a post-merge machine-level operator step, not an acceptance criterion.\n- Do not execute skills/okf/scripts/selftest.sh — it makes real billed Codex CLI calls; static text edit only.\n- Do not touch reference/token-spend-report.mdx, docs/ROLES.md:95, src/lib/agents/__tests__/staffing.test.ts, .../tier-table.test.ts, .pan/records, .pan/continues, .beads/issues.jsonl, docs/design/*.html, or .release/*.md — verified out of scope during planning."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Execute the PRD verbatim with no clarifying questions.",
+        "rationale": "The PRD is a fully-specified, pre-verified implementation brief: exact file paths, line numbers, before/after snippets, verified external reference data, FRs, ACs, and explicit out-of-scope notes for all 14 work items. It leaves no open decision for the operator to make."
+      },
+      {
+        "summary": "Keep all Work-Item-14 doc/prompt updates as ONE bead rather than splitting per-file.",
+        "rationale": "Every edit is the same logical change (reflect the new family + new default in prose) and each is mechanically identical; splitting ~8 trivial wording edits into separate beads adds tracking overhead with no reviewability benefit. Decomposition guidance treats a coherent doc cluster as one bead."
+      },
+      {
+        "summary": "Set requiresInspection=false on every bead.",
+        "rationale": "Each bead is a mechanical additive edit dictated verbatim by a PRD before/after snippet. A reviewer verifies correctness against the PRD from a small diff, and any wrong model-ID string surfaces immediately at typecheck. The work.inspect gate would rubber-stamp mechanical diffs, not catch judgment defects — its intended value does not apply here."
+      },
+      {
+        "summary": "Split PRD Work Item 10 (two dashboard pickers) into two per-file beads.",
+        "rationale": "The chat ModelPicker.tsx and shared ModelPicker/ModelPicker.tsx are distinct files, each independently reviewable; per the one-file-one-bead heuristic they are cleaner as two beads. Both still trace FR-5, and D2 records that these two defaults plus providers.ts are the only non-additive edits."
+      }
+    ],
+    "items": [
+      {
+        "id": "register-model-ids",
+        "title": "Register gpt-5.6-sol/terra/luna in settings.ts (OpenAIModel union + getAvailableModelsSync)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-09T21:01:10.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2542",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD Work Item 1: add the three new IDs to the top of the `OpenAIModel` type union (before 'gpt-5.5', update the '2026-05-23' comment to '2026-07-09'), and prepend them to the `openaiModels` array in getAvailableModelsSync(). Leave the 'Retired' block untouched (FR-8). This is the typing foundation: MODEL_CAPABILITIES (Record<ModelId,…>) and model-fallback MODEL_PROVIDERS (Record<ModelId,…>) will not typecheck without these union entries."
+        },
+        "items": [
+          {
+            "id": "register-model-ids.ac1",
+            "title": "The OpenAIModel type union contains 'gpt-5.6-sol' | 'gpt-5.6-terra' | 'gpt-5.6-luna' ordered ahead of 'gpt-5.5', and npm run typecheck passes without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-model-ids.ac2",
+            "title": "Given settings.api_keys.openai is set, when getAvailableModelsSync() runs, then its OpenAI slice starts with ['gpt-5.6-sol','gpt-5.6-terra','gpt-5.6-luna','gpt-5.5', …]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-model-ids.ac3",
+            "title": "The diff preserves the 'Retired' block and every existing gpt-5.5/gpt-5.4 union member unchanged (no existing value edited)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "capability-entries",
+        "title": "Add gpt-5.6 capability entries to model-capabilities.ts + context-ceiling test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-09T21:01:10.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2542",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/model-capabilities.ts",
+            "src/lib/__tests__/model-capabilities.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/model-capabilities.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "model-capabilities.test.ts passes including the new gpt-5.6 context-ceiling cases"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD Work Item 2: insert three MODEL_CAPABILITIES entries immediately before the 'gpt-5.5' block. Derive skills mechanically — sol = gpt-5.5 skills +1 on every dimension EXCEPT speed(65) and context-length(95) held identical; terra = gpt-5.5 skills verbatim except speed:70; luna = gpt-5.4-mini skills verbatim. All three: contextWindow=CLIPROXY_CODEX_CONTEXT_WINDOW, minTier:'plus', costPer1MTokens 17.5/8.75/3.5. Leave the existing gpt-5.5 entry (and its stale $3/$18 comment) untouched. Add the it.each contextWindow test from the PRD."
+        },
+        "items": [
+          {
+            "id": "capability-entries.ac1",
+            "title": "Given MODEL_CAPABILITIES['gpt-5.6-sol'], then contextWindow === CLIPROXY_CODEX_CONTEXT_WINDOW === 150_000 (same for terra and luna)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "capability-entries.ac2",
+            "title": "The gpt-5.6-sol entry contains skills equal to gpt-5.5.skills +1 on every dimension except speed(65) and context-length(95) which are identical, with costPer1MTokens === 17.5 and minTier === 'plus'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "capability-entries.ac3",
+            "title": "The gpt-5.6-terra entry contains gpt-5.5.skills verbatim except speed === 70 (costPer1MTokens 8.75), and the gpt-5.6-luna entry contains gpt-5.4-mini.skills verbatim (costPer1MTokens 3.5, minTier 'plus')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "capability-entries.ac4",
+            "title": "The new it.each test asserting the three models' contextWindow === 150_000 passes, and the existing gpt-5.5 entry is preserved unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cost-pricing",
+        "title": "Add gpt-5.6 billing-accurate pricing rows to cost.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-09T21:01:10.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-2542",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cost.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD Work Item 3: insert three DEFAULT_PRICING rows immediately before the existing gpt-5.5 row — sol 0.005/0.030/0.0005, terra 0.0025/0.015/0.00025, luna 0.001/0.006/0.0001 (per-1k = verified per-1M ÷1000). Leave the gpt-5.5 row unchanged."
+        },
+        "items": [
+          {
+            "id": "cost-pricing.ac1",
+            "title": "getPricingSync('openai','gpt-5.6-sol') returns inputPer1k 0.005, outputPer1k 0.030, cacheReadPer1k 0.0005",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-pricing.ac2",
+            "title": "getPricingSync returns 0.0025/0.015/0.00025 for gpt-5.6-terra and 0.001/0.006/0.0001 for gpt-5.6-luna",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-pricing.ac3",
+            "title": "The diff preserves the existing gpt-5.5 pricing row unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "providers-default",
+        "title": "Repoint OpenAI opus-tier default to gpt-5.6-sol + provider lists/allowlist (providers.ts)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-09T21:01:10.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2542",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/providers.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD Work Item 5: prepend the three IDs to PROVIDERS.openai.models (line 97); change tierModels.opus from 'gpt-5.5' to 'gpt-5.6-sol' (line 98 — this is FR-5, the actual default; sonnet/haiku untouched); add the three IDs to getProviderForModelSync's allowlist (line 329)."
+        },
+        "items": [
+          {
+            "id": "providers-default.ac1",
+            "title": "PROVIDERS.openai.tierModels.opus returns 'gpt-5.6-sol'; the diff preserves tierModels.sonnet and .haiku unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "providers-default.ac2",
+            "title": "PROVIDERS.openai.models contains ['gpt-5.6-sol','gpt-5.6-terra','gpt-5.6-luna','gpt-5.5', …] with the three new IDs ordered first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "providers-default.ac3",
+            "title": "getProviderForModelSync('gpt-5.6-sol') returns 'openai' (same for terra and luna)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "router-config",
+        "title": "Add gpt-5.6 to both router-config model arrays + assertion (router-config.ts)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-09T21:01:10.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2542",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/router-config.ts",
+            "tests/lib/router-config.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/router-config.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "router-config.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD Work Item 6: prepend the three IDs to the openai provider models array in BOTH generateRouterConfig (line 70) and generateRouterConfigFromWorkTypes (line 137). Extend the tests/lib/router-config.test.ts:115 assertion (currently checks 'gpt-5.5' presence) to also check 'gpt-5.6-sol'."
+        },
+        "items": [
+          {
+            "id": "router-config.ac1",
+            "title": "generateRouterConfig() returns an openai provider models list containing 'gpt-5.6-sol','gpt-5.6-terra','gpt-5.6-luna' ordered ahead of 'gpt-5.5'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "router-config.ac2",
+            "title": "generateRouterConfigFromWorkTypes() returns an openai models list containing the three new IDs ahead of 'gpt-5.5'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "router-config.ac3",
+            "title": "The updated router-config.test.ts assertion checking 'gpt-5.6-sol' presence passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "model-fallback",
+        "title": "Add gpt-5.6 to model-fallback maps (providers/fallback/tier-rank) + assertions",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-09T21:01:10.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2542",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/model-fallback.ts",
+            "tests/lib/model-fallback.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/model-fallback.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "model-fallback.test.ts passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD Work Item 7: add the three IDs to MODEL_PROVIDERS (all 'openai'); FALLBACK_MAP (sol/terra→'claude-sonnet-5', luna→'claude-haiku-4-5'); MODEL_TIER_RANK (sol 2, terra 2, luna 1 — decision recorded in the PRD). Update tests/lib/model-fallback.test.ts:91-92,395 to also assert getAvailableModelsSync includes the three new IDs. MODEL_PROVIDERS is Record<ModelId,…>, so this bead depends on register-model-ids."
+        },
+        "items": [
+          {
+            "id": "model-fallback.ac1",
+            "title": "MODEL_PROVIDERS['gpt-5.6-sol'] returns 'openai' (same for terra and luna)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "model-fallback.ac2",
+            "title": "FALLBACK_MAP returns 'claude-sonnet-5' for 'gpt-5.6-sol' and 'gpt-5.6-terra', and 'claude-haiku-4-5' for 'gpt-5.6-luna'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "model-fallback.ac3",
+            "title": "MODEL_TIER_RANK returns 2 for 'gpt-5.6-sol' and 'gpt-5.6-terra', and 1 for 'gpt-5.6-luna'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "model-fallback.ac4",
+            "title": "The updated model-fallback.test.ts passes, asserting getAvailableModelsSync contains the three new IDs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "harness-policy-gating",
+        "title": "Gate gpt-5.6 tiers behind subscription auth + generalize block message (harness-policy.ts)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-09T21:01:10.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2542",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/harness-policy.ts",
+            "src/lib/__tests__/harness-policy.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/harness-policy.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "harness-policy.test.ts passes including the new gpt-5.6 gating cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD Work Item 8: rename module-private const GPT_5_5_API_KEY_BLOCK → SUBSCRIPTION_ONLY_MODEL_BLOCK and generalize its reason so it no longer hardcodes 'GPT-5.5'; add the three IDs to SUBSCRIPTION_ONLY_OPENAI_MODELS; update the single call site in canUseModelWithAuthSync (~line 64) and the file's top doc comment (lines 9-11). Add the two it.each tests (api-key blocked / subscription allowed) from the PRD."
+        },
+        "items": [
+          {
+            "id": "harness-policy-gating.ac1",
+            "title": "For every harness, canUseHarnessSync(harness,'gpt-5.6-sol','api-key') returns allowed:false with a reason containing 'subscription' (same for terra and luna)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-policy-gating.ac2",
+            "title": "For every harness, canUseHarnessSync(harness,'gpt-5.6-sol','subscription') returns { allowed: true } (same for terra and luna)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-policy-gating.ac3",
+            "title": "The renamed SUBSCRIPTION_ONLY_MODEL_BLOCK.reason no longer hardcodes 'GPT-5.5', its single call site references the renamed const, typecheck passes, and gpt-5.5's existing gating behavior is preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-policy-gating.ac4",
+            "title": "The two new it.each blocks in harness-policy.test.ts pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "model-api-ids",
+        "title": "Add gpt-5.6 identity rows to dashboard server MODEL_API_IDS (settings route)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-09T21:01:10.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "api",
+          "issueLabel": "pan-2542",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/settings.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD Work Item 9: insert three identity-map rows into MODEL_API_IDS before the 'gpt-5.5-pro' line — { apiModel: 'gpt-5.6-sol' } etc. Same pattern as every other gpt-5.x row."
+        },
+        "items": [
+          {
+            "id": "model-api-ids.ac1",
+            "title": "MODEL_API_IDS['gpt-5.6-sol'] returns { apiModel: 'gpt-5.6-sol' } (same identity map for terra and luna)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "model-api-ids.ac2",
+            "title": "The three new rows appear before the existing 'gpt-5.5-pro' row and the diff preserves all existing rows unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-api-order",
+        "title": "Reorder gpt-5.6 ahead of gpt-5.5 in settings-api openaiOrder + comment fixups",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-09T21:01:10.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2542",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings-api.ts",
+            "src/dashboard/server/routes/command-deck.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD Work Item 12: replace the openaiOrder map (settings-api.ts lines 1304-1312) so gpt-5.6-sol/terra/luna are 0/1/2 and existing entries renumber to 10+ preserving their relative order; update the ordering comment. Also update the stale comment at command-deck.ts:525 from 'role-default model (gpt-5.5)' to '(gpt-5.6-sol)'."
+        },
+        "items": [
+          {
+            "id": "settings-api-order.ac1",
+            "title": "openaiOrder returns 0/1/2 for 'gpt-5.6-sol'/'gpt-5.6-terra'/'gpt-5.6-luna' and 10 for 'gpt-5.5', and preserves the relative order of all legacy entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-api-order.ac2",
+            "title": "The updated command-deck.ts:525 comment contains 'role-default model (gpt-5.6-sol)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ui-model-catalog",
+        "title": "Add gpt-5.6 entries to the Settings frontend model catalog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-09T21:01:10.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2542",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/modelCatalog.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD Work Item 4: insert three entries into the openai.models array before gpt-5.5 — Sol (Gem/premium/17.5), Terra (Sparkles/balanced/8.75), Luna (Zap/fast/3.5) with the exact capabilities and descriptions from the PRD. Prepend a 2026-07-09 addendum note to the trim comment. Gem/Sparkles/Zap are already imported — no new imports."
+        },
+        "items": [
+          {
+            "id": "ui-model-catalog.ac1",
+            "title": "The openai.models array renders 'GPT-5.6 Sol'/'GPT-5.6 Terra'/'GPT-5.6 Luna' before 'GPT-5.5' and contains costPer1MTokens 17.5/8.75/3.5 respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-model-catalog.ac2",
+            "title": "The trim comment gains a 2026-07-09 addendum noting the gpt-5.6 family was added without dropping anything, and the diff contains no new icon imports (Gem/Sparkles/Zap already imported)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "chat-model-picker",
+        "title": "Set gpt-5.6-sol as ohmypi default + list family in chat ModelPicker",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-09T21:01:10.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2542",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ModelPicker.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD Work Item 10 (chat picker half): change HARNESS_DEFAULT_MODEL.ohmypi from 'gpt-5.5' to 'gpt-5.6-sol' (line 32); prepend GPT-5.6 Sol/Terra/Luna to the openai FALLBACK_GROUPS list (lines 139-146) using the existing '$0/1M' placeholder style. Do not fill real numbers into the fallback list."
+        },
+        "items": [
+          {
+            "id": "chat-model-picker.ac1",
+            "title": "HARNESS_DEFAULT_MODEL.ohmypi defaults to 'gpt-5.6-sol'; the diff preserves the claude-code and codex entries unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chat-model-picker.ac2",
+            "title": "The openai FALLBACK_GROUPS list renders GPT-5.6 Sol/Terra/Luna ahead of GPT-5.5/GPT-5.4, each showing the '$0/1M' fallback-list costDisplay",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "shared-model-picker",
+        "title": "Set gpt-5.6-sol as ohmypi preferred default in shared ModelPicker",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-09T21:01:10.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-2542",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD Work Item 10 (shared picker half): at line 416, change the 'preferred' expression's ohmypi branch from 'gpt-5.5' to 'gpt-5.6-sol' (codex and claude-code branches unchanged). This must move together with the chat picker default per the in-code comment."
+        },
+        "items": [
+          {
+            "id": "shared-model-picker.ac1",
+            "title": "The 'preferred' expression resolves to 'gpt-5.6-sol' when newHarness === 'ohmypi'; the codex and claude-code branches are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-model-picker.ac2",
+            "title": "npm run typecheck passes without errors after the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "display-names",
+        "title": "Map gpt-5.6 backing models to display names (dashboard-utils.ts)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-09T21:01:10.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-2542",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/dashboard-utils.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ],
+          "acJustification": "Two ACs suffice: the new mappings (positive behavior) and preservation of the existing gpt-5.5-pro branch (no-loss). The change is a three-line insertion of display-name checks."
+        },
+        "narrative": {
+          "Action": "Per PRD Work Item 11: insert three display-name checks before the existing gpt-5.5-pro check (line 122) — backingModel containing 'gpt-5.6-sol'/'-terra'/'-luna' returns 'GPT-5.6 Sol'/'Terra'/'Luna'. Order matters: the more-specific gpt-5.6 checks precede gpt-5.5-pro."
+        },
+        "items": [
+          {
+            "id": "display-names.ac1",
+            "title": "The display-name mapper returns 'GPT-5.6 Sol'/'GPT-5.6 Terra'/'GPT-5.6 Luna' for backing models containing 'gpt-5.6-sol'/'gpt-5.6-terra'/'gpt-5.6-luna', evaluated before the gpt-5.5-pro branch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "display-names.ac2",
+            "title": "The diff preserves the existing gpt-5.5-pro and other display-name mappings unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cost-parser-regression",
+        "title": "Add gpt-5.6-sol Codex rollout cost-parser regression test + fixture",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-09T21:01:10.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-2542",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cost-parsers/__tests__/codex-parser-gpt56.test.ts",
+            "src/lib/cost-parsers/__tests__/fixtures/rollout-gpt56sol-nested.jsonl"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cost-parsers/__tests__/codex-parser-gpt56.test.ts"
+          ],
+          "expected_outputs": [
+            "codex-parser-gpt56.test.ts passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD Work Item 13: add codex-parser-gpt56.test.ts and fixtures/rollout-gpt56sol-nested.jsonl, structurally identical to the existing gpt-5.5 pair but with \"model\":\"gpt-5.6-sol\", asserting the parsed cost matches getPricingSync('openai','gpt-5.6-sol') ($5/$30 per 1M). Do not modify the existing gpt-5.5 fixtures/tests. Depends on cost-pricing (the pricing the test asserts against)."
+        },
+        "items": [
+          {
+            "id": "cost-parser-regression.ac1",
+            "title": "codex-parser-gpt56.test.ts passes: it parses fixtures/rollout-gpt56sol-nested.jsonl and returns a total cost consistent with getPricingSync('openai','gpt-5.6-sol') ($5/$30 per 1M)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-parser-regression.ac2",
+            "title": "The new test passes under vitest and the existing gpt-5.5 parser fixtures/tests are left unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-and-prompts",
+        "title": "Update docs, role/rule/skill prompts to reflect the gpt-5.6 family + new default",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-09T21:01:10.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2542",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx",
+            "reference/harness-landscape.mdx",
+            "docs/MODEL_RECOMMENDATIONS.md",
+            "docs/DECISIONS.md",
+            "roles/flywheel.md",
+            "sync-sources/rules/harness-routing-cliproxy.md",
+            "sync-sources/skills/pan-agent-activity/SKILL.md",
+            "skills/okf/docs/USAGE.md",
+            "skills/okf/scripts/selftest.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint passes on the changed docs/prompt files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD Work Item 14: reflect the new family and default across prose. harnesses.mdx + harness-landscape.mdx: name GPT-5.6 Sol as default, keep GPT-5.5 as previous/still-supported. MODEL_RECOMMENDATIONS.md: add sol/terra/luna pricing + context rows with 'not published at launch' in the SWE-bench column, repoint current-default language. DECISIONS.md TENET-11 + roles/flywheel.md + sync-sources rule + pan-agent-activity SKILL.md: 'gpt-5.5→codex' → 'gpt-5.5/gpt-5.6→codex'. skills/okf USAGE.md + selftest.sh: example '--model gpt-5.5' → 'gpt-5.6-sol'. Do NOT run selftest.sh (billed calls) and do NOT run `pan sync` (post-merge operator step). Invent no SWE-bench number."
+        },
+        "items": [
+          {
+            "id": "docs-and-prompts.ac1",
+            "title": "configuration/harnesses.mdx and reference/harness-landscape.mdx each contains GPT-5.6 Sol named as the default and retains GPT-5.5 as previous/still-supported",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-prompts.ac2",
+            "title": "docs/MODEL_RECOMMENDATIONS.md contains sol/terra/luna pricing + context-window rows with 'not published at launch' in the SWE-bench column and repoints current-default language to gpt-5.6-sol",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-prompts.ac3",
+            "title": "docs/DECISIONS.md TENET-11, roles/flywheel.md, sync-sources/rules/harness-routing-cliproxy.md, and sync-sources/skills/pan-agent-activity/SKILL.md each contains the 'gpt-5.5/gpt-5.6→codex' wording in place of 'gpt-5.5→codex'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-prompts.ac4",
+            "title": "skills/okf USAGE.md and selftest.sh example invocations use gpt-5.6-sol (selftest.sh not executed), npm run lint passes on the changed files, and no fabricated SWE-bench number for gpt-5.6 appears in any doc",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "register-model-ids",
+        "to": "capability-entries",
+        "type": "blocks"
+      },
+      {
+        "from": "register-model-ids",
+        "to": "model-fallback",
+        "type": "blocks"
+      },
+      {
+        "from": "cost-pricing",
+        "to": "cost-parser-regression",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-09-PAN-2542-feat-models-add-gpt-5-6-sol-terra-luna-family-make-gpt-5-6-sol-the-new-openai-default.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
