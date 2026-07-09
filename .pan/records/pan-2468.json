@@ -1,7 +1,79 @@
 {
   "issueId": "PAN-2468",
   "schemaVersion": 2,
-  "feedback": [],
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T05:17:37.198Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-08T05:17Z] review-agent → FAILED — seq 2",
+      "timestamp": "2026-07-08T05:17:42.640Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T05:17:42.686Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T06:06:23.585Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T06:09:04.370Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T07:27:50.923Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T07:27:59.868Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T09:00:29.373Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T15:00:54.723Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-08T15:03Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-08T15:03:48.111Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-08T15:28Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-07-08T15:28:03.075Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-08T15:03:48Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2468\n\nmnemos install writes archive bytes and Ollama auto-install can run curl|sh from background embedding jobs\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2468 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-07-08T15:28:03Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-2468 (attempt 1/3):\n\nFailed check: sync-target-branch\n\nSync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - sync-sources/hooks/record-cost-event.js.map\n\n## REQUIRED: Resolve merge conflicts BEFORE resubmitting\n\n1. Run: `git fetch origin main && git merge origin/main`\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request PAN-2468 -m \"Fixed sync-target-branch\"\n\nDo NOT resubmit until all repos sync cleanly and tests pass."
+    }
+  ],
   "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
@@ -106,16 +178,18 @@
   },
   "pipeline": {
     "issueId": "PAN-2468",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-08T05:16:31.230Z",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-07-09T04:02:04.749Z",
+    "reviewNotes": "Verification failed at sync-target-branch",
+    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - sync-sources/hooks/record-cost-event.js.map",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2488",
-    "lastVerifiedCommit": "e9214f9d087c128a72a6f5a31500de0c60a2364a",
-    "reviewRequestedAt": "2026-07-08T04:28:40.005Z",
+    "reviewedAtCommit": "53a1e35edd8bb8528aa142f60caff18b77f8ed10",
+    "lastVerifiedCommit": "53a1e35edd8bb8528aa142f60caff18b77f8ed10",
+    "reviewRequestedAt": "2026-07-08T15:01:02.130Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/records/pan-2468.json",
@@ -125,28 +199,40 @@
         "skills/okf/templates/repo/decisions/initial.md",
         "skills/okf/templates/repo/overview.md",
         "src/cli/commands/__tests__/knowledge.test.ts",
+        "src/cli/commands/conversations/embed.ts",
+        "src/dashboard/frontend/src/components/Agents/FleetAgentsView.tsx",
         "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
         "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
         "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.tsx",
         "src/dashboard/frontend/src/components/CommandDeck/RoleBadge.tsx",
+        "src/dashboard/frontend/src/components/primitives/AgentCard.tsx",
         "src/dashboard/frontend/src/types.ts",
         "src/dashboard/server/read-model.ts",
         "src/dashboard/server/routes/projects.ts",
         "src/dashboard/server/services/conversation-lifecycle.ts",
+        "src/dashboard/server/services/dashboard-db-task.ts",
+        "src/dashboard/server/services/dashboard-db-worker.ts",
         "src/lib/__tests__/settings-api.test.ts",
         "src/lib/agents/agent-state.ts",
         "src/lib/config-yaml/__tests__/knowledge-config.test.ts",
         "src/lib/config-yaml/defaults.ts",
         "src/lib/config-yaml/merge.ts",
+        "src/lib/conversations/__tests__/embeddings.test.ts",
+        "src/lib/conversations/embeddings/index.ts",
+        "src/lib/conversations/enrichment/index.ts",
         "src/lib/database/agent-backfill.ts",
         "src/lib/memory/settings.ts",
         "src/lib/overdeck/agents.ts",
         "src/lib/projects.ts",
         "src/lib/router-config.ts",
         "src/lib/settings-api.ts",
+        "sync-sources/hooks/record-cost-event.js",
+        "sync-sources/hooks/record-cost-event.js.map",
         "sync-sources/skills/pan-knowledge/SKILL.md",
+        "tests/fixtures/synced-skills.txt",
         "tests/integration/agent-spawning.test.ts",
         "tests/lib/memory/injection.test.ts",
+        "tests/unit/lib/overdeck/no-loss-matrix.ts",
         "tests/unit/lib/pan-444-post-merge-step0.test.ts"
       ],
       "declaredScopeUntouched": [
@@ -244,18 +330,23 @@
         "skills/okf/templates/repo/log.md",
         "skills/okf/templates/repo/overview.md",
         "src/cli/commands/__tests__/knowledge.test.ts",
+        "src/cli/commands/conversations/embed.ts",
         "src/cli/commands/knowledge.ts",
         "src/cli/index.ts",
+        "src/dashboard/frontend/src/components/Agents/FleetAgentsView.tsx",
         "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
         "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
         "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.tsx",
         "src/dashboard/frontend/src/components/CommandDeck/RoleBadge.tsx",
         "src/dashboard/frontend/src/components/CommandDeck/pipeline-helpers.test.ts",
         "src/dashboard/frontend/src/components/CommandDeck/pipeline-helpers.ts",
+        "src/dashboard/frontend/src/components/primitives/AgentCard.tsx",
         "src/dashboard/frontend/src/types.ts",
         "src/dashboard/server/read-model.ts",
         "src/dashboard/server/routes/projects.ts",
         "src/dashboard/server/services/conversation-lifecycle.ts",
+        "src/dashboard/server/services/dashboard-db-task.ts",
+        "src/dashboard/server/services/dashboard-db-worker.ts",
         "src/lib/__tests__/config-yaml-roles.test.ts",
         "src/lib/__tests__/ollama.test.ts",
         "src/lib/__tests__/role-definitions.test.ts",
@@ -269,6 +360,9 @@
         "src/lib/config-yaml/merge.ts",
         "src/lib/config-yaml/roles.ts",
         "src/lib/config-yaml/schema.ts",
+        "src/lib/conversations/__tests__/embeddings.test.ts",
+        "src/lib/conversations/embeddings/index.ts",
+        "src/lib/conversations/enrichment/index.ts",
         "src/lib/database/agent-backfill.ts",
         "src/lib/installers/__tests__/mnemos.test.ts",
         "src/lib/installers/mnemos.ts",
@@ -279,13 +373,17 @@
         "src/lib/projects.ts",
         "src/lib/router-config.ts",
         "src/lib/settings-api.ts",
+        "sync-sources/hooks/record-cost-event.js",
+        "sync-sources/hooks/record-cost-event.js.map",
         "sync-sources/skills/pan-knowledge/SKILL.md",
+        "tests/fixtures/synced-skills.txt",
         "tests/integration/agent-spawning.test.ts",
         "tests/lib/memory/injection.test.ts",
         "tests/unit/lib/cloister/postmerge-auto-retro.test.ts",
+        "tests/unit/lib/overdeck/no-loss-matrix.ts",
         "tests/unit/lib/pan-444-post-merge-step0.test.ts"
       ],
-      "recordedAt": "2026-07-08T03:26:46.995Z"
+      "recordedAt": "2026-07-08T05:16:41.870Z"
     }
   },
   "closeOut": {
@@ -293,9 +391,9 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 46303389,
-            "output": 24885,
-            "cacheRead": 43208832,
+            "input": 46561774,
+            "output": 25419,
+            "cacheRead": 43437568,
             "cacheWrite": 0
           },
           "openai/gpt-5.4-mini": {
@@ -305,9 +403,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 115458344,
-            "output": 239142,
-            "cacheRead": 111486464,
+            "input": 119907438,
+            "output": 249734,
+            "cacheRead": 115374592,
             "cacheWrite": 0
           }
         },
@@ -330,9 +428,9 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 46303389,
-          "output": 24885,
-          "cacheRead": 43208832,
+          "input": 46561774,
+          "output": 25419,
+          "cacheRead": 43437568,
           "cacheWrite": 0
         },
         "openai/gpt-5.4-mini": {
@@ -342,9 +440,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 115458344,
-          "output": 239142,
-          "cacheRead": 111486464,
+          "input": 119907438,
+          "output": 249734,
+          "cacheRead": 115374592,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -361,8 +459,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 113.80155525,
-        "pricingAsOf": "2026-07-08T05:16:31.294Z"
+        "usd": 118.86820925,
+        "pricingAsOf": "2026-07-09T04:02:04.864Z"
       }
     },
     "merges": [
@@ -370,6 +468,6 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "created": "2026-07-08T05:10:21.674Z",
-  "updated": "2026-07-08T05:16:31.302Z"
+  "created": "2026-07-08T05:17:37.055Z",
+  "updated": "2026-07-09T04:02:04.867Z"
 }
