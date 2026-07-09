@@ -7,8 +7,8 @@
  * setting cannot bypass the rule.
  *
  * Rules:
- *   1. gpt-5.5 requires ChatGPT subscription auth — OpenAI does not expose it
- *      via the standard API-key endpoint. (PAN-1067)
+ *   1. gpt-5.5 and the gpt-5.6 family require ChatGPT subscription auth — OpenAI
+ *      does not expose them via the standard API-key endpoint. (PAN-1067)
  *   2. ohmypi running an Anthropic model under Anthropic *subscription* auth is
  *      blocked (Claude Code subscription terms forbid using the Anthropic
  *      subscription with non-Anthropic harnesses). (Formerly applied to 'pi'.)
@@ -41,15 +41,15 @@ const OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK: HarnessPolicyDecision = {
     'Switch the Anthropic provider to API-key auth, or pick a non-Anthropic model for ohmypi.',
 }
 
-const GPT_5_5_API_KEY_BLOCK: HarnessPolicyDecision = {
+const SUBSCRIPTION_ONLY_MODEL_BLOCK: HarnessPolicyDecision = {
   allowed: false,
   reason:
-    'GPT-5.5 needs a ChatGPT/Codex subscription sign-in — it is not served by the plain OpenAI API key. ' +
+    'This OpenAI model needs a ChatGPT/Codex subscription sign-in — it is not served by the plain OpenAI API key. ' +
     'Run `codex login` on the host (workspace containers inherit the host sign-in), or pick a different model.',
 }
 
 /** Models that are gated to ChatGPT subscription auth only (no API-key path). */
-const SUBSCRIPTION_ONLY_OPENAI_MODELS = new Set(['gpt-5.5'])
+const SUBSCRIPTION_ONLY_OPENAI_MODELS = new Set(['gpt-5.5', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'])
 
 /**
  * Check whether a (model, authMode) pair is allowed, independent of harness.
@@ -61,7 +61,7 @@ export function canUseModelWithAuthSync(
 ): HarnessPolicyDecision {
   const provider = getProviderForModelSync(model)
   if (provider.name === 'openai' && SUBSCRIPTION_ONLY_OPENAI_MODELS.has(model) && authMode === 'api-key') {
-    return GPT_5_5_API_KEY_BLOCK
+    return SUBSCRIPTION_ONLY_MODEL_BLOCK
   }
   return ALLOWED
 }
