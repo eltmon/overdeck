@@ -41,6 +41,9 @@ const OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK: HarnessPolicyDecision = {
     'Switch the Anthropic provider to API-key auth, or pick a non-Anthropic model for ohmypi.',
 }
 
+/** Canonical reason returned for the blocked cell (exposed for tests + UI). */
+export const OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON = OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK.reason!
+
 const GPT_5_5_API_KEY_BLOCK: HarnessPolicyDecision = {
   allowed: false,
   reason:

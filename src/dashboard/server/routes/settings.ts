@@ -31,11 +31,11 @@ import {
 import { getClaudeAuthStatus } from '../../../lib/claude-auth.js';
 import { setUiTheme } from '../../../lib/ui-theme.js';
 import { getOpenAIAuthStatus } from '../../../lib/openai-auth.js';
-import { getProviderForModelSync, PROVIDERS, getKimiAnthropicBaseUrl } from '../../../lib/providers.js';
+import { PROVIDERS, getKimiAnthropicBaseUrl } from '../../../lib/providers.js';
 import { OpenRouterService } from '../services/openrouter-service.js';
 import { httpHandler } from './http-handler.js';
 import { getProviderAuthMode, getProviderEnvForModel } from '../../../lib/agents.js';
-import { canUseHarnessSync } from '../../../lib/harness-policy.js';
+import { buildHarnessPolicyDecisions } from '../../../lib/harness-policy-decisions.js';
 import {
   detectProviderEnvConflicts,
 } from '../../../lib/claude-settings-overlay.js';
@@ -1031,21 +1031,12 @@ const getHarnessPolicyRoute = HttpRouter.add(
         return jsonResponse({ error: 'Valid models parameter is required' }, { status: 400 });
       }
 
-      const decisions: Record<string, Record<string, { allowed: boolean; reason?: string }>> = {};
-      const authModeByProvider = new Map<string, Awaited<ReturnType<typeof getProviderAuthMode>>>();
-      for (const model of Array.from(new Set(models))) {
-        const providerName = getProviderForModelSync(model).name;
-        let authMode = authModeByProvider.get(providerName);
-        if (!authModeByProvider.has(providerName)) {
-          authMode = await getProviderAuthMode(model);
-          authModeByProvider.set(providerName, authMode);
-        }
-        decisions[model] = {
-          'claude-code': canUseHarnessSync('claude-code', model, authMode),
-          pi: canUseHarnessSync('pi', model, authMode),
-          codex: canUseHarnessSync('codex', model, authMode),
-        };
-      }
+      // The per-model loop is factored into a pure helper
+      // (src/lib/harness-policy-decisions.ts) so it can be unit-tested
+      // without an Effect HTTP server. The helper emits 'ohmypi' decisions
+      // — the prior 'pi' key was silently dropping the ToS block that
+      // pickers query under 'ohmypi' (PAN-2528).
+      const decisions = await buildHarnessPolicyDecisions(models, getProviderAuthMode);
       return jsonResponse({ decisions });
     });
   })),
