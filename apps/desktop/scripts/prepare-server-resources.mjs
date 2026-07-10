@@ -158,7 +158,15 @@ console.log(
 // ─── Install externals; rebuild node-pty for the Electron ABI ─────────────────
 
 const desktopPkg = JSON.parse(readFileSync(join(desktopDir, "package.json"), "utf8"));
-const electronVersion = desktopPkg.devDependencies.electron.replace(/^[\^~]/, "");
+// electron lives in devDependencies normally, but build-for-publish.mjs
+// promotes it to dependencies for the npm package — and npm publish re-runs
+// this script via prepublishOnly after that promotion.
+const electronRange = desktopPkg.devDependencies?.electron ?? desktopPkg.dependencies?.electron;
+if (!electronRange) {
+  console.error("[prepare-server] Cannot determine the Electron version from apps/desktop/package.json");
+  process.exit(1);
+}
+const electronVersion = electronRange.replace(/^[\^~]/, "");
 
 writeFileSync(
   join(serverDir, "package.json"),
@@ -188,7 +196,7 @@ execSync("npm install --omit=dev --no-audit --no-fund", {
 console.log(`[prepare-server] Rebuilding node-pty for Electron ${electronVersion}...`);
 execSync(
   `npx --no-install electron-rebuild --force --version ${electronVersion} ` +
-    `--module-dir "${serverDir}" --only node-pty-prebuilt-multiarch`,
+    `--module-dir "${serverDir}" --only @homebridge/node-pty-prebuilt-multiarch`,
   {
     cwd: desktopDir,
     stdio: "inherit",
