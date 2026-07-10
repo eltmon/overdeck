@@ -1,5 +1,5 @@
 1013 src/cli/commands/doctor.ts
-1039 src/cli/commands/done.ts
+1060 src/cli/commands/done.ts
 1575 src/cli/commands/start.ts
 1454 src/cli/index.ts
 1012 src/dashboard/frontend/src/components/AwaitingMergePage.tsx

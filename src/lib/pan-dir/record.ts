@@ -87,11 +87,29 @@ export interface PanIssueSwarmSupersededAttempt {
   supersededAt: string;
 }
 
+/**
+ * PAN-2372 WI-3 / FR-4: durable per-slot completion marker. A slot's `pan done`
+ * writes one of these keyed by `String(slotIndex)` so the swarm coordinator can
+ * tell a finished slot from one still working — without relying on the
+ * runtime-only agent-state plane, which is exactly what was being lost.
+ */
+export interface PanIssueSwarmSlotCompletion {
+  slotIndex: number;
+  itemId?: string;
+  agentId: string;
+  completedAt: string;
+}
+
 export interface PanIssueSwarmRecord {
   finalizedAt?: string;
   failedMergeBlock?: PanIssueSwarmFailedMergeBlock;
   slotAssignments?: PanIssueSwarmSlotAssignment[];
   supersededAttempts?: PanIssueSwarmSupersededAttempt[];
+  /**
+   * Keyed by `String(slotIndex)`. The coordinator (WI-4) consumes this to mark
+   * a slot durable-ready; merge/requeue clears the key (clearSwarmSlotCompletion).
+   */
+  slotCompletions?: Record<string, PanIssueSwarmSlotCompletion>;
 }
 
 export interface PanIssueRecoveryTrip {

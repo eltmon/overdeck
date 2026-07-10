@@ -435,9 +435,30 @@ async function resolveSlotCompletionContext(
   };
 }
 
-async function completeSlotWork(issueId: string, slot: SlotCompletionContext, comment?: string): Promise<void> {
+export async function completeSlotWork(issueId: string, slot: SlotCompletionContext, comment?: string): Promise<void> {
   const now = new Date().toISOString();
   const { saveAgentStateSync } = await import('../../lib/agents.js');
+
+  // PAN-2372 WI-3 / FR-4, FR-5: durably record this slot's completion and verify
+  // it persisted BEFORE any runtime-state write — see persistAndVerifySwarmSlotCompletion.
+  // statusOverrides are intentionally NOT written here; the coordinator (WI-4)
+  // derives item completion from this marker.
+  const { persistAndVerifySwarmSlotCompletion } = await import('../../lib/cloister/deacon-swarm-record.js');
+  const workspacePath = slot.workspacePath ?? process.cwd();
+  const persisted = persistAndVerifySwarmSlotCompletion(workspacePath, issueId, {
+    slotIndex: slot.slotIndex,
+    itemId: slot.slotItemId,
+    agentId: slot.agentId,
+    completedAt: now,
+  });
+  if (!persisted) {
+    console.error(chalk.red(
+      `✗ Slot ${slot.slotIndex} completion did NOT persist to ${issueId}'s record — ` +
+      `refusing to mark the slot done. Re-run \`pan done ${slot.agentId}\` so the ` +
+      `swarm coordinator can observe this slot as completed.`,
+    ));
+    process.exit(1);
+  }
 
   if (slot.agentState) {
     slot.agentState.status = 'stopped';
