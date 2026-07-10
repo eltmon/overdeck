@@ -23,6 +23,7 @@ import { extractNumberSync, resolveIssueIdSync } from '../../lib/issue-id.js';
 import { getWorkspacePanPaths } from '../../lib/pan-dir/index.js';
 import { restoreTrackedBeadsExport } from '../../lib/bd-mutex.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
+import { isStateMigrated } from '../../lib/state-home.js';
 import { findWorkspacePath } from '../../lib/lifecycle/archive-planning.js';
 import { changedFilesVsMain } from '../../lib/flywheel-merge-order.js';
 import {
@@ -593,10 +594,12 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     const { workspacePath } = await resolveDoneWorkspace(issueId, agentId);
 
     if (workspacePath && existsSync(workspacePath)) {
+      const doneProject = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+      const migratedState = await isStateMigrated(doneProject);
       // Commit any stale workspace orchestration artifacts from a previous interrupted
       // pan done run so the uncommitted-changes gate in runPreflightChecks doesn't
       // reject them.
-      try {
+      if (!migratedState) try {
         const { stdout: preDirty } = await execAsync(
           'git status --porcelain .pan/',
           { cwd: workspacePath, encoding: 'utf-8' }
@@ -629,7 +632,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         return;
       }
 
-      try {
+      if (!migratedState) try {
         const { stdout: postDirty } = await execAsync(
           'git status --porcelain .pan/',
           { cwd: workspacePath, encoding: 'utf-8' }

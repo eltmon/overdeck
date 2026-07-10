@@ -66,6 +66,8 @@ import {
 } from './spawn-prep.js';
 import { getConcurrencyLimits } from '../cloister/concurrency.js';
 import { listAgentStates } from './queries.js';
+import { findProjectByPathSync } from '../projects.js';
+import { isStateMigrated } from '../state-home.js';
 import {
   decideChannelsForWorkAgent,
   dismissDevChannelsDialog,
@@ -547,6 +549,10 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   if (role === 'work') {
     try {
       const workspace = options.workspace;
+      const project = findProjectByPathSync(workspace);
+      if (project && await isStateMigrated(project)) {
+        console.warn(`[agents] Deferred legacy .pan/ index cleanup for ${options.issueId} — migrated projects use gitignored .overdeck/ runtime files; historical entries retire with the branch`);
+      } else {
       const { stdout: trackedFiles } = await execAsync(
         'git ls-files .pan/continue.json .pan/spec.vbrief.json',
         { cwd: workspace },
@@ -569,6 +575,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
         } else {
           console.warn(`[agents] Skipping .pan/ untrack for ${options.issueId} — .pan/ paths have uncommitted changes`);
         }
+      }
       }
     } catch (err: any) {
       console.warn(`[agents] .pan/ untrack cleanup failed for ${options.issueId}: ${err.message}`);

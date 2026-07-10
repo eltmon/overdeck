@@ -19,6 +19,7 @@ import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle
 import { withBdMutex } from '../../../../lib/bd-mutex.js';
 import { validateProviderHealth } from '../../../../lib/provider-health.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../../../../lib/projects.js';
+import { isStateMigrated } from '../../../../lib/state-home.js';
 import { getWorkspaceStackHealth } from '../../../../lib/workspace/stack-health.js';
 import { writeAutoStartVBrief } from '../../../../lib/vbrief/auto-synthesize.js';
 import { findPlan, readPlan } from '../../../../lib/vbrief/io.js';
@@ -506,7 +507,8 @@ export const postAgentsRoute = HttpRouter.add(
       console.warn(`[agents] agent-spawn-host-override: ${issueId.toUpperCase()} (dashboard-confirmed)`);
     }
 
-    if (existsSync(workspacePanContinuePath) || existsSync(workspacePanDir)) {
+    const migratedState = projectConfig ? yield* Effect.promise(() => isStateMigrated(projectConfig)) : false;
+    if (!migratedState && (existsSync(workspacePanContinuePath) || existsSync(workspacePanDir))) {
       // Commit workspace orchestration artifacts before handing off to the work agent.
       // The entire block is best-effort — never let git errors abort the agent start.
       yield* Effect.gen(function* () {
