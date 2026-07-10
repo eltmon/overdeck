@@ -223,6 +223,7 @@ function destroyTray() {
 */
 const BASE_PORT = 7825;
 const MAX_RESTART_DELAY_MS = 3e4;
+const MAX_RESTART_ATTEMPTS = 8;
 const SIGTERM_GRACE_MS = 3e3;
 let serverProcess = null;
 let restartAttempt = 0;
@@ -236,6 +237,8 @@ function resolvePort() {
 	return BASE_PORT + restartAttempt % 10;
 }
 function startServer(onReady) {
+	quitting = false;
+	restartAttempt = 0;
 	onReadyCallback = onReady;
 	spawnServer();
 }
@@ -259,7 +262,7 @@ function spawnServer() {
 			TERM: process.env.TERM || "xterm-256color",
 			COLORTERM: process.env.COLORTERM || "truecolor",
 			LANG: process.env.LANG || "en_US.UTF-8",
-			ELECTRON_RUN_AS_NODE: void 0
+			ELECTRON_RUN_AS_NODE: "1"
 		},
 		stdio: [
 			"ignore",
@@ -276,8 +279,9 @@ function spawnServer() {
 	});
 	child.on("spawn", () => {
 		console.log(`[desktop/server] spawned pid=${child.pid} port=${port}`);
-		waitForServer(`http://127.0.0.1:${port}`, () => {
-			console.log(`[desktop/server] ready on port ${port}`);
+		waitForServer(`http://127.0.0.1:${port}`, (healthy) => {
+			console.log(`[desktop/server] ready on port ${port} (healthy=${String(healthy)})`);
+			if (healthy) restartAttempt = 0;
 			onReadyCallback?.(port, `ws://127.0.0.1:${port}`);
 		});
 	});
@@ -297,13 +301,13 @@ function waitForServer(url, callback, maxMs = 3e4) {
 	const interval = setInterval(() => {
 		if (Date.now() - start > maxMs) {
 			clearInterval(interval);
-			callback();
+			callback(false);
 			return;
 		}
 		fetch(url + "/api/health", { signal: AbortSignal.timeout(1e3) }).then((r) => {
 			if (r.ok) {
 				clearInterval(interval);
-				callback();
+				callback(true);
 			}
 		}).catch(() => {});
 	}, 500);
@@ -311,6 +315,10 @@ function waitForServer(url, callback, maxMs = 3e4) {
 function scheduleRestart() {
 	if (quitting) return;
 	restartAttempt++;
+	if (restartAttempt > MAX_RESTART_ATTEMPTS) {
+		console.error(`[desktop/server] server failed ${MAX_RESTART_ATTEMPTS} consecutive times — giving up. Use the app menu's dashboard restart to retry.`);
+		return;
+	}
 	const delay = Math.min(1e3 * Math.pow(2, restartAttempt - 1), MAX_RESTART_DELAY_MS);
 	console.log(`[desktop/server] restarting in ${delay}ms (attempt ${restartAttempt})`);
 	restartTimer = setTimeout(() => {
@@ -659,6 +667,10 @@ function buildMenuTemplate() {
 			},
 			{ type: "separator" },
 			{
+				label: "Flywheel Documentation",
+				click: () => void electron.shell.openExternal("https://github.com/eltmon/overdeck/blob/main/docs/FLYWHEEL.md")
+			},
+			{
 				label: "Overdeck on GitHub",
 				click: () => void electron.shell.openExternal("https://github.com/eltmon/overdeck")
 			},
@@ -880,7 +892,8 @@ const IPC = {
 	GET_UPDATE_STATUS: "pan:get-update-status",
 	CHECK_FOR_UPDATES: "pan:check-for-updates",
 	DOWNLOAD_UPDATE: "pan:download-update",
-	QUIT_AND_INSTALL: "pan:quit-and-install"
+	QUIT_AND_INSTALL: "pan:quit-and-install",
+	RESTART_DASHBOARD: "pan:restart-dashboard"
 };
 let mainWindow = null;
 let serverPort = 0;
@@ -888,6 +901,8 @@ let serverUrl = "";
 let serverWsUrl = "";
 let isQuitting = false;
 const terminalWindows = /* @__PURE__ */ new Map();
+if (!electron.app.requestSingleInstanceLock()) electron.app.exit(0);
+electron.app.on("second-instance", () => showOrCreateWindow());
 function resolveResourcePath(fileName) {
 	const candidates = [
 		node_path.join(process.resourcesPath ?? "", "resources", fileName),
@@ -997,6 +1012,17 @@ function registerIpcHandlers() {
 	});
 	electron.ipcMain.on(IPC.QUIT_AND_INSTALL, () => {
 		quitAndInstall();
+	});
+	electron.ipcMain.handle(IPC.RESTART_DASHBOARD, async () => {
+		console.log("[main] manual dashboard restart requested");
+		stopServer();
+		await new Promise((resolve) => setTimeout(resolve, 500));
+		startServer((port, wsUrl) => {
+			serverPort = port;
+			serverUrl = `http://127.0.0.1:${port}`;
+			serverWsUrl = wsUrl;
+			console.log(`[main] dashboard restarted on ${serverUrl}`);
+		});
 	});
 }
 function createWindow() {

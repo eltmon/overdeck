@@ -22,7 +22,8 @@ const IPC = {
 	MENU_ACTION: "pan:menu-action",
 	GET_DESKTOP_SETTINGS: "pan:get-desktop-settings",
 	UPDATE_DESKTOP_SETTING: "pan:update-desktop-setting",
-	NOTIFY: "pan:notify"
+	NOTIFY: "pan:notify",
+	RESTART_DASHBOARD: "pan:restart-dashboard"
 };
 electron.contextBridge.exposeInMainWorld("overdeckBridge", {
 	isDesktopApp: () => true,
@@ -51,7 +52,8 @@ electron.contextBridge.exposeInMainWorld("overdeckBridge", {
 	},
 	getDesktopSettings: () => electron.ipcRenderer.invoke(IPC.GET_DESKTOP_SETTINGS),
 	updateDesktopSetting: (key, value) => electron.ipcRenderer.invoke(IPC.UPDATE_DESKTOP_SETTING, key, value),
-	notify: (eventType, title, body) => electron.ipcRenderer.invoke(IPC.NOTIFY, eventType, title, body)
+	notify: (eventType, title, body) => electron.ipcRenderer.invoke(IPC.NOTIFY, eventType, title, body),
+	restartDashboard: () => electron.ipcRenderer.invoke(IPC.RESTART_DASHBOARD)
 });
 //#endregion
 
