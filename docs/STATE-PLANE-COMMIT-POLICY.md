@@ -28,6 +28,23 @@ Workspace runtime files are separate and gitignored under `.overdeck/` in the
 workspace. Project context is code-owned at `.overdeck/context/` on `main`.
 Neither belongs to `overdeck-state`.
 
+## Deletion protection
+
+The branch must never be deleted — it is the sole home of permanent state and
+shares no history with any code branch. For this repository the protection is
+layered (added 2026-07-10):
+
+- GitHub ruleset `protect-overdeck-state` blocks deletion and force pushes of
+  `refs/heads/overdeck-state`, with no bypass actors.
+- `.husky/pre-push` refuses to push a deletion of the branch.
+- The dedicated state worktree keeps the branch checked out, so git refuses a
+  local `git branch -D`.
+- The universal bundled rule `sync-sources/rules/protect-overdeck-state-branch.md`
+  forbids agents from deleting it in any form, on every machine and project.
+
+The ruleset and hook cover this repository only; each migrated project needs
+its own remote-side rule (see the migration runbook).
+
 ## Legacy compatibility
 
 The old permanent locations (`.pan/records/`, `.pan/continues/`,
@@ -74,3 +91,7 @@ lexerra, and tindra.
    carries zero state paths, and run Doctor. Only then treat the project as
    migrated; a branch without a valid marker remains migration-in-progress and
    all readers continue to resolve legacy state.
+8. Protect the new branch on the remote: block deletion and force pushes of
+   `overdeck-state` (GitHub: a repository ruleset targeting the branch, as this
+   repository has; GitLab: a protected-branch entry). Deleting the state branch
+   destroys the canonical state plane, and no code branch can restore it.

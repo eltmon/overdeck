@@ -166,3 +166,11 @@ uncomfortable, `git clone --single-branch` or `--filter=blob:none` skips it.
 You almost can't: GitHub refuses the pull request, and the CI guard plus the
 local pre-push hook reject the merge commit. If one is ever forced through,
 `git revert -m 1 <merge-commit>` restores `main` completely.
+
+**Can the `overdeck-state` branch be deleted?**
+Protect it like `main` — it is the only home of your pipeline state, and no
+code branch can restore it. Add a rule on your remote that blocks deletion
+and force pushes of `overdeck-state` (GitHub: a repository ruleset targeting
+the branch; GitLab: a protected-branch entry). Locally, git already refuses
+to delete the branch while the state worktree has it checked out, and
+Overdeck's bundled agent rules forbid agents from deleting it in any form.
