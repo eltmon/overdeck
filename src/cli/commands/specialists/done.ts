@@ -250,6 +250,16 @@ export async function doneCommand(
   }
 }
 
+/** CLI boundary: durable work finishes before forcing exit past stray open handles. */
+export async function doneAndExitCommand(
+  specialist: string,
+  issueId: string,
+  options: DoneOptions,
+): Promise<never> {
+  await doneCommand(specialist, issueId, options);
+  process.exit(0);
+}
+
 function formatStatus(status: string): string {
   switch (status) {
     case 'passed':
