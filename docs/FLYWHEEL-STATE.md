@@ -2398,3 +2398,20 @@ stale (written 2026-07-08); re-verified all order-book items against live GitHub
   (would fight deacon janitor; may be operator's).
 - NEXT: B7 commit progress / pan done → review→test→merge (TENET-10). On B7 land+closeout+green →
   dispatch B8=PAN-2364 (unfreezes A9). Watch planning-pan-1987 escalation.
+
+## RUN-62 tick 9 (2026-07-10 ~14:23 local) — B7 at 6/7 beads (NOT stalled); planning-1987 self-resolved
+
+- **B7 = PAN-2372 healthy, was NOT wedged** (tick-8 concern unfounded — it was working big beads).
+  Now 6 commits: +WI-4 (honor durable slot-completion marker in slot classifier) +WI-6 (state-plane
+  dirt = clean in slot worktree check). ~6/7 beads; remaining ≈WI-7 infer_completion default flip +
+  docs. agent-pan-2372 (glm-5.2) at 83% ctx (compact approaching, PAN-1781 handles), cost $26.87.
+  Auto mode, no nudge needed. Should pan done soon.
+- **planning-pan-1987 SELF-RESOLVED** — session gone, no work agent spawned. Orphan planning exited
+  cleanly; no drain violation. Anomaly closed.
+- **A9 = PAN-2229** still frozen by B8/PAN-2364 (expected; no action).
+- **Main HEAD advanced to 9a5d12a7** `fix(desktop): stop packaged-app fork bomb (PAN-2559)` —
+  operator/strike desktop fix (NOT order-book, no conflict w/ B7 cloister work). CI in_progress, not
+  red (guard success; test/build/lint building). Let it complete.
+- **Cross-project noise:** agent-min-865-review (MYN, deacon-managed) — not my scope.
+- NEXT: catch B7 pan done → review→test→merge (TENET-10 FULL suite, no --changed on cloister,
+  verify vs origin/main). On B7 land+closeout+main-green → dispatch B8=PAN-2364 (unfreezes A9).
