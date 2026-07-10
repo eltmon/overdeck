@@ -1,0 +1,24 @@
+{
+  "config": {
+    "auto_pickup_backlog": false,
+    "maxAgents": 4,
+    "minAgents": 2,
+    "require_uat_before_merge": true
+  },
+  "agents": [
+    { "id": "agent-pan-100", "issueId": "PAN-100", "state": "running" },
+    { "id": "agent-pan-200", "issueId": "PAN-200", "state": "running" }
+  ],
+  "issues": [
+    {
+      "id": "PAN-9003",
+      "title": "Refactor sequence.md writer into a single chokepoint",
+      "author": "eltmon",
+      "assignees": ["eltmon"],
+      "labels": ["ready", "planned"],
+      "ready": true,
+      "planned": true,
+      "status": "backlog"
+    }
+  ]
+}
