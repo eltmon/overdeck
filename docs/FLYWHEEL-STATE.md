@@ -2355,3 +2355,27 @@ stale (written 2026-07-08); re-verified all order-book items against live GitHub
   (why ready-to-merge slot-1 isn't merged; whether nudging ready slots is the thrash bug). Not
   hand-merging slot branches / not manual pan done — deacon owns swarm advance.
 - NEXT: tick 7 — re-check A9 slot state (advance vs confirmed stall); B7 bead progress; main green.
+
+## RUN-62 tick 7 (2026-07-10 ~13:44 local) — A9 CONFIRMED frozen by B8/PAN-2364 bug; B7 at WI-3
+
+- **Main green.**
+- **B7 = PAN-2372** advancing strongly — now 4 commits incl. `5b103f1e` **WI-3: durable
+  slot-completion marker written+verified by slot pan done** (the core statusOverrides atomicity
+  fix). agent-pan-2372 (glm-5.2) alive, ~4/7 beads. Priority, continue.
+- **A9 = PAN-2229 swarm CONFIRMED FROZEN by the B8/PAN-2364 bug.** Deacon log root cause: slot-1
+  (`eval-prompt-harness`) hit `failed-merge` at cycle 21948 (17:05); since then
+  `[swarm] blocked PAN-2229: failed-merge slot 1` EVERY patrol (21949→21968+, 45min+). All 3 slots
+  are done (slot-2 merged, slot-1+slot-3 ready-to-merge) but the ONE failed-merge slot freezes the
+  whole issue — slot-3 can't merge, remaining beads (ci-prompt-change-gate, prompt-eval-docs)
+  deferred "slot cap reached". This is textbook PAN-2364 ("one failed-merge slot freezes the entire
+  issue's swarm"). **Systemic:** same signature simultaneously froze PAN-2528, MIN-867, LEX-1
+  (cross-project/pre-existing, NOT this run's scope). Also: `pan swarm status` shows slot-1
+  ready-to-merge while deacon holds it failed-merge (status-surface discrepancy).
+- **Attempted sanctioned recovery** `pan swarm recover PAN-2229 1 --action retry` → **did NOT clear
+  it** (failed-merge re-asserts next patrol). Did NOT `--action drop` (would lose the core
+  eval-harness work). **Decision: leave A9 frozen pending B8.** Not hand-merging, not thrashing
+  retries. A9 is Lane A parallel (not critical path) and its frozen slots don't block B7 (single
+  work agent, not swarm). Added live-repro evidence to PAN-2364 (comment #4938033607) for the B8
+  implementer. **B8 now blocks live work → clear next dispatch when B7 lands.**
+- NEXT: keep B7 → pan done → review→test→merge (TENET-10). On B7 land+closeout+main-green →
+  dispatch B8=PAN-2364 (validated by A9 repro). A9 unfreezes once B8's per-slot isolation lands.
