@@ -2564,3 +2564,15 @@ stale (written 2026-07-08); re-verified all order-book items against live GitHub
 - NEXT: monitor B8 bead progress → pan done → review→test→merge (TENET-10 full suite; if PAN-2567
   stuck-after-review loop recurs → manual squash once reviewed+green+orthogonal). B8 lands → A9
   unfreezes → then B9-B13 (re-verify PRDs vs main). Substrate bugs filed this run: PAN-2567, PAN-2569.
+
+## RUN-62 tick 20 (2026-07-10 ~17:36 local) — B8 3/6 beads (healthy); main green
+
+- **B8 = PAN-2364** advancing well — 3/6 beads: +`38da6775` (coordinator continues merging/dispatching
+  around blocked slots) +`0f7fb0f1` (recordStalledSlotRecovery blocks each stalled slot individually).
+  agent-pan-2364 alive, healthy. Multi-tick effort continuing. No action.
+- **B7 = PAN-2372** still merged+verifying-on-main (~1hr; deacon close-out slow but owns it; not
+  blocking B8). Watch: if stuck in verifying-on-main indefinitely, check deacon verify-on-main step.
+- **A9 = PAN-2229** frozen (expected — clears when B8 merges).
+- **Main green** (bd18ee8c64, all success).
+- NEXT: B8 bead progress → pan done → review→test→merge (TENET-10 full suite; PAN-2567 remedy if
+  stuck-after-review recurs). B8 lands → A9 unfreezes → B9-B13 (re-verify PRDs vs main).
