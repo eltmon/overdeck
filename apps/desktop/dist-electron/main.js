@@ -255,7 +255,9 @@ function spawnServer() {
 	const child = node_child_process.spawn(process.execPath, [entry], {
 		env: {
 			...process.env,
+			API_PORT: String(port),
 			OVERDECK_PORT: String(port),
+			OVERDECK_FRONTEND_DIR: resolveServerStaticDir() ?? void 0,
 			OVERDECK_AUTH_TOKEN: authToken,
 			OVERDECK_MODE: "desktop",
 			OVERDECK_NO_BROWSER: "1",
@@ -930,6 +932,7 @@ function resolveServerStaticDir() {
 }
 function resolveWindowUrl() {
 	if (isDevelopment) return process.env.VITE_DEV_SERVER_URL;
+	if (serverUrl) return serverUrl;
 	return `${DESKTOP_SCHEME}://app/index.html`;
 }
 function createTerminalWindow(sessionName, title) {

@@ -33,9 +33,9 @@
     "start": "bun run scripts/start-electron.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --configLoader runner --passWithNoTests",
-    "dist:linux": "electron-builder --linux AppImage --publish never",
-    "dist:mac": "electron-builder --mac dmg --universal --publish never",
-    "dist:win": "electron-builder --win nsis --publish never",
+    "dist:linux": "node scripts/prepare-server-resources.mjs && electron-builder --linux AppImage --publish never",
+    "dist:mac": "node scripts/prepare-server-resources.mjs && electron-builder --mac dmg --universal --publish never",
+    "dist:win": "node scripts/prepare-server-resources.mjs && electron-builder --win nsis --publish never",
     "postinstall": "electron-rebuild -f -w node-pty 2>/dev/null; exit 0"
   },
   "dependencies": {
@@ -66,12 +66,12 @@
     ],
     "extraResources": [
       {
-        "from": "../../dist/dashboard/server.js",
-        "to": "server/server.js"
-      },
-      {
-        "from": "../../dist/dashboard/public",
-        "to": "server/public"
+        "from": "server",
+        "to": "server",
+        "filter": [
+          "**/*",
+          "!**/*.map"
+        ]
       },
       {
         "from": "resources",

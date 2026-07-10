@@ -16,7 +16,7 @@ import * as ChildProcess from "node:child_process";
 import * as Crypto from "node:crypto";
 import * as FS from "node:fs";
 
-import { resolveServerEntry } from "./main.js";
+import { resolveServerEntry, resolveServerStaticDir } from "./main.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -78,7 +78,13 @@ function spawnServer(): void {
     {
       env: {
         ...process.env,
+        // The server's config reads API_PORT || PORT (src/dashboard/server/config.ts)
+        API_PORT: String(port),
         OVERDECK_PORT: String(port),
+        // Packaged layout puts the frontend at resources/server/public, which
+        // the server cannot derive from its own bundle path (it assumes a
+        // repo-root dist/dashboard/public layout).
+        OVERDECK_FRONTEND_DIR: resolveServerStaticDir() ?? undefined,
         OVERDECK_AUTH_TOKEN: authToken,
         OVERDECK_MODE: "desktop",
         OVERDECK_NO_BROWSER: "1",

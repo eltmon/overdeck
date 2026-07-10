@@ -117,6 +117,14 @@ export function resolveWindowUrl(): string {
   if (isDevelopment) {
     return process.env.VITE_DEV_SERVER_URL!;
   }
+  // Serve the window from the embedded server's HTTP origin so the frontend's
+  // relative /api fetches and /ws/* sockets are same-origin, exactly like the
+  // browser dashboard. The overdeck:// protocol page has no working data
+  // layer (relative fetches resolve to the app bundle, PAN-2561) — it is only
+  // the pre-server fallback.
+  if (serverUrl) {
+    return serverUrl;
+  }
   return `${DESKTOP_SCHEME}://app/index.html`;
 }
 
