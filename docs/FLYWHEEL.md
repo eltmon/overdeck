@@ -173,6 +173,52 @@ The default brief lives at [`docs/flywheel-brief.md`](./flywheel-brief.md). Cust
 
 Do not put secrets, machine-local paths, or one-time session state in a brief. Put durable operating rules in the brief and transient run state in the Flywheel run directory.
 
+## Prompt-regression protection
+
+`roles/flywheel.md` and `docs/flywheel-brief.md` are load-bearing safety surfaces: the soul of the Flywheel orchestrator and the operating contract it reads every run. A prior incident showed that well-intentioned commits can silently strip rail text (author/assignee allowlists, vetoed-is-absolute, the saturation cap, the `auto_pickup_backlog` switch) without any test catching the regression. PAN-2229 closed that hole with three layers of mechanical protection. Every layer covers a different failure mode — all three are required.
+
+### The three layers
+
+| Layer | What it does | Where it lives | Runs in CI? |
+| --- | --- | --- | --- |
+| **Deterministic invariant tests** | Assert the load-bearing rail text exists in the prompt files themselves (e.g. "vetoed-is-absolute", "auto_pickup_backlog", author/assignee allowlist). Pure Vitest, no model calls. | `tests/unit/prompts/prompt-invariants.test.ts` | Yes |
+| **Live golden-scenario evals** | Load the actual prompt and ask a model (at `temperature: 0`) whether it still drives the right behavior on fixture scenarios — flywheel launches an agent (not a report) given a fixture board; review synthesis still emits the canonical blocker format given fixture reviewer reports. | `evals/flywheel-launch.eval.ts`, `evals/review-blocker-format.eval.ts` | No — operator-driven only |
+| **CI prompt-gate trailer job** | Refuses any PR whose diff touches `roles/*.md` or `docs/flywheel-brief.md` without a `Prompt-Change:` trailer in the commit message footer. | `scripts/check-prompt-trailer.sh` (wired into CI) | Yes |
+
+The invariant tests run on every `npm test`. The trailer job runs on every PR. The live evals run only when an operator explicitly invokes them with `OVERDECK_EVAL_MODEL` set; they are deliberately kept out of blocking CI because they call a model and would add cost plus nondeterminism.
+
+### When deliberately changing a prompt file
+
+When an operator intentionally edits `roles/flywheel.md`, `docs/flywheel-brief.md`, or any other file under `roles/*.md`:
+
+1. Update the role/brief content.
+2. Update the deterministic invariants in `tests/unit/prompts/prompt-invariants.test.ts` if the rail text changes. If you remove a rail, delete its invariant too — a stale invariant that no longer matches the prompt will silently pass.
+3. If the change affects behavior the live evals exercise, re-run them locally with `OVERDECK_EVAL_MODEL=<model> npm run eval` and verify the case still scores.
+4. Add a `Prompt-Change:` trailer to the commit footer explaining the change. The CI job parses the trailer key, not the value — keep the value short and human-readable.
+5. Do not amend pushed commits to add the trailer. If a commit already landed without one, ship a follow-up commit carrying the trailer rather than rewriting history.
+
+Example commit subject + footer:
+
+```text
+fix(flywheel): restore the author-gate negative case rail
+
+The flywheel role lost the "you may only touch the prompt under your
+own author gate" rail. Restore it verbatim.
+
+Prompt-Change: restored author-gate rail; behavior unchanged elsewhere
+```
+
+### Gated paths
+
+The CI prompt-gate trailer job matches these paths exactly:
+
+- `roles/*.md` — every role prompt the Flywheel coordinates, including the flywheel orchestrator, plan, work, review, test, and any specialist roles added later.
+- `docs/flywheel-brief.md` — the operating contract the orchestrator reads at the start of every run.
+
+Both paths require a `Prompt-Change:` trailer on every commit that diffs them. Anything else in the repository is unaffected.
+
+See [PAN-2229](https://github.com/eltmon/overdeck/issues/2229) for the full design — including the incident that motivated the protection, the layer-by-layer rationale, and the cost math for the live evals.
+
 ## Skill → CLI → API → UI map
 
 | Layer | Surface | Responsibility |
