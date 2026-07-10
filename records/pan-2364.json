@@ -1,19 +1,97 @@
 {
   "issueId": "PAN-2364",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-10T22:34:32.751Z"
+    },
+    {
+      "timestamp": "2026-07-10T22:47:49.244Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    }
+  ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-baseline.txt",
+      "tests/unit/lib/cloister/deacon-swarm-completion.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/SWARM.md",
+      "src/cli/commands/swarm.ts",
+      "src/lib/cloister/deacon-swarm.ts",
+      "src/lib/cloister/swarm-failed-slot.ts",
+      "src/lib/pan-dir/record.ts",
+      "tests/unit/cli/commands/swarm.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-hold.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-recovery.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-stall.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/SWARM.md",
+      "scripts/file-size-baseline.txt",
+      "src/cli/commands/swarm.ts",
+      "src/lib/cloister/deacon-swarm.ts",
+      "src/lib/cloister/swarm-failed-slot.ts",
+      "src/lib/pan-dir/record.ts",
+      "tests/unit/cli/commands/swarm.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-completion.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-hold.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-recovery.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-stall.test.ts"
+    ],
+    "recordedAt": "2026-07-10T22:47:42.876Z"
+  },
   "created": "2026-07-10T20:57:17.176Z",
-  "updated": "2026-07-10T21:08:29.244Z",
+  "updated": "2026-07-10T22:47:49.297Z",
   "pipeline": {
     "issueId": "PAN-2364",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-10T21:08:29.211Z",
-    "inspectNotes": "Inspecting bead per-slot-block-storage"
+    "updatedAt": "2026-07-10T22:47:49.245Z",
+    "inspectNotes": "Inspecting bead per-slot-block-storage",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2571",
+    "reviewRequestedAt": "2026-07-10T22:47:49.245Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "scripts/file-size-baseline.txt",
+        "tests/unit/lib/cloister/deacon-swarm-completion.test.ts"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/SWARM.md",
+        "src/cli/commands/swarm.ts",
+        "src/lib/cloister/deacon-swarm.ts",
+        "src/lib/cloister/swarm-failed-slot.ts",
+        "src/lib/pan-dir/record.ts",
+        "tests/unit/cli/commands/swarm.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-hold.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-recovery.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-stall.test.ts"
+      ],
+      "actualChangedFiles": [
+        "docs/SWARM.md",
+        "scripts/file-size-baseline.txt",
+        "src/cli/commands/swarm.ts",
+        "src/lib/cloister/deacon-swarm.ts",
+        "src/lib/cloister/swarm-failed-slot.ts",
+        "src/lib/pan-dir/record.ts",
+        "tests/unit/cli/commands/swarm.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-completion.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-hold.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-recovery.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-stall.test.ts"
+      ],
+      "recordedAt": "2026-07-10T22:47:42.876Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -34,11 +112,19 @@
             "cacheWrite": 180006
           }
         },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 14362,
+            "output": 4919,
+            "cacheRead": 247854,
+            "cacheWrite": 100204
+          }
+        },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 405733,
-            "output": 60827,
-            "cacheRead": 15360768,
+            "input": 1021359,
+            "output": 186660,
+            "cacheRead": 66250752,
             "cacheWrite": 0
           }
         }
@@ -56,21 +142,59 @@
           "cacheRead": 6644060,
           "cacheWrite": 180006
         },
+        "anthropic/claude-sonnet-5": {
+          "input": 14362,
+          "output": 4919,
+          "cacheRead": 247854,
+          "cacheWrite": 100204
+        },
         "custom/kimi-k2.7-code": {
-          "input": 405733,
-          "output": 60827,
-          "cacheRead": 15360768,
+          "input": 1021359,
+          "output": 186660,
+          "cacheRead": 66250752,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 14.830811,
-        "pricingAsOf": "2026-07-10T21:08:29.240Z"
+        "usd": 25.966086,
+        "pricingAsOf": "2026-07-10T22:47:49.296Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2571"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5"
+  "model": "kimi-k2.7-code",
+  "statusOverrides": {
+    "stalled-slots-block-individually": "completed",
+    "stalled-slots-block-individually.ac1": "completed",
+    "stalled-slots-block-individually.ac2": "completed",
+    "stalled-slots-block-individually.ac3": "completed",
+    "coordinator-per-slot-guard": "completed",
+    "coordinator-per-slot-guard.ac1": "completed",
+    "coordinator-per-slot-guard.ac2": "completed",
+    "coordinator-per-slot-guard.ac3": "completed",
+    "coordinator-per-slot-guard.ac4": "completed",
+    "coordinator-per-slot-guard.ac5": "completed",
+    "per-slot-block-storage": "completed",
+    "per-slot-block-storage.ac1": "completed",
+    "per-slot-block-storage.ac2": "completed",
+    "per-slot-block-storage.ac3": "completed",
+    "per-slot-block-storage.ac4": "completed",
+    "docs-swarm-per-slot-isolation": "completed",
+    "docs-swarm-per-slot-isolation.ac1": "completed",
+    "docs-swarm-per-slot-isolation.ac2": "completed",
+    "status-lists-blocked-slots": "completed",
+    "status-lists-blocked-slots.ac1": "completed",
+    "status-lists-blocked-slots.ac2": "completed",
+    "status-lists-blocked-slots.ac3": "completed",
+    "recover-retry-fresh-attempt": "completed",
+    "recover-retry-fresh-attempt.ac1": "completed",
+    "recover-retry-fresh-attempt.ac2": "completed",
+    "recover-retry-fresh-attempt.ac3": "completed",
+    "recover-retry-fresh-attempt.ac4": "completed",
+    "recover-retry-fresh-attempt.ac5": "completed"
+  }
 }
