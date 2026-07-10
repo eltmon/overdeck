@@ -1,0 +1,29 @@
+{
+  "config": {
+    "auto_pickup_backlog": true,
+    "minAgents": 1,
+    "maxAgents": 4,
+    "require_uat_before_merge": true,
+    "scope": ["overdeck"]
+  },
+  "agents": [
+    { "id": "agent-alpha", "issueId": "PAN-1234", "state": "running" },
+    { "id": "agent-beta",  "issueId": "PAN-1500", "state": "running" }
+  ],
+  "issues": [
+    {
+      "id": "PAN-9001",
+      "title": "Tighten the planning floor for emergency blocks-main",
+      "author": "eltmon",
+      "assignees": [],
+      "labels": ["ready", "planned"],
+      "ready": true,
+      "planned": true,
+      "status": "open",
+      "vetoed": false,
+      "parked": false,
+      "inPipeline": false,
+      "blocksMain": false
+    }
+  ]
+}
