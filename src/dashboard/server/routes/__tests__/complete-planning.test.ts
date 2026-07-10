@@ -146,6 +146,16 @@ describe('completePlanningArtifacts', () => {
     expect(commands.flat()).not.toContain('-f');
   });
 
+  it('does not stage workspace state paths after state migration', () => {
+    const { workspacePath } = makeProject('PAN-2541');
+    mkdirSync(join(workspacePath, '.pan'), { recursive: true });
+    mkdirSync(join(workspacePath, '.beads'), { recursive: true });
+    writeFileSync(join(workspacePath, '.gitignore'), '.overdeck/\n');
+    expect(completePlanningWorkspaceGitAddCommands(workspacePath, true)).toEqual([
+      ['add', '.gitignore'],
+    ]);
+  });
+
   it('includes codebase map changes in the main-side promote commit pathspec', async () => {
     const issueId = 'PAN-1150';
     const { projectPath } = makeProject(issueId);
