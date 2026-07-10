@@ -18,7 +18,7 @@ vi.mock('../projects.js', async (importActual) => {
 });
 
 import { getOverdeckHome } from '../paths.js';
-import { projectKey } from '../state-home.js';
+import { projectKey } from '../project-key.js';
 import { resolveStateDomainPathSync, resolveStateReadHomeSync } from '../state-read-home.js';
 
 const SHA_A = 'a'.repeat(40);
@@ -107,14 +107,14 @@ describe('resolveStateReadHomeSync (sync read door)', () => {
     expect(home.root).toBe(projectPath);
   });
 
-  it('shares the registered-key lookup with state-home.ts projectKey() (one implementation)', () => {
+  it('shares the registered-key lookup with the canonical projectKey() (one implementation)', () => {
     registry.value = [{ key: 'panopticon-cli', config: { name: 'Overdeck', path: projectPath } }];
     const project = { name: 'Overdeck', path: projectPath } as ProjectConfig;
 
-    // projectKey() is exported from state-home.ts and reused by the sync read
-    // door. Place the marker under the key projectKey() resolves; if the SUT
-    // used a duplicated basename-only lookup it would probe .../state/repo-overdeck
-    // and miss the marker entirely.
+    // projectKey() is exported from projects.ts and reused by both the async
+    // state-home door and the sync read door. Place the marker under the key
+    // projectKey() resolves; if the SUT used a duplicated basename-only lookup
+    // it would probe .../state/repo-overdeck and miss the marker entirely.
     expect(projectKey(project)).toBe('panopticon-cli');
     expect(projectKey(project)).not.toBe(basename(projectPath));
     mkdirSync(join(overdeckHome, 'state', projectKey(project)), { recursive: true });

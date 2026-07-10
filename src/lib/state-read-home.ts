@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getOverdeckHome } from './paths.js';
 import { resolveInfraRepo, type ProjectConfig } from './projects.js';
-import { projectKey as resolveProjectKey } from './state-home.js';
+import { projectKey as resolveProjectKey } from './project-key.js';
 
 export interface StateReadHome {
   root: string;

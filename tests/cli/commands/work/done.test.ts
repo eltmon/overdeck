@@ -102,6 +102,12 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
 
 vi.mock('../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssueSync: mockResolveProjectFromIssue,
+  // PAN-2372: resolveStateReadHomeSync resolves the state-worktree key via
+  // projectKey() (in project-key.ts), which calls listProjectsSync(). These
+  // preflight/shadow tests exercise doneCommand without caring which state
+  // worktree it resolves, so return an empty registry and let projectKey fall
+  // back to the path basename.
+  listProjectsSync: () => [],
 }));
 
 vi.mock('../../../../src/lib/lifecycle/archive-planning.js', () => ({
