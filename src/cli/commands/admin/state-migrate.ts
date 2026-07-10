@@ -142,7 +142,15 @@ export async function migrateProjectState(
     for (const path of untracked) {
       if (!existsSync(join(repo, path))) continue;
       const destination = join(stateRoot, 'notes', path.slice('.pan/'.length));
-      if (existsSync(destination)) throw new Error(`Untracked-note destination collision: ${destination}`);
+      if (existsSync(destination)) {
+        // A byte-identical destination is this migration's own interrupted
+        // prior copy — resume over it. Only differing content is a genuine
+        // collision worth refusing.
+        const identical = readFileSync(join(repo, path)).equals(readFileSync(destination));
+        if (!identical) throw new Error(`Untracked-note destination collision: ${destination}`);
+        manifest.push(manifestEntry(join(repo, path), destination));
+        continue;
+      }
       mkdirSync(dirname(destination), { recursive: true });
       copyFileSync(join(repo, path), destination);
       manifest.push(manifestEntry(join(repo, path), destination));
