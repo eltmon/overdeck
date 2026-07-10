@@ -226,3 +226,8 @@ __pycache__/
 .overdeck/test/
 .overdeck/kickoff.md
 .overdeck/agent-mcp.json
+# Machine-local runtime config copied into the workspace by the launcher:
+# absolute project paths (/home/... in projects.yaml) and provider api_keys
+# (config.yaml) make these non-portable — they must never be committed.
+.overdeck/config.yaml
+.overdeck/projects.yaml
