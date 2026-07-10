@@ -80,7 +80,7 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
   const normalizedId = normalizeAgentId(agentId);
   const agentState = getAgentStateSync(normalizedId);
   if (agentState?.paused === true) {
-    const gateBlockReason = getAgentResumeGateBlockReason(agentState) ?? 'agent is paused';
+    const gateBlockReason = getAgentResumeGateBlockReason(agentState)?.reason ?? 'agent is paused';
     queueAgentMail(normalizedId, message);
     logAgentLifecycleSync(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
     console.log(`[agents] Queued message for ${normalizedId}; ${gateBlockReason}`);
@@ -90,7 +90,7 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
   // Check if agent is suspended - auto-resume if so (PAN-80)
   const runtimeState = getAgentRuntimeStateSync(normalizedId);
   if (runtimeState?.state === 'suspended') {
-    const gateBlockReason = agentState ? getAgentResumeGateBlockReason(agentState) : undefined;
+    const gateBlockReason = agentState ? getAgentResumeGateBlockReason(agentState)?.reason : undefined;
     if (gateBlockReason) {
       queueAgentMail(normalizedId, message);
       logAgentLifecycleSync(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
@@ -125,7 +125,7 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
   // sessionExists() returns true for that dead shell. resumeAgent() kills the zombie
   // session before re-creating it.
   if (agentState && agentState.status === 'stopped') {
-    const gateBlockReason = getAgentResumeGateBlockReason(agentState);
+    const gateBlockReason = getAgentResumeGateBlockReason(agentState)?.reason;
     if (gateBlockReason) {
       queueAgentMail(normalizedId, message);
       logAgentLifecycleSync(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
