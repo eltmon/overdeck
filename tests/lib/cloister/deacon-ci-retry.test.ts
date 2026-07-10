@@ -31,6 +31,8 @@ const mockGetAgentRuntimeState = vi.fn().mockReturnValue(null);
 const mockIsIssueClosed = vi.fn();
 // PAN-2209 dead-end respawn
 const mockGetAgentStateSync = vi.fn().mockReturnValue(null);
+const mockGetAgentDir = vi.fn().mockReturnValue('/tmp/nonexistent-agent-dir');
+const mockSaveAgentStateSync = vi.fn();
 const mockClearAgentTroubledSync = vi.fn();
 const mockSpawnWorkAgentThroughAgentsEndpoint = vi.fn();
 
@@ -87,11 +89,11 @@ vi.mock('../../../src/lib/agents.js', () => ({
   saveSessionId: vi.fn(),
   listRunningAgents: vi.fn(() => []),
   listRunningAgentsSync: vi.fn(() => []),
-  getAgentDir: vi.fn().mockReturnValue('/tmp'),
+  getAgentDir: (...args: unknown[]) => mockGetAgentDir(...args),
   getAgentState: vi.fn().mockReturnValue(null),
   getAgentStateSync: (...args: unknown[]) => mockGetAgentStateSync(...args),
   saveAgentState: vi.fn(),
-  saveAgentStateSync: vi.fn(),
+  saveAgentStateSync: (...args: unknown[]) => mockSaveAgentStateSync(...args),
   clearAgentTroubledSync: (...args: unknown[]) => mockClearAgentTroubledSync(...args),
 }));
 
@@ -607,6 +609,8 @@ describe('checkDeadEndAgents — PAN-2209 dead work-agent respawn on review-bloc
     mockSendKeysAsync.mockReset().mockResolvedValue(undefined);
     mockResolveProjectFromIssue.mockReset().mockReturnValue(null);
     mockGetAgentStateSync.mockReset().mockReturnValue({ paused: false });
+    mockGetAgentDir.mockReset().mockReturnValue('/tmp/nonexistent-agent-dir');
+    mockSaveAgentStateSync.mockReset();
     mockClearAgentTroubledSync.mockReset();
     mockSpawnWorkAgentThroughAgentsEndpoint.mockReset().mockResolvedValue({ spawned: true, agentId: `agent-${deadEndIssueId.toLowerCase()}` });
     mockLoadReviewStatuses.mockReset().mockImplementation(() => {
@@ -660,6 +664,33 @@ describe('checkDeadEndAgents — PAN-2209 dead work-agent respawn on review-bloc
     expect(mockSpawnWorkAgentThroughAgentsEndpoint).not.toHaveBeenCalled();
     expect(mockClearAgentTroubledSync).not.toHaveBeenCalled();
     expect(actions.some(a => /respawned/.test(a))).toBe(false);
+  });
+
+  it('keeps an explicit mid-work operator stop without a completed handoff', async () => {
+    mockGetAgentStateSync.mockReturnValue({ stoppedByUser: true });
+    writeStatusFile({ [deadEndIssueId]: blockedStatus() });
+
+    const actions = await checkDeadEndAgents();
+
+    expect(mockSpawnWorkAgentThroughAgentsEndpoint).not.toHaveBeenCalled();
+    expect(mockSaveAgentStateSync).not.toHaveBeenCalled();
+    expect(actions.some(a => /respawned/.test(a))).toBe(false);
+  });
+
+  it('clears historical stoppedByUser for completed-handoff rework before respawn', async () => {
+    const agentDir = mkdtempSync(join(tmpdir(), 'pan-2536-completed-'));
+    writeFileSync(join(agentDir, 'completed.processed'), '');
+    const state = { stoppedByUser: true };
+    mockGetAgentDir.mockReturnValue(agentDir);
+    mockGetAgentStateSync.mockReturnValue(state);
+    writeStatusFile({ [deadEndIssueId]: blockedStatus() });
+
+    await checkDeadEndAgents();
+
+    expect(state.stoppedByUser).toBeUndefined();
+    expect(mockSaveAgentStateSync).toHaveBeenCalledWith(state);
+    expect(mockSpawnWorkAgentThroughAgentsEndpoint).toHaveBeenCalledTimes(1);
+    rmSync(agentDir, { recursive: true, force: true });
   });
 
   it('does not respawn a merge-CI dead-end with a dead session (no work rework needed)', async () => {

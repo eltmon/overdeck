@@ -5,6 +5,8 @@
  * consult the cached memory verdict through this one function before acting.
  * Callers still reserve their role-specific concurrency slot after admission.
  */
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   decideResumeGate,
   getAgentResumeGateBlockReason,
@@ -36,4 +38,14 @@ export function decideAutonomousRedrive(
     return { decision: 'defer', reason: `memory pressure is ${memoryVerdict.band}` };
   }
   return { decision: 'proceed', gateDecision };
+}
+
+export function decideAgentAutonomousRedrive(
+  state: Pick<AgentState, 'paused' | 'pausedReason' | 'yieldedByScheduler' | 'troubled' | 'troubledAt' | 'stoppedByUser' | 'consecutiveFailures'>,
+  agentDir: string,
+  owesRework: boolean,
+): RedriveGateDecision {
+  const hasCompletedHandoff = existsSync(join(agentDir, 'completed'))
+    || existsSync(join(agentDir, 'completed.processed'));
+  return decideAutonomousRedrive(state, { hasCompletedHandoff, owesRework });
 }

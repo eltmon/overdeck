@@ -187,6 +187,7 @@ import { withConcurrencyLimit } from '../concurrency.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { checkStuckAgentRemediation } from './stuck-remediation.js';
+import { decideAgentAutonomousRedrive } from './redrive-gate.js';
 import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { reconcileOrphanProposedSpecs, spawnWorkAgentThroughAgentsEndpoint, triggerRebuildAndStart } from './orphan-proposed-reconciler.js';
@@ -1964,13 +1965,12 @@ export async function checkDeadEndAgents(): Promise<string[]> {
         // to `continue`; the merge-CI branch below requires a live session).
         if (isReviewBlocked || isVerificationFailed || isTestFailed) {
           const agentState = getAgentStateSync(agentSessionName);
-          if (agentState?.paused === true) {
-            // A deliberate pause (operator, burn-guard, verify-hold) parked this
-            // agent. Respect it — never override an intentional pause to respawn.
-            console.log(`[deacon] PAN-2209: ${issueId} (${statusType}) has a dead session but is paused (${agentState.pausedReason ?? 'no reason'}) — respecting pause`);
+          const gateDecision = decideAgentAutonomousRedrive(agentState ?? {}, getAgentDir(agentSessionName), true);
+          if (gateDecision.decision === 'defer') {
+            console.log(`[deacon] PAN-2209: ${issueId} (${statusType}) re-drive deferred — ${gateDecision.reason}`);
           } else {
-            deadEndCooldowns.set(key, now);
-            // Engage the shared circuit breaker so a chronically-dying agent
+            if (gateDecision.gateDecision.clearStoppedByUser && agentState) { delete agentState.stoppedByUser; saveAgentStateSync(agentState); }
+            deadEndCooldowns.set(key, now); // Engage the shared circuit breaker so a chronically-dying agent
             // cannot be respawned forever (>=25 requeues halts, checked above).
             setReviewStatusSync(issueId, { autoRequeueCount: autoRequeueCount + 1 });
             // Clear only the system-set `troubled` gate (resume-failure counter
