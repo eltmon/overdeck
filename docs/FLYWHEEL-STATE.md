@@ -2475,3 +2475,27 @@ stale (written 2026-07-08); re-verified all order-book items against live GitHub
 - **A9 = PAN-2229** frozen by B8/PAN-2364 (expected). **B8 HELD** until B7 merges.
 - NEXT: catch test phase → verify FULL suite green (TENET-10) → merge → closeout. On B7
   merge+closeout+main-green → dispatch B8=PAN-2364 (unfreezes A9).
+
+## RUN-62 tick 14 (2026-07-10 ~15:39 local) — B7 REVIEWED+GREEN but merge STUCK (advancing-reconcile loop); SURFACED to operator
+
+- **B7 = PAN-2372 fully ready but NOT merging.** Review PASSED (verdict advancing, reaped 18:58);
+  PR #2562 full CI GREEN incl **test 9m10s (full suite, not --changed → TENET-10 SATISFIED)**; PR
+  **CLEAN + MERGEABLE** (12 ahead / 9 behind). The 9 main-ahead commits are ALL orthogonal to B7's
+  files (releases v0.45.1/2/3, desktop/PAN-2561, docs) — verified none touch cloister/state-home/
+  beads, so B7's green CI is valid vs current main.
+- **STALL: deacon "Reconciled journaled advancing verdict for PAN-2372" EVERY cycle** (22001→22015+,
+  ~40min) with NO merge and NO test-agent dispatch. Server resume is ON (pid 953015, no NO_RESUME
+  env — the pan-status "Boot --no-resume" rows are STALE historical agents). This is the known
+  stuck-after-review class (PAN-2143 / state-plane churn PAN-2468). Trigger: heavy **main churn** —
+  operator is mid RELEASE BURST (v0.45.1→0.45.2→0.45.3 rapid) + my per-tick doc commits.
+- **DECISION: SURFACED to operator, did NOT auto-merge.** B7 is merge-ready+safe, but the operator is
+  actively release-bursting on main; autonomously squash-merging into their live release flow is a
+  hard-to-reverse-in-context action (they may be controlling what lands per release). Recommending
+  operator either merge PR #2562 or authorize me to land it. Also **reducing my own main-commit
+  churn** (batching state updates) to stop contributing to the trigger. Did NOT `pan review reset`
+  (re-runs passed review = waste/thrash) and did NOT manual-merge mid-burst.
+- **B8=PAN-2364 still HELD** (B7 not merged; one Lane B in flight). A9=PAN-2229 frozen (waits on B8).
+- NEXT: if B7 merged (pipeline caught up post-burst OR operator merged) → closeout+dispatch B8. If
+  still stuck AND operator authorizes / burst settled → land PR #2562 via squash-merge (TENET-10
+  satisfied) + reconcile lifecycle (close, labels, postMergeLifecycle bypass) + file the
+  stuck-after-review substrate bug. Minimize main commits until B7 lands.
