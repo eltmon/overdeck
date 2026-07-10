@@ -190,6 +190,7 @@ import { checkStuckAgentRemediation } from './stuck-remediation.js';
 import { decideAgentAutonomousRedrive } from './redrive-gate.js';
 import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
+import { reconcilePipelineLabelsPatrol } from './label-reconciler.js';
 import { reconcileOrphanProposedSpecs, spawnWorkAgentThroughAgentsEndpoint, triggerRebuildAndStart } from './orphan-proposed-reconciler.js';
 import { reconcileTestStatusFromGreenCiWithDeps } from './test-status-green-ci-reconciler.js';
 import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
@@ -3162,11 +3163,10 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...stuckActions);
   for (const a of stuckActions) addLog('action', a, state.patrolCycle);
 
-  // API error recovery: nudge agents that stopped due to transient provider errors.
   const apiErrorActions = await checkApiErrorAgents();
   actions.push(...apiErrorActions);
   for (const a of apiErrorActions) addLog('action', a, state.patrolCycle);
-
+  if (state.patrolCycle % 10 === 0) for (const action of await reconcilePipelineLabelsPatrol()) { actions.push(action); addLog('action', action, state.patrolCycle); }
   // PAN-1625: reap orphaned dashboard-server processes (failed-restart leftovers
   // that lost the port but keep running — and can run a second Deacon). Low
   // cadence (~10 min). Never touches the live server, the port owner, a

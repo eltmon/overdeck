@@ -21,6 +21,7 @@ import { backfillTitlesCommand } from './conversations-handler.js';
 import { listStatesCommand, cleanupStatesCommand } from './tracker-handler.js';
 import { migrateConfigCommand } from '../migrate-config.js';
 import { registerStateMigrationCommand } from './state-migrate.js';
+import { registerReconcileLabelsCommand } from './reconcile-labels.js';
 
 export function registerAdminCommands(program: Command): void {
   const admin = program
@@ -28,6 +29,7 @@ export function registerAdminCommands(program: Command): void {
     .description('Plumbing commands: watchdog, specialists, infra, db, config, and more');
 
   registerStateMigrationCommand(admin);
+  registerReconcileLabelsCommand(admin);
 
   // pan admin cloister — lifecycle watchdog
   registerCloisterCommands(admin);
