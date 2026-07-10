@@ -2379,3 +2379,22 @@ stale (written 2026-07-08); re-verified all order-book items against live GitHub
   implementer. **B8 now blocks live work → clear next dispatch when B7 lands.**
 - NEXT: keep B7 → pan done → review→test→merge (TENET-10). On B7 land+closeout+main-green →
   dispatch B8=PAN-2364 (validated by A9 repro). A9 unfreezes once B8's per-slot isolation lands.
+
+## RUN-62 tick 8 (2026-07-10 ~14:06 local) — B7 no new commit ~16min (watch); orphan planning-pan-1987 noted
+
+- **Main green** (origin/main 208c673f5).
+- **B7 = PAN-2372** — STILL 4 commits (WI-3 latest), no new bead committed in ~16min. BUT agent
+  alive + working: cost $8.4→$22.86, +1365/-149, 59% ctx. Likely mid a complex bead (WI-4+) or a
+  compact. Not clearly wedged but NOT visibly advancing commits either. **Watch next tick**: if same
+  commit + idle prompt (no ✻ spinner), nudge via `pan tell agent-pan-2372`. Cost climbing ($22) —
+  keep an eye on ROI. 1 bead closed / 5 open.
+- **A9 = PAN-2229** still frozen by B8/PAN-2364 bug (expected). No re-recovery attempts.
+- **ANOMALY noted (not acted on): planning-pan-1987** appeared (session created 14:03). PAN-1987
+  ("allow renaming a registered project") is already `planned`, NOT in the order book, NOT
+  flywheel-dispatched. Deacon janitor log: `cleanupOrphanedPlanningSessions: planning-pan-1987 kept
+  — work agent not running` → it's a PRE-EXISTING orphaned planning session the deacon preserved
+  (possibly operator-initiated). Harmless while planning. **Watch:** if it spawns a RUNNING work
+  agent (agent-pan-1987) = unlisted work vs drain posture → then pause PAN-1987. Not killing now
+  (would fight deacon janitor; may be operator's).
+- NEXT: B7 commit progress / pan done → review→test→merge (TENET-10). On B7 land+closeout+green →
+  dispatch B8=PAN-2364 (unfreezes A9). Watch planning-pan-1987 escalation.
