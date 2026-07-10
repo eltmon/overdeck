@@ -279,3 +279,29 @@ jobs:
           kill "$SERVER_PID" 2>/dev/null || true
           wait "$SERVER_PID" 2>/dev/null || true
           if [ "$ok" != 1 ]; then cat /tmp/pan-dashboard.log; exit 1; fi
+
+  # PAN-2229: prompt-gate trailer check. Refuses any PR whose diff touches
+  # roles/*.md or docs/flywheel-brief.md without a `Prompt-Change:` trailer
+  # in the commit message body. Runs on pull_request only — push events to
+  # main are exempt because the trailer is a PR-time review signal, not a
+  # gate on direct pushes. Pure git + bash; no Node/Bun setup needed.
+  # Independent of the test job's skip_vitest shortcut so it never inherits
+  # a "tests already passed elsewhere" skip.
+  prompt-gate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5  # PAN-1651: cap wall-clock so a hung step can't wedge the required check.
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # the script needs full history for `git log <base>..<head>`
+
+      - name: Fetch the PR base ref
+        # The PR build SHA in github.sha is the temporary merge commit, not
+        # the base branch's tip. `git diff base...HEAD` against that merge
+        # commit produces an empty set, so we explicitly fetch the base ref.
+        run: git fetch origin "${{ github.base_ref }}"
+
+      - name: Run the prompt-gate trailer check
+        run: bash scripts/check-prompt-change-trailer.sh "origin/${{ github.base_ref }}" HEAD
