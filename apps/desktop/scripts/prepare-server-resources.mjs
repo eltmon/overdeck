@@ -85,6 +85,16 @@ console.log(`[prepare-server] Copied ${jsFiles.length} server chunks → server/
 cpSync(join(distDashboard, "public"), join(serverDir, "public"), { recursive: true });
 console.log("[prepare-server] Copied frontend assets → server/public/");
 
+// First-boot database migration SQL. The server resolves it as
+// <packageRoot>/drizzle/... where packageRoot is one level above the bundle
+// dir (resources/ in the packaged app, the package root in the npm flavor).
+// Without it, a machine with no existing ~/.overdeck database crash-loops on
+// first launch (PAN-2570 field reports).
+const drizzleDest = join(desktopDir, "drizzle");
+rmSync(drizzleDest, { recursive: true, force: true });
+cpSync(join(repoRoot, "drizzle"), drizzleDest, { recursive: true });
+console.log("[prepare-server] Copied migration SQL → drizzle/");
+
 // ─── Discover externalized runtime deps ───────────────────────────────────────
 // Walk the chunk graph reachable from the build's entry points and collect
 // bare import specifiers. dist/dashboard may contain stale chunks from prior
