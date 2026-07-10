@@ -2593,3 +2593,18 @@ stale (written 2026-07-08); re-verified all order-book items against live GitHub
 - **Main green** (708c993760, building on latest).
 - NEXT: B8 remaining beads → pan done → review→test→merge (TENET-10 full suite; PAN-2567 manual-squash
   remedy if stuck-after-review recurs). B8 lands → A9 unfreezes → B9-B13 (re-verify PRDs vs main).
+
+## RUN-62 tick 22 (2026-07-10 ~18:14 local) — B8 ran full suite ✅ + pushed; working final 3 beads
+
+- **B8 = PAN-2364** healthy, NOT wedged — 4 commits pushed; pane shows it already ran **full gates:
+  lint ✅ + npm test ✅ (971 test files passed, frontend passed)** = strong TENET-10 signal for merge.
+  In a long active turn (Brewed 46m) working the final 3 beads: swarm-status-lists-blocked-slots,
+  recover-retry-archives-conflicted-attempt (in_progress), docs/SWARM.md per-slot semantics. Cost $15,
+  51% ctx. No nudge — progressing. WATCH: if next tick still 4 commits + same brew (no pan done),
+  nudge to commit remaining beads + pan done.
+- **B7 = PAN-2372** resting verifying-on-main (done; close-out interactive, left for operator).
+- **A9 = PAN-2229** held (clears when B8 merges).
+- **Main green** (04eb5fdc8f, all success).
+- NEXT: B8 finishes 3 beads → pan done → review→merge (full suite already green → TENET-10; PAN-2567
+  manual-squash remedy if stuck-after-review recurs). B8 lands → A9 unfreezes → B9=PAN-2149
+  (decompose cloister/service.ts) with MANDATORY PRD re-verify vs current main first.
