@@ -32,6 +32,7 @@ import { cleanupAgentDirectories } from '../../lib/agent-directory-cleanup.js';
 import { migrateOverdeckToPanSync } from '../../lib/workspace-manager.js';
 import { runMultiToolSyncSync, resolveAlsoSyncToolsSync } from '../../lib/multi-tool-sync.js';
 import { ensurePlaywrightIsolationSync, ensureExcalidrawMcpSync } from '../../lib/claude-mcp.js';
+import { resolveProjectContextFile } from '../../lib/context-layers/layers.js';
 
 // Bundled git hooks distributed to registered projects (PAN-1201: sync-sources/).
 const BUNDLED_GIT_HOOKS_DIR = SYNC_SOURCES.gitHooks;
@@ -137,7 +138,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     console.log(chalk.cyan('context layers → CLAUDE.md:'));
     console.log(`  ${chalk.blue('↻')} global → ~/.claude/CLAUDE.md ${chalk.dim('(managed region)')}`);
     for (const { config } of listProjectsSync()) {
-      if (existsSync(join(config.path, '.pan', 'context', 'project.md'))) {
+      if (existsSync(resolveProjectContextFile(config.path))) {
         console.log(
           `  ${chalk.blue('↻')} ${config.name} → ${join(config.path, 'CLAUDE.md')} ${chalk.dim('(managed region)')}`,
         );

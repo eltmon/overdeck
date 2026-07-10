@@ -5,7 +5,7 @@ import type { ContinueFeedbackEntry } from '../vbrief/continue-state.js';
 import { renderPrompt } from './prompts.js';
 import { extractTeamPrefix, findProjectByTeamSync } from '../projects.js';
 import { isTldrEnabledSync } from '../config-yaml.js';
-import { getWorkspacePanPaths, readWorkspaceContext, readFeedback, writeWorkspaceContext } from '../pan-dir/index.js';
+import { getReadableWorkspacePanPaths, readWorkspaceContext, readFeedback, writeWorkspaceContext } from '../pan-dir/index.js';
 import { getProjectConfigFromWorkspacePath, readRecordContinueViewSync, resolveProjectForIssue } from '../pan-dir/record.js';
 import { findPlanSync, readWorkspacePlanSync, readPlanSync, readWorkspacePlan } from '../vbrief/io.js';
 import { createActiveSlice, getDispatchableItems } from '../vbrief/dag.js';
@@ -225,7 +225,7 @@ export async function getTrackerContext(
 
   // Find continue file mtime via workspace `.pan/continue.json` first, then migration fallbacks.
   try {
-    const workspaceContinuePath = getWorkspacePanPaths(workspacePath).continuePath
+    const workspaceContinuePath = getReadableWorkspacePanPaths(workspacePath).continuePath
     if (existsSync(workspaceContinuePath)) {
       stateMtime = statSync(workspaceContinuePath).mtime
     }

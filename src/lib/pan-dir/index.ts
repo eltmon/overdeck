@@ -3,6 +3,7 @@ export {
   PAN_CONTINUE_FILENAME,
   PAN_CONTINUES_DIRNAME,
   PAN_DIRNAME,
+  LEGACY_PAN_DIRNAME,
   PAN_DRAFTS_DIRNAME,
   PAN_FEEDBACK_DIRNAME,
   PAN_SESSIONS_FILENAME,
@@ -37,6 +38,8 @@ export {
 
 export {
   ensureWorkspacePanDir,
+  getLegacyWorkspacePanPaths,
+  getReadableWorkspacePanPaths,
   getWorkspacePanPaths,
 } from './continue.js'
 
@@ -57,4 +60,3 @@ export {
   type PrdGateResult,
 } from './drafts.js'
 export { readWorkspaceContext, writeWorkspaceContext } from './context.js'
-

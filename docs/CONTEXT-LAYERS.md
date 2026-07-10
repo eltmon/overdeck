@@ -11,8 +11,8 @@ Context composes from three layers, outermost to innermost:
 | Layer | Source file | Applies |
 |---|---|---|
 | **Global** | `~/.overdeck/context/global.md` | Every harness session on this machine |
-| **Project** | `<projectRoot>/.pan/context/project.md` | Sessions whose CWD is under a registered project |
-| **Workspace** | `<workspace>/.pan/context/workspace.md` | Inside one issue workspace |
+| **Project** | `<projectRoot>/.overdeck/context/project.md` | Sessions whose CWD is under a registered project |
+| **Workspace** | `<workspace>/.overdeck/context/workspace.md` | Inside one issue workspace |
 
 The global layer is per-machine and lives under `~/.overdeck`. The project
 layer is committed to the repo. The workspace layer is **auto-assembled** by
@@ -30,7 +30,7 @@ are unambiguous:
 |---|---|
 | **Context layers** | This whole distribution system |
 | **Global layer** (machine context) | `~/.overdeck/context/global.md` — per-machine quirks only |
-| **Project layer** | `<root>/.pan/context/project.md` |
+| **Project layer** | `<root>/.overdeck/context/project.md` |
 | **Workspace layer** | auto-assembled per issue; never hand-authored |
 | **Bundled rule** | `sync-sources/rules/<name>.md` (`scope: universal` or `dev`) — every-machine engineering rules |
 | **Harness context files** | the rendered outputs (`~/.claude/CLAUDE.md` managed region, project `CLAUDE.md`/`AGENTS.md`, `pi-global.md`, `codex-global.md`) — never edited directly |
@@ -46,7 +46,7 @@ alone routes the content:
 |---|---|
 | "add a **universal rule**" | `sync-sources/rules/<name>.md`, `scope: universal` |
 | "add a **dev rule**" | `sync-sources/rules/<name>.md`, `scope: dev` |
-| "add a **project rule**" | `<root>/.pan/context/project.md` |
+| "add a **project rule**" | `<root>/.overdeck/context/project.md` |
 | "add a **machine rule**" | `~/.overdeck/context/global.md` |
 
 The `rule-authoring` bundled rule (`scope: dev`) carries the authoring
@@ -133,7 +133,7 @@ already maintain. Three guarantees:
    the very first write that touches your content always has a safety net.
 
 3. **Opt-in per project.** A project's files are touched only when its
-   `.pan/context/project.md` exists. Register a project but write no
+   `.overdeck/context/project.md` exists. Register a project but write no
    `project.md` and its `CLAUDE.md`/`AGENTS.md` are never modified.
 
 The Pi **global** layer is the one exception to "we only write managed
@@ -173,7 +173,9 @@ pan context migrate               # one-shot migration off sync.devroot
 The dashboard Context page edits the same layered files as the CLI. Use the
 layer selector to switch between Global, Project, and Workspace context; project
 and workspace selectors choose the registered project or workspace whose
-`.pan/context/project.md` or `.pan/context/workspace.md` file is loaded.
+`.overdeck/context/project.md` or `.overdeck/context/workspace.md` file is loaded.
+Reads fall back to the corresponding legacy `.pan/context/` file when the
+canonical file is absent; when both exist, `.overdeck/` wins.
 
 The editor shows per-harness previews for Claude Code and Pi. A separate **Full
 injected prompt** pane shows the complete Overdeck-controlled bundle that will
