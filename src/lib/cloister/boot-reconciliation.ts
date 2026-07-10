@@ -129,8 +129,8 @@ export function armBootReconciliationGraceTimer(
   graceTimer = setTimeout(() => {
     graceTimer = null;
     if (getBootReconciliationState().decision !== 'pending') return;
-    setBootReconciliationDecision('resume_all');
-    logDeaconEventSync('boot reconciliation grace expired — decision set to resume_all');
+    setBootReconciliationDecision('hold_all');
+    logDeaconEventSync('boot reconciliation grace expired — decision set to hold_all');
     void Promise.resolve(onGraceExpired()).catch((err) => {
       const message = err instanceof Error ? err.message : String(err);
       logDeaconEventSync(`boot reconciliation grace expiry apply hook failed: ${message}`);
@@ -203,7 +203,7 @@ export function startBootReconciliation(
   // arrivals from the deacon-child reconciliation are discovered and held, and
   // the dialog renders. If the window expires with still-zero candidates
   // (genuinely clean boot / dashboard-only restart with nothing stopped), the
-  // grace timer resolves `pending` → `resume_all` as a harmless no-op.
+  // grace timer resolves `pending` → `hold_all`, the safe timeout default.
   setBootReconciliationDecision('pending');
   const timerArmed = armBootReconciliationGraceTimer(graceDeadline, options.onGraceExpired);
   const heldSummary = candidateIds.length === 0
