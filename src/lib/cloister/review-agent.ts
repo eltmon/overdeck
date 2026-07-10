@@ -453,6 +453,7 @@ function buildSelfReviewPrompt(opts: {
           const { stdout } = await execAsync('git rev-parse --short=8 HEAD', {
             cwd: opts.workspace,
             encoding: 'utf-8',
+            timeout: 10_000,
           });
           const currentRunId = `agent-${opts.issueId.toLowerCase()}-review-${stdout.trim()}`;
           const synthReviewRunId = getAgentStateSync(reviewSessionName)?.reviewRunId;
@@ -571,7 +572,7 @@ function buildSelfReviewPrompt(opts: {
     // directory and don't overwrite round-1 files (collision prevention).
     let headSha = 'unknown';
     try {
-      const { stdout } = await execAsync('git rev-parse --short=8 HEAD', { cwd: opts.workspace, encoding: 'utf-8' });
+      const { stdout } = await execAsync('git rev-parse --short=8 HEAD', { cwd: opts.workspace, encoding: 'utf-8', timeout: 10_000 });
       headSha = stdout.trim();
     } catch { /* non-fatal — fall back to static runId */ }
     const runId = headSha !== 'unknown'

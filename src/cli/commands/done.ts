@@ -189,7 +189,7 @@ async function updateGitHubToInReview(issueId: string, comment?: string): Promis
 
     // Get current labels
     const labelsRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
-      headers,
+      headers, signal: AbortSignal.timeout(15_000),
     });
     const currentLabels = labelsRes.ok ? (await labelsRes.json() as any[]).map((l: any) => l.name) : [];
 
@@ -204,14 +204,14 @@ async function updateGitHubToInReview(issueId: string, comment?: string): Promis
 
     // Update labels (set all at once to replace)
     await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
-      method: 'PUT', headers,
+      method: 'PUT', headers, signal: AbortSignal.timeout(15_000),
       body: JSON.stringify({ labels: targetLabels }),
     });
 
     // Add completion comment
     if (comment) {
       await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/comments`, {
-        method: 'POST', headers,
+        method: 'POST', headers, signal: AbortSignal.timeout(15_000),
         body: JSON.stringify({ body: `🤖 **Agent completed work:**\n\n${comment}` }),
       });
     }

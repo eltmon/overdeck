@@ -3253,7 +3253,7 @@ export async function runPatrol(): Promise<PatrolResult> {
                   const branch = `feature/${issueId.toLowerCase()}`;
                   const { stdout } = await execAsync(
                     `git -C "${resolved.projectPath}" log --oneline origin/main --grep="Merge branch '${branch}'" 2>/dev/null | head -1`,
-                    { encoding: 'utf-8' }
+                    { encoding: 'utf-8', timeout: 15_000 }
                   );
                   if (stdout.trim()) {
                     console.log(`[deacon] PAN-375: merge specialist died but ${issueId} IS merged (${stdout.trim()}). Auto-completing.`);
