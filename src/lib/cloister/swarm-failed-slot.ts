@@ -85,10 +85,15 @@ export async function requeueFailedSwarmSlots(
   doc: VBriefDocument,
   reconciled: SlotReconcileResult,
   deps: FailedSlotArchiveDeps & { applyTaskOperationToPlanFile: (path: string, operation: PersistedTaskOperation, workspace?: string) => Promise<unknown> },
+  blockedSlotIndexes: Set<number> = new Set(),
 ): Promise<{ doc: VBriefDocument; actions: string[] }> {
   let nextDoc = doc;
   const actions: string[] = [];
   for (const slot of classified.filter(candidate => candidate.lifecycle === 'failed')) {
+    if (blockedSlotIndexes.has(slot.slotIndex)) {
+      actions.push(`[swarm] skipped requeue slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: failed-merge block — awaiting operator recovery`);
+      continue;
+    }
     const admission = decideAutonomousRedrive(slot.agentId ? getAgentStateSync(slot.agentId) ?? {} : {}, { owesRework: true });
     if (admission.decision === 'defer') { actions.push(`[swarm] deferred failed slot ${slot.slotIndex}: ${admission.reason}`); continue; }
     const attempt = await archiveFailedSwarmSlot(issueId, workspacePath, slot, deps);

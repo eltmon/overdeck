@@ -2,6 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+
+const mocks = vi.hoisted(() => ({
+  listProjectsSync: vi.fn(),
+  resolveProjectFromIssueSync: vi.fn(),
+}));
+
+vi.mock('../../../../src/lib/projects.js', () => ({
+  listProjectsSync: mocks.listProjectsSync,
+  findProjectByPathSync: () => null,
+  resolveProjectFromIssueSync: mocks.resolveProjectFromIssueSync,
+}));
+
 import {
   clearFailedMergeBlock,
   getFailedMergeBlock,
@@ -14,7 +26,12 @@ import {
   type CoordinateSwarmSlotsDeps,
 } from '../../../../src/lib/cloister/deacon-swarm.js';
 import { writeIssueRecordForWorkspaceSync } from '../../../../src/lib/pan-dir/record.js';
+import { requeueFailedSwarmSlots } from '../../../../src/lib/cloister/swarm-failed-slot.js';
 import type { VBriefDocument, VBriefItem } from '../../../../src/lib/vbrief/types.js';
+
+beforeEach(() => {
+  mocks.resolveProjectFromIssueSync.mockReturnValue(null);
+});
 
 function item(id = 'wi-a', status: VBriefItem['status'] = 'running'): VBriefItem {
   return {
@@ -61,6 +78,31 @@ function readySlot(): ClassifiedSwarmSlot {
     agentId: 'agent-pan-2203-slot-1',
     lifecycle: 'ready-to-merge',
     exitStatus: 0,
+  };
+}
+
+function readySlotAt(index: number, itemId: string): ClassifiedSwarmSlot {
+  return {
+    itemId,
+    slotIndex: index,
+    status: 'in_flight',
+    branch: `feature/pan-2203-slot-${index}`,
+    agentId: `agent-pan-2203-slot-${index}`,
+    lifecycle: 'ready-to-merge',
+    exitStatus: 0,
+  };
+}
+
+function failedSlotAt(index: number, itemId: string): ClassifiedSwarmSlot {
+  return {
+    itemId,
+    slotIndex: index,
+    status: 'in_flight',
+    branch: `feature/pan-2203-slot-${index}`,
+    agentId: `agent-pan-2203-slot-${index}`,
+    lifecycle: 'failed',
+    reason: 'pane-exit-nonzero',
+    exitStatus: 1,
   };
 }
 
@@ -268,5 +310,55 @@ describe('deacon-swarm failed-merge recovery', () => {
       itemId: 'wi-a',
       slotIndex: 1,
     }));
+  });
+
+  it('PAN-2364: mergeReadySlots skips a blocked ready-to-merge slot every pass', async () => {
+    recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-b', slotIndex: 2, note: 'slot 2 conflict' }, workspacePath);
+    const fakeDeps = mergeDeps();
+
+    await expect(mergeReadySlots(
+      'PAN-2203',
+      workspacePath,
+      doc(item('wi-b')),
+      [readySlotAt(2, 'wi-b')],
+      fakeDeps,
+      new Set([2]),
+    )).resolves.toEqual([
+      '[swarm] skipped merge slot 2 (item wi-b) for PAN-2203: failed-merge block — awaiting `pan swarm recover`',
+    ]);
+
+    expect(fakeDeps.verifyAndMergeSlot).not.toHaveBeenCalled();
+  });
+
+  it('PAN-2364: requeueFailedSwarmSlots skips a blocked failed slot without archiving', async () => {
+    recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-b', slotIndex: 2, note: 'slot 2 conflict' }, workspacePath);
+    const fakeDeps = {
+      ...recoveryDeps(),
+      runGitCommand: vi.fn(async () => undefined),
+    };
+
+    const { doc: nextDoc, actions } = await requeueFailedSwarmSlots(
+      'PAN-2203',
+      workspacePath,
+      [failedSlotAt(2, 'wi-b')],
+      doc(item('wi-b')),
+      {
+        issueId: 'PAN-2203',
+        merged: [],
+        inFlight: [failedSlotAt(2, 'wi-b')],
+        pending: [],
+        branches: [],
+        agents: [],
+      },
+      fakeDeps,
+      new Set([2]),
+    );
+
+    expect(actions).toEqual([
+      '[swarm] skipped requeue slot 2 (item wi-b) for PAN-2203: failed-merge block — awaiting operator recovery',
+    ]);
+    expect(fakeDeps.runGitCommand).not.toHaveBeenCalled();
+    expect(fakeDeps.applyTaskOperationToPlanFile).not.toHaveBeenCalled();
+    expect(nextDoc.plan.items.find(i => i.id === 'wi-b')?.status).toBe('running');
   });
 });

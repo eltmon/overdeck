@@ -16,7 +16,7 @@
 1520 src/dashboard/server/services/issue-data-service.ts
 1321 src/dashboard/server/ws-rpc.ts
 1035 src/lib/cloister/deacon-auto-resume.ts
-1075 src/lib/cloister/deacon-swarm.ts
+1152 src/lib/cloister/deacon-swarm.ts
 3622 src/lib/cloister/deacon.ts
 1409 src/lib/cloister/merge-agent.ts
 2135 src/lib/cloister/service.ts
