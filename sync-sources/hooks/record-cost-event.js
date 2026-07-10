@@ -2,21 +2,21 @@
 import { createRequire } from "node:module";
 import { appendFileSync, chmodSync, closeSync, copyFileSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, statSync, writeFileSync } from "fs";
 import { exec, execFile, execFileSync } from "child_process";
-import { dirname, join, sep } from "path";
+import { dirname, join, resolve, sep } from "path";
 import { homedir, totalmem } from "os";
 import { fileURLToPath } from "url";
 import * as NFS from "node:fs";
 import { appendFileSync as appendFileSync$1, existsSync as existsSync$1, mkdirSync as mkdirSync$1, readFileSync as readFileSync$1, writeFileSync as writeFileSync$1 } from "node:fs";
 import * as Path from "node:path";
-import { dirname as dirname$1, isAbsolute, join as join$1 } from "node:path";
+import { basename, dirname as dirname$1, isAbsolute, join as join$1 } from "node:path";
 import { readFile } from "node:fs/promises";
 import * as OS from "node:os";
 import * as NodeChildProcess from "node:child_process";
 import { execFile as execFile$1 } from "node:child_process";
 import * as Crypto from "node:crypto";
 import * as NodeUrl from "node:url";
-import { promisify } from "node:util";
 import { mkdir, writeFile } from "fs/promises";
+import { promisify } from "node:util";
 import { promisify as promisify$1 } from "util";
 //#region \0rolldown/runtime.js
 var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod), cb = null), mod.exports);
@@ -18694,17 +18694,6 @@ const layer = /* @__PURE__ */ succeed$1(Path$1)({
 	fromFileUrl,
 	toFileUrl
 });
-promisify(execFile$1);
-layer$4.pipe(provide(mergeAll(layer$2, layer)));
-const DEFAULT_STATE_FLUSH_WINDOW_MS = 600 * 1e3;
-parseStateFlushWindowMs(process.env.OVERDECK_STATE_FLUSH_WINDOW_MS);
-function parseStateFlushWindowMs(value) {
-	if (!value) return DEFAULT_STATE_FLUSH_WINDOW_MS;
-	const parsed = Number(value);
-	if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_STATE_FLUSH_WINDOW_MS;
-	return parsed;
-}
-Promise.resolve();
 //#endregion
 //#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/identity.js
 var require_identity = /* @__PURE__ */ __commonJSMin(((exports) => {
@@ -25405,6 +25394,35 @@ function listProjectsSync() {
 		config: projectConfig
 	}));
 }
+/**
+* Resolve the correct project path for an issue based on labels
+*
+* @param project - The project config
+* @param labels - Array of label names from the Linear issue
+* @returns The resolved path (may differ from project.path based on routing rules)
+*/
+/**
+* PAN-1908: resolve the infra-repo checkout path and records subdir for a project.
+*
+* - monorepo / missing pan_records: repoPath = project.path, recordsPath = .pan
+* - polyrepo with pan_records.repo: look up named repo in workspace.repos[]
+* - pan_records.repo = ".": repoPath = project.path
+*/
+function resolveInfraRepo(project) {
+	const recordsPath = project.pan_records?.path ?? ".pan";
+	const repoName = project.pan_records?.repo;
+	if (!repoName || repoName === ".") return {
+		repoPath: project.path,
+		recordsPath
+	};
+	const repos = project.workspace?.repos ?? [];
+	const matching = repos.find((r) => r.name === repoName);
+	if (!matching) throw new Error(`Project pan_records.repo "${repoName}" not found in workspace.repos. Available repos: ${repos.map((r) => r.name).join(", ") || "none"}`);
+	return {
+		repoPath: resolve(project.path, matching.path),
+		recordsPath
+	};
+}
 function resolveProjectPath(project, labels = []) {
 	if (!project.issue_routing || project.issue_routing.length === 0) return project.path;
 	const normalizedLabels = labels.map((l) => l.toLowerCase());
@@ -25459,6 +25477,44 @@ function resolveProjectFromIssueSync(issueId, labels = []) {
 	}
 	return null;
 }
+//#endregion
+//#region ../../src/lib/state-read-home.ts
+function validMarker(value) {
+	if (!value || typeof value !== "object") return false;
+	const marker = value;
+	return typeof marker.sourceMainSha === "string" && /^[0-9a-f]{40}$/i.test(marker.sourceMainSha) && typeof marker.stateBranchSha === "string" && /^[0-9a-f]{40}$/i.test(marker.stateBranchSha) && typeof marker.completedAt === "string" && Number.isFinite(Date.parse(marker.completedAt)) && Number.isInteger(marker.version) && Number(marker.version) >= 1;
+}
+function resolveStateReadHomeSync(project, projectKey = basename(project.path)) {
+	const root = join$1(getOverdeckHome(), "state", projectKey);
+	try {
+		if (validMarker(JSON.parse(readFileSync$1(join$1(root, "migration-complete.json"), "utf8")))) return {
+			root,
+			migrated: true
+		};
+	} catch {}
+	try {
+		return {
+			root: resolveInfraRepo(project).repoPath,
+			migrated: false
+		};
+	} catch {
+		return {
+			root: project.path,
+			migrated: false
+		};
+	}
+}
+promisify(execFile$1);
+layer$4.pipe(provide(mergeAll(layer$2, layer)));
+const DEFAULT_STATE_FLUSH_WINDOW_MS = 600 * 1e3;
+parseStateFlushWindowMs(process.env.OVERDECK_STATE_FLUSH_WINDOW_MS);
+function parseStateFlushWindowMs(value) {
+	if (!value) return DEFAULT_STATE_FLUSH_WINDOW_MS;
+	const parsed = Number(value);
+	if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_STATE_FLUSH_WINDOW_MS;
+	return parsed;
+}
+Promise.resolve();
 const RECORD_DIRNAME = "records";
 /** Workspace path for an issue, or null if no project is configured. */
 function getIssueWorkspacePath(issueId) {
@@ -25473,7 +25529,8 @@ function getIssueWorkspacePath(issueId) {
 * (used in tests and non-worktree contexts).
 */
 function getIssueRecordPath(project, issueId) {
-	return join$1(getIssueRecordBasePath(project, issueId), ".pan", RECORD_DIRNAME, `${issueId.toLowerCase()}.json`);
+	const stateHome = resolveStateReadHomeSync(project);
+	return join$1(stateHome.migrated ? join$1(stateHome.root, RECORD_DIRNAME) : join$1(getIssueRecordBasePath(project, issueId), ".pan", RECORD_DIRNAME), `${issueId.toLowerCase()}.json`);
 }
 /** Base directory for an issue record: workspace if it exists, else project root. */
 function getIssueRecordBasePath(project, issueId) {
