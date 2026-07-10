@@ -48,6 +48,7 @@ export interface SwarmCommandDeps {
   ensureWorkspace: (issueId: string, project: ResolvedProjectLike) => Promise<string>;
   coordinateSwarmSlots: typeof coordinateSwarmSlots;
   getFailedMergeBlock: typeof getFailedMergeBlock;
+  getFailedMergeBlocks: typeof getFailedMergeBlocks;
   recoverFailedMergeSlot: typeof recoverFailedMergeSlot;
   console: ConsoleLike;
 }
@@ -100,6 +101,7 @@ const defaultDeps: SwarmCommandDeps = {
   ensureWorkspace: ensureFeatureWorkspace,
   coordinateSwarmSlots,
   getFailedMergeBlock,
+  getFailedMergeBlocks,
   recoverFailedMergeSlot,
   console,
 };
@@ -190,7 +192,17 @@ export async function swarmRecoverCommand(
         return { ok: true, actions, workspacePath };
       }
     }
-    deps.console.error(chalk.red(`No failed-merge slot is recorded for ${issue}.`));
+    const otherBlocks = deps.getFailedMergeBlocks(issue, workspacePath);
+    if (otherBlocks.length > 0) {
+      const lines = otherBlocks
+        .map(b => `  slot ${b.slotIndex} (item ${b.itemId}): ${b.note}`)
+        .join('\n');
+      deps.console.error(
+        chalk.red(`No failed-merge block for ${issue} slot ${slotIndex}. Currently blocked slots:\n${lines}`),
+      );
+    } else {
+      deps.console.error(chalk.red(`No failed-merge slot is recorded for ${issue}.`));
+    }
     return { ok: false, actions: [] };
   }
 
@@ -632,13 +644,6 @@ export async function swarmStatusCommand(
     return { ok: true };
   }
 
-  if (blockedSlots.length > 0) {
-    deps.console.log(
-      `Blocked slots: ${blockedSlots.map(b => `slot ${b.slotIndex} (item ${b.itemId})`).join(', ')} — `
-      + 'awaiting `pan swarm recover`. Other slots continue around them.',
-    );
-  }
-
   deps.console.log('Slots:');
   for (const row of rows) {
     const branch = row.branch ?? `feature/${issueLower}-slot-${row.slotIndex}`;
@@ -647,10 +652,24 @@ export async function swarmStatusCommand(
       : branchMergedBySlot.get(row.slotIndex) ? 'merged' : 'unmerged';
     const sessionName = row.agentId ?? `agent-${issueLower}-slot-${row.slotIndex}`;
     const sessionState = liveSessions.has(sessionName) ? 'session alive' : 'session dead';
+    const lifecycle = row.lifecycle === 'failed-merge-blocked'
+      ? 'failed-merge (blocked)'
+      : row.lifecycle;
     deps.console.log(
-      `  slot ${row.slotIndex} · item ${row.itemId} · ${row.lifecycle} · branch ${branch} (${branchState}) · ${sessionState}`,
+      `  slot ${row.slotIndex} · item ${row.itemId} · ${lifecycle} · branch ${branch} (${branchState}) · ${sessionState}`,
     );
   }
+
+  if (blockedSlots.length > 0) {
+    deps.console.log('Blocked slots:');
+    for (const block of blockedSlots) {
+      deps.console.log(
+        `  slot ${block.slotIndex} (item ${block.itemId}): ${block.note}. `
+        + `Recover with \`pan swarm recover ${issue} ${block.slotIndex} --action retry|drop|handoff\`.`,
+      );
+    }
+  }
+
   return { ok: true };
 }
 

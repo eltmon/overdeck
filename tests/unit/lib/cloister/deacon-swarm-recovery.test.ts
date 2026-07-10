@@ -208,6 +208,7 @@ describe('deacon-swarm failed-merge recovery', () => {
     expect(record?.swarm?.supersededAttempts).toEqual(
       expect.arrayContaining([expect.objectContaining({ slotIndex: 1, itemId: 'wi-a' })]),
     );
+    expect(fakeDeps.clearSlotAssignment).toHaveBeenCalledWith(workspacePath, 'PAN-2203', 1, 'wi-a');
     expect(getFailedMergeBlock('PAN-2203', 1, workspacePath)).toBeUndefined();
   });
 
@@ -241,6 +242,48 @@ describe('deacon-swarm failed-merge recovery', () => {
     expect(fakeDeps.applyTaskOperationToPlanFile).not.toHaveBeenCalled();
     expect(fakeDeps.spawnRun).not.toHaveBeenCalled();
     expect(getFailedMergeBlock('PAN-2203', 1, workspacePath)?.note).toContain('Operator handoff required');
+  });
+
+  it('PAN-2364: recover drop on slot 3 marks only that item done and leaves slot 1 block intact', async () => {
+    recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-a', slotIndex: 1, note: 'slot 1 conflict' }, workspacePath);
+    recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-c', slotIndex: 3, note: 'slot 3 conflict' }, workspacePath);
+    const fakeDeps = recoveryDeps();
+
+    await expect(recoverFailedMergeSlot('PAN-2203', workspacePath, 3, doc(item('wi-c', 'blocked')), 'drop', fakeDeps))
+      .resolves.toEqual(['[swarm] dropped failed-merge slot 3 (item wi-c) for PAN-2203']);
+
+    expect(fakeDeps.applyTaskOperationToPlanFile).toHaveBeenCalledWith(
+      join(workspacePath, '.pan', 'spec.vbrief.json'),
+      {
+        type: 'done',
+        itemId: 'wi-c',
+        writerId: 'deacon-swarm',
+        reason: 'Dropped failed swarm slot after operator recovery',
+      },
+      workspacePath,
+    );
+    expect(fakeDeps.applyTaskOperationToPlanFile).toHaveBeenCalledTimes(1);
+    expect(getFailedMergeBlock('PAN-2203', 3, workspacePath)).toBeUndefined();
+    expect(getFailedMergeBlock('PAN-2203', 1, workspacePath)).toEqual(expect.objectContaining({
+      itemId: 'wi-a',
+      slotIndex: 1,
+    }));
+  });
+
+  it('PAN-2364: recover handoff updates only the targeted slot block note and leaves others untouched', async () => {
+    recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-a', slotIndex: 1, note: 'slot 1 conflict' }, workspacePath);
+    recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-c', slotIndex: 3, note: 'slot 3 conflict' }, workspacePath);
+    const fakeDeps = recoveryDeps();
+
+    await recoverFailedMergeSlot('PAN-2203', workspacePath, 1, doc(), 'handoff', fakeDeps);
+
+    expect(fakeDeps.applyTaskOperationToPlanFile).not.toHaveBeenCalled();
+    expect(fakeDeps.spawnRun).not.toHaveBeenCalled();
+    expect(getFailedMergeBlock('PAN-2203', 1, workspacePath)?.note).toContain('Operator handoff required');
+    expect(getFailedMergeBlock('PAN-2203', 3, workspacePath)).toEqual(expect.objectContaining({
+      itemId: 'wi-c',
+      note: 'slot 3 conflict',
+    }));
   });
 
   it('stores and returns multiple per-slot blocks independently', () => {

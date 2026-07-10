@@ -74,6 +74,7 @@ function makeDeps(doc: VBriefDocument): SwarmCommandDeps {
       '[swarm] dispatched implementation slot 1 (item wi-1) for PAN-2203',
     ]),
     getFailedMergeBlock: vi.fn(() => ({ issueId: 'PAN-2203', itemId: 'wi-1', slotIndex: 1, note: 'conflict' })),
+    getFailedMergeBlocks: vi.fn(() => []),
     recoverFailedMergeSlot: vi.fn(async () => ['[swarm] retrying failed-merge slot 1 (item wi-1) for PAN-2203']),
     console: {
       log: vi.fn(),
@@ -248,6 +249,29 @@ describe('pan swarm command', () => {
     expect(result.ok).toBe(true);
     expect(deps.coordinateSwarmSlots).toHaveBeenCalledWith({ issueId: 'PAN-2203' });
     expect(deps.recoverFailedMergeSlot).not.toHaveBeenCalled();
+  });
+
+  it('recover against a slot with no block lists the currently blocked slots and exits nonzero', async () => {
+    const deps = makeDeps(makeDoc([makeEligibleItem('wi-1', 'src/a.ts')]));
+    deps.getFailedMergeBlock = vi.fn(() => undefined);
+    deps.getFailedMergeBlocks = vi.fn(() => [
+      { issueId: 'PAN-2203', itemId: 'wi-1', slotIndex: 1, note: 'slot 1 conflict' },
+      { issueId: 'PAN-2203', itemId: 'wi-3', slotIndex: 3, note: 'slot 3 conflict' },
+    ]);
+    deps.coordinateSwarmSlots = vi.fn(async () => []);
+
+    const result = await swarmRecoverCommand('PAN-2203', '2', { action: 'retry' }, deps);
+
+    expect(result.ok).toBe(false);
+    expect(deps.recoverFailedMergeSlot).not.toHaveBeenCalled();
+    expect(deps.console.error).toHaveBeenCalledWith(
+      expect.stringContaining('No failed-merge block for PAN-2203 slot 2'),
+    );
+    const errorCall = vi.mocked(deps.console.error).mock.calls.find(call =>
+      String(call[0]).includes('No failed-merge block for PAN-2203 slot 2'),
+    )?.[0];
+    expect(String(errorCall)).toContain('slot 1 (item wi-1): slot 1 conflict');
+    expect(String(errorCall)).toContain('slot 3 (item wi-3): slot 3 conflict');
   });
 
   it('recover reads a failed slot persisted by Deacon instead of a CLI-local map', async () => {
@@ -581,19 +605,22 @@ describe('pan swarm status (PAN-2214)', () => {
         { itemId: 'wi-1', slotIndex: 1, lifecycle: 'ready-to-merge' },
         { itemId: 'wi-2', slotIndex: 2, lifecycle: 'running' },
       ],
-      getFailedMergeBlocks: vi.fn(() => [
+      getFailedMergeBlocks: () => [
         { issueId: 'PAN-2203', itemId: 'wi-1', slotIndex: 1, note: 'merge conflict' },
-      ]),
+        { issueId: 'PAN-2203', itemId: 'wi-3', slotIndex: 3, note: 'another conflict' },
+      ],
     });
 
     const result = await swarmStatusCommand('PAN-2203', deps);
 
     expect(result.ok).toBe(true);
     const output = loggedText(deps);
-    expect(output).toContain('Blocked slots: slot 1 (item wi-1)');
-    expect(output).toContain('slot 1 · item wi-1 · failed-merge-blocked');
+    expect(output).toContain('slot 1 · item wi-1 · failed-merge (blocked)');
     expect(output).not.toContain('slot 1 · item wi-1 · ready-to-merge');
     expect(output).toContain('slot 2 · item wi-2 · running');
+    expect(output).toContain('Blocked slots:');
+    expect(output).toContain('slot 1 (item wi-1): merge conflict. Recover with `pan swarm recover PAN-2203 1 --action retry|drop|handoff`.');
+    expect(output).toContain('slot 3 (item wi-3): another conflict. Recover with `pan swarm recover PAN-2203 3 --action retry|drop|handoff`.');
   });
 
   it('is read-only: no record writes, git mutations, or spawns are possible through its deps', async () => {
