@@ -346,3 +346,33 @@ describe('swarm tail dispatch: an in-progress swarm may finish its last item', (
     expect(actions).not.toContain('[swarm] considered PAN-905: swarm eligible');
   });
 });
+
+describe('PAN-2372 WI-4 unreadable record surfacing (FR-7, AC5)', () => {
+  it('warns naming the issue and treats a corrupt record as no overrides instead of silently absent', async () => {
+    const { coordinateSwarmSlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
+    const projectPath = join(tempRoot, 'project');
+    const workspacePath = join(projectPath, 'workspaces', 'feature-pan-910');
+    mkdirSync(workspacePath, { recursive: true });
+    writeSpec(projectPath, 'PAN-910', makeDoc('PAN-910', 2));
+    // Corrupt record: the file EXISTS but is not parseable JSON.
+    // readIssueRecordForWorkspaceSync returns null for the parse failure, and the
+    // existsSync check in defaultReadStatusOverrides distinguishes that from a
+    // genuinely absent record — surfacing it as a warning instead of silent undefined.
+    const recordsDir = join(workspacePath, '.pan', 'records');
+    mkdirSync(recordsDir, { recursive: true });
+    writeFileSync(join(recordsDir, 'pan-910.json'), '{ this is not valid json');
+    mocks.listProjectsSync.mockReturnValue([{ config: { path: projectPath } }]);
+
+    // coordinateSwarmSlots() with no deps uses defaultDeps, whose readStatusOverrides
+    // IS the real defaultReadStatusOverrides under test.
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const actions = await coordinateSwarmSlots();
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[swarm] record unreadable for PAN-910'));
+    // Did not throw, and without readable overrides the plan's two pending items are
+    // still dispatch-eligible — the corrupt record did not falsely mark anything done.
+    expect(actions).toContain('[swarm] considered PAN-910: swarm eligible');
+    expect(actions).not.toContain(expect.stringContaining('finalized PAN-910'));
+    warnSpy.mockRestore();
+  });
+});

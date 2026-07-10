@@ -42,3 +42,26 @@ describe('PAN-2543 failed swarm slot supersession', () => {
     expect(clearSlotAssignment).toHaveBeenCalledWith(workspace, 'PAN-2543', 2, 'wi-8');
   });
 });
+
+describe('PAN-2372 WI-4 supersession clears the durable slot-completion marker (FR-6, AC4)', () => {
+  it('removes swarm.slotCompletions[slotIndex] when a slot is archived/superseded, preserving siblings', async () => {
+    workspace = mkdtempSync(join(tmpdir(), 'pan-2372-swarm-requeue-'));
+    const { writeSwarmSlotCompletion } = await import('../../../../src/lib/cloister/deacon-swarm-record.js');
+    // Seed a durable marker for the slot about to be superseded, plus a sibling
+    // marker that must survive (only the requeued slot's marker is cleared).
+    writeSwarmSlotCompletion(workspace, 'PAN-2372', {
+      slotIndex: 2, itemId: 'wi-8', agentId: 'agent-pan-2372-slot-2', completedAt: '2026-07-10T01:02:03.000Z',
+    });
+    writeSwarmSlotCompletion(workspace, 'PAN-2372', {
+      slotIndex: 3, itemId: 'wi-9', agentId: 'agent-pan-2372-slot-3', completedAt: '2026-07-10T01:02:03.000Z',
+    });
+
+    await archiveFailedSwarmSlot('PAN-2372', workspace, {
+      itemId: 'wi-8', slotIndex: 2, status: 'in_flight', branch: 'feature/pan-2372-slot-2', agentId: 'agent-pan-2372-slot-2', reason: 'auth-death',
+    }, { runGitCommand: vi.fn(async () => undefined), clearSlotAssignment: vi.fn() }, new Date('2026-07-10T01:02:03.000Z'));
+
+    const record = readIssueRecordForWorkspaceSync(workspace, 'PAN-2372');
+    expect(record?.swarm?.slotCompletions?.['2']).toBeUndefined();   // requeued slot cleared
+    expect(record?.swarm?.slotCompletions?.['3']).toBeDefined();     // sibling preserved
+  });
+});

@@ -215,3 +215,90 @@ describe('deacon-swarm stalled-slot detection and duplicate-spawn guard', () => 
     expect(fakeDeps.spawnRun).toHaveBeenCalledWith('PAN-2203', 'work', expect.objectContaining({ slotIndex: 3 }));
   });
 });
+
+describe('PAN-2372 WI-4 durable slot-completion marker (FR-6)', () => {
+  // classifyInFlightSlots now takes an optional readSlotCompletion dep. The marker
+  // — swarm.slotCompletions[String(slotIndex)], written durably by slot `pan done`
+  // (WI-3) — is the STRONGEST completion signal: it is the durable record that the
+  // slot finished, so it is checked before session/agent/runtime classification and
+  // beats a vanished session or a missing agent (the runtime plane is rebuildable).
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-01T00:00:00.000Z'));
+    resetSwarmLoopSafetyForTests();
+  });
+
+  afterEach(() => {
+    resetSwarmLoopSafetyForTests();
+    vi.useRealTimers();
+  });
+
+  function marker(slotIndex: number, itemId?: string) {
+    return {
+      slotIndex,
+      ...(itemId !== undefined ? { itemId } : {}),
+      agentId: `agent-pan-2203-slot-${slotIndex}`,
+      completedAt: '2026-07-01T00:00:00.000Z',
+    };
+  }
+
+  it('AC1: a matching marker classifies ready-to-merge durable-completion with the session alive and idle', async () => {
+    const deps = {
+      ...classifyDeps(),
+      readSlotCompletion: vi.fn(async () => marker(1, 'wi-a')),
+    };
+
+    const result = await classifyInFlightSlots([slot()], deps, {
+      workspacePath: '/workspace',
+      issueId: 'PAN-2203',
+    });
+
+    // The marker wins even though the session is alive and idle (classifyDeps
+    // lists the agent session as present) — it does not wait for the session to exit.
+    expect(result).toEqual([
+      expect.objectContaining({ lifecycle: 'ready-to-merge', signal: 'durable-completion', exitStatus: 0 }),
+    ]);
+    expect(deps.readSlotCompletion).toHaveBeenCalledWith('/workspace', 'PAN-2203', 1);
+  });
+
+  it('AC2: a marker whose itemId differs from the slot is ignored and the slot falls through to normal classification', async () => {
+    const deps = {
+      ...classifyDeps(),
+      // Stale marker left for a different item (e.g. a re-plan rotated slot→item).
+      readSlotCompletion: vi.fn(async () => marker(1, 'wi-other')),
+    };
+
+    const result = await classifyInFlightSlots([slot()], deps, {
+      workspacePath: '/workspace',
+      issueId: 'PAN-2203',
+    });
+
+    // Session alive + not dead ⇒ running. The mismatched marker did NOT short-circuit.
+    expect(result).toEqual([expect.objectContaining({ lifecycle: 'running' })]);
+    expect(result[0]?.signal).not.toBe('durable-completion');
+  });
+
+  it('AC3: a marker beats a vanished session — the slot is still ready-to-merge durable-completion', async () => {
+    // Same slot, but the agent session is GONE (not in listSessionNames). Without
+    // the marker this classifies as failed 'vanished-session'; with the durable
+    // marker it is ready-to-merge — proving the marker beats vanished classification.
+    const vanishedDeps = {
+      ...classifyDeps(),
+      listSessionNames: vi.fn(async () => []),
+    };
+
+    const withoutMarker = await classifyInFlightSlots([slot()], vanishedDeps, {
+      workspacePath: '/workspace',
+      issueId: 'PAN-2203',
+    });
+    expect(withoutMarker).toEqual([expect.objectContaining({ lifecycle: 'failed', reason: 'vanished-session' })]);
+
+    const withMarker = await classifyInFlightSlots([slot()], {
+      ...vanishedDeps,
+      readSlotCompletion: vi.fn(async () => marker(1, 'wi-a')),
+    }, { workspacePath: '/workspace', issueId: 'PAN-2203' });
+    expect(withMarker).toEqual([
+      expect.objectContaining({ lifecycle: 'ready-to-merge', signal: 'durable-completion', exitStatus: 0 }),
+    ]);
+  });
+});

@@ -17,7 +17,9 @@ import {
 import {
   readIssueRecordForWorkspaceSync,
   writeIssueRecordForWorkspaceSync,
+  getIssueRecordPathForWorkspace,
   type PanIssueRecord,
+  type PanIssueSwarmSlotCompletion,
 } from '../pan-dir/record.js';
 import { findSpecByIssue } from '../pan-dir/specs.js';
 import { capturePane, isPaneDead, listPaneValues, listSessionNames as listTmuxSessionNames } from '../tmux.js';
@@ -59,7 +61,7 @@ import {
   type RequestIssueReviewResult,
 } from './deacon-swarm-finalization.js';
 import { gcMergedSlots } from './deacon-swarm-gc.js';
-import { createMinimalIssueRecord, writeSwarmFinalizedAt } from './deacon-swarm-record.js';
+import { createMinimalIssueRecord, writeSwarmFinalizedAt, clearSwarmSlotCompletion } from './deacon-swarm-record.js';
 import { fireTieredCommitHooks } from './swarm-tiered-hooks.js';
 import { applySupersededSlotHighWater, requeueFailedSwarmSlots } from './swarm-failed-slot.js';
 
@@ -133,6 +135,13 @@ export interface CoordinateSwarmSlotsDeps {
   getIssueHold?: (issueId: string) => Pick<ReviewStatus, 'stuck' | 'deaconIgnored' | 'stuckReason'> | null;
   /** Per-issue record statusOverrides — the durable item done-ness the merged plan view applies. */
   readStatusOverrides?: (workspacePath: string, issueId: string) => Record<string, string> | undefined;
+  /**
+   * PAN-2372 WI-4 / FR-6: durable per-slot completion marker (written by slot
+   * `pan done`). When present for a slot, it beats every other classification —
+   * even a vanished session or missing agent — because it is the durable record
+   * that the slot finished; the runtime plane is rebuildable and may be absent.
+   */
+  readSlotCompletion?: (workspacePath: string, issueId: string, slotIndex: number) => PanIssueSwarmSlotCompletion | undefined;
   getFinalizedAt: (issueId: string, workspacePath: string) => string | undefined;
   setFinalizedAt: (issueId: string, workspacePath: string, finalizedAt: string) => void;
   /**
@@ -196,6 +205,7 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   getMaxSlotIndex: defaultGetMaxSlotIndex,
   listSlotAssignments: listDurableSlotAssignments,
   readStatusOverrides: defaultReadStatusOverrides,
+  readSlotCompletion: defaultReadSlotCompletion,
   getFinalizedAt: getSwarmFinalizedAt,
   setFinalizedAt: recordSwarmFinalizedAt,
   requestIssueReview: defaultRequestIssueReview,
@@ -214,8 +224,34 @@ function defaultGetIssueHold(issueId: string): Pick<ReviewStatus, 'stuck' | 'dea
 }
 
 function defaultReadStatusOverrides(workspacePath: string, issueId: string): Record<string, string> | undefined {
+  // PAN-2372 WI-4 / FR-7: distinguish an absent record (silent undefined — a
+  // brand-new issue that simply has no overrides yet) from an UNREADABLE record
+  // (the file exists but won't parse). readIssueRecordForWorkspaceSync returns
+  // null for both, so the existsSync check is what separates them. A corrupt
+  // record is preserved as a .corrupt-<ts> sidecar by the atomic writer (WI-1);
+  // warn so a broken sidecar never silently masks a slot's done-ness.
+  const normalized = issueId.toUpperCase();
+  const record = readIssueRecordForWorkspaceSync(workspacePath, normalized);
+  if (record === null && existsSync(getIssueRecordPathForWorkspace(workspacePath, normalized))) {
+    console.warn(`[swarm] record unreadable for ${normalized} — treating as no overrides; see .corrupt sidecar`);
+    return undefined;
+  }
+  return record?.statusOverrides;
+}
+
+/**
+ * PAN-2372 WI-4 / FR-6: read a slot's durable completion marker from the record
+ * door. Returns undefined when no record or no marker exists. Used by
+ * classifyInFlightSlots to recognize a slot whose `pan done` durably recorded
+ * completion even when the runtime plane (agent state, tmux session) is gone.
+ */
+function defaultReadSlotCompletion(
+  workspacePath: string,
+  issueId: string,
+  slotIndex: number,
+): PanIssueSwarmSlotCompletion | undefined {
   try {
-    return readIssueRecordForWorkspaceSync(workspacePath, issueId.toUpperCase())?.statusOverrides;
+    return readIssueRecordForWorkspaceSync(workspacePath, issueId.toUpperCase())?.swarm?.slotCompletions?.[String(slotIndex)];
   } catch {
     return undefined;
   }
@@ -242,7 +278,7 @@ export interface ClassifiedSwarmSlot extends ReconciledSlotItem {
   exitStatus?: number | null;
   reason?: 'missing-agent' | 'vanished-session' | 'pane-exit-nonzero' | 'pane-exit-unknown' | 'no-progress-timeout';
   stalledForMs?: number;
-  signal?: 'inferred' | 'completion-nudge';
+  signal?: 'inferred' | 'completion-nudge' | 'durable-completion';
   actions?: string[];
 }
 
@@ -367,6 +403,7 @@ export async function classifyInFlightSlots(
       | 'getSlotBranchAheadCount'
       | 'isSlotWorktreeClean'
       | 'sendCompletionNudge'
+      | 'readSlotCompletion'
     >> = defaultDeps,
   options: ClassifyInFlightSlotsOptions = {},
 ): Promise<ClassifiedSwarmSlot[]> {
@@ -376,6 +413,24 @@ export async function classifyInFlightSlots(
   const stallThresholdMs = options.stallThresholdMs ?? swarmStallThresholdMs();
 
   for (const slot of slots) {
+    // PAN-2372 WI-4 / FR-6: a durable completion marker (written by slot
+    // `pan done`) is the STRONGEST completion signal — it is the durable record
+    // that the slot finished, so it beats a vanished session, a missing agent,
+    // and the rebuildable runtime plane. Check it before everything else. The
+    // itemId guard (AC2) ignores a stale marker left for a slot now bound to a
+    // different item (e.g. after a re-plan rotated slot→item).
+    if (options.workspacePath && options.issueId) {
+      const completion = await (deps.readSlotCompletion ?? defaultReadSlotCompletion)(
+        options.workspacePath,
+        options.issueId,
+        slot.slotIndex,
+      );
+      if (completion && (!completion.itemId || completion.itemId === slot.itemId)) {
+        classified.push({ ...slot, lifecycle: 'ready-to-merge', exitStatus: 0, signal: 'durable-completion' });
+        continue;
+      }
+    }
+
     const durableReady = await classifyDurableReadySlot(slot, deps, options);
     if (!slot.agentId) {
       if (durableReady) {
@@ -513,6 +568,10 @@ export async function mergeReadySlots(
         itemId: item.id,
         writerId: 'deacon-swarm',
       }, workspacePath);
+      // PAN-2372 WI-4 / FR-6: the durable marker has done its job — the slot is
+      // merged. Clear it so the same slotIndex can be re-dispatched later without
+      // a stale "completed" marker falsely surfacing as ready-to-merge.
+      clearSwarmSlotCompletion(workspacePath, issueId, slot.slotIndex);
       actions.push(`[swarm] merged slot ${slot.slotIndex} (item ${item.id}) for ${issueId}`);
       // PAN-2385: commits just landed — fire the tiered feed + supervisor review (best-effort).
       try {
