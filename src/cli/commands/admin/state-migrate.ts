@@ -69,25 +69,30 @@ function workspacePaths(repo: string): string[] {
     .filter((path) => existsSync(join(path, '.git')));
 }
 
+const GITIGNORE_MANAGED_LINES = [
+  '# PAN-2541: permanent state is on overdeck-state; workspace runtime stays local.',
+  '.pan/',
+  '.beads/',
+  '.overdeck/continue.json',
+  '.overdeck/spec.vbrief.json',
+  '.overdeck/sessions.jsonl',
+  '.overdeck/feedback/',
+  '.overdeck/review/',
+  '.overdeck/test/',
+  '.overdeck/kickoff.md',
+  '.overdeck/agent-mcp.json',
+];
+
 function rewriteGitignore(repo: string): void {
   const path = join(repo, '.gitignore');
   const prior = existsSync(path) ? readFileSync(path, 'utf8') : '';
-  const kept = prior.split('\n').filter((line) => line.trim() !== '.overdeck/' && line.trim() !== '.pan/' && line.trim() !== '.beads/');
-  kept.push(
-    '# PAN-2541: permanent state is on overdeck-state; workspace runtime stays local.',
-    '.pan/',
-    '.beads/',
-    '.overdeck/continue.json',
-    '.overdeck/spec.vbrief.json',
-    '.overdeck/sessions.jsonl',
-    '.overdeck/feedback/',
-    '.overdeck/review/',
-    '.overdeck/test/',
-    '.overdeck/kickoff.md',
-    '.overdeck/agent-mcp.json',
-    '',
-  );
-  writeFileSync(path, kept.join('\n'));
+  // Idempotent: strip every line this function manages (plus the legacy bare
+  // '.overdeck/' entry) before appending the block exactly once — an
+  // interrupted migration must not accrete duplicate blocks on resume.
+  const managed = new Set([...GITIGNORE_MANAGED_LINES, '.overdeck/']);
+  const kept = prior.split('\n').filter((line) => !managed.has(line.trim()));
+  while (kept.length > 0 && kept[kept.length - 1]?.trim() === '') kept.pop();
+  writeFileSync(path, [...kept, '', ...GITIGNORE_MANAGED_LINES, ''].join('\n'));
 }
 
 export async function migrateProjectState(
