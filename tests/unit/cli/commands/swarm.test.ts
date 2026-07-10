@@ -234,6 +234,21 @@ describe('pan swarm command', () => {
     );
   });
 
+  it('recover retry routes a non-merge slot failure through coordinator archival', async () => {
+    const deps = makeDeps(makeDoc([makeEligibleItem('wi-1', 'src/a.ts')]));
+    deps.getFailedMergeBlock = vi.fn(() => undefined);
+    deps.coordinateSwarmSlots = vi.fn(async () => [
+      '[swarm] archived failed slot 3 (item wi-1) for PAN-2203',
+      '[swarm] dispatched implementation slot 4 (item wi-1) for PAN-2203',
+    ]);
+
+    const result = await swarmRecoverCommand('PAN-2203', '3', { action: 'retry' }, deps);
+
+    expect(result.ok).toBe(true);
+    expect(deps.coordinateSwarmSlots).toHaveBeenCalledWith({ issueId: 'PAN-2203' });
+    expect(deps.recoverFailedMergeSlot).not.toHaveBeenCalled();
+  });
+
   it('recover reads a failed slot persisted by Deacon instead of a CLI-local map', async () => {
     resetSwarmLoopSafetyForTests();
     const workspace = mkdtempSync(join(tmpdir(), 'pan-2203-swarm-recover-'));

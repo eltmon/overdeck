@@ -178,6 +178,14 @@ export async function swarmRecoverCommand(
   const workspacePath = await deps.ensureWorkspace(issue, loaded.project);
   const block = deps.getFailedMergeBlock(issue, workspacePath);
   if (!block) {
+    if (action === 'retry') {
+      const actions = await deps.coordinateSwarmSlots({ issueId: issue });
+      const retried = actions.some(line => line.includes(`archived failed slot ${slotIndex} `));
+      if (retried) {
+        for (const line of actions) deps.console.log(line);
+        return { ok: true, actions, workspacePath };
+      }
+    }
     deps.console.error(chalk.red(`No failed-merge slot is recorded for ${issue}.`));
     return { ok: false, actions: [] };
   }
