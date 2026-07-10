@@ -7,16 +7,16 @@ import { FsError } from '../errors.js'
 import type { WorkspacePanPaths } from './types.js'
 import {
   PAN_CONTINUE_FILENAME,
-  PAN_DIRNAME,
+  WORKSPACE_RUNTIME_DIRNAME,
   PAN_FEEDBACK_DIRNAME,
   PAN_SESSIONS_FILENAME,
   PAN_SPEC_FILENAME,
   PAN_CONTEXT_FILENAME,
-  LEGACY_PAN_DIRNAME,
+  LEGACY_WORKSPACE_RUNTIME_DIRNAME,
 } from './types.js'
 
 function workspacePanPaths(workspacePath: string): WorkspacePanPaths {
-  const panDir = join(workspacePath, PAN_DIRNAME)
+  const panDir = join(workspacePath, WORKSPACE_RUNTIME_DIRNAME)
   return {
     panDir,
     specPath: join(panDir, PAN_SPEC_FILENAME),
@@ -32,7 +32,7 @@ export function getWorkspacePanPaths(workspacePath: string): WorkspacePanPaths {
 }
 
 export function getLegacyWorkspacePanPaths(workspacePath: string): WorkspacePanPaths {
-  const panDir = join(workspacePath, LEGACY_PAN_DIRNAME)
+  const panDir = join(workspacePath, LEGACY_WORKSPACE_RUNTIME_DIRNAME)
   return {
     panDir,
     specPath: join(panDir, PAN_SPEC_FILENAME),
