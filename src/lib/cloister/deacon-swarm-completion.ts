@@ -2,6 +2,7 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { messageAgent } from '../agents/messaging.js';
 import type { ReconciledSlotItem } from '../agents/slot-reconcile.js';
+import { isStatePlaneOnlyStatus } from '../state-plane.js';
 import { loadCloisterConfigSync, type SwarmInferCompletionMode } from './config.js';
 import type { ClassifiedSwarmSlot, ClassifyInFlightSlotsOptions, CoordinateSwarmSlotsDeps } from './deacon-swarm.js';
 
@@ -128,7 +129,12 @@ export async function defaultGetSlotBranchAheadCount(
 
 export async function defaultIsSlotWorktreeClean(slotWorkspacePath: string): Promise<boolean> {
   const { stdout } = await execAsync('git status --porcelain', { cwd: slotWorkspacePath });
-  return stdout.trim().length === 0;
+  // PAN-2372 WI-6 / FR-9: treat state-plane-only dirt (.pan/continue.json, .pan/records/...,
+  // the workspace record door) as clean. The swarm writes durable state to those paths on the
+  // permanent plane, so their presence must not block a slot from being inferred complete.
+  // isStatePlaneOnlyStatus already returns true for empty porcelain (vacuous every()), so one
+  // shared classifier covers both cases — no local path list here. See docs/STATE-PLANE-COMMIT-POLICY.md.
+  return isStatePlaneOnlyStatus(stdout);
 }
 
 export async function defaultSendCompletionNudge(agentId: string, issueId: string): Promise<void> {

@@ -376,3 +376,60 @@ describe('PAN-2372 WI-4 unreadable record surfacing (FR-7, AC5)', () => {
     warnSpy.mockRestore();
   });
 });
+
+describe('PAN-2372 WI-6 state-plane-aware worktree clean predicate (FR-9)', () => {
+  // defaultIsSlotWorktreeClean now classifies `git status --porcelain` output through the
+  // shared isStatePlaneOnlyStatus classifier: state-plane-only dirt (.pan/continue.json,
+  // .pan/records/...) reads clean, any source file reads dirty, empty porcelain reads clean.
+  // These are real-git tests so the porcelain flows through the actual `git status` the
+  // predicate runs — proving the wiring, not just the classifier in isolation.
+
+  async function setupRepo(name: string): Promise<{ repo: string; git: (...args: string[]) => void }> {
+    const { execFileSync } = await import('node:child_process');
+    const repo = join(tempRoot, name);
+    mkdirSync(repo, { recursive: true });
+    const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, stdio: 'ignore' });
+    git('init', '-b', 'main');
+    git('config', 'user.email', 't@t');
+    git('config', 'user.name', 't');
+    git('commit', '--allow-empty', '-m', 'base');
+    return { repo, git };
+  }
+
+  it('AC1: porcelain listing only a state-plane path (.pan/continue.json) reads clean', async () => {
+    const { defaultIsSlotWorktreeClean } = await import('../../../../src/lib/cloister/deacon-swarm-completion.js');
+    const { repo, git } = await setupRepo('clean-state-plane');
+    // Track a sibling under .pan/ so git lists the untracked continue.json as an individual
+    // state-plane path (a fully-untracked .pan/ would collapse to '?? .pan/'). This models the
+    // realistic workspace where .pan/ holds tracked state-plane infrastructure.
+    mkdirSync(join(repo, '.pan', 'records'), { recursive: true });
+    writeFileSync(join(repo, '.pan', 'records', 'pan-2372.json'), '{"v":1}');
+    git('add', '--force', '.pan/records/pan-2372.json');
+    git('commit', '-m', 'track state-plane');
+    writeFileSync(join(repo, '.pan', 'continue.json'), '{}');
+
+    await expect(defaultIsSlotWorktreeClean(repo)).resolves.toBe(true);
+  });
+
+  it('AC2: a modified source file reads dirty', async () => {
+    const { defaultIsSlotWorktreeClean } = await import('../../../../src/lib/cloister/deacon-swarm-completion.js');
+    const { repo, git } = await setupRepo('dirty-src');
+    mkdirSync(join(repo, 'src', 'lib'), { recursive: true });
+    writeFileSync(join(repo, 'src', 'lib', 'foo.ts'), 'export const x = 1;\n');
+    git('add', 'src/lib/foo.ts');
+    git('commit', '-m', 'track src');
+    writeFileSync(join(repo, 'src', 'lib', 'foo.ts'), 'export const x = 2;\n');
+
+    await expect(defaultIsSlotWorktreeClean(repo)).resolves.toBe(false);
+  });
+
+  it('AC3: an empty worktree reads clean via the shared state-plane classifier', async () => {
+    const { defaultIsSlotWorktreeClean } = await import('../../../../src/lib/cloister/deacon-swarm-completion.js');
+    const { repo } = await setupRepo('empty-clean');
+
+    // Empty porcelain ⇒ isStatePlaneOnlyStatus is vacuously true ⇒ clean. AC1 (state-plane
+    // path ⇒ clean) + AC2 (source path ⇒ dirty) + this empty case together prove the shared
+    // classifier is wired, with no local path list introduced.
+    await expect(defaultIsSlotWorktreeClean(repo)).resolves.toBe(true);
+  });
+});
