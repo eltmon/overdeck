@@ -457,14 +457,12 @@ function buildSelfReviewPrompt(opts: {
           });
           const currentRunId = `agent-${opts.issueId.toLowerCase()}-review-${stdout.trim()}`;
           const synthReviewRunId = getAgentStateSync(reviewSessionName)?.reviewRunId;
-          // Stale when the existing session carries a runId that does not match
-          // the current HEAD. If it carries no runId at all (legacy session
-          // from before this field was persisted), stay conservative and keep
-          // the "skip" behaviour so we never kill a genuinely-running review.
-          if (synthReviewRunId && synthReviewRunId !== currentRunId) {
+          // A missing identity cannot prove that the live pane covers the
+          // current obligation, so legacy/unknown sessions are stale too.
+          if (!synthReviewRunId || synthReviewRunId !== currentRunId) {
             staleRunId = true;
             console.log(
-              `[review-agent] ${reviewSessionName} is stale — runId ${synthReviewRunId} != current ${currentRunId}; killing convoy and respawning`,
+              `[review-agent] ${reviewSessionName} is stale — runId ${synthReviewRunId ?? 'missing'} != current ${currentRunId}; killing convoy and respawning`,
             );
           }
         } catch (probeErr) {
