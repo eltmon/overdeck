@@ -11,6 +11,9 @@ import type { ClassifiedSwarmSlot } from './deacon-swarm.js';
 import type { PersistedTaskOperation } from '../vbrief/dag.js';
 import type { VBriefDocument } from '../vbrief/types.js';
 
+/** Patrol GC never removes forensic attempts; configured issue close-out owns teardown. */
+export const SWARM_SUPERSEDED_RETENTION = 'issue-close-out' as const;
+
 export interface FailedSlotArchiveDeps {
   runGitCommand: (command: string, cwd: string) => Promise<unknown>;
   clearSlotAssignment: (workspacePath: string, issueId: string, slotIndex: number, itemId?: string) => void;

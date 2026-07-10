@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { archiveFailedSwarmSlot, nextSwarmSlotIndex } from '../../../../src/lib/cloister/swarm-failed-slot.js';
+import { archiveFailedSwarmSlot, nextSwarmSlotIndex, SWARM_SUPERSEDED_RETENTION } from '../../../../src/lib/cloister/swarm-failed-slot.js';
 import { readIssueRecordForWorkspaceSync } from '../../../../src/lib/pan-dir/record.js';
 
 let workspace = '';
@@ -13,6 +13,9 @@ afterEach(() => {
 });
 
 describe('PAN-2543 failed swarm slot supersession', () => {
+  it('retains superseded attempts until issue close-out, never time-based GC', () => {
+    expect(SWARM_SUPERSEDED_RETENTION).toBe('issue-close-out');
+  });
   it('archives occupied branch/worktree metadata and preserves a monotonic next index', async () => {
     workspace = mkdtempSync(join(tmpdir(), 'pan-2543-swarm-'));
     mkdirSync(`${workspace}-slot-2`);

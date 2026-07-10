@@ -192,6 +192,22 @@ describe('teardown-workspace', () => {
     expect(branchResult!.success).toBe(true);
   });
 
+  it('removes archived failed-slot worktrees and branches only during configured close-out', async () => {
+    const archived = join(testDir, 'workspaces', 'feature-pan-100-slot-2-failed-20260710');
+    mkdirSync(archived, { recursive: true });
+    mockExecAsync.mockImplementation(async (command: string) => {
+      if (command.startsWith('git for-each-ref')) return { stdout: 'feature/pan-100-slot-2-failed-20260710\n', stderr: '' };
+      if (command.startsWith('git ls-remote')) return { stdout: 'abc\trefs/heads/feature/pan-100-slot-2-failed-20260710\n', stderr: '' };
+      return { stdout: '', stderr: '' };
+    });
+
+    await teardownWorkspace({ issueId: 'PAN-100', projectPath: testDir }, { deleteWorkspace: true, deleteBranches: true });
+
+    expect(mockExecAsync).toHaveBeenCalledWith(expect.stringContaining(`worktree remove "${archived}"`), expect.anything());
+    expect(mockExecAsync).toHaveBeenCalledWith('git branch -D "feature/pan-100-slot-2-failed-20260710"', expect.anything());
+    expect(mockExecAsync).toHaveBeenCalledWith('git push origin --delete "feature/pan-100-slot-2-failed-20260710"', expect.anything());
+  });
+
   it('should not delete branches by default', async () => {
     const results = await teardownWorkspace({
       issueId: 'PAN-100',
