@@ -76,10 +76,22 @@ export interface PanIssueSwarmSlotAssignment {
   assignedAt?: string;
 }
 
+export interface PanIssueSwarmSupersededAttempt {
+  slotIndex: number;
+  itemId: string;
+  agentId?: string;
+  branch?: string;
+  archivedBranch?: string;
+  archivedWorktree?: string;
+  reason: string;
+  supersededAt: string;
+}
+
 export interface PanIssueSwarmRecord {
   finalizedAt?: string;
   failedMergeBlock?: PanIssueSwarmFailedMergeBlock;
   slotAssignments?: PanIssueSwarmSlotAssignment[];
+  supersededAttempts?: PanIssueSwarmSupersededAttempt[];
 }
 
 export interface PanIssuePipelineRecord {

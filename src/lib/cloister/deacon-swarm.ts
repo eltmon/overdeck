@@ -61,6 +61,7 @@ import {
 import { gcMergedSlots } from './deacon-swarm-gc.js';
 import { createMinimalIssueRecord, writeSwarmFinalizedAt } from './deacon-swarm-record.js';
 import { fireTieredCommitHooks } from './swarm-tiered-hooks.js';
+import { applySupersededSlotHighWater, requeueFailedSwarmSlots } from './swarm-failed-slot.js';
 
 export { gcOrphanedSlots } from './deacon-swarm-orphan-gc.js';
 export { gcMergedSlots } from './deacon-swarm-gc.js';
@@ -326,7 +327,6 @@ export async function coordinateSwarmSlots(
         }
         actions.push(`[swarm] considered ${issueId}: endgame (merge/cleanup only)`);
       }
-
       const classified = await classifyInFlightSlots(reconciled.inFlight, deps, {
         workspacePath: workspace.workspacePath,
         issueId,
@@ -336,13 +336,15 @@ export async function coordinateSwarmSlots(
         actions.push(`[swarm] ${issueId} slot ${slot.slotIndex} ${slot.lifecycle}${slot.signal ? ` signal: ${slot.signal}` : ''}`);
         if (slot.actions) actions.push(...slot.actions);
       }
-      actions.push(...recordStalledSlotRecovery(issueId, classified, workspace.workspacePath));
+      const requeue = await requeueFailedSwarmSlots(issueId, workspace.workspacePath, classified, doc, reconciled, deps);
+      actions.push(...requeue.actions);
+      actions.push(...recordStalledSlotRecovery(issueId, classified, workspace.workspacePath)); // stalled slots remain operator-recoverable
       actions.push(...await mergeReadySlots(issueId, workspace.workspacePath, doc, classified, deps));
       actions.push(...await gcMergedSlots(issueId, workspace.workspacePath, reconciled.merged, deps));
       actions.push(...await gcOrphanedSlots(issueId, workspace.workspacePath, reconciled, deps));
       actions.push(...await finalizeSwarmIssueIfComplete(issueId, workspace.workspacePath, spec.document, deps));
       if (dispatchEligible) {
-        actions.push(...await dispatchNextWave(issueId, workspace.workspacePath, doc, reconciled, readiness, deps));
+        actions.push(...await dispatchNextWave(issueId, workspace.workspacePath, requeue.doc, reconciled, analyzeSwarmReadiness(requeue.doc), deps));
       }
       recordSwarmAdvanceSuccess(issueId);
     } catch (err) {
@@ -743,19 +745,17 @@ export async function dispatchNextWave(
   const actions: string[] = [];
   const mergedItemIds = new Set(reconciled.merged.map(slot => slot.itemId));
   const slotEligibleIds = new Set(readiness.items.filter(item => item.slotEligible).map(item => item.id));
-  const maxSlotIndex = Math.max(1, Math.floor((deps.getMaxSlotIndex ?? defaultGetMaxSlotIndex)()));
+  const configuredMaxSlotIndex = Math.max(1, Math.floor((deps.getMaxSlotIndex ?? defaultGetMaxSlotIndex)()));
   const occupiedSlotIndexes = new Set([
     ...reconciled.inFlight.map(slot => slot.slotIndex),
-    // ALL local slot branches — merged or not — hold their index until gc
-    // deletes the branch; reusing a merged-branch index would respawn onto a
-    // stale branch (PAN-2214).
+    // Local branches hold their index until GC; archived indexes are added below.
     ...reconciled.branches.map(branch => branch.slotIndex),
     ...reconciled.agents.map(agent => agent.slotIndex),
-    // Durable slot assignments from the issue record survive registry resets.
     ...(deps.listSlotAssignments ?? listDurableSlotAssignments)(issueId, workspacePath).map(assignment => assignment.slotIndex),
+    ...(reconciled.superseded ?? []).map(attempt => attempt.slotIndex),
   ]);
-  // Orphaned on-disk slot worktrees — no assignment, agent, or branch entry —
-  // still occupy their index (PAN-2213).
+  const maxSlotIndex = applySupersededSlotHighWater(occupiedSlotIndexes, reconciled, configuredMaxSlotIndex);
+  // Orphaned on-disk worktrees still occupy their index (PAN-2213).
   if (deps.slotWorktreeExists) {
     for (let index = 1; index <= maxSlotIndex; index++) {
       if (!occupiedSlotIndexes.has(index) && deps.slotWorktreeExists(`${workspacePath}-slot-${index}`)) {
