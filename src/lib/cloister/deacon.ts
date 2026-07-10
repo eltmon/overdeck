@@ -192,6 +192,7 @@ import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { reconcilePipelineLabelsPatrol } from './label-reconciler.js';
 import { pruneTerminalStoppedAgents } from './agent-gc.js';
+import { shouldRunRecoveryJanitor } from './patrol-cadence.js';
 import { reconcileOrphanProposedSpecs, spawnWorkAgentThroughAgentsEndpoint, triggerRebuildAndStart } from './orphan-proposed-reconciler.js';
 import { reconcileTestStatusFromGreenCiWithDeps } from './test-status-green-ci-reconciler.js';
 import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
@@ -3191,8 +3192,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   for (const warning of await recreatedStateWarnings(projectConfigs)) addLog('error', warning, state.patrolCycle);
   const divergenceWarnings = await recordMainDivergenceHealth(state, projectConfigs);
   for (const warning of divergenceWarnings) addLog('warn', warning, state.patrolCycle);
-  // Periodic agent state cleanup (PAN-154)
-  if (Math.random() < 0.003) {
+  if (shouldRunRecoveryJanitor('agent-state', state.patrolCycle)) {
     const cleanupActions = await cleanupStaleAgentState();
     actions.push(...cleanupActions);
     for (const a of cleanupActions) addLog('action', a, state.patrolCycle);
@@ -3201,7 +3201,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   // Periodic abandoned-feedback sweep — safety net for workspaces where the
   // event-driven cleanup (new review cycle / merge / close-out) never fired.
   // See docs/REVIEW-AGENT-ARCHITECTURE.md.
-  if (Math.random() < 0.003) {
+  if (shouldRunRecoveryJanitor('feedback', state.patrolCycle)) {
     const feedbackActions = await cleanupAbandonedFeedback();
     actions.push(...feedbackActions);
     for (const a of feedbackActions) addLog('action', a, state.patrolCycle);
@@ -3210,7 +3210,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   // PAN-1908: primary orphan reviewer-session cleanup is reactive
   // (agent.stopped for the owning work agent). This is a thin safety-net
   // sweep for dropped events (PAN-846).
-  if (Math.random() < 0.01) {
+  if (shouldRunRecoveryJanitor('orphan-reviewer', state.patrolCycle)) {
     const orphanActions = await cleanupOrphanReviewerSessions();
     actions.push(...orphanActions);
     for (const a of orphanActions) addLog('action', a, state.patrolCycle);
