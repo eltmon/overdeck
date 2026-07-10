@@ -371,9 +371,9 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       if (!existsSync(config.path)) continue;
       const mainBeadsDir = join(config.path, '.beads');
       if (!existsSync(mainBeadsDir)) continue; // Project hasn't used beads yet — skip
+      const bdRoot = resolveStateReadHomeSync(config).root;
       // Test connectivity. If the database is missing, auto-init.
       try {
-        const bdRoot = resolveStateReadHomeSync(config).root;
         execSync(`bd -C ${JSON.stringify(bdRoot)} list --json --limit 0 2>&1`, { cwd: config.path, stdio: 'pipe', timeout: 8000 });
       } catch (e: any) {
         const msg = String(e?.stdout ?? e?.stderr ?? e?.message ?? '');
@@ -569,9 +569,9 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       if (!existsSync(config.path)) continue;
       const mainBeadsDir = join(config.path, '.beads');
       if (!existsSync(mainBeadsDir)) continue; // Project hasn't used beads yet — skip
+      const bdRoot = resolveStateReadHomeSync(config).root;
       // Test connectivity. If the database is missing, auto-init.
       try {
-        const bdRoot = resolveStateReadHomeSync(config).root;
         execSync(`bd -C ${JSON.stringify(bdRoot)} list --json --limit 0 2>&1`, { cwd: config.path, stdio: 'pipe', timeout: 8000 });
       } catch (e: any) {
         const msg = String(e?.stdout ?? e?.stderr ?? e?.message ?? '');
