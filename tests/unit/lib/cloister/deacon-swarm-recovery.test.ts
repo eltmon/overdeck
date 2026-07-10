@@ -25,7 +25,7 @@ import {
   type ClassifiedSwarmSlot,
   type CoordinateSwarmSlotsDeps,
 } from '../../../../src/lib/cloister/deacon-swarm.js';
-import { writeIssueRecordForWorkspaceSync } from '../../../../src/lib/pan-dir/record.js';
+import { readIssueRecordForWorkspaceSync, writeIssueRecordForWorkspaceSync } from '../../../../src/lib/pan-dir/record.js';
 import { requeueFailedSwarmSlots } from '../../../../src/lib/cloister/swarm-failed-slot.js';
 import type { VBriefDocument, VBriefItem } from '../../../../src/lib/vbrief/types.js';
 
@@ -200,6 +200,14 @@ describe('deacon-swarm failed-merge recovery', () => {
       slotIndex: 1,
       slotItemId: 'wi-a',
     }));
+    expect(fakeDeps.runGitCommand).toHaveBeenCalledWith(
+      expect.stringContaining('git branch -m'),
+      workspacePath,
+    );
+    const record = readIssueRecordForWorkspaceSync(workspacePath, 'PAN-2203');
+    expect(record?.swarm?.supersededAttempts).toEqual(
+      expect.arrayContaining([expect.objectContaining({ slotIndex: 1, itemId: 'wi-a' })]),
+    );
     expect(getFailedMergeBlock('PAN-2203', 1, workspacePath)).toBeUndefined();
   });
 
