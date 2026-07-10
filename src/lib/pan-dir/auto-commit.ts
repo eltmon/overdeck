@@ -242,9 +242,13 @@ export function queueAutoCommit(opts: {
  * nothing changed.
  */
 export function queueBeadsAutoCommit(projectRoot: string): void {
+  const project = findProjectByPathSync(projectRoot);
+  const beadsRoot = project && resolveStateReadHomeSync(project).migrated
+    ? resolveStateReadHomeSync(project).root
+    : projectRoot;
   const candidates = [
-    join(projectRoot, '.beads', 'issues.jsonl'),
-    join(projectRoot, '.beads', 'export-state.json'),
+    join(beadsRoot, '.beads', 'issues.jsonl'),
+    join(beadsRoot, '.beads', 'export-state.json'),
   ];
   const paths = candidates.filter((p) => existsSync(p));
   if (paths.length === 0) return;

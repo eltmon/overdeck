@@ -1,7 +1,9 @@
 import { exec } from 'child_process';
-import { existsSync, mkdirSync, writeFileSync, rmSync, chmodSync } from 'fs';
-import { join, resolve } from 'path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, rmSync, chmodSync } from 'fs';
+import { join } from 'path';
 import { promisify } from 'util';
+import { findProjectByPathSync, type ProjectConfig } from '../../lib/projects.js';
+import { ensureStateWorktree, resolveStateHome } from '../../lib/state-home.js';
 
 const execAsync = promisify(exec);
 const REDIRECT_MANAGED_BEADS_VERSION = 1 * 10000 + 0 * 100 + 4;
@@ -25,6 +27,38 @@ async function getBeadsVersion(): Promise<number> {
   return 0;
 }
 
+export async function ensureWorkspaceBeadsRedirect(
+  workspacePath: string,
+  project: ProjectConfig | null = findProjectByPathSync(workspacePath),
+): Promise<string> {
+  let expectedTarget = '../../.beads';
+  if (project) {
+    const stateHome = await resolveStateHome(project);
+    if (stateHome.migrated) {
+      const status = await ensureStateWorktree(project);
+      if (status.status === 'dirty' || status.status === 'error' || status.status === 'legacy') {
+        throw new Error(`Cannot repair workspace beads redirect: state worktree ${status.status}`);
+      }
+      expectedTarget = join(stateHome.worktreePath, '.beads');
+    }
+  }
+
+  const beadsDir = join(workspacePath, '.beads');
+  const redirectPath = join(beadsDir, 'redirect');
+  let current: string | null = null;
+  try {
+    current = readFileSync(redirectPath, 'utf8').trim();
+  } catch {}
+  if (current === expectedTarget) return redirectPath;
+
+  mkdirSync(beadsDir, { recursive: true });
+  chmodSync(beadsDir, 0o700);
+  const tmp = `${redirectPath}.tmp-${process.pid}`;
+  writeFileSync(tmp, expectedTarget, { encoding: 'utf8', mode: 0o600 });
+  renameSync(tmp, redirectPath);
+  return redirectPath;
+}
+
 /**
  * Initialize beads for a workspace
  *
@@ -40,20 +74,7 @@ export async function initializeWorkspaceBeads(workspacePath: string, issueId: s
       // The worktree's .beads/ directory is created from git (only issues.jsonl is committed),
       // so it lacks the redirect file needed to find the main repo's Dolt database.
       // We must create .beads/redirect explicitly — it is gitignored so cannot be inherited.
-      const beadsDir = join(workspacePath, '.beads');
-      const redirectPath = join(beadsDir, 'redirect');
-      if (!existsSync(redirectPath)) {
-        // Walk up from workspacePath to find the main repo's .beads/ directory
-        // Worktrees live at <projectRoot>/workspaces/feature-<id>/ — two levels up
-        const projectRoot = resolve(workspacePath, '..', '..');
-        const mainBeadsDir = join(projectRoot, '.beads');
-        if (existsSync(mainBeadsDir)) {
-          mkdirSync(beadsDir, { recursive: true });
-          chmodSync(beadsDir, 0o700);
-          // Write relative path from workspace .beads/ to main .beads/
-          writeFileSync(redirectPath, '../../.beads', 'utf-8');
-        }
-      }
+      await ensureWorkspaceBeadsRedirect(workspacePath);
 
       // Use bare issueId label (e.g. "pan-419") matching createBeadsFromVBrief and all query sites
       const issueLabel = issueId.toLowerCase();
