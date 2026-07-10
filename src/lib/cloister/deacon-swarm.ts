@@ -264,7 +264,7 @@ function defaultShouldDispatch(issueId: string): boolean {
   return !(hold?.stuck || hold?.deaconIgnored);
 }
 
-export type SwarmSlotLifecycle = 'running' | 'ready-to-merge' | 'failed' | 'stalled' | 'awaiting-completion-signal';
+export type SwarmSlotLifecycle = 'running' | 'ready-to-merge' | 'failed' | 'stalled' | 'awaiting-completion-signal' | 'failed-merge-blocked';
 
 export interface ClassifyInFlightSlotsOptions {
   workspacePath?: string;

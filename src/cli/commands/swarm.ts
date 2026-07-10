@@ -529,6 +529,7 @@ export interface SwarmStatusCommandDeps {
     slots: Parameters<typeof classifyInFlightSlots>[0],
     workspacePath: string,
   ) => Promise<ClassifiedSwarmSlot[]>;
+  getFailedMergeBlocks: typeof getFailedMergeBlocks;
   getReviewStatusSync: typeof getReviewStatusSync;
   listSessionNamesSync: () => string[];
   getConcurrencyLimits: typeof getConcurrencyLimits;
@@ -541,6 +542,7 @@ const defaultStatusDeps: SwarmStatusCommandDeps = {
   findSpecByIssue,
   reconcileSlotState,
   classifyInFlightSlots: (slots, workspacePath) => classifyInFlightSlots(slots, undefined, { workspacePath }),
+  getFailedMergeBlocks,
   getReviewStatusSync,
   listSessionNamesSync,
   getConcurrencyLimits,
@@ -571,6 +573,8 @@ export async function swarmStatusCommand(
   const lifecycleBySlot = new Map(classified.map(slot => [slot.slotIndex, slot.lifecycle]));
   const branchMergedBySlot = new Map(reconciled.branches.map(branch => [branch.slotIndex, branch.merged]));
   const liveSessions = new Set(safeListSessionNames(deps));
+  const blockedSlots = deps.getFailedMergeBlocks(issue, workspacePath);
+  const blockedSlotIndexes = new Set(blockedSlots.map(block => block.slotIndex));
 
   deps.console.log(chalk.bold(`Swarm status for ${issue}`));
 
@@ -599,13 +603,40 @@ export async function swarmStatusCommand(
   );
 
   const rows = [
-    ...reconciled.merged.map(slot => ({ ...slot, lifecycle: 'merged' })),
-    ...reconciled.inFlight.map(slot => ({ ...slot, lifecycle: lifecycleBySlot.get(slot.slotIndex) ?? 'running' })),
-  ].sort((a, b) => a.slotIndex - b.slotIndex);
+    ...reconciled.merged.map(slot => ({ ...slot, lifecycle: 'merged' as const })),
+    ...reconciled.inFlight.map(slot => ({
+      ...slot,
+      lifecycle: blockedSlotIndexes.has(slot.slotIndex)
+        ? 'failed-merge-blocked'
+        : (lifecycleBySlot.get(slot.slotIndex) ?? 'running'),
+    })),
+  ];
+
+  for (const block of blockedSlots) {
+    if (!rows.some(row => row.slotIndex === block.slotIndex)) {
+      rows.push({
+        itemId: block.itemId,
+        slotIndex: block.slotIndex,
+        status: 'in_flight',
+        branch: block.branch,
+        agentId: undefined,
+        lifecycle: 'failed-merge-blocked',
+      });
+    }
+  }
+
+  rows.sort((a, b) => a.slotIndex - b.slotIndex);
 
   if (rows.length === 0) {
     deps.console.log('Slots: none — nothing is dispatched right now, and no merged slot state remains.');
     return { ok: true };
+  }
+
+  if (blockedSlots.length > 0) {
+    deps.console.log(
+      `Blocked slots: ${blockedSlots.map(b => `slot ${b.slotIndex} (item ${b.itemId})`).join(', ')} — `
+      + 'awaiting `pan swarm recover`. Other slots continue around them.',
+    );
   }
 
   deps.console.log('Slots:');

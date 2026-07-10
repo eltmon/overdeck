@@ -474,6 +474,7 @@ describe('pan swarm status (PAN-2214)', () => {
     hold?: { deaconIgnored?: boolean; deaconIgnoredReason?: string; stuck?: boolean; stuckReason?: string } | null;
     reconciled?: Record<string, unknown>;
     classified?: Array<Record<string, unknown>>;
+    getFailedMergeBlocks?: () => Array<Record<string, unknown>>;
     sessionNames?: string[];
     liveSlotCount?: number;
   } = {}): SwarmStatusCommandDeps {
@@ -500,6 +501,7 @@ describe('pan swarm status (PAN-2214)', () => {
         ...options.reconciled,
       })) as unknown as SwarmStatusCommandDeps['reconcileSlotState'],
       classifyInFlightSlots: vi.fn(async () => (options.classified ?? []) as never),
+      getFailedMergeBlocks: vi.fn(() => (options.getFailedMergeBlocks ? options.getFailedMergeBlocks() : [])),
       getReviewStatusSync: vi.fn(() => options.hold ?? null) as unknown as SwarmStatusCommandDeps['getReviewStatusSync'],
       listSessionNamesSync: vi.fn(() => options.sessionNames ?? []),
       getConcurrencyLimits: vi.fn(() => ({
@@ -563,6 +565,37 @@ describe('pan swarm status (PAN-2214)', () => {
     expect(loggedText(deps)).toContain('Hold: none — the Deacon is actively coordinating this issue on every patrol.');
   });
 
+  it('PAN-2364: lists blocked slots separately and overrides ready-to-merge mislabel', async () => {
+    const deps = makeStatusDeps({
+      reconciled: {
+        inFlight: [
+          { itemId: 'wi-1', slotIndex: 1, status: 'in_flight', branch: 'feature/pan-2203-slot-1', agentId: 'agent-pan-2203-slot-1' },
+          { itemId: 'wi-2', slotIndex: 2, status: 'in_flight', branch: 'feature/pan-2203-slot-2', agentId: 'agent-pan-2203-slot-2' },
+        ],
+        branches: [
+          { slotIndex: 1, branch: 'feature/pan-2203-slot-1', merged: false },
+          { slotIndex: 2, branch: 'feature/pan-2203-slot-2', merged: false },
+        ],
+      },
+      classified: [
+        { itemId: 'wi-1', slotIndex: 1, lifecycle: 'ready-to-merge' },
+        { itemId: 'wi-2', slotIndex: 2, lifecycle: 'running' },
+      ],
+      getFailedMergeBlocks: vi.fn(() => [
+        { issueId: 'PAN-2203', itemId: 'wi-1', slotIndex: 1, note: 'merge conflict' },
+      ]),
+    });
+
+    const result = await swarmStatusCommand('PAN-2203', deps);
+
+    expect(result.ok).toBe(true);
+    const output = loggedText(deps);
+    expect(output).toContain('Blocked slots: slot 1 (item wi-1)');
+    expect(output).toContain('slot 1 · item wi-1 · failed-merge-blocked');
+    expect(output).not.toContain('slot 1 · item wi-1 · ready-to-merge');
+    expect(output).toContain('slot 2 · item wi-2 · running');
+  });
+
   it('is read-only: no record writes, git mutations, or spawns are possible through its deps', async () => {
     const deps = makeStatusDeps({
       reconciled: {
@@ -584,6 +617,7 @@ describe('pan swarm status (PAN-2214)', () => {
       'countRunningSwarmSlotsForIssue',
       'findSpecByIssue',
       'getConcurrencyLimits',
+      'getFailedMergeBlocks',
       'getReviewStatusSync',
       'listSessionNamesSync',
       'reconcileSlotState',
