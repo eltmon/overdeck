@@ -34,7 +34,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --configLoader runner --passWithNoTests",
     "dist:linux": "node scripts/prepare-server-resources.mjs && electron-builder --linux AppImage --publish never",
-    "dist:mac": "node scripts/prepare-server-resources.mjs && electron-builder --mac dmg --universal --publish never",
+    "dist:mac": "node scripts/prepare-server-resources.mjs && electron-builder --mac dmg --arm64 --publish never",
     "dist:win": "node scripts/prepare-server-resources.mjs && electron-builder --win nsis --publish never",
     "postinstall": "electron-rebuild -f -w node-pty 2>/dev/null; exit 0"
   },
@@ -95,8 +95,7 @@
         {
           "target": "dmg",
           "arch": [
-            "arm64",
-            "x64"
+            "arm64"
           ]
         }
       ],

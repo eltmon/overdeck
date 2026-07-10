@@ -39,6 +39,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import Module from "node:module";
@@ -245,6 +246,32 @@ if (!existsSync(ptyBinary)) {
   console.error("  The electron-targeted rebuild did not produce a build/Release/pty.node.");
   process.exit(1);
 }
+
+// Prune node-pty's prebuilds/ and @electron/rebuild's bin/ artifact dirs.
+// Neither is on the runtime path we ship (no electron-ABI prebuild exists, so
+// the loader always falls back to build/Release), and bin/ contains a file
+// HARDLINKED to build/Release/pty.node — intra-package hardlinks make npm
+// publish fail with "415 Hard link is not allowed" (the v0.45.4 npm failure).
+const ptyPackageDir = join(serverDir, "node_modules/@homebridge/node-pty-prebuilt-multiarch");
+rmSync(join(ptyPackageDir, "prebuilds"), { recursive: true, force: true });
+rmSync(join(ptyPackageDir, "bin"), { recursive: true, force: true });
+
+// Break any remaining intra-tree hardlinks the same way: rewrite multi-link
+// files as independent copies so `npm pack` never emits hard-link tar entries.
+const breakHardLinks = (dir) => {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const entryPath = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      breakHardLinks(entryPath);
+    } else if (entry.isFile() && statSync(entryPath).nlink > 1) {
+      const content = readFileSync(entryPath);
+      const mode = statSync(entryPath).mode;
+      rmSync(entryPath);
+      writeFileSync(entryPath, content, { mode });
+    }
+  }
+};
+breakHardLinks(serverDir);
 
 // Belt-and-suspenders ABI check: a fresh npm install also leaves a stock-Node
 // prebuild copied to build/Release, so existence alone cannot prove the
