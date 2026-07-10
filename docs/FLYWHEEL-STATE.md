@@ -2551,3 +2551,16 @@ stale (written 2026-07-08); re-verified all order-book items against live GitHub
 - NEXT: monitor B8 bead progress → pan done → review→test→merge (TENET-10 full suite; cloister-core).
   If B8 hits the PAN-2567 stuck-after-review loop → same remedy (manual squash once reviewed+green+
   orthogonal). Watch B7 close-out complete. After B8 lands → A9 unfreezes. Then B9-B13 (re-verify PRDs).
+
+## RUN-62 tick 19 (2026-07-10 ~17:17 local) — B8 progressing (1/6 beads); B7 verifying; A9 frozen; main green
+
+- **B8 = PAN-2364** healthy — agent-pan-2364 working, 1/6 beads committed (`75c45911` store
+  failed-merge blocks per-slot in record + in-memory map — the core isolation fix). 6-bead effort
+  (multi-tick like B7), compact imminent (PAN-1781 handles). Idle review-supervisor (Sonnet 5)
+  waiting — harmless. No action.
+- **B7 = PAN-2372** still merged+verifying-on-main (deacon close-out slow but owns it).
+- **A9 = PAN-2229** frozen (expected — clears when B8 merges).
+- **Main green** (04ceeefcdd, all checks success).
+- NEXT: monitor B8 bead progress → pan done → review→test→merge (TENET-10 full suite; if PAN-2567
+  stuck-after-review loop recurs → manual squash once reviewed+green+orthogonal). B8 lands → A9
+  unfreezes → then B9-B13 (re-verify PRDs vs main). Substrate bugs filed this run: PAN-2567, PAN-2569.
