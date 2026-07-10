@@ -17,6 +17,7 @@ import {
   stateWorktreePath,
 } from '../state-home.js';
 import { getProjectPanPaths } from '../pan-dir/specs.js';
+import { resolveStateReadHomeSync as resolveStandaloneStateReadHomeSync } from '../state-read-home.js';
 
 function git(cwd: string, args: string[]): string {
   return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
@@ -162,11 +163,31 @@ describe('state home', () => {
     expect(getProjectPanPaths(repo).specsDir).toBe(join(stateRoot, 'specs'));
   });
 
+  it('routes synchronous legacy reads to the designated polyrepo host', () => {
+    const infra = join(root, 'infra');
+    const polyrepo: ProjectConfig = {
+      name: 'Polyrepo fixture',
+      path: root,
+      workspace: { type: 'polyrepo', repos: [{ name: 'infra', path: 'infra' }] },
+      pan_records: { repo: 'infra' },
+    };
+
+    expect(resolveStateReadHomeSync(polyrepo)).toEqual({ root: infra, migrated: false });
+    expect(resolveStandaloneStateReadHomeSync(polyrepo)).toEqual({ root: infra, migrated: false });
+    expect(resolveStandaloneStateReadHomeSync(project)).toEqual({ root: repo, migrated: false });
+  });
+
   it('trips when a migrated checkout recreates a legacy state directory', async () => {
     const parent = pushUnmarkedStateBranch();
     pushCompletionMarker(parent);
+    const polyrepo: ProjectConfig = {
+      name: 'Polyrepo fixture',
+      path: root,
+      workspace: { type: 'polyrepo', repos: [{ name: 'infra', path: 'repo' }] },
+      pan_records: { repo: 'infra' },
+    };
     mkdirSync(join(repo, '.pan', 'records'), { recursive: true });
-    await expect(findRecreatedLegacyStatePaths(project)).resolves.toEqual([join(repo, '.pan', 'records')]);
+    await expect(findRecreatedLegacyStatePaths(polyrepo)).resolves.toEqual([join(repo, '.pan', 'records')]);
   });
 
   it('recreates a clean wrong-branch state worktree on overdeck-state', async () => {

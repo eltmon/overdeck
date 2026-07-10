@@ -156,10 +156,11 @@ export function shouldCommitLegacyWorkspaceArtifacts(migrated: boolean): boolean
 
 export async function findRecreatedLegacyStatePaths(project: ProjectConfig): Promise<string[]> {
   if (!(await isStateMigrated(project))) return [];
+  const legacyStateRoot = resolveInfraRepo(project).repoPath;
   return STATE_BRANCH_PATHS
     .map((statePath) => statePath === '.beads/'
-      ? join(project.path, '.beads')
-      : join(project.path, '.pan', statePath.slice(0, -1)))
+      ? join(legacyStateRoot, '.beads')
+      : join(legacyStateRoot, '.pan', statePath.slice(0, -1)))
     .filter(existsSync);
 }
 
