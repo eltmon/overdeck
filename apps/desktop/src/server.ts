@@ -22,6 +22,7 @@ import { resolveServerEntry } from "./main.js";
 
 const BASE_PORT = 7825;
 const MAX_RESTART_DELAY_MS = 30_000;
+const MAX_RESTART_ATTEMPTS = 8;
 const SIGTERM_GRACE_MS = 3_000;
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -52,6 +53,8 @@ export function startServer(onReady: (port: number, wsUrl: string) => void): voi
   // The app-quit path sets isQuitting in main.ts before stopServer, so this
   // only un-latches the flag when the caller intends a real restart.
   quitting = false;
+  // A deliberate (re)start gets a fresh crash budget.
+  restartAttempt = 0;
   onReadyCallback = onReady;
   spawnServer();
 }
@@ -83,8 +86,10 @@ function spawnServer(): void {
         TERM: process.env.TERM || "xterm-256color",
         COLORTERM: process.env.COLORTERM || "truecolor",
         LANG: process.env.LANG || "en_US.UTF-8",
-        // Strip env vars that would confuse the child
-        ELECTRON_RUN_AS_NODE: undefined,
+        // process.execPath is the Electron binary; without this flag a
+        // packaged app ignores [entry] and boots the full desktop app again,
+        // fork-bombing the machine (PAN-2559).
+        ELECTRON_RUN_AS_NODE: "1",
       } as NodeJS.ProcessEnv,
       stdio: ["ignore", "pipe", "pipe"],
     },
@@ -102,8 +107,13 @@ function spawnServer(): void {
   child.on("spawn", () => {
     console.log(`[desktop/server] spawned pid=${child.pid} port=${port}`);
     // Wait for server to be listening before signalling ready
-    waitForServer(`http://127.0.0.1:${port}`, () => {
-      console.log(`[desktop/server] ready on port ${port}`);
+    waitForServer(`http://127.0.0.1:${port}`, (healthy) => {
+      console.log(`[desktop/server] ready on port ${port} (healthy=${String(healthy)})`);
+      if (healthy) {
+        // A confirmed-healthy boot resets the crash budget so the cap only
+        // counts consecutive failures.
+        restartAttempt = 0;
+      }
       onReadyCallback?.(port, `ws://127.0.0.1:${port}`);
     });
   });
@@ -123,19 +133,19 @@ function spawnServer(): void {
   });
 }
 
-function waitForServer(url: string, callback: () => void, maxMs = 30_000): void {
+function waitForServer(url: string, callback: (healthy: boolean) => void, maxMs = 30_000): void {
   const start = Date.now();
   const interval = setInterval(() => {
     if (Date.now() - start > maxMs) {
       clearInterval(interval);
-      callback(); // call anyway — server might still come up
+      callback(false); // call anyway — server might still come up
       return;
     }
     fetch(url + "/api/health", { signal: AbortSignal.timeout(1_000) })
       .then((r) => {
         if (r.ok) {
           clearInterval(interval);
-          callback();
+          callback(true);
         }
       })
       .catch(() => {
@@ -147,6 +157,13 @@ function waitForServer(url: string, callback: () => void, maxMs = 30_000): void 
 function scheduleRestart(): void {
   if (quitting) return;
   restartAttempt++;
+  if (restartAttempt > MAX_RESTART_ATTEMPTS) {
+    console.error(
+      `[desktop/server] server failed ${MAX_RESTART_ATTEMPTS} consecutive times — giving up. ` +
+        "Use the app menu's dashboard restart to retry.",
+    );
+    return;
+  }
   const delay = Math.min(1_000 * Math.pow(2, restartAttempt - 1), MAX_RESTART_DELAY_MS);
   console.log(`[desktop/server] restarting in ${delay}ms (attempt ${restartAttempt})`);
   restartTimer = setTimeout(() => {

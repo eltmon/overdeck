@@ -56,6 +56,17 @@ export let serverWsUrl = "";
 export let isQuitting = false;
 const terminalWindows = new Map<string, BrowserWindow>();
 
+// ─── Single instance lock ─────────────────────────────────────────────────────
+// A second launch must not boot another full app (window, tray, embedded
+// server). Duplicates exit immediately and the running instance is focused
+// via the second-instance event below (PAN-2559).
+
+if (!app.requestSingleInstanceLock()) {
+  app.exit(0);
+}
+
+app.on("second-instance", () => showOrCreateWindow());
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 export function resolveResourcePath(fileName: string): string | null {
