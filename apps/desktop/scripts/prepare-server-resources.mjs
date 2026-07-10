@@ -42,6 +42,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import Module from "node:module";
+import * as OS from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -193,15 +194,47 @@ execSync("npm install --omit=dev --no-audit --no-fund", {
 // NODE_MODULE_VERSION is Electron's own (143 for Electron 40). Compile from
 // source for that ABI; node-pty's runtime loader falls back to
 // build/Release/pty.node when no matching prebuild exists.
+//
+// Use @electron/rebuild's programmatic API rather than a `npx electron-rebuild`
+// shell-out: bun's workspace install does not reliably link the scoped
+// package's bin where npx/PATH can see it on CI (the v0.45.3 failure), and
+// the in-process call also removes shell-quoting and Windows .cmd-shim
+// concerns. Resolve the tool from the workspace when bun did link it; fall
+// back to a private npm install (npm's linking is deterministic everywhere).
 console.log(`[prepare-server] Rebuilding node-pty for Electron ${electronVersion}...`);
-execSync(
-  `npx --no-install electron-rebuild --force --version ${electronVersion} ` +
-    `--module-dir "${serverDir}" --only @homebridge/node-pty-prebuilt-multiarch`,
-  {
-    cwd: desktopDir,
-    stdio: "inherit",
-  },
-);
+const rebuildRange =
+  desktopPkg.devDependencies?.["@electron/rebuild"] ?? desktopPkg.dependencies?.["@electron/rebuild"];
+if (!rebuildRange) {
+  console.error("[prepare-server] @electron/rebuild is missing from apps/desktop/package.json");
+  process.exit(1);
+}
+
+const desktopRequire = Module.createRequire(join(desktopDir, "package.json"));
+let rebuild;
+try {
+  ({ rebuild } = desktopRequire("@electron/rebuild"));
+} catch {
+  const toolsDir = join(OS.tmpdir(), "overdeck-desktop-rebuild-tools");
+  console.log(`[prepare-server] @electron/rebuild not resolvable from the workspace — installing into ${toolsDir}`);
+  mkdirSync(toolsDir, { recursive: true });
+  writeFileSync(
+    join(toolsDir, "package.json"),
+    `${JSON.stringify(
+      { name: "overdeck-desktop-rebuild-tools", private: true, dependencies: { "@electron/rebuild": rebuildRange } },
+      null,
+      2,
+    )}\n`,
+  );
+  execSync("npm install --omit=dev --no-audit --no-fund", { cwd: toolsDir, stdio: "inherit" });
+  ({ rebuild } = Module.createRequire(join(toolsDir, "package.json"))("@electron/rebuild"));
+}
+
+await rebuild({
+  buildPath: serverDir,
+  electronVersion,
+  force: true,
+  onlyModules: ["@homebridge/node-pty-prebuilt-multiarch"],
+});
 
 const ptyBinary = join(
   serverDir,
@@ -211,6 +244,25 @@ if (!existsSync(ptyBinary)) {
   console.error(`[prepare-server] node-pty native binary missing: ${ptyBinary}`);
   console.error("  The electron-targeted rebuild did not produce a build/Release/pty.node.");
   process.exit(1);
+}
+
+// Belt-and-suspenders ABI check: a fresh npm install also leaves a stock-Node
+// prebuild copied to build/Release, so existence alone cannot prove the
+// rebuild ran. Load the binary under the actual Electron binary when it is
+// resolvable (ELECTRON_RUN_AS_NODE needs no display).
+try {
+  const electronBinary = desktopRequire("electron");
+  execSync(`"${electronBinary}" -e "require(process.env.PTY_BINARY)"`, {
+    stdio: "inherit",
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", PTY_BINARY: ptyBinary },
+  });
+  console.log("[prepare-server] Verified: pty.node loads under the Electron ABI");
+} catch (error) {
+  if (error?.status) {
+    console.error("[prepare-server] pty.node failed to load under the Electron binary — wrong ABI.");
+    process.exit(1);
+  }
+  console.warn("[prepare-server] electron binary not resolvable here — skipping the ABI load check");
 }
 
 console.log("[prepare-server] Done. server/ is ready for packaging.");
