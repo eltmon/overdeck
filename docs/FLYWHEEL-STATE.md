@@ -2666,3 +2666,27 @@ stale (written 2026-07-08); re-verified all order-book items against live GitHub
 - B7 done. A9 held (unfreezes post-deploy).
 - NEXT: verify B8 CI green → careful deploy → verify → A9 unfreezes → report release readiness →
   B9=PAN-2149 (re-verify PRD vs main).
+
+## RUN-62 tick 26 (2026-07-10 ~19:20-19:30 local) — B3-B8 batch DEPLOYED + verified; B8 closed; A9 spec-invisible (B7 cutover)
+
+- **DEPLOYED the Lane B B3-B8 batch.** main green (174f27f921) → `npm run build` (✓) → BOOT-TEST on
+  :3099 clean (bound port, ReadModel bootstrapped, no circular-ESM, no state-home crash) → `pan
+  restart --dashboard --health-timeout 180000`. New server healthy on :3011 (health ok, mode primary),
+  deacon running (deacon=on). **B8 code CONFIRMED LIVE**: `recordStalledSlotRecovery` present in
+  deployed dist/dashboard/deacon-swarm-Ejulayhc.js. Boot gates: deacon=on, **resume=off (source=
+  default)** — auto-resume OFF, so stopped work agents need manual re-drive during the drain.
+- **B8 = PAN-2364 CLOSED OUT** (operator-instructed `pan close --force`): merge confirmed, artifacts
+  archived, workspace/sessions torn down, GitHub #2364 closed + closed-out label. **Lane B B0-B8 DONE.**
+- **A9 = PAN-2229 — B8 resolved the failed-merge freeze, but B7's CUTOVER made its spec INVISIBLE**
+  (exactly B7's tick-4 prediction): `pan swarm status` → "No main-side vBRIEF spec found for PAN-2229".
+  Its spec was written to legacy `.pan/` by the old buggy door; canonical reader (now deployed) can't
+  see it. Slots 1/2/3 still alive. **Fix per B7's note: re-promote via proper doors (`pan plan
+  finalize` for the affected issue).** A9 is Lane A (parallel, NOT critical path) — flagging, not
+  blindly re-promoting into live slots. Affected-by-cutover set (B7): pan-2044 record, PAN-2229,
+  PAN-2372(closed).
+- **Main green.** Substrate bugs filed this run: PAN-2567 (stuck-after-review merge loop, hit B7+B8),
+  PAN-2569 (silent planning→work spawn-fail).
+- **RELEASE READINESS: B3-B8 CI/CD reliability batch landed + deployed + verified.** Per brief →
+  SUGGEST next cut (v0.45.x patch, fixes-only). Operator tags, never me.
+- NEXT: report release readiness to operator + decide A9 spec re-promotion; then B9=PAN-2149
+  (decompose cloister/service.ts) with PRD re-verify vs current main.
