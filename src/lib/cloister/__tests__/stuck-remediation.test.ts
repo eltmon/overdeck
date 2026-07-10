@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   isFlywheelGloballyPaused: vi.fn(),
   describeAgentDeath: vi.fn(),
   countPendingAskUserQuestionsForAgent: vi.fn(),
+  recordRecoveryFailure: vi.fn(),
 }));
 
 vi.mock('../../agents.js', () => ({
@@ -115,6 +116,7 @@ vi.mock('../../beads-query.js', () => ({
     }),
   ),
 }));
+vi.mock('../recovery-trip.js', () => ({ recordRecoveryFailure: mocks.recordRecoveryFailure }));
 
 import { checkStuckAgentRemediation } from '../stuck-remediation.js';
 import { queryReadyBeadsByIssueLabels } from '../../beads-query.js';
@@ -205,6 +207,7 @@ describe('checkStuckAgentRemediation', () => {
     mocks.resumeFlywheel.mockResolvedValue({ activeRunId: 'RUN-8' });
     mocks.describeAgentDeath.mockReturnValue('exit=1 at 2026-05-23T11:59:00Z');
     mocks.countPendingAskUserQuestionsForAgent.mockReturnValue(Effect.succeed(0));
+    mocks.recordRecoveryFailure.mockReturnValue({ trip: { tripCount: 1 }, emitNeedsYou: true });
     mockReadyBeads();
   });
 
@@ -290,7 +293,7 @@ describe('checkStuckAgentRemediation', () => {
     const actions = await checkStuckAgentRemediation({ now: NOW });
 
     const expectedAction = '[deacon] stuck-remediation stage=3 issue=PAN-1415 idleMin=100 action=marked-troubled';
-    expect(actions).toEqual([expectedAction]);
+    expect(actions).toEqual([expectedAction, '[deacon] needs-you PAN-1415: stuck remediation exhausted']);
     expect(mocks.markAgentTroubled).toHaveBeenCalledWith('agent-pan-1415');
     expect(mocks.messageAgent).not.toHaveBeenCalled();
     expect(mocks.resumeAgent).not.toHaveBeenCalled();
@@ -394,7 +397,7 @@ describe('checkStuckAgentRemediation', () => {
     const actions = await checkStuckAgentRemediation({ now: NOW });
 
     const expectedAction = '[deacon] stuck-remediation stage=3 issue=PAN-1415 idleMin=100 action=rework-wedge-troubled';
-    expect(actions).toEqual([expectedAction]);
+    expect(actions).toEqual([expectedAction, '[deacon] needs-you PAN-1415: stuck remediation exhausted']);
     expect(mocks.killSessionSync).not.toHaveBeenCalled();
     expect(mocks.markAgentTroubled).toHaveBeenCalledWith('agent-pan-1415');
   });
