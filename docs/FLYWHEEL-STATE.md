@@ -2647,3 +2647,22 @@ stale (written 2026-07-08); re-verified all order-book items against live GitHub
   main-delta orthogonal to B8 files → `gh pr merge 2571 --squash`.
 - **A9 = PAN-2229** held (unfreezes when B8 merges). B7 done.
 - NEXT: review verdict + PR #2571 full CI → merge B8 → A9 unfreezes → B9=PAN-2149 (re-verify PRD).
+
+## RUN-62 tick 25 (2026-07-10 ~19:06 local) — B8 MERGED; Lane B B0-B8 COMPLETE; deploy pending
+
+- **B8 = PAN-2364 MERGED** ✅ (PR #2571 squash → main aea717cc8e, 23:06:47Z). Hit the SAME
+  PAN-2567 stuck-after-review loop as B7 (advancing-verdict reconcile + model_divergence system-stuck)
+  → applied the remedy: review PASSED + PR #2571 full CI GREEN (test 8m3s full suite = TENET-10) +
+  CLEAN/MERGEABLE + main-delta orthogonal (1 ahead, non-cloister) → `gh pr merge 2571 --squash`.
+  **LANE B B0-B8 ALL LANDED — the CI/CD reliability batch (B3-B8) is COMPLETE on main.**
+- B8 merge commit CI building (guard✅; test/build/lint in_progress) — verify green before deploy.
+- **DEPLOY PENDING (next tick):** live server pid 2086006 (from 16:57, pre-B7/B8) runs OLD dist —
+  B7/B8 fixes NOT live. **A9=PAN-2229 will NOT unfreeze until B8's per-slot isolation is DEPLOYED**
+  (live deacon runs new code). Deploy plan (careful — B7 changed state-home resolution = boot-adjacent):
+  npm run build → BOOT-TEST on throwaway port (no circular-ESM, state-home resolves) → `pan restart
+  --dashboard --health-timeout 180000` → verify new pid binds :3011, deacon=on → A9 unfreezes.
+- **Release readiness:** per brief, after B3-B8 batch lands+deploys+verifies → SUGGEST next cut
+  (operator decides; operator has been cutting v0.45.x). Report after deploy verified.
+- B7 done. A9 held (unfreezes post-deploy).
+- NEXT: verify B8 CI green → careful deploy → verify → A9 unfreezes → report release readiness →
+  B9=PAN-2149 (re-verify PRD vs main).
