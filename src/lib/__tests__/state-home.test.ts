@@ -11,8 +11,11 @@ import {
   isStateMigrated,
   parseMigrationCompleteMarker,
   resolveStateHome,
+  resolveStateDomainPathSync,
+  resolveStateReadHomeSync,
   stateWorktreePath,
 } from '../state-home.js';
+import { getProjectPanPaths } from '../pan-dir/specs.js';
 
 function git(cwd: string, args: string[]): string {
   return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
@@ -142,6 +145,20 @@ describe('state home', () => {
     await expect(ensureStateWorktree(project, { projectKey: 'fixture' })).resolves.toEqual({ status: 'created', path });
     expect(git(path, ['branch', '--show-current'])).toBe('overdeck-state');
     await expect(ensureStateWorktree(project, { projectKey: 'fixture' })).resolves.toEqual({ status: 'healthy', path });
+  });
+
+  it('routes synchronous read doors to a materialized marked worktree with legacy fallback', async () => {
+    expect(resolveStateReadHomeSync(project)).toEqual({ root: repo, migrated: false });
+    expect(getProjectPanPaths(repo).specsDir).toBe(join(repo, '.pan', 'specs'));
+
+    const parent = pushUnmarkedStateBranch();
+    pushCompletionMarker(parent);
+    await ensureStateWorktree(project);
+    const stateRoot = stateWorktreePath(project);
+
+    expect(resolveStateReadHomeSync(project)).toEqual({ root: stateRoot, migrated: true });
+    expect(resolveStateDomainPathSync(project, 'records')).toBe(join(stateRoot, 'records'));
+    expect(getProjectPanPaths(repo).specsDir).toBe(join(stateRoot, 'specs'));
   });
 
   it('recreates a clean wrong-branch state worktree on overdeck-state', async () => {

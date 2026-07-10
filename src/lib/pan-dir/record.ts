@@ -17,6 +17,7 @@ import { dirname, join } from 'node:path';
 import { hostname } from 'node:os';
 
 import { queueAutoCommit } from './auto-commit.js';
+import { resolveStateReadHomeSync } from '../state-home.js';
 import {
   getProjectSync,
   resolveProjectFromIssueSync,
@@ -181,7 +182,11 @@ export function getIssueRecordPathForWorkspace(workspacePath: string, issueId: s
  * (used in tests and non-worktree contexts).
  */
 export function getIssueRecordPath(project: ProjectConfig, issueId: string): string {
-  return join(getIssueRecordBasePath(project, issueId), '.pan', RECORD_DIRNAME, `${issueId.toLowerCase()}.json`);
+  const stateHome = resolveStateReadHomeSync(project);
+  const recordsDir = stateHome.migrated
+    ? join(stateHome.root, RECORD_DIRNAME)
+    : join(getIssueRecordBasePath(project, issueId), '.pan', RECORD_DIRNAME);
+  return join(recordsDir, `${issueId.toLowerCase()}.json`);
 }
 
 /** Base directory for an issue record: workspace if it exists, else project root. */

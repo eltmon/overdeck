@@ -8,7 +8,7 @@
  */
 
 import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, rm } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -33,6 +33,11 @@ export interface StateHome {
   migrated: boolean;
   migrationInProgress: boolean;
   remoteTip: string | null;
+}
+
+export interface StateReadHome {
+  root: string;
+  migrated: boolean;
 }
 
 export type StateWorktreeStatus =
@@ -150,6 +155,39 @@ export async function resolveStateHome(project: ProjectConfig, options: StateHom
   return migration.migrated
     ? { ...migration, worktreePath, repoPath: worktreePath, recordsPath: '.' }
     : { ...migration, worktreePath, repoPath: legacy.repoPath, recordsPath: legacy.recordsPath };
+}
+
+/**
+ * Synchronous read-door resolution for legacy synchronous APIs. The async
+ * resolver remains authoritative for migration detection; this compatibility
+ * door uses only an already-materialized, valid state-worktree marker and
+ * otherwise falls back read-only to the legacy checkout.
+ */
+export function resolveStateReadHomeSync(
+  project: ProjectConfig,
+  options: StateHomeOptions = {},
+): StateReadHome {
+  const worktreePath = stateWorktreePath(project, options);
+  const markerPath = join(worktreePath, MIGRATION_COMPLETE_MARKER);
+  if (existsSync(markerPath)) {
+    try {
+      if (parseMigrationCompleteMarker(JSON.parse(readFileSync(markerPath, 'utf8')))) {
+        return { root: worktreePath, migrated: true };
+      }
+    } catch {
+      // Invalid or interrupted marker: preserve D12's legacy resolution.
+    }
+  }
+  return { root: resolveInfraRepo(project).repoPath, migrated: false };
+}
+
+export function resolveStateDomainPathSync(
+  project: ProjectConfig,
+  domain: string,
+  options: StateHomeOptions = {},
+): string {
+  const home = resolveStateReadHomeSync(project, options);
+  return home.migrated ? join(home.root, domain) : join(home.root, '.pan', domain);
 }
 
 async function addStateWorktree(repoPath: string, path: string): Promise<void> {

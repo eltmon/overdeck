@@ -2,6 +2,8 @@ import { join } from 'path'
 import { Effect, FileSystem } from 'effect'
 import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem'
 import { FsError } from '../errors.js'
+import { findProjectByPathSync, type ProjectConfig } from '../projects.js'
+import { resolveStateReadHomeSync } from '../state-home.js'
 
 import { normalizeVBriefEnvelope, serializeVBriefDocument, VBriefMergeConflictError } from '../vbrief/io.js'
 import { generateVBriefFilename, parseVBriefFilename, slugify } from '../vbrief/lifecycle.js'
@@ -23,11 +25,17 @@ import {
 } from './types.js'
 
 function projectPanPaths(projectRoot: string): ProjectPanPaths {
+  const project: ProjectConfig = findProjectByPathSync(projectRoot) ?? {
+    name: projectRoot,
+    path: projectRoot,
+  }
+  const stateHome = resolveStateReadHomeSync(project)
+  const panDir = stateHome.migrated ? stateHome.root : join(stateHome.root, PAN_DIRNAME)
   return {
-    panDir: join(projectRoot, PAN_DIRNAME),
-    specsDir: join(projectRoot, PAN_DIRNAME, PAN_SPECS_DIRNAME),
-    draftsDir: join(projectRoot, PAN_DIRNAME, PAN_DRAFTS_DIRNAME),
-    continuesDir: join(projectRoot, PAN_DIRNAME, PAN_CONTINUES_DIRNAME),
+    panDir,
+    specsDir: join(panDir, PAN_SPECS_DIRNAME),
+    draftsDir: join(panDir, PAN_DRAFTS_DIRNAME),
+    continuesDir: join(panDir, PAN_CONTINUES_DIRNAME),
   }
 }
 
