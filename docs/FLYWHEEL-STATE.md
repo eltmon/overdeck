@@ -2499,3 +2499,23 @@ stale (written 2026-07-08); re-verified all order-book items against live GitHub
   still stuck AND operator authorizes / burst settled → land PR #2562 via squash-merge (TENET-10
   satisfied) + reconcile lifecycle (close, labels, postMergeLifecycle bypass) + file the
   stuck-after-review substrate bug. Minimize main commits until B7 lands.
+
+## RUN-62 ticks 15–16 (2026-07-10 ~15:39–16:21 local) — B7 LANDED via squash-merge; filed PAN-2567; B8 next
+
+- **B7 = PAN-2372 MERGED** ✅ (PR #2562 squash → main eeaca5640c, 20:21:59Z). CI on the merge commit
+  building (guard success; test/build/lint in_progress) — verify green before close-out/B8.
+- **How it landed:** pipeline could NOT merge (advancing-verdict reconcile loop + repeated rebase→CI
+  re-runs never converging on a churning main). Operator kept release-bursting (v0.45.1/2/3/4 +
+  PAN-2561 desktop) — main never quieted. B7's full CI went GREEN (test 9m0s full suite), PR
+  CLEAN+MERGEABLE, and the entire main-ahead delta is ORTHOGONAL to B7's cloister/state-home files
+  (verified) → green valid vs main, TENET-10 satisfied. Operator surfaced (tick 14) + silent →
+  DECISIVE reversible call: `gh pr merge 2562 --squash`. Landed cleanly.
+- **Filed PAN-2567** — the stuck-after-review merge convergence substrate bug (distinct from PAN-2143
+  NO_RESUME variant; resume was ON here). Advancing verdict reconciled forever, test-agent never
+  dispatched, rebase↔CI thrash never converges. This is the substrate feedback of this run.
+- **LIFECYCLE RECONCILE PENDING** (direct merge bypassed postMergeLifecycle): PAN-2372 still labeled
+  in-review; stale agent-pan-2372 + agent-pan-2372-review sessions linger. Next tick: confirm main
+  CI green → `pan close PAN-2372` (close-out: reconciles labels, reaps stale agents, teardown) →
+  then dispatch B8.
+- **B8 = PAN-2364 READY TO DISPATCH** once main green + B7 closed-out (drip rule). B8 unfreezes
+  A9=PAN-2229 (still frozen). Order-book after B8: decompositions B9-B13 (re-verify PRDs vs main).
