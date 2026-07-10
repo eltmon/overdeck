@@ -27,8 +27,9 @@ import * as NodeChildProcessSpawner from '@effect/platform-node/NodeChildProcess
 import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem';
 import * as NodePath from '@effect/platform-node/NodePath';
 import { GitError } from '../errors.js';
-import { findProjectByPathSync } from '../projects.js';
+import { findProjectByPathSync, listProjectsSync } from '../projects.js';
 import { resolveStateReadHomeSync, STATE_BRANCH } from '../state-home.js';
+import { isStateMigrationLocked } from '../state-migration-lock.js';
 import { isStatePlaneOnlyDiff } from '../state-plane.js';
 
 const spawnerLayer = NodeChildProcessSpawner.layer.pipe(
@@ -203,6 +204,11 @@ export function queueAutoCommit(opts: {
   if (repoRoot && existsSync(join(repoRoot, 'migration-complete.json'))) expectedBranch = STATE_BRANCH;
   const project = findProjectByPathSync(projectRoot);
   if (project) {
+    const key = listProjectsSync().find(({ config }) => config.path === project.path)?.key;
+    if (key && isStateMigrationLocked(key)) {
+      console.warn(`[pan-dir/auto-commit] refusing state write while migration lock is held for ${key}`);
+      return;
+    }
     const stateHome = resolveStateReadHomeSync(project);
     if (stateHome.migrated) {
       repoRoot = stateHome.root;

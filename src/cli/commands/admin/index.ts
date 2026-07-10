@@ -20,11 +20,14 @@ import { hookCommand } from './fpp-handler.js';
 import { backfillTitlesCommand } from './conversations-handler.js';
 import { listStatesCommand, cleanupStatesCommand } from './tracker-handler.js';
 import { migrateConfigCommand } from '../migrate-config.js';
+import { registerStateMigrationCommand } from './state-migrate.js';
 
 export function registerAdminCommands(program: Command): void {
   const admin = program
     .command('admin')
     .description('Plumbing commands: watchdog, specialists, infra, db, config, and more');
+
+  registerStateMigrationCommand(admin);
 
   // pan admin cloister — lifecycle watchdog
   registerCloisterCommands(admin);
