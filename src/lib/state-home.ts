@@ -1,0 +1,202 @@
+/**
+ * State-home resolver and dedicated overdeck-state worktree manager (PAN-2541).
+ *
+ * Migration is complete only when the tip of origin/overdeck-state contains a
+ * valid migration-complete.json whose stateBranchSha names the marker's parent.
+ * An unmarked branch is an in-progress migration and continues using legacy
+ * project-root state paths.
+ */
+
+import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { mkdir, rm } from 'node:fs/promises';
+import { basename, dirname, join, resolve } from 'node:path';
+import { promisify } from 'node:util';
+import { getOverdeckHome } from './paths.js';
+import { listProjectsSync, resolveInfraRepo, type ProjectConfig } from './projects.js';
+
+const execFileAsync = promisify(execFile);
+export const STATE_BRANCH = 'overdeck-state';
+export const MIGRATION_COMPLETE_MARKER = 'migration-complete.json';
+
+export interface MigrationCompleteMarker {
+  sourceMainSha: string;
+  stateBranchSha: string;
+  completedAt: string;
+  version: number;
+}
+
+export interface StateHome {
+  worktreePath: string;
+  repoPath: string;
+  recordsPath: string;
+  migrated: boolean;
+  migrationInProgress: boolean;
+  remoteTip: string | null;
+}
+
+export type StateWorktreeStatus =
+  | { status: 'healthy'; path: string }
+  | { status: 'created'; path: string }
+  | { status: 'recreated'; path: string }
+  | { status: 'legacy'; path: string }
+  | { status: 'dirty'; path: string; detail: string }
+  | { status: 'error'; path: string; detail: string };
+
+interface StateHomeOptions {
+  projectKey?: string;
+}
+
+const migrationCache = new Map<string, { remoteTip: string | null; migrated: boolean }>();
+
+async function git(repoPath: string, args: string[]): Promise<string> {
+  const { stdout } = await execFileAsync('git', args, {
+    cwd: repoPath,
+    encoding: 'utf8',
+    maxBuffer: 16 * 1024 * 1024,
+    timeout: 15_000,
+    killSignal: 'SIGTERM',
+  });
+  return stdout.trim();
+}
+
+function projectKey(project: ProjectConfig, explicit?: string): string {
+  if (explicit) return explicit;
+  const projectPath = resolve(project.path);
+  const match = listProjectsSync().find(({ config }) => resolve(config.path) === projectPath);
+  return match?.key ?? basename(projectPath);
+}
+
+export function stateWorktreePath(project: ProjectConfig, options: StateHomeOptions = {}): string {
+  return join(getOverdeckHome(), 'state', projectKey(project, options.projectKey));
+}
+
+function isSha(value: unknown): value is string {
+  return typeof value === 'string' && /^[0-9a-f]{40}$/i.test(value);
+}
+
+export function parseMigrationCompleteMarker(value: unknown): MigrationCompleteMarker | null {
+  if (!value || typeof value !== 'object') return null;
+  const marker = value as Partial<MigrationCompleteMarker>;
+  if (!isSha(marker.sourceMainSha) || !isSha(marker.stateBranchSha)) return null;
+  if (typeof marker.completedAt !== 'string' || !Number.isFinite(Date.parse(marker.completedAt))) return null;
+  if (!Number.isInteger(marker.version) || (marker.version ?? 0) < 1) return null;
+  return marker as MigrationCompleteMarker;
+}
+
+async function remoteStateTip(repoPath: string): Promise<string | null> {
+  const output = await git(repoPath, ['ls-remote', '--heads', 'origin', `refs/heads/${STATE_BRANCH}`]);
+  const sha = output.split(/\s+/)[0];
+  return isSha(sha) ? sha : null;
+}
+
+async function markerAtRemoteTip(repoPath: string, tip: string): Promise<MigrationCompleteMarker | null> {
+  await git(repoPath, [
+    'fetch',
+    '--quiet',
+    'origin',
+    `refs/heads/${STATE_BRANCH}:refs/remotes/origin/${STATE_BRANCH}`,
+  ]);
+  const fetchedTip = await git(repoPath, ['rev-parse', `refs/remotes/origin/${STATE_BRANCH}`]);
+  if (fetchedTip !== tip) return null;
+
+  let raw: string;
+  try {
+    raw = await git(repoPath, ['show', `${tip}:${MIGRATION_COMPLETE_MARKER}`]);
+  } catch {
+    return null;
+  }
+  let marker: MigrationCompleteMarker | null;
+  try {
+    marker = parseMigrationCompleteMarker(JSON.parse(raw));
+  } catch {
+    marker = null;
+  }
+  if (!marker) return null;
+
+  const parent = await git(repoPath, ['rev-parse', `${tip}^`]).catch(() => '');
+  return marker.stateBranchSha === parent ? marker : null;
+}
+
+export async function inspectStateMigration(project: ProjectConfig): Promise<{
+  migrated: boolean;
+  migrationInProgress: boolean;
+  remoteTip: string | null;
+}> {
+  const { repoPath } = resolveInfraRepo(project);
+  let tip: string | null;
+  try {
+    tip = await remoteStateTip(repoPath);
+  } catch {
+    return { migrated: false, migrationInProgress: false, remoteTip: null };
+  }
+  const cached = migrationCache.get(repoPath);
+  if (cached?.remoteTip === tip) {
+    return { migrated: cached.migrated, migrationInProgress: tip !== null && !cached.migrated, remoteTip: tip };
+  }
+  const migrated = tip !== null && await markerAtRemoteTip(repoPath, tip) !== null;
+  migrationCache.set(repoPath, { remoteTip: tip, migrated });
+  return { migrated, migrationInProgress: tip !== null && !migrated, remoteTip: tip };
+}
+
+export async function isStateMigrated(project: ProjectConfig): Promise<boolean> {
+  return (await inspectStateMigration(project)).migrated;
+}
+
+export async function resolveStateHome(project: ProjectConfig, options: StateHomeOptions = {}): Promise<StateHome> {
+  const legacy = resolveInfraRepo(project);
+  const migration = await inspectStateMigration(project);
+  const worktreePath = stateWorktreePath(project, options);
+  return migration.migrated
+    ? { ...migration, worktreePath, repoPath: worktreePath, recordsPath: '.' }
+    : { ...migration, worktreePath, repoPath: legacy.repoPath, recordsPath: legacy.recordsPath };
+}
+
+async function addStateWorktree(repoPath: string, path: string): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  const localBranchExists = await git(repoPath, ['show-ref', '--verify', '--quiet', `refs/heads/${STATE_BRANCH}`])
+    .then(() => true, () => false);
+  const args = localBranchExists
+    ? ['worktree', 'add', path, STATE_BRANCH]
+    : ['worktree', 'add', '--track', '-b', STATE_BRANCH, path, `origin/${STATE_BRANCH}`];
+  await git(repoPath, args);
+}
+
+export async function ensureStateWorktree(
+  project: ProjectConfig,
+  options: StateHomeOptions = {},
+): Promise<StateWorktreeStatus> {
+  const migration = await inspectStateMigration(project);
+  const path = stateWorktreePath(project, options);
+  if (!migration.migrated) return { status: 'legacy', path };
+
+  const { repoPath } = resolveInfraRepo(project);
+  if (!existsSync(path)) {
+    await addStateWorktree(repoPath, path);
+    return { status: 'created', path };
+  }
+
+  let branch: string;
+  let dirty: string;
+  try {
+    branch = await git(path, ['branch', '--show-current']);
+    dirty = await git(path, ['status', '--porcelain']);
+  } catch (error) {
+    return { status: 'error', path, detail: error instanceof Error ? error.message : String(error) };
+  }
+  if (dirty) return { status: 'dirty', path, detail: 'state worktree has uncommitted changes; refusing destructive repair' };
+  if (branch === STATE_BRANCH) return { status: 'healthy', path };
+
+  try {
+    await git(repoPath, ['worktree', 'remove', path]);
+    await rm(path, { recursive: true, force: true });
+    await addStateWorktree(repoPath, path);
+    return { status: 'recreated', path };
+  } catch (error) {
+    return { status: 'error', path, detail: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+export function clearStateMigrationCache(): void {
+  migrationCache.clear();
+}

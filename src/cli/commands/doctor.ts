@@ -23,7 +23,7 @@ import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { CacheService } from '../../dashboard/server/services/cache-service.js';
 import { classifyDashboardAgent } from '../../dashboard/frontend/src/lib/agent-classifier.js';
 import { getMainDivergence, type MainDivergence } from '../../lib/state-plane.js';
-
+import { checkStateWorktrees } from './doctor-state-worktree.js';
 // Minimum supported omp version for the ohmypi harness (PAN-1989).
 // omp uses a different version lineage from pi. Baselined at 16.1.16 (verified).
 export const SUPPORTED_OMP_VERSION_MIN = '16.1.0';
@@ -864,7 +864,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   }));
   checks.push(checkOrphanProposedSpecs());
   checks.push(...await checkMainDivergence());
-
+  checks.push(...await checkStateWorktrees());
   // Check smee-client webhook relay
   try {
     const { isSmeeProcessRunningSync } = await import('../../lib/smee.js');
