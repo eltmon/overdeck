@@ -12,7 +12,7 @@
  * invariant) while still making it portable via `git push`.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, promises as fsp } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync, promises as fsp } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { hostname } from 'node:os';
 
@@ -87,11 +87,29 @@ export interface PanIssueSwarmSupersededAttempt {
   supersededAt: string;
 }
 
+/**
+ * PAN-2372 WI-3 / FR-4: durable per-slot completion marker. A slot's `pan done`
+ * writes one of these keyed by `String(slotIndex)` so the swarm coordinator can
+ * tell a finished slot from one still working — without relying on the
+ * runtime-only agent-state plane, which is exactly what was being lost.
+ */
+export interface PanIssueSwarmSlotCompletion {
+  slotIndex: number;
+  itemId?: string;
+  agentId: string;
+  completedAt: string;
+}
+
 export interface PanIssueSwarmRecord {
   finalizedAt?: string;
   failedMergeBlock?: PanIssueSwarmFailedMergeBlock;
   slotAssignments?: PanIssueSwarmSlotAssignment[];
   supersededAttempts?: PanIssueSwarmSupersededAttempt[];
+  /**
+   * Keyed by `String(slotIndex)`. The coordinator (WI-4) consumes this to mark
+   * a slot durable-ready; merge/requeue clears the key (clearSwarmSlotCompletion).
+   */
+  slotCompletions?: Record<string, PanIssueSwarmSlotCompletion>;
 }
 
 export interface PanIssueRecoveryTrip {
@@ -190,10 +208,22 @@ export function getIssueWorkspacePath(issueId: string): string | null {
 }
 
 /**
- * Record path for an issue within a specific workspace directory.
- * Lives at `<workspacePath>/.pan/records/<issueId-lowercase>.json`.
+ * Record path for an issue reached from a workspace directory. When the issue
+ * resolves to a registered project, delegates to {@link getIssueRecordPath}
+ * (canonical, migration-aware) so every workspace-door caller converges on the
+ * SAME record as the canonical door — including a migrated project, whose
+ * record lives at `${OVERDECK_HOME}/state/<project>/records/` rather than the
+ * slot worktree (FR-3, PAN-2372 WI-2).
+ *
+ * When no project can be resolved for the issue, falls back directly to
+ * `<workspace>/.pan/records/<issue>.json` — byte-identical to the pre-PAN-2372
+ * behavior, and intentionally NOT routed through `getIssueRecordPath` (which
+ * would need migration/infra-repo resolution for a project that does not
+ * exist). Proven by `record-rehome.test.ts`.
  */
 export function getIssueRecordPathForWorkspace(workspacePath: string, issueId: string): string {
+  const project = resolveProjectForIssue(issueId);
+  if (project) return getIssueRecordPath(project, issueId);
   return join(workspacePath, '.pan', RECORD_DIRNAME, `${issueId.toLowerCase()}.json`);
 }
 
@@ -258,6 +288,53 @@ function preserveCloseOutSync(path: string, record: PanIssueRecord): PanIssueRec
   return record;
 }
 
+/**
+ * FR-2 (PAN-2372): before a record write, if the existing file is non-empty and
+ * fails JSON.parse, preserve the corrupt bytes as a sidecar rather than
+ * silently overwriting them. A truncated/malformed record (the "empty/malformed
+ * at char 0" symptom that stranded PAN-2253) used to be quietly replaced by the
+ * next write, destroying every accumulated statusOverride. Non-empty + unparseable
+ * is the only case sidecarred — an absent or empty file is a normal fresh write.
+ */
+function preserveCorruptRecordSync(path: string): void {
+  let raw: string;
+  try {
+    raw = readFileSync(path, 'utf-8');
+  } catch {
+    return; // No existing file — nothing to preserve.
+  }
+  if (raw.length === 0) return; // Empty file is a normal fresh-write state, not corruption.
+  try {
+    JSON.parse(raw);
+    return; // Existing file parses — the rename below atomically replaces it.
+  } catch {
+    // Non-empty and unparseable — fall through to sidecar.
+  }
+  const sidecar = `${path}.corrupt-${Date.now()}`;
+  try {
+    renameSync(path, sidecar);
+    console.warn(`[record] Preserved corrupt record at ${sidecar} (existing file failed JSON.parse before write)`);
+  } catch (error) {
+    console.warn(`[record] Could not preserve corrupt record at ${path}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * FR-1 (PAN-2372): atomic, verified record write. Writes to a same-directory
+ * temp file, atomically renames it into place, then read-back verifies the
+ * renamed file parses as JSON. A mid-write crash can no longer truncate the
+ * record in place (rename is atomic); a write that somehow produces unparseable
+ * bytes throws instead of leaving a corrupt record for readers to silently
+ * fabricate over. Modeled on writePlanFileAtomic (src/lib/vbrief/dag-cli.ts:101).
+ */
+function writeRecordFileAtomicSync(path: string, record: PanIssueRecord): void {
+  preserveCorruptRecordSync(path);
+  const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
+  writeFileSync(tmp, JSON.stringify(record, null, 2), 'utf-8');
+  renameSync(tmp, path);
+  JSON.parse(readFileSync(path, 'utf-8')); // read-back verification; throws if the renamed file is unparseable
+}
+
 export function writeIssueRecordSync(
   project: ProjectConfig,
   issueId: string,
@@ -276,7 +353,7 @@ export function writeIssueRecordSync(
     created: record.created || now,
     updated: now,
   };
-  writeFileSync(path, JSON.stringify(next, null, 2), 'utf-8');
+  writeRecordFileAtomicSync(path, next);
   return path;
 }
 
@@ -290,6 +367,12 @@ export function writeIssueRecordForWorkspaceSync(
   issueId: string,
   record: PanIssueRecord,
 ): string {
+  // FR-3 (PAN-2372 WI-2): resolve the owning project so the write lands on the
+  // canonical (migration-aware) record path, not a slot-local one. A null result
+  // means the issue is unregistered; the path resolver then falls back to the
+  // workspace .pan/records/ dir and we do NOT queue a state commit (no owning
+  // project to commit on behalf of).
+  const resolvedProject = resolveProjectForIssue(issueId);
   const path = getIssueRecordPathForWorkspace(workspacePath, issueId);
   const dir = dirname(path);
   if (!existsSync(dir)) {
@@ -303,7 +386,12 @@ export function writeIssueRecordForWorkspaceSync(
     created: record.created || now,
     updated: now,
   };
-  writeFileSync(path, JSON.stringify(next, null, 2), 'utf-8');
+  writeRecordFileAtomicSync(path, next);
+  if (resolvedProject) {
+    // Re-homed swarm writes must travel to overdeck-state like every canonical
+    // write, or a migrated-project record written here would never be committed.
+    queueIssueRecordCommit(resolvedProject, issueId, path);
+  }
   return path;
 }
 

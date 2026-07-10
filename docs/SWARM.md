@@ -52,7 +52,7 @@ Two dispatchable items whose `files_scope` overlaps are serialized. Deacon may d
    `reconcileSlotState()` derives merged, in-flight, pending, branch, and agent state from git branches, worktrees, agent state, and vBRIEF item status. Runtime truth is not stored in a swarm JSON file.
 
 4. Detect slot lifecycle.
-   `classifyInFlightSlots()` classifies slots as `running`, `ready-to-merge`, `failed`, or `stalled`. A pane exit code of 0 makes a slot ready to merge. A missing session, missing agent, non-zero pane exit, or unknown dead-pane exit makes it failed. A live pane with no branch-tip commit progress and no pane-output progress past the stall threshold becomes stalled.
+   `classifyInFlightSlots()` classifies slots as `running`, `ready-to-merge`, `failed`, or `stalled`. It checks a slot's durable completion marker first (see [Durable Slot Completion](#durable-slot-completion) below); a matching marker makes the slot `ready-to-merge` with signal `durable-completion` regardless of session state. Otherwise a pane exit code of 0 makes a slot ready to merge. A missing session, missing agent, non-zero pane exit, or unknown dead-pane exit makes it failed. A live pane with no branch-tip commit progress and no pane-output progress past the stall threshold becomes stalled.
 
 5. Verify and merge ready slots.
    `mergeReadySlots()` calls `verifyAndMergeSlot()`. On success it writes the item `done` through `applyTaskOperationToPlanFile()`. On merge conflicts it records a failed-merge recovery block.
@@ -135,6 +135,35 @@ Pane exit alone is not enough. A model can leave a pane alive while making no pr
 If neither changes before the stall threshold elapses, the slot becomes `stalled`. Deacon records a recovery block and stops advancing that issue until the operator chooses `retry`, `drop`, or `handoff`.
 
 The default stall threshold is 30 minutes. It can be overridden with `PAN_SWARM_STALL_THRESHOLD_MS` for test or operational tuning.
+
+## Durable Slot Completion
+
+A slot can finish its work and exit its agent cleanly yet leave no durable signal: the workspace record's `statusOverrides` may be absent (the bug PAN-2372 fixed), and a vanished tmux session is rebuildable, not proof of completion. Swarm v2 now records completion on the permanent plane and, when that record is missing, infers it from git state.
+
+### Durable marker — `swarm.slotCompletions`
+
+When a slot work agent runs `pan done <issue>`, the CLI writes a completion marker into the per-issue record at `swarm.slotCompletions[String(slotIndex)]` and reads it back to confirm the write landed (`persistAndVerifySwarmSlotCompletion()` in `src/lib/cloister/deacon-swarm-record.ts`). A marker carries `slotIndex`, an optional `itemId`, `agentId`, and `completedAt`.
+
+`classifyInFlightSlots()` checks this marker at the top of the per-slot loop, before any session, agent, or pane classification. A marker whose `itemId` is absent or matches the slot classifies the slot `ready-to-merge` with signal `durable-completion`. Because the marker is the strongest completion evidence, it beats a vanished session that would otherwise classify as `failed`.
+
+The coordinator clears the marker through the record door when the slot leaves flight:
+
+- **merge** — `mergeReadySlots()` clears the slot's marker after it writes the item `done`;
+- **requeue / supersede** — `archiveFailedSwarmSlot()` clears the marker so a fresh attempt on the same `slotIndex` is not falsely observed as already complete.
+
+### Inferred completion — `swarm.infer_completion`
+
+For a slot that has committed clean, branch-ahead work but written no marker — the agent exited without signaling, or the marker write raced — `classifyDoneWithoutSignal()` infers completion from git state: a branch-ahead count of at least 1 and a state-plane-clean worktree (see below). The default mode is `auto`:
+
+- **`auto`** (default) — nudge the slot's agent once (`run pan done <issue>`), then after two consecutive stable observations (unchanged commit time, output digest, and ahead count) classify the slot `ready-to-merge` with signal `inferred`.
+- **`nudge`** — nudge once and never converge; the slot stays `awaiting-completion-signal` until an explicit `pan done` lands. Use this when an operator-visible signal is required.
+- **`off`** — no nudge and no inference; `classifyDoneWithoutSignal()` returns `null` and the slot is left to normal stall/failed classification.
+
+Set the mode in `~/.overdeck/cloister.toml` under `[swarm] infer_completion`, or override it per process with the `PAN_SWARM_INFER_COMPLETION=auto|nudge|off` environment variable. The previous default was `nudge`; it is now `auto`, so a slot that genuinely finished is not stuck awaiting a signal that never arrives.
+
+### State-plane-clean worktree
+
+Both inference paths treat the slot worktree as clean when the only `git status` dirt is state-plane state — `.pan/continue.json`, the workspace record door, and the other durable paths the swarm writes to the permanent plane (the full set is enumerated in `STATE_PLANE_PATHS`). Their presence must not block a slot from being inferred complete. `defaultIsSlotWorktreeClean()` in `src/lib/cloister/deacon-swarm-completion.ts` delegates to `isStatePlaneOnlyStatus()`. A genuinely dirty worktree — uncommitted implementation edits — still blocks inference.
 
 ## Synthesis Slots
 

@@ -10,10 +10,11 @@
 import { execFile } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, rm } from 'node:fs/promises';
-import { basename, dirname, join, resolve } from 'node:path';
+import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { getOverdeckHome } from './paths.js';
-import { listProjectsSync, resolveInfraRepo, type ProjectConfig } from './projects.js';
+import { resolveInfraRepo, type ProjectConfig } from './projects.js';
+import { projectKey } from './project-key.js';
 import { STATE_BRANCH_PATHS } from './state-plane.js';
 
 const execFileAsync = promisify(execFile);
@@ -64,13 +65,6 @@ async function git(repoPath: string, args: string[]): Promise<string> {
     killSignal: 'SIGTERM',
   });
   return stdout.trim();
-}
-
-function projectKey(project: ProjectConfig, explicit?: string): string {
-  if (explicit) return explicit;
-  const projectPath = resolve(project.path);
-  const match = listProjectsSync().find(({ config }) => resolve(config.path) === projectPath);
-  return match?.key ?? basename(projectPath);
 }
 
 export function stateWorktreePath(project: ProjectConfig, options: StateHomeOptions = {}): string {

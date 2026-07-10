@@ -388,7 +388,7 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
     yield_cooldown_secs: 600,
   },
   swarm: {
-    infer_completion: 'nudge',
+    infer_completion: 'auto',
   },
   notifications: {
     slack_webhook: undefined,

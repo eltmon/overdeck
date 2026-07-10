@@ -6,9 +6,9 @@ import { dirname, join, resolve, sep } from "path";
 import { homedir, totalmem } from "os";
 import { fileURLToPath } from "url";
 import * as NFS from "node:fs";
-import { appendFileSync as appendFileSync$1, existsSync as existsSync$1, mkdirSync as mkdirSync$1, readFileSync as readFileSync$1, writeFileSync as writeFileSync$1 } from "node:fs";
+import { appendFileSync as appendFileSync$1, existsSync as existsSync$1, mkdirSync as mkdirSync$1, readFileSync as readFileSync$1, renameSync, writeFileSync as writeFileSync$1 } from "node:fs";
 import * as Path from "node:path";
-import { basename, dirname as dirname$1, isAbsolute, join as join$1 } from "node:path";
+import { basename, dirname as dirname$1, isAbsolute, join as join$1, resolve as resolve$1 } from "node:path";
 import { readFile } from "node:fs/promises";
 import * as OS from "node:os";
 import * as NodeChildProcess from "node:child_process";
@@ -25478,14 +25478,38 @@ function resolveProjectFromIssueSync(issueId, labels = []) {
 	return null;
 }
 //#endregion
+//#region ../../src/lib/project-key.ts
+/**
+* Resolve the state-worktree key for a project (PAN-2372).
+*
+* An explicitly passed key wins; otherwise the registered projects.yaml key for
+* this path; otherwise the path basename as a fallback for unregistered
+* projects. This is the single source of truth for the registered-key lookup —
+* reused by both the async state-home door (`state-home.ts`) and the sync read
+* door (`resolveStateReadHomeSync` in `state-read-home.ts`) so they cannot
+* disagree on which state worktree a project lives in.
+*
+* It lives in its own module (rather than `state-home.ts`) so that importing it
+* from the lightweight sync-read door does not transitively pull
+* `child_process` / `state-plane` via the heavier `state-home` module — that
+* coupling previously broke tests that partially mock `child_process`. It
+* imports {@link listProjectsSync} from `projects.js`, so a `vi.mock` of
+* `projects.js` still steers the registry.
+*/
+function projectKey(project, explicit) {
+	if (explicit) return explicit;
+	const projectPath = resolve$1(project.path);
+	return listProjectsSync().find(({ config }) => resolve$1(config.path) === projectPath)?.key ?? basename(projectPath);
+}
+//#endregion
 //#region ../../src/lib/state-read-home.ts
 function validMarker(value) {
 	if (!value || typeof value !== "object") return false;
 	const marker = value;
 	return typeof marker.sourceMainSha === "string" && /^[0-9a-f]{40}$/i.test(marker.sourceMainSha) && typeof marker.stateBranchSha === "string" && /^[0-9a-f]{40}$/i.test(marker.stateBranchSha) && typeof marker.completedAt === "string" && Number.isFinite(Date.parse(marker.completedAt)) && Number.isInteger(marker.version) && Number(marker.version) >= 1;
 }
-function resolveStateReadHomeSync(project, projectKey = basename(project.path)) {
-	const root = join$1(getOverdeckHome(), "state", projectKey);
+function resolveStateReadHomeSync(project, projectKey$1) {
+	const root = join$1(getOverdeckHome(), "state", projectKey(project, projectKey$1));
 	try {
 		if (validMarker(JSON.parse(readFileSync$1(join$1(root, "migration-complete.json"), "utf8")))) return {
 			root,
@@ -25565,19 +25589,61 @@ function preserveCloseOutSync(path, record) {
 	} catch {}
 	return record;
 }
+/**
+* FR-2 (PAN-2372): before a record write, if the existing file is non-empty and
+* fails JSON.parse, preserve the corrupt bytes as a sidecar rather than
+* silently overwriting them. A truncated/malformed record (the "empty/malformed
+* at char 0" symptom that stranded PAN-2253) used to be quietly replaced by the
+* next write, destroying every accumulated statusOverride. Non-empty + unparseable
+* is the only case sidecarred — an absent or empty file is a normal fresh write.
+*/
+function preserveCorruptRecordSync(path) {
+	let raw;
+	try {
+		raw = readFileSync$1(path, "utf-8");
+	} catch {
+		return;
+	}
+	if (raw.length === 0) return;
+	try {
+		JSON.parse(raw);
+		return;
+	} catch {}
+	const sidecar = `${path}.corrupt-${Date.now()}`;
+	try {
+		renameSync(path, sidecar);
+		console.warn(`[record] Preserved corrupt record at ${sidecar} (existing file failed JSON.parse before write)`);
+	} catch (error) {
+		console.warn(`[record] Could not preserve corrupt record at ${path}: ${error instanceof Error ? error.message : String(error)}`);
+	}
+}
+/**
+* FR-1 (PAN-2372): atomic, verified record write. Writes to a same-directory
+* temp file, atomically renames it into place, then read-back verifies the
+* renamed file parses as JSON. A mid-write crash can no longer truncate the
+* record in place (rename is atomic); a write that somehow produces unparseable
+* bytes throws instead of leaving a corrupt record for readers to silently
+* fabricate over. Modeled on writePlanFileAtomic (src/lib/vbrief/dag-cli.ts:101).
+*/
+function writeRecordFileAtomicSync(path, record) {
+	preserveCorruptRecordSync(path);
+	const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
+	writeFileSync$1(tmp, JSON.stringify(record, null, 2), "utf-8");
+	renameSync(tmp, path);
+	JSON.parse(readFileSync$1(path, "utf-8"));
+}
 function writeIssueRecordSync(project, issueId, record) {
 	const path = getIssueRecordPath(project, issueId);
 	const dir = dirname$1(path);
 	if (!existsSync$1(dir)) mkdirSync$1(dir, { recursive: true });
 	const now = (/* @__PURE__ */ new Date()).toISOString();
-	const next = {
+	writeRecordFileAtomicSync(path, {
 		...preserveCloseOutSync(path, record),
 		issueId: issueId.toUpperCase(),
 		schemaVersion: 2,
 		created: record.created || now,
 		updated: now
-	};
-	writeFileSync$1(path, JSON.stringify(next, null, 2), "utf-8");
+	});
 	return path;
 }
 function readIssueRecordSync(project, issueId) {

@@ -6,7 +6,7 @@ import {
   type PanIssueRecord,
   type PanIssueSwarmSupersededAttempt,
 } from '../pan-dir/record.js';
-import { createMinimalIssueRecord } from './deacon-swarm-record.js';
+import { createMinimalIssueRecord, clearSwarmSlotCompletion } from './deacon-swarm-record.js';
 import type { PersistedTaskOperation } from '../vbrief/dag.js';
 import type { VBriefDocument } from '../vbrief/types.js';
 import { recordRecoveryFailure } from './recovery-trip.js';
@@ -70,6 +70,10 @@ export async function archiveFailedSwarmSlot(
       supersededAttempts: [...(existing.swarm?.supersededAttempts ?? []), attempt],
     },
   });
+  // PAN-2372 WI-4 / FR-6: this slot is being superseded/requeued — clear its
+  // durable completion marker so a fresh attempt on the same slotIndex is not
+  // falsely observed as already-completed by classifyInFlightSlots.
+  clearSwarmSlotCompletion(workspacePath, normalized, slot.slotIndex);
   deps.clearSlotAssignment(workspacePath, normalized, slot.slotIndex, slot.itemId);
   return attempt;
 }
