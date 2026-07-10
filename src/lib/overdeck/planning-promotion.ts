@@ -99,15 +99,27 @@ type CompletePlanningPhase = 'prdGate' | 'beadsMaterialize' | 'specWrite' | 'aut
 type CompletePlanningPhaseStatus = 'start' | 'success' | 'failure' | 'skipped';
 
 const completePlanningGuard = createInFlightGuard();
+const completePlanningAutoSpawnIntent = new Set<string>();
 
-export function beginCompletePlanningLease(issueId: string): { started: boolean; release: () => void } {
+export function beginCompletePlanningLease(
+  issueId: string,
+  autoSpawnRequested = false,
+): { started: boolean; autoSpawnRequested: () => boolean; release: () => void } {
   const key = issueId.toLowerCase();
+  if (autoSpawnRequested) completePlanningAutoSpawnIntent.add(key);
   let release!: () => void;
   const lease = new Promise<void>((resolve) => {
     release = resolve;
   });
   const started = completePlanningGuard.run(key, () => lease);
-  return { started, release: started ? release : () => undefined };
+  return {
+    started,
+    autoSpawnRequested: () => completePlanningAutoSpawnIntent.has(key),
+    release: started ? () => {
+      completePlanningAutoSpawnIntent.delete(key);
+      release();
+    } : () => undefined,
+  };
 }
 
 function emitCompletePlanningPhase(
@@ -438,7 +450,7 @@ export async function completePlanningForIssue(options: {
   }
   const sessionName = `planning-${id.toLowerCase()}`;
   const issueLower = id.toLowerCase();
-  const completePlanningLease = beginCompletePlanningLease(id);
+  const completePlanningLease = beginCompletePlanningLease(id, autoSpawn);
   if (!completePlanningLease.started) {
     console.log(`[complete-planning] ${id} already has an in-flight finalize; returning in-flight status`);
     return jsonResponse({
@@ -705,18 +717,19 @@ export async function completePlanningForIssue(options: {
     // PAN-2386: if auto-start is requested, make sure the workspace tree is clean
     // before we ask start-agent to spawn. The per-issue record may have been
     // modified by debounced auto-commit writes during finalize.
-    if (autoSpawn && workspacePath) {
+    const effectiveAutoSpawn = autoSpawn || completePlanningLease.autoSpawnRequested();
+    if (effectiveAutoSpawn && workspacePath) {
       await commitWorkspaceRecordBeforeAutoSpawn(workspacePath, id);
     }
 
     const autoSpawnResult = await completePlanningAutoSpawnAndKill({
       issueId: id,
-      autoSpawn,
+      autoSpawn: effectiveAutoSpawn,
       skipKill,
       sessionName,
     });
     emitCompletePlanningPhase(id, 'terminal', 'success', autoSpawnResult?.workAgentSpawned ? 'planning complete and work agent spawn requested' : autoSpawnResult?.workAgentSkipReason ?? 'planning complete', {
-      autoSpawn,
+      autoSpawn: effectiveAutoSpawn,
       workAgentSpawned: autoSpawnResult?.workAgentSpawned ?? false,
       workAgentSkipReason: autoSpawnResult?.workAgentSkipReason,
     });

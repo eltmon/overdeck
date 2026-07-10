@@ -106,10 +106,11 @@ afterEach(() => {
 describe('completePlanningArtifacts', () => {
   it('serializes concurrent complete-planning attempts for the same issue', async () => {
     const first = beginCompletePlanningLease('PAN-2247');
-    const second = beginCompletePlanningLease('pan-2247');
+    const second = beginCompletePlanningLease('pan-2247', true);
 
     expect(first.started).toBe(true);
     expect(second.started).toBe(false);
+    expect(first.autoSpawnRequested()).toBe(true);
 
     first.release();
     await flush();
