@@ -151,7 +151,6 @@ temp/
 .pan/agent-mcp.json
 # Machine-local Overdeck config (config.yaml, projects.yaml, settings.json) —
 # copied into workspaces by copyOverdeckSettingsToWorkspaceSync, never committed.
-.overdeck/
 # Spec-writer crash debris — the writer should self-clean these on dead-PID detection.
 # Tracking them lets stale locks contaminate fresh worktrees.
 .pan/specs/*.tmp
@@ -215,3 +214,15 @@ __pycache__/
 # Test-run output logs (e2e/unit/playwright/dashboard) — generated per run
 /reports/
 .vercel
+
+# PAN-2541: permanent state is on overdeck-state; workspace runtime stays local.
+.pan/
+.beads/
+.overdeck/continue.json
+.overdeck/spec.vbrief.json
+.overdeck/sessions.jsonl
+.overdeck/feedback/
+.overdeck/review/
+.overdeck/test/
+.overdeck/kickoff.md
+.overdeck/agent-mcp.json
