@@ -2415,3 +2415,20 @@ stale (written 2026-07-08); re-verified all order-book items against live GitHub
 - **Cross-project noise:** agent-min-865-review (MYN, deacon-managed) — not my scope.
 - NEXT: catch B7 pan done → review→test→merge (TENET-10 FULL suite, no --changed on cloister,
   verify vs origin/main). On B7 land+closeout+main-green → dispatch B8=PAN-2364 (unfreezes A9).
+
+## RUN-62 tick 10 (2026-07-10 ~14:41 local) — B7 all 8 WIs committed, self-verifying toward pan done; v0.45.1 cut
+
+- **B7 = PAN-2372 — ALL 8 work items committed** (WI-1..WI-7 + state-home): +WI-5 (default swarm
+  infer_completion→auto) +WI-7 (docs) landed since tick 9. Now in a thorough **self-verification
+  phase** — agent-pan-2372 (glm-5.2) in one continuous 2h10m turn running caller/import greps on its
+  projectKey/state-home resolver changes (correct diligence on a shared resolver). Survived a compact
+  (ctx 83%→62%), cost $30.28. NOT idle/wedged — actively verifying. Approaching pan done; no nudge.
+  WATCH: if still in the same verification turn next tick w/o pan done, nudge to wrap up + pan done.
+  Only uncommitted = untracked `.overdeck/*.yaml` runtime files (harmless).
+- **Operator cut v0.45.1** — main HEAD 061f4f18 `chore: release 0.45.1`. Main CI GREEN
+  (guard/lint/test/build all success). Release tag/build pipeline finishing (gh release list still
+  shows v0.45.0 Latest; v0.45.1 tag lands when CI completes). Operator owns releases.
+- **A9 = PAN-2229** still frozen by B8/PAN-2364 (expected; no action).
+- NEXT: catch B7 pan done → shepherd review→test→merge (TENET-10 FULL suite green, no --changed on
+  cloister files, verify vs origin/main). On B7 land+closeout+main-green → dispatch B8=PAN-2364
+  (unfreezes A9). Dirty dist-electron artifacts still present (surfaced tick 9; leave untouched).
