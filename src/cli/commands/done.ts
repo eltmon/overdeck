@@ -592,12 +592,9 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
   // Pre-flight completion checks (unless --force)
   if (!options.force) {
     const { workspacePath } = await resolveDoneWorkspace(issueId, agentId);
-
     if (workspacePath && existsSync(workspacePath)) {
-      const fallbackProject = getProjectConfigFromWorkspacePath(workspacePath);
-      let doneProject = fallbackProject;
-      try { doneProject = resolveProjectForIssue(issueId) ?? fallbackProject; } catch { /* isolated tests / missing registry */ }
-      const migratedState = resolveStateReadHomeSync(doneProject).migrated;
+      const doneProject = (() => { try { return resolveProjectForIssue(issueId); } catch { return null; } })();
+      const migratedState = resolveStateReadHomeSync(doneProject ?? getProjectConfigFromWorkspacePath(workspacePath)).migrated;
       // Commit stale orchestration artifacts so preflight does not reject them.
       if (shouldCommitLegacyWorkspaceArtifacts(migratedState)) try {
         const { stdout: preDirty } = await execAsync(
