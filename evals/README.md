@@ -28,10 +28,12 @@ Keep datasets small until baseline storage and CI policy exist. Do not commit AP
 
 ## Caveats
 
-The memory-status-rollup eval is offline and deterministic. The flywheel launch eval is live-model: it calls `runPromptScenario`, which fails loudly when `OVERDECK_EVAL_MODEL` is unset (no hardcoded model fallback — see `evals/lib/prompt-harness.ts`) and makes no network call at all while that env var is absent. Run it manually:
+The memory-status-rollup eval is offline and deterministic. The flywheel launch eval is live-model: it calls `runPromptScenario`, which fails loudly when `OVERDECK_EVAL_MODEL` is unset (no hardcoded model fallback — see `evals/lib/prompt-harness.ts`) and makes no network call at all while that env var is absent. Run it manually with a **sonnet-tier-or-stronger** model:
 
 ```bash
-OVERDECK_EVAL_MODEL=claude-haiku-4-5-20251001 npm run eval
+OVERDECK_EVAL_MODEL=<sonnet-tier-or-stronger model> npm run eval
 ```
+
+The author/assignee-gate case (`excludes-untrusted-author`) is security-critical and sits near the floor of model reliability. Verified live: a sonnet-tier model passes all three hard scorers (ac1 launch, ac2 author-gate withhold, ac3 pickup-OFF hold); a haiku-tier / flash-slot model intermittently *starts* the untrusted issue and fails ac2 — a model-capability gap, not a prompt regression (the gate is intact in `roles/flywheel.md`). Use a sonnet-tier-or-stronger eval model so a weak model is not misread as doctrine degradation.
 
 Per NFR-1 it is intentionally NOT in the blocking CI gate; live model evals should read credentials from the existing Overdeck/provider environment and document expected cost before being added. CI wiring is deferred until the team decides which evals are cheap and stable enough to gate by default.
