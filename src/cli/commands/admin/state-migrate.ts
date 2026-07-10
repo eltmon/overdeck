@@ -157,7 +157,11 @@ export async function migrateProjectState(
     }
     if (untracked.length > 0) {
       await git(stateRoot, ['add', 'notes']);
-      await git(stateRoot, ['commit', '-m', 'chore(state): preserve untracked operator notes']);
+      // Resume tolerance: a prior interrupted attempt may have already
+      // committed these notes — git commit exits 1 on an empty index.
+      if (await git(stateRoot, ['diff', '--cached', '--name-only'])) {
+        await git(stateRoot, ['commit', '-m', 'chore(state): preserve untracked operator notes']);
+      }
       await git(stateRoot, ['push', 'origin', STATE_BRANCH]);
     }
 
@@ -174,7 +178,10 @@ export async function migrateProjectState(
     rewriteGitignore(repo);
     await git(repo, ['add', '-u', '--', '.pan/context']);
     await git(repo, ['add', '--', '.gitignore', '.overdeck/context']);
-    await git(repo, ['commit', '-m', 'chore(state): move permanent state to overdeck-state']);
+    // Resume tolerance: skip when a prior attempt already committed the cleanup.
+    if (await git(repo, ['diff', '--cached', '--name-only'])) {
+      await git(repo, ['commit', '-m', 'chore(state): move permanent state to overdeck-state']);
+    }
 
     verifyStateMigrationManifest(manifest);
     for (const entry of manifest) rmSync(entry.source, { force: true });
