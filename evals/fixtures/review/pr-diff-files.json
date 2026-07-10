@@ -1,0 +1,12 @@
+{
+  "cycle": 1,
+  "headSha": "deadbeef",
+  "baseSha": "cafef00d",
+  "files": [
+    "src/lib/cloister/prompts/work.md",
+    "roles/work.md",
+    "tests/unit/scripts/prompt-change-trailer.test.ts",
+    "scripts/check-prompt-change-trailer.sh",
+    ".github/workflows/ci.yml"
+  ]
+}
