@@ -176,7 +176,12 @@ export async function migrateProjectState(
       renameSync(oldContext, newContext);
     }
     rewriteGitignore(repo);
-    await git(repo, ['add', '-u', '--', '.pan/context']);
+    // Resume tolerance: a prior attempt may already have committed the
+    // context deletions — `git add -u` exits 128 on a pathspec with no
+    // tracked entries left.
+    if (await git(repo, ['ls-files', '--', '.pan/context'])) {
+      await git(repo, ['add', '-u', '--', '.pan/context']);
+    }
     await git(repo, ['add', '--', '.gitignore', '.overdeck/context']);
     // Resume tolerance: skip when a prior attempt already committed the cleanup.
     if (await git(repo, ['diff', '--cached', '--name-only'])) {
