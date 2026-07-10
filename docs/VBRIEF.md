@@ -78,14 +78,14 @@ Per-issue records include `pipeline` (durable verdicts from `review_status`), `c
 
 PRDs and vBRIEFs are distinct artifacts that flow through the same pipeline:
 
-1. **PRD drafted** — human or planning agent writes a markdown PRD to `.pan/drafts/` on main
-2. **Planning completes** — planning agent converts the PRD into a machine-readable vBRIEF spec in `.pan/specs/` with `status: "proposed"`
-3. **Work starts** — `pan start` updates the spec's `status` field to `"active"` on main; work agents read it via `findPlan()` and track item progress in workspace `continue.json` `statusOverrides`
-4. **Work completes** — after merge, `status` updated to `"completed"` on main
+1. **PRD drafted** — human or planning agent writes a markdown PRD to `drafts/` on `overdeck-state`
+2. **Planning completes** — planning agent converts the PRD into a machine-readable vBRIEF spec in `specs/` on `overdeck-state` with `status: "proposed"`
+3. **Work starts** — `pan start` updates the spec's `status` field to `"active"` through the state write door; work agents read it via `findPlan()` and track item progress in workspace `.overdeck/continue.json` `statusOverrides`
+4. **Work completes** — after merge, `status` is updated to `"completed"` on `overdeck-state`
 
 ### Status Transitions (field-based)
 
-Status is a JSON field inside the vBRIEF — files never move between directories. All transitions are single atomic commits on main.
+Status is a JSON field inside the vBRIEF — files never move between directories. All transitions are commits on `overdeck-state` through the state write door.
 
 ```
 draft ──► proposed ──► active ──► completed
@@ -95,11 +95,11 @@ draft ──► proposed ──► active ──► completed
 
 | Transition | Trigger | What happens |
 |-----------|---------|--------------|
-| (new) → draft | `pan plan` starts | PRD written to `.pan/drafts/` on main |
-| draft → proposed | Planning completes | vBRIEF created in `.pan/specs/` with `status: "proposed"` |
-| proposed → active | `pan start` | Status field updated to `"active"` on main; agents read spec from main via `findPlan()` |
-| active → completed | PR merges | Status field updated to `"completed"` on main |
-| active → cancelled | Issue closed | Status field updated to `"cancelled"` on main |
+| (new) → draft | `pan plan` starts | PRD written to `drafts/` on `overdeck-state` |
+| draft → proposed | Planning completes | vBRIEF created in `specs/` on `overdeck-state` with `status: "proposed"` |
+| proposed → active | `pan start` | Status field updated to `"active"` on `overdeck-state`; agents read through `findPlan()` |
+| active → completed | PR merges | Status field updated to `"completed"` on `overdeck-state` |
+| active → cancelled | Issue closed | Status field updated to `"cancelled"` on `overdeck-state` |
 
 ### Issue-Keyed Filenames
 
@@ -119,16 +119,16 @@ If `slugify()` receives an empty or all-special-character title, it returns `'pl
 
 ### Workspace Spec (PAN-1124: single-spec-on-main)
 
-There is no workspace-local copy of the spec. Work agents read the canonical spec directly from main's `.pan/specs/` via `findPlan()`. Item/subItem status updates are tracked in the workspace `continue.json`'s `statusOverrides` flat map. `readWorkspacePlan()` returns a merged view (main spec + overlay) so callers see a complete document with up-to-date statuses.
+There is no workspace-local copy of the spec. Work agents read the canonical spec directly from `specs/` on `overdeck-state` via `findPlan()`. Item/subItem status updates are tracked in the workspace `continue.json`'s `statusOverrides` flat map. `readWorkspacePlan()` returns a merged view (canonical spec + overlay) so callers see a complete document with up-to-date statuses.
 
 ### Concurrency Model
 
 | Resource | Writer | Readers | Contention |
 |----------|--------|---------|------------|
-| `.pan/specs/<file>` on main | Pipeline only | Dashboard, agents (via `findPlan()`) | None — single writer, immutable after planning |
-| `.pan/continue.json` on branch | Pipeline + `updateItemStatus()` | Agent (injected into prompt at session start) | None — one agent per workspace |
-| `.pan/sessions.jsonl` on branch | Pipeline appends | Dashboard, post-mortems | Minimal — append-only |
-| `.pan/feedback/*.md` on branch | Pipeline only | Agent (injected into prompt) | None — single writer |
+| `specs/<file>` on `overdeck-state` | Pipeline only | Dashboard, agents (via `findPlan()`) | None — single writer, immutable after planning |
+| `.overdeck/continue.json` in a workspace | Pipeline + `updateItemStatus()` | Agent (injected into prompt at session start) | None — one agent per workspace |
+| `.overdeck/sessions.jsonl` in a workspace | Pipeline appends | Dashboard, post-mortems | Minimal — append-only |
+| `.overdeck/feedback/*.md` in a workspace | Pipeline only | Agent (injected into prompt) | None — single writer |
 | Beads (`.beads/`) | Each agent via `bd update` | Pipeline, dashboard | Serialized by Dolt mutex |
 
 For N parallel agents on N different issues: each has its own feature branch with its own `.pan/` directory. Zero cross-agent contention. Beads writes serialize through the Dolt mutex but target different bead IDs.
@@ -137,7 +137,7 @@ For N parallel agents on N different issues: each has its own feature branch wit
 
 ## Continue State — Structured Session History
 
-The continue file is the machine-readable operational state for in-progress work. It lives on the feature branch at `.pan/continue.json`.
+The continue file is the machine-readable operational state for in-progress work. It lives on the feature branch at `.overdeck/continue.json`.
 
 ### Schema
 
@@ -230,7 +230,7 @@ Every vBRIEF has exactly two top-level keys per the vBRIEF spec:
     "updated": "2026-04-04T18:30:00Z",
     "references": [
       { "uri": "https://github.com/eltmon/overdeck/issues/436", "label": "PAN-436", "type": "issue" },
-      { "uri": ".pan/drafts/PAN-436.md", "label": "PAN-436 PRD draft", "type": "prd" }
+      { "uri": "${OVERDECK_HOME}/state/<project>/drafts/PAN-436.md", "label": "PAN-436 PRD draft (drafts/PAN-436.md on overdeck-state)", "type": "prd" }
     ],
     "tags": ["frontend", "ux"],
     "narratives": {
@@ -314,14 +314,14 @@ The `plan.status` field drives lifecycle transitions:
 
 | Status | Location | Meaning |
 |--------|----------|---------|
-| `draft` | `.pan/drafts/` (PRD stage) | Planning in progress |
-| `proposed` | `.pan/specs/` | Planning done, awaiting approval |
-| `approved` | `.pan/specs/` | User approved, ready to start |
-| `pending` | `.pan/specs/` | Queued, waiting for resources |
-| `running` | `.pan/specs/` | Agent is executing |
-| `completed` | `.pan/specs/` | Work done, merged |
-| `blocked` | `.pan/specs/` | Waiting on external dependency |
-| `cancelled` | `.pan/specs/` | Abandoned |
+| `draft` | `drafts/` (PRD stage) | Planning in progress |
+| `proposed` | `specs/` | Planning done, awaiting approval |
+| `approved` | `specs/` | User approved, ready to start |
+| `pending` | `specs/` | Queued, waiting for resources |
+| `running` | `specs/` | Agent is executing |
+| `completed` | `specs/` | Work done, merged |
+| `blocked` | `specs/` | Waiting on external dependency |
+| `cancelled` | `specs/` | Abandoned |
 
 #### References
 
@@ -383,11 +383,11 @@ These extensions are NOT part of the xBRIEF core spec. We've opened a feature re
 
 ## `pan scope` Commands
 
-Manual lifecycle transition overrides for vBRIEFs. All commands resolve the project from the issue ID and update the status field in `.pan/specs/` on main.
+Manual lifecycle transition overrides for vBRIEFs. All commands resolve the project from the issue ID and update the status field in `specs/` on `overdeck-state`.
 
 | Command | Effect |
 |---------|--------|
-| `pan scope list` | Scan `.pan/specs/` across all projects, print issue ID / title / status |
+| `pan scope list` | Scan `specs/` across all projects, print issue ID / title / status |
 | `pan scope show <issueId>` | Display title, status, sequence, file path, item count |
 | `pan scope propose <issueId>` | Set `plan.status` to `proposed` |
 | `pan scope approve <issueId>` | Set `plan.status` to `approved` |
@@ -416,34 +416,34 @@ Manual lifecycle transition overrides for vBRIEFs. All commands resolve the proj
 
 ## How Overdeck Uses vBRIEF
 
-1. **PRD authored** — human or planning agent writes a PRD to `.pan/drafts/` on main.
+1. **PRD authored** — human or planning agent writes a PRD to `drafts/` on `overdeck-state`.
 2. **Planning agent** converts the PRD into a vBRIEF spec during the discovery session. Creates `plan.vbrief.json` in the workspace `.pan/` directory.
-3. **`complete-planning`** promotes the vBRIEF to `.pan/specs/` on main with an issue-keyed filename and sets `plan.status` to `proposed`.
+3. **`complete-planning`** promotes the vBRIEF to `specs/` on `overdeck-state` with an issue-keyed filename and sets `plan.status` to `proposed`.
 4. **`pan start`** updates `plan.status` to `active` on main. Work agents read the spec from main via `findPlan()`.
 5. **Work agent** works through beads in DAG dependency order (`bd ready -l <issue>`). Item/subItem status updates are written to workspace `continue.json`'s `statusOverrides` map. `readWorkspacePlan()` returns a merged view with current statuses.
 6. **Verification gate** checks all child items with `metadata.kind: "acceptance_criterion"` are `completed` before allowing review.
-7. **`postMergeLifecycle`** updates `plan.status` to `completed` in `.pan/specs/` on main.
+7. **`postMergeLifecycle`** updates `plan.status` to `completed` in `specs/` on `overdeck-state`.
 8. **Dashboard** renders the plan via the Directive Flow (DAG visualization) and vBRIEF viewer (List/DAG/Raw JSON tabs).
 
 ### Plan Resolution (PAN-1124: single-spec-on-main)
 
-`findPlan(workspacePath)` in `src/lib/vbrief/io.ts` now resolves the main-side spec first via `findSpecByIssue(projectRoot, issueId)`. It derives the issue ID from the workspace directory name (`feature-<id>`) and the project root (two levels up). Falls back to workspace-local `.pan/spec.vbrief.json` for migration compat with in-flight workspaces.
+`findPlan(workspacePath)` in `src/lib/vbrief/io.ts` now resolves the canonical spec on `overdeck-state` first via `findSpecByIssue(projectRoot, issueId)`. It derives the issue ID from the workspace directory name (`feature-<id>`) and the project root (two levels up). Falls back to workspace-local `.overdeck/spec.vbrief.json` for migration compat with in-flight workspaces.
 
-`readWorkspacePlan(workspacePath)` returns a merged view: main-side spec + `statusOverrides` from workspace `continue.json`. This is transparent to all callers.
+`readWorkspacePlan(workspacePath)` returns a merged view: canonical `overdeck-state` spec + `statusOverrides` from workspace `.overdeck/continue.json`. This is transparent to all callers.
 
 `findVBriefByIssue(projectRoot, issueId)` in `lifecycle-io.ts` remains the canonical read-only lifecycle lookup for cross-issue queries.
 
 ### Backward Compatibility
 
-`.planning/plan.vbrief.json` was retired in PAN-967. Workspace-local `.pan/spec.vbrief.json` was retired in PAN-1124 — existing workspace copies are still read as a fallback, but new workspaces do not receive a copy.
+PAN-967 replaced `.planning/plan.vbrief.json` with workspace-local `.pan/spec.vbrief.json`. PAN-1124 later retired new workspace spec copies; existing `.pan/spec.vbrief.json` is still read as a historical fallback. PAN-2541 renames workspace runtime compatibility copies to `.overdeck/spec.vbrief.json`; the current canonical spec is `specs/<file>` on `overdeck-state` (on disk: `${OVERDECK_HOME}/state/<project>/specs/<file>`).
 
-The legacy `vbrief/{proposed,active,completed,cancelled}/` lifecycle directories at the project root are still read by `findLegacyVBriefByIssue` so in-flight work from before the cutover keeps resolving. All writes target `.pan/specs/` only, and lifecycle status changes are atomic field flips on a single file — files do NOT move between directories.
+The legacy `vbrief/{proposed,active,completed,cancelled}/` lifecycle directories at the project root are still read by `findLegacyVBriefByIssue` so in-flight work from before the cutover keeps resolving. All writes target `specs/` on `overdeck-state` only, and lifecycle status changes are atomic field flips on a single file — files do NOT move between directories.
 
-Continue files on the main side live at `<projectRoot>/.pan/continues/<issue-lowercase>.vbrief.json`. Workspace-side continue state lives at `<workspace>/.pan/continue.json` and includes `statusOverrides` for item/subItem status tracking.
+Continue files on the main side live at `${OVERDECK_HOME}/state/<project>/continues/<issue-lowercase>.vbrief.json`. Workspace-side continue state lives at `<workspace>/.overdeck/continue.json` and includes `statusOverrides` for item/subItem status tracking.
 
 ### Per-issue permanent record (PAN-1908)
 
-In addition to the vBRIEF spec and continue file, every in-flight issue has a single durable record in the infra repo at `.pan/<recordsPath>/<issue-lowercase>.json` (for example `.pan/pan-1908.json`). This record is autocommitted on durable transitions.
+In addition to the vBRIEF spec and continue file, every in-flight issue has a durable record at `records/<issue-lowercase>.json` on `overdeck-state` (on disk: `${OVERDECK_HOME}/state/<project>/records/<issue-lowercase>.json`). This record is committed through the state write door on durable transitions.
 
 It contains:
 
@@ -513,7 +513,7 @@ Overdeck adapts deft's lifecycle model for multi-agent, multi-issue orchestratio
 |-----------------|----------------------|
 | One `plan.vbrief.json` per project | N concurrent vBRIEFs per project (one per issue) |
 | Serialized changes | N agents on N issues in parallel, each in its own workspace |
-| `history/changes/` folder structure | Issue-keyed filenames in `.pan/specs/` |
+| `history/changes/` folder structure | Issue-keyed filenames in `specs/` |
 | Status = directory location | Status = JSON field (files never move) |
 | `specification.vbrief.json` required | Optional (exists in repo but not enforced) |
 | `playbook-{name}.vbrief.json` | Overdeck uses skills for this |

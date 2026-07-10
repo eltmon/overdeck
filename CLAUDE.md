@@ -64,6 +64,10 @@ The goal is autonomous correctness. Every manual intervention is a system bug.
 
 When working directly on `main` (not in a Overdeck workspace), commit completed changes and push to `origin` before ending the session. Agent PRs merge to `origin/main` through the pipeline — unpushed local commits cause divergence that requires manual merge resolution. Don't commit half-done work; finish the change, verify it builds, then commit and push.
 
+Permanent pipeline state is the exception to the code-branch destination: its
+domain writers commit to the dedicated `overdeck-state` worktree. Never stage
+state paths on `main` or a feature branch after a project is migrated.
+
 ## CRITICAL: Releases Go Through `pan release stable` — Never Manual
 
 **To cut a new release of `@overdeck/*`, ALWAYS use `pan release stable --version X.Y.Z`. NEVER run `git tag v...` manually, never edit `"version"` in any `package.json` directly, never `npm version` or `npm publish`.**
@@ -446,13 +450,13 @@ The deep-wipe endpoint (`POST /api/agents/:id/deep-wipe`) with `deleteWorkspace:
 1. **tmux sessions** — all agent sessions killed
 2. **Agent state directories** — `~/.overdeck/agents/<id>/` removed
 3. **Entire workspace directory** — this includes:
-   - `.pan/spec.vbrief.json` — the **workspace-specific vBRIEF plan**
+   - `.overdeck/spec.vbrief.json` — the **workspace-specific vBRIEF plan**
    - `.beads/` — all task tracking beads
    - Any implementation work in progress
 4. **Git branches** — both local AND remote `feature/<issue-id>` branches deleted
 5. **Linear/GitHub status** — issue status reset to Todo/Open
 
-**The scope vBRIEF** in `.pan/specs/` on main survives deep-wipe — it's committed to the project repo independently of the workspace. Project-level PRD archives (e.g., a team's own `docs/prds/` if they keep one for narrative archival) also survive; the Overdeck-managed PRD draft at `<projectRoot>/.pan/drafts/<issue>.md` survives too. The workspace `.pan/` directory (spec, continue state) and `.beads/` are destroyed.
+**The scope vBRIEF** in `specs/` on `overdeck-state` survives deep-wipe — it's committed to the project repo independently of the workspace. Project-level PRD archives also survive; the Overdeck-managed PRD at `drafts/<issue>.md` on `overdeck-state` survives too (on disk: `${OVERDECK_HOME}/state/<project>/drafts/<issue>.md`). The workspace `.overdeck/` runtime directory and `.beads/` redirect are disposable.
 
 **Rules:**
 - **NEVER call deep-wipe programmatically** without the user explicitly requesting it
@@ -512,30 +516,30 @@ There are four artifacts. They are distinct — do not conflate them.
 
 | Artifact | Location | Writer | Mutability |
 | --- | --- | --- | --- |
-| **PRD draft** (`.md`) | `<projectRoot>/.pan/drafts/<issue>.md` | Human or planning agent | Free-form narrative, human-mutable |
-| **vBRIEF spec** (`.json`) on main | `<projectRoot>/.pan/specs/<YYYY-MM-DD>-<ISSUE>-<slug>.vbrief.json` | Pipeline only (single writer) | Immutable after planning — only `plan.status` changes via `updateSpecStatus()` |
-| **Project-side continue state** (`.json`) | `<projectRoot>/.pan/continues/<issue-lowercase>.vbrief.json` | Pipeline | Session resume point, decisions, hazards, sessionHistory, feedback — one canonical file per issue, never moves |
-| **Workspace-side continue state** (`.json`) | `<workspace>/.pan/continue.json` | Pipeline + work agent | Session state + `statusOverrides` map tracking item/subItem completion |
+| **PRD draft** (`.md`) | `drafts/<issue>.md` on `overdeck-state` (disk: `${OVERDECK_HOME}/state/<project>/drafts/<issue>.md`) | Human or planning agent | Free-form narrative, human-mutable |
+| **vBRIEF spec** (`.json`) | `specs/<YYYY-MM-DD>-<ISSUE>-<slug>.vbrief.json` on `overdeck-state` (disk: `${OVERDECK_HOME}/state/<project>/specs/<file>`) | Pipeline only (single writer) | Immutable after planning — only `plan.status` changes via `updateSpecStatus()` |
+| **Project-side continue state** (`.json`) | `${OVERDECK_HOME}/state/<project>/continues/<issue-lowercase>.vbrief.json` | Pipeline | Session resume point, decisions, hazards, sessionHistory, feedback — one canonical file per issue, never moves |
+| **Workspace-side continue state** (`.json`) | `<workspace>/.overdeck/continue.json` | Pipeline + work agent | Session state + `statusOverrides` map tracking item/subItem completion |
 
-**The PAN-1124 invariant — the spec on main is immutable after planning.** `findPlan()` resolves the main-side spec via `findSpecByIssue()`. `readWorkspacePlan()` returns a merged view: main spec + `statusOverrides` from workspace continue.json. `updateItemStatus()` and `updateSubItemStatus()` write ONLY to the workspace continue file's `statusOverrides` map — they cannot mutate the spec. The only legal spec mutation is `plan.status` via `updateSpecStatus()` in `pan-dir/specs.ts`. This replaces the old PAN-946 invariant (workspace-spec isolation) with a stronger guarantee: there is no workspace spec to isolate.
+**The PAN-1124 invariant — the canonical spec is immutable after planning.** `findPlan()` resolves the canonical spec on `overdeck-state` via `findSpecByIssue()`. `readWorkspacePlan()` returns a merged view: canonical spec + `statusOverrides` from workspace continue.json. `updateItemStatus()` and `updateSubItemStatus()` write ONLY to the workspace continue file's `statusOverrides` map — they cannot mutate the spec. The only legal spec mutation is `plan.status` via `updateSpecStatus()` in `pan-dir/specs.ts`. This replaces the old PAN-946 invariant (workspace-spec isolation) with a stronger guarantee: there is no workspace spec to isolate.
 
-**Gitignore policy.** `.pan/continue.json` is listed in `.gitignore` and must NEVER be tracked in main. `.pan/spec.vbrief.json` may still exist in older workspaces (migration compat) but is no longer written by the pipeline. The lifecycle artifacts (`.pan/specs/`, `.pan/continues/`, `.pan/drafts/`) remain tracked — they're the canonical record of plans, continue states, and PRD drafts at rest.
+**Gitignore policy.** `.overdeck/continue.json` is listed in `.gitignore` and must NEVER be tracked in main. `.overdeck/spec.vbrief.json` may still exist in older workspaces (migration compat) but is no longer written by the pipeline. The lifecycle artifacts (`specs/`, `continues/`, `drafts/`) remain tracked — they're the canonical record of plans, continue states, and PRD drafts at rest.
 
 ### Status is a JSON field, not a directory
 
-`plan.status` advances through one canonical file via atomic single-commit updates on main. Files do not move between directories.
+`plan.status` advances through one canonical file via state-door commits on `overdeck-state`. Files do not move between directories.
 
 ```
-draft (in .pan/drafts/*.md) ──► proposed ──► approved ──► active/running ──► completed
+draft (in `drafts/*.md` on `overdeck-state`) ──► proposed ──► approved ──► active/running ──► completed
                                        │                                          │
                                        └──────────► cancelled ◄───────────────────┘
 ```
 
 | Transition | Trigger | What changes |
 | --- | --- | --- |
-| (new) → draft | `pan plan` starts | Markdown PRD written to `<projectRoot>/.pan/drafts/<issue>.md` |
-| draft → proposed | Planning completes | vBRIEF created in `<projectRoot>/.pan/specs/...` with `plan.status: "proposed"` |
-| proposed → approved/running | `pan start` | Status field flipped on main; work agent reads spec from main via `findPlan()` |
+| (new) → draft | `pan plan` starts | Markdown PRD written to `drafts/<issue>.md` |
+| draft → proposed | Planning completes | vBRIEF created in `specs/...` with `plan.status: "proposed"` |
+| proposed → approved/running | `pan start` | Status field flipped on `overdeck-state`; work agent reads spec from main via `findPlan()` |
 | running → completed | PR merges | Status field flipped to `"completed"` on main |
 | any → cancelled | Issue closed | Status field flipped to `"cancelled"` on main |
 
@@ -543,28 +547,28 @@ draft (in .pan/drafts/*.md) ──► proposed ──► approved ──► acti
 
 PAN-967 unified everything under `.pan/`. The following are gone or read-only legacy:
 
-- `.planning/plan.vbrief.json` — **DELETED.** Replaced by `.pan/spec.vbrief.json`.
-- `docs/prds/planned/`, `docs/prds/active/` — no longer a Overdeck convention. PRD drafts live in `.pan/drafts/`. Projects may keep their own `docs/prds/` for human archival, but Overdeck does not read or write it.
-- `vbrief/{proposed,active,completed,cancelled}/` at the project root — still read by `findLegacyVBriefByIssue` for backward compatibility during migration; pipeline writes target `.pan/specs/` only. Legacy spec files (non-continue) remain at these paths as read-only fallback.
+- `.planning/plan.vbrief.json` — **DELETED.** PAN-967 replaced it with `.pan/spec.vbrief.json`; PAN-1124 later retired new workspace copies. PAN-2541 uses `.overdeck/spec.vbrief.json` only as the renamed workspace-runtime compatibility path. The current canonical spec is `specs/<file>` on `overdeck-state`.
+- `docs/prds/planned/`, `docs/prds/active/` — no longer a Overdeck convention. PRD drafts live in `drafts/`. Projects may keep their own `docs/prds/` for human archival, but Overdeck does not read or write it.
+- `vbrief/{proposed,active,completed,cancelled}/` at the project root — still read by `findLegacyVBriefByIssue` for backward compatibility during migration; pipeline writes target `specs/` only. Legacy spec files (non-continue) remain at these paths as read-only fallback.
 
 If you see an agent referencing `.planning/`, `docs/prds/planned/*.vbrief.json`, or planning a "copy PRD vBRIEF into workspace .planning" step, the agent is reading a pre-PAN-967 problem statement and needs to be redirected at `docs/VBRIEF.md`.
 
 ### Auto-Behaviors
 
 - `io.ts` (`updateItemStatus`/`updateSubItemStatus`) write to workspace continue.json `statusOverrides` map — they do NOT mutate the spec.
-- `readWorkspacePlan()` returns a merged view: main spec + `statusOverrides` overlay from workspace continue.json.
-- `complete-planning` writes the vBRIEF to `<projectRoot>/.pan/specs/...` with `plan.status: "proposed"`.
+- `readWorkspacePlan()` returns a merged view: canonical spec + `statusOverrides` overlay from workspace continue.json.
+- `complete-planning` writes the vBRIEF to `specs/...` with `plan.status: "proposed"`.
 - `start-agent` flips the main-side status field. Work agents read the spec from main via `findPlan()`.
 - `postMergeLifecycle` marks merged work as `verifying_on_main` and preserves the vBRIEF in its running/active state.
 - `closeOut` flips the main-side `plan.status` to `"completed"` after post-merge verification, and runs verified Docker stack + `_devnet` network teardown (with the closed-issue reaper as a backstop).
-- `findPlan(workspacePath)` resolves main-side spec via `findSpecByIssue(projectRoot, issueId)`, with fallback to workspace-local `.pan/spec.vbrief.json` for migration compat.
+- `findPlan(workspacePath)` resolves `specs/<file>` on `overdeck-state` via `findSpecByIssue(projectRoot, issueId)`, with fallback to workspace-local `.overdeck/spec.vbrief.json` for migration compatibility.
 
 ### Dashboard Viewer
 
 VBriefViewer components at `src/dashboard/frontend/src/components/vbrief/`:
 - Accessible via **vBRIEF button** on kanban issue cards and InspectorPanel
 - List / DAG / Raw JSON tabs
-- Fetches from `GET /api/workspaces/:issueId/plan` (resolves from `.pan/specs/` on main via `findSpecByIssue`, with workspace fallback for migration compat)
+- Fetches from `GET /api/workspaces/:issueId/plan` (resolves from `specs/` on `overdeck-state` via `findSpecByIssue`, with workspace fallback for migration compat)
 
 ## Issue Creation from PRDs
 
@@ -573,6 +577,10 @@ When creating a Linear or GitHub issue from a PRD, **always reference the PRD at
 ```
 **PRD:** [`path/to/prd.md`](https link to the file in the repo)
 ```
+
+For a migrated project, link the canonical PRD as
+`blob/overdeck-state/drafts/<issue>.md`; the legacy `.pan/drafts/` link is only
+for projects without a valid migration completion marker.
 
 The issue body should then contain a tight summary (vision, motivation, design goals, key capabilities, phases) -- NOT a full copy of the PRD. The PRD is the source of truth for data models, architecture, code samples, and implementation details. Duplicating that content into the issue creates drift.
 
