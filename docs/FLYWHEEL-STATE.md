@@ -2536,3 +2536,18 @@ stale (written 2026-07-08); re-verified all order-book items against live GitHub
 - NEXT: monitor B8 planning→work→review→merge (TENET-10 full suite, cloister-core so full test req).
   Confirm B7 close-out completes (verifying-on-main → closed). After B8 lands → A9 should unfreeze;
   then decompositions B9-B13 (re-verify each PRD vs current main — seams drifted post PAN-2372 too).
+
+## RUN-62 tick 18 (2026-07-10 ~16:56 local) — B8 work agent re-dispatched (silent spawn-fail recurred → filed PAN-2569)
+
+- **B8 = PAN-2364: silent work-spawn failure RECURRED** (2/2 this run) — planning finalized
+  (issue→`planned`) but no agent-pan-2364 + no planning session spawned. Manual `pan start PAN-2364`
+  re-dispatched → **agent-pan-2364 now RUNNING** (16:57, working its brief, cost $0.78). B8's fix =
+  per-slot swarm failure isolation (unfreezes A9). **Filed PAN-2569** — the planning→work auto-start
+  handoff silently no-ops (NOT just restart-interrupted; B8 had no release restart). Orchestrator
+  must watch 'planned but no work agent' + re-dispatch until the substrate fix lands.
+- **B7 = PAN-2372** still `merged` + `verifying-on-main` (deacon closing out; fine).
+- **A9 = PAN-2229** still frozen (waits on B8).
+- **Main green** (test building on latest).
+- NEXT: monitor B8 bead progress → pan done → review→test→merge (TENET-10 full suite; cloister-core).
+  If B8 hits the PAN-2567 stuck-after-review loop → same remedy (manual squash once reviewed+green+
+  orthogonal). Watch B7 close-out complete. After B8 lands → A9 unfreezes. Then B9-B13 (re-verify PRDs).
