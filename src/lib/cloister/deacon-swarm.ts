@@ -64,7 +64,7 @@ import {
 import { gcMergedSlots } from './deacon-swarm-gc.js';
 import { createMinimalIssueRecord, writeSwarmFinalizedAt, clearSwarmSlotCompletion } from './deacon-swarm-record.js';
 import { fireTieredCommitHooks } from './swarm-tiered-hooks.js';
-import { applySupersededSlotHighWater, requeueFailedSwarmSlots } from './swarm-failed-slot.js';
+import { applySupersededSlotHighWater, archiveFailedSwarmSlot, requeueFailedSwarmSlots } from './swarm-failed-slot.js';
 
 export { gcOrphanedSlots } from './deacon-swarm-orphan-gc.js';
 export { gcMergedSlots } from './deacon-swarm-gc.js';
@@ -715,6 +715,7 @@ export function clearFailedMergeBlock(issueId: string, slotIndex: number, worksp
 export async function recoverFailedMergeSlot(
   issueId: string,
   workspacePath: string,
+  slotIndex: number,
   doc: VBriefDocument,
   action: SwarmRecoveryAction,
   deps: Pick<
@@ -729,11 +730,23 @@ export async function recoverFailedMergeSlot(
     | 'shouldDispatch'
     | 'getMaxSlotIndex'
     | 'listSlotAssignments'
+    | 'runGitCommand'
   > = defaultDeps,
 ): Promise<string[]> {
   const normalizedIssueId = issueId.toUpperCase();
-  const block = getFailedMergeBlocks(normalizedIssueId, workspacePath)[0];
-  if (!block) return [`[swarm] no failed-merge slot for ${normalizedIssueId}`];
+  const block = getFailedMergeBlock(normalizedIssueId, slotIndex, workspacePath);
+  if (!block) {
+    const otherBlocks = getFailedMergeBlocks(normalizedIssueId, workspacePath);
+    if (otherBlocks.length === 0) {
+      return [`[swarm] no failed-merge slot for ${normalizedIssueId}`];
+    }
+    const lines = otherBlocks
+      .map(b => `  slot ${b.slotIndex} (item ${b.itemId}): ${b.note}`)
+      .join('\n');
+    return [
+      `[swarm] no failed-merge block for ${normalizedIssueId} slot ${slotIndex}. Currently blocked slots:\n${lines}`,
+    ];
+  }
 
   const planPath = join(workspacePath, '.pan', 'spec.vbrief.json');
   if (action === 'handoff') {
@@ -754,6 +767,20 @@ export async function recoverFailedMergeSlot(
     return [`[swarm] dropped failed-merge slot ${block.slotIndex} (item ${block.itemId}) for ${normalizedIssueId}`];
   }
 
+  // retry: archive the conflicted attempt so it cannot re-assert, then unblock
+  // and dispatch a fresh attempt.
+  await archiveFailedSwarmSlot(
+    normalizedIssueId,
+    workspacePath,
+    {
+      itemId: block.itemId,
+      slotIndex: block.slotIndex,
+      status: 'in_flight',
+      branch: block.branch,
+      agentId: block.branch ? `agent-${normalizedIssueId.toLowerCase()}-slot-${block.slotIndex}` : undefined,
+    },
+    { runGitCommand: deps.runGitCommand, clearSlotAssignment: deps.clearSlotAssignment },
+  );
   await deps.applyTaskOperationToPlanFile(planPath, {
     type: 'unblock',
     itemId: block.itemId,

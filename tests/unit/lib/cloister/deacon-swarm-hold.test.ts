@@ -178,6 +178,7 @@ type DispatchDeps = Pick<
   | 'spawnRun'
   | 'getMaxSlotIndex'
   | 'listSlotAssignments'
+  | 'runGitCommand'
 >;
 
 function dispatchDeps(overrides: Partial<DispatchDeps> = {}): DispatchDeps {
@@ -191,6 +192,7 @@ function dispatchDeps(overrides: Partial<DispatchDeps> = {}): DispatchDeps {
     spawnRun: vi.fn(async () => undefined),
     getMaxSlotIndex: vi.fn(() => 5),
     listSlotAssignments: vi.fn(() => []),
+    runGitCommand: vi.fn(async () => undefined),
     ...overrides,
   };
 }
@@ -273,7 +275,7 @@ describe('per-spawn freeze/hold re-check (PAN-2214 slot-20 regression)', () => {
     const doc = makeDoc('PAN-107', 1);
     const deps = dispatchDeps();
 
-    const actions = await recoverFailedMergeSlot('PAN-107', workspacePath, doc, 'retry', deps);
+    const actions = await recoverFailedMergeSlot('PAN-107', workspacePath, 1, doc, 'retry', deps);
 
     expect(deps.spawnRun).not.toHaveBeenCalled();
     expect(actions).toContain('[swarm] dispatch-halted wi-1: freeze/hold active');

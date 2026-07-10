@@ -132,6 +132,7 @@ function recoveryDeps(): Pick<
   | 'releaseSwarmSlot'
   | 'spawnRun'
   | 'shouldDispatch'
+  | 'runGitCommand'
 > {
   return {
     applyTaskOperationToPlanFile: vi.fn(async () => undefined),
@@ -142,6 +143,7 @@ function recoveryDeps(): Pick<
     releaseSwarmSlot: vi.fn(),
     spawnRun: vi.fn(async () => undefined),
     shouldDispatch: vi.fn(() => true),
+    runGitCommand: vi.fn(async () => undefined),
   };
 }
 
@@ -178,7 +180,7 @@ describe('deacon-swarm failed-merge recovery', () => {
     await recordConflict();
     const fakeDeps = recoveryDeps();
 
-    await expect(recoverFailedMergeSlot('PAN-2203', workspacePath, doc(item('wi-a', 'blocked')), 'retry', fakeDeps))
+    await expect(recoverFailedMergeSlot('PAN-2203', workspacePath, 1,doc(item('wi-a', 'blocked')), 'retry', fakeDeps))
       .resolves.toEqual([
         '[swarm] retrying failed-merge slot 1 (item wi-a) for PAN-2203',
         '[swarm] dispatched implementation slot 1 (item wi-a) for PAN-2203',
@@ -205,7 +207,7 @@ describe('deacon-swarm failed-merge recovery', () => {
     await recordConflict();
     const fakeDeps = recoveryDeps();
 
-    await expect(recoverFailedMergeSlot('PAN-2203', workspacePath, doc(), 'drop', fakeDeps))
+    await expect(recoverFailedMergeSlot('PAN-2203', workspacePath, 1,doc(), 'drop', fakeDeps))
       .resolves.toEqual(['[swarm] dropped failed-merge slot 1 (item wi-a) for PAN-2203']);
 
     expect(fakeDeps.applyTaskOperationToPlanFile).toHaveBeenCalledWith(
@@ -225,7 +227,7 @@ describe('deacon-swarm failed-merge recovery', () => {
     await recordConflict();
     const fakeDeps = recoveryDeps();
 
-    await expect(recoverFailedMergeSlot('PAN-2203', workspacePath, doc(), 'handoff', fakeDeps))
+    await expect(recoverFailedMergeSlot('PAN-2203', workspacePath, 1,doc(), 'handoff', fakeDeps))
       .resolves.toEqual(['[swarm] handoff paused PAN-2203 slot 1 (item wi-a)']);
 
     expect(fakeDeps.applyTaskOperationToPlanFile).not.toHaveBeenCalled();

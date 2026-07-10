@@ -194,7 +194,7 @@ export async function swarmRecoverCommand(
     return { ok: false, actions: [] };
   }
 
-  const actions = await deps.recoverFailedMergeSlot(issue, workspacePath, loaded.doc, action);
+  const actions = await deps.recoverFailedMergeSlot(issue, workspacePath, slotIndex, loaded.doc, action);
   for (const line of actions) deps.console.log(line);
 
   return { ok: true, actions, workspacePath };

@@ -229,6 +229,7 @@ describe('pan swarm command', () => {
     expect(deps.recoverFailedMergeSlot).toHaveBeenCalledWith(
       'PAN-2203',
       '/repo/workspaces/feature-pan-2203',
+      1,
       doc,
       'retry',
     );
@@ -293,7 +294,7 @@ describe('pan swarm command', () => {
       const result = await swarmRecoverCommand('PAN-2203', '1', { action: 'retry' }, deps);
 
       expect(result.ok).toBe(true);
-      expect(deps.recoverFailedMergeSlot).toHaveBeenCalledWith('PAN-2203', workspace, doc, 'retry');
+      expect(deps.recoverFailedMergeSlot).toHaveBeenCalledWith('PAN-2203', workspace, 1, doc, 'retry');
     } finally {
       rmSync(workspace, { recursive: true, force: true });
       resetSwarmLoopSafetyForTests();
