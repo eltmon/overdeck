@@ -7,6 +7,12 @@ import {
   resetSwarmLoopSafetyForTests,
   type CoordinateSwarmSlotsDeps,
 } from '../../../../src/lib/cloister/deacon-swarm.js';
+import {
+  classifyDoneWithoutSignal,
+  resetSwarmCompletionInferenceForTests,
+  swarmInferCompletionMode,
+  type DoneWithoutSignalObservation,
+} from '../../../../src/lib/cloister/deacon-swarm-completion.js';
 import type { ReconciledSlotItem, SlotReconcileResult } from '../../../../src/lib/agents/slot-reconcile.js';
 import { analyzeSwarmReadiness } from '../../../../src/lib/vbrief/swarm-readiness.js';
 import type { VBriefDocument, VBriefItem } from '../../../../src/lib/vbrief/types.js';
@@ -300,5 +306,89 @@ describe('PAN-2372 WI-4 durable slot-completion marker (FR-6)', () => {
     expect(withMarker).toEqual([
       expect.objectContaining({ lifecycle: 'ready-to-merge', signal: 'durable-completion', exitStatus: 0 }),
     ]);
+  });
+});
+
+describe('PAN-2372 WI-5 infer_completion default + classifyDoneWithoutSignal modes (FR-8)', () => {
+  // The default flipped nudge → auto: a stalled, alive-idle, clean+ahead slot now gets ONE
+  // completion nudge and then converges to ready-to-merge signal 'inferred' after two stable
+  // observations. Explicit 'nudge' (never converges) and 'off' (no nudge, returns null) keep
+  // their prior semantics. classifyDoneWithoutSignal is exercised directly — the bead names it
+  // — with an injected now/options and mocked ahead/clean deps, so no wall-clock waits.
+  const originalEnv = process.env.PAN_SWARM_INFER_COMPLETION;
+
+  beforeEach(() => {
+    resetSwarmCompletionInferenceForTests();
+    delete process.env.PAN_SWARM_INFER_COMPLETION;
+  });
+
+  afterEach(() => {
+    resetSwarmCompletionInferenceForTests();
+    if (originalEnv === undefined) delete process.env.PAN_SWARM_INFER_COMPLETION;
+    else process.env.PAN_SWARM_INFER_COMPLETION = originalEnv;
+  });
+
+  function doneDeps() {
+    return {
+      getSlotBranchAheadCount: vi.fn(async () => 1),
+      isSlotWorktreeClean: vi.fn(async () => true),
+      sendCompletionNudge: vi.fn(async () => undefined),
+    };
+  }
+
+  function observation(overrides: Partial<DoneWithoutSignalObservation> = {}): DoneWithoutSignalObservation {
+    return { commitTime: 1000, outputDigest: 'stable-digest', progressKey: 'wi-a-slot-1', stalledForMs: 9999, ...overrides };
+  }
+
+  const opts = (inferCompletion: 'auto' | 'nudge' | 'off') => ({
+    workspacePath: '/workspace',
+    issueId: 'PAN-2203',
+    inferCompletion,
+  });
+
+  it('AC1: swarmInferCompletionMode falls back to auto and honors explicit env values', () => {
+    // An unparseable env value reaches the fallback branch — proving it is now 'auto'
+    // (the same branch an absent config/env takes).
+    process.env.PAN_SWARM_INFER_COMPLETION = 'garbage';
+    expect(swarmInferCompletionMode()).toBe('auto');
+    // Explicit valid values are honored (config.yaml / env opt-out semantics preserved).
+    for (const value of ['auto', 'nudge', 'off'] as const) {
+      process.env.PAN_SWARM_INFER_COMPLETION = value;
+      expect(swarmInferCompletionMode()).toBe(value);
+    }
+  });
+
+  it('AC2: auto mode nudges exactly once and converges to ready-to-merge inferred after two stable observations', async () => {
+    const deps = doneDeps();
+    const options = opts('auto');
+
+    const first = await classifyDoneWithoutSignal(slot(), deps, options, observation());
+    expect(first).toEqual(expect.objectContaining({ lifecycle: 'awaiting-completion-signal', signal: 'completion-nudge' }));
+    expect(deps.sendCompletionNudge).toHaveBeenCalledTimes(1);
+
+    // Same signature (stable commit + output) ⇒ second consecutive stable observation.
+    const second = await classifyDoneWithoutSignal(slot(), deps, options, observation());
+    expect(second).toEqual(expect.objectContaining({ lifecycle: 'ready-to-merge', signal: 'inferred', exitStatus: 0 }));
+    // No second nudge on the converging pass — exactly one nudge across the two observations.
+    expect(deps.sendCompletionNudge).toHaveBeenCalledTimes(1);
+  });
+
+  it('AC3: nudge mode never converges; off mode returns null and nudges nothing', async () => {
+    // nudge: nudges once on the first pass, then stays awaiting-completion-signal however many
+    // stable observations accrue (mode !== 'auto' never reaches the converge branch).
+    const nudgeDeps = doneDeps();
+    const nudgeOpts = opts('nudge');
+    for (let pass = 1; pass <= 3; pass++) {
+      const result = await classifyDoneWithoutSignal(slot(), nudgeDeps, nudgeOpts, observation());
+      expect(result).toEqual(expect.objectContaining({ lifecycle: 'awaiting-completion-signal' }));
+      expect(result?.signal).not.toBe('inferred');
+    }
+    expect(nudgeDeps.sendCompletionNudge).toHaveBeenCalledTimes(1);
+
+    // off: distinct progressKey so it is independent of the nudge observations above.
+    const offDeps = doneDeps();
+    const off = await classifyDoneWithoutSignal(slot(), offDeps, opts('off'), observation({ progressKey: 'off-slot' }));
+    expect(off).toBeNull();
+    expect(offDeps.sendCompletionNudge).not.toHaveBeenCalled();
   });
 });

@@ -110,7 +110,10 @@ export function clearSwarmCompletionObservation(progressKey: string): void {
 
 export function swarmInferCompletionMode(): SwarmInferCompletionMode {
   const raw = process.env.PAN_SWARM_INFER_COMPLETION ?? loadCloisterConfigSync().swarm?.infer_completion;
-  return raw === 'off' || raw === 'nudge' || raw === 'auto' ? raw : 'nudge';
+  // PAN-2372 WI-5 / FR-8: default to 'auto' (nudge once, then converge after two stable
+  // observations). Explicit 'nudge' / 'off' in config.yaml or PAN_SWARM_INFER_COMPLETION
+  // still parse and keep their exact prior semantics.
+  return raw === 'off' || raw === 'nudge' || raw === 'auto' ? raw : 'auto';
 }
 
 export async function defaultGetSlotBranchAheadCount(
