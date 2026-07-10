@@ -20,6 +20,11 @@ vi.mock('../../../../src/lib/projects.js', () => ({
   listProjectsSync: mocks.listProjectsSync,
   findProjectByPathSync: () => null,
   getProjectSwarmHotspots: () => [],
+  // PAN-2372 WI-2: getIssueRecordPathForWorkspace now routes through project
+  // resolution. These coordination tests keep records at the workspace
+  // .pan/records/ fixture path, so treat every issue as unregistered and let
+  // the workspace-door fallback resolve it.
+  resolveProjectFromIssueSync: () => null,
 }));
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
@@ -36,6 +41,11 @@ let tempRoot: string;
 beforeEach(async () => {
   tempRoot = await mkdtemp(join(tmpdir(), 'overdeck-swarm-doneness-'));
   mocks.listProjectsSync.mockReset();
+  // PAN-2372: resolveStateReadHomeSync (WI-0) and getIssueRecordPathForWorkspace
+  // (WI-2) both consult listProjectsSync(). Production always returns an array;
+  // seed a valid default so an unseeded mock never yields undefined and throws.
+  // Tests that need a registered project override this with mockReturnValue.
+  mocks.listProjectsSync.mockReturnValue([]);
   mocks.getReviewStatusSync.mockReset();
   mocks.setReviewStatusSync.mockReset();
   mocks.spawnReviewRoleForIssue.mockReset();

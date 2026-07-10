@@ -190,10 +190,22 @@ export function getIssueWorkspacePath(issueId: string): string | null {
 }
 
 /**
- * Record path for an issue within a specific workspace directory.
- * Lives at `<workspacePath>/.pan/records/<issueId-lowercase>.json`.
+ * Record path for an issue reached from a workspace directory. When the issue
+ * resolves to a registered project, delegates to {@link getIssueRecordPath}
+ * (canonical, migration-aware) so every workspace-door caller converges on the
+ * SAME record as the canonical door — including a migrated project, whose
+ * record lives at `${OVERDECK_HOME}/state/<project>/records/` rather than the
+ * slot worktree (FR-3, PAN-2372 WI-2).
+ *
+ * When no project can be resolved for the issue, falls back directly to
+ * `<workspace>/.pan/records/<issue>.json` — byte-identical to the pre-PAN-2372
+ * behavior, and intentionally NOT routed through `getIssueRecordPath` (which
+ * would need migration/infra-repo resolution for a project that does not
+ * exist). Proven by `record-rehome.test.ts`.
  */
 export function getIssueRecordPathForWorkspace(workspacePath: string, issueId: string): string {
+  const project = resolveProjectForIssue(issueId);
+  if (project) return getIssueRecordPath(project, issueId);
   return join(workspacePath, '.pan', RECORD_DIRNAME, `${issueId.toLowerCase()}.json`);
 }
 
@@ -337,6 +349,12 @@ export function writeIssueRecordForWorkspaceSync(
   issueId: string,
   record: PanIssueRecord,
 ): string {
+  // FR-3 (PAN-2372 WI-2): resolve the owning project so the write lands on the
+  // canonical (migration-aware) record path, not a slot-local one. A null result
+  // means the issue is unregistered; the path resolver then falls back to the
+  // workspace .pan/records/ dir and we do NOT queue a state commit (no owning
+  // project to commit on behalf of).
+  const resolvedProject = resolveProjectForIssue(issueId);
   const path = getIssueRecordPathForWorkspace(workspacePath, issueId);
   const dir = dirname(path);
   if (!existsSync(dir)) {
@@ -351,6 +369,11 @@ export function writeIssueRecordForWorkspaceSync(
     updated: now,
   };
   writeRecordFileAtomicSync(path, next);
+  if (resolvedProject) {
+    // Re-homed swarm writes must travel to overdeck-state like every canonical
+    // write, or a migrated-project record written here would never be committed.
+    queueIssueRecordCommit(resolvedProject, issueId, path);
+  }
   return path;
 }
 
