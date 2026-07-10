@@ -11,6 +11,8 @@ import type { ClassifiedSwarmSlot } from './deacon-swarm.js';
 import type { PersistedTaskOperation } from '../vbrief/dag.js';
 import type { VBriefDocument } from '../vbrief/types.js';
 import { recordRecoveryFailure } from './recovery-trip.js';
+import { getAgentStateSync } from '../agents/agent-state.js';
+import { decideAutonomousRedrive } from './redrive-gate.js';
 
 /** Patrol GC never removes forensic attempts; configured issue close-out owns teardown. */
 export const SWARM_SUPERSEDED_RETENTION = 'issue-close-out' as const;
@@ -83,6 +85,8 @@ export async function requeueFailedSwarmSlots(
   let nextDoc = doc;
   const actions: string[] = [];
   for (const slot of classified.filter(candidate => candidate.lifecycle === 'failed')) {
+    const admission = decideAutonomousRedrive(slot.agentId ? getAgentStateSync(slot.agentId) ?? {} : {}, { owesRework: true });
+    if (admission.decision === 'defer') { actions.push(`[swarm] deferred failed slot ${slot.slotIndex}: ${admission.reason}`); continue; }
     const attempt = await archiveFailedSwarmSlot(issueId, workspacePath, slot, deps);
     await deps.applyTaskOperationToPlanFile(`${workspacePath}/.pan/spec.vbrief.json`, {
       type: 'unblock', itemId: slot.itemId, writerId: 'deacon-swarm', reason: `Redispatch after ${slot.reason ?? 'slot failure'}`,
