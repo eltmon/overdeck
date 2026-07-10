@@ -2446,3 +2446,16 @@ stale (written 2026-07-08); re-verified all order-book items against live GitHub
 - NEXT: catch B7 pan done → review→test→merge (TENET-10 FULL suite, no --changed on cloister,
   verify vs origin/main). If B7 keeps verifying w/o pan done despite nudge, re-nudge firmer. On B7
   land+closeout+main-green → dispatch B8=PAN-2364 (unfreezes A9).
+
+## RUN-62 tick 12 (2026-07-10 ~15:11 local) — B7 PAN DONE → in-review (nudge worked)
+
+- **B7 = PAN-2372 handed off to review** ✅ — nudge (tick 11) took: agent ran gates, added 1 gate-fix
+  commit (11 total), then pan done. Issue now `in-review`; `agent-pan-2372-review` spawned 15:06.
+  Work agent idle post-handoff (normal). Review ~5min in, no verdict yet. Let review→test run.
+  TENET-10: B7 needs FULL suite green before merge (no --changed on cloister files). Cost landed ~$36.
+- **Main green** (v0.45.1).
+- **A9 = PAN-2229** still frozen by B8/PAN-2364 (expected). Unfreezes when B8 lands.
+- **B8=PAN-2364 HELD** — drip rule: exactly one Lane B in flight; B7 not merged yet. Dispatch B8 only
+  after B7 land+closeout+main-green.
+- NEXT: monitor B7 review verdict → test → merge. If review BLOCKS, relay/let work agent fix. On B7
+  merge+closeout+main-green → dispatch B8=PAN-2364 (unfreezes A9).
