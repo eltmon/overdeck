@@ -168,7 +168,7 @@ describe('deacon-swarm stalled-slot detection and duplicate-spawn guard', () => 
     expect(recordStalledSlotRecovery('PAN-2203', classified)).toEqual([
       '[swarm] stalled slot 1 (item wi-a) for PAN-2203: recovery required',
     ]);
-    expect(getFailedMergeBlock('PAN-2203')).toEqual(expect.objectContaining({
+    expect(getFailedMergeBlock('PAN-2203', 1)).toEqual(expect.objectContaining({
       itemId: 'wi-a',
       slotIndex: 1,
       note: expect.stringContaining('stalled'),

@@ -261,7 +261,7 @@ describe('deacon-swarm completion classification', () => {
     });
 
     expect(recordStalledSlotRecovery('PAN-2203', classified)).toEqual([]);
-    expect(getFailedMergeBlock('PAN-2203')).toBeUndefined();
+    expect(getFailedMergeBlock('PAN-2203', 1)).toBeUndefined();
   });
 
   it('infers ready-to-merge on the second unchanged idle observation in auto mode', async () => {

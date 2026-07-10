@@ -225,7 +225,7 @@ describe('pan swarm command', () => {
     const result = await swarmRecoverCommand('PAN-2203', '1', { action: 'retry' }, deps);
 
     expect(result.ok).toBe(true);
-    expect(deps.getFailedMergeBlock).toHaveBeenCalledWith('PAN-2203', '/repo/workspaces/feature-pan-2203');
+    expect(deps.getFailedMergeBlock).toHaveBeenCalledWith('PAN-2203', 1, '/repo/workspaces/feature-pan-2203');
     expect(deps.recoverFailedMergeSlot).toHaveBeenCalledWith(
       'PAN-2203',
       '/repo/workspaces/feature-pan-2203',
@@ -613,6 +613,7 @@ describe('pan swarm reset (PAN-2214)', () => {
       resolveProjectFromIssueSync: vi.fn(() => ({ projectName: 'overdeck', projectPath: '/repo' })),
       clearAllSlotAssignments: vi.fn(),
       clearFailedMergeBlock: vi.fn(),
+      getFailedMergeBlocks: vi.fn(() => [{ issueId: 'PAN-2203', itemId: 'wi-1', slotIndex: 1, note: 'conflict' }]),
       runGitCommand: vi.fn(async (command: string) => {
         gitCalls.push(command);
         if (command.startsWith('git for-each-ref')) {
@@ -708,7 +709,7 @@ describe('pan swarm reset (PAN-2214)', () => {
 
     expect(result.ok).toBe(true);
     expect(deps.clearAllSlotAssignments).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203');
-    expect(deps.clearFailedMergeBlock).toHaveBeenCalledWith('PAN-2203', '/repo/workspaces/feature-pan-2203');
+    expect(deps.clearFailedMergeBlock).toHaveBeenCalledWith('PAN-2203', 1, '/repo/workspaces/feature-pan-2203');
     // The running row is stopped twice at most (once via stop's enumeration, once via the
     // final sweep) — the essential guarantee is it is stopped and the stopped row is not touched.
     expect(deps.stopAgentSync).toHaveBeenCalledWith('agent-pan-2203-slot-1');

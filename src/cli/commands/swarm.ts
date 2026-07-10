@@ -16,6 +16,7 @@ import {
   clearFailedMergeBlock,
   coordinateSwarmSlots,
   getFailedMergeBlock,
+  getFailedMergeBlocks,
   recoverFailedMergeSlot,
   type ClassifiedSwarmSlot,
   type SwarmRecoveryAction,
@@ -177,7 +178,7 @@ export async function swarmRecoverCommand(
   }
 
   const workspacePath = await deps.ensureWorkspace(issue, loaded.project);
-  const block = deps.getFailedMergeBlock(issue, workspacePath);
+  const block = deps.getFailedMergeBlock(issue, slotIndex, workspacePath);
   if (!block) {
     if (action === 'retry') {
       const actions = await deps.coordinateSwarmSlots({ issueId: issue });
@@ -190,10 +191,6 @@ export async function swarmRecoverCommand(
       }
     }
     deps.console.error(chalk.red(`No failed-merge slot is recorded for ${issue}.`));
-    return { ok: false, actions: [] };
-  }
-  if (block.slotIndex !== slotIndex) {
-    deps.console.error(chalk.red(`Recorded failed-merge slot for ${issue} is slot ${block.slotIndex}, not slot ${slotIndex}.`));
     return { ok: false, actions: [] };
   }
 
@@ -325,6 +322,7 @@ export interface SwarmResetCommandDeps extends SwarmStopCommandDeps {
   runGitCommand: (command: string, cwd: string) => Promise<unknown>;
   clearAllSlotAssignments: typeof clearAllSlotAssignments;
   clearFailedMergeBlock: typeof clearFailedMergeBlock;
+  getFailedMergeBlocks: typeof getFailedMergeBlocks;
   removeAgentSync: (agentId: string) => void;
 }
 
@@ -334,6 +332,7 @@ const defaultResetDeps: SwarmResetCommandDeps = {
   runGitCommand: (command, cwd) => execAsync(command, { cwd }),
   clearAllSlotAssignments,
   clearFailedMergeBlock,
+  getFailedMergeBlocks,
   removeAgentSync,
 };
 
@@ -410,7 +409,9 @@ export async function swarmResetCommand(
   }
 
   deps.clearAllSlotAssignments(workspacePath, issue);
-  deps.clearFailedMergeBlock(issue, workspacePath);
+  for (const block of deps.getFailedMergeBlocks(issue, workspacePath)) {
+    deps.clearFailedMergeBlock(issue, block.slotIndex, workspacePath);
+  }
 
   // No stale running registration may survive: mark live-status rows stopped.
   let stoppedRows = 0;

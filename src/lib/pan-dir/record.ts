@@ -102,6 +102,11 @@ export interface PanIssueSwarmSlotCompletion {
 
 export interface PanIssueSwarmRecord {
   finalizedAt?: string;
+  /**
+   * @deprecated Read for migration only; new blocks live in `failedMergeBlocks`
+   * keyed by `String(slotIndex)`. `writeSwarmFailedMergeBlock` folds this into
+   * the map and clears it on first write.
+   */
   failedMergeBlock?: PanIssueSwarmFailedMergeBlock;
   slotAssignments?: PanIssueSwarmSlotAssignment[];
   supersededAttempts?: PanIssueSwarmSupersededAttempt[];
@@ -110,6 +115,12 @@ export interface PanIssueSwarmRecord {
    * a slot durable-ready; merge/requeue clears the key (clearSwarmSlotCompletion).
    */
   slotCompletions?: Record<string, PanIssueSwarmSlotCompletion>;
+  /**
+   * PAN-2364: failed-merge and stalled-slot recovery blocks keyed by
+   * `String(slotIndex)`. The legacy singular `failedMergeBlock` above is folded
+   * into this map on first write.
+   */
+  failedMergeBlocks?: Record<string, PanIssueSwarmFailedMergeBlock>;
 }
 
 export interface PanIssueRecoveryTrip {

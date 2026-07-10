@@ -1,15 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
+  clearFailedMergeBlock,
   getFailedMergeBlock,
+  getFailedMergeBlocks,
   mergeReadySlots,
+  recordFailedMergeBlock,
   recoverFailedMergeSlot,
   resetSwarmLoopSafetyForTests,
   type ClassifiedSwarmSlot,
   type CoordinateSwarmSlotsDeps,
 } from '../../../../src/lib/cloister/deacon-swarm.js';
+import { writeIssueRecordForWorkspaceSync } from '../../../../src/lib/pan-dir/record.js';
 import type { VBriefDocument, VBriefItem } from '../../../../src/lib/vbrief/types.js';
 
 function item(id = 'wi-a', status: VBriefItem['status'] = 'running'): VBriefItem {
@@ -120,7 +124,7 @@ describe('deacon-swarm failed-merge recovery', () => {
     await expect(mergeReadySlots('PAN-2203', workspacePath, doc(), [readySlot()], mergeDeps()))
       .resolves.toEqual(['[swarm] failed-merge slot 1 (item wi-a) for PAN-2203']);
 
-    expect(getFailedMergeBlock('PAN-2203', workspacePath)).toEqual(expect.objectContaining({
+    expect(getFailedMergeBlock('PAN-2203', 1, workspacePath)).toEqual(expect.objectContaining({
       issueId: 'PAN-2203',
       itemId: 'wi-a',
       slotIndex: 1,
@@ -152,7 +156,7 @@ describe('deacon-swarm failed-merge recovery', () => {
       slotIndex: 1,
       slotItemId: 'wi-a',
     }));
-    expect(getFailedMergeBlock('PAN-2203', workspacePath)).toBeUndefined();
+    expect(getFailedMergeBlock('PAN-2203', 1, workspacePath)).toBeUndefined();
   });
 
   it('drops a failed-merge slot by marking the item done and clearing the block', async () => {
@@ -172,7 +176,7 @@ describe('deacon-swarm failed-merge recovery', () => {
       },
       workspacePath,
     );
-    expect(getFailedMergeBlock('PAN-2203', workspacePath)).toBeUndefined();
+    expect(getFailedMergeBlock('PAN-2203', 1, workspacePath)).toBeUndefined();
   });
 
   it('handoff keeps auto-advance paused with an operator note', async () => {
@@ -184,6 +188,85 @@ describe('deacon-swarm failed-merge recovery', () => {
 
     expect(fakeDeps.applyTaskOperationToPlanFile).not.toHaveBeenCalled();
     expect(fakeDeps.spawnRun).not.toHaveBeenCalled();
-    expect(getFailedMergeBlock('PAN-2203', workspacePath)?.note).toContain('Operator handoff required');
+    expect(getFailedMergeBlock('PAN-2203', 1, workspacePath)?.note).toContain('Operator handoff required');
+  });
+
+  it('stores and returns multiple per-slot blocks independently', () => {
+    recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-a', slotIndex: 1, note: 'slot 1 conflict' }, workspacePath);
+    recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-c', slotIndex: 3, note: 'slot 3 conflict' }, workspacePath);
+
+    const blocks = getFailedMergeBlocks('PAN-2203', workspacePath);
+    expect(blocks).toHaveLength(2);
+    expect(blocks.map(b => b.slotIndex)).toEqual([1, 3]);
+    expect(getFailedMergeBlock('PAN-2203', 1, workspacePath)?.itemId).toBe('wi-a');
+    expect(getFailedMergeBlock('PAN-2203', 3, workspacePath)?.itemId).toBe('wi-c');
+  });
+
+  it('folds a legacy singular block into the per-slot map on first write and clears the singular field', () => {
+    writeIssueRecordForWorkspaceSync(workspacePath, 'PAN-2203', {
+      issueId: 'PAN-2203',
+      schemaVersion: 2,
+      feedback: [],
+      swarm: {
+        failedMergeBlock: {
+          issueId: 'PAN-2203',
+          itemId: 'wi-legacy',
+          slotIndex: 2,
+          note: 'legacy singular block',
+        },
+      },
+      pipeline: {
+        issueId: 'PAN-2203',
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        mergeStatus: 'pending',
+        readyForMerge: false,
+        updatedAt: '2026-07-01T00:00:00.000Z',
+      },
+      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'test' },
+    });
+
+    expect(getFailedMergeBlocks('PAN-2203', workspacePath)).toEqual([
+      expect.objectContaining({ slotIndex: 2, itemId: 'wi-legacy' }),
+    ]);
+
+    recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-a', slotIndex: 1, note: 'slot 1 conflict' }, workspacePath);
+
+    const record = JSON.parse(readFileSync(join(workspacePath, '.pan', 'records', 'pan-2203.json'), 'utf-8'));
+    expect(record.swarm.failedMergeBlock).toBeUndefined();
+    expect(record.swarm.failedMergeBlocks).toEqual(expect.objectContaining({
+      '1': expect.objectContaining({ itemId: 'wi-a' }),
+      '2': expect.objectContaining({ itemId: 'wi-legacy' }),
+    }));
+  });
+
+  it('clearFailedMergeBlock removes only the targeted slot', () => {
+    recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-a', slotIndex: 1, note: 'slot 1 conflict' }, workspacePath);
+    recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-c', slotIndex: 3, note: 'slot 3 conflict' }, workspacePath);
+
+    clearFailedMergeBlock('PAN-2203', 1, workspacePath);
+
+    expect(getFailedMergeBlock('PAN-2203', 1, workspacePath)).toBeUndefined();
+    expect(getFailedMergeBlock('PAN-2203', 3, workspacePath)).toEqual(expect.objectContaining({
+      itemId: 'wi-c',
+      slotIndex: 3,
+    }));
+    expect(getFailedMergeBlocks('PAN-2203', workspacePath)).toEqual([
+      expect.objectContaining({ slotIndex: 3, itemId: 'wi-c' }),
+    ]);
+  });
+
+  it('durable blocks survive resetSwarmLoopSafetyForTests clearing the in-memory map', () => {
+    recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-a', slotIndex: 1, note: 'slot 1 conflict' }, workspacePath);
+
+    resetSwarmLoopSafetyForTests();
+
+    expect(getFailedMergeBlocks('PAN-2203', workspacePath)).toEqual([
+      expect.objectContaining({ slotIndex: 1, itemId: 'wi-a' }),
+    ]);
+    expect(getFailedMergeBlock('PAN-2203', 1, workspacePath)).toEqual(expect.objectContaining({
+      itemId: 'wi-a',
+      slotIndex: 1,
+    }));
   });
 });
