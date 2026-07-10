@@ -14,6 +14,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { getOverdeckHome } from './paths.js';
 import { listProjectsSync, resolveInfraRepo, type ProjectConfig } from './projects.js';
+import { STATE_BRANCH_PATHS } from './state-plane.js';
 
 const execFileAsync = promisify(execFile);
 export const STATE_BRANCH = 'overdeck-state';
@@ -146,6 +147,15 @@ export async function inspectStateMigration(project: ProjectConfig): Promise<{
 
 export async function isStateMigrated(project: ProjectConfig): Promise<boolean> {
   return (await inspectStateMigration(project)).migrated;
+}
+
+export async function findRecreatedLegacyStatePaths(project: ProjectConfig): Promise<string[]> {
+  if (!(await isStateMigrated(project))) return [];
+  return STATE_BRANCH_PATHS
+    .map((statePath) => statePath === '.beads/'
+      ? join(project.path, '.beads')
+      : join(project.path, '.pan', statePath.slice(0, -1)))
+    .filter(existsSync);
 }
 
 export async function resolveStateHome(project: ProjectConfig, options: StateHomeOptions = {}): Promise<StateHome> {

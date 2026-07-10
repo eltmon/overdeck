@@ -7,6 +7,7 @@ import type { ProjectConfig } from '../projects.js';
 import {
   clearStateMigrationCache,
   ensureStateWorktree,
+  findRecreatedLegacyStatePaths,
   inspectStateMigration,
   isStateMigrated,
   parseMigrationCompleteMarker,
@@ -159,6 +160,13 @@ describe('state home', () => {
     expect(resolveStateReadHomeSync(project)).toEqual({ root: stateRoot, migrated: true });
     expect(resolveStateDomainPathSync(project, 'records')).toBe(join(stateRoot, 'records'));
     expect(getProjectPanPaths(repo).specsDir).toBe(join(stateRoot, 'specs'));
+  });
+
+  it('trips when a migrated checkout recreates a legacy state directory', async () => {
+    const parent = pushUnmarkedStateBranch();
+    pushCompletionMarker(parent);
+    mkdirSync(join(repo, '.pan', 'records'), { recursive: true });
+    await expect(findRecreatedLegacyStatePaths(project)).resolves.toEqual([join(repo, '.pan', 'records')]);
   });
 
   it('recreates a clean wrong-branch state worktree on overdeck-state', async () => {

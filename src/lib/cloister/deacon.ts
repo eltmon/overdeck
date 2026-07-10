@@ -161,6 +161,7 @@ import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync } from '../projects.js';
 import { queueBeadsAutoCommit } from '../pan-dir/auto-commit.js';
+import { findRecreatedLegacyStatePaths } from '../state-home.js';
 import { withIssueRecordLock } from '../pan-dir/record-lock.js';
 import { recordMainDivergenceHealth, type ProjectMainDivergence } from './deacon-main-divergence.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
@@ -3187,7 +3188,14 @@ export async function runPatrol(): Promise<PatrolResult> {
   }
 
   const projectConfigs = listProjectsSync();
-  for (const { config: projectConfig } of projectConfigs) if (projectConfig.path) queueBeadsAutoCommit(projectConfig.path);
+  for (const { config: projectConfig } of projectConfigs) {
+    if (!projectConfig.path) continue;
+    queueBeadsAutoCommit(projectConfig.path);
+    const recreated = await findRecreatedLegacyStatePaths(projectConfig);
+    if (recreated.length > 0) {
+      addLog('error', `Migrated checkout has recreated state paths (stray writer): ${recreated.join(', ')}`, state.patrolCycle);
+    }
+  }
   const divergenceWarnings = await recordMainDivergenceHealth(state, projectConfigs);
   for (const warning of divergenceWarnings) addLog('warn', warning, state.patrolCycle);
 

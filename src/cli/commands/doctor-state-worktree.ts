@@ -1,5 +1,5 @@
 import { listProjectsSync, type ProjectConfig } from '../../lib/projects.js';
-import { ensureStateWorktree, type StateWorktreeStatus } from '../../lib/state-home.js';
+import { ensureStateWorktree, findRecreatedLegacyStatePaths, type StateWorktreeStatus } from '../../lib/state-home.js';
 
 interface StateWorktreeCheck {
   name: string;
@@ -16,6 +16,15 @@ export async function checkStateWorktrees(
     try {
       const result = await ensure(config, { projectKey: key });
       const name = `State Worktree: ${key} (${config.name})`;
+      const recreated = await findRecreatedLegacyStatePaths(config);
+      if (recreated.length > 0) {
+        return {
+          name,
+          status: 'error',
+          message: `Migrated checkout contains recreated state paths: ${recreated.join(', ')}`,
+          fix: 'Stop the stray writer and move the data through the state write door; do not delete before comparing it with overdeck-state.',
+        };
+      }
       switch (result.status) {
         case 'legacy': return { name, status: 'ok', message: 'Legacy state layout (migration not complete)' };
         case 'healthy': return { name, status: 'ok', message: `Healthy overdeck-state worktree at ${result.path}` };
