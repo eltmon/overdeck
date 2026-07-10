@@ -2519,3 +2519,20 @@ stale (written 2026-07-08); re-verified all order-book items against live GitHub
   then dispatch B8.
 - **B8 = PAN-2364 READY TO DISPATCH** once main green + B7 closed-out (drip rule). B8 unfreezes
   A9=PAN-2229 (still frozen). Order-book after B8: decompositions B9-B13 (re-verify PRDs vs main).
+
+## RUN-62 tick 17 (2026-07-10 ~16:37 local) — B7 verified green on main + deacon-reconciled; B8 DISPATCHED
+
+- **B7 = PAN-2372: main GREEN post-merge** ✅ — merge commit eeaca5640c CI all success (lint/test/
+  build/guard); B7 did NOT break main. **Deacon AUTO-RECONCILED lifecycle** (despite manual squash
+  merge): PAN-2372 now labeled `merged` + `verifying-on-main` (in-review stripped), stale
+  agent-pan-2372 + agent-pan-2372-review sessions REAPED. No manual close-out needed — deacon owns
+  verify-on-main → close-out. B7 fully done. **Lane B: B0-B7 all landed.**
+- **B8 = PAN-2364 DISPATCHED** (per-slot swarm failure isolation) — planning-pan-2364 live (16:38).
+  Auto-planning → work. This is the fix for the A9 freeze. Substantive gate met (main green + B7
+  merged); didn't force pan close (deacon handles B7 verify→closeout).
+- **A9 = PAN-2229 still frozen** by the failed-merge-slot bug (deacon "blocked PAN-2229: failed-merge
+  slot 1" cycle 22041) — WILL CLEAR once B8 lands its per-slot isolation. Slots 1/2/3 preserved.
+- **Main green.**
+- NEXT: monitor B8 planning→work→review→merge (TENET-10 full suite, cloister-core so full test req).
+  Confirm B7 close-out completes (verifying-on-main → closed). After B8 lands → A9 should unfreeze;
+  then decompositions B9-B13 (re-verify each PRD vs current main — seams drifted post PAN-2372 too).
