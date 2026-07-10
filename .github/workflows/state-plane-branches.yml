@@ -1,0 +1,34 @@
+name: state-plane-branches
+
+on:
+  push:
+    branches: [main, overdeck-state]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Enforce code/state branch separation
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == pull_request ]]; then
+            branch=main
+            range="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+          else
+            branch="${GITHUB_REF_NAME}"
+            before="${{ github.event.before }}"
+            if [[ "$before" == 0000000000000000000000000000000000000000 ]]; then
+              before=$(git hash-object -t tree /dev/null)
+            fi
+            range="$before..${{ github.sha }}"
+          fi
+          bash scripts/guard-state-plane-branches.sh --branch "$branch" --range "$range"
