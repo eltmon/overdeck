@@ -149,6 +149,10 @@ export async function isStateMigrated(project: ProjectConfig): Promise<boolean> 
   return (await inspectStateMigration(project)).migrated;
 }
 
+export function shouldCommitLegacyWorkspaceArtifacts(migrated: boolean): boolean {
+  return !migrated;
+}
+
 export async function findRecreatedLegacyStatePaths(project: ProjectConfig): Promise<string[]> {
   if (!(await isStateMigrated(project))) return [];
   return STATE_BRANCH_PATHS

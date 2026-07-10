@@ -67,7 +67,7 @@ import {
 import { getConcurrencyLimits } from '../cloister/concurrency.js';
 import { listAgentStates } from './queries.js';
 import { findProjectByPathSync } from '../projects.js';
-import { isStateMigrated } from '../state-home.js';
+import { isStateMigrated, shouldCommitLegacyWorkspaceArtifacts } from '../state-home.js';
 import {
   decideChannelsForWorkAgent,
   dismissDevChannelsDialog,
@@ -550,7 +550,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     try {
       const workspace = options.workspace;
       const project = findProjectByPathSync(workspace);
-      if (project && await isStateMigrated(project)) {
+      if (project && !shouldCommitLegacyWorkspaceArtifacts(await isStateMigrated(project))) {
         console.warn(`[agents] Deferred legacy .pan/ index cleanup for ${options.issueId} — migrated projects use gitignored .overdeck/ runtime files; historical entries retire with the branch`);
       } else {
       const { stdout: trackedFiles } = await execAsync(

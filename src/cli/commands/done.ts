@@ -23,7 +23,7 @@ import { extractNumberSync, resolveIssueIdSync } from '../../lib/issue-id.js';
 import { getWorkspacePanPaths } from '../../lib/pan-dir/index.js';
 import { restoreTrackedBeadsExport } from '../../lib/bd-mutex.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
-import { isStateMigrated } from '../../lib/state-home.js';
+import { isStateMigrated, shouldCommitLegacyWorkspaceArtifacts } from '../../lib/state-home.js';
 import { findWorkspacePath } from '../../lib/lifecycle/archive-planning.js';
 import { changedFilesVsMain } from '../../lib/flywheel-merge-order.js';
 import {
@@ -596,7 +596,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     if (workspacePath && existsSync(workspacePath)) {
       const migratedState = await isStateMigrated(resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath));
       // Commit stale orchestration artifacts so preflight does not reject them.
-      if (!migratedState) try {
+      if (shouldCommitLegacyWorkspaceArtifacts(migratedState)) try {
         const { stdout: preDirty } = await execAsync(
           'git status --porcelain .pan/',
           { cwd: workspacePath, encoding: 'utf-8' }
@@ -629,7 +629,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         return;
       }
 
-      if (!migratedState) try {
+      if (shouldCommitLegacyWorkspaceArtifacts(migratedState)) try {
         const { stdout: postDirty } = await execAsync(
           'git status --porcelain .pan/',
           { cwd: workspacePath, encoding: 'utf-8' }
