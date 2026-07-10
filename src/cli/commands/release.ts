@@ -129,6 +129,16 @@ function getLatestTag(repoRoot: string): string | null {
   }
 }
 
+function getRemoteStateBranchSha(repoRoot: string): string | undefined {
+  try {
+    const output = run('git ls-remote --heads origin refs/heads/overdeck-state', repoRoot);
+    const sha = output.split(/\s+/)[0];
+    return /^[0-9a-f]{40}$/i.test(sha) ? sha : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function getCommitSubjects(repoRoot: string, range: string): string[] {
   try {
     const output = run(`git log ${range} --pretty=format:%s`, repoRoot);
@@ -208,8 +218,9 @@ export function buildReleaseNotesMarkdown(params: {
   to: string;
   entries: string[];
   packageName: string;
+  stateBranchSha?: string;
 }): string {
-  const { channel, version, from, to, entries, packageName } = params;
+  const { channel, version, from, to, entries, packageName, stateBranchSha } = params;
   const range = from ? `${from}...${to}` : to;
   // Pin the package name (passed in from package.json) and the exact version, so a release's
   // notes install THAT release. The package was renamed across history
@@ -222,6 +233,7 @@ export function buildReleaseNotesMarkdown(params: {
 - Release ${version} (${channel})
 - Built from ${range}
 - Published intentionally from main via tag promotion
+${stateBranchSha ? `- State snapshot: overdeck-state ${stateBranchSha}\n` : ''}
 
 ## Highlights
 ${highlights}
@@ -487,6 +499,7 @@ async function releaseCreateCommand(
     to: tagName,
     entries,
     packageName: pkg.name ?? '@overdeck/core',
+    stateBranchSha: channel === 'stable' ? getRemoteStateBranchSha(repoRoot) : undefined,
   });
 
   writeTextFile(releaseNotesPath, releaseNotes);
