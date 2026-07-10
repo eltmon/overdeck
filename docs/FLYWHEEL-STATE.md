@@ -2283,3 +2283,21 @@ stale (written 2026-07-08); re-verified all order-book items against live GitHub
 - **No action this tick beyond observe** — healthy loop. NEXT: catch work-agent spawn for both;
   shepherd B7 through review→test→merge (green-gated, TENET-10 full suite). When B7 lands +
   closed-out + main green → dispatch B8 = PAN-2364.
+
+## RUN-62 tick 3 (2026-07-10 ~16:31Z) — B7 work-agent spawn recovered; both lanes live
+
+- **B7 = PAN-2372 spawn had FAILED silently** — planning finalized clean (`planned` label,
+  planning-pan-2372 stopped clean), but the first work-agent spawn left an EMPTY agent state
+  dir (no state.json) and NO tmux session; no spec materialized. Almost certainly interrupted
+  by the v0.45.0 release/restart happening in the same 12:03–12:26 window. **Recovery: re-ran
+  `pan start PAN-2372`** → found the existing plan, spawned straight to work (no re-plan needed).
+  `agent-pan-2372` now RUNNING (work, glm-5.2, Cloister-routed), reading beads, progressing.
+  Watch for recurrence — if a clean-planned issue fails work-spawn again OUTSIDE a release
+  window, file a substrate bug (silent work-spawn failure leaving empty state dir).
+- **A9 = PAN-2229 planned as a SWARM** — slot-1/2/3 + review-supervisor all alive and working
+  (created 12:17–12:26). One Lane A item, parallelized across slots. Within the 20-agent cap.
+- **Main CI GREEN** (build(22)/lint/smoke/guard all success; `test` finishing) — the v0.45.0
+  release build passed. Not red.
+- **Agent count:** min target 2 met and exceeded (1 Lane B work + 4 Lane A swarm + agent-min-865
+  MYN). NEXT: shepherd B7 to `pan done`→review→test→merge (TENET-10 full suite); watch A9 swarm
+  slots complete + assemble. When B7 lands+closed-out+main-green → dispatch B8 = PAN-2364.
