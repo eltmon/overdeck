@@ -1,0 +1,49 @@
+{
+  "version": "1",
+  "issueId": "PAN-1256",
+  "created": "2026-06-04T06:53:54.477Z",
+  "updated": "2026-06-05T05:34:09.549Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "feedback": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-06-04T06:53Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-04T06:53:54.477Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-04T06:53:54.526Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-04T06:54Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-04T06:54:24.075Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-04T07:04Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-06-04T07:04:11.683Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-04T07:04:12.072Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-04T07:05Z] verification-gate → FAILED — seq 4",
+      "timestamp": "2026-06-04T07:05:28.059Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-04T07:06Z] verification-gate → FAILED — seq 5",
+      "timestamp": "2026-06-04T07:06:56.630Z"
+    }
+  ]
+}

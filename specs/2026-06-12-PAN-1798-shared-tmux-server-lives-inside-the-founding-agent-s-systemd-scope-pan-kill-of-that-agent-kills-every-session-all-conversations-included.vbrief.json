@@ -1,0 +1,250 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-12T20:06:07.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1798: Shared tmux server lives inside the founding agent's systemd scope — pan kill of that agent kills EVERY session (all conversations included)",
+    "updated": "2026-06-12T20:10:29.980Z"
+  },
+  "plan": {
+    "id": "pan-1798",
+    "title": "Shared tmux server lives inside the founding agent's systemd scope — pan kill of that agent kills EVERY session (all conversations included)",
+    "status": "proposed",
+    "uid": "2946fafe-cf4d-471e-b0df-e7ea0e2480c5",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-06-12T20:06:07.000Z",
+    "updated": "2026-06-12T20:10:29.980Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1798",
+        "label": "PAN-1798",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-1798.md",
+        "label": "PRD draft (requirements FR-1..FR-6, NFR-1..NFR-4, decisions D1..D5, verified code references)",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "tmux",
+      "reliability",
+      "systemd",
+      "incident-fix"
+    ],
+    "narratives": {
+      "Problem": "Any `tmux new-session` against a dead `panopticon` socket forks the shared server into the calling spawn's cgroup with an agent-specific cmdline; killing that agent then destroys every session on the socket (live incident 2026-06-12 03:43 killed all 5 conversations + 2 review convoys). Commit b7e4ab885 landed clean founding (`systemd-run --scope`), `exit-empty off`, and a kill-sweep tmux filter — but the founding preflight sits behind the once-per-process `tmuxContextPrepared` latch (src/lib/tmux.ts:164,172). The long-lived dashboard latches at boot; when the server dies mid-lifetime, the next new-session dirty-founds it again (proof: live server PID 1947249, founded 08:53 after the fix commit, carries a conversation launcher cmdline). Also missing: the founder cgroup guard, fallback logging, and any tests.",
+      "Proposal": "De-latch founding into an exported `ensurePanopticonTmuxServer()` preflight that runs before EVERY `new-session` through the tmuxExecSync/tmuxExecAsync choke points (verified: all founding-capable spawns funnel there; attach/list/display cannot found). Keep the latch for config writing only. Add the founder guard: resolve server PID via `tmux display-message -p '#{pid}'` (verified to work with zero sessions), read /proc/<pid>/cgroup, loud warn-once-per-PID if it is a tmux-spawn-* scope (verified tmux 3.4 leaves the server in the founding client's cgroup, so clean foundings never false-positive). Log the non-systemd fallback. Lock the landed b7e4ab885 behavior (exit-empty off, clean founding argv) with regression tests. All decision rules are pre-made in the PRD draft (D1–D5): keep timestamped transient scopes, no retry loops, warn-only guard.",
+      "NonGoals": "- Restarting, killing, migrating, or adopting any currently running tmux server (live PID 1947249 stays exactly as the operator left it; never `pan kill` PAN-1579)\n- The deacon auto-resume race on just-killed agents ('has a resumable Claude session') — separate issue if pursued\n- Stable-named systemd service unit (panopticon-tmux-server.service) — timestamped transient scopes chosen (PRD D1)\n- Automatic re-founding or migration when the founder guard fires (warn-only)\n- Remote (Fly) tmux spawning and workspace-container tmux changes (fallback path covers no-systemd environments)\n- Removing dead src/lib/runtime/claude.ts (unimported legacy on the default socket)\n- KillMode=process interim mitigation automation (operator already applied manually)\n- Any change to inherit-user tmux config mode behavior"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Keep the already-landed timestamped `systemd-run --user --scope --collect --unit=panopticon-tmux-<Date.now()>` transient-scope founding instead of the issue's literal stable `--unit=panopticon-tmux-server` unit.",
+        "rationale": "A stable-named service needs Type=forking/RemainAfterExit fiddliness and collides when a stale unit lingers; timestamped transient scopes are collision-proof and equally outside any agent's scope. This mechanism is already on main (b7e4ab885) and working."
+      },
+      {
+        "summary": "Preflight placement: inside tmuxExecAsync/tmuxExecSync gated on args[0] === 'new-session', rather than per-call-site edits.",
+        "rationale": "Audit verified every managed-socket new-session funnels through these two functions, and only new-session/start-server can found a server (attach/list/display fail without founding). One choke point covers all current and future call sites at minimal per-call cost (NFR-4)."
+      },
+      {
+        "summary": "Founder guard warns on tmux-spawn-* cgroups only, at most once per server PID per process, warn-only (no restart/migration).",
+        "rationale": "Matches the issue comment's spec exactly; empirical probe confirmed tmux 3.4 leaves the server in the founding client's cgroup (tmux-spawn scopes are pane-only), so cleanly-founded servers never trigger the warning."
+      },
+      {
+        "summary": "The deacon auto-resume race (resuming a just-killed agent ~25s later) is out of scope.",
+        "rationale": "The issue labels it a 'bonus race' and its Fix-shape section targets only the server founding; bundling deacon lifecycle changes would expand blast radius well past the incident fix."
+      },
+      {
+        "summary": "Post-founding verification is a single aliveness assert with an error log — no retry loops or timed waits.",
+        "rationale": "systemd-run/execFile of the founding command blocks until the tmux client exits, by which time the socket is live; a failed founding surfaces immediately via the subsequent tmux command's own error. Avoids real-timer logic that the fake-timers test rule exists to prevent."
+      },
+      {
+        "summary": "Async-first implementation: the tmuxExecAsync preflight founds via execFileAsync; sync founding remains only on the legacy tmuxExecSync path.",
+        "rationale": "Repo rules ban blocking exec in dashboard-server-reachable code (PAN-70) and designate sync tmux primitives as legacy debt; the dashboard reaches the async path."
+      }
+    ],
+    "items": [
+      {
+        "id": "ensure-server-preflight",
+        "title": "De-latch managed-server founding into an ensurePanopticonTmuxServer preflight on every new-session",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-12T20:06:07.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1798",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "founder-guard",
+            "config-founding-lock-tests"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/tmux.ts, per PRD WI-1: (1) add foundManagedServerAsync mirroring foundManagedServerSync (tmux.ts:114-127) using execFileAsync, and make both log a console.warn '[tmux-server] systemd-run unavailable — tmux server founded without scope isolation' on the plain start-server fallback; (2) add isManagedServerAliveAsync mirroring isManagedServerAliveSync (tmux.ts:92-99); (3) export ensurePanopticonTmuxServer(): Promise<void> and ensurePanopticonTmuxServerSync(): no-op unless getTmuxConfigMode() === 'managed'; check aliveness; found cleanly if dead; assert aliveness after founding and console.error on failure (no retries — PRD D5); (4) in tmuxExecAsync (tmux.ts:239) and tmuxExecSync (tmux.ts:245), after ensureTmuxContextPrepared*, call the matching ensure variant when mode === 'managed' && args[0] === 'new-session'; (5) keep the tmuxContextPrepared latch for config-file writing only — founding must no longer be guarded by it (remove or delegate the founding block inside reloadManagedTmuxConfigSync/Async at tmux.ts:136-138,150-154). Dashboard boot (src/dashboard/server/main.ts:80 ensureManagedTmuxContextOnce) must still found at startup through the new helper. Tests in tests/lib/tmux-ensure-server.test.ts with vi.mock('child_process') and a temp PANOPTICON_HOME; never target the live 'panopticon' socket."
+        },
+        "items": [
+          {
+            "id": "ensure-server-preflight.ac1",
+            "title": "Given managed mode and a dead managed socket, when tmuxExecAsync runs a new-session command, it first founds the server via systemd-run --user --scope --collect --unit=panopticon-tmux-<unique> --quiet tmux -L panopticon -f <conf> start-server (mock-asserted argv) and then executes the new-session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ensure-server-preflight.ac2",
+            "title": "Given a live managed server, the new-session preflight performs no founding — neither systemd-run nor start-server is invoked beyond the single aliveness probe",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ensure-server-preflight.ac3",
+            "title": "Given the tmux server dies after the process has already prepared the tmux context once, a subsequent new-session re-founds the server cleanly (regression test for the once-per-process tmuxContextPrepared latch)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ensure-server-preflight.ac4",
+            "title": "Given systemd-run fails or is absent, founding falls back to plain tmux start-server and emits a console warning stating scope isolation is unavailable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ensure-server-preflight.ac5",
+            "title": "Given a live managed server, when tmuxExecAsync runs a non-session-creating command (list-sessions, capture-pane), it produces no aliveness probe subprocess; the async preflight founds via execFileAsync so no new blocking execFileSync is reachable from the async path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "founder-guard",
+        "title": "Warn loudly when the managed tmux server's cgroup is a tmux-spawn scope",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-12T20:06:07.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1798",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-2, in src/lib/tmux.ts: (1) add exported pure function cgroupIndicatesSpawnScope(cgroupContent: string): boolean — true iff any line of /proc/<pid>/cgroup content has a path whose final component matches /^tmux-spawn-.*\\.scope$/ (pure-function test seam, same pattern as paneTreeHasHarnessProcess); (2) add getManagedServerPid helper using `tmux -L panopticon display-message -p '#{pid}'` (verified to return the server PID with zero sessions), returning null on any failure; (3) wire a guard step into ensurePanopticonTmuxServer/Sync after the server is confirmed alive: resolve PID, read /proc/<pid>/cgroup, and when cgroupIndicatesSpawnScope is true emit a console.error prefixed '[tmux-founder-guard]' naming the offending scope unit and the server PID; warn at most once per server PID per process (module-level last-warned PID); silent no-op when /proc read fails (non-Linux); NEVER restart, signal, or migrate the server. Tests in tests/lib/tmux-founder-guard.test.ts: pure-function cases plus mocked-exec integration cases."
+        },
+        "items": [
+          {
+            "id": "founder-guard.ac1",
+            "title": "cgroupIndicatesSpawnScope returns true for cgroup content ending in tmux-spawn-<uuid>.scope and false for panopticon-tmux-*.scope, app.slice, and user session scope paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "founder-guard.ac2",
+            "title": "Given an ensured live server whose /proc/<pid>/cgroup names a tmux-spawn-*.scope, the ensure helper emits a console.error containing '[tmux-founder-guard]', the scope unit name, and the server PID",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "founder-guard.ac3",
+            "title": "The guard emits the warning at most once per server PID per process; after a re-founding produces a new server PID inside a spawn scope, the guard emits the warning again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "founder-guard.ac4",
+            "title": "When /proc/<pid>/cgroup is unreadable or the PID cannot be resolved, the guard returns silently without throwing and issues no kill/restart/migration command (asserted via exec mock receiving no such invocation)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "config-founding-lock-tests",
+        "title": "Regression-lock exit-empty off and the clean-founding command line with unit tests",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-12T20:06:07.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1798",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "acJustification": "Test-only bead locking two already-landed behaviors; two ACs cover both locked behaviors plus the socket-discipline constraint folded into each test's setup.",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-3, add tests/lib/tmux-managed-config.test.ts locking the b7e4ab885 behaviors that currently have zero test coverage: (1) with PANOPTICON_HOME pointed at a temp dir and child_process mocked, drive the managed-config ensure path and assert the written panopticon.tmux.conf contains the line 'set -g exit-empty off'; (2) assert the clean-founding argv is systemd-run --user --scope --collect --unit=panopticon-tmux-<timestamp> --quiet tmux -L panopticon -f <managed conf path> start-server (timestamp matched by pattern) and contains no launcher path or agent/conversation-specific strings. Test discipline per PAN-1794: all tmux interaction mocked; no test may target the live 'panopticon' socket; no real timers."
+        },
+        "items": [
+          {
+            "id": "config-founding-lock-tests.ac1",
+            "title": "A unit test drives the managed-config ensure path against a temp PANOPTICON_HOME and asserts the written panopticon.tmux.conf contains 'set -g exit-empty off'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-founding-lock-tests.ac2",
+            "title": "A unit test asserts the clean-founding argv matches systemd-run --user --scope --collect --unit=panopticon-tmux-<timestamp> --quiet tmux -L panopticon -f <conf> start-server and rejects any launcher/agent-specific string in the argv",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "ensure-server-preflight",
+        "to": "founder-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "ensure-server-preflight",
+        "to": "config-founding-lock-tests",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-12-PAN-1798-shared-tmux-server-lives-inside-the-founding-agent-s-systemd-scope-pan-kill-of-that-agent-kills-every-session-all-conversations-included.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

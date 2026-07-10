@@ -1,0 +1,131 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-06T01:50:20.796Z",
+    "updated": "2026-07-06T19:30:07.668Z",
+    "author": "overdeck/auto-start",
+    "description": "Auto-synthesized minimal plan for PAN-2386: pan plan --auto-start always refused on multi-repo workspaces: complete-planning leaves its own dirt behind",
+    "inspectionPolicy": "never"
+  },
+  "plan": {
+    "id": "pan-2386",
+    "title": "pan plan --auto-start always refused on multi-repo workspaces: complete-planning leaves its own dirt behind",
+    "status": "completed",
+    "uid": "bbe6ba0a-9289-4e2c-9c3e-4da04ff2c57d",
+    "author": "overdeck/auto-start",
+    "sequence": 8,
+    "created": "2026-07-06T01:50:20.796Z",
+    "updated": "2026-07-06T19:30:07.668Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2386",
+        "label": "PAN-2386",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "auto-start"
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-06-PAN-2386-pan-plan-auto-start-always-refused-on-multi-repo-workspaces-complete-planning-leaves-its-own-dirt-behind.vbrief.json"
+    },
+    "narratives": {
+      "Problem": "## What happened\n\n`pan plan MIN-857 --auto --auto-start` (myn project) completed planning and finalize successfully (19 beads, spec promoted), but the work-agent auto-start was refused:\n\n```\n{\"event\":\"agent.start_refused_dirty_workspace\",\"issueId\":\"MIN-857\",\n \"porcelain\":\"M .pan/records/min-857.json\\n?? api/\\n?? docs/\\n?? fe/\\n?? infra/\\n?? myn-skills/\\n?? openclaw-plugin/\"}\n```\n\nThe result: planning ends, no work agent spawns, the issue sits at Todo, and the dashboard project tree shows \"(no active features)\" with no surfaced error. The operator only finds out by digging through lifecycle.log.\n\n## Root causes (two, both self-inflicted dirt)\n\n1. **complete-planning modifies `.pan/records/<issue>.json` AFTER its own `chore(plan): complete planning` commit**, so the scaffold repo is always left with a modified tracked file the moment auto-start evaluates it.\n2. **Multi-repo (myn-style) workspace scaffolds have no .gitignore for sub-repo checkouts** (`api/`, `fe/`, `docs/`, `infra/`, ...), so they always appear as untracked entries in porcelain.\n\nEither alone trips the dirty-workspace guard; together they make `--auto-start` structurally impossible for multi-repo projects.\n\n## Related symptoms from the same run\n\n- `[deacon] Error coordinating swarm MIN-857: Command failed: git branch --list \"feature/min-857-slot-*\"` (likely ran in the scaffold repo or a non-repo cwd)\n- After manual cleanup (commit record + add .gitignore), `pan start MIN-857` single-agent kickoff also failed (\"Claude Code did not become ready within 30s ... exited before kickoff\"), though the deacon swarm path then spawned slot-1/slot-2 successfully.\n\n## Suggested fix\n\n- complete-planning should commit (or not re-modify) the record as its final act so the tree it hands to auto-start is clean.\n- Workspace scaffold creation for multi-repo projects should write a .gitignore covering the sub-repo directories.\n- The dirty-workspace refusal should surface to the operator (activity event / dashboard toast), not just lifecycle.log — a silent no-op after `--auto-start` reads as \"planning succeeded, work started\".\n\n## Evidence\n\n- `~/.overdeck/agents/agent-min-857/lifecycle.log` (refusal event, 2026-07-05T18:37:40Z)\n- `~/.overdeck/agents/planning-min-857/` (planning completed normally)\n- Workspace: `/home/eltmon/Projects/myn/workspaces/feature-min-857` (scaffold repo on `master`, last commit `chore(plan): complete planning for MIN-857` + dirty record)\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+      "Proposal": "Implement the issue directly from the tracker-provided title and body."
+    },
+    "items": [
+      {
+        "id": "auto-start",
+        "title": "Implement issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-06T01:50:20.796Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2386",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "## What happened\n\n`pan plan MIN-857 --auto --auto-start` (myn project) completed planning and finalize successfully (19 beads, spec promoted), but the work-agent auto-start was refused:\n\n```\n{\"event\":\"agent.start_refused_dirty_workspace\",\"issueId\":\"MIN-857\",\n \"porcelain\":\"M .pan/records/min-857.json\\n?? api/\\n?? docs/\\n?? fe/\\n?? infra/\\n?? myn-skills/\\n?? openclaw-plugin/\"}\n```\n\nThe result: planning ends, no work agent spawns, the issue sits at Todo, and the dashboard project tree shows \"(no active features)\" with no surfaced error. The operator only finds out by digging through lifecycle.log.\n\n## Root causes (two, both self-inflicted dirt)\n\n1. **complete-planning modifies `.pan/records/<issue>.json` AFTER its own `chore(plan): complete planning` commit**, so the scaffold repo is always left with a modified tracked file the moment auto-start evaluates it.\n2. **Multi-repo (myn-style) workspace scaffolds have no .gitignore for sub-repo checkouts** (`api/`, `fe/`, `docs/`, `infra/`, ...), so they always appear as untracked entries in porcelain.\n\nEither alone trips the dirty-workspace guard; together they make `--auto-start` structurally impossible for multi-repo projects.\n\n## Related symptoms from the same run\n\n- `[deacon] Error coordinating swarm MIN-857: Command failed: git branch --list \"feature/min-857-slot-*\"` (likely ran in the scaffold repo or a non-repo cwd)\n- After manual cleanup (commit record + add .gitignore), `pan start MIN-857` single-agent kickoff also failed (\"Claude Code did not become ready within 30s ... exited before kickoff\"), though the deacon swarm path then spawned slot-1/slot-2 successfully.\n\n## Suggested fix\n\n- complete-planning should commit (or not re-modify) the record as its final act so the tree it hands to auto-start is clean.\n- Workspace scaffold creation for multi-repo projects should write a .gitignore covering the sub-repo directories.\n- The dirty-workspace refusal should surface to the operator (activity event / dashboard toast), not just lifecycle.log — a silent no-op after `--auto-start` reads as \"planning succeeded, work started\".\n\n## Evidence\n\n- `~/.overdeck/agents/agent-min-857/lifecycle.log` (refusal event, 2026-07-05T18:37:40Z)\n- `~/.overdeck/agents/planning-min-857/` (planning completed normally)\n- Workspace: `/home/eltmon/Projects/myn/workspaces/feature-min-857` (scaffold repo on `master`, last commit `chore(plan): complete planning for MIN-857` + dirty record)\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)"
+        },
+        "items": [
+          {
+            "id": "auto-start.ac1",
+            "title": "[deacon] Error coordinating swarm MIN-857: Command failed: git branch --list \"feature/min-857-slot-*\" (likely ran in the scaffold repo or a non-repo cwd)",
+            "status": "pending",
+            "created": "2026-07-06T01:50:20.796Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac2",
+            "title": "After manual cleanup (commit record + add .gitignore), pan start MIN-857 single-agent kickoff also failed (\"Claude Code did not become ready within 30s ... exited before kickoff\"), though the deacon swarm path then spawned slot-1/slot-2 successfully.",
+            "status": "pending",
+            "created": "2026-07-06T01:50:20.796Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac3",
+            "title": "complete-planning should commit (or not re-modify) the record as its final act so the tree it hands to auto-start is clean.",
+            "status": "pending",
+            "created": "2026-07-06T01:50:20.796Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac4",
+            "title": "Workspace scaffold creation for multi-repo projects should write a .gitignore covering the sub-repo directories.",
+            "status": "pending",
+            "created": "2026-07-06T01:50:20.796Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac5",
+            "title": "The dirty-workspace refusal should surface to the operator (activity event / dashboard toast), not just lifecycle.log — a silent no-op after --auto-start reads as \"planning succeeded, work started\".",
+            "status": "pending",
+            "created": "2026-07-06T01:50:20.796Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac6",
+            "title": "~/.overdeck/agents/agent-min-857/lifecycle.log (refusal event, 2026-07-05T18:37:40Z)",
+            "status": "pending",
+            "created": "2026-07-06T01:50:20.796Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac7",
+            "title": "~/.overdeck/agents/planning-min-857/ (planning completed normally)",
+            "status": "pending",
+            "created": "2026-07-06T01:50:20.796Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac8",
+            "title": "Workspace: /home/eltmon/Projects/myn/workspaces/feature-min-857 (scaffold repo on master, last commit chore(plan): complete planning for MIN-857 + dirty record)",
+            "status": "pending",
+            "created": "2026-07-06T01:50:20.796Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "completed"
+}

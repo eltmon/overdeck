@@ -1,0 +1,30 @@
+{
+  "version": "1",
+  "issueId": "PAN-934",
+  "created": "2026-05-08T01:55:51.772Z",
+  "updated": "2026-05-08T09:40:09.067Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "kimi-k2.6",
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-08T01:55:51.772Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.4",
+      "timestamp": "2026-05-08T09:40:09.065Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.4",
+      "timestamp": "2026-05-08T09:40:09.067Z"
+    }
+  ],
+  "feedback": []
+}

@@ -1,0 +1,901 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-25T08:45:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-863: Workspace + branch hygiene sweep (124 feature/* branches, 28 worktrees)",
+    "updated": "2026-05-25T08:40:27.406Z"
+  },
+  "plan": {
+    "id": "pan-863",
+    "title": "Workspace + branch hygiene sweep (124 feature/* branches, 28 worktrees)",
+    "status": "proposed",
+    "uid": "da3a8383-eada-419b-a5b2-84d0275f3c6c",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-25T08:45:00.000Z",
+    "updated": "2026-05-25T08:40:27.406Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/863",
+        "label": "PAN-863",
+        "type": "issue"
+      },
+      {
+        "uri": "src/lib/cloister/merge-agent.ts",
+        "label": "postMergeLifecycle",
+        "type": "code"
+      },
+      {
+        "uri": "src/lib/lifecycle/teardown-workspace.ts",
+        "label": "teardownWorkspace + removeWorktree + deleteBranches",
+        "type": "code"
+      },
+      {
+        "uri": "src/lib/lifecycle/workflows.ts",
+        "label": "closeOut (reads close_out config)",
+        "type": "code"
+      },
+      {
+        "uri": "src/lib/cloister/config.ts",
+        "label": "DEFAULT_CLOISTER_CONFIG.close_out",
+        "type": "code"
+      },
+      {
+        "uri": "src/lib/cloister/deacon.ts",
+        "label": "runPatrol + startDeacon",
+        "type": "code"
+      },
+      {
+        "uri": "src/lib/close-out.ts",
+        "label": "isBranchMerged (squash-merge detection)",
+        "type": "code"
+      },
+      {
+        "uri": "src/lib/worktree.ts",
+        "label": "listWorktrees / removeWorktree / pruneWorktrees",
+        "type": "code"
+      }
+    ],
+    "tags": [
+      "hygiene",
+      "cleanup",
+      "deacon",
+      "lifecycle",
+      "destructive-ops"
+    ],
+    "narratives": {
+      "Problem": "194 local feature branches (124 cited in issue + drift since filing), 167 remote feature branches, and 28 workspace worktrees have accumulated. Root cause: `close_out` config defaults `remove_workspace: false` and `delete_feature_branch: false`, so even the human-gated close-out ceremony preserves debris. The 2026-05-25 operator audit caught 9 freshly closed-out issues with stale branches (PAN-1358/1379/1381/1385/1389/1391/1393/1407/1408). `postMergeLifecycle` is correctly NOT deleting branches/worktrees at merge time (the workspace must survive the `verifying_on_main` phase), but no downstream step picks up the deletion either. There is no janitor patrol that catches missed cleanup. Triage-then-act tooling does not exist.",
+      "Proposal": "Three coordinated changes, shipped together:\n\n1. **One-shot sweep tooling** — `pan admin hygiene scan` writes a triage report (`docs/CLEANUP-<date>.md`) classifying every feature/* branch and every workspaces/feature-* worktree against a safety filter. `pan admin hygiene apply --category <cat> [--dry-run]` executes cleanup per operator-approved category, re-running the safety filter immediately before each destructive op.\n\n2. **Lifecycle hardening** — flip `close_out` config defaults to delete (workspace still survives `verifying_on_main`; deletion only at close-out), add a post-condition assertion to `closeOut` that fires `close_out_invariant_violated` if cleanup didn't complete.\n\n3. **Periodic janitor** — low-frequency Deacon patrol hook (every 60min) that runs the same classifier and auto-deletes safe candidates. First run is forced into dry-run; operator must flip `janitor.armed` in app_settings to enable live deletion. Per-cycle cap at 10 deletions.\n\n4. **One-shot execution** — agent runs the new CLI against the live repo and lands the cleaned state in this PR. Expected post-state: ~20 feature branches max, only with active worktrees / open PRs / running agents."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Sweep tooling lives under `pan admin hygiene` (matches `pan admin cloister/tracker/...` pattern)",
+        "rationale": "Existing admin namespace convention; less surface area than a top-level verb."
+      },
+      {
+        "summary": "Flip `close_out` defaults: `delete_feature_branch: true`, `remove_workspace: true`",
+        "rationale": "The operator's 2026-05-25 audit proves the current defaults are causing the very accumulation this issue is trying to solve. Workspace still survives merge → verifying_on_main; deletion only at close-out, which is human-gated."
+      },
+      {
+        "summary": "Janitor first run is forced into dry-run; operator must flip `janitor.armed` in app_settings to go live",
+        "rationale": "Defense against surprise damage on first deploy when hundreds of stale branches exist."
+      },
+      {
+        "summary": "Per-cycle cap of 10 deletions for the janitor",
+        "rationale": "Rate-limit catastrophic damage from a misconfigured safety filter; remaining candidates surface as activity entries for the next cycle."
+      },
+      {
+        "summary": "Min-age filter: 7 days (configurable via `cleanup.min_age_days`)",
+        "rationale": "Catches abandoned work but leaves a window for the agent pipeline to land legitimate work that's mid-flight without an open PR yet (e.g. between merge and close-out)."
+      },
+      {
+        "summary": "Reuse `isBranchMerged` squash-merge detection from src/lib/close-out.ts instead of re-implementing",
+        "rationale": "Squash-merge detection is subtle (branch tip not ancestor of main; needs code-diff check ignoring planning artifacts). The existing implementation has been battle-tested by 70+ close-out runs; duplicating it is bug-bait."
+      },
+      {
+        "summary": "Honor `cleanup:keep` git notes as a permanent do-not-delete pin",
+        "rationale": "Operators occasionally want to preserve a branch indefinitely (long-running experiment, historical reference). A git note is durable, greppable, and survives across machines."
+      },
+      {
+        "summary": "Workspaces matching `workspaces/feature-*` only; other worktree paths flagged for manual review",
+        "rationale": "Scope-limit destructive ops to the convention the issue title cites. Non-conforming paths (`feature-agent-min-*`, ad-hoc) are rare and worth a human glance."
+      },
+      {
+        "summary": "Cap any single scan's gh-CLI cost at one `gh pr list` call, cached for the scan duration",
+        "rationale": "Without this, classifying 200+ branches would trigger 200+ gh-CLI calls and hit GitHub's secondary rate limit (~30 req/min for authenticated)."
+      }
+    ],
+    "items": [
+      {
+        "id": "branch-classifier",
+        "title": "Pure branch classifier with safety filters",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-863",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "worktree-classifier",
+            "hygiene-report",
+            "hygiene-cli-scan",
+            "hygiene-cli-apply",
+            "deacon-janitor"
+          ]
+        },
+        "narrative": {
+          "Action": "Create `src/lib/hygiene/branch-classifier.ts` exporting `classifyBranch(branchName, ctx): Effect.Effect<BranchClassification>` where `BranchClassification = { branch: string; verdict: 'safe-to-delete' | 'keep-open-pr' | 'keep-active-worktree' | 'keep-active-agent' | 'keep-protected' | 'keep-young' | 'keep-pinned' | 'manual-review'; reasons: string[]; mergedSha?: string }`. The function must:\n\n1. Reject protected names (main, master, the current branch in any worktree).\n2. Consult a pre-cached `Map<string, OpenPr>` (PRs fetched once per scan via `gh pr list --state open --json headRefName,number,isDraft`) — if present, verdict is `keep-open-pr`.\n3. Cross-check against `listWorktrees(repoPath)` — if a worktree references this branch, verdict is `keep-active-worktree`.\n4. Cross-check against `tmux -L panopticon list-sessions` output via `listSessionNames()` — if `agent-<issue-from-branch>` or `planning-<issue-from-branch>` is running, verdict is `keep-active-agent`.\n5. Cross-check the branch's last-commit date against `cleanup.min_age_days` (default 7) — younger = `keep-young`.\n6. Cross-check `git notes show <branch> 2>/dev/null | grep -q '^cleanup:keep$'` — if pinned, verdict is `keep-pinned`.\n7. Call `isBranchMerged` semantics (reuse `src/lib/close-out.ts:isBranchMerged` — DO NOT re-implement squash-merge detection) — if merged AND none of the above blocked, verdict is `safe-to-delete` with `mergedSha` populated for reflog recovery.\n8. Recognise slot branches (`feature/<parent>-slot-N`, see `parseSlotBranch` in merge-agent.ts) and only treat them safe-to-delete iff parent feature branch is itself merged AND already deleted.\n9. Anything else (e.g. orphaned, no PR, not merged, > 30 days old): `manual-review` with reasons listing every signal checked.\n\nClassifier must be a pure function over a `ClassifierContext` (open-pr cache, worktree list, tmux session names, current time) — no side effects, no fs writes outside the read-only git/gh commands needed to populate the context.",
+          "Tests": "Unit tests with mocked context covering every verdict branch; integration test against a small fixture repo with three branches (one merged, one open-pr, one young) and a stub `gh` mock."
+        },
+        "subItems": [
+          {
+            "id": "branch-classifier.ac1",
+            "title": "`classifyBranch` returns `keep-protected` for main/master/current-branch in every worktree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "branch-classifier.ac2",
+            "title": "Squash-merge detection reuses `isBranchMerged` from src/lib/close-out.ts; classifier file does NOT contain its own `git diff main...` command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "branch-classifier.ac3",
+            "title": "Slot branches (`feature/pan-1201-slot-2`) get `manual-review` until their parent feature branch is merged + deleted, then `safe-to-delete`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "branch-classifier.ac4",
+            "title": "`cleanup:keep` git note pins a branch to `keep-pinned` regardless of any other signal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "branch-classifier.ac5",
+            "title": "Function is pure: callable repeatedly with the same context returns identical verdicts; no fs writes or network calls inside `classifyBranch` itself",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "branch-classifier.ac6",
+            "title": "Non-PAN-prefixed branches (`feature/473`, `feature/agent-min-841`) classify by branch name only — no tracker-issue lookup is attempted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "worktree-classifier",
+        "title": "Pure worktree classifier with safety filters",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-863",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "hygiene-report",
+            "hygiene-cli-scan",
+            "hygiene-cli-apply",
+            "deacon-janitor"
+          ]
+        },
+        "narrative": {
+          "Action": "Create `src/lib/hygiene/worktree-classifier.ts` exporting `classifyWorktree(worktree: WorktreeInfo, ctx): Effect.Effect<WorktreeClassification>` where `WorktreeClassification = { path: string; branch: string; verdict: 'safe-to-remove' | 'keep-active-agent' | 'keep-uncommitted' | 'keep-non-feature' | 'keep-branch-not-merged' | 'manual-review'; reasons: string[]; dirty: boolean; uncommittedFiles?: string[] }`. The function must:\n\n1. Reject worktrees whose path does not match `workspaces/feature-*` — verdict is `keep-non-feature` (flagged for manual review).\n2. Run `git -C <worktreePath> status --porcelain` — non-empty output means `keep-uncommitted` with `uncommittedFiles` populated. Apply CLI will stash these with the `salvageable:` prefix.\n3. Check `tmux -L panopticon list-sessions` for `agent-<issue>` or `planning-<issue>` matching the worktree's issue — running = `keep-active-agent`.\n4. Defer to `classifyBranch` (passed in via ctx, not re-imported — avoids circular dep) for the underlying branch verdict. If branch verdict is `safe-to-delete`, worktree verdict is `safe-to-remove`. If branch is `keep-young`, worktree is `manual-review` (don't preemptively kill a young workspace).\n5. Recognise the `WorktreeInfo.prunable` flag from `listWorktrees` — prunable worktrees are admin-dir-only leftovers and always `safe-to-remove`.\n\nLike the branch classifier, no side effects beyond read-only git commands. Stash creation lives in the apply CLI, not in the classifier.",
+          "Tests": "Unit tests with mocked context per verdict; fixture-repo integration test confirming prunable detection."
+        },
+        "subItems": [
+          {
+            "id": "worktree-classifier.ac1",
+            "title": "Worktrees outside `workspaces/feature-*` always get `keep-non-feature`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "worktree-classifier.ac2",
+            "title": "Dirty worktrees (`git status --porcelain` non-empty) get `keep-uncommitted` with the file list populated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "worktree-classifier.ac3",
+            "title": "Worktrees whose branch classifier verdict is `keep-young` get `manual-review` (NOT `safe-to-remove`)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "worktree-classifier.ac4",
+            "title": "Prunable worktrees (admin-dir leftover) always get `safe-to-remove`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "worktree-classifier.ac5",
+            "title": "Worktree classifier does NOT import the branch classifier directly — branch verdict is passed via context",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hygiene-report",
+        "title": "Triage report generator (markdown)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-863",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create `src/lib/hygiene/report.ts` exporting `generateCleanupReport(projectRoot: string, today: Date): Effect.Effect<{ path: string; markdown: string; summary: ReportSummary }>`. Output schema:\n\n```md\n# Workspace + Branch Hygiene Sweep — YYYY-MM-DD\n\n## Summary\n| Verdict | Branches | Worktrees |\n|---|---|---|\n| safe-to-delete / safe-to-remove | N | M |\n| keep-open-pr | … | — |\n| keep-active-agent | … | … |\n| keep-active-worktree | … | — |\n| keep-uncommitted | — | … |\n| keep-young | … | … |\n| keep-pinned | … | — |\n| manual-review | … | … |\n\n## Branches\n### safe-to-delete (N)\n- feature/pan-1358 [merged @ <sha7>; PR #1403]\n- …\n### keep-open-pr (N)\n- …\n## Worktrees\n### safe-to-remove (N)\n- workspaces/feature-pan-1391 [branch feature/pan-1391 safe-to-delete]\n- …\n## Generated by `pan admin hygiene scan` at <iso-timestamp>\n```\n\nWrites to `<projectRoot>/docs/CLEANUP-<YYYY-MM-DD>.md` and returns the path. Idempotent — same input on same day overwrites the same file.",
+          "Tests": "Snapshot test on a fixture context with one branch in each verdict + one worktree in each verdict."
+        },
+        "subItems": [
+          {
+            "id": "hygiene-report.ac1",
+            "title": "Output file written to `docs/CLEANUP-<YYYY-MM-DD>.md` with today's date",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hygiene-report.ac2",
+            "title": "Summary table at top shows counts per verdict for both branches and worktrees",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hygiene-report.ac3",
+            "title": "Each `safe-to-delete` branch entry includes the merged SHA (short) for reflog recovery",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hygiene-report.ac4",
+            "title": "Snapshot test in `src/lib/hygiene/__tests__/report.test.ts` covers all verdict types",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hygiene-cli-scan",
+        "title": "`pan admin hygiene scan` CLI subcommand",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-863",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add `pan admin hygiene scan` as a new admin subgroup. Wire `src/cli/commands/admin/hygiene-handler.ts` and register it from `src/cli/commands/admin/index.ts`. The handler:\n\n1. Refuses to run if `process.cwd()` matches `workspaces/feature-*` (force operator to invoke from main repo root — see hazard H10).\n2. Builds `ClassifierContext` once (open PRs via `gh pr list --json`, worktrees via `listWorktrees`, tmux sessions via `listSessionNames`).\n3. Iterates every `feature/*` branch (local + remote, deduped) and every `workspaces/feature-*` worktree; calls the classifiers.\n4. Calls `generateCleanupReport` and prints `Wrote <path>` to stdout.\n5. Exits 0 even when there's nothing to do (idempotent).\n\nFlags: `--project <key>` (multi-project support; defaults to current repo), `--no-pr-check` (skip gh PR query for offline runs).",
+          "Tests": "Integration test that runs the CLI against a tmp git repo with two branches and checks the report file appears."
+        },
+        "subItems": [
+          {
+            "id": "hygiene-cli-scan.ac1",
+            "title": "`pan admin hygiene scan --help` lists `--project` and `--no-pr-check` flags",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hygiene-cli-scan.ac2",
+            "title": "Running from a `workspaces/feature-*` directory exits non-zero with an error explaining to run from the main repo",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hygiene-cli-scan.ac3",
+            "title": "`gh pr list` is called exactly once per scan (cached for the duration)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hygiene-cli-scan.ac4",
+            "title": "Report file path is printed to stdout on success",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hygiene-cli-apply",
+        "title": "`pan admin hygiene apply` CLI subcommand (destructive)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-863",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "execute-sweep",
+            "deacon-janitor"
+          ]
+        },
+        "narrative": {
+          "Action": "Add `pan admin hygiene apply [--category <name>] [--dry-run] [--max <N>] [--force]` as a sibling CLI to `scan`. Behaviour:\n\n1. Same `process.cwd()` refusal as scan (must run from main repo root).\n2. Loads today's report; aborts with an error if no scan ran today.\n3. For each candidate matching `--category` (or all categories if omitted), RE-RUNS the classifier (does not trust the report — see hazard H3).\n4. If verdict has changed since the report, skips and logs.\n5. For branches still `safe-to-delete`:\n   - Log resolved SHA via `emitActivityEntrySync({source: 'hygiene', level: 'info', message: 'Deleting feature/pan-XXX at <sha>; reflog has 90 days'})`.\n   - `git branch -D <branch>` (local), then `git push origin --delete <branch>` (remote). Ignore 'not found' errors on either side.\n6. For worktrees still `safe-to-remove`:\n   - If `dirty`, create `salvageable:<issue>:<iso-timestamp>:auto-sweep` stash inside the worktree first.\n   - `git worktree remove --force <path>`.\n7. After all per-worktree removes complete, run `git worktree prune` once.\n8. `--dry-run` runs steps 3-4 but logs intentions instead of executing 5-7.\n9. `--max <N>` caps deletions per category (default unlimited for CLI; janitor uses this with its own default).\n10. Without `--force`, requires `--category` to be specified (don't accidentally nuke everything).\n11. Writes a summary line per cleaned item to a `docs/CLEANUP-<date>-applied.log` audit file.",
+          "Tests": "Integration tests in `src/lib/hygiene/__tests__/apply.test.ts` against a fixture repo: dry-run reports correct counts; live run deletes only safe-to-delete and skips a branch whose classification changed mid-run; salvageable stash created for dirty worktrees."
+        },
+        "subItems": [
+          {
+            "id": "hygiene-cli-apply.ac1",
+            "title": "`--dry-run` performs classifier re-check but executes NO destructive ops (verified by git log + worktree list unchanged after run)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hygiene-cli-apply.ac2",
+            "title": "Classifier is re-run inside apply; a branch whose verdict has changed since the report is skipped with a log line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hygiene-cli-apply.ac3",
+            "title": "Dirty worktree → `salvageable:<issue>:<iso-ts>:auto-sweep` stash created BEFORE `git worktree remove`; stash ref logged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hygiene-cli-apply.ac4",
+            "title": "Every destructive op writes an `emitActivityEntrySync` entry with the resolved SHA (for branches) or workspace path (for worktrees)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hygiene-cli-apply.ac5",
+            "title": "Audit log at `docs/CLEANUP-<date>-applied.log` appended on every live run; idempotent across multiple invocations on the same day",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hygiene-cli-apply.ac6",
+            "title": "Without `--category` AND without `--force`, exits with a usage error (don't accidentally nuke everything)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hygiene-cli-apply.ac7",
+            "title": "`git worktree prune` runs exactly once at the end of an apply run, after all per-worktree removes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "closeout-defaults",
+        "title": "Flip `close_out` config defaults: delete branch + workspace by default",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-863",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In `src/lib/cloister/config.ts`, change `DEFAULT_CLOISTER_CONFIG.close_out` from `{ remove_workspace: false, delete_feature_branch: false }` to `{ remove_workspace: true, delete_feature_branch: true }`. Update `src/lib/cloister/__tests__/config.test.ts` snapshot. Add a brief note in `docs/PANOPTICON_DEV_SOP.md` (or `docs/HYGIENE.md` if that exists post-bead-hygiene-docs) explaining the change and how to opt out per-project via `projects.yaml`.",
+          "Tests": "`src/lib/cloister/__tests__/config.test.ts` covers the new defaults."
+        },
+        "subItems": [
+          {
+            "id": "closeout-defaults.ac1",
+            "title": "`DEFAULT_CLOISTER_CONFIG.close_out` has `remove_workspace: true` and `delete_feature_branch: true`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closeout-defaults.ac2",
+            "title": "Existing config tests updated; `npm test -- src/lib/cloister/__tests__/config.test.ts` passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closeout-defaults.ac3",
+            "title": "Migration note added to project docs explaining the change and the per-project opt-out",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "closeout-postcondition",
+        "title": "Post-condition assertion in `closeOut` workflow",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-863",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "After `teardownWorkspace` returns in `src/lib/lifecycle/workflows.ts:closeOut`, add a post-condition step:\n\n1. If `closeOutConfig?.delete_feature_branch !== false`: assert `git branch --list feature/<issue-lower>` is empty AND `git ls-remote --heads origin feature/<issue-lower>` returns nothing. If either still shows the branch, emit `close_out_invariant_violated` activity entry (level: warn, with the lingering ref).\n2. If `closeOutConfig?.remove_workspace !== false`: assert no `workspaces/feature-<issue-lower>` directory exists AND `git worktree list` does not include it. Same loud-but-non-blocking activity entry on violation.\n3. The post-condition is logged in the workflow result as a separate `StepResult` so the dashboard surfaces violations without aborting the workflow (issue close + label apply must still proceed — a leftover branch shouldn't block tracker closure).",
+          "Tests": "Unit test against a mocked closeOut where teardown is stubbed to leave branches behind; assert the warn activity entry is emitted and the workflow still returns success: true."
+        },
+        "subItems": [
+          {
+            "id": "closeout-postcondition.ac1",
+            "title": "Post-condition checks run AFTER teardownWorkspace and BEFORE closeIssue in workflows.ts:closeOut",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closeout-postcondition.ac2",
+            "title": "Violations emit `close_out_invariant_violated` activity entry with the lingering ref's name and SHA",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closeout-postcondition.ac3",
+            "title": "Violation does NOT abort the workflow; closeIssue still runs (loud-but-non-blocking)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closeout-postcondition.ac4",
+            "title": "Post-condition is skipped when `delete_feature_branch: false` or `remove_workspace: false` is set in config (don't false-alarm operators who opted out)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deacon-janitor",
+        "title": "Periodic janitor patrol in Deacon",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-863",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a low-frequency patrol hook in `src/lib/cloister/deacon.ts:runPatrol`:\n\n1. Gated on `cleanup.janitor.enabled` (default `true`) in cloister config.\n2. Runs only once per `cleanup.janitor.interval_minutes` (default 60) — track `state.lastJanitor` ISO timestamp in deacon state; skip if last run was less than the interval ago.\n3. First-run guard: if `app_settings.janitor.armed !== true`, the run is forced into dry-run mode. Emits one `janitor_dry_run` activity entry listing first 20 candidates and pointing to the operator UI for arming.\n4. When armed: invokes the apply CLI logic in-process (reuse `applyCleanup({ category: 'all', max: cleanup.janitor.max_per_cycle, dryRun: false })`) with a hard cap of 10 deletions per cycle (`cleanup.janitor.max_per_cycle` default 10).\n5. Excess candidates logged via `janitor_queued` activity entry with their count.\n6. Honors `isDeaconGloballyPaused()` (skips the whole run).\n7. Each janitor decision is logged via the existing deacon `addLog` channel for retrievability through the dashboard.",
+          "Tests": "Vitest with `vi.useFakeTimers()` to advance patrol cycles; mock the apply function; verify (a) first run is dry-run without armed flag, (b) subsequent runs respect interval, (c) max_per_cycle cap is honored."
+        },
+        "subItems": [
+          {
+            "id": "deacon-janitor.ac1",
+            "title": "Patrol respects `cleanup.janitor.interval_minutes` and does NOT run on every 60s tick",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-janitor.ac2",
+            "title": "First run without `app_settings.janitor.armed === true` is forced into dry-run and emits `janitor_dry_run` activity entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-janitor.ac3",
+            "title": "`cleanup.janitor.max_per_cycle` caps deletions per cycle (default 10); excess emits `janitor_queued`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-janitor.ac4",
+            "title": "Janitor reuses `applyCleanup` from the hygiene module — no duplicate destructive logic in deacon.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-janitor.ac5",
+            "title": "Skipped entirely when `isDeaconGloballyPaused()` returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-janitor.ac6",
+            "title": "Tests use `vi.useFakeTimers()` per CLAUDE.md (no real-time waits)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hygiene-skill-wrapper",
+        "title": "`pan-admin-hygiene` skill wrapper",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-863",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create `skills/pan-admin-hygiene/SKILL.md` per docs/SKILLS-CONVENTION.md. Documents the `pan admin hygiene scan` and `pan admin hygiene apply` flags (including the safety filters, `--category`, `--dry-run`, `--force`, `--max`), the `cleanup:keep` git note escape hatch, and the operator workflow (scan → review report → apply per category). Must pass `scripts/lint-skills.sh` (cross-checked against actual CLI help output). This is required because the lint script enforces 'when CLI changes, wrapper skill changes in the same commit'.",
+          "Tests": "`npm run lint` (which invokes lint-skills.sh) passes."
+        },
+        "subItems": [
+          {
+            "id": "hygiene-skill-wrapper.ac1",
+            "title": "Skill file at `skills/pan-admin-hygiene/SKILL.md` exists and matches the shape in docs/SKILLS-CONVENTION.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hygiene-skill-wrapper.ac2",
+            "title": "Every flag the skill mentions appears in `pan admin hygiene scan --help` or `pan admin hygiene apply --help` output (verified by lint-skills.sh)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hygiene-skill-wrapper.ac3",
+            "title": "`npm run lint` passes (lint-skills.sh finds no skill ↔ CLI drift)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hygiene-docs",
+        "title": "`docs/HYGIENE.md` operator guide",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-863",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create `docs/HYGIENE.md` covering:\n\n1. Why this exists (the 2026-05-25 audit, 9 stale branches after close-out).\n2. The lifecycle of a feature branch: created → merged → close-out (deletes by default) → janitor catches strays.\n3. How to run a manual sweep: `pan admin hygiene scan` then `pan admin hygiene apply --category <safe-to-delete|safe-to-remove>`.\n4. Safety filters reference table (every verdict, what triggers it).\n5. Escape hatches: `cleanup:keep` git note (permanent pin), `close_out` per-project override in projects.yaml.\n6. Recovery: reflog for branches (90 days), salvageable:* stash for worktrees.\n7. Janitor configuration: `cleanup.janitor.*` keys, the `app_settings.janitor.armed` toggle, how to first-arm after deploy.\n\nAdd a one-line pointer in CLAUDE.md's 'Project Structure' section (next to Stash Hygiene).",
+          "Tests": "Manual read-through; lint-skills.sh references this doc."
+        },
+        "subItems": [
+          {
+            "id": "hygiene-docs.ac1",
+            "title": "`docs/HYGIENE.md` exists and covers scan → report → apply → janitor flow end-to-end",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hygiene-docs.ac2",
+            "title": "Safety filters reference table lists every classifier verdict (both branch + worktree) with what triggers it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hygiene-docs.ac3",
+            "title": "Recovery section documents reflog (branches) and salvageable stash (worktrees)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hygiene-docs.ac4",
+            "title": "CLAUDE.md has a 1-line pointer to docs/HYGIENE.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hygiene-tests",
+        "title": "End-to-end test suite for hygiene module",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-863",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Aggregate test coverage check across the hygiene module. Files expected (some may already exist from the per-bead unit tests above; this bead enforces the e2e harness and completeness):\n\n1. `src/lib/hygiene/__tests__/branch-classifier.test.ts` — already from `branch-classifier` bead, verify it exists.\n2. `src/lib/hygiene/__tests__/worktree-classifier.test.ts` — from `worktree-classifier` bead.\n3. `src/lib/hygiene/__tests__/report.test.ts` — from `hygiene-report` bead.\n4. `src/lib/hygiene/__tests__/apply.test.ts` — from `hygiene-cli-apply` bead.\n5. `src/lib/hygiene/__tests__/e2e.test.ts` — NEW: scaffolds a tmp git repo with 5 branches (one in each verdict) and 3 worktrees, runs scan + apply --dry-run, asserts report matches and no destructive ops happen; then runs apply (live), asserts only safe-to-delete branches + safe-to-remove worktrees are gone.\n6. `src/lib/cloister/__tests__/deacon-janitor.test.ts` — from `deacon-janitor` bead.\n7. `src/lib/lifecycle/__tests__/closeout-postcondition.test.ts` — from `closeout-postcondition` bead.\n\nAll tests must use `vi.useFakeTimers()` for any retry/delay logic (per CLAUDE.md). Run `npm test` from workspace root after `bun install`; must pass.",
+          "Tests": "Itself."
+        },
+        "subItems": [
+          {
+            "id": "hygiene-tests.ac1",
+            "title": "All 7 test files listed above exist and pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hygiene-tests.ac2",
+            "title": "`src/lib/hygiene/__tests__/e2e.test.ts` exercises scan → dry-run → live-apply against a tmp fixture repo",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hygiene-tests.ac3",
+            "title": "`npm test` passes from workspace root after `bun install`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hygiene-tests.ac4",
+            "title": "`npm run typecheck` and `npm run lint` pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "execute-sweep",
+        "title": "Run the one-shot sweep against the live repo",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T08:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-863",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "After all tooling beads land, execute the actual sweep. This is the operator-facing deliverable that closes the issue:\n\n1. Pull latest main; run `pan admin hygiene scan` from the main repo root.\n2. Inspect `docs/CLEANUP-<today>.md`. Commit the report.\n3. Run `pan admin hygiene apply --category safe-to-delete --dry-run` and review output.\n4. Run `pan admin hygiene apply --category safe-to-delete` (live).\n5. Run `pan admin hygiene apply --category safe-to-remove --dry-run` (worktrees), review.\n6. Run `pan admin hygiene apply --category safe-to-remove` (live).\n7. Run `pan admin hygiene scan` again — confirm report now shows ~20 or fewer feature branches and only worktrees with active agents.\n8. Commit the final report + audit log with `chore: hygiene sweep 2026-05-25 — N branches, M worktrees removed` (numbers from the audit log).\n\nIMPORTANT: This bead is destructive. The work agent MUST NOT execute `apply` (live) without inspecting the dry-run output first. If any branch in the report looks wrong, halt and flag to the operator instead of forcing the delete.",
+          "Tests": "Post-sweep validation: `git branch -l 'feature/*' | wc -l` < 30; `git worktree list | wc -l` ≤ 1 + (count of running work agents)."
+        },
+        "subItems": [
+          {
+            "id": "execute-sweep.ac1",
+            "title": "`docs/CLEANUP-<today>.md` committed with classification of all 194+ local feature branches and 28 worktrees",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "execute-sweep.ac2",
+            "title": "Dry-run output reviewed BEFORE live apply for each category",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "execute-sweep.ac3",
+            "title": "Post-sweep: `git branch -l 'feature/*' | wc -l` returns under 30",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "execute-sweep.ac4",
+            "title": "Post-sweep: every remaining worktree has either an open PR, a running agent, or recent commits (<7 days)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "execute-sweep.ac5",
+            "title": "No `salvageable:*` stashes were dropped during the sweep (verify via `git stash list | grep salvageable:` count matches pre-sweep count + any new stashes the sweep created)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "execute-sweep.ac6",
+            "title": "Audit log `docs/CLEANUP-<today>-applied.log` committed alongside the report",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "branch-classifier",
+        "to": "worktree-classifier",
+        "type": "blocks"
+      },
+      {
+        "from": "branch-classifier",
+        "to": "hygiene-report",
+        "type": "blocks"
+      },
+      {
+        "from": "worktree-classifier",
+        "to": "hygiene-report",
+        "type": "blocks"
+      },
+      {
+        "from": "hygiene-report",
+        "to": "hygiene-cli-scan",
+        "type": "blocks"
+      },
+      {
+        "from": "branch-classifier",
+        "to": "hygiene-cli-apply",
+        "type": "blocks"
+      },
+      {
+        "from": "worktree-classifier",
+        "to": "hygiene-cli-apply",
+        "type": "blocks"
+      },
+      {
+        "from": "hygiene-cli-scan",
+        "to": "hygiene-cli-apply",
+        "type": "informs"
+      },
+      {
+        "from": "hygiene-cli-apply",
+        "to": "deacon-janitor",
+        "type": "blocks"
+      },
+      {
+        "from": "closeout-defaults",
+        "to": "closeout-postcondition",
+        "type": "blocks"
+      },
+      {
+        "from": "hygiene-cli-scan",
+        "to": "hygiene-skill-wrapper",
+        "type": "blocks"
+      },
+      {
+        "from": "hygiene-cli-apply",
+        "to": "hygiene-skill-wrapper",
+        "type": "blocks"
+      },
+      {
+        "from": "hygiene-skill-wrapper",
+        "to": "hygiene-docs",
+        "type": "informs"
+      },
+      {
+        "from": "hygiene-cli-apply",
+        "to": "hygiene-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "deacon-janitor",
+        "to": "hygiene-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "closeout-postcondition",
+        "to": "hygiene-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "hygiene-tests",
+        "to": "execute-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "hygiene-cli-apply",
+        "to": "execute-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "hygiene-docs",
+        "to": "execute-sweep",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-25-PAN-863-workspace-branch-hygiene-sweep-124-feature-branches-28-worktrees.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

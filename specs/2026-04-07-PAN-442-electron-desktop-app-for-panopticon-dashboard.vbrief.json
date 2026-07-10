@@ -1,0 +1,698 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-07T18:00:00Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-442: Electron desktop app for Panopticon dashboard"
+  },
+  "plan": {
+    "id": "pan-442",
+    "title": "Electron desktop app for Panopticon dashboard",
+    "status": "approved",
+    "uid": "c8f2a1d4-7e3b-4f6a-9d5c-2b8e4f1a3c7d",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-04-07T18:00:00Z",
+    "updated": "2026-04-07T18:00:00Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/442",
+        "label": "PAN-442",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "electron",
+      "desktop",
+      "dashboard",
+      "native-app"
+    ],
+    "narratives": {
+      "Problem": "Panopticon dashboard requires terminal commands (pan up) and a browser tab. Users want a native desktop experience with one-click launch, system tray monitoring, and OS-level notifications for agent events.",
+      "Proposal": "Wrap the existing dashboard in an Electron shell at apps/desktop/. Main process spawns the Node.js server as a child process, BrowserWindow loads the frontend via custom protocol (packaged) or localhost (dev). Full native integration: system tray with configurable status, per-event-type notifications, playful auto-start nag flow, Cmd+K command palette, and pan up CLI integration."
+    },
+    "items": [
+      {
+        "id": "scaffold",
+        "title": "Scaffold Electron app at apps/desktop/",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-07T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-442"
+        },
+        "narrative": {
+          "Action": "Create apps/desktop/ as a new Bun workspace with package.json (Electron 40.x, electron-builder), tsdown.config.ts (CJS output to dist-electron/ for main.ts + preload.ts), tsconfig.json, and dev scripts (dev:bundle with tsdown --watch, dev:electron launcher script). Register workspace in root package.json. Ensure bun install resolves correctly."
+        },
+        "subItems": [
+          {
+            "id": "scaffold.ac1",
+            "title": "apps/desktop/package.json exists with Electron 40.x dependency and correct workspace config",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scaffold.ac2",
+            "title": "tsdown builds main.ts and preload.ts to dist-electron/ as CJS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scaffold.ac3",
+            "title": "bun install from workspace root resolves apps/desktop as a workspace package",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scaffold.ac4",
+            "title": "Dev mode launches Electron with hot-reload on main process changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "server-embed",
+        "title": "Embed dashboard server as child process",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-07T18:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-442"
+        },
+        "narrative": {
+          "Action": "In main.ts, spawn dist/dashboard/server.js as a child process using process.execPath with ELECTRON_RUN_AS_NODE=1. Pass bootstrap config (port, mode, auth token) via fd 3. Implement exponential backoff restart on crash, rotating log capture for child stdout/stderr, and graceful shutdown (SIGTERM then SIGKILL) on app quit. Use dynamic port allocation (localhost:0) to avoid conflicts. Rebuild native addons (node-pty, better-sqlite3) for Electron's Node version using electron-rebuild."
+        },
+        "subItems": [
+          {
+            "id": "server-embed.ac1",
+            "title": "Dashboard server starts as child process and serves API on a dynamic port",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-embed.ac2",
+            "title": "Server restarts automatically with exponential backoff on unexpected exit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-embed.ac3",
+            "title": "App quit sends SIGTERM to server child process and waits for clean shutdown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-embed.ac4",
+            "title": "node-pty and better-sqlite3 work correctly under Electron's Node runtime (terminal streams, SQLite queries)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hybrid-loading",
+        "title": "Hybrid frontend loading (protocol + localhost)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-07T18:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-442"
+        },
+        "narrative": {
+          "Action": "Register panopticon:// custom protocol in main process to serve static files from bundled dist/dashboard/public/. In dev mode, load BrowserWindow from Vite dev server URL (VITE_DEV_SERVER_URL env). In packaged builds, load panopticon://app/index.html. Handle WebSocket connections (ws/rpc and ws/terminal) correctly in both modes — protocol handler serves static assets, WS connections go to localhost server port. Configure CSP headers appropriately for both modes."
+        },
+        "subItems": [
+          {
+            "id": "hybrid-loading.ac1",
+            "title": "Dev mode loads from Vite dev server with working HMR",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hybrid-loading.ac2",
+            "title": "Packaged build loads from panopticon:// protocol without localhost exposure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hybrid-loading.ac3",
+            "title": "WebSocket connections (ws/rpc, ws/terminal) work in both modes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "system-tray",
+        "title": "System tray with configurable status indicator",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-07T18:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-442"
+        },
+        "narrative": {
+          "Action": "Create Tray with dynamic icon reflecting agent status: green (all idle), yellow (agents working), red (INPUT_NEEDED or stuck). Overlay agent count badge on the icon. Build rich tooltip showing active agent count, issues needing attention, and last activity timestamp. Create context menu: Show Dashboard, Start Cloister, Stop Cloister, Emergency Stop All, separator, Settings, Quit. Poll server health endpoint or subscribe to domain events via WS for real-time status. Add tray configuration section to Settings page (toggle badge, choose which states show notifications)."
+        },
+        "subItems": [
+          {
+            "id": "system-tray.ac1",
+            "title": "Tray icon changes color based on aggregate agent status (idle/working/attention)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "system-tray.ac2",
+            "title": "Agent count badge displays on tray icon",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "system-tray.ac3",
+            "title": "Tooltip shows agent count, attention items, and last activity",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "system-tray.ac4",
+            "title": "Context menu actions (start/stop cloister, emergency stop, quit) work correctly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "system-tray.ac5",
+            "title": "Tray appearance is configurable in Settings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "notifications",
+        "title": "Native notifications with per-event-type configuration",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-07T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-442"
+        },
+        "narrative": {
+          "Action": "Subscribe to domain events from the server (via WS or IPC). Map event types to notification categories: INPUT_NEEDED, stuck_agent, merge_failure, work_complete, planning_done, merge_ready. Use Electron Notification API for OS-native notifications with appropriate urgency levels. Add Settings section with per-event-type toggles. Persist notification preferences in electron-store. Clicking a notification focuses the dashboard and navigates to the relevant agent/issue."
+        },
+        "subItems": [
+          {
+            "id": "notifications.ac1",
+            "title": "OS-native notifications fire for configured event types",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "notifications.ac2",
+            "title": "Each event type can be independently toggled on/off in Settings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "notifications.ac3",
+            "title": "Clicking a notification focuses the app and navigates to the relevant context",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "auto-start",
+        "title": "Auto-start with playful nag flow",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-07T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-442"
+        },
+        "narrative": {
+          "Action": "Implement auto-start toggle using Electron's app.setLoginItemSettings(). Build the nag flow: Launch 1 shows a full dialog with warm copy explaining auto-start value (never miss an agent asking for help). Launches 2-5 show in-app toasts with personality and countdown ('Reminder 3 of 5'). Three buttons: 'Enable' (primary, prominent, inviting), 'Not yet' (neutral), 'Stop reminding me' (subtle). 'Enable' should be the lowest-friction path — large, colored, positioned for natural click. Track nag state (launch count, dismissed permanently) in electron-store. After 5 prompts or 'Stop reminding me': never prompt again."
+        },
+        "subItems": [
+          {
+            "id": "auto-start.ac1",
+            "title": "First launch shows dialog explaining auto-start with Enable/Not yet/Stop options",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac2",
+            "title": "Launches 2-5 show toast with countdown and personality text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac3",
+            "title": "Enable button registers app as login item on both Linux and macOS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac4",
+            "title": "Stop reminding me permanently suppresses the nag flow",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "menu-bar",
+        "title": "Menu bar with Panopticon actions",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-07T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-442"
+        },
+        "narrative": {
+          "Action": "Build Electron Menu with standard menus (File, Edit, View, Window, Help) plus a Panopticon menu containing: Start Cloister, Stop Cloister, Emergency Stop All Agents, separator, Open Workspace (submenu of active workspaces), separator, Settings, separator, Quit. Menu actions call server API endpoints. Ensure macOS app menu follows platform conventions (app name menu, About, Preferences mapped to Settings)."
+        },
+        "subItems": [
+          {
+            "id": "menu-bar.ac1",
+            "title": "Panopticon menu with Start/Stop Cloister, Emergency Stop, Open Workspace, Settings, Quit actions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-bar.ac2",
+            "title": "Menu actions correctly call server API endpoints",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-bar.ac3",
+            "title": "macOS menu follows platform conventions (app name menu, About, Preferences)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "command-palette",
+        "title": "Cmd+K command palette",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-07T18:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-442"
+        },
+        "narrative": {
+          "Action": "Build a command palette component in the React frontend triggered by Cmd+K (macOS) / Ctrl+K (Linux). Searchable list of commands: all menu bar actions, navigate to workspace, navigate to agent, navigate to settings, toggle theme. Fuzzy search over command names. Keyboard navigation (arrow keys, Enter to execute, Escape to dismiss). Commands execute via IPC to main process (for Electron actions) or via React Router navigation (for in-app navigation). Register Cmd+K as global accelerator in Electron."
+        },
+        "subItems": [
+          {
+            "id": "command-palette.ac1",
+            "title": "Cmd+K / Ctrl+K opens searchable command palette overlay",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "command-palette.ac2",
+            "title": "Fuzzy search filters commands, workspaces, and agents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "command-palette.ac3",
+            "title": "Keyboard navigation (arrows, Enter, Escape) works correctly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "command-palette.ac4",
+            "title": "Commands execute appropriate actions (IPC for native, router for navigation)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-integration",
+        "title": "pan up prefers Electron app when installed",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-07T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-442"
+        },
+        "narrative": {
+          "Action": "Modify pan up in src/cli/index.ts to detect if the Electron app is installed (check standard install locations: /usr/local/bin/panopticon, /opt/Panopticon/, ~/Applications/Panopticon.app, /Applications/Panopticon.app). If found, launch the Electron app instead of spawning bare server + opening browser. Add --no-desktop flag to force bare server mode. Falls back gracefully if Electron app not found."
+        },
+        "subItems": [
+          {
+            "id": "cli-integration.ac1",
+            "title": "pan up launches Electron app when detected in standard install locations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-integration.ac2",
+            "title": "pan up --no-desktop forces bare server mode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-integration.ac3",
+            "title": "Falls back to bare server + browser when Electron app not installed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "npx-launcher",
+        "title": "npx panopticon server+browser launcher",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-04-07T18:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-442"
+        },
+        "narrative": {
+          "Action": "Ensure the panopticon npm package has a bin entry that starts the dashboard server and opens localhost in the default browser. This is essentially what pan up --no-desktop does, exposed as the default npx command. Verify the package.json bin field points to the right entry point and that the CLI detects the npx context correctly."
+        },
+        "subItems": [
+          {
+            "id": "npx-launcher.ac1",
+            "title": "npx panopticon starts dashboard server and opens browser to localhost",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "npx-launcher.ac2",
+            "title": "Works without Electron installed — no native addon requirements for the npx path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "desktop-settings",
+        "title": "Desktop settings UI section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-07T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-442"
+        },
+        "narrative": {
+          "Action": "Add a Desktop section to the Settings page in the React frontend. Sections: Tray (toggle badge, tooltip detail level), Notifications (per-event-type toggles for INPUT_NEEDED, stuck agents, merge failures, work complete, planning done, merge ready), Auto-start (enable/disable toggle, reset nag counter). Settings are persisted via IPC to electron-store in the main process. When running in browser mode (not Electron), hide the Desktop settings section or show a message that these features require the desktop app."
+        },
+        "subItems": [
+          {
+            "id": "desktop-settings.ac1",
+            "title": "Settings page has Desktop section with Tray, Notifications, and Auto-start subsections",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "desktop-settings.ac2",
+            "title": "Settings persist via IPC to electron-store and take effect immediately",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "desktop-settings.ac3",
+            "title": "Desktop settings section is hidden when running in browser mode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "packaging",
+        "title": "Package with electron-builder for Linux + macOS",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-07T18:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-442"
+        },
+        "narrative": {
+          "Action": "Configure electron-builder in apps/desktop/package.json for two targets: Linux (AppImage) and macOS (DMG, both arm64 and x64). Include dist/dashboard/server.js, dist/dashboard/public/, and native addon binaries in the package. Configure electron-rebuild in postinstall to rebuild node-pty and better-sqlite3 for Electron's Node version. Create app icons (Panopticon logo) for both platforms. Add npm scripts: dist:linux, dist:mac. Verify packaged app starts correctly on both platforms."
+        },
+        "subItems": [
+          {
+            "id": "packaging.ac1",
+            "title": "electron-builder produces working AppImage for Linux x64",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "packaging.ac2",
+            "title": "electron-builder produces working DMG for macOS (arm64 and x64)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "packaging.ac3",
+            "title": "Native addons (node-pty, better-sqlite3) work in packaged builds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "packaging.ac4",
+            "title": "App icon displays correctly on both platforms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "preload-bridge",
+        "title": "Preload script with IPC bridge",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-07T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-442"
+        },
+        "narrative": {
+          "Action": "Create preload.ts exposing a panopticonBridge object to the renderer via contextBridge.exposeInMainWorld. Bridge methods: getServerUrl(), getWsUrl(), pickFolder(), openExternal(url), showContextMenu(), setTheme(theme), getDesktopSettings(), updateDesktopSetting(key, value), onMenuAction(listener), isDesktopApp(). All methods use typed IPC channels. Main process registers corresponding ipcMain.handle handlers. Frontend detects desktop mode via window.panopticonBridge existence."
+        },
+        "subItems": [
+          {
+            "id": "preload-bridge.ac1",
+            "title": "panopticonBridge is available on window in renderer process",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preload-bridge.ac2",
+            "title": "IPC channels are typed and validated in both main and preload",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preload-bridge.ac3",
+            "title": "Frontend correctly detects desktop vs browser mode via bridge existence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "scaffold",
+        "to": "server-embed",
+        "type": "blocks"
+      },
+      {
+        "from": "scaffold",
+        "to": "preload-bridge",
+        "type": "blocks"
+      },
+      {
+        "from": "scaffold",
+        "to": "hybrid-loading",
+        "type": "blocks"
+      },
+      {
+        "from": "server-embed",
+        "to": "system-tray",
+        "type": "blocks"
+      },
+      {
+        "from": "server-embed",
+        "to": "notifications",
+        "type": "blocks"
+      },
+      {
+        "from": "server-embed",
+        "to": "menu-bar",
+        "type": "blocks"
+      },
+      {
+        "from": "preload-bridge",
+        "to": "hybrid-loading",
+        "type": "blocks"
+      },
+      {
+        "from": "preload-bridge",
+        "to": "desktop-settings",
+        "type": "blocks"
+      },
+      {
+        "from": "preload-bridge",
+        "to": "command-palette",
+        "type": "informs"
+      },
+      {
+        "from": "system-tray",
+        "to": "desktop-settings",
+        "type": "informs"
+      },
+      {
+        "from": "notifications",
+        "to": "desktop-settings",
+        "type": "informs"
+      },
+      {
+        "from": "auto-start",
+        "to": "desktop-settings",
+        "type": "informs"
+      },
+      {
+        "from": "scaffold",
+        "to": "auto-start",
+        "type": "blocks"
+      },
+      {
+        "from": "scaffold",
+        "to": "packaging",
+        "type": "blocks"
+      },
+      {
+        "from": "server-embed",
+        "to": "packaging",
+        "type": "blocks"
+      },
+      {
+        "from": "hybrid-loading",
+        "to": "packaging",
+        "type": "blocks"
+      },
+      {
+        "from": "menu-bar",
+        "to": "command-palette",
+        "type": "informs"
+      },
+      {
+        "from": "packaging",
+        "to": "cli-integration",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "proposed"
+}

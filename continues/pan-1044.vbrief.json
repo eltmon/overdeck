@@ -1,0 +1,177 @@
+{
+  "version": "1",
+  "issueId": "PAN-1044",
+  "created": "2026-05-09T23:33:58.846Z",
+  "updated": "2026-05-10T09:07:00.003Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "approved",
+      "timestamp": "2026-05-10T09:06:59Z",
+      "markdownBody": "# Verdict: APPROVED\n\n## Summary\nPR #1058 (PAN-1044) introduces the Command Deck Project Overview Panel — a hero billboard, pipeline swimlanes, per-issue cost badge with hover breakdown, and click-split routing for `ProjectNode`. Round 1 identified one High-severity correctness defect: stuck features were rendered in both `StuckCallout` and a general `PipelineSection`, producing duplicate cards for any project with stuck issues. Five follow-up commits resolved the defect by typing `PIPELINE_STAGES` as `Exclude<PipelineStage, 'stuck'>[]` (compile-time guard), separating it from a new `BUCKET_STAGES` array used only for Map initialization and `activeStageCount`, and adding a regression test with `queryAllByText(...).toHaveLength(1)` and `queryByRole('region', { name: 'Stuck / blocked pipeline stage' }).not.toBeInTheDocument()` assertions. All 34 acceptance criteria are verified across all six vBRIEF items; the security pass is clean; the four performance observations are all advisory nits with no measurable impact at current project scale. The PR is approved for merge.\n\n## Blockers (MUST fix before merge)\n\n_none_\n\n## High Priority (SHOULD fix; synthesis may still approve if justified)\n\n_none_\n\n## Nits (advisory — safe to defer)\n\n- `src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx:127` — `?` — Broad Zustand selector subscribes to the entire `reviewStatusByIssueId` map, re-rendering `ProjectOverview` on every domain event touching any issue's review status. Consider `useShallow` scoped to the current project's features if project counts grow large. (performance)\n- `src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx:418` — `?` — `IssueCard` closure `() => onSelectFeature(entry.feature)` is recreated on every render. Zero current impact; only becomes relevant if `IssueCard` is later wrapped in `React.memo`. (performance)\n- `src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx:158–159` — `?` — `stuckFeatures` and `activeStageCount` computed outside `useMemo`; O(9) constant cost per render. The `?? []` fallback on `stuckFeatures` is dead code (all stages pre-populated by the init loop). Trivially safe to defer indefinitely. (performance)\n- `src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx:565–566` — `?` — `sortedCostRows` allocates on hover (`Object.entries` + `.sort`, k ≤ 5 rows). Triggered only on `mouseEnter`, immeasurable in practice. (performance)\n\n## Cross-cutting groups\n\n_none_\n\n## What's good\n- Round-1 C-1 fix types `PIPELINE_STAGES` as `Exclude<PipelineStage, 'stuck'>[]` — TypeScript now makes it a compile error to re-introduce the duplication, providing durable protection.\n- `BUCKET_STAGES` (includes `'stuck'`) feeds `activeStageCount` so the hero \"Pipeline stages\" stat correctly counts the stuck bucket as an active stage.\n- All 34 acceptance criteria across all six vBRIEF items verified; requirements pass is complete and clean.\n- Security pass is clean: no `dangerouslySetInnerHTML`, no `eval`, no user-controlled data reaching any CSS or DOM injection sink, no new trust boundaries.\n- `bucketFeature()` correctly uses `session.type === 'work'` (not `role`), honouring the PRD's explicit codebase correction.\n- Four-way routing (conversation → feature → project → empty) implemented, tested, and priority-correct per spec.\n- All expensive derivations (`bucketedFeatures`, `issueCostDetails`, `selectedProjectData`) correctly wrapped in `useMemo`; all new callbacks in `useCallback`.\n- No hardcoded hex or RGB colors anywhere — every value uses CSS custom properties throughout.\n- Regression test guards the exact failure mode with both a `queryAllByText` count assertion and a `queryByRole` not-in-DOM assertion.\n- Cost breakdown tooltip follows the existing `FeatureItem.tsx` hover pattern (onMouseEnter / onMouseLeave / onFocus / onBlur) with graceful degradation when cost data is absent.\n\n## Review stats\n- Blockers: 0   High: 0   Medium: 0   Nits: 4\n- By reviewer: correctness=0, security=0, performance=4, requirements=0\n- Files touched: 19   Files with findings: 1\n\n## Appendix: individual reviews\n\nSee individual reviewer output files listed in `## Reviewer Output Files` in the Synthesis Context above. Those files contain full per-reviewer detail; this synthesis is the policy layer.\n\n## ✅ CODE APPROVED — YOUR WORK IS COMPLETE\n\n**Do NOT make any more changes.**\n**Do NOT run `pan done` again.**\n**Do NOT run `pan review request`.**\n\nThe specialist pipeline will now run tests. If tests pass, the issue enters the merge queue for human approval.\n"
+    }
+  ],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-05-09T23:33Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-09T23:33:58.854Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-09T23:33:58.922Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-09T23:34Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-09T23:34:24.368Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-09T23:34:24.458Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-09T23:40Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-09T23:40:42.486Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-09T23:40:42.592Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-09T23:40Z] review-agent → APPROVED — seq 3",
+      "timestamp": "2026-05-09T23:40:55.100Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-09T23:40Z] verification-gate → FAILED — seq 4",
+      "timestamp": "2026-05-09T23:40:58.285Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-09T23:48Z] verification-gate → FAILED — seq 5",
+      "timestamp": "2026-05-09T23:48:12.571Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-09T23:48:12.723Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-09T23:56Z] verification-gate → FAILED — seq 6",
+      "timestamp": "2026-05-09T23:56:55.256Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-09T23:56:55.480Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T00:05Z] verification-gate → FAILED — seq 7",
+      "timestamp": "2026-05-10T00:05:47.923Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-10T00:05:48.012Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T00:06Z] verification-gate → FAILED — seq 8",
+      "timestamp": "2026-05-10T00:06:11.132Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T00:11Z] review-agent → APPROVED — seq 1",
+      "timestamp": "2026-05-10T00:11:28.665Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-10T00:21:49.381Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T01:26Z] review-agent → COMMENTED — seq 1",
+      "timestamp": "2026-05-10T01:26:23.411Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T01:30Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-10T01:30:27.529Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-10T01:30:27.606Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T02:13Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-10T02:13:04.314Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-10T02:13:04.342Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T02:22Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-10T02:22:50.291Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-10T02:22:50.337Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T02:23Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-05-10T02:23:12.861Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-10T03:21:17.055Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T03:44Z] review-agent → COMMENTED — seq 1",
+      "timestamp": "2026-05-10T03:44:23.415Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-10T05:32:30.130Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T08:22Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-10T08:22:45.216Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T09:06Z] review-agent → APPROVED — seq 1",
+      "timestamp": "2026-05-10T09:06:59.980Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-10T09:07:00.003Z"
+    }
+  ]
+}

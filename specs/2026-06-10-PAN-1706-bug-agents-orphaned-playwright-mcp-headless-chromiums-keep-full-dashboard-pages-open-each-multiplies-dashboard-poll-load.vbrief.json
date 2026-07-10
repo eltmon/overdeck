@@ -1,0 +1,170 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-06-10T00:59:09.003Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1706: orphaned playwright-mcp headless Chromiums keep full dashboard pages open — agent hygiene (browser_close) so they stop multiplying dashboard poll load",
+    "updated": "2026-06-10T01:05:27.825Z"
+  },
+  "plan": {
+    "id": "pan-1706",
+    "title": "bug(agents): orphaned playwright-mcp headless Chromiums keep full dashboard pages open — each multiplies dashboard poll load",
+    "status": "proposed",
+    "uid": "03f62053-bb4b-44b8-80cc-bdc68b105e40",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 4,
+    "created": "2026-06-10T00:59:09.003Z",
+    "updated": "2026-06-10T01:05:27.825Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1706",
+        "label": "PAN-1706",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1705",
+        "label": "PAN-1705 (owns dashboard hidden-poll defense, fix #3)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "bug",
+      "cloister",
+      "playwright",
+      "uat",
+      "agent-hygiene",
+      "dashboard-load"
+    ],
+    "narratives": {
+      "Problem": "Agent sessions spawn `npx @playwright/mcp --isolated` for browser UAT and routinely leave the headless Chromium open on the dashboard when they finish. Because App.tsx pollers run with `refetchIntervalInBackground: true`, each leftover page keeps running the full React app at full poll rate forever (~0.5 MB conversation list every 4s plus resources/flywheel/version). During the PAN-1705 queueing collapse, three such ghosts were observed multiplying intended dashboard load ~4x. The deacon reaper (fix #2) already landed on this branch as the backstop, but it only fires after a 10-min orphan grace plus a ~10-patrol-cycle cadence (an orphan can survive ~20 min). The primary fix is for the browser-driving agents to close their own browser the moment they finish.",
+      "Proposal": "Deliver the agent-hygiene half (fix #1). The reaper (fix #2) is already implemented in cba5579e9 and is treated as the existing backstop — not re-created. The dashboard-side hidden-tab slow-poll defense (fix #3) is owned by the active PAN-1705 workspace (same App.tsx polling surface, same branch tip) and is intentionally out of scope here to avoid a guaranteed merge conflict. Each of the three browser-driving prompt surfaces — the test role, the pan-uat-agent subagent, and the pipeline UAT prompt — gains an explicit instruction to call the Playwright MCP `browser_close` tool when verification finishes (pass, fail, or early exit). One bead per surface; all three are documentation/prompt edits with no automated test, verified by reading the diff."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Treat the reaper (fix #2) as already-delivered existing code; do not create beads to re-implement it.",
+        "rationale": "cba5579e9 on this branch already adds src/lib/cloister/playwright-mcp-reaper.ts + deacon patrol wiring + passing unit tests. Re-creating it would be duplicate work and could regress a tested implementation. It is recorded as decision D1 and protected by hazard H2."
+      },
+      {
+        "summary": "Scope fix #3 (dashboard hidden-tab slow-poll / removing refetchIntervalInBackground:true) OUT of PAN-1706 and leave it to the active PAN-1705 workspace.",
+        "rationale": "There is a live workspaces/feature-pan-1705 worktree on the same branch tip (cba5579e9), and PAN-1705 owns the dashboard polling/perf surface. The fix touches App.tsx:496/548/781 and useCostStream.ts:66 — exactly the lines a live PAN-1705 workspace edits — so doing it here would force a merge conflict and duplicate PAN-1705's work. The issue text itself flags #3 as 'also part of PAN-1705'. Recorded as D4; backstopped by hazard H3 (file a follow-up if PAN-1705 drops it)."
+      },
+      {
+        "summary": "Deliver fix #1 as three separate beads, one per browser-driving prompt file, rather than one combined bead.",
+        "rationale": "The three edits land in three different files (roles/test.md, sync-sources/agents/pan-uat-agent.md, src/lib/cloister/prompts/uat-agent.md). Per the decompose-aggressively guidance, changes in separate files that are independently reviewable and mergeable should be separate beads; if one prompt change is contested the other two still land."
+      },
+      {
+        "summary": "Hygiene instructions reference the Playwright MCP `browser_close` tool, and the pipeline UAT prompt's existing `await browser.close()` snippet is clarified as library-API-only.",
+        "rationale": "Agents drive Playwright through the @playwright/mcp server (browser_navigate/browser_close/... MCP tools), not the chromium.launch() library API shown in the prompt's example. An instruction that only said 'close the browser' or relied on the library snippet would not map to the tools the agent actually has."
+      }
+    ],
+    "items": [
+      {
+        "id": "test-role-browser-close",
+        "title": "Add browser_close cleanup to the test role's Browser UAT contract",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-10T00:59:09.003Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1706",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In roles/test.md, under the 'Browser UAT Contract' section (around lines 84-93), add an explicit cleanup requirement: once browser UAT finishes — whether the verdict is TESTS PASSED, TESTS FAILED, or the role exits early — the role MUST call the Playwright MCP `browser_close` tool to release the headless browser. Add a one-line rationale: a left-open headless page keeps running the full dashboard at full poll rate, multiplying server load (PAN-1706)."
+        },
+        "subItems": [
+          {
+            "id": "test-role-browser-close.ac1",
+            "title": "roles/test.md instructs the test role to call the Playwright MCP `browser_close` tool after emitting the UAT verdict AND on any early exit/failure.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-role-browser-close.ac2",
+            "title": "The added instruction names the `browser_close` MCP tool explicitly (not just 'close the browser') and gives the one-line rationale (a left-open headless page keeps polling the dashboard at full rate).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uat-subagent-browser-close",
+        "title": "Add browser_close boundary to the pan-uat-agent subagent definition",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-10T00:59:09.003Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1706",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In sync-sources/agents/pan-uat-agent.md, add a Boundaries/cleanup line requiring the subagent to call the Playwright MCP `browser_close` tool before it emits its UAT PASSED / UAT FAILED sentinel, and also when it aborts early. Edit ONLY the sync-source — .claude/agents/pan-uat-agent.md is a gitignored sync target and must not be edited or committed (hazard H1)."
+        },
+        "subItems": [
+          {
+            "id": "uat-subagent-browser-close.ac1",
+            "title": "sync-sources/agents/pan-uat-agent.md requires calling the `browser_close` MCP tool before/when emitting the final UAT PASSED|FAILED sentinel and on early abort.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-subagent-browser-close.ac2",
+            "title": "Only sync-sources/agents/pan-uat-agent.md is changed in the diff; .claude/agents/pan-uat-agent.md (gitignored sync target) is not modified or committed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uat-prompt-browser-close",
+        "title": "Add MCP browser_close cleanup phase to the pipeline UAT prompt",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-10T00:59:09.003Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1706",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/prompts/uat-agent.md, add a final cleanup step that calls the Playwright MCP `browser_close` tool after Phase 4 (Console & Network Audit) and on any early termination. Also clarify near the existing 'Handling Playwright' code snippet that `await browser.close()` is the Playwright *library* API; an agent driving Playwright via the MCP server must call the `browser_close` MCP tool instead. Keep the change to prose/instructions only — no code."
+        },
+        "subItems": [
+          {
+            "id": "uat-prompt-browser-close.ac1",
+            "title": "src/lib/cloister/prompts/uat-agent.md includes a final cleanup step that calls the `browser_close` MCP tool after the four phases and on early termination.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-prompt-browser-close.ac2",
+            "title": "The prompt clarifies that the existing `await browser.close()` snippet is the Playwright library API and that the agent must call the MCP `browser_close` tool (so the snippet is no longer the only/misleading close guidance).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-06-10-PAN-1706-bug-agents-orphaned-playwright-mcp-headless-chromiums-keep-full-dashboard-pages-open-each-multiplies-dashboard-poll-load.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

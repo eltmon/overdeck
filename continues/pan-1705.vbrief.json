@@ -1,0 +1,73 @@
+{
+  "version": "1",
+  "issueId": "PAN-1705",
+  "created": "2026-06-10T00:54:03.825Z",
+  "updated": "2026-06-10T01:20:00.000Z",
+  "gitState": { "branch": "feature/pan-1705", "sha": "cba5579e9", "dirty": false },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Scope is the RESIDUAL work only. Three of the four issue fix-directions already landed on main before this workspace branched: (a) the pending-input feed /api/conversations/pending-input replaced the 0.5 MB AskUserQuestion poll, (b) single-flight + 2s TTL coalescing on the enriched conversation list, (c) fetchWithTimeout (20s) on the messages fetch and every list fetcher — all in commit c3a0452b6. The ×4 orphaned-playwright-browser amplifier was fixed separately in PAN-1706 (cba5579e9). Do NOT re-implement any of these.",
+      "recordedAt": "2026-06-10T01:20:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Primary remaining mechanism = pipeline gate-window CPU/IO starvation. nice -n 19 already wraps LOCAL quality gates (validation.ts:423-432, added 2026-05-07) but the 2026-06-09 collapse happened anyway. Two reasons it was insufficient: (1) the PRE-gate steps in verification-runner.ts — `bun install` (line ~322) and the contracts `build_command` (line ~334) — run at NORMAL priority and bypass the wrapper entirely; (2) nice only de-prioritises CPU, doing nothing for the heavy disk I/O of bun install/build. Fix: a shared low-priority wrapper combining nice + ionice, applied to the gate wrapper AND the pre-gate install/build steps.",
+      "recordedAt": "2026-06-10T01:20:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Finish the issue-comment fix: the panopticon:reconnected handler in CommandDeck/index.tsx (~line 1030-1037) already calls queryClient.invalidateQueries() but NOT cancelQueries(). A messages fetch that hung across a server restart stays in-flight; invalidateQueries dedupes against it and waits up to the 20s fetchWithTimeout before refetching. Adding queryClient.cancelQueries() before invalidateQueries() aborts the stalled promise immediately so the click recovers in ~0s instead of ~20s.",
+      "recordedAt": "2026-06-10T01:20:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Include the MALLOC_ARENA_MAX=2 experiment the issue explicitly names (server RSS 1.3 GB vs 236 MB V8 heap = glibc malloc arena fragmentation from constant child spawning). It is cosmetic (does NOT cause the Loading bug) but is a one-line, reversible, zero-risk env tweak the issue requests, so it is the defensible auto-mode default to ship it. Lowest priority bead.",
+      "recordedAt": "2026-06-10T01:20:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "OUT OF SCOPE — deferred deliberately: (1) Full WS push-first migration AND ETag/304 for the conversations list belong to the separately-tracked push-first effort (#790/#898). Marginal value here: all four list pollers (ConversationList, CloisterStatusBar, useConversationFeed, CommandDeck/index) share queryKey ['conversations'] so React Query already coalesces them to ONE fetch per tab; server-side coalescing already de-dups concurrent work; and the enriched list churns (costs/statuses) every few seconds during pipeline load, so a 304 conditional response would mostly MISS exactly when the bug bites. (2) Dropping refetchIntervalInBackground:true from the remaining background polls — they are now lightweight (backend-health, cliproxy-status, pending-input feed, cost stream) and exist to catch outages even in a hidden tab; the orphaned-browser amplifier they fed is already gone (PAN-1706). (3) The gate-concurrency throttle is #1665's scope; this issue's backpressure piece (nice/ionice) only complements it.",
+      "recordedAt": "2026-06-10T01:20:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "ionice is Linux-only; macOS has no ionice binary and Windows has neither nice nor ionice. The existing wrapper already guards process.platform === 'win32' (bare command). The new helper MUST degrade gracefully: nice+ionice on linux, nice-only on other POSIX (darwin), bare command on win32. The production dashboard host is Linux so the real path is nice+ionice.",
+      "mitigation": "Branch on process.platform in the helper. Unit-test all three branches by stubbing platform / asserting the constructed command string."
+    },
+    {
+      "id": "H2",
+      "summary": "The gate command is interpolated into a shell string (`sh -c '<escaped>'`) and ultimately into SSH/docker-exec contexts in sibling branches of validation.ts. The existing code single-quote-escapes the command (command.replace(/'/g, \"'\\\\''\")) and rejects double-quotes in the SSH path. Adding the ionice prefix MUST preserve that exact escaping and must NOT widen the injection surface — keep the same `nice -n 19 ionice -c2 -n7 sh -c '<escaped>'` shape, only adding a fixed-literal prefix.",
+      "mitigation": "Reuse the existing escape logic verbatim; the ionice/nice prefix is fixed literal text with no interpolation. Add an AC asserting the escaped-command portion is byte-identical to today's."
+    },
+    {
+      "id": "H3",
+      "summary": "verification-runner.ts pre-gate steps use execAsync with their own timeouts (bun install 60s, build 30s). Wrapping in `nice ... ionice ... sh -c '...'` changes argv shape; a malformed wrapper could break install/build silently or alter exit-code propagation.",
+      "mitigation": "Use the same helper as the gate wrapper so behaviour is consistent and tested once. Verify exit codes still propagate (execAsync rejects on non-zero) via the existing verification-runner.test.ts."
+    },
+    {
+      "id": "H4",
+      "summary": "MALLOC_ARENA_MAX must be set on the spawned server CHILD's env, not just the supervising pan-up/pan-dev process. The supervised API child is spawned at dev.ts:366-369 with env:{...process.env, ...}. There may be more than one spawn site (production `pan up` vs the dev hot-reload API child); set it on every site that launches dist/dashboard/server.js.",
+      "mitigation": "Grep for all spawn(node22,[bundledServer]...) / server.js spawn sites and add MALLOC_ARENA_MAX:'2' to each env block."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-8",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-06-10T00:54:03.825Z",
+      "reason": "planning",
+      "note": "Planning session started for PAN-1705: bug(dashboard): conversation click stuck on Loading… for minutes during pipeline load — fat-poll request queueing collapse",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "timestamp": "2026-06-10T01:20:00.000Z",
+      "reason": "planning",
+      "note": "Auto-mode discovery complete. Verified 3 of 4 fix-directions already landed (c3a0452b6 + PAN-1706). Scoped plan to the residual: complete gate nice/ionice backpressure (pre-gate install/build bypass the wrapper; no ionice yet), cancelQueries on reconnect, and the requested MALLOC_ARENA_MAX=2 experiment. Deferred ETag/push-first to #790/#898.",
+      "agentModel": "agent:claude-opus-4-8"
+    }
+  ]
+}

@@ -1,0 +1,120 @@
+{
+  "issueId": "PAN-2257",
+  "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T10:09:06.969Z"
+    }
+  ],
+  "feedback": [],
+  "harness": "codex",
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "verify-troubled-tree": "completed",
+    "verify-troubled-tree.ac1": "completed",
+    "verify-troubled-tree.ac2": "completed",
+    "verify-troubled-tree.ac3": "completed",
+    "clear-troubled-badge": "completed",
+    "clear-troubled-badge.ac1": "completed",
+    "clear-troubled-badge.ac2": "completed",
+    "clear-troubled-badge.ac3": "completed",
+    "clear-troubled-badge.ac4": "completed",
+    "render-troubled-badge": "completed",
+    "render-troubled-badge.ac1": "completed",
+    "render-troubled-badge.ac2": "completed",
+    "render-troubled-badge.ac3": "completed",
+    "render-troubled-badge.ac4": "completed",
+    "session-tree-troubled-fields": "completed",
+    "session-tree-troubled-fields.ac1": "completed",
+    "session-tree-troubled-fields.ac2": "completed",
+    "session-tree-troubled-fields.ac3": "completed"
+  },
+  "pipeline": {
+    "issueId": "PAN-2257",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-03T11:53:09.339Z",
+    "inspectNotes": "Spec fidelity passed: the diff factors gate metadata into readSessionGateFields and applies troubled fields plus queued mail count to planning/work/strike and review/test/ship session nodes. Constraint compliance passed: no prohibited patterns or PRD constraint violations found.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2281",
+    "reviewRequestedAt": "2026-07-03T09:26:26.633Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        ".pan/drafts/PAN-2257.md",
+        ".pan/records/pan-2257.json",
+        ".pan/test/result.json",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/TroubledBadges.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/troubledBadge.ts",
+        "src/dashboard/frontend/src/components/IssueActionMenu/index.ts"
+      ],
+      "declaredScopeUntouched": [
+        "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts"
+      ],
+      "declaredScope": [
+        "packages/contracts/src/types.ts",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+        "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+        "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts",
+        "src/dashboard/server/routes/projects.ts",
+        "tests/e2e/styleguide-conformance.spec.ts",
+        "tests/unit/dashboard/server/routes/projects.test.ts"
+      ],
+      "actualChangedFiles": [
+        ".pan/drafts/PAN-2257.md",
+        ".pan/records/pan-2257.json",
+        ".pan/test/result.json",
+        "packages/contracts/src/types.ts",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/TroubledBadges.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/troubledBadge.ts",
+        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+        "src/dashboard/frontend/src/components/IssueActionMenu/index.ts",
+        "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+        "src/dashboard/server/routes/projects.ts",
+        "tests/e2e/styleguide-conformance.spec.ts",
+        "tests/unit/dashboard/server/routes/projects.test.ts"
+      ],
+      "recordedAt": "2026-07-03T09:26:20.325Z"
+    }
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 77886,
+            "output": 1457,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 77886,
+          "output": 1457,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 0,
+        "pricingAsOf": "2026-07-03T11:53:09.362Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2281"
+    ],
+    "ranOn": "eltmon-z790"
+  },
+  "created": "2026-07-03T10:06:21.823Z",
+  "updated": "2026-07-03T11:53:09.363Z"
+}

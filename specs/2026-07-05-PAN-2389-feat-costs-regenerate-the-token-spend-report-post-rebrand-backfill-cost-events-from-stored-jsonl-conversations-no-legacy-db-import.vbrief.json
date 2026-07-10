@@ -1,0 +1,584 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-05T21:59:55.237Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2389: feat(costs): regenerate the token spend report post-rebrand — backfill cost events from stored JSONL conversations, no legacy DB import",
+    "updated": "2026-07-06T22:58:12.508Z"
+  },
+  "plan": {
+    "id": "pan-2389",
+    "title": "feat(costs): regenerate the token spend report post-rebrand — backfill cost events from stored JSONL conversations, no legacy DB import",
+    "status": "completed",
+    "uid": "909c028c-aecf-4b5b-b13d-40cd1cfe7226",
+    "author": "agent:claude-fable-5",
+    "sequence": 5,
+    "created": "2026-07-05T21:59:55.237Z",
+    "updated": "2026-07-06T22:58:12.508Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2389",
+        "label": "PAN-2389",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2387",
+        "label": "PAN-2387 (attribution fixes — not blocked on)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2388",
+        "label": "PAN-2388 (per-harness parsers — not blocked on)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-2389.md",
+        "label": "PRD draft (glossary, verified references, decisions D1-D8)",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "costs",
+      "backfill",
+      "token-spend-report",
+      "github-pages",
+      "cache-derivability"
+    ],
+    "narratives": {
+      "Problem": "The public token spend report is stale and unpublished after the Panopticon→Overdeck rebrand: the current cost store ~/.overdeck/costs/events.jsonl starts exactly at the rebrand (min ts 2026-06-19T18:30:25Z), eltmon.github.io/overdeck/token-spend-report/ returns 404 because the repo has NO GitHub Pages site configured (gh api repos/eltmon/overdeck/pages → 404, no workflow exists), and docs/token-spend-report/index.html still carries pre-rebrand data (734,117 calls / ~$54k) with an obsolete two-source generation procedure. The operator's architectural bet: cost history is derivable from harness session JSONL still on disk — no legacy DB import needed.",
+      "Proposal": "Ship a durable `pan cost backfill` CLI command (dry-run default, --write to execute) that sweeps ALL known session stores through the existing machinery: the never-called full Claude-projects sweep reconcile() in src/lib/costs/reconciler.ts:717, plus the CostWriter door's ohmypi/codex reconciles (src/lib/overdeck/cost.ts ~:536) extended with extra scan roots for global ~/.codex/sessions (content back to 2026-02-19), global ~/.pi/agent/sessions (back to 2026-04-11), and legacy ~/.panopticon/agents/*/sessions (~2026-05). All writes go through CostWriter.record() (requestId dedup, sourceFile fallback) — idempotent and read-only on session files. Then run the backfill on this machine, regenerate docs/token-spend-report/index.html from the merged store as the single source with an honest per-harness coverage banner and an archival note about the deliberately-not-imported pre-rebrand era, fix the 404 with a Pages deploy workflow publishing only docs/token-spend-report/, and land a repo-tracked dev skill documenting the post-rebrand procedure. Full decisions D1-D8 and hazards in .pan/drafts/pan-2389.md and continue.json.",
+      "NonGoals": "- No import of ~/.panopticon/costs/events.jsonl (686k events) or ~/.panopticon/panopticon.db — proving they are unnecessary is the point of the issue\n- No codex/ohmypi parser accuracy fixes beyond exposing session cwd for attribution (PAN-2388 owns parsers)\n- No UNKNOWN-bucket attribution redesign, no by-issue rollup fixes, no dashboard Costs page changes (PAN-2387 owns those)\n- No evolution/gource video regeneration\n- No attempt to recover pre-May-2026 Claude Code transcript history — the coverage boundary is reported honestly, not worked around\n- No changes to the live cost hook or the scheduled pi reconcile cadence\n- No modification, rename, or deletion of any session JSONL file anywhere"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Backfill is a durable `pan cost backfill` CLI subcommand, not a one-off script",
+        "rationale": "Cache-derivability is a maintained system property; the capability must outlive this issue. Precedent scripts/backfill-costs-pan1570.mts was a throwaway; the issue frames the bet as ongoing."
+      },
+      {
+        "summary": "Dry-run default with --write to execute; dry-run persists nothing (no record(), no offsets/seen state)",
+        "rationale": "The command appends thousands of events; safe default costs nothing. Persisting offsets during dry-run would silently starve the later --write run (H2)."
+      },
+      {
+        "summary": "Do not block on open issues PAN-2387/PAN-2388; proceed with current parsers and disclose attribution limits in the report",
+        "rationale": "The issue itself frames it as 'should land first OR the backfill inherits the UNKNOWN bucket' — inheriting with honest labeling is the smallest acceptable option; append-only dedup makes later re-runs safe (though they won't retro-correct attribution, which is disclosed)."
+      },
+      {
+        "summary": "Extra scan roots are parameterized in CostWriter.reconcile (src/lib/overdeck/cost.ts), keeping cost-parsers/* internals untouched",
+        "rationale": "Minimizes conflict surface with in-flight PAN-2388 and keeps the single write door as the only ingest path (single-source-of-truth tenet)."
+      },
+      {
+        "summary": "Codex backfill keeps the door's per-session-file event granularity with sourceFile dedup",
+        "rationale": "It is the existing, dedup-correct shape; PAN-2388 owns finer accuracy. Changing granularity here would duplicate in-flight work."
+      },
+      {
+        "summary": "Pages fix is a workflow-based deploy (configure-pages enablement:true) publishing ONLY docs/token-spend-report/",
+        "rationale": "The repo has no Pages site at all; a checked-in workflow is reproducible, and the docs/ tree is Mintlify source for overdeck.ai that must not be served raw."
+      },
+      {
+        "summary": "The regenerated report presents the post-rebrand store as its dataset and labels the pre-rebrand era (Feb 2025–Jun 2026, 734,117 calls, ~$54k) as archival, deliberately not imported",
+        "rationale": "Measured coverage: Claude transcripts on disk only reach ~May/Jun 2026 (cleanup pruned older); codex reaches Feb 2026, pi Apr 2026. Honest boundary reporting is an explicit issue requirement."
+      }
+    ],
+    "items": [
+      {
+        "id": "backfill-cli",
+        "title": "Add `pan cost backfill [--write]` running the full Claude sweep + door reconciles with a coverage summary",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-05T21:59:55.237Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2389",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/cost.ts",
+            "src/lib/costs/reconciler.ts",
+            "src/lib/costs/__tests__/reconciler-backfill.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/costs/__tests__/"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "reconciler backfill tests pass including the dry-run-persists-nothing assertion"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/cost.ts (the `pan cost` group at line 117), add a `backfill` subcommand with a `--write` flag. It calls (a) the exported-but-never-called full Claude-projects sweep `reconcile()` from src/lib/costs/reconciler.ts:717, and (b) `CostWriter.reconcile({source:'ohmypi'})` and `{source:'codex'}` via the cost door layers (follow how reconciler.ts builds CostDoorLive for its own writes). Thread a `dryRun` option through `reconcilePromise()` and the door reconcile so that WITHOUT --write nothing is persisted: no `record()` calls, no `saveSessionOffset()`/seen-set writes (decision D2 / hazard H2 in continue.json). After the run, print a per-source coverage summary: sessions scanned, events imported (or would-import in dry-run), duplicates skipped, errors, earliest and latest imported event ts. Add a fixture-backed test under a temp HOME (src/lib/costs paths resolve process.env.HOME) asserting: dry-run leaves events.jsonl and the costs/state dir byte-identical, and a --write run over a synthetic Claude transcript imports events then imports 0 on the second run."
+        },
+        "items": [
+          {
+            "id": "backfill-cli.ac1",
+            "title": "Given a synthetic Claude transcript under a temp HOME, `pan cost backfill --write` imports its cost events and a second identical run imports 0 (summary reports duplicates instead)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "backfill-cli.ac2",
+            "title": "Without --write, the command prints would-import counts and preserves events.jsonl and ~/.overdeck/costs/state byte-identical (asserted by test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "backfill-cli.ac3",
+            "title": "The summary output prints per-source sessions scanned, events imported, duplicates skipped, errors, and earliest/latest imported event timestamp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "backfill-cli.ac4",
+            "title": "All imports flow through CostWriter.record() — the diff contains no direct events.jsonl appends and no direct cost_events SQL inserts outside the door",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "door-scan-roots",
+        "title": "Extend the cost door's codex reconcile with extra scan roots including global ~/.codex/sessions",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-05T21:59:55.237Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2389",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "pi-extra-roots"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/cost.ts",
+            "src/lib/cost-parsers/codex-parser.ts",
+            "src/lib/overdeck/__tests__/cost-backfill-roots.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "codex extra-roots fixture test passes including idempotent second run"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/overdeck/cost.ts, extend `CostWriter.reconcile` opts from `{source}` to also accept extra scan roots (e.g. `{source, extraRoots?: string[]}`), defaulting to today's per-agent walk under $OVERDECK_HOME/agents. For source 'codex', when the global codex home root ($CODEX_HOME, default ~/.codex, sessions under sessions/YYYY/MM/DD/rollout-*.jsonl per codex-parser.ts:4) is passed, walk it recursively and emit one event per session file exactly like the existing codex branch: parseCodexSessionSync(), sourceFile dedup, ts = session start. Attribution: derive issueId from the session's cwd (codex session_meta carries `cwd`; expose it from parseCodexSessionSync's return if not already present — keep the parser diff to that minimum, PAN-2388 owns parser accuracy per decision D3) using the same issue-from-path inference the reconciler uses (see inferIssueFromPath in src/lib/costs/reconciler.ts); fall back to the existing issueIdFromAgentName only for per-agent roots. agentId for global-root sessions: 'codex-global'. Fixture test under a temp HOME/CODEX_HOME: a synthetic rollout JSONL with session_meta cwd containing 'feature-pan-1234' yields one event with issueId PAN-1234, the parsed model id, token counts, sourceFile set; running reconcile twice imports the event exactly once."
+        },
+        "items": [
+          {
+            "id": "door-scan-roots.ac1",
+            "title": "Given a synthetic codex rollout under a temp CODEX_HOME sessions tree, reconcile with the global root emits one cost event carrying the parsed model, token counts, and sourceFile",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "door-scan-roots.ac2",
+            "title": "A session_meta cwd containing a workspace path like feature-pan-1234 produces issueId PAN-1234; a non-issue cwd falls back to UNKNOWN",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "door-scan-roots.ac3",
+            "title": "Running the same reconcile twice persists exactly one event row — the second run marks it as a duplicate and imports 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "door-scan-roots.ac4",
+            "title": "The default per-agent walk behaves exactly as before when no extra roots are passed (existing tests keep passing)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pi-extra-roots",
+        "title": "Sweep global ~/.pi/agent/sessions and legacy ~/.panopticon/agents pi transcripts via the roots mechanism",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-05T21:59:55.237Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2389",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/cost.ts",
+            "src/cli/commands/cost.ts",
+            "src/lib/overdeck/__tests__/cost-backfill-roots.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/ src/lib/costs/__tests__/"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "pi extra-roots fixture tests pass including requestId dedup on re-run"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Using the roots mechanism from door-scan-roots, make the backfill's ohmypi sweep also cover: (a) the global pi store ~/.pi/agent/sessions/<encoded-cwd-dirname>/*.jsonl — infer issueId from the encoded cwd directory name (same inference family as inferIssueFromPath; dir names look like --home-eltmon-Projects-panopticon-cli-workspaces-feature-pan-1788--), agentId 'pi-global'; and (b) the legacy per-agent store ~/.panopticon/agents/<id>/sessions/**/*.jsonl — issueId via the existing issueIdFromAgentName(agentName), agentId = the legacy agent dir name. Reuse the existing pi parse path (parseOhmypiSessionCostEventsSync / extractPiCostEvents shape with provider responseId as requestId dedup). Both roots are read-only. Wire these roots into the `pan cost backfill` invocation from the backfill-cli bead. Fixture tests under a temp HOME mirroring the codex bead: one global-pi fixture and one legacy-agent fixture, each asserting issueId attribution, token/model fields, and exactly-once import across two runs."
+        },
+        "items": [
+          {
+            "id": "pi-extra-roots.ac1",
+            "title": "Given a synthetic pi session under a temp ~/.pi/agent/sessions/<dir encoding feature-pan-1788>, the sweep emits events attributed to PAN-1788 with model and token fields populated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pi-extra-roots.ac2",
+            "title": "Given a synthetic legacy transcript under a temp ~/.panopticon/agents/agent-pan-913/sessions/, the sweep emits events attributed to PAN-913",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pi-extra-roots.ac3",
+            "title": "Re-running the sweep over both roots imports 0 new events (requestId dedup) and the store persists the first run's events unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "run-backfill",
+        "title": "Execute the backfill on this machine and capture the coverage summary",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-05T21:59:55.237Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-2389",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/token-spend-report/coverage.json"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "node -e \"const fs=require('fs');let mn=null;for(const l of fs.readFileSync(process.env.HOME+'/.overdeck/costs/events.jsonl','utf8').split('\\n')){if(!l)continue;const t=JSON.parse(l).ts;if(!mn||t<mn)mn=t}console.log('earliest:',mn);process.exit(mn<'2026-06-19'?0:1)\""
+          ],
+          "expected_outputs": [
+            "earliest event ts in ~/.overdeck/costs/events.jsonl is earlier than 2026-06-19 and the command exits 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Operational bead — runs on this machine against real data; all preceding code beads must be merged into this workspace branch first. Steps: (1) Confirm the planning-time safety snapshot ~/.overdeck/costs/events.jsonl.pre-pan2389-backfill.bak exists (37,158 lines) — do NOT proceed without it, never delete or overwrite it (hazard H7). (2) Run `pan cost backfill` in default dry-run mode via the workspace CLI (e.g. `npx tsx src/cli/index.ts cost backfill`) and sanity-check the would-import counts and per-source coverage. (3) Run with --write. (4) Run with --write AGAIN and verify the second run imports 0 events (idempotence proof). (5) Record the final coverage summary (per-source earliest/latest event ts, events imported, sessions scanned, duplicates) into docs/token-spend-report/coverage.json (new small JSON committed to the branch) for the report bead to consume. All session files are opened read-only; nothing under ~/.claude, ~/.codex, ~/.pi, or ~/.panopticon is modified (NFR-1)."
+        },
+        "items": [
+          {
+            "id": "run-backfill.ac1",
+            "title": "When the --write run completes, the events store persists events with ts earlier than 2026-06-19 (the pre-backfill store minimum moves back)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-backfill.ac2",
+            "title": "A second --write run imports 0 events and prints a summary showing only duplicates skipped (idempotence proven on real data)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-backfill.ac3",
+            "title": "docs/token-spend-report/coverage.json is committed on the branch and contains per-source earliest/latest event ts and import counts from the real run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-backfill.ac4",
+            "title": "The safety snapshot events.jsonl.pre-pan2389-backfill.bak survives untouched and no file under ~/.claude, ~/.codex, ~/.pi, or ~/.panopticon has a changed mtime attributable to the backfill",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "report-regenerate",
+        "title": "Regenerate docs/token-spend-report/index.html from the merged store with an honest coverage banner",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-05T21:59:55.237Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-2389",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/token-spend-report/index.html"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"const html=require('fs').readFileSync('docs/token-spend-report/index.html','utf8');const m=html.match(/reportData\\s*=\\s*(\\{[\\s\\S]*?\\});/);JSON.parse(JSON.stringify(eval('('+m[1]+')')));console.log('reportData parses')\"",
+            "grep -c \"deliberately not imported\\|734,117\" docs/token-spend-report/index.html"
+          ],
+          "expected_outputs": [
+            "reportData parses as a JS object",
+            "the archival note referencing the 734,117-call pre-rebrand era appears in the HTML"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Regenerate docs/token-spend-report/index.html using ~/.overdeck/costs/events.jsonl as the SINGLE data source (decision D6 — no SQLite combine, no ~/.panopticon files). Compute aggregates with a node script that sorts/scans by ts (hazard H3: backfill appends out of order): total spend/calls/tokens hero stats, models (top 10), providers, sessionType stages, monthly costs, top-15 issues, dailyCosts. Update the reportData object and hero counters; preserve the existing structure and style rules (dark theme #0f172a, monthly chart stays type 'bar' with borderRadius 6/borderSkipped false, subscription chart labels unchanged, model cards pattern). ADD two honesty elements: (1) a prominent coverage banner (orange warning style) stating the per-harness reconstruction boundary from docs/token-spend-report/coverage.json (codex from 2026-02, pi from 2026-04, Claude Code from ~2026-05/06) and that attribution quality is bounded by current parsers (PAN-2387/PAN-2388 pending); (2) an archival note stating the pre-rebrand era — Feb 2025 – Jun 2026, 734,117 calls, ~$54k — was deliberately NOT imported (cache-derivability bet) and its report is archived in git history. Update the hero h1 dollar figure to the new-store total; do not claim continuity with the $54k figure. Update git-derived stats (commit count, fileGrowth via the git ls-tree per-day snapshot method — never per-commit churn) only if already stale; skip video regeneration (NonGoal)."
+        },
+        "items": [
+          {
+            "id": "report-regenerate.ac1",
+            "title": "Re-running the extraction script over events.jsonl produces numbers equal to the hero counters and reportData totals in the HTML (exact match)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "report-regenerate.ac2",
+            "title": "The report renders a coverage banner stating per-harness earliest-data boundaries sourced from coverage.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "report-regenerate.ac3",
+            "title": "The report contains an archival note that the pre-rebrand era (Feb 2025 – Jun 2026, 734,117 calls, ~$54k) was deliberately not imported",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "report-regenerate.ac4",
+            "title": "Monthly chart remains type 'bar' with borderRadius 6 and the page renders without console errors when served locally (python3 -m http.server + Playwright screenshot self-check)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pages-workflow",
+        "title": "Add a GitHub Pages deploy workflow publishing docs/token-spend-report/ (fixes the 404)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-05T21:59:55.237Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-2389",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/pages.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "python3 -c \"import yaml,sys; d=yaml.safe_load(open('.github/workflows/pages.yml')); assert d['permissions']['pages']=='write' and d['permissions']['id-token']=='write'; print('pages.yml valid, permissions correct')\""
+          ],
+          "expected_outputs": [
+            "pages.yml parses as valid YAML with pages: write and id-token: write permissions"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Create .github/workflows/pages.yml per decision D7. Root cause verified 2026-07-05: gh api repos/eltmon/overdeck/pages returns 404 — the repo has no Pages site; the configuration did not survive the rebrand. Workflow: name 'Deploy token spend report to GitHub Pages'; triggers on push to main with paths filter docs/token-spend-report/** plus workflow_dispatch; permissions contents: read, pages: write, id-token: write; concurrency group 'pages'. Job steps: checkout; stage `mkdir -p _site && cp -r docs/token-spend-report _site/` (publish ONLY the report — the docs/ tree is Mintlify source for overdeck.ai and must not be served raw); actions/configure-pages@v5 with `enablement: true` (creates the Pages site on first run — hazard H5); actions/upload-pages-artifact@v3 with path _site; actions/deploy-pages@v4 in a deploy environment (environment name github-pages, url from the deploy step output). Resulting URL: https://eltmon.github.io/overdeck/token-spend-report/. Post-merge verification (test/UAT role, cannot run pre-merge): after the first successful workflow run on main, curl -s -o /dev/null -w '%{http_code}' on that URL returns 200."
+        },
+        "items": [
+          {
+            "id": "pages-workflow.ac1",
+            "title": "pages.yml passes YAML validation and contains permissions pages: write and id-token: write plus a concurrency group",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pages-workflow.ac2",
+            "title": "The staging step copies only docs/token-spend-report into the uploaded artifact so the deployed site contains /token-spend-report/ and nothing else from docs/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pages-workflow.ac3",
+            "title": "configure-pages runs with enablement: true so the first run creates the Pages site on a repo that currently has none",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pages-workflow.ac4",
+            "title": "Post-merge: the first successful run deploys and https://eltmon.github.io/overdeck/token-spend-report/ returns HTTP 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skill-update",
+        "title": "Add repo-tracked dev skill documenting the post-rebrand report generation procedure",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-05T21:59:55.237Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2389",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/dev-skills/token-spend-report/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test -f sync-sources/dev-skills/token-spend-report/SKILL.md && grep -c \"pan cost backfill\\|~/.overdeck/costs/events.jsonl\" sync-sources/dev-skills/token-spend-report/SKILL.md"
+          ],
+          "expected_outputs": [
+            "SKILL.md exists and references pan cost backfill and the single ~/.overdeck events.jsonl source"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Create sync-sources/dev-skills/token-spend-report/SKILL.md (the current skill exists ONLY machine-locally at ~/.claude/skills/token-spend-report/SKILL.md and is stale: it still instructs combining ~/.panopticon/panopticon.db SQLite with ~/.panopticon/costs/events.jsonl and uses eltmon/panopticon-cli URLs). Base the new skill on the old one's structure (pre-flight review of the existing report, style consistency rules, step-by-step generation, verify, commit) but rewritten for post-rebrand reality: SINGLE data source ~/.overdeck/costs/events.jsonl (sort by ts — not chronologically ordered after backfill); run `pan cost backfill` first to catch up history; per-harness coverage boundary from docs/token-spend-report/coverage.json must stay in the report; archival note about the deliberately-not-imported pre-rebrand era must stay; repo URLs use eltmon/overdeck; Pages publishing happens automatically via .github/workflows/pages.yml on merge to main. Match the frontmatter shape of neighboring dev-skills (see sync-sources/dev-skills/pan-dashboard-restart). Do NOT edit ~/.claude/skills directly — pan sync distributes it."
+        },
+        "items": [
+          {
+            "id": "skill-update.ac1",
+            "title": "sync-sources/dev-skills/token-spend-report/SKILL.md contains frontmatter matching neighboring dev-skills and covers the single-source (~/.overdeck/costs/events.jsonl, ts-sorted) generation procedure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-update.ac2",
+            "title": "The skill contains a `pan cost backfill` step before regeneration and preserves the coverage banner and archival note requirements in the report procedure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-update.ac3",
+            "title": "The skill contains no references to ~/.panopticon paths as live data sources or eltmon/panopticon-cli URLs (legacy paths may appear only in a historical note)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "door-scan-roots",
+        "to": "pi-extra-roots",
+        "type": "blocks"
+      },
+      {
+        "from": "backfill-cli",
+        "to": "pi-extra-roots",
+        "type": "blocks"
+      },
+      {
+        "from": "backfill-cli",
+        "to": "run-backfill",
+        "type": "blocks"
+      },
+      {
+        "from": "door-scan-roots",
+        "to": "run-backfill",
+        "type": "blocks"
+      },
+      {
+        "from": "pi-extra-roots",
+        "to": "run-backfill",
+        "type": "blocks"
+      },
+      {
+        "from": "run-backfill",
+        "to": "report-regenerate",
+        "type": "blocks"
+      },
+      {
+        "from": "report-regenerate",
+        "to": "skill-update",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-05-PAN-2389-feat-costs-regenerate-the-token-spend-report-post-rebrand-backfill-cost-events-from-stored-jsonl-conversations-no-legacy-db-import.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

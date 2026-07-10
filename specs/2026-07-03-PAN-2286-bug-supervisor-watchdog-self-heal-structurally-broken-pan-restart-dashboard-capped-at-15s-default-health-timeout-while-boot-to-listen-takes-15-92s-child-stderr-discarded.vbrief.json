@@ -1,0 +1,113 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-03T15:45:01.892Z",
+    "updated": "2026-07-03T20:43:47.442Z",
+    "author": "overdeck/auto-start",
+    "description": "Auto-synthesized minimal plan for PAN-2286: bug(supervisor): watchdog self-heal structurally broken — pan restart --dashboard capped at 15s default health timeout while boot-to-listen takes 15-92s; child stderr discarded",
+    "inspectionPolicy": "never"
+  },
+  "plan": {
+    "id": "pan-2286",
+    "title": "bug(supervisor): watchdog self-heal structurally broken — pan restart --dashboard capped at 15s default health timeout while boot-to-listen takes 15-92s; child stderr discarded",
+    "status": "completed",
+    "uid": "09c078c3-4895-4d26-b278-cd7e17bc3183",
+    "author": "overdeck/auto-start",
+    "sequence": 4,
+    "created": "2026-07-03T15:45:01.892Z",
+    "updated": "2026-07-03T20:43:47.442Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2286",
+        "label": "PAN-2286",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "auto-start"
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-03-PAN-2286-bug-supervisor-watchdog-self-heal-structurally-broken-pan-restart-dashboard-capped-at-15s-default-health-timeout-while-boot-to-listen-takes-15-92s-child-stderr-discarded.vbrief.json"
+    },
+    "narratives": {
+      "Problem": "## Symptom\n\nEvery watchdog-triggered dashboard restart on 2026-07-03 (~12 attempts, 06:57Z–09:26Z) failed with `pan restart --dashboard exited 1` after a consistent ~16–18s, ending twice in `WATCHDOG GIVING UP — manual intervention required`. The self-healing path has likely **never succeeded** on a loaded machine:\n\n```\n[2026-07-03T06:57:31.080Z] watchdog spawned pan restart --dashboard (pid 3613204)\n[2026-07-03T06:57:49.725Z] watchdog restart failed: pan restart --dashboard exited 1\n[2026-07-03T07:04:50.101Z] watchdog spawned pan restart --dashboard (pid 3740027)\n[2026-07-03T07:05:06.746Z] watchdog restart failed: pan restart --dashboard exited 1\n[2026-07-03T07:07:00.827Z] WATCHDOG GIVING UP — manual intervention required: The operation was aborted due to timeout\n...\n[2026-07-03T09:26:53.456Z] WATCHDOG GIVING UP — manual intervention required: fetch failed\n```\n\n## Root cause (verified in source)\n\n1. **The health wait defaults to 15 seconds, and the watchdog never overrides it.**\n   - `src/supervisor/server.ts:99` spawns `pan restart --dashboard` with no `--health-timeout` flag.\n   - `src/cli/commands/restart.ts:178-180` leaves `healthTimeoutMs` `undefined` when the flag is absent.\n   - `src/lib/platform-lifecycle.ts:210`: `const timeoutMs = opts.timeoutMs ?? 15_000;`\n2. **Dashboard boot-to-listen alone takes 15–92s**, so the 15s health window expires before even a healthy boot can start listening. Boot-timing lines from dashboard.log this morning: `+17312ms`, `+15174ms`, `+91780ms`, `+15444ms` (all \"HTTP server listening\" — health passes only after that). The restart is therefore **structurally guaranteed to exit 1** under exactly the starved conditions that trigger the watchdog in the first place. The operator SOP already says restarts need `--health-timeout` ≥ 120s; the watchdog violates it.\n3. **The failure reason is invisible**: `src/supervisor/server.ts:101` spawns the child with `stdio: 'ignore'`, so the child's stderr (`✗ [health] health check at ... did not pass within 15000ms`) is discarded. The supervisor log only ever shows the bare exit code.\n\nA secondary confusion multiplier: the exit-1 happens AFTER the child has already SIGTERM'd and respawned the dashboard, so the dashboard often does come back seconds later — while the watchdog has already recorded a failed attempt toward its give-up budget (`maxRestarts`), and (pre-PAN-2219-fix conditions) keeps burning attempts until `gaveUp`.\n\n## Fix\n\n1. In `src/supervisor/server.ts` `spawnRestart()`, pass an explicit generous health timeout (e.g. `--health-timeout 120000`), or thread `watchdogConfig` through so it is configurable.\n2. Capture the child's stdout/stderr (pipe to the supervisor `log()` on failure) instead of `stdio: 'ignore'` so the next failure is diagnosable from supervisor.log alone.\n3. Test: unit test that the spawned argv includes the health-timeout flag, plus a watchdog test where restart succeeds when boot takes 60s (fake timers per repo rule).\n\n## Relations\n\n- Concrete mechanism behind part of #2253 (no recovery guardian / silent outage — the guardian exists but its remedy cannot succeed).\n- Amplifies #1711 (event-loop stalls trigger the watchdog; the doomed restarts then add churn on an already-starved box).\n- Evidence from the 2026-07-03 morning incident; starvation driver that morning was the PAN-2148 workspace container crash-loop/rebuild churn (see #1740).",
+      "Proposal": "Implement the issue directly from the tracker-provided title and body."
+    },
+    "items": [
+      {
+        "id": "auto-start",
+        "title": "Implement issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T15:45:01.892Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2286",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "## Symptom\n\nEvery watchdog-triggered dashboard restart on 2026-07-03 (~12 attempts, 06:57Z–09:26Z) failed with `pan restart --dashboard exited 1` after a consistent ~16–18s, ending twice in `WATCHDOG GIVING UP — manual intervention required`. The self-healing path has likely **never succeeded** on a loaded machine:\n\n```\n[2026-07-03T06:57:31.080Z] watchdog spawned pan restart --dashboard (pid 3613204)\n[2026-07-03T06:57:49.725Z] watchdog restart failed: pan restart --dashboard exited 1\n[2026-07-03T07:04:50.101Z] watchdog spawned pan restart --dashboard (pid 3740027)\n[2026-07-03T07:05:06.746Z] watchdog restart failed: pan restart --dashboard exited 1\n[2026-07-03T07:07:00.827Z] WATCHDOG GIVING UP — manual intervention required: The operation was aborted due to timeout\n...\n[2026-07-03T09:26:53.456Z] WATCHDOG GIVING UP — manual intervention required: fetch failed\n```\n\n## Root cause (verified in source)\n\n1. **The health wait defaults to 15 seconds, and the watchdog never overrides it.**\n   - `src/supervisor/server.ts:99` spawns `pan restart --dashboard` with no `--health-timeout` flag.\n   - `src/cli/commands/restart.ts:178-180` leaves `healthTimeoutMs` `undefined` when the flag is absent.\n   - `src/lib/platform-lifecycle.ts:210`: `const timeoutMs = opts.timeoutMs ?? 15_000;`\n2. **Dashboard boot-to-listen alone takes 15–92s**, so the 15s health window expires before even a healthy boot can start listening. Boot-timing lines from dashboard.log this morning: `+17312ms`, `+15174ms`, `+91780ms`, `+15444ms` (all \"HTTP server listening\" — health passes only after that). The restart is therefore **structurally guaranteed to exit 1** under exactly the starved conditions that trigger the watchdog in the first place. The operator SOP already says restarts need `--health-timeout` ≥ 120s; the watchdog violates it.\n3. **The failure reason is invisible**: `src/supervisor/server.ts:101` spawns the child with `stdio: 'ignore'`, so the child's stderr (`✗ [health] health check at ... did not pass within 15000ms`) is discarded. The supervisor log only ever shows the bare exit code.\n\nA secondary confusion multiplier: the exit-1 happens AFTER the child has already SIGTERM'd and respawned the dashboard, so the dashboard often does come back seconds later — while the watchdog has already recorded a failed attempt toward its give-up budget (`maxRestarts`), and (pre-PAN-2219-fix conditions) keeps burning attempts until `gaveUp`.\n\n## Fix\n\n1. In `src/supervisor/server.ts` `spawnRestart()`, pass an explicit generous health timeout (e.g. `--health-timeout 120000`), or thread `watchdogConfig` through so it is configurable.\n2. Capture the child's stdout/stderr (pipe to the supervisor `log()` on failure) instead of `stdio: 'ignore'` so the next failure is diagnosable from supervisor.log alone.\n3. Test: unit test that the spawned argv includes the health-timeout flag, plus a watchdog test where restart succeeds when boot takes 60s (fake timers per repo rule).\n\n## Relations\n\n- Concrete mechanism behind part of #2253 (no recovery guardian / silent outage — the guardian exists but its remedy cannot succeed).\n- Amplifies #1711 (event-loop stalls trigger the watchdog; the doomed restarts then add churn on an already-starved box).\n- Evidence from the 2026-07-03 morning incident; starvation driver that morning was the PAN-2148 workspace container crash-loop/rebuild churn (see #1740)."
+        },
+        "items": [
+          {
+            "id": "auto-start.ac1",
+            "title": "- src/supervisor/server.ts:99 spawns pan restart --dashboard with no --health-timeout flag.",
+            "status": "pending",
+            "created": "2026-07-03T15:45:01.892Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac2",
+            "title": "- src/cli/commands/restart.ts:178-180 leaves healthTimeoutMs undefined when the flag is absent.",
+            "status": "pending",
+            "created": "2026-07-03T15:45:01.892Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac3",
+            "title": "- src/lib/platform-lifecycle.ts:210: const timeoutMs = opts.timeoutMs ?? 15_000;",
+            "status": "pending",
+            "created": "2026-07-03T15:45:01.892Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac4",
+            "title": "Concrete mechanism behind part of #2253 (no recovery guardian / silent outage — the guardian exists but its remedy cannot succeed).",
+            "status": "pending",
+            "created": "2026-07-03T15:45:01.892Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac5",
+            "title": "Amplifies #1711 (event-loop stalls trigger the watchdog; the doomed restarts then add churn on an already-starved box).",
+            "status": "pending",
+            "created": "2026-07-03T15:45:01.892Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac6",
+            "title": "Evidence from the 2026-07-03 morning incident; starvation driver that morning was the PAN-2148 workspace container crash-loop/rebuild churn (see #1740).",
+            "status": "pending",
+            "created": "2026-07-03T15:45:01.892Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "completed"
+}

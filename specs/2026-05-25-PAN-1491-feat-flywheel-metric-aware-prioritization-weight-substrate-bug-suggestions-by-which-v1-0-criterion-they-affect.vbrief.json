@@ -1,0 +1,738 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-06T16:31:30.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-1491: metric-aware flywheel prioritization — weight substrate-bug suggestions by which v1.0 criterion they affect",
+    "updated": "2026-07-06T17:08:22.203Z"
+  },
+  "plan": {
+    "id": "pan-1491",
+    "title": "feat(flywheel): metric-aware prioritization — weight substrate-bug suggestions by which v1.0 criterion they affect",
+    "status": "proposed",
+    "uid": "4f862c7d-d398-4b8e-850a-c0f581c16da7",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-07-06T16:31:30.000Z",
+    "updated": "2026-07-06T17:08:22.203Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1491",
+        "label": "PAN-1491",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1487",
+        "label": "PAN-1487 (dependency, merged)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "flywheel",
+      "prioritization",
+      "telemetry",
+      "v1.0-required",
+      "substrate-improvement"
+    ],
+    "narratives": {
+      "Problem": "The flywheel ranks suggestions by P-level + age only (roles/flywheel.md:225-233). All substrate bugs bucket the same; there is no signal about which bug is closest to a v1.0 criterion threshold. #1487 (PR #1505, merged) shipped the telemetry that knows which criterion is under threat; nothing consumes it for ranking. Commit 74403b36a6 landed substrate-first bucketing and explicitly left 'deterministic label-weighting in code' to this issue. NOTE: the June 2026 implementation (PR #1636) was RETIRED (closed, not merged) because it was built against the pre-remodel/pre-rebrand foundation; this is a rebuild against current code.",
+      "Proposal": "Add a deterministic metric-drift weight for substrate bugs, consumed as a ranking signal by the LLM orchestrator (which authors suggestions) and surfaced in the dashboard. (1) Substrate bugs declare affected criteria via a `Flywheel-Affects-Criterion: N,M` body trailer (primary) or `affects-criterion-N` labels (parse-only fallback). (2) A pure lib computes weight+reason from affected criteria and the live 30-day stats snapshot. (3) A shared lib service joins bugs+stats+weights into a sorted table; both a new HTTP route and a new sandbox-safe CLI call it. (4) roles/flywheel.md teaches the orchestrator to call `pan flywheel weights --json` each tick and write weight/weightReason onto emitted substrate suggestions (contract extended with two optional fields). (5) The dashboard renders a weight badge + reason and applies weight as a secondary sort within an equal priority tier. Weight formula: contribution(c)=STATUS_MULT[status]*(STATUS_FLOOR[status]+normalizedDistance(c)), weight=Σ over affected criteria; STATUS_MULT {red:3,yellow:2,green:1,insufficient_data:0}, STATUS_FLOOR {red:1,yellow:0.5,green:0,insufficient_data:0}.",
+      "NonGoals": "- Non-substrate (user-pipeline) bug prioritization — those keep normal P-level ranking.\n- Operator-filed / operator-injected issues always-on-top — preserved; weighting is a default sort, not a filter (NFR-1).\n- Changing how the seven criteria are computed or their targets — #1487 owns that.\n- Introducing per-criterion weight constants or altering the v1.0 AND-gate definition.\n- Historical backfill of Flywheel-Affects-Criterion on pre-existing substrate bugs.\n- Creating affects-criterion-N GitHub labels as infrastructure — labels are parse-only if present; the trailer is the primary path.\n- Re-sorting a server-built suggestion list — suggestions are LLM-authored, not server-computed."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Mapping mechanism = `Flywheel-Affects-Criterion: N,M` body trailer (primary) + `affects-criterion-N` labels (parse-only fallback).",
+        "rationale": "Reuses #1487's trailer convention and substrate-bug-poller.ts parsing style; requires no GitHub label infrastructure. Issue Scope item listed both label and trailer as options; trailer is the smallest-footprint choice consistent with existing provenance."
+      },
+      {
+        "summary": "Weight = Σ STATUS_MULT[status] * (STATUS_FLOOR[status] + normalizedDistance) over affected criteria.",
+        "rationale": "Status floor guarantees red > yellow > green ordering even when a compound criterion value (c4/c6) cannot be cleanly normalized to a scalar; the drift term still differentiates within a status. Improves on the earlier raw-distance formula which would zero-out un-normalizable criteria."
+      },
+      {
+        "summary": "Criterion weights are uniform (all seven equal).",
+        "rationale": "Telemetry defines no per-criterion weight constants and vision.mdx treats the seven as an equal AND-gate; inventing weights would exceed scope."
+      },
+      {
+        "summary": "Weight is a secondary sort WITHIN an equal priority tier; never overrides P0/urgent; never a hard filter.",
+        "rationale": "Issue Scope: 'metric weighting is a default sort, not a hard filter'; Out-of-scope: operator escape hatch preserved."
+      },
+      {
+        "summary": "`pan flywheel weights` reads the shared lib service directly (no HTTP).",
+        "rationale": "The flywheel orchestrator runs in a sandbox that may not reach the dashboard HTTP port; matches the existing `flywheel merge-blockers` direct-SQLite sandbox-safe pattern in flywheel-surfaces.ts."
+      },
+      {
+        "summary": "insufficient_data criteria contribute 0.",
+        "rationale": "Before 3 completed pipeline runs in the window telemetry has no signal; ranking on noise would mislead. This is correct restraint, not a bug."
+      }
+    ],
+    "items": [
+      {
+        "id": "b1-contract",
+        "title": "Extend FlywheelSuggestion contract with optional weight + weightReason",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-06T16:31:30.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-1491",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/flywheel.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd packages/contracts && npm run build",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "contracts build emits updated dist with weight/weightReason",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In packages/contracts/src/flywheel.ts, add two optional fields to BOTH the `FlywheelSuggestion` TypeScript interface (lines ~178-183) and the `FlywheelSuggestion` Effect `Schema.Struct` (lines ~185-190): `weight?: number | undefined` (Schema.optional(Schema.Number)) and `weightReason?: string | undefined` (Schema.optional(Schema.String)). Do not change existing fields (action, issueId, rationale, priority). Rebuild the contracts package so consumers (server, CLI, frontend) see the new types."
+        },
+        "items": [
+          {
+            "id": "b1-contract.ac1",
+            "title": "Given a FlywheelSuggestion object, the type accepts an optional numeric `weight` and string `weightReason` and still accepts objects without them (backward compatible)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-contract.ac2",
+            "title": "The Effect Schema.Struct decodes a payload containing weight and weightReason without error and preserves both fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-contract.ac3",
+            "title": "`cd packages/contracts && npm run build` completes and the emitted dist exports the widened FlywheelSuggestion; root `npm run typecheck` passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b2-parse-criteria",
+        "title": "Add parseAffectedCriteria(body, labels) → number[]",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-06T16:31:30.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1491",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "b4-service",
+            "b9-producer-doc"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/affected-criteria.ts",
+            "src/lib/overdeck/__tests__/affected-criteria.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/affected-criteria.test.ts"
+          ],
+          "expected_outputs": [
+            "affected-criteria.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create a pure function `parseAffectedCriteria(body: string | null | undefined, labels: readonly string[] = []): number[]` in a new file src/lib/overdeck/affected-criteria.ts. Parse a `Flywheel-Affects-Criterion:` trailer line (multiline, case-insensitive) whose value is a comma/space-separated list of integers, mirroring the regex style of parseSubstrateBugTrailer in src/dashboard/server/services/substrate-bug-poller.ts:105-115. ALSO parse labels matching /^affects-criterion-(\\d+)$/. Union the two sources, keep only integers 1..7, dedupe, sort ascending. Return [] when neither source declares anything (must NOT require any #1487 trailer to be present). No network/DB access."
+        },
+        "items": [
+          {
+            "id": "b2-parse-criteria.ac1",
+            "title": "Given a body containing `Flywheel-Affects-Criterion: 1,5`, returns [1,5]; given `Affects-Criterion: 5 1 5` (any case, repeats, spaces) returns [1,5]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-parse-criteria.ac2",
+            "title": "Given labels ['affects-criterion-3','substrate'] and no trailer, returns [3]; given both a trailer (1) and a label (3), returns the sorted union [1,3]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-parse-criteria.ac3",
+            "title": "Rejects out-of-range values: `Flywheel-Affects-Criterion: 0,8,3` returns [3]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-parse-criteria.ac4",
+            "title": "Given null/empty body and no labels, returns []; given a body carrying only other Flywheel trailers (Flywheel-Run-Id/Filed-By) returns []",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b3-weight-fn",
+        "title": "Add computeSubstrateBugWeight(criteria, stats) → { weight, reason }",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-06T16:31:30.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1491",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "b4-service"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/substrate-bug-weight.ts",
+            "src/lib/overdeck/__tests__/substrate-bug-weight.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/substrate-bug-weight.test.ts"
+          ],
+          "expected_outputs": [
+            "substrate-bug-weight.test.ts passes with cases for each criterion type incl compound and insufficient_data"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/overdeck/substrate-bug-weight.ts exporting: (a) a `CRITERION_META` table mapping each criterion number 1..7 to { key: keyof FlywheelStatsCriteria, direction: 'lower'|'higher'|'zero', valueField?: string } per the PRD table (c4 valueField 'medianMs', c6 valueField 'ratio', c2 direction 'zero', c3 direction 'higher', rest 'lower'); (b) `computeSubstrateBugWeight(criteria: number[], stats: FlywheelStats): { weight: number; reason: string }`. For each affected criterion read stats.criteria[key]. Compute normalizedDistance: 'lower' = max(0,(value-target)/target); 'higher' = max(0,(target-value)/target); 'zero' = value. If value/target are objects, read the numeric valueField sub-field; if absent or non-numeric, normalizedDistance = 0. contribution = STATUS_MULT[status] * (STATUS_FLOOR[status] + normalizedDistance) with STATUS_MULT {red:3,yellow:2,green:1,insufficient_data:0} and STATUS_FLOOR {red:1,yellow:0.5,green:0,insufficient_data:0}. weight = Σ contributions, rounded to 2 decimals. reason describes the single highest-contribution criterion using its label + status + value/target (e.g. 'criterion 1 (substrate-bug discovery rate) red at 3.2% vs target <2%'). Empty criteria → { weight: 0, reason: 'no affected criteria declared' }. IMPLEMENTATION CHECKPOINT: confirm c4/c6 compound sub-field names by reading computeMttrCriterion/computeCriterion6Bucket in src/dashboard/server/services/flywheel-telemetry.ts (planning-verified: c4 {medianMs,p95Ms}; c6 bucket {medianMs,p95Ms,ratio})."
+        },
+        "items": [
+          {
+            "id": "b3-weight-fn.ac1",
+            "title": "computeSubstrateBugWeight([1], stats) returns weight 4.8 when criterion 1 is red with value 0.032 vs target 0.02 (3*(1+0.6))",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-weight-fn.ac2",
+            "title": "computeSubstrateBugWeight returns a larger weight for a single red criterion than for a single green criterion carrying larger raw drift (status multiplier and floor dominate)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-weight-fn.ac3",
+            "title": "For c4 with compound value {medianMs,p95Ms} the function returns a finite (non-NaN) weight by reading medianMs; when the configured valueField is absent it returns a weight using normalizedDistance 0 plus the status floor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-weight-fn.ac4",
+            "title": "computeSubstrateBugWeight over only insufficient_data criteria returns weight 0 and a reason mentioning insufficient telemetry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-weight-fn.ac5",
+            "title": "computeSubstrateBugWeight returns a reason string naming the highest-contributing criterion by label, status, and value-vs-target",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b4-service",
+        "title": "Add listSubstrateBugWeights(window) lib service joining bugs + stats + weights",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-06T16:31:30.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1491",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/substrate-bug-weights-service.ts",
+            "src/lib/overdeck/__tests__/substrate-bug-weights-service.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/substrate-bug-weights-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "service test passes",
+            "typecheck clean"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/overdeck/substrate-bug-weights-service.ts exporting `async function listSubstrateBugWeights(window = '30d', deps?): Promise<WeightedSubstrateBug[]>`. Steps: (1) compute the window bounds and call computeFlywheelStats(window, ...inputs) — reuse the same input-derivation the route uses (see getFlywheelStatsPayload in src/dashboard/server/routes/flywheel.ts:423 which composes derivePipelineRunStatsInputs + listInWindow). (2) list in-window substrate bugs via listInWindow(since, until) from src/lib/overdeck/flywheel-substrate-bugs.ts:157. (3) for each bug, fetch its issue body+labels (bugs carry issueId; reuse whatever body source #1487 stores, else GitHub fetch is out of scope — parse from the stored row/body if available), call parseAffectedCriteria, then computeSubstrateBugWeight(criteria, stats). (4) return WeightedSubstrateBug[] = { issueId, severity, filedBy, affectedCriteria, weight, weightReason } sorted by weight desc, then filed_at asc. Inject stats/bugs via a deps param so tests avoid real DB/telemetry. Keep this the SINGLE source both the route (b5) and CLI (b6) call."
+        },
+        "items": [
+          {
+            "id": "b4-service.ac1",
+            "title": "Given injected stats and two in-window bugs declaring different criteria, returns both as WeightedSubstrateBug rows sorted by weight descending",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b4-service.ac2",
+            "title": "listSubstrateBugWeights produces rows that each expose issueId, severity, filedBy, affectedCriteria (number[]), weight (number), and weightReason (string)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b4-service.ac3",
+            "title": "With fewer than 3 completed pipeline runs (insufficient telemetry), every row returns weight 0 and an insufficient-telemetry reason rather than being dropped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b5-route",
+        "title": "Add GET /api/flywheel/substrate-bug-weights route",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-06T16:31:30.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-1491",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/flywheel.ts",
+            "src/dashboard/server/routes/__tests__/flywheel.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/flywheel.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "flywheel route test passes including the new endpoint",
+            "typecheck clean"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/flywheel.ts, add `getSubstrateBugWeightsRoute` following the exact HttpRouter.add pattern used by getFlywheelStatsRoute (lines 528-540): read optional `window` search param (default '30d'), call listSubstrateBugWeights(window), return jsonResponse. Register it into `flywheelRouteLayer` (the Layer.mergeAll at lines ~972-1003). Add a route test asserting the endpoint returns the weighted array."
+        },
+        "items": [
+          {
+            "id": "b5-route.ac1",
+            "title": "GET /api/flywheel/substrate-bug-weights returns 200 with a JSON array of WeightedSubstrateBug rows sorted by weight desc",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b5-route.ac2",
+            "title": "The ?window=<dur> query param is honored and passed through to listSubstrateBugWeights; default is 30d when omitted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b5-route.ac3",
+            "title": "The composed server router returns 200 for GET /api/flywheel/substrate-bug-weights, confirming the route is registered in flywheelRouteLayer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b6-cli",
+        "title": "Add `pan flywheel weights` CLI (direct lib, no HTTP)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-06T16:31:30.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1491",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/flywheel-surfaces.ts",
+            "src/cli/commands/__tests__/flywheel.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/flywheel.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "flywheel CLI test passes including `weights`",
+            "typecheck clean"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a `pan flywheel weights [--issue <id>] [--window <dur>] [--json]` subcommand. Register it in src/cli/commands/flywheel-surfaces.ts (registerFlywheelSurfaceCommands, lines 137-151) next to `merge-blockers`, which is the sandbox-safe direct-read precedent. The handler calls listSubstrateBugWeights(window) DIRECTLY (import the lib service — NO fetch/HTTP), optionally filters to --issue, and prints: default = an aligned text table (issueId, severity, weight, reason); --json = JSON.stringify of the array. Match the output/formatting conventions of the neighbouring surface commands."
+        },
+        "items": [
+          {
+            "id": "b6-cli.ac1",
+            "title": "`pan flywheel weights` prints an aligned table of substrate bugs ordered by weight desc with issueId, severity, weight, and reason columns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b6-cli.ac2",
+            "title": "`pan flywheel weights --json` emits a JSON array parseable by the orchestrator; `--issue PAN-N` filters to that one bug",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b6-cli.ac3",
+            "title": "The command performs no HTTP request — it imports and calls listSubstrateBugWeights directly (grep for fetch/http in the handler returns nothing)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b7-ui",
+        "title": "Surface weight badge + reason and secondary weight sort in FlywheelStatusDetails",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-06T16:31:30.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-1491",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelStatusDetails.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusDetails.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusDetails.test.tsx"
+          ],
+          "expected_outputs": [
+            "FlywheelStatusDetails test passes including weight badge + sort assertions"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/flywheel/FlywheelStatusDetails.tsx: (1) extend sortSuggestions (line 103) so that within an equal priority tier, suggestions sort by `weight` descending (undefined weight sorts last); priority tier remains the primary key — do NOT let weight cross tiers. (2) In the suggestion row (lines ~145-160), after SuggestionPriorityBadge, render a new `SuggestionWeightBadge` when suggestion.weight != null, using the styling conventions in src/dashboard/frontend/src/components/shared/statusPrimitives.tsx (cn() + semantic tokens, font-mono, info tone e.g. bg-info/15 text-info-foreground border-info/30 — no arbitrary colors, no new pill shapes beyond the existing badge idiom). (3) render suggestion.weightReason as a small muted sub-line beneath the rationale. Add/extend the component test."
+        },
+        "items": [
+          {
+            "id": "b7-ui.ac1",
+            "title": "A suggestion with weight renders a weight badge (font-mono, semantic token color) and its weightReason as a muted sub-line; a suggestion without weight renders neither",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b7-ui.ac2",
+            "title": "Two suggestions of equal priority render in weight-descending order; a higher-priority suggestion with lower weight still renders above a lower-priority higher-weight one (tier stays primary)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b7-ui.ac3",
+            "title": "The component renders the weight badge using only existing semantic color tokens / badge idiom from statusPrimitives (no arbitrary hex, no decorative color)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b8-orchestrator-doc",
+        "title": "Teach the flywheel orchestrator to consume weights (roles/flywheel.md + docs/flywheel-brief.md)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-06T16:31:30.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-1491",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/flywheel.md",
+            "docs/flywheel-brief.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"pan flywheel weights\" roles/flywheel.md docs/flywheel-brief.md"
+          ],
+          "expected_outputs": [
+            "both files reference `pan flywheel weights --json` and describe writing weight/weightReason onto substrate suggestions"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Update the ranking guidance in roles/flywheel.md (Decide step, lines ~225-233; and the metric-drift lines ~46 and ~118) and docs/flywheel-brief.md to instruct the orchestrator: each tick, run `pan flywheel weights --json`; within the substrate-hardening tier, order substrate-bug suggestions by the returned weight (higher first); set the emitted suggestion's `weight` and `weightReason` fields from that output. Include ONE worked example showing sample `pan flywheel weights --json` output and the resulting suggestion ordering/fields. State explicitly that weight only re-orders WITHIN the tier and never overrides P0/red-main and never filters (operator injection preserved)."
+        },
+        "items": [
+          {
+            "id": "b8-orchestrator-doc.ac1",
+            "title": "`grep 'pan flywheel weights --json' roles/flywheel.md` returns a match inside the Decide-step ranking guidance that orders substrate suggestions by weight within the substrate-hardening tier",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b8-orchestrator-doc.ac2",
+            "title": "roles/flywheel.md renders a worked example showing sample weights JSON and the resulting suggestion order with weight/weightReason set on each substrate suggestion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b8-orchestrator-doc.ac3",
+            "title": "`grep -in 'within .*tier' roles/flywheel.md docs/flywheel-brief.md` returns a match stating weight re-orders only within a tier and never overrides red-main/P0 or filters operator-injected work",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b9-producer-doc",
+        "title": "Teach substrate-bug filing to declare Flywheel-Affects-Criterion",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-06T16:31:30.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-1491",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/flywheel.md",
+            "docs/FLYWHEEL.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -n \"Flywheel-Affects-Criterion\" roles/flywheel.md docs/FLYWHEEL.md"
+          ],
+          "expected_outputs": [
+            "filing guidance documents the Flywheel-Affects-Criterion trailer format"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Document the producer side: where the flywheel (or an agent) files a substrate bug and knows which v1.0 criterion it degrades, it should append a `Flywheel-Affects-Criterion: N[,M]` trailer to the issue body (same trailer block style as #1487's Flywheel-Run-Id/Filed-By, documented in docs/FLYWHEEL.md 'Substrate-bug provenance' section lines ~75-94). Update roles/flywheel.md's substrate-bug filing guidance and docs/FLYWHEEL.md to describe the trailer, its meaning, and the 1..7 criterion numbering (cross-reference the seven criteria in docs/FLYWHEEL.md 'Reading the Stats panel'). This is guidance only — it does NOT create GitHub labels and does NOT modify the gh-issue-trailer-hook (the hook derives trailers from env vars; affected-criterion is semantic and author-supplied)."
+        },
+        "items": [
+          {
+            "id": "b9-producer-doc.ac1",
+            "title": "`grep 'Flywheel-Affects-Criterion' docs/FLYWHEEL.md` returns a match that documents the trailer format and the 1..7 criterion numbering with a cross-reference to the seven criteria",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b9-producer-doc.ac2",
+            "title": "roles/flywheel.md substrate-bug filing guidance instructs agents to add the trailer when the affected criterion is known",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b10-user-docs",
+        "title": "Document metric-aware weighting in FLYWHEEL.md + vision.mdx",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-06T16:31:30.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-1491",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/FLYWHEEL.md",
+            "vision.mdx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -n \"metric-aware\\|substrate-bug-weights\\|weight\" docs/FLYWHEEL.md vision.mdx"
+          ],
+          "expected_outputs": [
+            "FLYWHEEL.md describes the weighting model + the pan flywheel weights command; vision.mdx metric-aware note updated"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a short 'Metric-aware prioritization' subsection to docs/FLYWHEEL.md explaining: how a substrate bug declares affected criteria, the weight formula in plain terms (status dominates, drift breaks ties, insufficient_data → 0), the `pan flywheel weights` command, and the dashboard badge. Update the metric-aware note in vision.mdx (lines ~200-202) to point at the now-implemented weighting and the command. Keep it consistent with the seven-criteria descriptions already in FLYWHEEL.md 'Reading the Stats panel'."
+        },
+        "items": [
+          {
+            "id": "b10-user-docs.ac1",
+            "title": "`grep -i 'metric-aware' docs/FLYWHEEL.md` returns a match in a new subsection that describes the weight model and the `pan flywheel weights` command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b10-user-docs.ac2",
+            "title": "`grep -i 'pan flywheel weights' vision.mdx` returns a match near the metric-aware prioritization note referencing the implemented weighting rather than pending work",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "b1-contract",
+        "to": "b7-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "b1-contract",
+        "to": "b8-orchestrator-doc",
+        "type": "blocks"
+      },
+      {
+        "from": "b2-parse-criteria",
+        "to": "b4-service",
+        "type": "blocks"
+      },
+      {
+        "from": "b2-parse-criteria",
+        "to": "b9-producer-doc",
+        "type": "informs"
+      },
+      {
+        "from": "b3-weight-fn",
+        "to": "b4-service",
+        "type": "blocks"
+      },
+      {
+        "from": "b4-service",
+        "to": "b5-route",
+        "type": "blocks"
+      },
+      {
+        "from": "b4-service",
+        "to": "b6-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "b6-cli",
+        "to": "b8-orchestrator-doc",
+        "type": "blocks"
+      },
+      {
+        "from": "b3-weight-fn",
+        "to": "b10-user-docs",
+        "type": "informs"
+      },
+      {
+        "from": "b9-producer-doc",
+        "to": "b8-orchestrator-doc",
+        "type": "blocks"
+      },
+      {
+        "from": "b9-producer-doc",
+        "to": "b10-user-docs",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-06-PAN-1491-feat-flywheel-metric-aware-prioritization-weight-substrate-bug-suggestions-by-which-v1-0-criterion-they-affect.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

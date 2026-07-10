@@ -1,0 +1,1756 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-07T13:32:48Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2464: feat(dashboard): Machine Room — complete /resources overhaul (attribution, reclaim advisor, stop/pause, disk, spawn-gate visibility)",
+    "updated": "2026-07-08T00:04:47.703Z"
+  },
+  "plan": {
+    "id": "pan-2464",
+    "title": "feat(dashboard): Machine Room — complete /resources overhaul (attribution, reclaim advisor, stop/pause, disk, spawn-gate visibility)",
+    "status": "completed",
+    "uid": "5b2e0079-5807-4705-bfdb-f658d8397977",
+    "author": "agent:claude-fable-5",
+    "sequence": 4,
+    "created": "2026-07-07T13:32:48Z",
+    "updated": "2026-07-08T00:04:47.703Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2464",
+        "label": "PAN-2464",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-2464.md",
+        "label": "PRD (FR-1..11, NFR-1..3, D1-D7)",
+        "type": "doc"
+      },
+      {
+        "uri": "docs/design/mockups/resources-machine-room.html",
+        "label": "BINDING mockup (operator-approved 2026-07-07)",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "resources",
+      "docker",
+      "frontend",
+      "observability"
+    ],
+    "narratives": {
+      "Problem": "The current /resources page shows a flat container list with CPU/mem and start/restart only. Operations exposed every gap at once: 9 GB held by stacks of already-merged issues (no reclaim surface, no stop button), a container OOM-thrashing at its 4 GB limit with no limit visibility, a load-45 vitest spike with no attribution, mystery spawn-gate 409s, and 52 GB of orphaned TLDR venvs invisible to the UI.",
+      "Proposal": "Rebuild /resources as the Machine Room per the binding mockup: host vitals strip with spawn-gate state, pipeline-aware reclaim advisor, issue-grouped stack cards with limit awareness and the full verb set (start/stop/pause/restart/logs/terminal/tear-down), agents section with process-tree stats and burn rate, core services and host-process attribution, and a 24h annotated history with capacity forecast. All data flows through the extended /api/resources read door (D1); resources.ts splits into a routes/resources/ module folder; grouping, reclaim logic, and burn math are server-side.",
+      "NonGoals": "- No new state plane and no direct DB/GitHub access from the frontend — pipeline state via the review-status resolver only (D3)\n- Tear-down never deletes the git worktree — docker containers/volumes/networks only (D4)\n- No continuous per-process history — spike-attribution snapshots only (D6)\n- No ML forecasting — heuristic last-run peak / fleet median only (D7)\n- No changes to spawn-gate enforcement behavior — this issue only surfaces the existing verdict\n- No mobile/responsive redesign — mockup targets 1440px desktop\n- No removal or behavior change of the 11 existing /api/resources endpoints (no-loss audit enforces this)\n- No raising of memory limits automatically — 'Raise limit' only opens the compose override editor path"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Corrected the PRD's evaluateSpawnGuardrails reference: the function is defined in src/dashboard/server/routes/agents/shared.ts:548; spawn.ts:341 is the call site. Gate mapping: 200+no-warnings=OPEN, requiresAcknowledgement=SOFT, blocked=BLOCKED.",
+        "rationale": "Verified by grep during discovery; the PRD cited the call site. Recording the definition site prevents the work agent hunting for a function that isn't in spawn.ts."
+      },
+      {
+        "summary": "Teardown endpoint reuses only docker-scoped steps (stopDocker + compose down -v equivalent), never teardownWorkspace() wholesale.",
+        "rationale": "teardownWorkspace() calls removeWorktree (teardown-workspace.ts:375), which deletes the git worktree — directly violating D4's 'Tear-down NEVER deletes the git worktree'. The PRD said 'through the existing teardown lib'; the safe reading is its docker steps only."
+      },
+      {
+        "summary": "Single issue with one mega-vBRIEF (22 beads) rather than sibling issues; two foundation server beads then vertical slices, with snapshot.ts-touching beads marked readiness:sequential.",
+        "rationale": "The PRD's Sequencing section explicitly suggests a single work agent with server phases before UI; the beads share one payload contract (snapshot.ts) and one page shell, so parallel dispatch would conflict on shared files — sequential is the honest readiness."
+      },
+      {
+        "summary": "Frontend rework lands in a new src/dashboard/frontend/src/components/resources/ module folder with ResourcesPanel.tsx remaining the mounted entry.",
+        "rationale": "Keeps the '/resources' route mounting (App/routes.ts, AppRoutes.tsx) untouched, satisfies the file-size ceiling, and gives the six UI beads mostly disjoint files_scope."
+      },
+      {
+        "summary": "Live refresh extends the existing resources.updated emitOnly domain-event path on the DockerStatsCollector 5s cadence; polling is only the WS-down fallback.",
+        "rationale": "Discovery showed the frontend is already event-driven (EventRouter -> Zustand -> useResourceStats); adding a parallel polling loop would duplicate the read path and raise event-loop load (NFR-1)."
+      }
+    ],
+    "items": [
+      {
+        "id": "routes-split",
+        "title": "Split routes/resources.ts into a routes/resources/ module folder with a no-loss endpoint audit",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-07T13:32:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-2464",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "stacks-grouping",
+            "host-vitals",
+            "spawn-gate",
+            "container-verbs",
+            "stack-verbs",
+            "teardown-endpoint",
+            "reclaim-candidates",
+            "limits-oom",
+            "agents-burn",
+            "core-services",
+            "host-processes",
+            "history-annotations",
+            "spike-sampler",
+            "forecast"
+          ],
+          "files_scope": [
+            "src/dashboard/server/routes/resources.ts",
+            "src/dashboard/server/routes/resources/index.ts",
+            "src/dashboard/server/routes/resources/snapshot.ts",
+            "src/dashboard/server/routes/resources/containers.ts",
+            "src/dashboard/server/routes/resources/prune.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/dashboard/routes/resources-no-loss.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/routes/resources-no-loss.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "no-loss audit test passes listing all 11 legacy endpoints",
+            "lint-file-size.sh passes with no baseline additions"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Move the contents of src/dashboard/server/routes/resources.ts (370 lines: getResourcesEffect, container history/details/logs, start/restart, delete container/network/volume, prune-containers/prune-volumes) into a routes/resources/ folder: index.ts (route registration + Layer export, preserving the existing export name the server composes), snapshot.ts (the GET /api/resources payload builder), containers.ts (per-container GET/POST/DELETE routes), prune.ts (prune + network/volume deletes). Behavior-neutral: same paths, same handlers, same responses. Add tests/unit/dashboard/routes/resources-no-loss.test.ts that asserts the composed router registers ALL 11 legacy endpoints by method+path: GET /api/resources, GET /api/resources/:containerId/history, GET /api/resources/:containerId/details, GET /api/resources/docker/container/:id/logs, POST /api/resources/docker/container/:id/restart, POST /api/resources/docker/container/:id/start, POST /api/resources/docker/prune-containers, POST /api/resources/docker/prune-volumes, DELETE /api/resources/docker/container/:id, DELETE /api/resources/docker/network/:name, DELETE /api/resources/docker/volume/:name. This test is the no-loss audit gate for the whole overhaul — later beads extend it as they add endpoints. No file over 1000 lines; nothing added to scripts/file-size-baseline.txt."
+        },
+        "items": [
+          {
+            "id": "routes-split.ac1",
+            "title": "Given the new routes/resources/ folder, the composed router registers all 11 legacy method+path pairs and the no-loss audit test passes naming each one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes-split.ac2",
+            "title": "GET /api/resources returns the same payload shape as before the split (containers, stoppedContainers, networks, volumes, agents, updatedAt) — snapshot test compares field sets",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes-split.ac3",
+            "title": "bash scripts/lint-file-size.sh exits 0 with no new entries in scripts/file-size-baseline.txt and every new module under 1000 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes-split.ac4",
+            "title": "grep -rn execSync src/dashboard/server/routes/resources/ produces no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stacks-grouping",
+        "title": "Server-side stack grouping: container → compose project → issue with aggregates and pipeline phase",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-07T13:32:48Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2464",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "stack-verbs",
+            "teardown-endpoint",
+            "reclaim-candidates",
+            "forecast",
+            "fe-stacks",
+            "fe-advisor"
+          ],
+          "files_scope": [
+            "src/dashboard/server/routes/resources/stacks.ts",
+            "src/dashboard/server/routes/resources/snapshot.ts",
+            "tests/unit/dashboard/routes/resources-stacks.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/routes/resources-stacks.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "fixture-driven grouping tests pass: compose-project→issue mapping, aggregates, phase attachment"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add stacks.ts building a stacks[] field in the /api/resources payload (D2): map each container to its compose project (docker compose labels / name convention like myn-feature-min-857), map compose project to issue via the workspace path convention workspaces/feature-<issue>, and group. Each stack carries: issueId, issueTitle, composeProject, serviceCount, per-service rows (reusing ContainerStats from DockerStatsCollector.getStats()), aggregates (CPU%, RAM bytes, disk = volumes+layers via batched docker system df / inspect on the collector cadence, NOT per-request), and pipeline phase resolved via the review-status read door (getReviewStatusSync / cached loadReviewStatuses — same phase vocabulary as getPipelineIssuePhase in src/dashboard/frontend/src/lib/pipeline-state.ts). Containers with no issue mapping group under an 'unassigned' pseudo-stack so nothing disappears (no-loss). The client never re-derives grouping. This payload contract is the foundation for all stack UI: define the Stack type in the payload module and export it for the frontend snapshot type. Sequential: this bead and its siblings share snapshot.ts, so they are deliberately serialized under one work agent."
+        },
+        "items": [
+          {
+            "id": "stacks-grouping.ac1",
+            "title": "Given fixture containers labeled with compose project myn-feature-min-857, GET /api/resources returns a stack keyed to issue MIN-857 with serviceCount and aggregate CPU/RAM summing the fixture services",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stacks-grouping.ac2",
+            "title": "A stack whose issue record reports merged renders phase 'merged' in the payload; phase values come from the review-status resolver, never from GitHub calls in the request path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stacks-grouping.ac3",
+            "title": "The payload returns a container with no issue mapping under the 'unassigned' pseudo-stack, and the sum of services across all stacks equals the fixture container count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stacks-grouping.ac4",
+            "title": "GET /api/resources produces zero docker exec spawns per request — handlers return cached collector snapshots only (exec spy asserts no calls during GET)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "host-vitals",
+        "title": "Host vitals in the payload: CPU/load with sparkline series, memory+swap, disk, docker counts, agent fleet",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-07T13:32:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/resources/host-vitals.ts",
+            "src/dashboard/server/routes/resources/snapshot.ts",
+            "tests/unit/dashboard/routes/resources-host-vitals.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/routes/resources-host-vitals.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "host-vitals tests pass with fixture /proc + docker inputs"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add host-vitals.ts producing a hostVitals payload field (FR-1): CPU percent + load 1/5/15 + a rolling 30-point sparkline series (sampled on the collector 5s cadence, kept in memory), RAM used/available + swap used/total (from /proc/meminfo or os module), disk used/free for the project filesystem (statfs or df, batched on cadence) plus a reclaimable figure filled in by the reclaim-candidates bead (0 until then), docker counts (containers total/running, stack count from stacks-grouping, networks used / 31 pool), and agent fleet counts (sessions total/active from listAgentStates + tmux liveness, idle >15m count; aggregate burn filled by agents-burn bead, 0 until then). All sampling async with timeouts; docker daemon failure marks the snapshot stale:true instead of throwing (NFR-2). Sequential: shares snapshot.ts with sibling payload beads."
+        },
+        "items": [
+          {
+            "id": "host-vitals.ac1",
+            "title": "GET /api/resources returns hostVitals with cpu.percent, cpu.load[3], cpu.spark[≤30], mem.usedBytes/availableBytes/swapUsedBytes, disk.usedBytes/freeBytes, docker.{containers,running,stacks,networks,networkPool}, agents.{sessions,active,idleOver15m}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-vitals.ac2",
+            "title": "When the docker CLI exec fails, the payload still returns with stale:true and the last cached docker counts preserved (fixture test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-vitals.ac3",
+            "title": "The payload returns a cpu.spark array capped at 30 points after 35 collector ticks (fake-timer test advances 35 ticks and asserts length 30)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawn-gate",
+        "title": "Spawn-gate visibility: OPEN/SOFT/BLOCKED state with reason in payload and vitals-strip widget",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T13:32:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/resources/spawn-gate.ts",
+            "src/dashboard/server/routes/resources/snapshot.ts",
+            "src/dashboard/frontend/src/components/resources/SpawnGateVital.tsx",
+            "tests/unit/dashboard/routes/resources-spawn-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/routes/resources-spawn-gate.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "gate mapping tests pass for OPEN, SOFT, and BLOCKED fixture health inputs"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add spawn-gate.ts exposing a spawnGate payload field by calling getSystemHealthSnapshot() and evaluateSpawnGuardrails(health) (defined at src/dashboard/server/routes/agents/shared.ts:548 — NOT spawn.ts, which is the call site). Map the SpawnGuardrailDecision per D8: status 200 with empty warnings → state 'OPEN'; requiresAcknowledgement true → 'SOFT'; blocked true → 'BLOCKED'. reason = decision.error ?? first warnings[].message ?? ''. Render the gate cell in the vitals strip (SpawnGateVital.tsx per the mockup: colored border gate-open/gate-soft, state text, reason subline, pressure bar). Update the 409 hint text in the spawn error path to deep-link to /resources (the 'no more mystery 409s' rule). This bead is vertical: server field + widget + deep-link. Sequential: shares snapshot.ts with sibling payload beads and lands its widget after fe-shell."
+        },
+        "items": [
+          {
+            "id": "spawn-gate.ac1",
+            "title": "Given a fixture health snapshot that evaluates to requiresAcknowledgement, GET /api/resources returns spawnGate.state 'SOFT' with the guardrail's warning message as reason (AC-7)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-gate.ac2",
+            "title": "GET /api/resources returns spawnGate.state 'OPEN' for a green fixture health and 'BLOCKED' for a blocked fixture health — all three mappings covered by unit test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-gate.ac3",
+            "title": "The vitals strip renders the gate cell with the SOFT amber border style and reason text when the store holds a SOFT verdict (component test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-gate.ac4",
+            "title": "The spawn 409 response returns hint text containing a /resources link (assert on the hint string)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "container-verbs",
+        "title": "Container action endpoints: stop, pause, unpause",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-07T13:32:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-2464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/resources/containers.ts",
+            "tests/unit/dashboard/routes/resources-container-verbs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/routes/resources-container-verbs.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "verb tests pass against the fake docker exec layer"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add POST /api/resources/docker/container/:id/stop (docker stop with 30s grace, exec timeout > grace), POST .../pause (docker pause), POST .../unpause (docker unpause), following the exact handler shape of the existing restart route (resources/containers.ts after the split). Async exec only, each with a timeout; errors return a JSON error payload with the docker stderr, never a hung request. Extend the no-loss audit test with the three new endpoints. Tests use a fake docker exec layer (inject/spy the exec dependency) — never a real docker call (H4)."
+        },
+        "items": [
+          {
+            "id": "container-verbs.ac1",
+            "title": "POST /api/resources/docker/container/abc/stop invokes exactly `docker stop` with the id and a 30s grace against the fake exec layer and returns success JSON",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "container-verbs.ac2",
+            "title": "POST pause invokes docker pause and POST unpause invokes docker unpause, and each returns the refreshed container state marker (fake exec test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "container-verbs.ac3",
+            "title": "A failing docker exec returns HTTP 500 with the stderr text in the JSON body within the exec timeout (fake exec rejects; fake timers)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "container-verbs.ac4",
+            "title": "The no-loss audit test now lists 14 endpoints (11 legacy + stop/pause/unpause) and passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stack-verbs",
+        "title": "Stack action endpoints: start, stop, pause across all services of an issue's stack",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T13:32:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-2464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/resources/stacks.ts",
+            "tests/unit/dashboard/routes/resources-stack-verbs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/routes/resources-stack-verbs.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "stack verb tests pass: fan-out to every service container, partial-failure reporting"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add POST /api/resources/stacks/:issueId/{start|stop|pause} that resolves the issue's stack via the stacks-grouping module and applies the verb to every service container sequentially (start uses docker start; stop uses docker stop 30s grace; pause uses docker pause; a paused stack's 'start' unpauses paused containers). Response reports per-container results {containerId, ok, error?} so partial failures are visible, and overall ok=false if any failed. 404 when the issue has no stack. Extend the no-loss audit list. Sequential: shares stacks.ts with the forecast bead."
+        },
+        "items": [
+          {
+            "id": "stack-verbs.ac1",
+            "title": "POST /api/resources/stacks/MIN-857/stop invokes docker stop for each of the fixture stack's 3 services and returns 3 per-container results",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stack-verbs.ac2",
+            "title": "When one container's exec fails, the response returns ok=false overall with that container's error and the other results ok=true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stack-verbs.ac3",
+            "title": "POST for an issueId with no stack returns 404 with an explanatory JSON error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "teardown-endpoint",
+        "title": "Stack tear-down endpoint: typed-confirm token, reclaim estimate, docker-only (never the worktree)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-07T13:32:48Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-2464",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "fe-actions",
+            "fe-advisor"
+          ],
+          "files_scope": [
+            "src/dashboard/server/routes/resources/teardown.ts",
+            "src/lib/lifecycle/teardown-workspace.ts",
+            "tests/unit/dashboard/routes/resources-teardown.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/routes/resources-teardown.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "teardown tests pass: refuses without confirm token, docker-only steps, worktree untouched"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add GET /api/resources/stacks/:issueId/teardown-estimate returning {ramBytes, diskBytes, confirmToken} where the estimate sums the stack's live RAM plus volumes+layers disk, and confirmToken is a short-lived server-generated token bound to the issueId. Add POST /api/resources/stacks/:issueId/teardown accepting {confirmToken, typedText}; the server validates the token AND that typedText equals the compose project name — otherwise 422, nothing executed (NFR-3). Execution = docker-scoped steps ONLY: stop all stack containers, then the compose down -v equivalent (remove containers, stack networks, stack volumes). CRITICAL (D9/H1): do NOT call teardownWorkspace() — it removes the git worktree via removeWorktree (teardown-workspace.ts:375), violating D4. Either call its exported docker-scoped step (stopDocker at line 144) plus explicit volume/network removal, or add a narrow dockerOnlyTeardown helper in teardown-workspace.ts that composes only docker steps. Write an activity.entry event recording the reclaim (feeds history annotations). Tests: fake exec layer; assert the workspace directory path is never touched (no fs removal calls) and refusal paths execute zero docker commands. Sequential: destructive endpoint reviewed at deep inspection depth; deliberately serialized after stacks-grouping."
+        },
+        "items": [
+          {
+            "id": "teardown-endpoint.ac1",
+            "title": "POST teardown without a valid confirmToken or with typedText not matching the compose project returns 422 and executes zero docker commands (fake exec spy)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "teardown-endpoint.ac2",
+            "title": "A valid confirmed teardown stops the stack's containers then removes its containers, stack networks, and stack volumes via the fake exec layer, and returns freed {ramBytes, diskBytes}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "teardown-endpoint.ac3",
+            "title": "Teardown preserves the workspace directory: no fs rm/rmdir call targets the worktree path and removeWorktree is never invoked (spy assertion)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "teardown-endpoint.ac4",
+            "title": "A completed teardown emits one activity.entry event naming the issue and freed bytes (event store spy)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "teardown-endpoint.ac5",
+            "title": "The endpoint rejects a confirmToken older than its TTL with 422 (fake timers advance past the TTL)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reclaim-candidates",
+        "title": "Reclaim advisor server logic: pipeline-aware safe-to-free candidates",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-07T13:32:48Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/resources/reclaim.ts",
+            "src/dashboard/server/routes/resources/snapshot.ts",
+            "tests/unit/dashboard/routes/resources-reclaim.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/routes/resources-reclaim.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "candidate tests pass including the live-agent-blocks-reclaim rule"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add reclaim.ts computing reclaimCandidates[] in the payload (D3): (a) merged/closed-issue stacks still running or holding disk — issue state via the review-status resolver, blocked if any live agent session references the issue (listAgentStates + tmux liveness); (b) orphaned workspace TLDR .venv directories >1 GB whose issue is closed (scan workspaces/*/.venv sizes on the collector cadence, cached); (c) dangling volumes + build cache (docker system df / volume ls -f dangling=true); (d) exited containers. Each candidate: {kind, label, why, ramBytes, diskBytes, action} where action names the endpoint the UI calls (stack stop, venv delete, prune, remove). Include totals; the UI hides the advisor when total < 500 MB (threshold shipped in payload so server owns the rule). Add DELETE /api/resources/venvs/:issue for the venv candidate (validates the issue is closed server-side before rm). All scanning batched on the collector cadence, never per-request. Sequential: shares snapshot.ts with sibling payload beads."
+        },
+        "items": [
+          {
+            "id": "reclaim-candidates.ac1",
+            "title": "GET /api/resources returns a reclaim candidate carrying RAM+disk amounts for a fixture stack whose issue record says merged and which has no live agent (AC-1)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reclaim-candidates.ac2",
+            "title": "The same merged stack with a live agent session referencing the issue is excluded from candidates (live-agent-blocks-reclaim test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reclaim-candidates.ac3",
+            "title": "A fixture workspaces/feature-x/.venv over 1 GB with a closed issue produces a venv candidate; DELETE /api/resources/venvs/x removes it only when the issue is closed, otherwise 409",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reclaim-candidates.ac4",
+            "title": "The payload returns reclaimTotals {ramBytes, diskBytes} and hostVitals.disk.reclaimableBytes matching the disk total (fixture)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "limits-oom",
+        "title": "Limit awareness: per-container memory limit and 24h OOM-kill count",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T13:32:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/docker-stats.ts",
+            "src/dashboard/server/routes/resources/limits.ts",
+            "tests/unit/dashboard/routes/resources-limits.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/routes/resources-limits.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "limit/OOM fixture tests pass including the 95% red threshold"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Surface each container's memory limit in the payload (DockerStatsCollector already parses usage+limit via parseMemUsage at docker-stats.ts:99 — expose limitBytes on the service rows). Add an OOM-kill counter for the last 24h per container by sampling `docker events --filter event=oom --since 24h` (or `docker inspect .State.OOMKilled` + RestartCount deltas) on the collector cadence, cached. Payload service rows gain {memLimitBytes, memPercentOfLimit, oomKills24h}. Threshold semantics (amber ≥85%, red ≥95%) are applied client-side; the server ships raw numbers. Also expose the compose override editor path ('Raise limit') as a per-service composeFile hint field when derivable from the container's compose labels."
+        },
+        "items": [
+          {
+            "id": "limits-oom.ac1",
+            "title": "A fixture container with usage 3.8 GB / limit 4 GB returns memPercentOfLimit 95 and the UI fixture renders it red with the OOM count (AC-4)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "limits-oom.ac2",
+            "title": "The service row returns oomKills24h 2 for two fixture OOM events within 24h and excludes events older than 24h",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "limits-oom.ac3",
+            "title": "A container without a memory limit returns memLimitBytes null and no percent-of-limit (host-percent fallback preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agents-burn",
+        "title": "Agents section data: process-tree CPU/RAM per session plus burn $/h and session total from the cost door",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T13:32:48Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/resources/agents-stats.ts",
+            "src/dashboard/server/routes/resources/snapshot.ts",
+            "tests/unit/dashboard/routes/resources-agents.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/routes/resources-agents.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "burn-rate fixture test passes within 5% of expected $/h"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Add agents-stats.ts producing agents[] rows per live session: identity from listAgentStates + tmux listSessions (session pid), process-tree CPU%/RSS by walking the pid tree from the tmux session pid (read /proc/<pid>/stat + children via /proc/<pid>/task/*/children or one batched `ps -o pid,ppid,pcpu,rss` parse per cadence — never pgrep-per-agent-per-request), status chip inputs (working/idle minutes from state + last activity, fan-out marker when child count spikes), and cost: burn $/h = sum of queryCostEvents({agentId, startTs: now-30min}) extrapolated ×2 (D5), totalUsd = session sum. Subscription-covered usage returns burnUsdPerHour 0 with hypotheticalUsdPerHour carrying the would-be figure for the tooltip (cost-display convention). Aggregate fleet burn feeds hostVitals.agents.burnUsdPerHour. Sequential: shares snapshot.ts with sibling payload beads."
+        },
+        "items": [
+          {
+            "id": "agents-burn.ac1",
+            "title": "A fixture agent with $1.05 of cost_events in the last 30 min returns burnUsdPerHour within 5% of 2.10 (AC-5)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-burn.ac2",
+            "title": "The agent row returns burnUsdPerHour 0 with hypotheticalUsdPerHour > 0 for subscription-covered fixture events",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-burn.ac3",
+            "title": "A fixture pid tree of 4 processes returns the summed CPU% and RSS for the session row from one batched ps parse (exec spy called once per cadence tick)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-burn.ac4",
+            "title": "The payload returns hostVitals.agents.burnUsdPerHour equal to the sum of per-session burn rates (fixture)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "core-services",
+        "title": "Core services data: dashboard event-loop p99, deacon tick health, aggregated support fleet",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T13:32:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/resources/core-services.ts",
+            "src/dashboard/server/routes/resources/snapshot.ts",
+            "tests/unit/dashboard/routes/resources-core-services.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/routes/resources-core-services.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "core-services payload tests pass"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Add core-services.ts producing coreServices[]: dashboard server row (node version, dist path, uptime, own CPU%, event-loop p99Ms from getEventLoopDelaySample() in services/event-loop-monitor.ts — same source as /api/metrics/summary), deacon row (last tick age, patrol summary/stuck counts from the deacon's existing status surface; if no queryable surface exists, read the most recent deacon heartbeat event from the event store), and one aggregated support-fleet row (traefik, smee, pty-supervisors, tldr daemon) with combined CPU/RAM from the batched ps parse shared with agents-stats. Existing restart/logs affordances link to their current endpoints; this bead adds no new action endpoints. Sequential: shares snapshot.ts with sibling payload beads."
+        },
+        "items": [
+          {
+            "id": "core-services.ac1",
+            "title": "coreServices[0] (dashboard) returns eventLoopP99Ms matching getEventLoopDelaySample().p99Ms and an uptime string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-services.ac2",
+            "title": "The deacon row returns lastTickAgeSeconds derived from the most recent heartbeat (fixture event) and a patrol summary count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "core-services.ac3",
+            "title": "The payload returns one aggregated support-fleet row with combined CPU/RAM across fixture traefik/smee/pty/tldr processes and a member count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "host-processes",
+        "title": "Host processes data: top non-docker consumers with owner attribution and transient-burst retention",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T13:32:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/resources/host-processes.ts",
+            "src/dashboard/server/routes/resources/snapshot.ts",
+            "tests/unit/dashboard/routes/resources-host-processes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/routes/resources-host-processes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "attribution and transient-retention tests pass with fake timers"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Add host-processes.ts producing hostProcesses[]: from the shared batched ps parse, exclude pids inside docker cgroups and pids already attributed to agent sessions/core services, group remainder by command family (chrome renderers, vitest workers, mvn, etc.), return top-N (10) by CPU and by RAM merged. Attribution: if a process's ancestor chain reaches a tmux agent session pid, attribute to that agent/issue; chrome grouped as 'your browser'. Transient bursts: when a group that exceeded a CPU threshold exits, keep its row for 1h with current 0%, peak figures, and a 'caused spike' note referencing the annotation event if the spike-sampler recorded one (fake-timer test for the 1h retention window). Sequential: shares snapshot.ts with sibling payload beads."
+        },
+        "items": [
+          {
+            "id": "host-processes.ac1",
+            "title": "Fixture ps output with docker-cgroup pids excluded returns only non-docker groups, sorted by CPU, capped at top-10",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-processes.ac2",
+            "title": "The payload returns attribution 'spawned by agent-pan-2341-test' on a fixture vitest worker whose parent chain reaches that agent's session pid",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-processes.ac3",
+            "title": "A high-CPU group that exits survives in the payload for 1h with peak values and 0% current, then drops after fake timers advance past 1h",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "history-annotations",
+        "title": "24h history series with event annotations from the events table",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T13:32:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/resources/history.ts",
+            "tests/unit/dashboard/routes/resources-history.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/routes/resources-history.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "history downsampling and annotation-filter tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Add GET /api/resources/history/24h returning {cpu: point[], mem: point[], annotations: []}: accumulate host CPU/RAM samples from the collector cadence into a rolling 24h ring buffer downsampled to ≤288 points (5-min buckets), persisted in memory (acceptable to lose on restart — label partial coverage with startedAt). Annotations come from eventStore.queryByType('activity.entry', N) filtered to resource-relevant kinds (spawn-gate flips, reclaims, stack start/stop, spike-attribution events from the sampler; filter by a details.category='resources' marker that emitting sites set) within the window, each {ts, label, targetKind, targetId} so the UI can scroll to the culprit row. Extend the no-loss audit list with the new endpoint."
+        },
+        "items": [
+          {
+            "id": "history-annotations.ac1",
+            "title": "GET /api/resources/history/24h returns cpu and mem series capped at 288 points covering the buffered window with startedAt marking coverage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "history-annotations.ac2",
+            "title": "The endpoint returns annotations for fixture activity.entry events with category 'resources' inside 24h, each carrying targetKind/targetId, and excludes non-resource and older events",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "history-annotations.ac3",
+            "title": "The ring buffer preserves only the trailing 24h of points after 30 fake-timer hours of accumulation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spike-sampler",
+        "title": "Spike-attribution sampler: snapshot top processes into one annotation event when host CPU spikes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T13:32:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/resources/spike-sampler.ts",
+            "tests/unit/dashboard/routes/resources-spike-sampler.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/routes/resources-spike-sampler.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "sampler tests pass: one event per spike episode, includes top-process attribution"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Add spike-sampler.ts hooked to the collector cadence (D6): when host CPU or 1-min load crosses a threshold (default CPU >80% or load > cores×1.5) and no spike episode is open, snapshot the top-3 process groups from the shared ps parse and write ONE activity.entry via emitActivityEntrySync (activity-logger.ts:107) with details.category='resources', message naming the top culprits (e.g. 'Load 45 spike — vitest ×10 workers (agent-pan-2341-test)'), and the attribution ids. The episode closes when the metric drops below threshold−hysteresis for 2 ticks; a new episode may then open. No continuous per-process history is stored. All tests use fake timers."
+        },
+        "items": [
+          {
+            "id": "spike-sampler.ac1",
+            "title": "Driving fixture CPU above threshold for 3 ticks emits exactly one activity.entry naming the top fixture process group (AC-6 server half)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spike-sampler.ac2",
+            "title": "CPU oscillating above threshold within one episode does not emit a second event; dropping below hysteresis for 2 ticks then spiking again emits a new one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spike-sampler.ac3",
+            "title": "The emitted event persists details.category 'resources' and the attributed agent/issue id so history-annotations returns it (fixture round-trip)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "forecast",
+        "title": "Capacity forecast: store stack peak footprint on stop, predict from last-run peak or fleet median",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-07T13:32:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/resources/forecast.ts",
+            "src/dashboard/server/routes/resources/stacks.ts",
+            "tests/unit/dashboard/routes/resources-forecast.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/routes/resources-forecast.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "forecast tests pass: last-run peak preferred, fleet median fallback"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Add forecast.ts (D7): record each stack's peak RAM and average CPU while running (from the collector cadence) and persist the peak on stack stop/teardown as a small JSON sidecar in the server's state dir (or reuse an existing lightweight KV if one exists in the routes' reach — NOT a new SQLite table). Payload field forecast: for each stopped stack, predictedRamBytes/predictedLoad = its own last-run peak, else the median of all recorded stack peaks (fleet median) for first runs, flagged approximate:true. The payload also includes headroom {freeRamBytes, loadHeadroom} so the UI can render 'starting X ≈ +N GB → fits'. Heuristic only — no ML, no external calls. Sequential: shares stacks.ts with the stack-verbs bead."
+        },
+        "items": [
+          {
+            "id": "forecast.ac1",
+            "title": "A stack stopped after a fixture run persists its peak RAM; the next payload predicts that stack's footprint from the recorded peak with approximate:true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "forecast.ac2",
+            "title": "The payload returns the fleet-median prediction for a stack with no recorded history (fixture with 3 recorded stacks)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "forecast.ac3",
+            "title": "The payload returns forecast.headroom matching hostVitals free RAM so predicted-vs-fits comparisons render server-consistent numbers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fe-shell",
+        "title": "Machine Room page shell: vitals strip, filter, group-by control, keyboard handling",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-07T13:32:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/resources/MachineRoom.tsx",
+            "src/dashboard/frontend/src/components/resources/VitalsStrip.tsx",
+            "src/dashboard/frontend/src/components/resources/MachineRoomTopbar.tsx",
+            "src/dashboard/frontend/src/components/ResourcesPanel.tsx",
+            "src/dashboard/frontend/src/hooks/useResourceStats.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --project frontend src/dashboard/frontend/src/components/resources"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "shell component tests pass: vitals render, filter narrows rows, keyboard verbs fire"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Create the components/resources/ module folder (D10): MachineRoom.tsx shell rendered by ResourcesPanel.tsx (route mounting untouched), MachineRoomTopbar.tsx (title, auto-refresh indicator, filter input focused by '/', group-by segmented control By workspace / By kind / Flat, kbd legend), and VitalsStrip.tsx with the six cells (CPU+load sparkline, memory, disk, docker, agents, spawn gate cell filled by the spawn-gate bead) bound to hostVitals from the extended snapshot via useResourceStats. Rows are focusable; S/P/L on the focused row dispatch stop/pause/logs (wired fully by fe-actions — here the key handling + action dispatch scaffold). Follow the binding mockup's layout/typography and the pan-style-guide (Space Grotesk headings, DM Sans body, DM Mono ids; restrained color; no pill badges beyond the mockup's chips). Stale badge renders when snapshot.stale (NFR-2). Sequential: the shell hosts every later FE section; serialized before them."
+        },
+        "items": [
+          {
+            "id": "fe-shell.ac1",
+            "title": "The /resources route renders the vitals strip with six cells populated from a fixture hostVitals snapshot, including sparkline and pressure bars",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-shell.ac2",
+            "title": "Pressing '/' focuses the filter input, and typing renders only the rows matching the issue/container/process substring across sections",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-shell.ac3",
+            "title": "With a row focused, pressing S/P/L dispatches the row's stop/pause/logs action callback (component test with spies)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-shell.ac4",
+            "title": "A snapshot flagged stale renders a visible 'stale' badge next to the auto-refresh indicator",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fe-stacks",
+        "title": "Stack cards: aggregate meters, phase chips, expandable services, limit colors, idle-honesty hints",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-07T13:32:48Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-2464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/resources/StackCard.tsx",
+            "src/dashboard/frontend/src/components/resources/StacksSection.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/pipeline-helpers.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --project frontend src/dashboard/frontend/src/components/resources"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "stack card tests pass: grouping, chips, limit colors, hints"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Render the Workspace stacks section from snapshot.stacks: one card per issue (never a flat list by default) with issue id/title, phase chip reusing pipelineChipFor/PipelineChipSpec from CommandDeck/pipeline-helpers.ts (resources and pipeline never disagree), aggregate CPU/RAM meters + disk figure, expandable per-service rows with per-service meters and status chips. Limit coloring: amber when memPercentOfLimit ≥85, red ≥95 with the OOM count badge (limits-oom data); the at-limit hint row offers 'Raise limit' (opens the compose override editor path) and 'Create issue' (pre-fills a bug via the existing issue-creation affordance). Idle-honesty hint (mockup rule 12): any stack holding >1 GB RAM while idle >2h renders the pause hint row with a Pause button. Merged-stopped stacks render dimmed with Start + 'Tear down · frees N GB'. UAT URL button renders when the project defines one. Group-by 'By kind' and 'Flat' views reuse the same rows regrouped client-side. Sequential: shares StackCard.tsx with fe-actions; serialized after fe-shell."
+        },
+        "items": [
+          {
+            "id": "fe-stacks.ac1",
+            "title": "A fixture snapshot with 3 stacks renders 3 cards grouped by issue with aggregate meters and service rows appearing on expand",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-stacks.ac2",
+            "title": "A stack in review phase renders the same chip label/colors as pipelineChipFor produces for that phase (AC-3 chip-language half)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-stacks.ac3",
+            "title": "A service at 95% of its memory limit renders the red meter with its OOM count; at 87% it renders amber (AC-4)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-stacks.ac4",
+            "title": "A fixture stack idle 3h holding 2.9 GB renders the idle-honesty pause hint; an active stack does not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fe-advisor",
+        "title": "Reclaim advisor UI: candidate rows, per-line actions, streamed Reclaim-all-safe",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-07T13:32:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/resources/ReclaimAdvisor.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --project frontend src/dashboard/frontend/src/components/resources"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "advisor tests pass: hidden under threshold, per-line actions, sequential reclaim-all progress"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Render the reclaim advisor block (the page hero, mockup rule 2) from snapshot.reclaimCandidates: header with RAM+disk totals and 'Reclaim all safe', one row per candidate with label, why-text, amount, and its action button (Stop stack → stack-verbs stop; Delete venvs → venv DELETE; Prune → existing prune endpoints; Remove → existing container delete). Advisor hidden when totals are under the server-shipped threshold. 'Reclaim all safe' executes candidates sequentially, rendering per-row progress (pending/running/done/error) as each completes — client-side sequential awaits over the same endpoints (streamed progress UX, no new server surface). Errors stop the run at the failed row with the error text; completed rows stay checked. Confirmation dialog before the batch (it is destructive) — but each candidate is by definition pipeline-safe, so per-row typed confirm is NOT required (teardown stays out of the advisor's verbs). Sequential: serialized after fe-shell which hosts it."
+        },
+        "items": [
+          {
+            "id": "fe-advisor.ac1",
+            "title": "The advisor renders per-row amounts and header totals for fixture candidates totaling 61 GB, and renders nothing for a fixture under the server-shipped threshold",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-advisor.ac2",
+            "title": "Reclaim all safe calls each candidate's endpoint sequentially — the second request fires only after the first resolves (spy order test) — with per-row progress states rendered",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-advisor.ac3",
+            "title": "A failing candidate stops the batch at that row, renders its error, and preserves the done state of prior rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-advisor.ac4",
+            "title": "The batch run only starts after the user accepts a confirmation dialog; cancel fires zero requests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fe-actions",
+        "title": "Verb wiring: Start/Stop/Pause/Unpause/Restart/Logs/Terminal buttons and the typed-confirm teardown modal",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-07T13:32:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/resources/StackActions.tsx",
+            "src/dashboard/frontend/src/components/resources/TeardownModal.tsx",
+            "src/dashboard/frontend/src/components/resources/StackCard.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --project frontend src/dashboard/frontend/src/components/resources"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "action wiring tests pass: verbs hit correct endpoints, teardown modal enforces typed confirm"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Wire the full verb set on stack cards AND service rows: Start/Stop/Pause/Unpause/Restart call the container-verbs and stack-verbs endpoints; Logs opens the existing logs endpoint/panel; Terminal opens the existing terminal panel for the container. Pause toggles to Unpause when paused. Tear down opens TeardownModal: fetches the estimate (GET teardown-estimate), displays 'frees N GB RAM · M GB disk', requires typing the compose project name exactly, and only then POSTs teardown with {confirmToken, typedText}; the confirm button stays disabled until the typed text matches. All destructive requests fire only on explicit user click — never on mount, never speculatively (NFR-3). Keyboard S/P/L from fe-shell routes to these same handlers. Buttons disable while their request is in flight; results refresh the snapshot. Sequential: shares StackCard.tsx with fe-stacks; serialized after it."
+        },
+        "items": [
+          {
+            "id": "fe-actions.ac1",
+            "title": "Stop on a service row sends POST /api/resources/docker/container/:id/stop; Stop on the stack header sends POST /api/resources/stacks/:issueId/stop (spy asserts URLs)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-actions.ac2",
+            "title": "The teardown modal's confirm button stays disabled until the typed text equals the compose project name, then POSTs with the estimate's confirmToken",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-actions.ac3",
+            "title": "Rendering cards and opening the teardown modal produces zero POST/DELETE requests — only the GET estimate (network spy proves no speculative destructive calls)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-actions.ac4",
+            "title": "A paused fixture container renders Unpause in place of Pause and POSTs unpause on click",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fe-sections",
+        "title": "Agents, core services, and host processes sections",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T13:32:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/resources/AgentsSection.tsx",
+            "src/dashboard/frontend/src/components/resources/CoreServicesSection.tsx",
+            "src/dashboard/frontend/src/components/resources/HostProcessesSection.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --project frontend src/dashboard/frontend/src/components/resources"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "section tests pass: agent rows with burn, services rows, attributed processes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Render the three table sections per the mockup grids: Agents (session name, issue/role/model subline, status chip working/idle-Nm/fan-out, CPU%, RAM, burn $/h with $0/h+tooltip for subscription-covered, total $, Terminal + Pause actions calling the existing agent endpoints), Core services (dashboard row with event-loop p99 + Restart/Logs, deacon row with tick age + Freeze via existing deacon pause toggle endpoint, aggregated support-fleet row with Expand toggle revealing members), Host processes (grouped rows with CPU/RAM, attribution sublines, transient-burst rows dimmed with peak figures and 'caused spike' note). Idle agents render dimmed per the mockup. All rows participate in the shell's filter and focus model. Sequential: serialized after fe-shell which hosts the sections."
+        },
+        "items": [
+          {
+            "id": "fe-sections.ac1",
+            "title": "A fixture agent row renders status chip, CPU/RAM, burn and total from snapshot.agents; subscription-covered burn renders $0/h with the hypothetical figure in a tooltip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-sections.ac2",
+            "title": "The core services section renders the dashboard p99, deacon tick age, and one aggregated support-fleet row that expands to its members",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-sections.ac3",
+            "title": "A transient fixture process group renders dimmed with '0% now · N% peak' and its caused-spike note",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fe-history",
+        "title": "24h history chart with clickable annotations and the capacity forecast bar",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T13:32:48Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-2464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/resources/HistorySection.tsx",
+            "src/dashboard/frontend/src/components/resources/ForecastBar.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --project frontend src/dashboard/frontend/src/components/resources"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "history tests pass: chart renders series, annotation click scrolls to target row"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Render the Last-24h section from GET /api/resources/history/24h: stacked CPU + memory area chart (SVG, matching the mockup's gradient style — no new chart library) with vertical annotation markers, and the annotation list beside it; clicking an annotation scrolls to and briefly highlights the culprit row resolved from targetKind/targetId (agent row, stack card, or process row; AC-6 UI half). Below, the capacity forecast bar from snapshot.forecast: 'Starting <stopped stacks> ≈ +N GB RAM, +L load → fits/does not fit (M GB free)', always rendered with the approx sign (D7). The Simulate button is OUT of scope (NonGoals) — render the static forecast line only. Sequential: serialized after fe-shell which hosts the section."
+        },
+        "items": [
+          {
+            "id": "fe-history.ac1",
+            "title": "Fixture history data renders the stacked CPU/mem SVG chart with one marker per annotation at its time position",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-history.ac2",
+            "title": "Clicking an annotation targeting an agent session invokes scrollIntoView on that agent's row and renders the highlight class on it (spy + class assertion)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-history.ac3",
+            "title": "The forecast bar renders predicted +RAM/+load with the approx sign and a fits/does-not-fit verdict computed from headroom",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "visual-verify",
+        "title": "Mockup-fidelity visual verification at 1440px with screenshot posted to the issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T13:32:48Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-2464",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan2464-machine-room.spec.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx playwright test src/dashboard/frontend/tests/pan2464-machine-room.spec.ts"
+          ],
+          "expected_outputs": [
+            "Playwright spec passes and writes a 1440px full-page screenshot artifact"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a Playwright spec (pattern: src/dashboard/frontend/tests/pan2450-pipeline-overview.spec.ts) that loads /resources at 1440px viewport in an ISOLATED browser instance/profile (H9 — no shared Playwright session), waits for the snapshot, asserts the major sections render (vitals strip, advisor or its hidden state, stacks, agents, core services, host processes, history), and captures a full-page screenshot. The work agent posts the screenshot to the issue (gh issue comment with the image) and self-verifies against the binding mockup — section order, chip usage, meter styling — per the self-verify-rendering rule (never ask the operator to eyeball). This is the AC-3 gate and runs after all FE beads land."
+        },
+        "items": [
+          {
+            "id": "visual-verify.ac1",
+            "title": "The Playwright spec renders /resources at 1440px in an isolated browser profile and passes section-presence assertions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "visual-verify.ac2",
+            "title": "The spec produces a full-page screenshot artifact and the work agent posts it as a comment on PAN-2464 (AC-3)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "routes-split",
+        "to": "stacks-grouping",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-split",
+        "to": "host-vitals",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-split",
+        "to": "spawn-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-split",
+        "to": "container-verbs",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-split",
+        "to": "stack-verbs",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-split",
+        "to": "teardown-endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-split",
+        "to": "reclaim-candidates",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-split",
+        "to": "limits-oom",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-split",
+        "to": "agents-burn",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-split",
+        "to": "core-services",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-split",
+        "to": "host-processes",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-split",
+        "to": "history-annotations",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-split",
+        "to": "spike-sampler",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-split",
+        "to": "forecast",
+        "type": "blocks"
+      },
+      {
+        "from": "stacks-grouping",
+        "to": "stack-verbs",
+        "type": "blocks"
+      },
+      {
+        "from": "stacks-grouping",
+        "to": "teardown-endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "stacks-grouping",
+        "to": "reclaim-candidates",
+        "type": "blocks"
+      },
+      {
+        "from": "stacks-grouping",
+        "to": "forecast",
+        "type": "blocks"
+      },
+      {
+        "from": "stacks-grouping",
+        "to": "fe-stacks",
+        "type": "blocks"
+      },
+      {
+        "from": "host-vitals",
+        "to": "fe-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "fe-shell",
+        "to": "spawn-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "fe-shell",
+        "to": "fe-stacks",
+        "type": "blocks"
+      },
+      {
+        "from": "fe-shell",
+        "to": "fe-advisor",
+        "type": "blocks"
+      },
+      {
+        "from": "fe-shell",
+        "to": "fe-sections",
+        "type": "blocks"
+      },
+      {
+        "from": "fe-shell",
+        "to": "fe-history",
+        "type": "blocks"
+      },
+      {
+        "from": "container-verbs",
+        "to": "fe-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "stack-verbs",
+        "to": "fe-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "teardown-endpoint",
+        "to": "fe-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "reclaim-candidates",
+        "to": "fe-advisor",
+        "type": "blocks"
+      },
+      {
+        "from": "limits-oom",
+        "to": "fe-stacks",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-burn",
+        "to": "fe-sections",
+        "type": "blocks"
+      },
+      {
+        "from": "core-services",
+        "to": "fe-sections",
+        "type": "blocks"
+      },
+      {
+        "from": "host-processes",
+        "to": "fe-sections",
+        "type": "blocks"
+      },
+      {
+        "from": "history-annotations",
+        "to": "fe-history",
+        "type": "blocks"
+      },
+      {
+        "from": "forecast",
+        "to": "fe-history",
+        "type": "blocks"
+      },
+      {
+        "from": "spike-sampler",
+        "to": "fe-history",
+        "type": "informs"
+      },
+      {
+        "from": "fe-stacks",
+        "to": "fe-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "fe-stacks",
+        "to": "visual-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "fe-advisor",
+        "to": "visual-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "fe-actions",
+        "to": "visual-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "fe-sections",
+        "to": "visual-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "fe-history",
+        "to": "visual-verify",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-07-PAN-2464-feat-dashboard-machine-room-complete-resources-overhaul-attribution-reclaim-advisor-stop-pause-disk-spawn-gate-visibility.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

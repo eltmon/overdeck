@@ -1,0 +1,145 @@
+{
+  "issueId": "PAN-2063",
+  "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-06-27T19:13Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-06-27T19:13:06.215Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T12:47:05.454Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T13:21:55.100Z"
+    },
+    {
+      "timestamp": "2026-06-29T13:23:33.751Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T13:23:34.480Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-29T13:24Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-06-29T13:24:59.894Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T13:26:23.885Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T13:29:25.797Z"
+    }
+  ],
+  "feedback": [],
+  "harness": "claude-code",
+  "model": "claude-opus-4-8",
+  "pipeline": {
+    "issueId": "PAN-2063",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "mergeStatus": "merged",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-07T03:04:59.082Z",
+    "reviewNotes": "No blocking findings; UAT collapse behavior meets requirements and non-goals.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2110",
+    "reviewedAtCommit": "6f9bb0ced0e256c07bff1131c6855ba7cc6cbaca",
+    "lastVerifiedCommit": "6f9bb0ced0e256c07bff1131c6855ba7cc6cbaca",
+    "reviewRequestedAt": "2026-06-29T13:23:33.767Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-07T03:04:59.082Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 50595,
+            "output": 7728,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 29577,
+            "output": 57490,
+            "cacheRead": 5048063,
+            "cacheWrite": 281556
+          }
+        },
+        "test": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 813,
+            "output": 14407,
+            "cacheRead": 7833241,
+            "cacheWrite": 632769
+          }
+        },
+        "work": {
+          "custom/glm-5.2": {
+            "input": 237548,
+            "output": 113650,
+            "cacheRead": 21441856,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 50595,
+          "output": 7728,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 29577,
+          "output": 57490,
+          "cacheRead": 5048063,
+          "cacheWrite": 281556
+        },
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 813,
+          "output": 14407,
+          "cacheRead": 7833241,
+          "cacheWrite": 632769
+        },
+        "custom/glm-5.2": {
+          "input": 237548,
+          "output": 113650,
+          "cacheRead": 21441856,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 10.492847,
+        "pricingAsOf": "2026-07-03T08:29:58.285Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2110"
+    ],
+    "ranOn": "eltmon-z790"
+  },
+  "created": "2026-06-27T18:34:19.239Z",
+  "updated": "2026-07-08T16:01:27.629Z",
+  "statusOverrides": {
+    "collapse-uat-panel": "completed",
+    "collapse-uat-panel.ac1": "completed",
+    "collapse-uat-panel.ac2": "completed",
+    "collapse-uat-panel.ac3": "completed",
+    "collapse-uat-panel.ac4": "completed"
+  }
+}

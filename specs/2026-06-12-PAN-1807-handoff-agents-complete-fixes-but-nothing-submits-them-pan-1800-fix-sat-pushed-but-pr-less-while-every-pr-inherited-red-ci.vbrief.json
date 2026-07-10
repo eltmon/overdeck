@@ -1,0 +1,415 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-12T20:05:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1807: Handoff agents complete fixes but nothing submits them — PAN-1800 fix sat pushed-but-PR-less while every PR inherited red CI",
+    "updated": "2026-06-12T20:32:13.213Z"
+  },
+  "plan": {
+    "id": "pan-1807",
+    "title": "Handoff agents complete fixes but nothing submits them — completion contract + unsubmitted-work detection",
+    "status": "proposed",
+    "uid": "25477a82-d97b-47e8-8e6a-0ee5203c90e1",
+    "author": "agent:claude-fable-5",
+    "sequence": 11,
+    "created": "2026-06-12T20:05:00.000Z",
+    "updated": "2026-06-12T20:32:13.213Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1807",
+        "label": "PAN-1807",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-1807.md",
+        "label": "PRD draft (verified file/line references, decision rules 1-8, contract text spec, work items W1-W6)",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "handoff",
+      "conversations",
+      "pipeline",
+      "cli",
+      "review"
+    ],
+    "narratives": {
+      "Problem": "Handoff conversations (pan handoff) intentionally bypass the work-agent pipeline but have no completion contract: when one finishes real work on a feature branch and pushes, nothing submits it — no PR, no pan done, no review request, no operator surface. The PAN-1800 fix sat pushed-but-PR-less for ~a day while every open PR inherited red CI; it was found only by manual workspace audit and merged by hand (2148beaf7). Summary forks get a delivery-side instruction (FORK_WAIT_INSTRUCTION, src/lib/conversations/summary-fork.ts:89); handoff briefs get nothing, and no component detects pushed-but-unsubmitted branches afterward.",
+      "Proposal": "Two arms. Prevention: append a delivery-side completion-contract footer to every handoff brief whose successor cwd is inside a feature workspace (issue id parsed from the cwd path, never conv.issueId), telling the agent that pushing is not completion and naming the exact command pan done <ISSUE>; make pan done executable from such workspaces by adding a canonical-workspace fallback (workspaces/feature-<issue>) when agent state.json is absent. Detection: detectUnsubmittedHandoffWork() in src/lib/conversations/handoff-submission.ts (pure verdict core evaluateHandoffCandidate + async collectors, execAsync only) flags feature branches with commits pushed ahead of the merge target that have a recent (7-day) handoff conversation and no submission signal (review status, completion marker, running agent, existing PR, closed issue all suppress; best-effort null never suppresses); pan review pending prints these as an 'Unsubmitted handoff work' section with the action line pan done <ISSUE>. All file/line anchors, decision rules, and the contract text spec live in .pan/drafts/PAN-1807.md.",
+      "NonGoals": "- No dashboard needs-you / frontend surface for unsubmitted handoff work (needs-you is strictly pending-input-driven, store.ts:322; a new subject type spans contracts+events+UI — follow-up issue)\n- No auto-submission (flywheel running pan done on detections) — surface for the operator only\n- No detection of committed-but-unpushed work (issue scope is pushed-but-unsubmitted)\n- No changes to roles/handoff*.md authoring templates — the contract is delivery-side only\n- No fixes for PAN-1790 (handoff CLI arg ergonomics) or PAN-1802 (prompt-too-long authoring)\n- No multi-repo merge-set support in detection (single workspace repo only)\n- No new pan CLI flags\n- No behavior change for non-handoff forks (summary/plain) or handoffs outside feature workspaces"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Implement BOTH arms (instruct + detect) even though the issue requires 'at least one of'",
+        "rationale": "Prevention without detection repeats the failure the moment a model ignores the prompt; detection without prevention makes every handoff a cleanup task. Both arms are individually small; together they close the loop."
+      },
+      {
+        "summary": "Completion contract is delivery-side (appended in runForkPipeline), not template-side",
+        "rationale": "One append point covers external-authored, source-authored, reused handoff docs, and handoff-to-summary fallbacks, and does not depend on the authoring model following template instructions."
+      },
+      {
+        "summary": "Issue id derived from successor cwd path, never conv.issueId",
+        "rationale": "conv.issueId is inherited from the parent and can be null or wrong; the workspace path is the ground truth of where commits land."
+      },
+      {
+        "summary": "Contract appends on requested forkMode=handoff including fallback-to-summary briefs",
+        "rationale": "A fallback successor still sits in the feature workspace and can complete work; the contract concerns how to finish, so it coexists with FORK_WAIT_INSTRUCTION."
+      },
+      {
+        "summary": "Detection surfaces only in pan review pending (one of the two surfaces the issue names); dashboard needs-you is a NonGoal",
+        "rationale": "The needs-you queue is strictly pending-input-subject driven (src/dashboard/frontend/src/lib/store.ts:322); a new subject type spans contracts, events, and UI — disproportionate to this issue. The lib function is server-importable for that follow-up."
+      },
+      {
+        "summary": "Recency window for handoff candidates defaults to 7 days",
+        "rationale": "Covers the observed failure (discovered ~a day later) with margin while bounding git/gh probes per pan review pending invocation."
+      },
+      {
+        "summary": "Best-effort suppression checks (gh PR lookup, tracker closed-state) that fail return null and do not suppress",
+        "rationale": "A false positive in a CLI list is cheaper than a silent miss — the silent miss is the bug this issue exists to fix."
+      },
+      {
+        "summary": "pan done falls back to <projectPath>/workspaces/feature-<issue-lowercase> when agent state.json is absent",
+        "rationale": "Makes the instructed contract executable from never-started workspaces; the downstream pipeline (completion markers, review trigger) already works by issueId/dir-name without state.json (service.ts:1047, review-spawn-reviewer.ts:44)."
+      },
+      {
+        "summary": "Overwrote the stale PAN-1788 content in this workspace's .pan/spec.vbrief.json working copy",
+        "rationale": "The PAN-1788 canonical spec is already promoted to .pan/specs/ on main; findWorkspaceDraftPlanSync explicitly nulls out drafts whose plan.id mismatches the workspace issue, so the stale copy was inert and overwriting it is the designed planning flow."
+      }
+    ],
+    "items": [
+      {
+        "id": "contract-helper",
+        "title": "Pure helper buildHandoffCompletionContract(cwd) + workspace-path parser",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-12T20:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1807",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/conversations/handoff-contract.ts exporting (1) parseWorkspaceFromCwd(cwd) returning { issueId, workspacePath } or null — matches the /workspaces/feature-<segment>/ pattern anywhere in cwd (regex precedent: src/cli/commands/resources.ts:159) and parses the segment with parseIssueIdFromTextSync from src/lib/resource-utils.ts; and (2) buildHandoffCompletionContract(cwd) returning null when the parser returns null, otherwise a Markdown footer starting with a horizontal rule and a '## Completion contract' heading that states: pushing commits is NOT completion; run pan done <ISSUE> (uppercase) from the workspace root (it rebases, pushes, creates the PR/review artifacts, and enters the review pipeline); if pan done fails, report the exact error verbatim in the final message instead of stopping silently; if the work is intentionally not for submission, say so explicitly in the final message. Exact content spec: Decision rule 8 in .pan/drafts/PAN-1807.md. Pure string logic — no git, no fs, no DB imports. Unit tests in src/lib/conversations/__tests__/handoff-contract.test.ts."
+        },
+        "items": [
+          {
+            "id": "contract-helper.ac1",
+            "title": "Given cwd /home/u/Projects/x/workspaces/feature-pan-1800, buildHandoffCompletionContract returns a footer containing 'pan done PAN-1800' and '## Completion contract'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-helper.ac2",
+            "title": "Given a cwd that is a subdirectory of a workspace (.../workspaces/feature-pan-1800/src/lib), the helper still returns the PAN-1800 contract",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-helper.ac3",
+            "title": "Given a non-workspace cwd (/home/u/Projects/x, /tmp/foo) or an unparseable segment (workspaces/feature-notanissue), the helper returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-helper.ac4",
+            "title": "A unit suite at src/lib/conversations/__tests__/handoff-contract.test.ts covers ac1-ac3 and passes under npm test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "contract-injection",
+        "title": "Append completion contract to handoff briefs in runForkPipeline",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-12T20:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1807",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/conversations.ts runForkPipeline (declared ~:3861), after the brief string is final (after the forkMode handoff/else branches that assign `summary`, ~:3976) and BEFORE updateConversationForkFallbackReason/injectForkSummary, add: if (forkMode === 'handoff') { const contract = buildHandoffCompletionContract(conv.cwd); if (contract) summary += contract; }. Key on the REQUESTED forkMode, not effectiveForkMode, so handoff-to-summary fallback briefs also carry the contract (decision D3 in .pan/continue.json). The contract must ride the SAME string through injectForkSummary — never a second delivery, because PAN-1624 deliver-and-confirm may redeliver the one string (hazard H1). This single append point covers all four brief sources: external-authored docs, source-authored docs, reused docs via readExistingHandoffDoc, and fallback summaries. Do not modify injectForkSummary. Verify behavior with a test near the existing conversations route tests (src/dashboard/server/routes/__tests__/) or, if runForkPipeline is untestable in isolation there, by unit-testing the appended-string construction through the contract-helper plus a typecheck-verified wiring review."
+        },
+        "items": [
+          {
+            "id": "contract-injection.ac1",
+            "title": "A handoff fork whose successor cwd is inside workspaces/feature-<x> produces an injected brief that ends with the completion contract naming pan done <X>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-injection.ac2",
+            "title": "A handoff fork into a non-workspace cwd produces a brief identical to current behavior (no contract), and summary/plain forks render without any contract",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-injection.ac3",
+            "title": "A handoff that falls back to summary mode (authoring failure) in a feature-workspace cwd still delivers the contract footer inside the same single injected string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "done-workspace-fallback",
+        "title": "pan done resolves the canonical workspace when agent state is absent",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-12T20:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1807",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/done.ts add a single workspace resolver used by all three resolution sites — preflight (:261-263), rebase (:330-334), review-artifact creation (:409-415): prefer getAgentStateSync(agentId)?.workspace when it exists on disk; otherwise resolve the project via resolveProjectFromIssueSync (src/lib/projects.ts:351 — VERIFY the actual project-path field name on its return type before wiring, hazard H5) and use join(<project path>, 'workspaces', 'feature-' + issueId.toLowerCase()) if existsSync (path convention precedent: src/cli/commands/inspect.ts:64, doctor.ts:444, review-spawn-reviewer.ts:44). Keep the `if (existingState)` guard at :436 — when state is absent the state mutation is skipped; the completion-marker write at :449 already mkdirSync's the agent dir, and checkCompletionMarkers (src/lib/cloister/service.ts:1047) derives the issue from the dir name, so the downstream pipeline proceeds without state.json. Update the :413 error message to name both missing sources: no agent state and no workspaces/feature-<issue> directory. Add tests in src/cli/commands/__tests__/done-workspace-fallback.test.ts."
+        },
+        "items": [
+          {
+            "id": "done-workspace-fallback.ac1",
+            "title": "With agent state present, the resolver returns the state.json workspace (existing behavior preserved, verified by test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "done-workspace-fallback.ac2",
+            "title": "With no agent state and an existing workspaces/feature-<issue> directory, pan done proceeds through preflight, rebase, and review-artifact creation against that directory and exits 0 on a clean tree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "done-workspace-fallback.ac3",
+            "title": "With no agent state and no canonical workspace directory, pan done exits non-zero with the updated error message naming both missing sources",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "done-workspace-fallback.ac4",
+            "title": "A test suite at src/cli/commands/__tests__/done-workspace-fallback.test.ts covers ac1-ac3 and passes under npm test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "detection-core",
+        "title": "Pure verdict logic evaluateHandoffCandidate + types",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-12T20:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1807",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "detection-collect",
+            "detection-cli"
+          ],
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/conversations/handoff-submission.ts with the types HandoffWorkCandidate and UnsubmittedHandoffWork (exact field lists in .pan/drafts/PAN-1807.md W4) and the PURE function evaluateHandoffCandidate(c) returning the UnsubmittedHandoffWork row or null. Flag iff aheadOfTargetCount >= 1 AND none of these suppress: (a) c.reviewStatus.reviewStatus is one of pending/reviewing/passed, OR c.reviewStatus.mergeStatus === 'merged', OR c.reviewStatus.prUrl is non-empty; (b) c.completionMarkerExists; (c) c.agentRunning; (d) c.prExistsForBranch === true; (e) c.trackerIssueClosed === true. Best-effort nulls (prExistsForBranch or trackerIssueClosed === null) NEVER suppress — decision D6 in .pan/continue.json: a false positive in a CLI list is cheaper than the silent miss this issue exists to fix. No I/O imports in this bead; the function is a pure mapping unit-tested without git/DB/network in src/lib/conversations/__tests__/handoff-submission.test.ts."
+        },
+        "items": [
+          {
+            "id": "detection-core.ac1",
+            "title": "evaluateHandoffCandidate returns the UnsubmittedHandoffWork row for a candidate with aheadOfTargetCount>=1 and all suppression inputs falsy or null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detection-core.ac2",
+            "title": "Each suppression input — pipeline review status, merged status, non-empty prUrl, completion marker, running agent, prExistsForBranch=true, trackerIssueClosed=true — independently produces a null return (one test per rule)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detection-core.ac3",
+            "title": "aheadOfTargetCount === 0 returns null, and prExistsForBranch=null / trackerIssueClosed=null do NOT suppress an otherwise-flagged candidate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "detection-collect",
+        "title": "Async collectors + detectUnsubmittedHandoffWork()",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-12T20:05:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1807",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/conversations/handoff-submission.ts add detectUnsubmittedHandoffWork(opts?: { sinceDays?: number }) returning Promise<UnsubmittedHandoffWork[]> (default sinceDays 7). Candidates: listConversations() (src/lib/database/conversations-db.ts:166) filtered to handoffDocPath !== null, createdAt within sinceDays, and cwd parseable by parseWorkspaceFromCwd imported from handoff-contract.ts (shared parser — do not duplicate the regex); dedupe to one candidate per workspace keeping the newest conversation. Per candidate collect with execAsync ONLY — hazard H4: this lib may later be imported by the dashboard server and execSync freezes the event loop (PAN-70). Collect: current branch via git rev-parse --abbrev-ref HEAD in the workspace (skip candidate unless it matches feature/*); merge target via git rev-parse --abbrev-ref origin/HEAD mapped to origin/<name>, falling back to origin/main; aheadOfTargetCount via git rev-list --count <target>..origin/<branch>, skipping the candidate when origin/<branch> does not exist (never pushed — NonGoal); reviewStatus via getReviewStatusSync (src/lib/review-status.ts); completionMarkerExists via existsSync(join(AGENTS_DIR, 'agent-' + issueId.toLowerCase(), 'completed')); agentRunning via listRunningAgentsSync() computed ONCE outside the per-candidate loop; prExistsForBranch via gh pr list --head <branch> --state all --json number --limit 1 run in the workspace with a 5-second timeout (pattern: src/lib/cloister/merge-agent.ts:185), try/catch yielding null; trackerIssueClosed via the GitHub issue-state lookup pattern used by done.ts (resolveGitHubIssueSync), try/catch yielding null. Compose results through evaluateHandoffCandidate. A failing workspace logs console.warn and is skipped — the function never throws for one bad candidate. Tests: vi.mock the conversations-db module to verify the sinceDays filter, the non-workspace-cwd filter, and per-workspace dedupe; mock execAsync rather than racing real timeouts (hazard H7 — use vi.useFakeTimers if any real timer is unavoidable, per the repo fake-timers rule)."
+        },
+        "items": [
+          {
+            "id": "detection-collect.ac1",
+            "title": "detectUnsubmittedHandoffWork returns only candidates whose conversations have handoffDocPath set, fall within sinceDays, and whose cwd parses to a feature workspace — verified with a mocked listConversations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detection-collect.ac2",
+            "title": "Given two handoff conversations in the same workspace, detection produces one candidate row carrying the newest conversation's name and createdAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detection-collect.ac3",
+            "title": "A candidate whose git probe fails, whose branch is not feature/*, or whose origin/<branch> is missing is skipped with a console.warn and does not abort the remaining candidates",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detection-collect.ac4",
+            "title": "handoff-submission.ts contains zero execSync occurrences (grep-verified), and a gh/tracker lookup failure produces null candidate fields rather than a thrown error (test asserts both)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "detection-cli",
+        "title": "pan review pending prints 'Unsubmitted handoff work' section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-12T20:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1807",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/pending.ts (pan review pending, registered at src/cli/index.ts:325-328), call detectUnsubmittedHandoffWork() in the DEFAULT mode only — never in --ready mode, whose output feeds the flywheel tick (PAN-1735) and must stay byte-stable (hazard H6). Print the section after the pending-reviews output AND on the 'No pending reviews' early-return path: header 'Unsubmitted handoff work', then one block per row showing the issue id (chalk.yellow), '<n> commit(s) pushed on <branch>, no PR/review submitted', the workspace path, the conversation name with status and date, and 'Action: pan done <ISSUE>' (layout spec: W6 in .pan/drafts/PAN-1807.md). Print nothing extra when the detection list is empty. No new CLI flags, so the skills lint is unaffected; read skills/pan-review/SKILL.md and update it ONLY if its text contradicts the new output. Tests in src/cli/commands/__tests__/pending-handoff-section.test.ts mocking the detection module."
+        },
+        "items": [
+          {
+            "id": "detection-cli.ac1",
+            "title": "With one mocked detection row, pan review pending renders the section with issue id, ahead-count, branch, workspace, conversation, and the 'pan done <ISSUE>' action line — including when there are zero pending reviews",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detection-cli.ac2",
+            "title": "With an empty detection result, pan review pending prints default-mode output unchanged from today (no header, no blank section)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detection-cli.ac3",
+            "title": "pan review pending --ready prints byte-identical output to current behavior and performs zero detection calls (mock asserts no invocations)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contract-helper",
+        "to": "contract-injection",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-helper",
+        "to": "detection-collect",
+        "type": "blocks"
+      },
+      {
+        "from": "detection-core",
+        "to": "detection-collect",
+        "type": "blocks"
+      },
+      {
+        "from": "detection-collect",
+        "to": "detection-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "done-workspace-fallback",
+        "to": "contract-injection",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-12-PAN-1807-handoff-agents-complete-fixes-but-nothing-submits-them-completion-contract-unsubmitted-work-detection.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

@@ -1,0 +1,590 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-06T15:12:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2407: feat(cli): one paved-road verb to take an issue from any state to running work — collapse the plan/--auto/--auto-start flag maze",
+    "updated": "2026-07-07T18:50:50.490Z"
+  },
+  "plan": {
+    "id": "pan-2407",
+    "title": "feat(cli): one paved-road verb to take an issue from any state to running work — collapse the plan/--auto/--auto-start flag maze",
+    "status": "completed",
+    "uid": "7f3a9c2e-4b1d-4e8a-9c6f-2d5b8e1a4f37",
+    "author": "agent:claude-fable-5",
+    "sequence": 9,
+    "created": "2026-07-06T15:12:00.000Z",
+    "updated": "2026-07-07T18:50:50.490Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2407",
+        "label": "PAN-2407",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-2407.md",
+        "label": "PRD draft",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "cli",
+      "planning",
+      "dx",
+      "deprecation"
+    ],
+    "narratives": {
+      "Problem": "Getting an issue moving requires a 2-verb × 3-flag matrix (pan plan / --auto / --auto-start / pan start --auto). Worse, pan start on an unplanned issue silently creates one generic bead instead of planning. Operators must know three entry points for one intent: 'get this issue moving' plus a planning-depth choice.",
+      "Proposal": "Make pan start <id> the paved road: no plan → kick off planning at the configured depth via the existing start-planning endpoint with the autoSpawnOnFinalize stamp so work starts automatically on finalize; plan exists → spawn work (unchanged); already running → no-op with a clear message and exit 0. Planning depth becomes one dial: --plan interactive|auto|skip, defaulting to new config key planning.default_mode (shipped default 'auto'). pan start --auto becomes a deprecated alias of --plan skip; pan plan --auto-start prints a deprecation pointer. Skills and CLAUDE.md updated in the same change.",
+      "NonGoals": "- No dashboard UI changes (PlanDialog, kanban Plan/Auto-plan actions keep their payloads)\n- No changes to the start-planning or start-agent server route contracts\n- No removal of pan plan, pan plan --auto, pan plan --auto-start, or pan start --auto (deprecation warnings only)\n- No removal of the single-generic-bead fallback in start.ts:1239-1261\n- No migration of flywheel/orchestrator call sites to the new surface (old flags keep working)\n- No changes to remote (Fly.io) workspace spawn behavior beyond passing workspaceLocation through to start-planning"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Reuse the dashboard start-planning endpoint for pan start's auto-plan routing instead of a new CLI-side planning spawn path.",
+        "rationale": "pan plan already POSTs /api/issues/:id/start-planning with auto/autoStart and the autoSpawnOnFinalize stamp already drives work spawn on finalize; one spawn path keeps single-source-of-truth and requires zero server changes."
+      },
+      {
+        "summary": "Shipped default planning mode is 'auto'.",
+        "rationale": "The issue body names 'shipped default auto' explicitly; auto-planning is the defensible middle between interactive (blocks on a human) and skip (no real plan)."
+      },
+      {
+        "summary": "Precedence: --plan flag > legacy --auto (maps to 'skip') > planning.default_mode > 'auto'; --plan wins over --auto with a warning when both are passed.",
+        "rationale": "Explicit new dial beats deprecated alias beats config beats shipped default — standard CLI precedence; erroring on the combination would break scripts mid-deprecation-window."
+      },
+      {
+        "summary": "--plan interactive sends autoStart: true.",
+        "rationale": "The issue specifies 'Q&A session first, then continues to work on approval' — the auto-start stamp is exactly that continuation."
+      },
+      {
+        "summary": "pan start on an already-running work agent exits 0 with an informative message; paused/troubled keep exit 1.",
+        "rationale": "The issue asks for 'no-op with a clear message'; the paved-road intent (get it moving) is already satisfied, so success is truthful. Paused/troubled require operator action, so failure remains correct there."
+      },
+      {
+        "summary": "Plan existence is detected via findPlanSync(workspace) when a workspace exists, else pan-dir findSpecByIssue(projectRoot, issueId); any found spec counts regardless of status.",
+        "rationale": "Mirrors the pipeline's canonical spec resolution (PAN-1124 single-spec-on-main); re-planning completed/cancelled issues is pan reopen's job, not pan start's."
+      },
+      {
+        "summary": "planning.default_mode is validated at the consumption site (resolver exits 1 naming key and valid values on an invalid value), not at config load.",
+        "rationale": "Config load stays resilient for unrelated commands; the failure is loud exactly where the value is used — consistent with the no-silent-fallback rule."
+      },
+      {
+        "summary": "The single-generic-bead fallback in start.ts stays in place even though the paved road makes it unreachable for unplanned local issues.",
+        "rationale": "Additive-refactor/no-loss rule: deleting a reachable-in-edge-cases behavior needs its own audit; retention is zero-risk."
+      },
+      {
+        "summary": "Deprecations are warn-only in this issue; no flags are removed.",
+        "rationale": "Issue acceptance explicitly requires pan plan --auto --auto-start to keep working with a pointer; removal is a future issue after the window."
+      },
+      {
+        "summary": "Dry-run on an unplanned issue prints the intended planning route and exits before any POST.",
+        "rationale": "Naive routing would make --dry-run actually spawn a planning session — a side effect dry-run must never have."
+      }
+    ],
+    "items": [
+      {
+        "id": "config-default-mode",
+        "title": "Add planning.default_mode config key to YAML config schema",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-06T15:12:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2407",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/domain-mergers.ts",
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/config-yaml/__tests__/planning-config.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/config-yaml/__tests__/planning-config.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "planning-config.test.ts reports all tests passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a new top-level optional section to YamlConfig in src/lib/config-yaml/schema.ts (place it alphabetically near the existing remote?/agents? sections, around line 385-540): `planning?: { /** Default planning depth for pan start on an unplanned issue: 'interactive' | 'auto' | 'skip'. Unset = 'auto'. */ default_mode?: 'interactive' | 'auto' | 'skip' }`. Thread the section through the config load/merge path (src/lib/config-yaml/domain-mergers.ts and defaults.ts follow the pattern of other optional sections — copy how a small section like compliance or resources is merged). Keep the raw value as-typed; do NOT validate or coerce at load time — per decision D7 validation happens in the pan start resolver (see item plan-mode-flag). Write a unit test (new file src/lib/config-yaml/__tests__/planning-config.test.ts, or extend an existing config-yaml test file if the directory convention prefers that) covering: value round-trips from YAML, and absent section leaves planning undefined."
+        },
+        "items": [
+          {
+            "id": "config-default-mode.ac1",
+            "title": "Given planning.default_mode: interactive in config YAML, loadConfigSync().config.planning.default_mode returns 'interactive' (unit test asserts the round-trip)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-default-mode.ac2",
+            "title": "Given a config YAML with no planning section, the loaded config returns undefined for planning?.default_mode and no error is emitted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-default-mode.ac3",
+            "title": "npm run typecheck exits 0 after the schema addition (the new planning section produces no type errors)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "plan-mode-flag",
+        "title": "Add --plan <mode> flag to pan start with precedence resolver and --auto deprecation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-06T15:12:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2407",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/index.ts",
+            "src/cli/commands/start.ts",
+            "src/cli/commands/planning-mode.ts",
+            "src/cli/commands/__tests__/planning-mode.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/planning-mode.test.ts",
+            "npx tsx src/cli/index.ts start --help"
+          ],
+          "expected_outputs": [
+            "planning-mode.test.ts reports all tests passed",
+            "start --help output lists --plan <mode> with interactive | auto | skip"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "1) In src/cli/index.ts (start command declaration, lines 554-571) add `.option('--plan <mode>', \"Planning depth when no plan exists yet: interactive | auto | skip (default: config planning.default_mode, shipped default auto)\")` and update the --auto option description to say '[deprecated: use --plan skip]' while keeping it functional. 2) Create a small pure module src/cli/commands/planning-mode.ts exporting `type PlanningMode = 'interactive' | 'auto' | 'skip'` and `resolvePlanningMode(input: { planFlag?: string; legacyAuto?: boolean; configDefault?: string }): { mode: PlanningMode; warnings: string[] } ` implementing precedence D3: planFlag (validated) > legacyAuto → 'skip' (with deprecation warning string naming --plan skip) > configDefault (validated per D7 — invalid value throws an Error naming planning.default_mode and the three valid values) > 'auto'. When both planFlag and legacyAuto are set, planFlag wins and a warning is added. An invalid planFlag throws an Error listing interactive, auto, skip. 3) In src/cli/commands/start.ts add `plan?: string` to IssueOptions and call the resolver early in issueCommand, printing warnings via console.warn(chalk.yellow(...)) and exiting 1 on thrown validation errors. IMPORT TRAP: planning config must be read from the YAML config — loadYamlConfig().config.planning?.default_mode (start.ts line 13 alias), NOT loadConfigSync from ../../lib/config.js (line 82). 4) Unit-test the resolver exhaustively in src/cli/commands/__tests__/planning-mode.test.ts (pure function — no fs/network mocks needed)."
+        },
+        "items": [
+          {
+            "id": "plan-mode-flag.ac1",
+            "title": "pan start --help output lists --plan <mode> naming interactive, auto, and skip, and marks --auto as deprecated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-mode-flag.ac2",
+            "title": "resolvePlanningMode returns the --plan value when given, 'skip' plus a deprecation warning when only legacy --auto is set, the config default when neither flag is set, and 'auto' when config is unset (unit test covers all four branches)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-mode-flag.ac3",
+            "title": "resolvePlanningMode throws an Error listing interactive, auto, skip for an invalid --plan value, and pan start exits with code 1 printing that message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-mode-flag.ac4",
+            "title": "Given an invalid planning.default_mode config value and no flags, resolvePlanningMode throws an Error naming planning.default_mode and the valid values (no silent fallback)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-mode-flag.ac5",
+            "title": "When both --plan and --auto are passed, the --plan value wins and a warning about the deprecated --auto flag is printed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "route-unplanned-to-planning",
+        "title": "Route pan start on an unplanned issue to the start-planning endpoint per resolved mode",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-06T15:12:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2407",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "update-skills",
+            "update-docs"
+          ],
+          "files_scope": [
+            "src/cli/commands/start.ts",
+            "src/cli/commands/plan.ts",
+            "src/cli/commands/planning-stream.ts",
+            "src/cli/commands/__tests__/start-plan-routing.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/start-plan-routing.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "start-plan-routing.test.ts reports all tests passed, including assertions on the POSTed start-planning request body per mode",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-8",
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In issueCommand (src/cli/commands/start.ts:856), after the paused/troubled gates and before workspace creation / remote handling (before the findWorkspaceWithLocation block around line 941): detect plan existence per decision D6 — if a workspace exists use findPlanSync(workspace) (src/lib/vbrief/io.ts); otherwise use findSpecByIssue(projectRoot, issueId) from src/lib/pan-dir/specs.ts:216 via Effect.runPromise, or add and use a sync export mirroring the private findSpecByIssueSync (src/lib/vbrief/io.ts:48). projectRoot comes from findProjectRoot(id) (start.ts:564). THEN: (a) plan exists → fall through to the existing spawn path completely unchanged (FR-8). (b) No plan and resolved mode is 'auto' or 'interactive' → if options.dryRun, print 'Would start <mode> planning session for <id> (work agent auto-starts on finalize)' and return without any HTTP request (FR-9); otherwise POST `${getDashboardApiUrlSync()}/api/issues/<ID>/start-planning` with JSON body { auto: mode === 'auto', autoStart: true, probe: false, model, harness, effort, workspaceLocation: options.remote ? 'remote' : 'local' } — the same body shape planCommand sends (src/cli/commands/plan.ts:26-38) — and stream the SSE progress events exactly as planCommand's reader loop does (plan.ts:53-84). Extract that reader loop into a shared helper (new src/cli/commands/planning-stream.ts or an export from plan.ts) so the two commands cannot drift; planCommand must be refactored to call the same helper. On success print a completion line stating the planning session name and that the work agent will start automatically after planning finalizes. On connection failure (dashboard down) print an error pointing at 'pan up' and '--plan skip' for offline use, exit 1 (hazard H1). (c) No plan and mode 'skip' → set the existing options.auto synthesized-vBRIEF path in motion unchanged (start.ts:1215-1232 writeAutoStartVBrief + createBeadsFromVBrief); no deprecation warning for skip-via---plan (FR-4). Do NOT touch the single-generic-bead fallback at start.ts:1239-1261 (decision D8). Tests (src/cli/commands/__tests__/start-plan-routing.test.ts): mock fetch and the spec/plan lookup; assert request body per mode ({auto:true,autoStart:true} for auto; {auto:false,autoStart:true} for interactive), assert no fetch for plan-exists and for dry-run, assert skip path calls writeAutoStartVBrief and never fetches start-planning. Follow existing start.ts test-mocking patterns (see start-harness.test.ts). Repo rule: no real timers/sleeps — mock the SSE stream; use vi.useFakeTimers() if anything delay-based appears."
+        },
+        "items": [
+          {
+            "id": "route-unplanned-to-planning.ac1",
+            "title": "Given no spec exists for the issue and effective mode auto, pan start POSTs /api/issues/:id/start-planning with body auto:true and autoStart:true and prints that the work agent starts automatically after planning finalizes (test asserts the request body)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-unplanned-to-planning.ac2",
+            "title": "Given no spec and --plan interactive, the POSTed body carries auto:false and autoStart:true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-unplanned-to-planning.ac3",
+            "title": "Given no spec and --plan skip, pan start synthesizes the minimal vBRIEF and beads via writeAutoStartVBrief/createBeadsFromVBrief and sends no start-planning request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-unplanned-to-planning.ac4",
+            "title": "Given a spec already exists for the issue, pan start sends no start-planning request and proceeds down the existing work-spawn path unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-unplanned-to-planning.ac5",
+            "title": "Given no spec and --dry-run, pan start prints the planning mode it would use and exits without sending any HTTP request or creating files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "running-noop",
+        "title": "pan start on an already-running work agent exits 0 with a clear no-op message",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-06T15:12:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2407",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/start.ts",
+            "src/cli/commands/__tests__/start-running-noop.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/start-running-noop.test.ts"
+          ],
+          "expected_outputs": [
+            "start-running-noop.test.ts reports all tests passed, including exit-code 0 for running and exit-code 1 preserved for paused"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "In issueCommand (src/cli/commands/start.ts:856), after the paused/troubled gates (lines 908-925) add an explicit liveness check: use getWorkAgentLifecycleStateSync (src/lib/work-agent-lifecycle.ts) — or sessionExistsSync from src/lib/tmux.js as the existing --fresh path does at line 965 — to determine whether agent-<id> has a live running session. If running, print a message that (1) states the work agent for <ID> is already running, (2) names `pan tell <id> \"...\"` for messaging and `tmux -L overdeck attach -t agent-<id>` for attaching, and return with exit code 0 (process.exitCode = 0, plain return — not process.exit(1)). Today this case throws from assertCanStartFreshSync (start.ts:984) and exits 1; the change scopes the exit-0 no-op STRICTLY to the live-running state (hazard H2). Paused agents keep the existing exit-1 refusal (start.ts:909-916); troubled agents keep exit-1 (start.ts:917-925); a stopped agent with a resumable session keeps the existing refusal pointing at pan resume/--fresh. Test in src/cli/commands/__tests__/start-running-noop.test.ts mocks the lifecycle/tmux lookups and asserts the exit codes and message content for running vs paused."
+        },
+        "items": [
+          {
+            "id": "running-noop.ac1",
+            "title": "Given a live running work agent for the issue, pan start <id> prints a no-op message naming pan tell and the tmux attach command and exits with code 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "running-noop.ac2",
+            "title": "Given a paused agent, pan start <id> still exits with code 1 and prints the existing pause refusal; troubled agents likewise keep exit 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "running-noop.ac3",
+            "title": "Given a stopped agent with a resumable saved session, pan start <id> preserves today's refusal pointing at pan resume / --fresh (no behavior change)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deprecate-plan-auto-start",
+        "title": "Deprecation pointer on pan plan --auto-start",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-06T15:12:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2407",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/index.ts",
+            "src/cli/commands/plan.ts",
+            "src/cli/commands/__tests__/plan.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/plan.test.ts",
+            "npx tsx src/cli/index.ts plan --help"
+          ],
+          "expected_outputs": [
+            "plan.test.ts reports all tests passed including the unchanged request body assertion",
+            "plan --help output marks --auto-start as [deprecated: use pan start]"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "1) In src/cli/index.ts line 413, change the --auto-start option description to prefix '[deprecated: use pan start <id>]' while keeping the option registered and functional. 2) In planCommand (src/cli/commands/plan.ts:16), when options.autoStart is true, print a yellow deprecation warning BEFORE starting the spinner: '--auto-start is deprecated — pan start <id> now plans and starts work in one command. This flag keeps working through the deprecation window.' Behavior must remain byte-identical otherwise: the request body still carries autoStart: true (plan.ts:31) and the autoSpawnOnFinalize stamp path is untouched. 3) Extend src/cli/commands/__tests__/plan.test.ts: assert the warning is printed when --auto-start is passed, and assert the POSTed body for pan plan X --auto --auto-start still carries { auto: true, autoStart: true } (acceptance: 'pan plan --auto --auto-start still works but prints a deprecation pointer')."
+        },
+        "items": [
+          {
+            "id": "deprecate-plan-auto-start.ac1",
+            "title": "pan plan <id> --auto-start prints a deprecation warning pointing at pan start <id> and still sends autoStart:true in the start-planning request body (test asserts both)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deprecate-plan-auto-start.ac2",
+            "title": "pan plan --help output marks --auto-start as deprecated with a pointer to pan start",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deprecate-plan-auto-start.ac3",
+            "title": "pan plan <id> --auto --auto-start produces the same start-planning request payload as before the change — the POSTed body still carries auto:true and autoStart:true (test asserts the body)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "update-skills",
+        "title": "Update pan-start and pan-plan wrapper skills for the paved road",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-06T15:12:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2407",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-start/SKILL.md",
+            "sync-sources/skills/pan-plan/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "lint-skills.sh exits 0 with no flag-drift errors for pan-start or pan-plan"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "1) sync-sources/skills/pan-start/SKILL.md: rewrite 'What It Does' to present pan start as the paved road (no plan → auto-plans then work starts on finalize; plan exists → spawns work; already running → no-op exit 0). Document --plan interactive|auto|skip with one usage example each, the planning.default_mode config default (shipped default auto), and mark --auto as deprecated alias of --plan skip. 2) sync-sources/skills/pan-plan/SKILL.md: reposition pan plan as the plan-ONLY verb; in the 'Auto-start after planning' section mark --auto-start deprecated with a pointer to pan start <id>; update the 'Related commands' block to name pan start as the paved road. 3) Every flag mentioned must exist in the corresponding pan <verb> --help output — scripts/lint-skills.sh (wired into npm run lint) enforces this; run it before completing the bead. This bead lands in the same change as the flag beads (skills/CLI same-commit convention)."
+        },
+        "items": [
+          {
+            "id": "update-skills.ac1",
+            "title": "pan-start SKILL.md documents --plan interactive|auto|skip, the planning.default_mode default, the unplanned→auto-plan paved road, and marks --auto deprecated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-skills.ac2",
+            "title": "pan-plan SKILL.md marks --auto-start as deprecated pointing at pan start <id> and presents pan plan as the plan-only verb",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-skills.ac3",
+            "title": "bash scripts/lint-skills.sh exits 0 (no skill/CLI flag drift)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "update-docs",
+        "title": "Update CLAUDE.md Planning Modes section to the paved-road model",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-06T15:12:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-2407",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'plan skip' CLAUDE.md",
+            "grep -cn 'auto-start' CLAUDE.md"
+          ],
+          "expected_outputs": [
+            "Planning Modes section names pan start --plan interactive|auto|skip and planning.default_mode",
+            "remaining --auto-start mentions in CLAUDE.md are annotated as deprecated"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-11"
+          ],
+          "acJustification": "Docs-only bead with a single section in one file; two criteria fully pin the change."
+        },
+        "narrative": {
+          "Action": "Rewrite the '## Planning Modes' section of the repo-root CLAUDE.md (currently line ~139) to present the paved road: pan start <id> as the single entry point (default from planning.default_mode, shipped default auto), pan start <id> --plan interactive and --plan skip per the issue table, pan plan <id> for plan-only workflows, and pan start --auto / pan plan --auto-start annotated as deprecated aliases kept through the deprecation window. Keep the existing Auto-Start subsection content accurate by folding it into the --plan skip description. Preserve the 'Always verify available flags with pan <verb> --help' note. Do not touch other CLAUDE.md sections (surgical-changes rule)."
+        },
+        "items": [
+          {
+            "id": "update-docs.ac1",
+            "title": "grep -n -- '--plan' CLAUDE.md returns matches inside the Planning Modes section naming pan start --plan interactive|auto|skip and planning.default_mode as the paved road",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-docs.ac2",
+            "title": "grep -n -- '--auto-start' CLAUDE.md returns only lines that carry a deprecated annotation — no CLAUDE.md line instructs new use of pan plan --auto-start or pan start --auto",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "config-default-mode",
+        "to": "plan-mode-flag",
+        "type": "blocks"
+      },
+      {
+        "from": "running-noop",
+        "to": "plan-mode-flag",
+        "type": "blocks"
+      },
+      {
+        "from": "deprecate-plan-auto-start",
+        "to": "plan-mode-flag",
+        "type": "blocks"
+      },
+      {
+        "from": "plan-mode-flag",
+        "to": "route-unplanned-to-planning",
+        "type": "blocks"
+      },
+      {
+        "from": "route-unplanned-to-planning",
+        "to": "update-skills",
+        "type": "blocks"
+      },
+      {
+        "from": "route-unplanned-to-planning",
+        "to": "update-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "deprecate-plan-auto-start",
+        "to": "update-skills",
+        "type": "blocks"
+      },
+      {
+        "from": "running-noop",
+        "to": "update-skills",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-06-PAN-2407-feat-cli-one-paved-road-verb-to-take-an-issue-from-any-state-to-running-work-collapse-the-plan-auto-auto-start-flag-maze.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

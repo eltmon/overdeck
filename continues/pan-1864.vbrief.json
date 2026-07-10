@@ -1,0 +1,59 @@
+{
+  "version": "1",
+  "issueId": "PAN-1864",
+  "created": "2026-06-24T00:53:15.619Z",
+  "updated": "2026-06-24T00:59:52.730Z",
+  "gitState": { "branch": "feature/pan-1864", "sha": "e2e269840", "dirty": true },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "PAN-1864's deterministic deacon-side synthesis fix already shipped on origin/main (commit bb57e9f16, verified by flywheel log c73f74f33). Operator-approved re-scope: this issue now adds ONLY the missing AC4 regression test. No production code changes.",
+      "recordedAt": "2026-06-24T00:59:52.730Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Test the PURE exported function synthesizeReviewFromReports (src/lib/cloister/deacon.ts:5939) directly. It takes report bodies in and returns {verdict, topBlocker, body} — no filesystem, no session, no live parent. That inherently satisfies the issue's 'without any live parent' requirement.",
+      "recordedAt": "2026-06-24T00:59:52.730Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Blocker semantics under test (findBlockingFindings, deacon.ts:5926): inside a '## Findings' section, a heading '### ! <title>' or '### ⊗ <title>' is a blocker; 'None' and advisory '###' headings (no !/⊗) do not block. topBlocker format is '[<subRole>] <title>'; passed body line is '## Verdict: APPROVED', blocked body line is '## Verdict: CHANGES REQUESTED — <topBlocker>'.",
+      "recordedAt": "2026-06-24T00:59:52.730Z"
+    },
+    {
+      "id": "D4",
+      "summary": "New test file location: src/lib/cloister/__tests__/deacon-review-synthesis.test.ts (vitest, matches sibling convention).",
+      "recordedAt": "2026-06-24T00:59:52.730Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "deacon.ts is 6000+ lines with heavy module-load side effects; a naive `import { synthesizeReviewFromReports } from '../deacon.js'` can fail or pull in real dependencies.",
+      "mitigation": "Copy the vi.mock() import scaffold verbatim from src/lib/cloister/__tests__/deacon-stash-janitor.test.ts (lines 1–138, ~20 mocks) before the import. That sibling proves the import works behind the scaffold."
+    },
+    {
+      "id": "H2",
+      "summary": "findBlockingFindings only inspects the '## Findings' section. A fixture report body without a '## Findings' heading is treated as clean (no blockers), which would make a 'blocker' fixture silently pass.",
+      "mitigation": "Every fixture body must contain a '## Findings' section. Put 'None' for clean, '### ! <title>' or '### ⊗ <title>' for a blocker, and a plain '### <title>' for an advisory (non-blocking) note."
+    },
+    {
+      "id": "H3",
+      "summary": "Risk of scope creep into production code — the implementation is shipped and verified; any edit to deacon.ts production logic is wrong here.",
+      "mitigation": "Test-only diff. NonGoals forbid touching synthesizeReviewFromReports, findBlockingFindings, or the call site (deacon.ts:6068–6140). Review must block any production change."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-8",
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "content": "Planning re-scoped after discovery found PAN-1864's deterministic-synthesis fix already shipped+verified on origin/main (bb57e9f16). Only the AC4 regression test is missing; operator approved scoping this issue to that single test bead.",
+      "note": "Planning session for PAN-1864 — re-scoped to add the missing deterministic-synthesis regression test (AC4).",
+      "timestamp": "2026-06-24T00:59:52.730Z",
+      "agentModel": "agent:claude-opus-4-8"
+    }
+  ],
+  "feedback": []
+}

@@ -1,0 +1,314 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-09T02:55:26.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2270: Review pipeline strands strike-originated PRs: auto-review trigger and pan review restart/request all require workspaces/feature-<id>",
+    "updated": "2026-07-09T04:22:48.572Z"
+  },
+  "plan": {
+    "id": "pan-2270",
+    "title": "Review pipeline strands strike-originated PRs: resolve strike workspace + branch at every review-dispatch site",
+    "status": "completed",
+    "uid": "7c609658-ee8f-43ef-b0ee-383746f5564c",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 5,
+    "created": "2026-07-09T02:55:26.000Z",
+    "updated": "2026-07-09T04:22:48.572Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2270",
+        "label": "PAN-2270",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "review-pipeline",
+      "strike",
+      "deacon",
+      "bugfix"
+    ],
+    "narratives": {
+      "Problem": "A strike agent works in workspaces/feature-<id>-strike on branch strike/<id>; pan done opens a PR against strike/<id>. Every review-dispatch path then hardcodes the branch as feature/<id> (deacon-review-status.ts) or feature/<numeric> (review-control.ts). Because the branch is wrong, the review agent (1) fails the fast mergeability check when it cannot resolve the PR via `gh pr view feature/<id>` (review-agent.ts:495-513), and/or (2) runs `git diff origin/main...HEAD` in a workspace whose HEAD is not the strike tip and produces nothing, then exits. The review status never records a verdict (stays pending/pending). The deacon orphan reconciler sees `reviewing` with no active review agent, resets to pending, re-dispatches with the same wrong branch, and thrashes (RUN-53: review live at 00:33, gone by 00:53, three times). review-control.ts is worse: getWorkspaceInfoForIssue (workspaces.ts:412) does not even know the -strike suffix, so `pan review restart --rerun` resolves a non-existent workspace dir. The manual unblock today is `pan workspace create PAN-<id>` + `pan review restart`, both requiring a human.",
+      "Proposal": "findAllWorkspacePaths already resolves the strike workspace (candidate #2, archive-planning.ts:53) — the workspace path is not the problem in the deacon paths. Introduce one pure helper, inferBranchFromWorkspace(workspacePath, issueLower), in archive-planning.ts: returns `strike/<id>` when the path ends in `-strike`, else `feature/<id>`. Apply it at all FOUR spawnReviewRoleForIssue sites in deacon-review-status.ts so the review agent gets the correct branch. Fix review-control.ts separately: resolve the workspace via findWorkspacePath (which includes -strike) instead of the -strike-blind getWorkspaceInfoForIssue/feature-<numeric> fallback, and derive the branch strike-aware while preserving its existing non-strike convention. Update the review-agent architecture doc. This makes strike-origin PRs reviewable without any manual workspace materialization.",
+      "NonGoals": "- Do NOT auto-create a workspaces/feature-<id> directory (the manual workaround); the root-cause fix removes the need for it.\n- Do NOT change findAllWorkspacePaths / findWorkspacePath ordering; the -strike candidate is already present and feature-first ordering is deliberate.\n- Do NOT add or change any orphan-reaper / patrol reaping logic; the RUN-53 reap-thrash is a symptom of the branch/workspace mismatch and is fixed by resolving both correctly.\n- Do NOT unify the two feature-branch conventions (deacon's feature/<id> vs review-control's feature/<numeric>); only redirect the strike case, leaving each site's existing non-strike branch string untouched.\n- Do NOT change getWorkspaceInfoForIssue itself; review-control switches to findWorkspacePath instead.\n- Do NOT change the best-effort reviewedAtCommit path in reconcileReviewStatusOrphan (line ~457); it is non-fatal and out of scope.\n- Do NOT change the auto-trigger event flow that fires when a strike first creates its PR; this issue covers the re-dispatch, restart, and patrol paths only."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Kept scope to the branch/workspace resolution at the four deacon dispatch sites + review-control, and diagnosed the RUN-53 reap-thrash as a symptom rather than adding orphan-reaper changes.",
+        "rationale": "The title names exactly these dispatch/restart/patrol paths. isReviewAgentActiveForIssue matches by issueId+role independent of workspace, so a correctly-dispatched strike review is detected as active — the thrash disappears once dispatch resolves the right workspace+branch. Adding reaper changes would be speculative scope beyond the verified root cause."
+      },
+      {
+        "summary": "Fixed all FOUR deacon spawnReviewRoleForIssue sites, not the three the pre-existing PRD draft listed.",
+        "rationale": "grep found a fourth hardcoded feature/<id> branch in the stalled-review-convoy recovery path (~line 757). Leaving it unfixed would strand strikes that hit that recovery path."
+      },
+      {
+        "summary": "Expanded review-control's fix from branch-only (as the draft said) to workspace+branch.",
+        "rationale": "getWorkspaceInfoForIssue does not know the -strike suffix, so a branch-only fix would still resolve a non-existent workspace directory for strike issues."
+      }
+    ],
+    "items": [
+      {
+        "id": "helper",
+        "title": "Add inferBranchFromWorkspace helper + unit tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-09T02:55:26.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2270",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/archive-planning.ts",
+            "tests/unit/lib/lifecycle/archive-planning.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/lifecycle/archive-planning.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "archive-planning.test.ts passes including the new inferBranchFromWorkspace cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/lifecycle/archive-planning.ts, immediately AFTER `export function findWorkspacePath` (grep anchor; currently line ~67-69), add a pure exported helper:\n\n```ts\n/**\n * Infer the git branch for an issue from its resolved workspace path.\n * Strike workspaces (path ends in `-strike`) use `strike/<id>`; every other\n * workspace uses `feature/<id>`. PAN-2270: review-dispatch callers must derive\n * the branch this way instead of hardcoding `feature/${issueLower}`.\n */\nexport function inferBranchFromWorkspace(workspacePath: string, issueLower: string): string {\n  if (workspacePath.endsWith('-strike')) return `strike/${issueLower}`;\n  return `feature/${issueLower}`;\n}\n```\n\nNo new imports needed. Then append unit tests to the EXISTING tests/unit/lib/lifecycle/archive-planning.test.ts (Vitest — it already imports from 'vitest'): a describe('inferBranchFromWorkspace') block asserting `feature-pan-2258-strike` → `strike/pan-2258`, `feature-pan-2258` → `feature/pan-2258`, and legacy `feature-2258` (issueLower '2258') → `feature/2258`. This bead is a leaf-plus-foundation: it only adds an unused export + tests, so it lands green on its own; beads `deacon-sites` and `review-control` import it."
+        },
+        "items": [
+          {
+            "id": "helper.ac1",
+            "title": "Given workspacePath '/proj/workspaces/feature-pan-2258-strike' and issueLower 'pan-2258', inferBranchFromWorkspace returns 'strike/pan-2258'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "helper.ac2",
+            "title": "Given a non-strike path '/proj/workspaces/feature-pan-2258' and issueLower 'pan-2258', the helper returns 'feature/pan-2258'; given legacy '/proj/workspaces/feature-2258' with issueLower '2258' it returns 'feature/2258'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "helper.ac3",
+            "title": "Running `npx vitest run tests/unit/lib/lifecycle/archive-planning.test.ts` produces a passing run that includes the inferBranchFromWorkspace cases, and `npm run typecheck` exits without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deacon-sites",
+        "title": "Derive the branch via inferBranchFromWorkspace at all four deacon review-dispatch sites",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-09T02:55:26.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2270",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-review-status.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "existing cloister tests still pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/deacon-review-status.ts, extend the archive-planning import (currently `import { findWorkspacePath } from '../lifecycle/archive-planning.js';`, ~line 20) to also import `inferBranchFromWorkspace`. Then replace the hardcoded branch argument at ALL FOUR spawnReviewRoleForIssue call sites. At each site the resolved `workspace` variable (from findWorkspacePath / agentState?.workspace) is already in scope; use it:\n\n- Site 1 — handleReviewCoordinatorDied (~line 381): `branch: \\`feature/${issueLower}\\`` → `branch: inferBranchFromWorkspace(workspace, issueLower)`.\n- Site 2 — pending re-dispatch in reconcileReviewStatusOrphan (~line 540): same substitution; `workspace` is the resolved var at line ~532.\n- Site 3 — stalled review convoy recovery (~line 757; workspace resolved at ~line 680): same substitution. THIS IS THE SITE THE OLD DRAFT MISSED — do not skip it.\n- Site 4 — checkMissingReviewStatus (~line 846; workspace resolved at ~line 830): same substitution.\n\nGrep to confirm zero remaining `branch: \\`feature/${issueLower}\\`` occurrences in this file after the edits. Change ONLY the branch argument value at each site — no other logic. Do not modify the reviewedAtCommit path (~line 457)."
+        },
+        "items": [
+          {
+            "id": "deacon-sites.ac1",
+            "title": "Grep of src/lib/cloister/deacon-review-status.ts shows zero `branch: `feature/${issueLower}`` occurrences and four `branch: inferBranchFromWorkspace(workspace, issueLower)` occurrences (one per spawnReviewRoleForIssue call)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-sites.ac2",
+            "title": "After the edits `npm run typecheck` exits without errors, confirming inferBranchFromWorkspace resolves from the '../lifecycle/archive-planning.js' import",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-sites.ac3",
+            "title": "Running `npx vitest run tests/unit/lib/cloister` produces no new failures relative to the pre-change baseline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "review-control",
+        "title": "Resolve strike workspace + branch in pan review restart (review-control.ts)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-09T02:55:26.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2270",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/review-control.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/workspaces/review-control.ts, fix the rerun re-dispatch block (~lines 302-318). Today: `wsPath = wsInfo.localPath || join(resolved.projectPath, 'workspaces', \\`feature-${numericSuffix}\\`)` and `branchName = \\`feature/${numericSuffix}\\``. Because getWorkspaceInfoForIssue is -strike-blind, wsInfo.localPath is undefined for strike issues and the fallback dir does not exist.\n\nChanges:\n1. Add import: `import { findWorkspacePath } from '../../../../lib/lifecycle/archive-planning.js';` (join the existing import block).\n2. Resolve the workspace via findWorkspacePath, which includes the -strike candidate, falling back to the current feature-<numeric> join only if it returns null:\n   `const wsPath = wsInfo.localPath || findWorkspacePath(resolved.projectPath, issueLower) || join(resolved.projectPath, 'workspaces', \\`feature-${numericSuffix}\\`);`\n3. Derive the branch strike-aware WITHOUT changing the existing non-strike convention:\n   `const branchName = wsPath.endsWith('-strike') ? \\`strike/${issueLower}\\` : \\`feature/${numericSuffix}\\`;`\n   (Keep the `feature/${numericSuffix}` string for the non-strike case exactly as-is per hazard H1 — do NOT switch it to feature/<id>.)\nLeave the spawnReviewRoleForIssue call otherwise unchanged (it already passes issueId, workspace: wsPath, branch: branchName, prUrl)."
+        },
+        "items": [
+          {
+            "id": "review-control.ac1",
+            "title": "For a strike issue whose only workspace is feature-<id>-strike, the rerun block resolves wsPath to the -strike workspace (via findWorkspacePath) and sets branchName to 'strike/<id>' before calling spawnReviewRoleForIssue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-control.ac2",
+            "title": "For a non-strike issue the block preserves branchName as `feature/${numericSuffix}` and preserves wsInfo.localPath as the preferred wsPath (non-strike behavior unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-control.ac3",
+            "title": "After findWorkspacePath is added to the review-control.ts imports, `npm run typecheck` passes and `npm run lint` passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document strike-origin PR review support",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-09T02:55:26.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2270",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/REVIEW-AGENT-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -n strike docs/REVIEW-AGENT-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "a new subsection describing strike-origin PR review + branch derivation is present"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a short subsection to docs/REVIEW-AGENT-ARCHITECTURE.md stating that strike-originated PRs are reviewed in the feature-<id>-strike workspace against branch strike/<id>, that review-dispatch sites derive the branch via inferBranchFromWorkspace (archive-planning.ts) from the resolved workspace path, and that no manual `pan workspace create` is required. Reference PAN-2270. Keep it to a focused paragraph or two; do not rewrite unrelated sections of the doc."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/REVIEW-AGENT-ARCHITECTURE.md contains a subsection that names the strike workspace (feature-<id>-strike), the strike/<id> branch, and inferBranchFromWorkspace, and states no manual workspace creation is needed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "The subsection references PAN-2270 and preserves all unrelated content in the doc unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "helper",
+        "to": "deacon-sites",
+        "type": "blocks"
+      },
+      {
+        "from": "helper",
+        "to": "review-control",
+        "type": "blocks"
+      },
+      {
+        "from": "deacon-sites",
+        "to": "docs",
+        "type": "informs"
+      },
+      {
+        "from": "review-control",
+        "to": "docs",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-09-PAN-2270-review-pipeline-strands-strike-originated-prs-resolve-strike-workspace-branch-at-every-review-dispatch-site.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

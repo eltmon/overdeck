@@ -1,0 +1,118 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-24T00:59:52.730Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-1864: add the missing AC4 regression test for deterministic deacon-side review synthesis (the fix itself already shipped on main)",
+    "updated": "2026-06-24T01:03:50.788Z"
+  },
+  "plan": {
+    "id": "pan-1864",
+    "title": "Regression test for deterministic deacon-side review synthesis (synthesizeReviewFromReports)",
+    "status": "proposed",
+    "uid": "2d71b234-cd29-4838-bb86-bff38132ff43",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-24T00:59:52.730Z",
+    "updated": "2026-06-24T01:03:50.788Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1864",
+        "label": "PAN-1864",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-1864.md",
+        "label": "PRD draft",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/commit/bb57e9f16e96d2d86360fa122611712414948b78",
+        "label": "bb57e9f16 — shipped fix",
+        "type": "commit"
+      }
+    ],
+    "tags": [
+      "review",
+      "deacon",
+      "convoy",
+      "test",
+      "regression"
+    ],
+    "narratives": {
+      "Problem": "PAN-1864 asked for deterministic deacon-side review synthesis so a wedged convoy parent can never block the pipeline. That fix ALREADY shipped and was verified on origin/main (commit bb57e9f16; flywheel log c73f74f33). All four functional acceptance criteria are met in current code: synthesizeReviewFromReports (src/lib/cloister/deacon.ts:5939) plus the wedge-detection/cleanup call site (deacon.ts:6068-6140). The ONLY unmet acceptance criterion is AC4 — the unit test. No test anywhere references synthesizeReviewFromReports, findBlockingFindings, or DeaconReviewSynthesis, so the critical deterministic-synthesis path has zero regression coverage.",
+      "Proposal": "Add a single new vitest file, src/lib/cloister/__tests__/deacon-review-synthesis.test.ts, that imports the pure exported function synthesizeReviewFromReports (behind the same vi.mock import scaffold the sibling deacon-stash-janitor.test.ts already uses) and asserts the correct verdict / topBlocker / body for representative on-disk reviewer reports — with no live parent and no filesystem. Touch no production code.",
+      "NonGoals": "- Do NOT modify synthesizeReviewFromReports, findBlockingFindings, the wedge-detection call site (deacon.ts:6068-6140), or any other production code — the implementation is shipped and verified.\n- Do NOT write an integration test that spawns a live parent, attaches tmux, or drives the deacon patrol loop — the function under test is pure and must be tested with no live parent.\n- Do NOT test the filesystem write of synthesis.md or the review-status transition — those are the call site's concern, out of scope for this pure-function unit.\n- Do NOT touch convoy-revival umbrella #1982 (making convoy review opt-in)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Re-scoped (operator-approved) from 'implement deterministic synthesis' to 'add the missing AC4 regression test', because discovery found the implementation already shipped+verified on origin/main (bb57e9f16).",
+        "rationale": "Finalizing an implement-the-fix plan would spawn a work agent to re-implement shipped, verified, critical pipeline code — pure waste and a regression risk. The only acceptance criterion still unmet is AC4, the unit test."
+      },
+      {
+        "summary": "Test the PURE exported function synthesizeReviewFromReports directly (no filesystem, no live parent), rather than the deacon patrol call site.",
+        "rationale": "The function takes report bodies in and returns {verdict, topBlocker, body} with no side effects, so testing it directly satisfies AC4's 'without any live parent' requirement with the smallest, most reliable test. The call-site behavior (write synthesis.md, transition status, kill parent) is already exercised in production and out of scope for the unit."
+      }
+    ],
+    "items": [
+      {
+        "id": "add-deterministic-synthesis-test",
+        "title": "Add regression test for synthesizeReviewFromReports (deterministic deacon-side synthesis)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-24T00:59:52.730Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1864",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create a new vitest file src/lib/cloister/__tests__/deacon-review-synthesis.test.ts. (1) Copy the vi.mock() import scaffold verbatim from the sibling src/lib/cloister/__tests__/deacon-stash-janitor.test.ts (its lines 1-138, ~20 mocks) so that `import { synthesizeReviewFromReports } from '../deacon.js';` loads with no module-load side effects. Also import `type ReviewSubRole` from '../review-monitor.js'. (2) Add a fixture helper that builds a report `{ subRole, path, body }` whose body contains a `## Findings` section — `None` for clean, `### ! <title>` or `### ⊗ <title>` for a blocker, plain `### <title>` for an advisory note (findBlockingFindings at deacon.ts:5926 only inspects the `## Findings` section; a body without it counts as clean). (3) Assert the four acceptance criteria below by calling synthesizeReviewFromReports({ issueId: 'PAN-1864', reviewDir: '/tmp/x', reports }) and checking the returned verdict, topBlocker, and body. The function is pure — no filesystem, no tmux, no live parent. Do NOT modify any production code; the synthesis implementation already shipped on main (bb57e9f16). Run the focused vitest path and confirm green before signaling done."
+        },
+        "items": [
+          {
+            "id": "add-deterministic-synthesis-test.ac1",
+            "title": "Given 4 reports (one per sub-role) each with a '## Findings' section of 'None', synthesizeReviewFromReports returns verdict 'passed' and a body containing the line '## Verdict: APPROVED' — with no filesystem and no live parent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-deterministic-synthesis-test.ac2",
+            "title": "Given 4 reports where exactly one (correctness) has '### ! Off-by-one in slice' under '## Findings' and the other three are clean, synthesizeReviewFromReports returns verdict 'blocked', topBlocker equal to '[correctness] Off-by-one in slice', and a body containing 'CHANGES REQUESTED'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-deterministic-synthesis-test.ac3",
+            "title": "Given a report whose '## Findings' contains only advisory '###' headings without a leading '!' or '⊗', synthesizeReviewFromReports returns verdict 'passed' (advisory notes never block).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-deterministic-synthesis-test.ac4",
+            "title": "Given a report with a '### ⊗ <title>' heading under '## Findings', synthesizeReviewFromReports returns verdict 'blocked' (the ⊗ glyph blocks identically to '!').",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-06-24-PAN-1864-regression-test-for-deterministic-deacon-side-review-synthesis-synthesizereviewfromreports.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

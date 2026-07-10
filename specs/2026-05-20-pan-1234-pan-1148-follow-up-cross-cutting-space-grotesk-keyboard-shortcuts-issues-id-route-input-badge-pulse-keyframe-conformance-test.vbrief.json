@@ -1,0 +1,653 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-20T02:45:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1234: PAN-1148 follow-up — cross-cutting (Space Grotesk / keyboard shortcuts / /issues/:id route / INPUT badge / pulse keyframe / conformance test)",
+    "updated": "2026-05-20T02:41:56.591Z"
+  },
+  "plan": {
+    "id": "pan-1234",
+    "title": "PAN-1148 follow-up — cross-cutting (Space Grotesk / keyboard shortcuts / /issues/:id route / INPUT badge / pulse keyframe / conformance test)",
+    "status": "proposed",
+    "uid": "7b1212bd-e17e-449a-9067-08d73e52bcf4",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-20T02:45:00.000Z",
+    "updated": "2026-05-20T02:41:56.591Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1234",
+        "label": "PAN-1234",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1226",
+        "label": "PAN-1226 (parent audit)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1148",
+        "label": "PAN-1148 (root unified-redesign)",
+        "type": "issue"
+      },
+      {
+        "uri": "docs/prds/planned/pan-dashboard-unified-redesign.md",
+        "label": "Unified-redesign PRD",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "ux",
+      "styleguide",
+      "follow-up"
+    ],
+    "narratives": {
+      "Problem": "Six gaps from the PAN-1148 audit live at the app-shell/cross-cutting layer rather than in any single surface: Space Grotesk is loaded but never applied to drawer title / CD tree head, keyboard navigation chords are unwired, /issues/:id direct-link route is unimplemented (only ?issue= query-param works), the INPUT verb badge never wins over the role-based badge on non-plan agents waiting on AskUserQuestion, the verb-badge pulse animation uses a non-token keyframe name (verb-badge-pulse instead of pulse per PRD §4.7.7), and the conformance Playwright test only asserts data-component presence rather than the visual contracts (grid templates, badge token classes, Space Grotesk application) that PRD §8 promises.",
+      "Proposal": "Land each gap as its own independently-reviewable bead in front-end-only changes. (1) Apply font-display Tailwind utility to drawer title and CD tree head and relax the PAN-698 Sidebar.tsx 'reserved for wordmark only' comment; the font is already preloaded in index.html. (2) Wire a chord-aware keyboard handler in App.tsx alongside the existing / and ⌘K handler: j/k for row navigation on Pipeline and Board (separate beads since they touch different row containers), and a g-prefix chord (g p, g b, g a, g c) for global lens navigation, with a footer chip update. (3) Add `/issues/:id` to TAB_PATHS and PATH_TO_TAB so direct-link rehydrates the current surface with the drawer open; preserve ?issue= back-compat. (4) Extend verbBadgeForPhase (PipelineView.tsx) to check hasActualPendingQuestion(agent) and return INPUT before falling back to the role-based variant; the helper already exists in lib/pipeline-state.ts. (5) Rename the verb-badge-pulse class and @keyframes to pulse atomically across index.css, VerbBadge.tsx, and VerbBadge.test.tsx — CSS modules localize their own @keyframes pulse so there is no collision with command-deck.module.css. (6) Strengthen tests/e2e/styleguide-conformance.spec.ts to assert (a) the Pipeline grid-template-columns matches PRD §4.1, (b) badge token classes (badge-bg-*, badge-border-*) are present on at least one rendered verb badge, and (c) Space Grotesk is the computed font-family on the drawer title — working within the existing constraint that the spec's vite plugin empties src/index.css (assertions must rely on inline Tailwind utilities or DOM attributes, not custom @layer tokens)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Treat PRD §15 'Space Grotesk reserved for sidebar wordmark only' as superseded by §4.7.8 (drawer title) and §4.7.10 (CD tree head) for the scope of this issue.",
+        "rationale": "The issue body explicitly cites §4.7.8 and §4.7.10 as the source of truth and lists §15's blanket reservation as the symptom being fixed. The PRD contradicts itself between §15 and §4.7.x. Auto mode picks the more specific section and the one the issue body endorses. The Sidebar.tsx PAN-698 comment, which encodes the §15 rule, is updated to reflect the new policy. The PRD itself is not edited (out of scope)."
+      },
+      {
+        "summary": "Drawer title font change is scoped to applying font-display only; size (PRD §4.7.8 says 22px, current is 18px) is NOT changed in this issue.",
+        "rationale": "The N-CC-3 gap description lists the failure as 'both fall back to DM Sans' — a typography-family problem, not a size problem. Touching size pulls in vertical-rhythm tradeoffs (header height is 52px) that belong to a typography-pass issue, not a font-application issue. If the user wants size aligned, file a separate follow-up."
+      },
+      {
+        "summary": "Decompose keyboard shortcuts into three beads: j/k on Pipeline rows, j/k on Board cards, and g-prefix chord global nav (with footer chip update).",
+        "rationale": "Each touches a distinct row container with its own selection model and a11y semantics; the global chord introduces a multi-key state machine that is mechanically different from a single-key navigation handler. Separate beads keep the diffs reviewable in isolation and let each ship independently if one is contentious."
+      },
+      {
+        "summary": "/issues/:id route maps to the user's prior surface (default Pipeline) and opens the drawer; the search-params back-compat (?issue=PAN-1234) is preserved unchanged.",
+        "rationale": "PRD §5.3 says 'Direct-link rehydrates to the surface the user came from, drawer open.' Without prior surface context, defaulting to Pipeline matches the new default-landing in §IA. Preserving ?issue= back-compat avoids breaking any external links or saved bookmarks that already use it."
+      },
+      {
+        "summary": "INPUT badge wins on ANY non-plan role when hasActualPendingQuestion(agent) is true (i.e., it overrides WORK/REVIEW/SHIP/READY-TO-MERGE/PLANNING).",
+        "rationale": "PRD §4.4 says INPUT = 'Agent waiting on AskUserQuestion' and the table lists it as its own variant alongside the role badges, not as a modifier. The clearest reading is that INPUT supersedes the role-based variant on any agent that is actually blocked on a question. The hasActualPendingQuestion helper already exists in lib/pipeline-state.ts."
+      },
+      {
+        "summary": "Conformance test stays a vitest+playwright hybrid in tests/e2e/ rather than being migrated to a pure Playwright runner.",
+        "rationale": "The existing fixture-injection and per-route context machinery is non-trivial and works. Migrating to playwright.config.ts would be a scope creep; strengthening the existing spec is the minimum change that closes the gap. The empty-index.css vite plugin constraint is preserved — new assertions either check DOM/attributes or inline Tailwind utilities."
+      },
+      {
+        "summary": "Pulse class and keyframe are renamed atomically in a single bead: verb-badge-pulse → pulse in index.css (both @keyframes and the utility class), VerbBadge.tsx (className), and VerbBadge.test.tsx (snapshot assertions and PULSING_VARIANTS class lookup).",
+        "rationale": "The rename is mechanically tied across these files — landing them separately produces an intermediate state where the test references a class the component no longer emits. CSS modules in command-deck.module.css scope their own @keyframes pulse so there is no global collision."
+      },
+      {
+        "summary": "No bead in this plan is marked requiresInspection: true.",
+        "rationale": "Each gap is a surface-level change with no downstream bead encoding assumptions about its internals; the chord handler is self-contained in App.tsx; the route addition is one TAB_PATHS entry; the INPUT-badge change is one function call; the keyframe rename is mechanically obvious. Errors in any of these surface immediately at typecheck/lint/the conformance test rather than as silent foundation rot. Following the planning rubric, requiresInspection stays false."
+      }
+    ],
+    "items": [
+      {
+        "id": "font-grotesk-apply",
+        "title": "Apply Space Grotesk to drawer title and Command Deck tree head; relax PAN-698 sidebar-only comment",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-20T02:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1234",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add the Tailwind `font-display` class to (a) the drawer title h2 at src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx:91 and (b) the Command Deck tree head/title element (find it in src/dashboard/frontend/src/components/CommandDeck/ — likely ZoneA.tsx or ProjectOverview.tsx; search for the project label that mirrors PRD §4.7.10 'Tree title'). Update the PAN-698 comment at src/dashboard/frontend/src/components/Sidebar.tsx:177 from 'Space Grotesk is reserved for the sidebar wordmark only' to reflect the new policy ('used for sidebar wordmark, drawer title, and Command Deck tree head'). Do NOT change font sizes — only the font family is in scope. Verify visually that Space Grotesk renders in both places (the Google Fonts preload is already in index.html, no link tag changes needed)."
+        },
+        "subItems": [
+          {
+            "id": "font-grotesk-apply.ac1",
+            "title": "Drawer title h2 in IssueDrawer.tsx uses the `font-display` Tailwind class.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "font-grotesk-apply.ac2",
+            "title": "Command Deck tree head/title element uses the `font-display` Tailwind class.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "font-grotesk-apply.ac3",
+            "title": "Sidebar.tsx PAN-698 comment is updated (not deleted) to reflect the broader allowance for drawer title + CD tree head.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "font-grotesk-apply.ac4",
+            "title": "No code change to index.html (font is already preloaded) and no link-tag additions in any file.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "font-grotesk-apply.ac5",
+            "title": "Drawer title and CD tree head computed font-family in the running browser shows 'Space Grotesk' as the first resolved family.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "font-grotesk-apply.ac6",
+            "title": "Existing IssueDrawer.test.tsx tests still pass (no test snapshots accept the class change unless re-snapshotted).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "keyframe-pulse-rename",
+        "title": "Rename verb-badge-pulse keyframe and class to `pulse` per PRD §4.7.7 token contract",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-20T02:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1234",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/index.css rename both the `@keyframes verb-badge-pulse { … }` block (around line 269) and the `.verb-badge-pulse { animation: verb-badge-pulse … }` utility (around line 250) to `pulse` (the keyframe) and `.pulse` (the class). The class's `animation:` declaration must reference the renamed keyframe. In VerbBadge.tsx (line 108), replace `verb-badge-pulse` with `pulse`. In VerbBadge.test.tsx, update all snapshot assertions and the `container.querySelector('.verb-badge-pulse')` lookups to use `.pulse`. Verify no other file in src/dashboard/frontend/ references `verb-badge-pulse`. Verify the CSS module @keyframes pulse in command-deck.module.css remains scoped (Vite CSS modules hash @keyframes names per module) and is not affected by the global rename."
+        },
+        "subItems": [
+          {
+            "id": "keyframe-pulse-rename.ac1",
+            "title": "@keyframes block in src/dashboard/frontend/src/index.css is named `pulse` (not `verb-badge-pulse`).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keyframe-pulse-rename.ac2",
+            "title": "Utility class in index.css is `.pulse` and references the `pulse` keyframe via `animation:`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keyframe-pulse-rename.ac3",
+            "title": "VerbBadge.tsx uses the className `pulse` for the pulsing dot.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keyframe-pulse-rename.ac4",
+            "title": "VerbBadge.test.tsx snapshot assertions and querySelector lookups reference `.pulse`; the file's PULSING_VARIANTS-based test still asserts the dot is present for variants where pulse=true and absent otherwise.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keyframe-pulse-rename.ac5",
+            "title": "No remaining reference to `verb-badge-pulse` in src/dashboard/frontend/ (grep returns no matches).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keyframe-pulse-rename.ac6",
+            "title": "command-deck.module.css continues to define its own scoped `@keyframes pulse` without runtime collision — CSS module hashing keeps the two distinct.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keyframe-pulse-rename.ac7",
+            "title": "Pulsing badges still animate visibly in dev/prod build after rename (manual or browser verification).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "badge-input-nonplan",
+        "title": "Emit INPUT verb badge for any non-plan agent waiting on AskUserQuestion",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-20T02:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1234",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/Pipeline/PipelineView.tsx, modify `verbBadgeForPhase` (line 162) to also accept the agent (or its pending-question flags) and return `<VerbBadge variant=\"INPUT\" />` BEFORE the existing phase-based branches whenever `hasActualPendingQuestion(agent)` returns true. Import `hasActualPendingQuestion` from src/dashboard/frontend/src/lib/pipeline-state.ts (line 31) — do not duplicate the logic. Update the call site at PipelineView.tsx:406 to thread the row's agent into the helper. Apply the same INPUT-precedence rule to any other surface that uses a phase-keyed badge dispatch (search the frontend for `verbBadgeForPhase` and `<VerbBadge variant=` and patch consistently). Add a Vitest case in PipelineView.test.tsx (or a new test file if more appropriate) that asserts: a row whose agent has hasPendingQuestion=true and pendingQuestionCount>0 on a WORK role renders the INPUT variant, not WORK RUNNING."
+        },
+        "subItems": [
+          {
+            "id": "badge-input-nonplan.ac1",
+            "title": "`verbBadgeForPhase` returns INPUT when `hasActualPendingQuestion(agent)` is true, regardless of phase/role.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "badge-input-nonplan.ac2",
+            "title": "The INPUT precedence does NOT trigger when hasPendingQuestion=true but pendingQuestionCount=0 and pendingQuestionPrompt is empty (i.e., respects the existing `hasActualPendingQuestion` semantics).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "badge-input-nonplan.ac3",
+            "title": "Helper `hasActualPendingQuestion` is imported, not re-implemented or duplicated in PipelineView.tsx.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "badge-input-nonplan.ac4",
+            "title": "A Vitest test asserts the INPUT precedence for a WORK-role agent with a real pending question.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "badge-input-nonplan.ac5",
+            "title": "If other surfaces (Board, Agents card, drawer header) use the same phase-keyed dispatch, INPUT precedence is applied there too; otherwise this AC is closed by an explicit note in the PR description that no other dispatch exists.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "route-issues-id",
+        "title": "Add /issues/:id direct-link route that opens the drawer over the current (or default) surface",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-20T02:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1234",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extend App.tsx routing so that hitting `/issues/PAN-1234` (or any issue id) (a) selects a default surface (Pipeline if no prior tab, otherwise the user's last tab), (b) calls `openIssue(<id>)` from the Zustand store (already wired at line 352), and (c) leaves the URL bar at `/issues/:id` (i.e., do NOT rewrite to ?issue=). Update `getTabFromPath` (around line 89) and the popstate handler (around line 490) so that back/forward across /issues/:id ↔ /pipeline preserves drawer state and the parent surface dim. Preserve full back-compat with `?issue=PAN-1234` (any existing call site or bookmark must still open the drawer on the same surface as today; do NOT remove the search-param branch of syncDrawerFromUrl in lib/store.ts). Add a Vitest test in __tests__/store.test.ts (or a new App.test.tsx) that asserts: navigating to /issues/PAN-1234 (a) sets activeTab to a valid Tab (default 'pipeline'), (b) opens the drawer for PAN-1234, (c) round-trips through popstate without losing the issueId."
+        },
+        "subItems": [
+          {
+            "id": "route-issues-id.ac1",
+            "title": "TAB_PATHS / PATH_TO_TAB / getTabFromPath handle `/issues/:id` paths and resolve the active tab to the user's prior tab or 'pipeline' as default.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-issues-id.ac2",
+            "title": "Navigating directly to `/issues/PAN-1234` opens the IssueDrawer for PAN-1234.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-issues-id.ac3",
+            "title": "The URL stays at `/issues/PAN-1234` after navigation (no automatic rewrite to ?issue= form).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-issues-id.ac4",
+            "title": "Back-compat: visiting `/pipeline?issue=PAN-1234` still opens the drawer on Pipeline exactly as today.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-issues-id.ac5",
+            "title": "Browser back/forward across /issues/:id ↔ /pipeline restores both the active tab and the drawer state (popstate handler updated).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-issues-id.ac6",
+            "title": "A Vitest test in src/dashboard/frontend/src/__tests__/ exercises the /issues/:id → openIssue path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "kbd-pipeline-rows",
+        "title": "Add j/k row navigation on Pipeline",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-20T02:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1234",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In PipelineView.tsx, add a keyboard-row-selection model: a `selectedIssueId` (or row index) state, and a keydown handler on the Pipeline container (or document-level inside an effect gated on `activeTab === 'pipeline'`) that responds to `j` (next row) and `k` (previous row) when the user is not inside an INPUT/TEXTAREA/contentEditable. Selected row gets a visible focus ring using existing token classes (e.g. `ring-2 ring-primary` on `[data-component='issue-row']`). Pressing Enter on the selected row opens that issue's drawer via `openIssue(issueId)`. Wrap-around: after the last row, j wraps to the first; before the first row, k wraps to the last. The handler must not fire when the search palette or command palette is open."
+        },
+        "subItems": [
+          {
+            "id": "kbd-pipeline-rows.ac1",
+            "title": "On the Pipeline lens, pressing `j` (with no modifier) moves selection to the next issue-row.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kbd-pipeline-rows.ac2",
+            "title": "Pressing `k` moves selection to the previous issue-row, wrapping around at the boundaries.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kbd-pipeline-rows.ac3",
+            "title": "The selected row has a visible focus indicator using existing token classes (not a custom color).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kbd-pipeline-rows.ac4",
+            "title": "Pressing Enter on a selected row opens the IssueDrawer for that issue.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kbd-pipeline-rows.ac5",
+            "title": "j/k do NOT fire when focus is in INPUT/TEXTAREA/contentEditable or when the search palette / command palette is open.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kbd-pipeline-rows.ac6",
+            "title": "A Vitest test exercises j/k progression and Enter-to-open on a fixture of >=3 issue rows.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "kbd-board-rows",
+        "title": "Add j/k card navigation on Board",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-20T02:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1234",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In KanbanBoard.tsx, add j/k card navigation analogous to Pipeline. Because Board is column-based, j moves down within the current column and k moves up; if no card remains in the column, j moves to the first card of the next non-empty column to the right (and k to the last card of the prev non-empty column to the left). Apply the same gating rules (no INPUT/TEXTAREA, no open palette). Selected card gets a focus ring via the same token classes used in the Pipeline bead so they look unified. Enter opens the drawer for the selected card."
+        },
+        "subItems": [
+          {
+            "id": "kbd-board-rows.ac1",
+            "title": "On the Board lens, pressing `j` moves selection to the next issue-card within the current column; crosses to the next non-empty column when the current column is exhausted.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kbd-board-rows.ac2",
+            "title": "Pressing `k` moves selection to the previous issue-card (or previous non-empty column).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kbd-board-rows.ac3",
+            "title": "Selected card has a visible focus indicator using the same token classes as the Pipeline focus ring (visual unification).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kbd-board-rows.ac4",
+            "title": "Pressing Enter on a selected card opens the IssueDrawer.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kbd-board-rows.ac5",
+            "title": "j/k do NOT fire inside text inputs or when a palette is open.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kbd-board-rows.ac6",
+            "title": "A Vitest test (preferably in or beside KanbanBoard.test.tsx) covers j/k progression and Enter-to-open across at least two columns.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "kbd-global-chords",
+        "title": "Add g-prefix chord shortcuts for global lens navigation; update sidebar footer chip",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-20T02:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1234",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In App.tsx (next to the existing keydown handler around line 657), add a two-key chord state machine: when the user presses `g` outside an input, set a `chordPrefix = 'g'` state with a short timeout (e.g. 1.5s) and listen for the next key. `g p` → setActiveTab('pipeline'), `g b` → setActiveTab('kanban'), `g a` → setActiveTab('agents'), `g c` → setActiveTab('command-deck'). Any other key (or timeout) clears the chord state. Update the Sidebar footer chip area (currently shows ⌘K) to also surface a discoverability hint for `g <x>` — minimal, a single chip line in the sidebar footer is fine. Test that pressing `g` then `p` switches to Pipeline; pressing `g` then `q` (unbound) silently clears the chord; pressing `g` inside an INPUT does not trigger chord state."
+        },
+        "subItems": [
+          {
+            "id": "kbd-global-chords.ac1",
+            "title": "`g p` activates the Pipeline lens.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kbd-global-chords.ac2",
+            "title": "`g b` activates the Board lens (Tab id `kanban`).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kbd-global-chords.ac3",
+            "title": "`g a` activates the Agents lens.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kbd-global-chords.ac4",
+            "title": "`g c` activates the Command Deck lens.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kbd-global-chords.ac5",
+            "title": "Pressing `g` then an unbound key, or pausing >1.5s, clears the chord state with no side effect.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kbd-global-chords.ac6",
+            "title": "Chord handler does NOT trigger inside INPUT/TEXTAREA/contentEditable or when a palette is open.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kbd-global-chords.ac7",
+            "title": "Sidebar footer chip area surfaces the chord shortcuts as a discoverability hint (no behavior depends on this — purely informational).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kbd-global-chords.ac8",
+            "title": "A Vitest test covers `g p`, an unbound second-key cancel, and the input-focus skip.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conformance-test-strengthen",
+        "title": "Strengthen styleguide-conformance spec to verify visual contracts, not just data-component presence",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-20T02:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1234",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extend tests/e2e/styleguide-conformance.spec.ts so that, in addition to the current data-component count assertions, it asserts: (1) the Pipeline issue row's grid-template-columns matches PRD §4.1 (`14px 78px 14px 1fr 220px 84px 26px`) when at least one row is rendered, via getComputedStyle on the row container, (2) at least one rendered verb-badge has both a `badge-bg-*` class and a `badge-border-*` class on its className (DOM attribute check; do NOT rely on computed colors because the test plugin empties src/index.css), and (3) the drawer title h2's computed font-family begins with 'Space Grotesk'. The font-family assertion requires Tailwind utilities to be applied — since Tailwind utilities are processed through src/index.css's @tailwind directive, the `styleguide-empty-index-css` vite plugin currently strips them. The work agent must either (a) relax the plugin to keep @tailwind directives while stripping custom @layer rules, OR (b) replace the assertion target with a DOM-attribute/class-name check that proves font-display is applied (e.g. assert the h2 has the `font-display` class). Pick (b) by default to keep the plugin's intent intact — assert the class, then leave the computed-style check as an aspirational TODO with a clear comment referencing this issue."
+        },
+        "subItems": [
+          {
+            "id": "conformance-test-strengthen.ac1",
+            "title": "Spec asserts the Pipeline row's grid-template-columns matches PRD §4.1 exactly.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conformance-test-strengthen.ac2",
+            "title": "Spec asserts at least one verb-badge has both a `badge-bg-*` and a `badge-border-*` class in its className.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conformance-test-strengthen.ac3",
+            "title": "Spec asserts the drawer title h2 has the `font-display` class (or, if the vite plugin is relaxed in this bead, asserts the computed font-family starts with 'Space Grotesk').",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conformance-test-strengthen.ac4",
+            "title": "Either the styleguide-empty-index-css vite plugin is preserved (preferred) or relaxed with a justification comment naming PAN-1234.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conformance-test-strengthen.ac5",
+            "title": "Spec uses isolated Playwright contexts (per the planning template's Playwright Isolation rule) — verify each route opens its own context as it does today.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conformance-test-strengthen.ac6",
+            "title": "`npm test` runs the spec to completion in the workspace and all assertions pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "font-grotesk-apply",
+        "to": "conformance-test-strengthen",
+        "type": "blocks"
+      },
+      {
+        "from": "keyframe-pulse-rename",
+        "to": "conformance-test-strengthen",
+        "type": "informs"
+      },
+      {
+        "from": "badge-input-nonplan",
+        "to": "conformance-test-strengthen",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-20-PAN-1234-pan-1148-follow-up-cross-cutting-space-grotesk-keyboard-shortcuts-issues-id-route-input-badge-pulse-keyframe-conformance-test.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

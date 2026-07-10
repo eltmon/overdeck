@@ -1,0 +1,119 @@
+{
+  "version": "1",
+  "issueId": "PAN-1140",
+  "created": "2026-05-16T23:57:08.390Z",
+  "updated": "2026-05-17T10:12:07.043Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "feedback": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-05-16T23:57Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-16T23:57:08.391Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T00:12Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T00:12:51.827Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T00:21Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T00:21:18.385Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T00:28Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-05-17T00:28:22.792Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T00:37Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T00:37:24.481Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T00:43Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T00:43:33.006Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T01:11Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T01:11:22.633Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T01:29Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T01:29:24.586Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T01:43Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T01:43:00.873Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T02:44Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-17T02:44:14.525Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T03:01Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T03:01:30.517Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T03:22Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T03:22:27.307Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T03:35Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T03:35:03.361Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T03:49Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T03:49:40.644Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T04:05Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T04:05:50.936Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T04:20Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T04:20:00.913Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T04:33Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T04:33:20.855Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T09:03Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T09:03:21.391Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T09:41Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T09:41:36.098Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T09:56Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T09:56:50.019Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T10:04Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T10:04:57.541Z"
+    }
+  ]
+}

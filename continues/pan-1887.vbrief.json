@@ -1,0 +1,102 @@
+{
+  "version": "1",
+  "issueId": "PAN-1887",
+  "created": "2026-06-14T18:13:30.753Z",
+  "updated": "2026-06-14T20:07:43.178Z",
+  "gitState": {
+    "branch": "feature/pan-1887",
+    "sha": "d9b9dbe6d",
+    "dirty": true
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Forge detection is by URL path pattern, not host: /pull/(\\d+) => github, /-/merge_requests/(\\d+) => gitlab. Supports self-hosted GitLab. New parseArtifactRef() lives in src/lib/forge.ts.",
+      "recordedAt": "2026-06-14T18:22:28.792Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Add a real `forge TEXT NOT NULL DEFAULT 'github'` column to pending_auto_merges (SCHEMA_VERSION 53->54) rather than overloading prNumber. Back-fills existing rows to 'github'. Makes the row self-describing so a GitLab iid in prNumber is never misread as a GitHub PR number.",
+      "recordedAt": "2026-06-14T18:22:28.792Z"
+    },
+    {
+      "id": "D3",
+      "summary": "GitLab eligibility is a focused injectable helper inside auto-merge-eligibility.ts, NOT a unified ForgeAdapter.getArtifactState() abstraction. The shared-abstraction convergence with PAN-933 is deferred.",
+      "recordedAt": "2026-06-14T18:22:28.792Z"
+    },
+    {
+      "id": "D4",
+      "summary": "GitLab MR mergeability uses `detailed_merge_status === 'mergeable'` as primary signal, with state==='opened' + draft pre-checks and merge_status==='can_be_merged' fallback. glab field names are an implementation checkpoint (confirm against a real MYN MR; fallback documented).",
+      "recordedAt": "2026-06-14T18:22:28.792Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Execution is NOT re-wired: triggerMerge (workspaces.ts) already resolves primaryForge from the merge set and merges via getForgeAdapter(forge).mergeReviewArtifact (glab mr merge for gitlab). The auto-merge executor delegates to triggerMerge. Issue work-item 3 is a verification + missing forge.ts test, not new code.",
+      "recordedAt": "2026-06-14T18:22:28.792Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "isAutoMergeEligible fires at flywheel.ts:325 BEFORE parsePrNumber at :333. It is GitHub-only and would 422 a GitLab MR first. Fixing only parsePrNumber (as the issue brief framed the 'blocking gap') does NOT unblock MIN-831.",
+      "mitigation": "WI-4 makes eligibility forge-aware; WI-3 makes the schedule parse forge-aware. BOTH must merge for the end-to-end fix. Each lands without regressing GitHub."
+    },
+    {
+      "id": "H2",
+      "summary": "glab `mr view -F json` field names (detailed_merge_status, merge_status, state, draft, has_conflicts) are assumed snake_case from go-gitlab; the installed GitLab instance may not populate detailed_merge_status.",
+      "mitigation": "WI-4 implementation checkpoint: confirm fields via `glab mr view 62 -R eltmon/mind-your-now -F json | jq 'keys'`; documented fallback to state+merge_status+has_conflicts."
+    },
+    {
+      "id": "H3",
+      "summary": "The `glab` eligibility call is server-reachable; execSync would freeze the dashboard event loop (PAN-70).",
+      "mitigation": "WI-4 uses promisified execFile only; an injectable dep keeps it unit-testable with no real glab call."
+    },
+    {
+      "id": "H4",
+      "summary": "Schema column add must stay in lockstep with pending-auto-merges-schema.test.ts which pins SCHEMA_VERSION===53 and the exact column list.",
+      "mitigation": "WI-2 updates the test (version 54 + 'forge' in the column list) in the same bead as the migration."
+    },
+    {
+      "id": "H5",
+      "summary": "GitLab eligibility needs the project path for `glab -R`; eligibility only has prUrl.",
+      "mitigation": "Parse <projectPath> from https://<host>/<projectPath>/-/merge_requests/<iid>. MYN is gitlab.com; self-hosted host-credentialed routing is a NonGoal."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-8",
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "note": "Initial planning session for PAN-1887 (pan plan --auto). Verified the code: execution is already forge-aware via triggerMerge->forge adapter; the real blocking gaps are the two GitHub-only gates in the schedule path (isAutoMergeEligible + parsePrNumber). 5 beads.",
+      "timestamp": "2026-06-14T18:22:28.792Z",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-14T19:48Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-14T19:48:44.347Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-14T20:07Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-14T20:07:43.178Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-06-14T19:48:44Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-1887 (attempt 1/10):\n\nFailed check: typecheck\n\nVerification FAILED at typecheck (11533ms):\n\n\n> @panctl/cli@0.21.0 pretypecheck\n> npm run build:contracts\n\n\n> @panctl/cli@0.21.0 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @panctl/contracts@0.21.0 build\n> tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1887/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m158.66 kB\u001b[22m \u001b[2m│ gzip: 26.92 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 158.66 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m2648ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m135.64 kB\u001b[22m \u001b[2m│ gzip: 25.10 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m255.41 kB\u001b[22m \u001b[2m│ gzip: 43.21 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 35.98 kB\u001b[22m \u001b[2m│ gzip:  4.14 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m620.81 kB\u001b[22m \u001b[2m│ gzip: 58.02 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 files, total: 1.05 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m2894ms\u001b[39m\n\n> @panctl/cli@0.21.0 typecheck\n> tsc --noEmit && npm run typecheck:hooks\n\nsrc/lib/cloister/auto-merge-eligibility.ts(120,48): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.\n  Type 'undefined' is not assignable to type 'string'.\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-1887 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-1887 -m \"Fixed typecheck\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
+    },
+    {
+      "seq": 2,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-06-14T20:07:43Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-1887 (attempt 1/10):\n\nFailed check: typecheck\n\nVerification FAILED at typecheck (10264ms):\n\n\n> @panctl/cli@0.21.0 pretypecheck\n> npm run build:contracts\n\n\n> @panctl/cli@0.21.0 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @panctl/contracts@0.21.0 build\n> tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1887/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m158.66 kB\u001b[22m \u001b[2m│ gzip: 26.92 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 158.66 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m2340ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m135.64 kB\u001b[22m \u001b[2m│ gzip: 25.10 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m255.41 kB\u001b[22m \u001b[2m│ gzip: 43.21 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 35.98 kB\u001b[22m \u001b[2m│ gzip:  4.14 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m620.81 kB\u001b[22m \u001b[2m│ gzip: 58.02 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 files, total: 1.05 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m2564ms\u001b[39m\n\n> @panctl/cli@0.21.0 typecheck\n> tsc --noEmit && npm run typecheck:hooks\n\nsrc/lib/cloister/auto-merge-eligibility.ts(120,48): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.\n  Type 'undefined' is not assignable to type 'string'.\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-1887 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-1887 -m \"Fixed typecheck\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
+    }
+  ]
+}

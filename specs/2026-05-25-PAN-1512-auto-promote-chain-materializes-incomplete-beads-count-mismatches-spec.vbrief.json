@@ -1,0 +1,515 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-25T22:55:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1512: Auto-promote chain materializes incomplete beads (count mismatches spec)",
+    "updated": "2026-05-25T23:02:12.823Z"
+  },
+  "plan": {
+    "id": "pan-1512",
+    "title": "Auto-promote chain materializes incomplete beads (count mismatches spec)",
+    "status": "proposed",
+    "uid": "b2c3d4e5-6f7a-4b8c-9d0e-1f2a3b4c5d6e",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-25T22:55:00.000Z",
+    "updated": "2026-05-25T23:02:12.823Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1512",
+        "label": "PAN-1512",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/pull/1511",
+        "label": "PAN-1509 fix that regressed",
+        "type": "pull-request"
+      }
+    ],
+    "tags": [
+      "bug",
+      "auto-promote",
+      "beads",
+      "vbrief",
+      "complete-planning",
+      "pipeline"
+    ],
+    "narratives": {
+      "Problem": "After PAN-1509 wired bead materialization into the auto-promote chain, the proposed spec is still written to main BEFORE beads materialize. If materialization partially fails — a bd timeout, a stale bd-mutex, or a 30-second client AbortController firing on the plan-finalize → /api/issues/:id/complete-planning fetch — the spec persists on main with N items while the workspace ends up with M<N beads. The next `pan start --host --yes` rejects with `Beads count (M) does not match vBRIEF plan items (N)`. Eight in-flight issues (PAN-1450, PAN-1496, PAN-1456, PAN-1242, PAN-1257, PAN-1488, PAN-1175, PAN-1248) are currently stuck in this state per the Flywheel RUN-11 report. Compounding factors: (a) three independent paths call createBeadsFromVBrief on the same workspace (plan-finalize.ts:62, completePlanningArtifacts at issues.ts:131, agents.ts:2517 auto-recovery), and each clears all existing beads before recreating, so any failed retry destroys the prior successful state; (b) plan-finalize's 30s fetch timeout is too tight for serial bd writes under bd-mutex contention.",
+      "Proposal": "Make the auto-promote chain transactional and idempotent. (1) Invert the order in completePlanningArtifacts — materialize beads FIRST, write the proposed spec to main ONLY on full success. This is what PAN-1509's commit message claimed but never executed. (2) Make createBeadsFromVBrief idempotent — when the existing bead set already matches the plan exactly (count + per-item title match + correct issueLabel), return success without clear+recreate. (3) Make agents.ts auto-recovery refuse to clear+recreate on a non-zero mismatch — only repair from zero state; surface a clear repair instruction on partial state. (4) Raise plan-finalize's fetch timeout from 30s to 120s for both promotePlanning and spawnWorkAgent. (5) Improve `pan start`'s mismatch error to point operators at the exact repair command. (6) Add regression tests at both the unit and integration boundaries so this can't silently regress again. Recovery for the 8 affected issues is the workaround already in the bug body: rerun `pan plan <id> --auto`; after this fix that rerun is safe and atomic."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix at the root (transactional spec write + idempotent materialization) rather than relax the pan start count guard.",
+        "rationale": "Relaxing the guard would let work agents spawn against incomplete plans, defeating PAN-1048 C6 (beads as hard prerequisite). The bug is upstream and must be fixed upstream."
+      },
+      {
+        "summary": "Keep the existing local createBeadsFromVBrief call in plan-finalize.ts:62 (do NOT remove it).",
+        "rationale": "plan-finalize is callable without the dashboard reachable (offline CLI mode). After B3's idempotency lands, the second call inside completePlanningArtifacts will no-op when state already matches, so the duplication is harmless. Removing the local call would break offline planning."
+      },
+      {
+        "summary": "Do not add a bulk-repair command for the 8 affected issues.",
+        "rationale": "The issue body documents the workaround (`pan plan <id> --auto`). After this fix that rerun is safe. Building a one-off bulk-repair surface for ~8 issues is more code than the repair itself."
+      },
+      {
+        "summary": "Tests use vi.useFakeTimers when exercising the raised 120s timeout, per the project rule on fake-timers-for-retry-tests.",
+        "rationale": "Otherwise tests for the timeout path would burn 30-120s of real wall-clock and risk OOM under parallel workers."
+      },
+      {
+        "summary": "Idempotency match uses full bead title `${plan.id}: ${item.title}` plus per-item label, not just title substring.",
+        "rationale": "Title matching alone has false-match risk. Combining title + label + count gives a defensible idempotency signature without requiring a new schema field on beads."
+      },
+      {
+        "summary": "Per-bead `bd create` 30s timeout in createBeadsFromVBrief is intentionally NOT raised.",
+        "rationale": "That timeout is runaway-protection for a single hung bd invocation, not a budget for whole-batch work. The right place to give the overall flow more time is the orchestrating HTTP client (plan-finalize's AbortController), not individual bd processes."
+      }
+    ],
+    "items": [
+      {
+        "id": "b1-regression-test",
+        "title": "Add regression test: completePlanningArtifacts must not write spec on main when bead materialization is incomplete",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T22:55:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1512",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extend src/dashboard/server/routes/__tests__/complete-planning.test.ts with two failing tests that pin the invariant 'spec on main only exists when beads match'. Test 1: inject a createBeads stub that returns success:true but with created.length < planItemCount; assert completePlanningArtifacts rejects AND that no file exists at <projectPath>/.pan/specs/. Test 2: inject a createBeads stub that returns success:false with errors; same assertions. Test 3 (positive control): full success — spec IS written and matches workspace doc byte-for-byte after asPanSpecDocument normalization."
+        },
+        "subItems": [
+          {
+            "id": "b1-regression-test.ac1",
+            "title": "New test in complete-planning.test.ts asserts no spec file exists under .pan/specs/ after a partial-count rejection",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-regression-test.ac2",
+            "title": "Test fails today (RED) on current main with the existing pre-bead writeSpec order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-regression-test.ac3",
+            "title": "Test passes after B2 lands (GREEN) without modification — the test is the contract",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-regression-test.ac4",
+            "title": "Existing test at line 76 'fails when bead materialization does not match the plan item count' still passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b2-transactional-spec-write",
+        "title": "Make completePlanningArtifacts transactional: materialize beads BEFORE writing proposed spec to main",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T22:55:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1512",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "b4-agents-route-refuse-on-mismatch",
+            "b7-end-to-end-integration-test"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/issues.ts, completePlanningArtifacts (lines 100-150): reorder so the createBeads call and the count-match guard run BEFORE the existingSpec/writeSpec/writeSpecForIssue block. Read workspaceDoc → validatePlanIssueId → createBeads → check planItemCount === created.length → THEN do the spec write. On count mismatch throw, the spec is never written, so no orphan proposed spec ends up on main. Preserve all existing behavior for the success path: spec content, filename derivation, asPanSpecDocument normalization. Keep the existing signature and return shape — completePlanningArtifacts still returns { proposed, beadCount, beadsWarning }."
+        },
+        "subItems": [
+          {
+            "id": "b2-transactional-spec-write.ac1",
+            "title": "createBeads runs before writeSpec / writeSpecForIssue in completePlanningArtifacts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-transactional-spec-write.ac2",
+            "title": "On count mismatch, the function throws and no file under <projectPath>/.pan/specs/ is created or modified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-transactional-spec-write.ac3",
+            "title": "B1's new tests now pass (GREEN)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-transactional-spec-write.ac4",
+            "title": "completePlanningArtifacts return shape is unchanged: { proposed: { path, filename }, beadCount, beadsWarning }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-transactional-spec-write.ac5",
+            "title": "Existing happy-path test at complete-planning.test.ts line 44 still passes with the new ordering",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b3-idempotent-create-beads",
+        "title": "Make createBeadsFromVBrief idempotent: skip clear+recreate when existing beads already match the plan",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T22:55:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1512",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "b4-agents-route-refuse-on-mismatch",
+            "b7-end-to-end-integration-test"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/vbrief/beads.ts, modify createBeadsFromVBriefPromise (lines 134-393). After reading the workspace plan and BEFORE clearBeadsForIssue (line 249), call listBeadsForIssue and check whether existing beads already satisfy the plan exactly. The match criterion: (a) existing bead count === plan.items.length, (b) for every plan item, an existing bead exists whose title equals `${plan.id}: ${item.title}`, (c) every existing bead carries the issueLabel `plan.id.toLowerCase()`. If all three hold, build the beadIds map from existing beads and return { success: true, created: existingTitles, errors: [], beadIds } without clearing. If any criterion fails (extra beads, missing items, wrong titles), fall through to the legacy clear+recreate path unchanged. Add a single log line `[beads] Existing beads already match plan for ${issueLabel} — skipping clear+recreate (idempotent fast path)`."
+        },
+        "subItems": [
+          {
+            "id": "b3-idempotent-create-beads.ac1",
+            "title": "When existing beads exactly match (count + per-item title + label), createBeadsFromVBrief returns success without invoking bd delete or bd create",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-idempotent-create-beads.ac2",
+            "title": "When ANY plan item is missing a matching bead, function falls through to clear+recreate (legacy path)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-idempotent-create-beads.ac3",
+            "title": "When existing bead count exceeds plan.items.length, function falls through to clear+recreate (orphan beads must be wiped)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-idempotent-create-beads.ac4",
+            "title": "Idempotency match uses exact full title `${plan.id}: ${item.title}` plus issueLabel — not substring",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-idempotent-create-beads.ac5",
+            "title": "New unit test in src/lib/vbrief/__tests__/create-beads.test.ts: calling createBeadsFromVBrief twice in a row on the same workspace produces no extra beads and no extra clear operations on the second call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-idempotent-create-beads.ac6",
+            "title": "Existing test 'three consecutive calls leave exactly planItemCount beads' (line 412) still passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-idempotent-create-beads.ac7",
+            "title": "Idempotency check is inside withBdMutexPromise so it serializes with concurrent callers; no race on list+create",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b4-agents-route-refuse-on-mismatch",
+        "title": "agents.ts /api/agents: refuse to clear+recreate beads on a non-zero count mismatch — only repair from zero state",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T22:55:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1512",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/agents.ts (lines 2495-2556), tighten the auto-recovery branch. Currently any time beadCount !== planItemCount, hasBeads is set false and createBeadsFromVBrief is invoked, which (today) clears existing beads and recreates them — destroying partial state if recovery itself fails partway. After this change: if beadCount === 0, attempt recovery as today (now safe because B3 makes createBeads idempotent and the actual race is reduced to a no-op). If beadCount > 0 AND beadCount !== planItemCount, do NOT call createBeadsFromVBrief — return 422 with error: 'beads_count_mismatch', a descriptive message naming the counts, and hint: `pan plan ${issueId} --auto` to rerun planning end-to-end. This makes agents.ts a read-only verifier on partial state and pushes repair through the canonical planning path."
+        },
+        "subItems": [
+          {
+            "id": "b4-agents-route-refuse-on-mismatch.ac1",
+            "title": "When beadCount > 0 AND beadCount !== planItemCount, /api/agents returns 422 with error code 'beads_count_mismatch' (NOT 'beads_required')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b4-agents-route-refuse-on-mismatch.ac2",
+            "title": "The 422 message includes both counts and the exact repair command `pan plan <ID> --auto`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b4-agents-route-refuse-on-mismatch.ac3",
+            "title": "When beadCount === 0, auto-recovery still runs (path is unchanged from today, just safer via B3)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b4-agents-route-refuse-on-mismatch.ac4",
+            "title": "New test exercises both branches: zero-beads → recovery attempted; mismatched beads → 422 with new error code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b5-plan-finalize-timeouts",
+        "title": "Raise plan-finalize fetch timeouts from 30s to 120s for promotePlanning and spawnWorkAgent",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T22:55:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1512",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/plan-finalize.ts, change the two `setTimeout(() => controller.abort(), 30_000)` calls (lines 166 and 202) to 120_000ms. Add a code comment near each: `// Allow up to 2 minutes — bead materialization under bd-mutex serialization can take 30-60s for 10+ items on a loaded host. Raising this is bounded by the route's own internal timeouts.`. The per-bead bd create timeout (30s in beads.ts) is intentionally NOT raised — that's runaway protection per single bd invocation."
+        },
+        "subItems": [
+          {
+            "id": "b5-plan-finalize-timeouts.ac1",
+            "title": "promotePlanning AbortController timeout is 120_000ms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b5-plan-finalize-timeouts.ac2",
+            "title": "spawnWorkAgent AbortController timeout is 120_000ms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b5-plan-finalize-timeouts.ac3",
+            "title": "A comment near each timeout explains the budget and why per-bead bd-create timeout is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b5-plan-finalize-timeouts.ac4",
+            "title": "If a test exercises this timeout path it uses vi.useFakeTimers() and vi.advanceTimersByTimeAsync() per the fake-timers-for-retry-tests rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b6-pan-start-repair-hint",
+        "title": "Improve `pan start` count-mismatch error to surface the exact repair command",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T22:55:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1512",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/start.ts, the failPostCreateValidation block at lines 1018-1031 prints the mismatch error today. Add to printDetails a line: `console.log(chalk.bold('To repair:'));` followed by `console.log('  ' + chalk.cyan('pan plan ' + id + ' --auto'));` and a one-liner explanation that re-running planning end-to-end is now safe (idempotent + transactional after B2+B3). Match the visual style of the existing 'To re-run planning' hint already present in the `No beads tasks found` branch (line 1008)."
+        },
+        "subItems": [
+          {
+            "id": "b6-pan-start-repair-hint.ac1",
+            "title": "Mismatch error in pan start now displays `pan plan <ID> --auto` as the repair command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b6-pan-start-repair-hint.ac2",
+            "title": "Hint visual style matches the existing 'To re-run planning' hint in the no-beads branch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b6-pan-start-repair-hint.ac3",
+            "title": "No behavior change beyond the printed lines — exit code and 422 messaging untouched",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b7-end-to-end-integration-test",
+        "title": "Integration test: full auto-promote chain end-to-end with simulated partial failure",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T22:55:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1512",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a new test file src/dashboard/server/routes/__tests__/auto-promote-chain-pan1512.integration.test.ts (or extend the existing auto-promote-chain test if it was reintroduced by PAN-1509). The test exercises the full plan-finalize → /api/issues/:id/complete-planning chain WITHOUT real bd, using a mock createBeads. Scenarios: (1) Full success — assert spec file under .pan/specs/ + workspace beads counts match. (2) Partial failure (created.length === planItemCount - 1) — assert completePlanningArtifacts throws AND no .pan/specs/ file is created AND no commit is made on main. (3) Re-run after partial failure with full-success mock — assert the second call writes the spec successfully (idempotency works through the chain, not just in createBeads). (4) Re-run after full success with no-op mock — assert nothing new is written (idempotent through the orchestration layer)."
+        },
+        "subItems": [
+          {
+            "id": "b7-end-to-end-integration-test.ac1",
+            "title": "Test file exists at src/dashboard/server/routes/__tests__/auto-promote-chain-pan1512.integration.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b7-end-to-end-integration-test.ac2",
+            "title": "Scenario 1 (full success): spec file under .pan/specs/, bead count matches plan, no warnings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b7-end-to-end-integration-test.ac3",
+            "title": "Scenario 2 (partial failure): no spec file at .pan/specs/, no commit, error surfaces with both counts named",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b7-end-to-end-integration-test.ac4",
+            "title": "Scenario 3 (re-run after partial): second call now writes spec, chain converges to success",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b7-end-to-end-integration-test.ac5",
+            "title": "Scenario 4 (re-run after success): no additional spec versions, no extra beads, no extra commits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b7-end-to-end-integration-test.ac6",
+            "title": "Test does NOT call real bd or git push — uses mocks/stubs per existing test patterns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "b1-regression-test",
+        "to": "b2-transactional-spec-write",
+        "type": "blocks"
+      },
+      {
+        "from": "b2-transactional-spec-write",
+        "to": "b4-agents-route-refuse-on-mismatch",
+        "type": "blocks"
+      },
+      {
+        "from": "b3-idempotent-create-beads",
+        "to": "b4-agents-route-refuse-on-mismatch",
+        "type": "blocks"
+      },
+      {
+        "from": "b2-transactional-spec-write",
+        "to": "b7-end-to-end-integration-test",
+        "type": "blocks"
+      },
+      {
+        "from": "b3-idempotent-create-beads",
+        "to": "b7-end-to-end-integration-test",
+        "type": "blocks"
+      },
+      {
+        "from": "b4-agents-route-refuse-on-mismatch",
+        "to": "b7-end-to-end-integration-test",
+        "type": "blocks"
+      },
+      {
+        "from": "b5-plan-finalize-timeouts",
+        "to": "b7-end-to-end-integration-test",
+        "type": "informs"
+      },
+      {
+        "from": "b6-pan-start-repair-hint",
+        "to": "b7-end-to-end-integration-test",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-25-PAN-1512-auto-promote-chain-materializes-incomplete-beads-count-mismatches-spec.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

@@ -1,0 +1,208 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-20T02:34:45.577Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1233: PAN-1148 follow-up — IssueCard primitive gradient-overlay + merge-ready border tokens",
+    "updated": "2026-05-20T02:37:37.309Z"
+  },
+  "plan": {
+    "id": "pan-1233",
+    "title": "PAN-1148 follow-up — IssueCard primitive gradient-overlay + merge-ready border tokens",
+    "status": "proposed",
+    "uid": "62c5fa0c-f0a2-474b-890a-934a9f45db86",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-20T02:34:45.577Z",
+    "updated": "2026-05-20T02:37:37.309Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1233",
+        "label": "PAN-1233",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1226",
+        "label": "PAN-1226 (parent audit)",
+        "type": "issue"
+      },
+      {
+        "uri": "docs/prds/planned/pan-dashboard-unified-redesign.md#476-issue-card-board",
+        "label": "PRD §4.7.6 Issue Card",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "design-tokens",
+      "issue-card",
+      "pan-1148-followup",
+      "ui"
+    ],
+    "narratives": {
+      "Problem": "The IssueCard primitive (src/dashboard/frontend/src/components/primitives/IssueCard.tsx) deviates from PRD §4.7.6 in two ways that surface on both Board and Pipeline. (1) PR-1 — the card uses a tinted gradient overlay div (line 86, with the `tone` ternary on lines 46–52) plus a 6px-wide accent strip flush to the card edge, instead of the spec's solid `color-mix(in srgb, var(--background) 92%, var(--color-white))` background plus a 2px `::before` priority bar inset 12px top/bottom. (2) PR-2 — merge-ready cards render an amber border (`border-warning/60` on line 79) instead of the PRD-mandated `color-mix(in srgb, var(--success) 32%, transparent)`. This is the same inversion previously flagged at the Board surface (B-3) re-appearing at the primitive layer; fixing it here propagates to every surface that uses the primitive.",
+      "Proposal": "Fix both deviations directly in the primitive. (Bead 1) Delete the gradient overlay div and the entire `tone` ternary; apply a single solid background via a new `.issue-card-surface` utility class in src/dashboard/frontend/src/index.css (matching the @layer components pattern already used by `.badge-bg-success` / `.drawer-gate-border-pass`); slim the accent strip from `w-1.5` (6px) to `w-0.5` (2px) while preserving the existing 12px top/bottom inset. (Bead 2) Replace `border-warning/60` on line 79 with the existing `.badge-border-success` utility class (which already resolves to the PRD's success-32%-transparent token). Both fixes are mechanical and independently shippable; verification is an isolated-Playwright UAT pass that confirms a merge-ready card and a default card both render per spec on the kanban board."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Use a CSS utility class (`.issue-card-surface`) in index.css for the spec background rather than a Tailwind arbitrary-value class (`bg-[color-mix(...)]`).",
+        "rationale": "Matches the existing codebase pattern (`.badge-bg-success`, `.drawer-gate-border-pass`, `.badge-shimmer-rtm`) for design-token utilities, avoids Tailwind JIT escaping pitfalls with commas/spaces inside `color-mix()`, and keeps the design-token surface centralized in index.css where the rest of the theme lives."
+      },
+      {
+        "summary": "Reuse the existing `.badge-border-success` class (index.css:214) for the merge-ready border rather than defining a new class.",
+        "rationale": "The class already evaluates to exactly the PRD-specified `color-mix(in srgb, var(--success) 32%, transparent)`. Introducing a parallel class would duplicate the token and create future drift risk."
+      },
+      {
+        "summary": "Delete the `tone` variable and its four branches entirely; do not keep it as a no-op fallback.",
+        "rationale": "Per CLAUDE.md (`no bandaids`, `no backwards-compat shims`), unused branches are deleted. State differentiation moves entirely to border + verb badge, as the PRD specifies."
+      },
+      {
+        "summary": "Accent strip keeps `left-0` (flush to card edge) — only its width and top/bottom inset are constrained by the PRD.",
+        "rationale": "PRD §4.7.6 specifies `inset 12px top/bottom` and `2px` width; left-edge inset is not specified. Current `left-0` is preserved; only `w-1.5` → `w-0.5` changes."
+      },
+      {
+        "summary": "Browser UAT runs in an isolated Playwright instance (its own profile/context), not piggybacking on any existing session.",
+        "rationale": "Repository workspace rule (Playwright Isolation section of the planning prompt) requires browser verification to be reproducible inside an isolated session so concurrent agents don't interfere."
+      }
+    ],
+    "items": [
+      {
+        "id": "ic-gradient-and-bar",
+        "title": "Replace gradient overlay with solid spec background + slim priority bar to 2px",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-20T02:34:45.577Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1233",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Edit src/dashboard/frontend/src/components/primitives/IssueCard.tsx and src/dashboard/frontend/src/index.css. In index.css, add a new utility class inside the existing `@layer components` block: `.issue-card-surface { background: color-mix(in srgb, var(--background) 92%, var(--color-white)); }`. In IssueCard.tsx, (a) delete the `tone` variable and all four ternary branches that compute it; (b) delete the JSX line `<div className={cn('pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-br', tone)} />` (currently line 86); (c) add `issue-card-surface` to the root div's className list, replacing the inherited `bg-card` for the default path (keep `bg-card` semantics for any specific-state branches such as `bg-destructive/10`, `bg-warning/10`, `bg-primary/10` that already exist on lines 77–81 — those overlay states layer on top of the surface and stay); (d) change the accent strip width from `w-1.5` to `w-0.5` on line 87 while keeping `absolute bottom-[12px] left-0 top-[12px] rounded-r-[2px] ${accent}`. After the edits, run `npm run typecheck`, `npm run lint`, and `npm run build` from the workspace root and confirm clean."
+        },
+        "subItems": [
+          {
+            "id": "ic-gradient-and-bar.ac1",
+            "title": "The JSX element matching `pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-br` no longer appears anywhere in IssueCard.tsx (grep returns zero matches).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ic-gradient-and-bar.ac2",
+            "title": "The `tone` local variable and all four of its ternary branches (`from-destructive/12 …`, `from-warning/20 …`, `from-primary/16 …`, `from-surface-overlay/60 …`) are removed from IssueCard.tsx — grep for `from-destructive/12`, `from-warning/20`, `from-primary/16`, `from-surface-overlay/60` inside this file returns zero matches.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ic-gradient-and-bar.ac3",
+            "title": "A new `.issue-card-surface` utility class exists in src/dashboard/frontend/src/index.css inside an `@layer components` block, with the declaration `background: color-mix(in srgb, var(--background) 92%, var(--color-white));` exactly as written (whitespace tolerant).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ic-gradient-and-bar.ac4",
+            "title": "The IssueCard root `<div>` applies the `issue-card-surface` class on the default (non-state) path so a card with no special-state props renders against the spec background. State-specific background overlays (`bg-destructive/10` for stuck/unhealthy, `bg-warning/10` for merge-ready, `bg-primary/10` for bulkSelected) remain intact.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ic-gradient-and-bar.ac5",
+            "title": "The priority accent strip uses width class `w-0.5` (2px) instead of `w-1.5` (6px); top/bottom inset stays at `12px` via the existing `top-[12px] bottom-[12px]` classes; left edge stays at `left-0`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ic-gradient-and-bar.ac6",
+            "title": "`npm run typecheck`, `npm run lint`, and `npm run build` (run from the workspace root) all complete with exit code 0 after the edits.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ic-gradient-and-bar.ac7",
+            "title": "Browser UAT in an isolated Playwright session: navigate to the dashboard's kanban board on the host (https://pan.localhost) with at least one default issue card and one running issue card visible. Take a screenshot. Confirm visually that (a) no diagonal gradient tint exists at the top of any card, (b) the priority bar on the left edge reads as a thin 2px line inset ~12px top/bottom, and (c) the card background reads as a single uniform tone slightly lighter than the surrounding column (the `color-mix(--background 92%, --color-white)` lift). The Playwright session MUST be launched with its own browser context — do not reuse an existing user-data dir.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ic-merge-ready-border",
+        "title": "Switch merge-ready border from `border-warning/60` to success-32% token",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-20T02:34:45.577Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1233",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Edit src/dashboard/frontend/src/components/primitives/IssueCard.tsx, line 79 (inside the `mergeReadyCard` branch of the className ternary). Replace the literal `border-warning/60 bg-warning/10 shadow-md` with `badge-border-success bg-warning/10 shadow-md`. The `.badge-border-success` class is defined at src/dashboard/frontend/src/index.css:214 and resolves to `border-color: color-mix(in srgb, var(--success) 32%, transparent)` — the exact value PRD §4.7.6 prescribes for merge-ready cards. Keep `bg-warning/10` and `shadow-md` untouched; only the border-color token changes. Do NOT alter the `selected` ring (`ring-warning/70` on line 75) — that is a different surface (selection focus), not a merge-ready signal, and is out of scope for this issue. Re-run quality gates after the edit."
+        },
+        "subItems": [
+          {
+            "id": "ic-merge-ready-border.ac1",
+            "title": "Line 79 of IssueCard.tsx no longer contains the substring `border-warning/60`. (grep for `border-warning/60` inside IssueCard.tsx returns zero matches.)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ic-merge-ready-border.ac2",
+            "title": "The same line applies `badge-border-success` in the merge-ready branch; the `bg-warning/10` and `shadow-md` classes are preserved alongside it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ic-merge-ready-border.ac3",
+            "title": "The `ring-warning/70` class on line 75 (selection ring) is untouched — grep confirms it still appears exactly once in the file.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ic-merge-ready-border.ac4",
+            "title": "`npm run typecheck`, `npm run lint`, and `npm run build` (run from the workspace root) all complete with exit code 0 after the edit.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ic-merge-ready-border.ac5",
+            "title": "Browser UAT in an isolated Playwright session: navigate to the dashboard's kanban board (https://pan.localhost) with at least one merge-ready issue card visible. Screenshot the merge-ready card and confirm the border reads as green (success token), not amber. If no merge-ready card is naturally available, surface this as a hazard rather than skipping the check — do not mark this AC done without a green-border screenshot. The Playwright session MUST run in its own isolated browser context.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-05-20-PAN-1233-pan-1148-follow-up-issuecard-primitive-gradient-overlay-merge-ready-border-tokens.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

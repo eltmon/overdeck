@@ -1,0 +1,601 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-06-10T14:29:53.682Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1737: UAT batch trains — auto-assembled, conflict-resolved, always-ready UAT batches with live frontends and batch promotion",
+    "updated": "2026-06-11T04:36:23.021Z"
+  },
+  "plan": {
+    "id": "pan-1737",
+    "title": "UAT batch trains — auto-assembled, conflict-resolved, always-ready UAT batches with live frontends and batch promotion",
+    "status": "completed",
+    "uid": "30851df6-29c6-48a1-9d0a-61bb02bb2a1e",
+    "author": "agent:claude-fable-5",
+    "sequence": 45,
+    "created": "2026-06-10T14:29:53.682Z",
+    "updated": "2026-06-11T04:36:23.021Z",
+    "metadata": {
+      "canonicalFilename": "2026-06-10-PAN-1737-merge-queue-ux-overhaul-branch-names-honest-control-labels-uat-instructions-live-uat-frontend-link.vbrief.json",
+      "pipeline": {
+        "phase": "review",
+        "issueId": "PAN-1737",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-06-10T18:10:51.390Z",
+        "work": {
+          "updatedAt": "2026-06-10T18:10:51.390Z",
+          "history": []
+        },
+        "verification": {
+          "status": "passed",
+          "updatedAt": "2026-06-10T18:10:51.390Z",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-06-10T18:10:51.390Z"
+            }
+          ]
+        },
+        "review": {
+          "status": "reviewing",
+          "updatedAt": "2026-06-10T18:10:51.390Z",
+          "notes": "Agent re-review request (4/25): Fixed review issues",
+          "history": [
+            {
+              "status": "reviewing",
+              "at": "2026-06-10T18:10:51.390Z",
+              "notes": "Agent re-review request (4/25): Fixed review issues"
+            }
+          ],
+          "approval": "pending"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-06-10T18:10:51.390Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-10T18:10:51.390Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-06-10T18:10:51.390Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-06-10T18:10:51.390Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-10T18:10:51.390Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1741"
+        }
+      }
+    },
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1737",
+        "label": "PAN-1737",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-1737.md",
+        "label": "PRD: UAT Batch Trains",
+        "type": "prd"
+      },
+      {
+        "uri": "docs/design/pan-1737-uat-batch-trains.html",
+        "label": "Approved 3-state mockup",
+        "type": "design"
+      }
+    ],
+    "tags": [
+      "flywheel",
+      "merge-train",
+      "uat",
+      "dashboard",
+      "frontend",
+      "backend"
+    ],
+    "narratives": {
+      "Problem": "Operator could not use the merge queue: no idea what it meant, what to UAT, or where to UAT it. The PAN-1691 model only bundles conflict-free features, never resolves conflicts, has a misleading manual 'Ship batch' control, and offers no live environment serving the assembled candidate. Re-planned 2026-06-10 (operator design session): this spec supersedes the original 7-bead merge-queue card UX scope; the old decision to split live-UAT-stack work into PAN-1738 is reversed — PAN-1738's core is absorbed here.",
+      "Proposal": "UAT batch trains per .pan/drafts/PAN-1737.md: an assembly engine builds throwaway uat/<codename>-<MMDD> branches off main containing as many ready features as possible in merge order, with cross-feature conflicts resolved inside the batch by a timeboxed headless assembly agent (unresolvable -> feature held out with visible reason). Generations accumulate; a new one assembles in the background while the current stays testable. Promote-the-batch is the primary merge (main receives exactly the tested tree); single-feature merge remains an escape hatch that invalidates live batches. Each generation gets an on-demand live stack at uat-<codename>-<mmdd>.pan.localhost (max 2 concurrent, mandatory teardown). The Flywheel rail card is rebuilt around batches with per-issue What-to-UAT checklists from the shared vBRIEF AC extractor."
+    },
+    "autoDecisions": [],
+    "items": [
+      {
+        "id": "uat-generations-store",
+        "title": "SQLite generation store: uat_generations table + CRUD module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-10T14:29:53.682Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1737",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "assembly-engine",
+            "uat-reconciler",
+            "promote-path",
+            "uat-stack-lifecycle",
+            "uat-generations-api"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a uat_generations table to ~/.panopticon/panopticon.db via the schema.ts migration chain (bump schema version): name (PK, e.g. uat/calm-otter-0610), branch, worktreePath, baseSha, members JSON (issueId, title, branch, headSha, mergeOrder), heldOut JSON (issueId, reason), resolutions JSON (issueIds, files, commitSha), status (assembling|ready|superseded|invalidated|promoted|failed), stackStartedAt nullable, createdAt/updatedAt. Build src/lib/database/uat-generations-db.ts following the app-settings.ts / review-status-db.ts sync-wrapper pattern: insert, getByName, listChain (newest first), updateStatus, setStackStartedAt, clearStack. Unit tests for CRUD + chain ordering."
+        },
+        "subItems": [
+          {
+            "id": "uat-generations-store.ac1",
+            "title": "Schema migration creates uat_generations with the fields above; migration is idempotent and existing DBs upgrade cleanly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-generations-store.ac2",
+            "title": "CRUD module exposes sync insert/getByName/listChain/updateStatus/stack-state functions in the established database module style; no execSync anywhere",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-generations-store.ac3",
+            "title": "Unit tests cover insert -> listChain ordering (newest first), status transitions, and JSON round-trip of members/heldOut/resolutions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "assembly-engine",
+        "title": "Assembly engine: persistent worktree, ordered merges, held-out fallback, generation recording",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-10T14:29:53.682Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1737",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "conflict-agent",
+            "uat-reconciler",
+            "promote-path",
+            "uat-stack-lifecycle"
+          ]
+        },
+        "narrative": {
+          "Action": "Build src/lib/cloister/uat-generation-engine.ts (pure orchestrator with injected deps, modeled on uat-assemble.ts) + uat-generation-deps.ts (real git). Given the ready set (ordered members with branches), assemble a new generation: unique codename via makeUatCandidateName seeded per generation (not per day), persistent worktree at <projectRoot>/workspaces/uat-<codename>-<mmdd>/ on branch uat/<codename>-<mmdd> off origin/main, merge each feature branch in order with --no-edit, on conflict call the injected resolveConflict hook, on hook failure git merge --abort and record the feature as held out with reason, push -u origin at the end, record the generation row (members with headShas, resolutions, heldOut, baseSha). All git via async exec. Old uat worktrees/branches beyond the newest 3 non-promoted generations are removed (worktree remove + branch delete local+origin)."
+        },
+        "subItems": [
+          {
+            "id": "assembly-engine.ac1",
+            "title": "Assembling with zero conflicts produces a pushed uat/<codename>-<mmdd> branch off origin/main whose tree contains every member branch merge, in queue order, and a ready generation row with baseSha and member headShas",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "assembly-engine.ac2",
+            "title": "A conflicting member invokes the resolveConflict hook; hook failure aborts that merge only — the member lands in heldOut with a human-readable reason and assembly continues with remaining members",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "assembly-engine.ac3",
+            "title": "Generation codenames never collide with existing rows (isTaken consults the store); worktree folder name matches the branch (slash -> dash) so the Traefik host pattern applies",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "assembly-engine.ac4",
+            "title": "Cleanup keeps at most the newest 3 non-promoted generations' worktrees/branches; engine unit tests with fake deps cover happy path, conflict-resolved, held-out, and cleanup",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conflict-agent",
+        "title": "Assembly-agent conflict resolution: timeboxed headless run in the generation worktree",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-10T14:29:53.682Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1737",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Implement the resolveConflict hook as a headless agent run (claude -p, async execFile with timeout/AbortSignal, never execSync): cwd = generation worktree mid-conflict, mission = resolve THIS merge only (no behavior changes beyond resolution), then stage and commit with a 'uat-assembly: resolve <issueId> <-> <conflictingIds>' subject. Post-run verification in code: no unmerged paths, merge concluded with a commit. Timebox (default 5 min) or verification failure -> git merge --abort -> held out. Record resolution files+commit in the generation row."
+        },
+        "subItems": [
+          {
+            "id": "conflict-agent.ac1",
+            "title": "A resolvable conflict between two member branches yields a resolution commit on the uat branch with the uat-assembly: marker, and the resolution (issueIds, files, commitSha) is recorded on the generation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-agent.ac2",
+            "title": "Agent timeout or leftover unmerged paths results in merge --abort and held-out — the assembly never wedges and the server event loop is never blocked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-agent.ac3",
+            "title": "Tests use fake timers / fake runner for the timebox path (no real multi-second waits) per the fake-timers rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uat-reconciler",
+        "title": "Reconciler: auto-assemble on ready-set change, invalidate stale generations",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-10T14:29:53.682Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1737",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "src/lib/cloister/uat-reconciler.ts + interval wiring in the dashboard server (60s, gated per-tick on isMergeTrainEnabled, single-flight). Each tick: compute the ready set from the flywheel merge queue (null-safe when no run is active — no-op); compare against the newest live generation (members ∪ heldOut issue sets, member branch headShas, baseSha vs origin/main). On difference: assemble the next generation (one assembly in flight at a time). Mark ready/superseded generations invalidated when baseSha no longer matches origin/main or a member left the queue / changed head; invalidation tears down that generation's stack. Newest ready generation supersedes older ready ones. Also export a force-reassemble entry for the API."
+        },
+        "subItems": [
+          {
+            "id": "uat-reconciler.ac1",
+            "title": "With merge_train_enabled on and >=1 ready feature, a generation exists within one tick with zero human action; with the flag off or no active flywheel run the tick is a no-op",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-reconciler.ac2",
+            "title": "A new ready feature triggers background assembly of a superset generation while the current generation row stays ready (status only flips to superseded when the new one reaches ready)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-reconciler.ac3",
+            "title": "main advancing past baseSha, a member leaving the queue, or a member branch gaining commits marks affected generations invalidated and tears down their stacks; reassembly follows automatically",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-reconciler.ac4",
+            "title": "Reconciler unit tests with fake deps cover: no-op tick, first assembly, superset assembly, invalidation cascade; interval tests use fake timers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "promote-path",
+        "title": "Promote: merge the tested batch to main, per-member post-merge exactly once",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-10T14:29:53.682Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1737",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "src/lib/cloister/uat-promote.ts: precondition generation.status in (ready|superseded) AND baseSha == origin/main HEAD (else reject with a 'stale — reassemble' error). Merge --no-ff the uat branch into main in a temporary worktree (NEVER the primary checkout), push main, then for each member issue run the existing per-issue post-merge lifecycle through the PAN-328 in-flight guard exactly once (GitHub auto-marks the per-feature PRs merged because their commits become reachable from main). Mark the generation promoted, tear down its stack, invalidate all other live generations (main moved), let the reconciler rebuild from the remaining queue."
+        },
+        "subItems": [
+          {
+            "id": "promote-path.ac1",
+            "title": "Promoting a ready generation whose baseSha matches origin/main produces one no-ff merge commit on main whose tree equals the uat branch tree, and pushes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "promote-path.ac2",
+            "title": "Every member issue goes through the post-merge lifecycle exactly once (in-flight guard respected; tests/unit/lib/cloister/in-flight-guard.test.ts stays green)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "promote-path.ac3",
+            "title": "Promoting with a stale baseSha is rejected with an explanatory error and no git mutation; promoting an older superseded generation works when its baseSha still matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "promote-path.ac4",
+            "title": "After promotion the generation is promoted, its stack is torn down, other live generations are invalidated, and unit tests with fake deps cover success/stale/partial-failure reporting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uat-stack-lifecycle",
+        "title": "On-demand live UAT stack per generation: max 2 concurrent, mandatory teardown",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-10T14:29:53.682Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1737",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "src/lib/cloister/uat-stack.ts: ensureUatStack(generation) renders the devcontainer on the generation worktree (ensureDevcontainerSync — folder uat-<codename>-<mmdd> yields host uat-<codename>-<mmdd>.pan.localhost via the FEATURE_FOLDER template) and runs docker compose up -d --build via async exec; records stackStartedAt. Enforce max 2 running UAT stacks: starting a third tears down the oldest first. teardownUatStack(generation) = compose down -v --remove-orphans + clear stack state; invoked on invalidation, promotion, and generation cleanup. Status probe for the API (running/starting/absent + frontendUrl)."
+        },
+        "subItems": [
+          {
+            "id": "uat-stack-lifecycle.ac1",
+            "title": "Ensuring a stack on a ready generation yields a reachable frontend at uat-<codename>-<mmdd>.pan.localhost serving that generation's tree; the API reports its status and URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-stack-lifecycle.ac2",
+            "title": "A third concurrent stack request tears down the oldest running UAT stack first — at no point do more than 2 UAT stacks run (Docker network pool protection)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-stack-lifecycle.ac3",
+            "title": "Invalidation and promotion always tear the generation's stack down (compose down -v --remove-orphans); no orphaned uat networks/containers accumulate; all exec is async",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uat-generations-api",
+        "title": "API: uat-generations chain (with per-member ACs), stack ensure, promote, force-rebuild",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-10T14:29:53.682Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1737",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "routes/flywheel.ts: GET /api/flywheel/uat-generations returns the chain newest-first — per generation: name, branch, status, createdAt, members (issueId, title, branch, prUrl), heldOut with reasons, resolutions, stack {status, frontendUrl}, and per-member acceptance criteria resolved server-side via findSpecByIssue + extractACFromDocument from the shared src/lib/vbrief/acceptance-criteria.ts (NO new vBRIEF parser). POST /api/flywheel/uat-generations/:name/stack ensures the stack; POST /api/flywheel/uat-generations/:name/promote promotes; POST /api/flywheel/assemble-uat repurposed to force-reassembly via the reconciler. GET /api/flywheel/merge-queue keeps the branchName/prUrl enrichment; POST /merge-next unchanged (escape hatch)."
+        },
+        "subItems": [
+          {
+            "id": "uat-generations-api.ac1",
+            "title": "GET /api/flywheel/uat-generations returns the documented shape including per-member ACs from the shared extractor, with graceful [] when no generations or no flywheel run exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-generations-api.ac2",
+            "title": "Stack and promote POSTs return structured success/error payloads (stale-base promote returns the reassemble guidance); assemble-uat now force-rebuilds and reports the new generation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-generations-api.ac3",
+            "title": "No second vBRIEF-parsing path is introduced (verifiable from the diff: only acceptance-criteria.ts/extractACFromDocument is used); merge-queue response is unchanged apart from the existing enrichment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uat-batches-card",
+        "title": "Frontend: UAT batches card per approved mockup (batches, checklists, honest dialogs, escape hatch)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-10T14:29:53.682Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1737",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Rebuild MergeQueueCard.tsx as the UAT batches card per docs/design/pan-1737-uat-batch-trains.html: plain-language intro; batches newest-first (ready: Open UAT frontend + Merge batch (N) to main + rebuild; assembling: live status line incl. conflict-resolution progress; superseded: still testable/promotable; held-out chips with reasons); What-to-UAT section grouped per member issue from the API's ACs with explicit verify-the-touchpoint items for resolutions; ready-features reference rows (order, IdLink, monospace branch, PR link, status chips); escape hatch 'Merge one feature to main…' via useConfirm naming exact semantics; promote confirm dialog naming every member and 'lands exactly the tree you tested'. All confirms via DialogProvider useConfirm. The string 'Ship batch' must not appear anywhere in the frontend."
+        },
+        "subItems": [
+          {
+            "id": "uat-batches-card.ac1",
+            "title": "The card renders the three mockup states from API data: steady (ready + superseded), assembling-in-background, and empty queue with the explanatory empty state — never an error on missing data",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-batches-card.ac2",
+            "title": "Promote and escape-hatch actions open useConfirm dialogs that name the exact members/branches and consequences; confirming fires the API call, cancelling fires nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-batches-card.ac3",
+            "title": "grep -r 'Ship batch' over src/dashboard/frontend returns nothing; What-to-UAT renders per-member ACs with a 'No UAT steps in plan' fallback and touchpoint items for resolved conflicts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-batches-card.ac4",
+            "title": "Open-UAT-frontend button reflects stack status (start-with-progress when absent, plain link when running) and component tests cover the state branches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "visual-verification",
+        "title": "Quality gates + Playwright visual pass of the three card states",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-10T14:29:53.682Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1737",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "npm run typecheck, npm run lint, npm test all green in the workspace. Playwright (isolated browser profile) screenshots of the card in steady/assembling/empty states against the dev dashboard; verify no overflow/truncation at rail width and that labels match the approved mockup language."
+        },
+        "subItems": [
+          {
+            "id": "visual-verification.ac1",
+            "title": "typecheck, lint, and the full test suite pass in the workspace; delay-based tests use fake timers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "visual-verification.ac2",
+            "title": "Screenshots of the three states exist and match the approved mockup's structure (zones, labels, dialogs) with no overflow at rail width",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "uat-generations-store",
+        "to": "assembly-engine",
+        "type": "blocks"
+      },
+      {
+        "from": "uat-generations-store",
+        "to": "uat-reconciler",
+        "type": "blocks"
+      },
+      {
+        "from": "uat-generations-store",
+        "to": "promote-path",
+        "type": "blocks"
+      },
+      {
+        "from": "uat-generations-store",
+        "to": "uat-stack-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "uat-generations-store",
+        "to": "uat-generations-api",
+        "type": "blocks"
+      },
+      {
+        "from": "assembly-engine",
+        "to": "conflict-agent",
+        "type": "blocks"
+      },
+      {
+        "from": "assembly-engine",
+        "to": "uat-reconciler",
+        "type": "blocks"
+      },
+      {
+        "from": "assembly-engine",
+        "to": "promote-path",
+        "type": "blocks"
+      },
+      {
+        "from": "assembly-engine",
+        "to": "uat-stack-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "uat-stack-lifecycle",
+        "to": "uat-generations-api",
+        "type": "blocks"
+      },
+      {
+        "from": "promote-path",
+        "to": "uat-generations-api",
+        "type": "blocks"
+      },
+      {
+        "from": "uat-reconciler",
+        "to": "uat-generations-api",
+        "type": "blocks"
+      },
+      {
+        "from": "uat-generations-api",
+        "to": "uat-batches-card",
+        "type": "blocks"
+      },
+      {
+        "from": "uat-batches-card",
+        "to": "visual-verification",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "completed"
+}

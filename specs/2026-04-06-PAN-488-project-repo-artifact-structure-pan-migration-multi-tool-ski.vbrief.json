@@ -1,0 +1,416 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-06T16:00:00Z",
+    "author": "panopticon-cli/0.6.0",
+    "description": "Plan for PAN-488: Project repo artifact structure: .pan/ migration + multi-tool skill sync"
+  },
+  "plan": {
+    "id": "pan-488",
+    "title": "Project repo artifact structure: .pan/ migration + multi-tool skill sync",
+    "status": "approved",
+    "uid": "d7e3a1f4-8b2c-4d9e-a6f1-3c5e7b9d2a4f",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-04-06T16:00:00Z",
+    "updated": "2026-04-06T16:00:00Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/488",
+        "label": "PAN-488",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "migration",
+      "sync",
+      "multi-tool",
+      "project-structure"
+    ],
+    "narratives": {
+      "Problem": "Project-level Panopticon artifacts use inconsistent, verbose paths (.panopticon/) and config names (.panopticon.yaml). Skills only sync to Claude Code. Planning archives use a flat structure that doesn't scale. No project-level skill source directory exists.",
+      "Proposal": "Rename .panopticon/ to .pan/ (project-level only), rename .panopticon.yaml to .pan.yaml with backwards compat, add .pan/skills/ as a sync source, implement multi-tool sync for 6 AI tools, change archive structure to per-issue subdirectories, and add safe workspace migration."
+    },
+    "items": [
+      {
+        "id": "add-design-doc",
+        "title": "Add docs/REPO-ARTIFACTS.md to the workspace branch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-06T16:00:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-488"
+        },
+        "narrative": {
+          "Action": "Copy docs/REPO-ARTIFACTS.md from the main worktree (/home/eltmon/Projects/panopticon-cli/docs/REPO-ARTIFACTS.md) into the workspace branch and commit it. This is the authoritative design doc — do not rewrite it."
+        },
+        "subItems": [
+          {
+            "id": "add-design-doc.ac1",
+            "title": "docs/REPO-ARTIFACTS.md exists in the workspace and is committed to the feature branch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rename-panopticon-dirs",
+        "title": "Rename all project-level .panopticon/ path references to .pan/",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-06T16:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-488"
+        },
+        "narrative": {
+          "Action": "Update DEFAULT_EVENTS_SUBDIR in costs/wal.ts and costs/sync-wal.ts, outputDir in convoy-templates.ts (unify triage+health to .pan/convoy), default in convoy.ts, prompt paths in remote/remote-agents.ts, events_path default in projects.ts. Update all related documentation references. Update existing unit tests to use new paths."
+        },
+        "subItems": [
+          {
+            "id": "rename-panopticon-dirs.ac1",
+            "title": "All project-level .panopticon/ path references updated to .pan/ (grep confirms zero remaining project-level references)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rename-panopticon-dirs.ac2",
+            "title": "Convoy outputs unify under .pan/convoy (triage and health share one directory)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rename-panopticon-dirs.ac3",
+            "title": "Existing unit tests for cost WAL pass after path rename",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rename-config-yaml",
+        "title": "Rename .panopticon.yaml to .pan.yaml with backwards compat",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-06T16:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-488"
+        },
+        "narrative": {
+          "Action": "Update loadProjectConfig() to check .pan.yaml first, fall back to .panopticon.yaml with stderr deprecation warning. Update hasProjectConfig() and getProjectConfigPath(). Update workspace setup to generate .pan.yaml. Update config command display text. Update documentation."
+        },
+        "subItems": [
+          {
+            "id": "rename-config-yaml.ac1",
+            "title": ".pan.yaml is loaded as the canonical config filename",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rename-config-yaml.ac2",
+            "title": ".panopticon.yaml falls back with stderr deprecation warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rename-config-yaml.ac3",
+            "title": "Existing workspaces with .panopticon.yaml continue to work (backwards compat verified in tests)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "archive-structure",
+        "title": "Change archive structure from flat to per-issue subdirectory",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-06T16:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-488"
+        },
+        "narrative": {
+          "Action": "Update complete-planning in issues.ts to copy STATE.md and plan.vbrief.json to docs/prds/active/<issue-id>/ subdirectory instead of flat files. Update movePrd in archive-planning.ts to use subdirectory format for completed PRDs. Add feature-${numericSuffix} candidate to findWorkspacePath() (same pattern as getWorkspaceInfoForIssue from commit be33bfb). Existing flat archives left as-is."
+        },
+        "subItems": [
+          {
+            "id": "archive-structure.ac1",
+            "title": "complete-planning archives to docs/prds/active/<issue-id>/ subdirectory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "archive-structure.ac2",
+            "title": "movePrd uses subdirectory format for completed PRDs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "archive-structure.ac3",
+            "title": "findWorkspacePath includes feature-${numericSuffix} candidate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-skills-source",
+        "title": "Add .pan/skills/ as a sync source with correct precedence",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-06T16:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-488"
+        },
+        "narrative": {
+          "Action": "Update planSync() and executeSync() in sync.ts to include .pan/skills/ from the project repo (at devroot) as a sync source. Precedence: 1) .claude/skills/<name>/ already exists → skip, 2) .pan/skills/<name>/ in project → write, 3) ~/.panopticon/skills/<name>/ → global fallback. Must integrate with the existing manifest-based conflict resolution."
+        },
+        "subItems": [
+          {
+            "id": "pan-skills-source.ac1",
+            "title": ".pan/skills/ in project repo is discovered and synced to .claude/skills/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-skills-source.ac2",
+            "title": "User-owned .claude/skills/<name>/ are never overwritten by .pan/skills/<name>/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-skills-source.ac3",
+            "title": "pan sync --dry-run shows .pan/skills/ source files correctly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "multi-tool-sync",
+        "title": "Implement multi-tool sync for all 6 AI tool targets",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-06T16:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-488"
+        },
+        "narrative": {
+          "Action": "Read tools.also_sync from global config merged with .pan.yaml (per-project, additive). Implement adapters for each tool: Cursor (.cursor/rules/*.mdc), Codex (AGENTS.md named blocks), Windsurf (.windsurf/rules/*.md), Cline (.clinerules/), Copilot (.github/instructions/*.instructions.md with applyTo frontmatter), Aider (CONVENTIONS.md). Each adapter must transform skill markdown into the tool's expected format. Per-project also_sync merges with global, never replaces."
+        },
+        "subItems": [
+          {
+            "id": "multi-tool-sync.ac1",
+            "title": "pan sync writes to all tools listed in also_sync (global + per-project merged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "multi-tool-sync.ac2",
+            "title": "Each tool adapter produces correct format (mdc, AGENTS.md blocks, etc.)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "multi-tool-sync.ac3",
+            "title": "pan sync --dry-run shows multi-tool output correctly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "multi-tool-sync.ac4",
+            "title": "Per-project also_sync merges with global (never replaces)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "workspace-migration",
+        "title": "Safe migration of existing .panopticon/ subdirs in workspaces",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-06T16:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-488"
+        },
+        "narrative": {
+          "Action": "Add a migration step in pan sync (or pan install) that renames .panopticon/ subdirs to .pan/ in active workspaces. Safety: check old path exists, verify new path does NOT already exist, then move. If both exist (partial previous run), log warning and skip — never overwrite silently. Skip ~/.panopticon/ (global tool dir, unchanged)."
+        },
+        "subItems": [
+          {
+            "id": "workspace-migration.ac1",
+            "title": "pan sync migrates existing .panopticon/ subdirs to .pan/ in active workspaces (non-destructive)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-migration.ac2",
+            "title": "Migration skips if .pan/ subdir already exists (handles partial previous runs safely)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-migration.ac3",
+            "title": "Migration never touches ~/.panopticon/ (global tool dir)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gitignore-injection",
+        "title": "Add .pan/events/, .pan/convoy/, .pan/prompts/ to .gitignore",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-06T16:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-488"
+        },
+        "narrative": {
+          "Action": "When creating or updating a workspace, ensure .pan/events/, .pan/convoy/, .pan/prompts/ are in .gitignore. Do NOT gitignore .pan/ itself (.pan/skills/ must remain tracked). Do NOT gitignore .planning/ (committed to feature branches)."
+        },
+        "subItems": [
+          {
+            "id": "gitignore-injection.ac1",
+            "title": ".pan/events/, .pan/convoy/, .pan/prompts/ are gitignored in new workspaces",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gitignore-injection.ac2",
+            "title": ".pan/ itself and .planning/ are NOT gitignored",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-update",
+        "title": "Update documentation to match implemented behavior",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-04-06T16:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-488"
+        },
+        "narrative": {
+          "Action": "Update docs/CONFIGURATION.md, docs/USAGE.md, docs/LEGACY-CODEBASE.md, docs/WORK-TYPES.md to replace .panopticon.yaml references with .pan.yaml. Verify docs/REPO-ARTIFACTS.md matches implemented behavior exactly. Update CLAUDE.md if any referenced paths changed."
+        },
+        "subItems": [
+          {
+            "id": "docs-update.ac1",
+            "title": "All documentation references to .panopticon.yaml updated to .pan.yaml",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-update.ac2",
+            "title": "docs/REPO-ARTIFACTS.md matches implemented behavior exactly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "add-design-doc",
+        "to": "rename-panopticon-dirs",
+        "type": "blocks"
+      },
+      {
+        "from": "rename-panopticon-dirs",
+        "to": "workspace-migration",
+        "type": "blocks"
+      },
+      {
+        "from": "rename-config-yaml",
+        "to": "multi-tool-sync",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-skills-source",
+        "to": "multi-tool-sync",
+        "type": "blocks"
+      },
+      {
+        "from": "rename-panopticon-dirs",
+        "to": "gitignore-injection",
+        "type": "blocks"
+      },
+      {
+        "from": "multi-tool-sync",
+        "to": "docs-update",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-migration",
+        "to": "docs-update",
+        "type": "blocks"
+      },
+      {
+        "from": "archive-structure",
+        "to": "docs-update",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

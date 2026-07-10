@@ -1,0 +1,886 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-23T04:35:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1358: pan handoff — agent-authored conversation handoff that spawns a new conversation",
+    "updated": "2026-05-23T04:28:42.782Z"
+  },
+  "plan": {
+    "id": "pan-1358",
+    "title": "pan handoff — agent-authored conversation handoff that spawns a new conversation",
+    "status": "proposed",
+    "uid": "5e954c72-0635-4302-ada1-3e03eab47293",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-23T04:35:00.000Z",
+    "updated": "2026-05-23T04:28:42.782Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1358",
+        "label": "PAN-1358",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/mattpocock/skills/blob/main/skills/productivity/handoff/SKILL.md",
+        "label": "Matt Pocock /handoff skill (inspiration)",
+        "type": "external"
+      },
+      {
+        "uri": "docs/FORKS.md",
+        "label": "Conversation Forks documentation",
+        "type": "doc"
+      },
+      {
+        "uri": "src/lib/conversations/summary-fork.ts",
+        "label": "Existing fork pipeline",
+        "type": "code"
+      }
+    ],
+    "tags": [
+      "fork",
+      "conversation",
+      "handoff",
+      "cli",
+      "dashboard"
+    ],
+    "narratives": {
+      "Problem": "Today Panopticon can fork a conversation in two ways: summary fork (a separate model distills the JSONL) and plain fork (raw history copy). Both are passive: a summarizer reads the transcript after the fact. Neither knows the dead ends the working agent learned, which skills the successor should pick up, or which slice of the work matters for the next task. Long-running work hits the context wall and either restarts with thin context or stops outright.",
+      "Proposal": "Add `pan handoff <conv> [--focus \"...\"]` as a third fork mode that asks the live source agent to author its own handoff document. The orchestrator delivers a handoff-authoring prompt to the source agent via the existing deliverAgentMessage primitive, waits for the agent to write a doc + .done sentinel to ${PANOPTICON_HOME}/handoffs/, validates the doc, then spawns a new conversation using the doc as the seed message — slotting into the same pipeline summary text occupies today. If the source is ended, stalls, or produces an invalid doc, the pipeline auto-falls back to summary fork so the command always produces a working new conversation."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Refactor SummaryForkOptions.plain: boolean → forkMode: 'summary' | 'plain' | 'handoff' rather than adding a parallel handoff: boolean flag.",
+        "rationale": "Two-boolean discriminators (plain && handoff?) are bug-prone. A single discriminator keeps the spec sharp and prevents nonsensical option combinations."
+      },
+      {
+        "summary": "Handoff doc path is ${PANOPTICON_HOME}/handoffs/<source-conv-id>-<iso-ts>.md with sibling .done sentinel.",
+        "rationale": "Issue body explicitly names this path. Timestamp-suffix is collision-free without locking. Separate .done sentinel cleanly distinguishes in-progress writes from completed handoffs."
+      },
+      {
+        "summary": "Handshake timeout defaults to 5 minutes (300_000ms), not exposed as a v1 CLI flag.",
+        "rationale": "Long enough for the agent to read its own context and curate; short enough to fail fast when stuck. Adding --timeout-ms in v1 inflates the surface without a known use case."
+      },
+      {
+        "summary": "Auto-fallback to summary fork on (a) source-ended, (b) timeout, (c) doc-validation failure.",
+        "rationale": "Acceptance criteria explicitly require fallback to summary fork on ended source and on agent stall/timeout. Validation failure shares the same recovery."
+      },
+      {
+        "summary": "Validation: doc must be non-empty (≥200 chars) and contain an H2 'Suggested skills' (case-insensitive) section. Redaction of secrets is instructed but not enforced by the validator.",
+        "rationale": "Two checks that are cheap and structural. Enforced redaction would produce false positives on legitimate config snippets; the instruction lives in the prompt template, where it belongs."
+      },
+      {
+        "summary": "Endpoint shape: extend POST /api/conversations/:name/summary-fork with a forkMode body field; keep legacy plain: true → forkMode: 'plain' for backwards compatibility.",
+        "rationale": "Reuses every existing eligibility/auth/spawn code path. A new route would duplicate logic without adding value."
+      },
+      {
+        "summary": "v1 refuses handoff for conversations running inside a workspace devcontainer and auto-falls back to summary fork.",
+        "rationale": "The single-deacon invariant prohibits mounting ${PANOPTICON_HOME} into workspace containers, so a containerized agent cannot write to the host's handoffs/ directory. Cross-container handoff is a separate, larger problem; punt it to a follow-up."
+      },
+      {
+        "summary": "Handoff is mode-symmetric with summary fork for harness rules: Pi source allowed (agent authors plain-text doc; portable), Pi target allowed (doc is injected via the Pi FIFO same as a summary).",
+        "rationale": "Doc is plain Markdown, so no Pi/Claude transcript incompatibility exists. The plain-fork Pi prohibition is specifically about raw JSONL, which handoff does not use."
+      },
+      {
+        "summary": "Sentinel mechanism: .done sidecar file (no new `pan handoff-ready` verb).",
+        "rationale": "Filesystem sentinel is observable from anywhere, requires no IPC, and matches the existing pattern used by pan done markers. Adding a CLI verb just for completion signal inflates the surface."
+      },
+      {
+        "summary": "Dashboard ForkModal exposes handoff as a fourth mode in the existing radio/checkbox layout with a 'Focus' text input.",
+        "rationale": "Keeps the existing UX shape; users already know where to look. The focus input mirrors the --focus CLI argument 1:1."
+      }
+    ],
+    "items": [
+      {
+        "id": "handoff-doc-contract",
+        "title": "Define handoff doc contract & inlined prompt template (roles/handoff.md)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:35:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1358",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "request-handoff-from-agent",
+            "pipeline-wire-handoff",
+            "handoff-validation-tests",
+            "handoff-artifact-record"
+          ]
+        },
+        "narrative": {
+          "Action": "Create roles/handoff.md as a harness-agnostic orchestrator-injected prompt template (NOT a Claude Code subagent definition; not a discoverable skill). Body specifies the doc contract: a Markdown document summarizing the conversation, a required '## Suggested skills' H2 section, references to artifacts (PRDs/plans/ADRs/issues/commits/diffs) by path/URL rather than inline duplication, redaction guidance for secrets/PII, and explicit instructions for the agent to (a) write the doc to a Panopticon-supplied path, (b) write a sibling .done sentinel ONLY after the doc is complete, and (c) resume normal work. The template must include {{focus}} and {{outputPath}} substitution placeholders. Add a brief section in docs/FORKS.md cross-referencing this template (full doc update is a separate bead)."
+        },
+        "subItems": [
+          {
+            "id": "handoff-doc-contract.ac1",
+            "title": "roles/handoff.md exists with frontmatter (name, description) and substitution placeholders {{focus}} and {{outputPath}}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-doc-contract.ac2",
+            "title": "Template instructs the agent to write to {{outputPath}} and emit a sibling .done sentinel only after the doc write completes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-doc-contract.ac3",
+            "title": "Template requires an H2 '## Suggested skills' section and prohibits duplicating PRD/plan/ADR content verbatim (reference by path/URL only)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-doc-contract.ac4",
+            "title": "Template instructs redaction of API keys, passwords, and PII",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-doc-contract.ac5",
+            "title": "Template instructs the agent to resume normal work after the sentinel is written; one-shot, non-blocking",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "handoff-paths",
+        "title": "Add path helpers for ${PANOPTICON_HOME}/handoffs/<conv-id>-<ts>.md and .done sentinel",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:35:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add HANDOFFS_DIR (or equivalent) to src/lib/paths.ts derived from PANOPTICON_HOME. Add a helper function (likely in a new src/lib/conversations/handoff-paths.ts) returning { docPath, sentinelPath } given (sourceConvId, isoTimestamp). Ensure the directory exists on first write (mkdir recursive). Sentinel filename pattern: <doc-basename>.done (i.e., <conv-id>-<iso-ts>.md.done). No directory creation at module load — only on demand."
+        },
+        "subItems": [
+          {
+            "id": "handoff-paths.ac1",
+            "title": "src/lib/paths.ts exports HANDOFFS_DIR computed from PANOPTICON_HOME (works with PANOPTICON_HOME env override)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-paths.ac2",
+            "title": "Helper returns deterministic { docPath, sentinelPath } pair given (convId, isoTimestamp)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-paths.ac3",
+            "title": "Sentinel filename is <doc-basename>.done (full path: <docPath>.done)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-paths.ac4",
+            "title": "Directory is created on demand (mkdir recursive) by the writer, not at module import",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-mode-discriminator",
+        "title": "Refactor SummaryForkOptions.plain: boolean → forkMode: 'summary' | 'plain' | 'handoff'",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:35:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1358",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "request-handoff-from-agent",
+            "pipeline-wire-handoff",
+            "endpoint-handoff-mode",
+            "cli-pan-handoff",
+            "dashboard-fork-modal-handoff"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace the SummaryForkOptions.plain: boolean discriminator with forkMode: 'summary' | 'plain' | 'handoff' in src/lib/conversations/summary-fork.ts and update all call sites: src/dashboard/server/routes/conversations.ts (runForkPipeline + the POST /summary-fork route body parsing), src/cli/commands/fork.ts, and any tests. Keep backwards compatibility by mapping legacy plain: true → forkMode: 'plain' at the route body boundary. No behavioral change for existing fork modes; this bead is the pure refactor that enables the handoff mode to land cleanly in subsequent beads."
+        },
+        "subItems": [
+          {
+            "id": "fork-mode-discriminator.ac1",
+            "title": "SummaryForkOptions exposes forkMode: 'summary' | 'plain' | 'handoff'; the legacy plain: boolean field is removed from the type",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-mode-discriminator.ac2",
+            "title": "runForkPipeline and POST /api/conversations/:name/summary-fork route updated to pass and read forkMode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-mode-discriminator.ac3",
+            "title": "Route body accepts legacy plain: true and translates it to forkMode: 'plain' (logged at debug level)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-mode-discriminator.ac4",
+            "title": "src/cli/commands/fork.ts continues to support --plain via forkMode: 'plain' under the new discriminator",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-mode-discriminator.ac5",
+            "title": "npm run typecheck and npm run lint pass; existing summary-fork and plain-fork behaviors observably unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "request-handoff-from-agent",
+        "title": "Implement requestHandoffFromAgent live-agent handshake with timeout and validation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:35:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1358",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "pipeline-wire-handoff",
+            "handoff-artifact-record",
+            "handoff-fallback-tests"
+          ]
+        },
+        "narrative": {
+          "Action": "Add requestHandoffFromAgent(sourceConv, focus, options) to src/lib/conversations/summary-fork.ts (parallel in shape to generateSummaryForFork). Resolves the handoff doc and sentinel paths via handoff-paths helpers, renders the inlined roles/handoff.md template with {{focus}} and {{outputPath}} substitutions, calls deliverAgentMessage(sourceConv.tmuxSession, prompt, 'handoff-request') to deliver the prompt, then polls the filesystem with a small backoff (e.g., 1s intervals) for BOTH docPath and sentinelPath to appear. Default timeout 300_000ms (5 minutes). On timeout, throw HandoffStallError; on validation failure, throw HandoffValidationError; on successful read, return { docPath, docText }. Validation: trimmed doc length ≥200 chars AND contains a '## Suggested skills' or '## Suggested Skills' header line."
+        },
+        "subItems": [
+          {
+            "id": "request-handoff-from-agent.ac1",
+            "title": "requestHandoffFromAgent exported from src/lib/conversations/summary-fork.ts (or a new sibling module); takes (sourceConv, focus?, options?)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "request-handoff-from-agent.ac2",
+            "title": "Function delivers the prompt via deliverAgentMessage (channels + tmux fallback, same primitive used elsewhere)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "request-handoff-from-agent.ac3",
+            "title": "Polls for BOTH doc and sentinel; requires both files present before reading the doc",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "request-handoff-from-agent.ac4",
+            "title": "Timeout defaults to 300_000ms; throws a distinct HandoffStallError on timeout (or returns a tagged failure object — implementer's choice, but distinguishable)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "request-handoff-from-agent.ac5",
+            "title": "validateHandoffDoc(text) returns ok when text length ≥200 chars and contains an H2 'Suggested skills' header (case-insensitive); returns a failure reason otherwise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "request-handoff-from-agent.ac6",
+            "title": "Function never blocks the event loop with sync FS or sleep calls; uses fs/promises and setTimeout-based polling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pipeline-wire-handoff",
+        "title": "Wire forkMode: 'handoff' through createSummaryFork and runForkPipeline with auto-fallback",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:35:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extend createSummaryForkPromise in src/lib/conversations/summary-fork.ts and runForkPipeline in src/dashboard/server/routes/conversations.ts to handle forkMode === 'handoff': call requestHandoffFromAgent on the source conversation, use the returned docText as the seed message slot that summary occupies today, then spawn the new conversation through the existing path. On HandoffStallError, HandoffValidationError, source-ended detection, OR source-in-workspace-container detection, log the reason and silently downgrade to forkMode: 'summary'. Update the conversation title prefix appropriately ('Handoff: ...' vs 'Summary Fork: ...'). Persist the doc path on the target conversation row (uses handoff-artifact-record's schema)."
+        },
+        "subItems": [
+          {
+            "id": "pipeline-wire-handoff.ac1",
+            "title": "createSummaryFork with forkMode: 'handoff' produces a new conversation whose first injected message is the agent-authored doc text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-wire-handoff.ac2",
+            "title": "Pipeline auto-falls back to summary fork on (a) source-ended, (b) handshake timeout, (c) validation failure, (d) source running inside a workspace devcontainer — with a structured log line naming the reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-wire-handoff.ac3",
+            "title": "Target conversation title is prefixed 'Handoff: <source title>' when handoff succeeds and 'Summary Fork: <source title>' on fallback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-wire-handoff.ac4",
+            "title": "Target conversation inherits issueId and cwd from source (existing behavior preserved through the handoff path)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-wire-handoff.ac5",
+            "title": "Handoff doc path is persisted on the target conversation row (handoff_doc_path) and source→target back-reference is recorded (handoff_target_conv_id)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "endpoint-handoff-mode",
+        "title": "Extend POST /api/conversations/:name/summary-fork to accept forkMode + focus",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:35:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Update the route handler in src/dashboard/server/routes/conversations.ts to parse forkMode ('summary' | 'plain' | 'handoff') and an optional focus: string from the request body. Translate legacy plain: true → forkMode: 'plain'. Pass forkMode and focus through to runForkPipeline (which already handles the dispatch from pipeline-wire-handoff). Add an input length cap on focus (e.g., 500 chars) and the same SAFE_MODEL_PATTERN-style validation pattern used elsewhere. Surface fallback reasons in the response when forkMode: 'handoff' was requested but pipeline downgraded — via a fallbackReason field on the conversation row read back from the DB by the dashboard."
+        },
+        "subItems": [
+          {
+            "id": "endpoint-handoff-mode.ac1",
+            "title": "Body field forkMode accepted; legacy plain: true mapped to forkMode: 'plain'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "endpoint-handoff-mode.ac2",
+            "title": "Body field focus accepted, trimmed, validated (length ≤ 500 chars; reject control characters); passed to runForkPipeline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "endpoint-handoff-mode.ac3",
+            "title": "When forkMode: 'handoff' is requested but pipeline downgrades, the fallback reason is recorded on the new conversation (forkFallbackReason column) and the dashboard subsequently reads it through the conversations snapshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "endpoint-handoff-mode.ac4",
+            "title": "Existing summary-fork and plain-fork callers continue to work unchanged (regression check via existing tests)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-pan-handoff",
+        "title": "Add pan handoff <conv> [--focus] [--model] [--harness] CLI verb",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T04:35:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create src/cli/commands/handoff.ts modeled on src/cli/commands/fork.ts but invoking createSummaryFork with forkMode: 'handoff' and the optional focus argument. Register the command in src/cli/index.ts with --focus <text>, --model <model>, --harness <harness>, --cwd <path> flags. On fallback (handoff downgrade), surface the fallback reason to stdout in chalk.yellow so the operator knows the new conversation was seeded with a summary instead. Resolve conv argument by numeric id or name, same as fork.ts."
+        },
+        "subItems": [
+          {
+            "id": "cli-pan-handoff.ac1",
+            "title": "pan handoff <conv> creates a new conversation seeded with an agent-authored handoff doc when the source is running and the doc validates",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-pan-handoff.ac2",
+            "title": "pan handoff <conv> --focus \"...\" passes the focus string through to the handoff prompt and the resulting doc reflects it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-pan-handoff.ac3",
+            "title": "pan handoff against an ended conversation prints a fallback notice and produces a summary-fork conversation (no error exit)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-pan-handoff.ac4",
+            "title": "pan handoff --help describes all flags and the fallback behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard-fork-modal-handoff",
+        "title": "Add 'Handoff (agent-authored)' mode to dashboard ForkModal with focus input",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:35:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Update src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx to surface the third mode. Introduce a 'Mode' radio group with options: Full summary (existing default), Fast summary (existing localSummaryOnly), Plain fork (existing), Handoff (agent-authored, new). When Handoff is selected, render a textarea/input labeled 'Focus (optional)' that maps to the --focus argument; disable the Fork button if source conversation is not running (use an existing aliveness signal — sessionAlive / conv.forkStatus / conv.lastActiveAt — already plumbed through the conversation snapshot). Update FORK_HELP_CONTENT to document the new mode and its fallback semantics. Pass forkMode + focus through onConfirm into the existing endpoint call."
+        },
+        "subItems": [
+          {
+            "id": "dashboard-fork-modal-handoff.ac1",
+            "title": "ForkModal renders four modes via a radio group; Handoff mode shows a 'Focus (optional)' input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-fork-modal-handoff.ac2",
+            "title": "Fork button is disabled with a tooltip when Handoff mode is selected and the source conversation is not running",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-fork-modal-handoff.ac3",
+            "title": "Submitting Handoff mode posts { forkMode: 'handoff', focus, ... } to the existing summary-fork endpoint",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-fork-modal-handoff.ac4",
+            "title": "FORK_HELP_CONTENT updated with a Handoff section describing the live-agent handshake and auto-fallback to summary",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "handoff-artifact-record",
+        "title": "Persist handoff doc artifact (DB schema, viewer endpoint, dashboard link)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:35:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add two columns to the conversations table: handoff_doc_path TEXT NULL (set on the target) and handoff_target_conv_id INTEGER NULL (set on the source as a back-reference). Use a SQLite migration consistent with the project's existing migration style. Add forkFallbackReason TEXT NULL too (used by endpoint-handoff-mode). Add a viewer endpoint GET /api/conversations/:name/handoff-doc that returns the doc text (404 if no handoff_doc_path; 410 if the file no longer exists on disk). Surface a 'Handoff doc' link in the dashboard's conversation card / inspector for any conversation with a handoff_doc_path."
+        },
+        "subItems": [
+          {
+            "id": "handoff-artifact-record.ac1",
+            "title": "Migration adds handoff_doc_path, handoff_target_conv_id, forkFallbackReason columns to conversations (NULLable, no defaults required)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-artifact-record.ac2",
+            "title": "GET /api/conversations/:name/handoff-doc returns 200 with text/markdown when present, 404 when handoff_doc_path is null, 410 when the file is missing on disk",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-artifact-record.ac3",
+            "title": "Dashboard conversation card or inspector shows a 'Handoff doc' link for conversations with a handoff_doc_path, opening the doc in a viewer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-artifact-record.ac4",
+            "title": "Source conversation's row carries handoff_target_conv_id pointing to the new conversation; the dashboard can navigate source → target via this link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-handoff-skill",
+        "title": "Add /pan-handoff wrapper skill (skills/pan-handoff + sync-sources/skills/pan-handoff)",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-23T04:35:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create the wrapper skill per docs/SKILLS-CONVENTION.md. Source-of-truth lives at skills/pan-handoff/SKILL.md (and sync-sources/skills/pan-handoff/SKILL.md mirror). Frontmatter description starts with the canonical 'pan handoff <conv> — agent-authored conversation handoff that spawns a new conversation'. Body explains: when to invoke (long-running conversations near context wall, deliberate context switch), the --focus argument, what 'fallback to summary fork' means in practice. Remove pan handoff from the docs/SKILLS-CONVENTION.md exclusion list if it appears there (it does not today; just confirming). Ensure scripts/lint-skills.sh passes against the current CLI surface."
+        },
+        "subItems": [
+          {
+            "id": "pan-handoff-skill.ac1",
+            "title": "skills/pan-handoff/SKILL.md and sync-sources/skills/pan-handoff/SKILL.md both exist with matching content and the canonical frontmatter description",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-handoff-skill.ac2",
+            "title": "Every flag and subcommand mentioned in the SKILL.md exists on pan handoff --help (scripts/lint-skills.sh passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-handoff-skill.ac3",
+            "title": "Skill body covers the --focus argument, the auto-fallback to summary fork, and when to choose handoff over summary or plain fork",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "handoff-validation-tests",
+        "title": "Vitest unit tests for validateHandoffDoc",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:35:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a Vitest unit test file covering validateHandoffDoc: (1) empty doc → fails; (2) short doc (<200 chars) → fails; (3) doc missing 'Suggested skills' header → fails; (4) doc with '## Suggested Skills' (capital S) → passes; (5) doc with '## suggested skills' lowercase → passes (case-insensitive); (6) doc with skills section in a deeper heading level (e.g., ###) → fails. Use the existing test conventions (vi.useFakeTimers if any timing involved — though pure validation should not need it)."
+        },
+        "subItems": [
+          {
+            "id": "handoff-validation-tests.ac1",
+            "title": "Test file under src/lib/conversations/__tests__/ (or matching project convention) exercises all six cases above",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-validation-tests.ac2",
+            "title": "npm test (root) passes including the new test file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "handoff-fallback-tests",
+        "title": "Vitest tests for handoff pipeline fallback paths",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:35:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add Vitest tests that drive runForkPipeline (or createSummaryFork) through the handoff fallback paths with mocked deliverAgentMessage and a tmp directory standing in for PANOPTICON_HOME/handoffs. Required cases: (a) source-ended → falls back to summary; (b) handshake timeout (never write doc/sentinel) → falls back to summary; (c) doc written but sentinel never appears → falls back to summary; (d) sentinel and doc both written but doc fails validation → falls back to summary; (e) happy path: doc + sentinel both written and valid → seeds the new conversation with the doc text. Use vi.useFakeTimers + vi.advanceTimersByTimeAsync for the timeout case (per the project's mandatory fake-timers rule for retry/delay code). Mock deliverAgentMessage as a no-op so the test does not actually attempt tmux/channels delivery."
+        },
+        "subItems": [
+          {
+            "id": "handoff-fallback-tests.ac1",
+            "title": "Test covers source-ended → summary-fork fallback with a fallbackReason recorded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-fallback-tests.ac2",
+            "title": "Test covers timeout fallback using vi.useFakeTimers / vi.advanceTimersByTimeAsync (NOT real setTimeout)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-fallback-tests.ac3",
+            "title": "Test covers doc-without-sentinel and sentinel-without-doc edge cases — both treated as in-progress until timeout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-fallback-tests.ac4",
+            "title": "Test covers validation-failure fallback (doc present but lacks 'Suggested skills' header)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-fallback-tests.ac5",
+            "title": "Test covers happy path: doc + sentinel + valid content → new conversation seeded with the doc text and handoff_doc_path persisted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "handoff-docs-update",
+        "title": "Update docs/FORKS.md with the Handoff mode section",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-23T04:35:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Update docs/FORKS.md to add a third 'Handoff (agent-authored)' section under 'Fork Modes', describing: who writes the seed text (the source agent itself), the --focus argument, the doc contract (Suggested skills section, references, redaction), the live-agent handshake (deliverAgentMessage → polled doc+sentinel), the timeout and auto-fallback semantics, and the Pi/devcontainer caveats. Cross-reference roles/handoff.md as the inlined prompt template and src/lib/conversations/summary-fork.ts as the implementation."
+        },
+        "subItems": [
+          {
+            "id": "handoff-docs-update.ac1",
+            "title": "docs/FORKS.md has a 'Handoff (agent-authored)' section under Fork Modes alongside Summary Fork and Plain Fork",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-docs-update.ac2",
+            "title": "Documentation names the doc path (${PANOPTICON_HOME}/handoffs/...), the sentinel pattern, the default 5-minute timeout, and the fallback-to-summary behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-docs-update.ac3",
+            "title": "Documentation calls out the workspace-devcontainer limitation and the Pi compatibility note",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "handoff-doc-contract",
+        "to": "request-handoff-from-agent",
+        "type": "blocks"
+      },
+      {
+        "from": "handoff-paths",
+        "to": "request-handoff-from-agent",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-mode-discriminator",
+        "to": "request-handoff-from-agent",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-mode-discriminator",
+        "to": "pipeline-wire-handoff",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-mode-discriminator",
+        "to": "endpoint-handoff-mode",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-mode-discriminator",
+        "to": "cli-pan-handoff",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-mode-discriminator",
+        "to": "dashboard-fork-modal-handoff",
+        "type": "blocks"
+      },
+      {
+        "from": "request-handoff-from-agent",
+        "to": "pipeline-wire-handoff",
+        "type": "blocks"
+      },
+      {
+        "from": "handoff-paths",
+        "to": "pipeline-wire-handoff",
+        "type": "blocks"
+      },
+      {
+        "from": "pipeline-wire-handoff",
+        "to": "endpoint-handoff-mode",
+        "type": "blocks"
+      },
+      {
+        "from": "pipeline-wire-handoff",
+        "to": "cli-pan-handoff",
+        "type": "blocks"
+      },
+      {
+        "from": "pipeline-wire-handoff",
+        "to": "dashboard-fork-modal-handoff",
+        "type": "blocks"
+      },
+      {
+        "from": "pipeline-wire-handoff",
+        "to": "handoff-artifact-record",
+        "type": "blocks"
+      },
+      {
+        "from": "handoff-artifact-record",
+        "to": "pipeline-wire-handoff",
+        "type": "informs"
+      },
+      {
+        "from": "cli-pan-handoff",
+        "to": "pan-handoff-skill",
+        "type": "blocks"
+      },
+      {
+        "from": "request-handoff-from-agent",
+        "to": "handoff-validation-tests",
+        "type": "informs"
+      },
+      {
+        "from": "pipeline-wire-handoff",
+        "to": "handoff-fallback-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "endpoint-handoff-mode",
+        "to": "handoff-fallback-tests",
+        "type": "informs"
+      },
+      {
+        "from": "pipeline-wire-handoff",
+        "to": "handoff-docs-update",
+        "type": "informs"
+      },
+      {
+        "from": "cli-pan-handoff",
+        "to": "handoff-docs-update",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-23-PAN-1358-pan-handoff-agent-authored-conversation-handoff-that-spawns-a-new-conversation.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

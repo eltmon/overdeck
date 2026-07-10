@@ -1,0 +1,337 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-03T14:22:44.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2194: Mechanically prevent the Flywheel orchestrator from authoring/committing artifacts (harness-agnostic git guard)",
+    "updated": "2026-07-07T03:06:45.745Z"
+  },
+  "plan": {
+    "id": "pan-2194",
+    "title": "Flywheel orchestrator did inline work — add mechanical, harness-agnostic write/commit guard",
+    "status": "completed",
+    "uid": "3d60525f-18f6-4196-8e75-09c27af6298c",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 3,
+    "created": "2026-07-03T14:22:44.000Z",
+    "updated": "2026-07-07T03:06:45.745Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2194",
+        "label": "PAN-2194",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "flywheel",
+      "guardrail",
+      "git-hooks",
+      "safety"
+    ],
+    "narratives": {
+      "Problem": "The flywheel orchestrator (RUN-45 on codex/gpt-5.5) edited a PRD, authored a 437-line vBRIEF, and committed+pushed both to main (862eebfc9c), bypassing the pipeline. The role prompt was hardened, but the prompt is the only lever: the pre-push guard (guard-agent-main-push.sh:51) only refuses code paths so a .pan/ vBRIEF slips through, and there is no commit-time guard at all; on claude-code the auto-approve-hook auto-approves every flywheel-* tool. An orchestrator must only dispatch, never author artifacts.",
+      "Proposal": "Add a harness-agnostic mechanical guard keyed on OVERDECK_AGENT_ID=flywheel-orchestrator (which reaches even the codex shell env). (1) A new .husky/pre-commit guard refuses any staged path outside a shared allowlist (docs/FLYWHEEL-STATE.md + state dirs .pan/records/,.pan/continues/,.pan/backlog/,.beads/) — load-bearing, works on codex/claude-code/pi. (2) Broaden the pre-push guard to cover orchestrator artifact paths (backstop). (3) Extend the claude-code auto-approve-hook to DENY Write/Edit to non-allowlisted repo paths for flywheel-* (defense-in-depth). (4) Document that the ban is now mechanical. No harness/model change, no codex sandbox restriction.",
+      "NonGoals": "- Restricting or changing the orchestrator harness/model, or adding a codex read-only sandbox\n- Fixing `pan flywheel stop` reporting success without killing the session (file separately)\n- The codex sandbox /api limitation / sandbox-safe CLI surfaces (sibling issue)\n- Defending against a deliberate `git commit --no-verify` bypass (branch protection / CI is the backstop)\n- Blocking working-tree edits on codex (no PreToolUse there); the commit guard prevents the durable artifact"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose a harness-agnostic git-level mechanical guard over a harness/model restriction.",
+        "rationale": "OVERDECK_AGENT_ID=flywheel-orchestrator reaches the codex shell env (codex.ts:567), so a git hook blocks the incident on any harness. This respects 'let Cloister route models', 'never force --harness claude-code for CLIProxy models', and 'never hardcode a model fallback' — a harness force would violate all three."
+      },
+      {
+        "summary": "Allowlist = docs/FLYWHEEL-STATE.md + state dirs (.pan/records/,.pan/continues/,.pan/backlog/,.beads/); everything else refused.",
+        "rationale": "The orchestrator legitimately commits only FLYWHEEL-STATE.md. State dirs are a safe superset (pipeline state, never authored content) that avoids false-positives on legitimate in-process state commits. Incident paths (.pan/drafts/**, .pan/specs/**, code) stay blocked."
+      },
+      {
+        "summary": "Did not add a codex read-only sandbox.",
+        "rationale": "read-only would block the legitimate FLYWHEEL-STATE.md write and could break pan-dispatch writes under ~/.overdeck."
+      },
+      {
+        "summary": "Commit/push policing lives in git hooks; the claude-code hook only polices Write/Edit.",
+        "rationale": "Git hooks inspect staged paths precisely and are harness-agnostic; a Bash 'git commit' string is hard to inspect in a PreToolUse hook, and denying all git commit would break the FLYWHEEL-STATE.md tick commit."
+      }
+    ],
+    "items": [
+      {
+        "id": "commit-guard",
+        "title": "Add harness-agnostic git pre-commit guard for the flywheel orchestrator",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T14:22:44.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-2194",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "push-guard",
+            "cc-write-deny"
+          ],
+          "files_scope": [
+            "scripts/guard-flywheel-orchestrator-commit.sh",
+            ".husky/pre-commit*",
+            "tests/unit/scripts/guard-flywheel-orchestrator-commit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/guard-flywheel-orchestrator-commit.test.ts"
+          ],
+          "expected_outputs": [
+            "guard-flywheel-orchestrator-commit.test.ts passes: orchestrator commit of .pan/drafts + .pan/specs refused; FLYWHEEL-STATE.md-only commit allowed; unset agent id is a no-op"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create scripts/guard-flywheel-orchestrator-commit.sh: if OVERDECK_AGENT_ID != flywheel-orchestrator exit 0; else read `git diff --cached --name-only` and refuse (exit 1, naming offending paths) any staged path not equal to docs/FLYWHEEL-STATE.md and not under .pan/records/,.pan/continues/,.pan/backlog/,.beads/. Wire it into .husky/pre-commit (currently empty) as `bash scripts/guard-flywheel-orchestrator-commit.sh </dev/null`. Add a vitest test mirroring tests/unit/scripts/guard-agent-main-push.test.ts (execFileSync bash against a temp git repo)."
+        },
+        "items": [
+          {
+            "id": "commit-guard.ac1",
+            "title": "Given OVERDECK_AGENT_ID=flywheel-orchestrator, staging .pan/drafts/PAN-1791.md plus a .pan/specs/*.vbrief.json, the guard exits non-zero and prints the offending paths (reproduces 862eebfc9c)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "commit-guard.ac2",
+            "title": "Given OVERDECK_AGENT_ID=flywheel-orchestrator, staging only docs/FLYWHEEL-STATE.md, the guard exits 0 (allows the tick commit)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "commit-guard.ac3",
+            "title": "Given OVERDECK_AGENT_ID=flywheel-orchestrator, staging src/foo.ts, the guard exits non-zero",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "commit-guard.ac4",
+            "title": "Given OVERDECK_AGENT_ID unset (or a non-orchestrator value), staging .pan/drafts/PAN-1791.md, the guard exits 0 (no-op — never affects work agents or server-side commits)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "commit-guard.ac5",
+            "title": "When the orchestrator runs `git commit` staging src/foo.ts, the .husky/pre-commit wiring rejects it and git exits non-zero",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "push-guard",
+        "title": "Broaden the pre-push guard to refuse orchestrator artifact-path pushes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T14:22:44.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-2194",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/guard-agent-main-push.sh",
+            "tests/unit/scripts/guard-agent-main-push.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/guard-agent-main-push.test.ts"
+          ],
+          "expected_outputs": [
+            "guard-agent-main-push.test.ts passes including new orchestrator cases; pre-existing agent/human cases stay green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In scripts/guard-agent-main-push.sh, before the existing offending_paths code-path check (:51), add an orchestrator branch: if OVERDECK_AGENT_ID == flywheel-orchestrator, refuse the pushed range if any changed path is outside the SAME allowlist as commit-guard (docs/FLYWHEEL-STATE.md + .pan/records/,.pan/continues/,.pan/backlog/,.beads/). Leave the general-agent code-path guard unchanged. Extend the existing test file with orchestrator cases."
+        },
+        "items": [
+          {
+            "id": "push-guard.ac1",
+            "title": "Given OVERDECK_AGENT_ID=flywheel-orchestrator, a push range touching .pan/specs/x.vbrief.json is refused (exit non-zero)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-guard.ac2",
+            "title": "Given OVERDECK_AGENT_ID=flywheel-orchestrator, a push range touching only docs/FLYWHEEL-STATE.md is allowed (exit 0)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-guard.ac3",
+            "title": "Given OVERDECK_AGENT_ID=agent-pan-2227, a push range touching src/ still exits non-zero, and a human (unset agent) push still exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cc-write-deny",
+        "title": "Deny orchestrator Write/Edit to non-allowlisted repo paths on claude-code",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T14:22:44.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-2194",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/hooks/auto-approve-hook*",
+            "tests/scripts/auto-approve-hook.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/scripts/auto-approve-hook.test.ts"
+          ],
+          "expected_outputs": [
+            "auto-approve-hook.test.ts passes: flywheel Write to src/ denied, Write to docs/FLYWHEEL-STATE.md allowed, non-flywheel Write unaffected"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend sync-sources/hooks/auto-approve-hook: for OVERDECK_AGENT_ID matching flywheel-* and TOOL_NAME in {Write,Edit,MultiEdit}, extract tool_input.file_path (jq), resolve against repo root; if it is inside the repo and NOT in the write-allowlist (docs/FLYWHEEL-STATE.md or under .pan/records/,.pan/continues/,.pan/backlog/,.beads/) emit permissionDecision:\"deny\" and exit 0. Writes outside the repo and to FLYWHEEL-STATE.md fall through to the existing allow. Leave all non-flywheel branches unchanged. Extend the existing test file. Note: deploying requires `pan sync`."
+        },
+        "items": [
+          {
+            "id": "cc-write-deny.ac1",
+            "title": "Given OVERDECK_AGENT_ID=flywheel-orchestrator and a Write to src/x.ts inside the repo, the hook emits permissionDecision:\"deny\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cc-write-deny.ac2",
+            "title": "Given OVERDECK_AGENT_ID=flywheel-orchestrator and a Write to docs/FLYWHEEL-STATE.md, the hook still returns permissionDecision:\"allow\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cc-write-deny.ac3",
+            "title": "Given OVERDECK_AGENT_ID=agent-pan-1234 and a Write to src/x.ts, the hook returns allow (non-flywheel agents unaffected)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the mechanical, harness-agnostic orchestrator guard",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-03T14:22:44.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2194",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/flywheel.md",
+            "docs/FLYWHEEL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"guard-flywheel-orchestrator-commit\" roles/flywheel.md docs/FLYWHEEL.md"
+          ],
+          "expected_outputs": [
+            "both files reference the mechanical guard script name and state the ban is now enforced harness-agnostically"
+          ],
+          "readiness": "ready",
+          "traces": []
+        },
+        "narrative": {
+          "Action": "Add one short paragraph to roles/flywheel.md and docs/FLYWHEEL.md: the 'never author/commit any file except docs/FLYWHEEL-STATE.md' rule is now mechanically enforced by a harness-agnostic git pre-commit/pre-push guard (scripts/guard-flywheel-orchestrator-commit.sh) keyed on OVERDECK_AGENT_ID, plus a claude-code PreToolUse Write/Edit deny. Note the --no-verify limitation and that the claude-code hook requires `pan sync` to deploy."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "roles/flywheel.md contains a paragraph referencing scripts/guard-flywheel-orchestrator-commit.sh and stating the write/commit ban is mechanically enforced on any harness",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "docs/FLYWHEEL.md contains the strings 'guard-flywheel-orchestrator-commit.sh' and '--no-verify' (the three guards and the bypass Non-Goal)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "commit-guard",
+        "to": "push-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "commit-guard",
+        "to": "cc-write-deny",
+        "type": "blocks"
+      },
+      {
+        "from": "commit-guard",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "push-guard",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "cc-write-deny",
+        "to": "docs",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-03-PAN-2194-flywheel-orchestrator-did-inline-work-add-mechanical-harness-agnostic-write-commit-guard.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

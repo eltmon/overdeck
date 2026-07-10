@@ -1,0 +1,329 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-23T04:50:13.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1132: TLDR — fix broken status reporting + expose to work agents",
+    "updated": "2026-05-23T04:52:18.574Z"
+  },
+  "plan": {
+    "id": "pan-1132",
+    "title": "TLDR: fix broken status reporting + expose to work agents",
+    "status": "proposed",
+    "uid": "0c406d35-023b-455e-8d02-547d67ccc5ad",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-23T04:50:13.000Z",
+    "updated": "2026-05-23T04:52:18.574Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1132",
+        "label": "PAN-1132",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/commit/ab8cd6f70",
+        "label": "Prior PAN-1132 fix (daemon pidfile + pan-tldr skill + roles/* TLDR sections)",
+        "type": "commit"
+      }
+    ],
+    "tags": [
+      "tldr",
+      "prompts",
+      "developer-experience",
+      "cleanup"
+    ],
+    "narratives": {
+      "Problem": "Three TLDR concerns: (1) `pan admin tldr status` reported running daemons as stopped because the CLI wrote its own state file with the CLI process's PID as a fallback, then reaped it on next read; (2) the work-agent-facing `pan-tldr` skill was removed in 0.7.0's legacy-skill purge and actively deleted by `pan sync`; (3) only `cloister/prompts/work.md` had a TLDR guidance block — review/test/planning/resume-work prompts were silent on TLDR. Concerns #1 and #2 were already addressed by commit ab8cd6f70 on main, and that commit also added unconditional TLDR sections to `roles/plan.md`, `roles/test.md`, and the four `roles/review-*.md` sub-roles. What remains is concern #3 literally: the four cloister prompt templates listed in the issue body still lack the `{{#TLDR_AVAILABLE}}` conditional block.",
+      "Proposal": "Add a `{{#TLDR_AVAILABLE}}` conditional block (same shape as the existing one in `cloister/prompts/work.md`) to each of `cloister/prompts/planning.md`, `cloister/prompts/review.md`, `cloister/prompts/test.md`, and `cloister/prompts/resume-work.md`. Add `TLDR_AVAILABLE` to the `optional:` frontmatter of each so `renderPrompt` permits the variable. Wire `spawn-planning-session.ts` to pass `TLDR_AVAILABLE: existsSync(join(workspacePath, '.venv'))` — the planning prompt is the only one of the four with an active production render site. Finish with an end-to-end verification bead that confirms all three issue criteria still hold."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Apply the {{#TLDR_AVAILABLE}} block to all four cloister prompts listed in the issue body, including the three that no production code currently renders (review.md, test.md, resume-work.md).",
+        "rationale": "The issue body's Fix #3 lists all four explicitly. The block is a no-op when TLDR_AVAILABLE is unset, so adding it has zero runtime cost and brings the templates in line with the issue's literal request. The templates are still exercised by `src/lib/cloister/__tests__/prompts.test.ts`, so they are not pure dead code. If/when they are revived they will be TLDR-aware from day one."
+      },
+      {
+        "summary": "Do NOT delete the unused review/test/resume-work cloister prompt files in this issue.",
+        "rationale": "Their deletion would require updating prompts.test.ts assertions and is independent of the TLDR exposure concern. Treat as a separate cleanup if needed."
+      },
+      {
+        "summary": "Skip changes to roles/review.md (the synthesis role).",
+        "rationale": "The role file at roles/review.md is the convoy-synthesis agent — it polls reviewer output files instead of doing fresh code exploration. The heavy-reading sub-roles (roles/review-{security,correctness,performance,requirements}.md) already have TLDR sections from commit ab8cd6f70."
+      },
+      {
+        "summary": "Do not re-implement concerns #1 and #2.",
+        "rationale": "Commit ab8cd6f70 (on main) already replaced the broken state-file machinery with reads from `<workspace>/.tldr/daemon.pid` and restored the `pan-tldr` skill. Verification of this state was performed during planning (workspace daemon at PID 291042 reports running/healthy via `pan admin tldr status`). Touching these files again would be wasted effort and risks regression."
+      }
+    ],
+    "items": [
+      {
+        "id": "tldr-planning-prompt-block",
+        "title": "Add {{#TLDR_AVAILABLE}} block to cloister/prompts/planning.md and wire spawn-planning-session.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:50:13.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1132",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add `TLDR_AVAILABLE` to the `optional:` frontmatter list in `src/lib/cloister/prompts/planning.md`. Insert a planning-flavored `{{#TLDR_AVAILABLE}}…{{/TLDR_AVAILABLE}}` block — short, mirroring the structure of the existing block in `cloister/prompts/work.md` (tldr_context / tldr_structure / tldr_semantic / tldr_calls / tldr_impact) but framed for planning's broad-exploration workflow. Update `src/lib/planning/spawn-planning-session.ts` (the only production caller of `renderPrompt({ name: 'planning' })` at line 281) to pass `TLDR_AVAILABLE: existsSync(join(workspacePath, '.venv'))` in the `vars` object. The `existsSync` and `join` imports already exist in that file."
+        },
+        "subItems": [
+          {
+            "id": "tldr-planning-prompt-block.ac1",
+            "title": "src/lib/cloister/prompts/planning.md has `TLDR_AVAILABLE` in its `optional:` frontmatter list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tldr-planning-prompt-block.ac2",
+            "title": "planning.md body contains a `{{#TLDR_AVAILABLE}}…{{/TLDR_AVAILABLE}}` block that names the five TLDR MCP tools (tldr_context, tldr_structure, tldr_semantic, tldr_calls, tldr_impact) and tells the planning agent to prefer summaries over full Reads during discovery",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tldr-planning-prompt-block.ac3",
+            "title": "src/lib/planning/spawn-planning-session.ts passes `TLDR_AVAILABLE: existsSync(join(workspacePath, '.venv'))` in the renderPrompt call at the `name: 'planning'` site",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tldr-planning-prompt-block.ac4",
+            "title": "Rendering planning.md with `TLDR_AVAILABLE: true` includes the TLDR section; rendering with the variable absent or `false` produces no TLDR section (verified by a new or updated test in src/lib/cloister/__tests__/prompts.test.ts, or by an inline assertion-style snippet in the existing MEMORY_CONTEXT test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tldr-planning-prompt-block.ac5",
+            "title": "`npm run typecheck` and the prompts.test.ts test file pass after the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tldr-review-prompt-block",
+        "title": "Add {{#TLDR_AVAILABLE}} block to cloister/prompts/review.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:50:13.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1132",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add `TLDR_AVAILABLE` to the `optional:` frontmatter list in `src/lib/cloister/prompts/review.md`. Insert a review-flavored `{{#TLDR_AVAILABLE}}…{{/TLDR_AVAILABLE}}` block that emphasizes TLDR for navigating the diff's surrounding context (tldr_context, tldr_calls, tldr_impact, tldr_semantic). No production render site needs wiring — this template is exercised only by `prompts.test.ts` today; the conditional block is a no-op when the var is unset."
+        },
+        "subItems": [
+          {
+            "id": "tldr-review-prompt-block.ac1",
+            "title": "review.md has `TLDR_AVAILABLE` in its `optional:` frontmatter list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tldr-review-prompt-block.ac2",
+            "title": "review.md body contains a `{{#TLDR_AVAILABLE}}…{{/TLDR_AVAILABLE}}` block framed for code-review usage (context for changed files, caller analysis, semantic search for related code)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tldr-review-prompt-block.ac3",
+            "title": "Existing prompts.test.ts assertion that renders review.md without TLDR_AVAILABLE still passes (no required-var error, no unwanted output)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tldr-test-prompt-block",
+        "title": "Add {{#TLDR_AVAILABLE}} block to cloister/prompts/test.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:50:13.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1132",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add `TLDR_AVAILABLE` to the `optional:` frontmatter list in `src/lib/cloister/prompts/test.md`. Insert a test-flavored `{{#TLDR_AVAILABLE}}…{{/TLDR_AVAILABLE}}` block emphasizing TLDR for diagnosing test failures (tldr_context for fixtures/helpers, tldr_calls/tldr_impact for tracing failing functions, tldr_semantic for finding where a behavior is implemented when an AC fails)."
+        },
+        "subItems": [
+          {
+            "id": "tldr-test-prompt-block.ac1",
+            "title": "test.md has `TLDR_AVAILABLE` in its `optional:` frontmatter list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tldr-test-prompt-block.ac2",
+            "title": "test.md body contains a `{{#TLDR_AVAILABLE}}…{{/TLDR_AVAILABLE}}` block framed for test-failure diagnosis",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tldr-test-prompt-block.ac3",
+            "title": "Existing prompts.test.ts assertion that renders test.md without TLDR_AVAILABLE still passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tldr-resume-work-prompt-block",
+        "title": "Add {{#TLDR_AVAILABLE}} block to cloister/prompts/resume-work.md",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-23T04:50:13.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1132",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add `TLDR_AVAILABLE` to the `optional:` frontmatter list in `src/lib/cloister/prompts/resume-work.md`. Insert a resume-work-flavored `{{#TLDR_AVAILABLE}}…{{/TLDR_AVAILABLE}}` block emphasizing TLDR for re-orienting on a partial implementation (tldr_context on the in-flight files to recover structure without re-reading the whole file)."
+        },
+        "subItems": [
+          {
+            "id": "tldr-resume-work-prompt-block.ac1",
+            "title": "resume-work.md has `TLDR_AVAILABLE` in its `optional:` frontmatter list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tldr-resume-work-prompt-block.ac2",
+            "title": "resume-work.md body contains a `{{#TLDR_AVAILABLE}}…{{/TLDR_AVAILABLE}}` block framed for re-orienting on partial work",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tldr-resume-work-prompt-block.ac3",
+            "title": "renderPrompt({ name: 'resume-work', vars: {} }) — or the equivalent existing test pattern — still succeeds with the new optional var",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tldr-end-to-end-verification",
+        "title": "End-to-end verification of all three PAN-1132 issue criteria",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-23T04:50:13.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1132",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Run the three verification commands listed in the issue body and document outcomes in the PR description (or as a comment on PAN-1132 if there is no PR). This is a verification-only bead — no code changes."
+        },
+        "subItems": [
+          {
+            "id": "tldr-end-to-end-verification.ac1",
+            "title": "`pan admin tldr status` correctly reports the workspace daemon as running with a real PID (not the CLI's PID), and after a daemon stop reports stopped. State must survive CLI exit (run the command, exit, run it again — same result).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tldr-end-to-end-verification.ac2",
+            "title": "After `pan sync`, `~/.claude/skills/pan-tldr/SKILL.md` exists and is not deleted on a subsequent `pan sync` (i.e. pan-tldr is NOT in LEGACY_SKILL_NAMES).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tldr-end-to-end-verification.ac3",
+            "title": "All four cloister prompts (planning, review, test, resume-work) render a TLDR section when `TLDR_AVAILABLE=true` and render no TLDR section when the variable is unset. work.md already does this — confirm no regression.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tldr-end-to-end-verification.ac4",
+            "title": "All seven role files that touch code-reading workflows (roles/plan.md, roles/work.md, roles/test.md, roles/review-security.md, roles/review-correctness.md, roles/review-performance.md, roles/review-requirements.md) still contain their TLDR sections from commit ab8cd6f70 — regression check.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tldr-end-to-end-verification.ac5",
+            "title": "`npm run typecheck`, `npm run lint`, and `npm test` (root + frontend) all pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "tldr-planning-prompt-block",
+        "to": "tldr-end-to-end-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "tldr-review-prompt-block",
+        "to": "tldr-end-to-end-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "tldr-test-prompt-block",
+        "to": "tldr-end-to-end-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "tldr-resume-work-prompt-block",
+        "to": "tldr-end-to-end-verification",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-23-PAN-1132-tldr-fix-broken-status-reporting-expose-to-work-agents.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

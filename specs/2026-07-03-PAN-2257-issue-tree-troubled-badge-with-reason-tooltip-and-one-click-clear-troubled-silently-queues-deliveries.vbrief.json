@@ -1,0 +1,360 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-03T05:38:59Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2257: Issue tree: troubled badge with reason tooltip and one-click clear (troubled silently queues deliveries)",
+    "updated": "2026-07-04T18:14:00.898Z"
+  },
+  "plan": {
+    "id": "pan-2257",
+    "title": "Issue tree: troubled badge with reason tooltip and one-click clear (troubled silently queues deliveries)",
+    "status": "completed",
+    "uid": "014abf61-2067-440e-a81c-f2ea7f43b87a",
+    "author": "agent:gpt-5.5",
+    "sequence": 5,
+    "created": "2026-07-03T05:38:59Z",
+    "updated": "2026-07-04T18:14:00.898Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2257",
+        "label": "PAN-2257",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "command-deck",
+      "agents",
+      "troubled"
+    ],
+    "narratives": {
+      "Problem": "A troubled agent gate can silently divert pan tell deliveries into an agent mail queue while the Command Deck issue tree shows no signal. Operators need to see troubled state, why it exists, when it started, whether it has queued deliveries, and clear the gate for the exact troubled agent without drilling into another page.",
+      "Proposal": "Extend the session-tree SessionNode contract and server builder with troubled metadata from agent state plus a queuedMailCount derived from the agent mail directory. Render a compact warning-semantic troubled badge in FeatureItem issue rows for troubled sessions. The badge title must include reason, failure count, troubledAt, queued delivery count, and the zero-failure spurious warning. Clicking the badge must clear the specific troubled session via the existing untroubled route/action plumbing and refresh dashboard state.",
+      "NonGoals": "- Do not change pan tell queueing or exit behavior; that belongs to PAN-2255.\n- Do not drain queued deliveries on spawn; that belongs to PAN-2255.\n- Do not add a new backend clear-troubled API or change clearAgentTroubled semantics.\n- Do not add bulk clear-all-troubled behavior when multiple sessions are troubled.\n- Do not redesign the Command Deck project tree beyond the troubled badge and its focused action.\n- Do not depend on shared Playwright/browser state for verification."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Plan around SessionNode contract enrichment instead of a frontend-only lookup from the global agents store.",
+        "rationale": "The reported incident involved a slot agent; session-tree rows already enumerate slots, while issue-level agent selection can point at a different agent."
+      },
+      {
+        "summary": "Use lastFailureReason as the troubled reason displayed in the tooltip.",
+        "rationale": "Discovery found no existing troubledReason field, while lastFailureReason is the available state field that explains why the troubled gate was set."
+      },
+      {
+        "summary": "Count queued deliveries as pending .md files in the agent mail directory.",
+        "rationale": "messageAgent writes queued user messages to getAgentDir(agentId)/mail/*.md, so this is the narrowest observable count without changing delivery behavior."
+      },
+      {
+        "summary": "Render the badge as warning/amber and reuse existing compact featureBadge styling.",
+        "rationale": "Troubled is an operator gate requiring attention, not a destructive action or necessarily an execution failure."
+      },
+      {
+        "summary": "Require isolated Playwright browser verification for the dashboard row.",
+        "rationale": "The issue is browser-visible and verification must be reproducible without another agent's browser profile or state."
+      }
+    ],
+    "items": [
+      {
+        "id": "session-tree-troubled-fields",
+        "title": "Expose troubled session metadata",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T05:38:59Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-2257",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "render-troubled-badge",
+            "clear-troubled-badge",
+            "verify-troubled-tree"
+          ],
+          "files_scope": [
+            "packages/contracts/src/types.ts",
+            "src/dashboard/server/routes/projects.ts",
+            "tests/unit/dashboard/server/routes/projects.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:contracts",
+            "npm run test:unit -- tests/unit/dashboard/server/routes/projects.test.ts"
+          ],
+          "expected_outputs": [
+            "@overdeck/contracts builds with SessionNode troubled metadata fields",
+            "projects route unit tests pass and assert troubled metadata plus queuedMailCount on session-tree nodes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Update the shared SessionNode schema in packages/contracts/src/types.ts with optional troubled, troubledAt, troubledReason, consecutiveFailures, and queuedMailCount fields. In src/dashboard/server/routes/projects.ts, add a small non-fatal helper that counts .md files under join(getAgentDir(sessionId), 'mail') and returns 0 when absent or unreadable. In collectSessionTreeNodes(), populate those fields for planning, work, strike, review, test, and ship session nodes that read agent state; use state.lastFailureReason for troubledReason. Add focused tests in tests/unit/dashboard/server/routes/projects.test.ts that build a troubled slot agent with mail files and assert the session tree returns the troubled fields and queuedMailCount without failing when mail is absent."
+        },
+        "items": [
+          {
+            "id": "session-tree-troubled-fields.ac1",
+            "title": "Given a troubled slot agent with lastFailureReason, troubledAt, consecutiveFailures, and two mail .md files, fetchProjectSessionTree returns that session with troubled true, troubledReason, troubledAt, consecutiveFailures, and queuedMailCount 2.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-tree-troubled-fields.ac2",
+            "title": "Given a troubled agent with no mail directory, fetchProjectSessionTree returns queuedMailCount 0 and preserves the session row.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-tree-troubled-fields.ac3",
+            "title": "Given an untroubled agent, fetchProjectSessionTree omits troubled-only values or returns troubled false without adding a warning payload.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "render-troubled-badge",
+        "title": "Render troubled warning badge",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T05:38:59Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2257",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx"
+          ],
+          "expected_outputs": [
+            "FeatureItem tests pass and assert troubled badge label, tooltip fields, spurious zero-failure text, and queued delivery count"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In FeatureItem.tsx, derive troubledSessions from feature.sessions where session.troubled is true. Render a compact warning-semantic badge group near the existing aggregate/paused badges. Use existing featureBadge warning/paused visual semantics or a narrowly named featureBadge_troubled class based on warning tokens. The badge title must include the sessionId, troubledReason when present, consecutiveFailures, troubledAt, queuedMailCount, and the sentence 'Likely spurious: troubled with 0 failures.' when consecutiveFailures is 0. The visible label should show Troubled and include queued count when queuedMailCount is greater than 0, for example 'Troubled · 3 queued'. If multiple sessions are troubled, render one compact badge per troubled session so each clear action has an unambiguous target."
+        },
+        "items": [
+          {
+            "id": "render-troubled-badge.ac1",
+            "title": "Given a feature row with one troubled session, FeatureItem renders a warning-semantic troubled badge with data-testid feature-troubled.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "render-troubled-badge.ac2",
+            "title": "Given troubledReason, consecutiveFailures, troubledAt, and queuedMailCount, the badge title renders each value for hover inspection.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "render-troubled-badge.ac3",
+            "title": "Given a troubled session with consecutiveFailures 0, the badge title renders the likely-spurious warning text.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "render-troubled-badge.ac4",
+            "title": "Given queuedMailCount greater than 0, the badge label renders the queued delivery count alongside Troubled.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "clear-troubled-badge",
+        "title": "Clear troubled from badge",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T05:38:59Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2257",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx src/lib/__tests__/issueActions.no-actions-lost.test.ts"
+          ],
+          "expected_outputs": [
+            "FeatureItem tests pass and assert clicking a troubled slot badge posts to /api/agents/<slot-id>/untroubled with mutation headers and refreshes state",
+            "issue action no-loss tests continue to pass with untroubled action preserved"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Expose a small reusable action path from useIssueActions, or a shared helper in the IssueActionMenu module, that can invoke the existing untroubled IssueActionEntry for an explicit agent id. It must use dashboardMutationJsonHeaders(), POST /api/agents/:agentId/untroubled, react-query refreshDashboardState(), and existing success/error alert behavior. FeatureItem must call that explicit-agent path when the troubled badge is clicked, stop propagation so the row does not expand/select unintentionally, and use the troubled sessionId rather than the issue-level activeAgentForIssue result. Do not add a new server endpoint or clear all troubled sessions at once."
+        },
+        "items": [
+          {
+            "id": "clear-troubled-badge.ac1",
+            "title": "Given a troubled slot session, clicking its badge posts to /api/agents/agent-pan-821-slot-1/untroubled rather than the base issue agent id.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clear-troubled-badge.ac2",
+            "title": "Given a successful clear response, the badge action refreshes dashboard state and surfaces the existing success alert behavior.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clear-troubled-badge.ac3",
+            "title": "Given a failed clear response, the badge action renders an error alert and does not clear any local troubled state optimistically.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clear-troubled-badge.ac4",
+            "title": "Given a badge click, FeatureItem preserves row selection and expansion state by stopping event propagation.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verify-troubled-tree",
+        "title": "Verify troubled tree UX",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T05:38:59Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-2257",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+            "tests/e2e/styleguide-conformance.spec.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build:contracts",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+            "npm --prefix ./src/dashboard/frontend run build"
+          ],
+          "expected_outputs": [
+            "contracts build completes before frontend typecheck",
+            "FeatureItem focused tests pass",
+            "frontend build completes without type or Vite errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Run the focused automated checks after the server contract and frontend slices land. Add or update tests only where the earlier beads did not already cover a required observable. For manual/browser UAT, start the dashboard from the built Node 22 server only after npm run build when server code changed, then use an isolated Playwright browser/profile to inspect a Command Deck issue row fixture or seeded state that has troubled true, consecutiveFailures 0, troubledAt, troubledReason, and queuedMailCount. Capture a screenshot and verify the badge is visible, warning-semantic, non-overlapping, and its click path clears the exact session id. Do not ask the operator to eyeball rendering."
+        },
+        "items": [
+          {
+            "id": "verify-troubled-tree.ac1",
+            "title": "Given all slices are implemented, focused frontend tests and contracts build complete without errors.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-troubled-tree.ac2",
+            "title": "Given an isolated Playwright browser/profile, the Command Deck issue tree renders the troubled badge without overlapping row text or existing badges.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-troubled-tree.ac3",
+            "title": "Given the Playwright session clicks the troubled badge, the browser records a POST to the specific session id's untroubled endpoint.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "session-tree-troubled-fields",
+        "to": "render-troubled-badge",
+        "type": "blocks"
+      },
+      {
+        "from": "render-troubled-badge",
+        "to": "clear-troubled-badge",
+        "type": "blocks"
+      },
+      {
+        "from": "render-troubled-badge",
+        "to": "verify-troubled-tree",
+        "type": "blocks"
+      },
+      {
+        "from": "clear-troubled-badge",
+        "to": "verify-troubled-tree",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-03-PAN-2257-issue-tree-troubled-badge-with-reason-tooltip-and-one-click-clear-troubled-silently-queues-deliveries.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

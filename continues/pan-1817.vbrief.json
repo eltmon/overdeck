@@ -1,0 +1,35 @@
+{
+  "version": "1",
+  "issueId": "PAN-1817",
+  "created": "2026-06-14T14:11:45.063Z",
+  "updated": "2026-06-14T14:46:42.948Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "kimi-k2.7-code",
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-06-14T14:11:45.063Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-06-14T14:13:28.849Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-06-14T14:15:28.825Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-06-14T14:17:29.809Z"
+    }
+  ],
+  "feedback": []
+}

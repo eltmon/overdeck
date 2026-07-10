@@ -1,0 +1,495 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-13T01:50:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1812: Flywheel governor stops work agents with false 'Work complete, no open beads' — agent-pan-1787 had 43 open + 7 in-progress beads",
+    "updated": "2026-06-13T01:49:38.814Z"
+  },
+  "plan": {
+    "id": "pan-1812",
+    "title": "Flywheel governor stops work agents with false 'Work complete, no open beads'",
+    "status": "proposed",
+    "uid": "17d2c6ad-41f1-4fc0-af28-788fec9e7ed0",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-06-13T01:50:00.000Z",
+    "updated": "2026-06-13T01:49:38.814Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1812",
+        "label": "PAN-1812",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "flywheel",
+      "deacon",
+      "beads",
+      "governor",
+      "agent-lifecycle"
+    ],
+    "narratives": {
+      "Problem": "On 2026-06-12 the deacon stuck ladder marked agent-pan-1787 troubled at 18:34Z (idleMin=90) while the agent was actively closing beads (18:31:52 and 18:38:31), because (a) runtime.lastActivity was ~90min stale with no independent activity evidence consulted, and (b) hasReadyBeads uses `bd ready`, which excludes in_progress and dependency-blocked beads, so a mid-bead agent reads as having no work. Flywheel RUN-28 then `pan pause`d the agent claiming 'Work complete, no open beads' — the brief forbids pan kill but is silent on pan pause, prescribes no completion-verification procedure, and has no agent provenance concept, so the governor reaped an operator-relevant flagship agent. Separately, checkTaskCompletionPromise in triggers.ts runs `bd list` without cwd, querying the server's working directory instead of the agent workspace. Full reconstruction with verified file/line references is in .pan/drafts/PAN-1812.md.",
+      "Proposal": "Four-front fix: (1) make every automated work-completeness check workspace-scoped, count in_progress as remaining work, and treat bd errors as unknown (triggers.ts cwd fix + new tri-state getWorkspaceBeadWork helper consumed by the stuck ladder); (2) stuck-remediation stage 3 pauses with an explanatory reason instead of marking troubled, and fresh .beads/issues.jsonl mtime resets the ladder; (3) record startedBy provenance ('operator'|'flywheel') at spawn, detected from PANOPTICON_AGENT_ID at CLI choke points and threaded explicitly through the plan→finalize→auto-spawn HTTP chain; (4) `pan pause` refuses flywheel-invoked pauses of non-flywheel-started work agents unless app-setting flywheel.governor_reap_operator_agents is true (default false), and docs/flywheel-brief.md gains explicit governor rules prescribing the verified workspace-scoped completion check.",
+      "NonGoals": "- Fixing the stale runtime.lastActivity activity-mirror pipeline itself (hooks/heartbeats) — the mtime cross-check mitigates it; root-cause fix is a separate issue if staleness recurs\n- Changing nudgeIdleWorkAgentsWithOpenBeads's `bd ready` usage in deacon.ts (ready-semantics are correct for naming the next actionable bead; it already uses cwd and skips on error)\n- Cleaning stale beads inherited from main out of workspace beads DBs\n- Gating pan kill or other lifecycle verbs (the brief already forbids them for the flywheel)\n- Changing evaluateFlywheelOrchestrator stage-3 semantics (paused-and-troubled for the orchestrator itself stays)\n- New provenance categories beyond operator|flywheel\n- Changing maxAgents/minAgents values, merge policy, or UAT policy"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Troubled-flag fix targets the deacon stuck ladder, not pan pause",
+        "rationale": "Verified from deacon logs (stage=3 marked-troubled at 18:34:04Z) and pause.ts source that pan pause never sets troubled; the issue's assumption that the governor set both flags was incorrect."
+      },
+      {
+        "summary": "Stage 3 sets paused+pausedReason (no process stop) instead of troubled",
+        "rationale": "troubled is documented as 'repeated resume failures' (agents.ts:1181); an idle agent with no remaining work has failed nothing. Pause is operator-visible, reversible via pan unpause, and stops nudge churn equally well."
+      },
+      {
+        "summary": "Work-completeness = open plus in_progress beads for the issue label from the workspace DB, as a tri-state helper (has-work|no-work|unknown)",
+        "rationale": "Directly encodes the issue's desired behavior 1; verified live that `bd list --json -l <label>` with cwd=workspace returns open+in_progress by default; tri-state makes 'bd error => unknown, never complete' structural."
+      },
+      {
+        "summary": "Provenance detected via PANOPTICON_AGENT_ID env at CLI choke points, with explicit --initiator override threaded through the auto-spawn HTTP chain; default 'operator'",
+        "rationale": "The launcher exports PANOPTICON_AGENT_ID into every agent shell (launcher-generator.ts:270) so flywheel-spawned `pan` children are detectable without new plumbing; env does not survive the complete-planning HTTP hop, hence the explicit field; defaulting unknowns to 'operator' is conservative (exempt from reaping)."
+      },
+      {
+        "summary": "Reap gate enforced in pan pause CLI plus stated in the brief; config gate is SQLite app-setting flywheel.governor_reap_operator_agents default false",
+        "rationale": "Prompt-only rules already failed in RUN-28, so enforcement is defense in depth; the flywheel.* app-settings pattern (app-settings.ts:79-118) is the established home for flywheel toggles."
+      },
+      {
+        "summary": "Leave deacon nudgeIdleWorkAgentsWithOpenBeads on bd ready",
+        "rationale": "Its purpose is naming the next actionable bead, where ready-semantics are correct; it already runs with cwd=workspace and skips on bd error, so it has neither defect."
+      }
+    ],
+    "items": [
+      {
+        "id": "triggers-workspace-cwd",
+        "title": "checkTaskCompletion queries the workspace beads DB and treats bd errors as unknown",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T01:50:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1812",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/triggers.ts checkTaskCompletionPromise (lines 289-302), pass `cwd: workspace` to both execAsync('bd list ...') calls when workspace is provided. Change the remaining-work query so in_progress beads count as remaining work (the current `--status open` query at line 300 misses them). Keep the catch-to-not-triggered behavior but reword the fallback reason to say beads state was unavailable/unknown, never implying completion. Callers already pass workspace (cloister/service.ts:1588, routes/agents.ts:2324). Full spec: WI-1 in .pan/drafts/PAN-1812.md."
+        },
+        "items": [
+          {
+            "id": "triggers-workspace-cwd.ac1",
+            "title": "Given a workspace argument, both bd list invocations in checkTaskCompletionPromise execute with exec options cwd equal to that workspace (unit test asserts the exec call options)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triggers-workspace-cwd.ac2",
+            "title": "Given a bead in in_progress status for the issue label, checkTaskCompletion returns triggered:false with a reason naming remaining tasks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triggers-workspace-cwd.ac3",
+            "title": "When the bd command fails, checkTaskCompletion returns triggered:false with a reason stating beads state is unknown/unavailable, never a completion claim",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bead-work-check",
+        "title": "Tri-state getWorkspaceBeadWork helper replaces hasReadyBeads in the stuck ladder",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T01:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1812",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "stage3-no-troubled",
+            "beads-activity-reset"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create leaf module src/lib/cloister/bead-work.ts exporting getWorkspaceBeadWork(workspace, issueLabel): Promise<'has-work'|'no-work'|'unknown'>. It runs `bd list --json -l <issueLabel>` via execFileAsync with cwd=workspace and timeout 10000ms; >=1 bead with status open or in_progress => 'has-work'; 0 => 'no-work'; any exec error, timeout, or JSON parse failure => 'unknown' with a logDeaconEventSync line. In src/lib/cloister/stuck-remediation.ts, replace the hasReadyBeads call at line 96: 'has-work' => return (deacon bead-nudge patrol owns that case); 'unknown' => log and return without escalation; only 'no-work' proceeds down the ladder. Delete hasReadyBeads (lines 40-49). Tests mock child_process execFile. Full spec: WI-2 in .pan/drafts/PAN-1812.md."
+        },
+        "items": [
+          {
+            "id": "bead-work-check.ac1",
+            "title": "getWorkspaceBeadWork returns 'has-work' when bd list --json -l <label> run with cwd=workspace yields at least one open or in_progress bead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bead-work-check.ac2",
+            "title": "getWorkspaceBeadWork returns 'unknown' (never 'no-work') when bd exits non-zero, times out, or emits unparseable JSON, and logs the failure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bead-work-check.ac3",
+            "title": "evaluateWorkAgent returns without any stage transition when the helper yields 'has-work' or 'unknown' (unit test exercises both)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bead-work-check.ac4",
+            "title": "The stuck ladder proceeds to stage evaluation only when the helper yields 'no-work', and hasReadyBeads no longer exists in stuck-remediation.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stage3-no-troubled",
+        "title": "Stuck-remediation stage 3 pauses work agents with a reason instead of marking troubled",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T01:50:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1812",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/stuck-remediation.ts evaluateWorkAgent stage-3 branch (lines 117-122), replace markAgentTroubled(agentId) with setAgentPausedSync(agentId, `stuck-remediation stage 3: idle ${idleMinutes} min with no remaining beads for ${issueId}`, false) — third arg false so the process is not flagged stopped (stage 3 today does not kill). Rename the logged action from 'marked-troubled' to 'paused-no-remaining-beads'. Do NOT touch evaluateFlywheelOrchestrator (lines 181-188) — the orchestrator's own paused-and-troubled stage 3 is out of scope. The existing guard at line 84 (paused/troubled => skip) keeps the ladder from re-firing. Full spec: WI-3 in .pan/drafts/PAN-1812.md."
+        },
+        "items": [
+          {
+            "id": "stage3-no-troubled.ac1",
+            "title": "Stage 3 for a work agent marks the agent paused and persists a pausedReason containing 'stuck-remediation' and the idle minutes, while troubled stays unset",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage3-no-troubled.ac2",
+            "title": "The stage-3 deacon log line emits action=paused-no-remaining-beads instead of marked-troubled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage3-no-troubled.ac3",
+            "title": "evaluateFlywheelOrchestrator stage 3 still pauses the flywheel and marks it troubled (existing tests keep passing unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "beads-activity-reset",
+        "title": "Fresh .beads/issues.jsonl mtime clears the stuck ladder before any stage fires",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T01:50:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1812",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In evaluateWorkAgent (src/lib/cloister/stuck-remediation.ts, after the review-status/idle guards and before stage evaluation), stat join(agent.workspace, '.beads', 'issues.jsonl') in a try/catch. If mtimeMs is newer than stuckState.firstStuckAt (or, when no stuck state exists, within the past config.stage1_minutes relative to the now parameter), call clearStuckRemediationState(agentId) and return. Missing/unreadable beads file falls through to existing behavior. This is the independent activity evidence that would have prevented the 18:34Z false positive (idleMin=90 while the agent closed beads at 18:31 and 18:38). Use the existing now-parameter test pattern; no real timers. Full spec: WI-4 in .pan/drafts/PAN-1812.md."
+        },
+        "items": [
+          {
+            "id": "beads-activity-reset.ac1",
+            "title": "Given a beads file mtime newer than firstStuckAt, evaluateWorkAgent clears stuck-remediation state and returns without any stage transition",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "beads-activity-reset.ac2",
+            "title": "Given a missing or stale beads file, the ladder behaves exactly as before (existing stage-transition tests keep passing)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-started-by",
+        "title": "AgentState.startedBy provenance recorded at spawn with env detection in pan start",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T01:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1812",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "autostart-provenance",
+            "pause-reap-gate"
+          ],
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Add startedBy?: 'operator' | 'flywheel' to AgentState in src/lib/agents.ts (~line 934) AND to the cleanAgentState field whitelist (~line 945) — omitting the whitelist entry silently drops the field on save. Add startedBy to SpawnOptions and persist in spawnAgent (default 'operator'). In src/cli/commands/start.ts add internal option --initiator <operator|flywheel> registered in src/cli/index.ts; resolution order: explicit flag, then env (process.env.PANOPTICON_AGENT_ID === FLYWHEEL_ORCHESTRATOR_AGENT_ID from src/lib/cloister/flywheel.ts:18 => 'flywheel'), else 'operator'; pass into the spawnAgent call at start.ts:1120. If importing the constant creates an import cycle, move it to a leaf module rather than inlining the literal. Update skills/pan-start/SKILL.md in the same commit if it enumerates flags (scripts/lint-skills.sh cross-checks --help). Full spec: WI-5 in .pan/drafts/PAN-1812.md."
+        },
+        "items": [
+          {
+            "id": "agent-started-by.ac1",
+            "title": "A spawned agent's state.json contains startedBy, and the value survives a save/load round-trip through cleanAgentState",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-started-by.ac2",
+            "title": "pan start running with PANOPTICON_AGENT_ID=flywheel-orchestrator records startedBy='flywheel'; with no PANOPTICON_AGENT_ID it defaults to 'operator'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-started-by.ac3",
+            "title": "An explicit --initiator flag value wins over env detection (unit test covers the three-step resolution order)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-started-by.ac4",
+            "title": "npm run lint passes, including the skills lint cross-check against pan start --help",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "autostart-provenance",
+        "title": "Initiator threads through plan kickoff, planning state, finalize, and auto-spawn",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T01:50:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1812",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Carry initiator explicitly across the two HTTP hops where env detection breaks: (1) src/cli/commands/plan.ts detects initiator from env (same resolution as agent-started-by) and includes it in the planning kickoff request body; (2) routes/issues.ts planning kickoff (lines ~845-1070) accepts initiator and passes it into spawnPlanningSession input (spawn-planning-session.ts:129-161); (3) buildPlanningAgentState persists startedBy beside autoSpawnOnFinalize (spawn-planning-session.ts:681-689); (4) plan-finalize.ts reads it back like readAutoSpawnOnFinalize (lines 82-92) and sends it in the promotePlanning POST body (line 299+); (5) completePlanningAutoSpawn (routes/issues.ts:253-302) forwards initiator in the work-agent spawn request and the agents start route (routes/agents.ts ~2514+, which shells pan start) appends --initiator <value>. Full spec: WI-6 in .pan/drafts/PAN-1812.md."
+        },
+        "items": [
+          {
+            "id": "autostart-provenance.ac1",
+            "title": "pan plan invoked with PANOPTICON_AGENT_ID=flywheel-orchestrator produces a planning agent state.json containing startedBy='flywheel'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "autostart-provenance.ac2",
+            "title": "plan-finalize reads the planning startedBy and sends it in the complete-planning request body (unit test on the read-back helper and request payload)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "autostart-provenance.ac3",
+            "title": "completePlanningAutoSpawn forwards initiator and the agents start route appends --initiator when shelling pan start (test asserts the spawn request/command at each seam)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "autostart-provenance.ac4",
+            "title": "A work agent auto-spawned from flywheel-initiated planning persists startedBy='flywheel'; operator-initiated planning produces 'operator'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pause-reap-gate",
+        "title": "pan pause refuses flywheel-invoked pauses of non-flywheel-started work agents behind a default-off toggle",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T01:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1812",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Add FLYWHEEL_GOVERNOR_REAP_OPERATOR_AGENTS_KEY = 'flywheel.governor_reap_operator_agents' to src/lib/database/app-settings.ts with isFlywheelGovernorReapOperatorAgents()/setFlywheelGovernorReapOperatorAgents() following the isFlywheelAutoPickupBacklog pattern (lines 104-118; default false). In src/cli/commands/pause.ts pauseCommand (lines 10-45), after resolving target state and before any mutation: if process.env.PANOPTICON_AGENT_ID === FLYWHEEL_ORCHESTRATOR_AGENT_ID AND state.role === 'work' AND state.startedBy !== 'flywheel' AND the toggle is false, print a policy error naming the config key and exit(1). Legacy agents without startedBy are protected (treated as operator-started). Update skills/pan-pause/SKILL.md if it documents behavior the lint cross-checks. Full spec: WI-7 in .pan/drafts/PAN-1812.md."
+        },
+        "items": [
+          {
+            "id": "pause-reap-gate.ac1",
+            "title": "app-settings stores flywheel.governor_reap_operator_agents via a set helper, and the is helper returns false when the setting is absent (defaults to off)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pause-reap-gate.ac2",
+            "title": "pauseCommand under PANOPTICON_AGENT_ID=flywheel-orchestrator targeting a work agent whose startedBy is not 'flywheel' exits non-zero with a message naming the config key, and the target state remains unpaused",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pause-reap-gate.ac3",
+            "title": "The same flywheel invocation succeeds against a startedBy='flywheel' agent, and succeeds against operator-started agents when the toggle is set true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pause-reap-gate.ac4",
+            "title": "Given no PANOPTICON_AGENT_ID in the environment, pauseCommand marks any resolvable agent paused exactly as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "brief-governor-policy",
+        "title": "Flywheel brief prescribes verified completion checks and limits slot reaping to flywheel-launched agents",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T01:50:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1812",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "In docs/flywheel-brief.md add a 'Governor: slots and reaping' subsection and extend the Do-not list (lines 95-113): maxAgents governs flywheel-initiated launches, not authority to reap operator-started agents; pan pause is permitted only against agents the flywheel itself launched (CLI-enforced — a refusal is policy, not a bug to work around); before asserting any agent's work is complete, run the verified workspace-scoped check `cd workspaces/feature-<id> && bd list -l <issue-id-lowercase>` where in_progress beads are active work and a bd error means unknown, never complete; bare `bd list` without -l counts other issues' beads inherited from main and must not be used; pause reasons must state the real rationale and never claim work-complete without the verified check. Keep the imperative voice of the existing brief. Full spec: WI-8 in .pan/drafts/PAN-1812.md."
+        },
+        "items": [
+          {
+            "id": "brief-governor-policy.ac1",
+            "title": "docs/flywheel-brief.md contains a governor subsection that prescribes the workspace-scoped, label-filtered bd check and states that in_progress beads are active work and bd errors mean unknown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "brief-governor-policy.ac2",
+            "title": "The Do-not list contains the rule that pan pause is permitted only against flywheel-launched agents and that slot caps govern flywheel-initiated launches only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "brief-governor-policy.ac3",
+            "title": "The brief contains the requirement that pause reasons give the real rationale and never claim work-complete without the verified check",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "bead-work-check",
+        "to": "stage3-no-troubled",
+        "type": "blocks"
+      },
+      {
+        "from": "bead-work-check",
+        "to": "beads-activity-reset",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-started-by",
+        "to": "autostart-provenance",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-started-by",
+        "to": "pause-reap-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "pause-reap-gate",
+        "to": "brief-governor-policy",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-13-PAN-1812-flywheel-governor-stops-work-agents-with-false-work-complete-no-open-beads.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

@@ -1,0 +1,61 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-12T16:37:29.540Z",
+    "updated": "2026-06-12T16:37:29.540Z",
+    "author": "panopticon-cli/auto-start",
+    "description": "Auto-synthesized minimal plan for PAN-18031: PAN-18031",
+    "inspectionPolicy": "never"
+  },
+  "plan": {
+    "id": "pan-18031",
+    "title": "PAN-18031",
+    "status": "proposed",
+    "uid": "e80975fe-d22d-4f39-9d93-7bbe101ce8d8",
+    "author": "panopticon-cli/auto-start",
+    "sequence": 1,
+    "created": "2026-06-12T16:37:29.540Z",
+    "updated": "2026-06-12T16:37:29.540Z",
+    "references": [],
+    "tags": [
+      "auto-start"
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-12-PAN-18031-pan-18031.vbrief.json"
+    },
+    "narratives": {
+      "Problem": "PAN-18031",
+      "Proposal": "Implement the issue directly from the tracker-provided title and body."
+    },
+    "items": [
+      {
+        "id": "auto-start",
+        "title": "Implement issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-12T16:37:29.540Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-18031",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "PAN-18031"
+        },
+        "items": [
+          {
+            "id": "auto-start.ac1",
+            "title": "Implement PAN-18031",
+            "status": "pending",
+            "created": "2026-06-12T16:37:29.540Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  }
+}

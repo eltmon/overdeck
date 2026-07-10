@@ -1,0 +1,487 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-07T16:05:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2426: feat(vbrief): adapt to upstream xBRIEF v0.8 (vBRIEF renamed to xBRIEF; spec upgraded)",
+    "updated": "2026-07-08T01:36:36.908Z"
+  },
+  "plan": {
+    "id": "pan-2426",
+    "title": "feat(vbrief): adapt to upstream xBRIEF v0.8 (vBRIEF renamed to xBRIEF; spec upgraded)",
+    "status": "completed",
+    "uid": "d0c4b944-4140-47a4-84c8-7b6735272630",
+    "author": "agent:claude-fable-5",
+    "sequence": 4,
+    "created": "2026-07-07T16:05:00.000Z",
+    "updated": "2026-07-08T01:36:36.908Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2426",
+        "label": "PAN-2426",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-2426.md",
+        "label": "PRD draft (with 2026-07-07 planning amendments)",
+        "type": "doc"
+      },
+      {
+        "uri": "https://github.com/deftai/xBRIEF",
+        "label": "Upstream spec repo (v0.8)",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "vbrief",
+      "xbrief",
+      "spec-upgrade",
+      "compat"
+    ],
+    "narratives": {
+      "Problem": "Upstream renamed the plan-document spec (deftai/vBRIEF -> deftai/xBRIEF) and bumped it to v0.8: the info envelope key changed from vBRIEFInfo to xBRIEFInfo. Overdeck writes v0.6 documents and its readers reject the xBRIEFInfo envelope outright. Upstream's backlog contains a 'remove vbrief readpath' item, so the legacy envelope will eventually stop being readable by upstream tooling. Our fork eltmon/vBRIEF is 9 commits behind with 0 unique commits.",
+      "Proposal": "Translate the envelope key at the read/write doors only, keeping the internal TypeScript field vBRIEFInfo unchanged (PRD D-1). Read door: a normalizeVBriefEnvelope helper applied at all seven raw-parse read sites accepts xBRIEFInfo and normalizes it to the internal field. Write door: a single serializeVBriefDocument function derives the on-disk key from the document version (>=0.7 -> xBRIEFInfo, <0.7 -> vBRIEFInfo; PRD D-2) and replaces JSON.stringify at exactly seven spec write sites. Writers (builder.ts, auto-synthesize.ts) and the two agent-facing prompt surfaces (planning template, write-vbrief skill; operator-approved D7) bump to version 0.8. The fork sync + rename (FR-7) was completed externally on 2026-07-07 (both masters at 56824ed4da99; CLAUDE.md links updated on main in 6240cf4a4f) - the plan carries only the remaining docs/VBRIEF.md reference updates. All code changes land in one PR (D-4).",
+      "NonGoals": "- Adopting PlanItem.type, PlanItem.summary, planRefs, status \"auto\" rollups, Source/Confidence narrative keys, or the x-xbrief/* extension registry (file follow-up issues if wanted)\n- Changing pipeline call sites to emit failed instead of blocked (the enum already permits failed; semantics adoption is a separate behavioral change)\n- Renaming .vbrief.json artifacts, docs/VBRIEF.md, the /write-vbrief skill name, or the vbrief/ viewer components (PRD D-5; requires a no-loss audit if ever done)\n- Renaming the internal TypeScript field vBRIEFInfo or touching any frontend component (PRD D-1, NFR-1)\n- Routing clone/byte-count/lock-file/tier-override JSON.stringify uses through the serializer (PRD D-6)\n- Adding ajv (or any validator) as a package dependency"
+    },
+    "autoDecisions": [],
+    "items": [
+      {
+        "id": "read-compat",
+        "title": "Read door: accept the xBRIEFInfo envelope at all seven read sites",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-07T16:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2426",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "write-door",
+            "writer-bump",
+            "template-bump"
+          ],
+          "files_scope": [
+            "src/lib/vbrief/io.ts",
+            "src/lib/vbrief/vbrief-index.ts",
+            "src/lib/vbrief/lifecycle-io.ts",
+            "src/lib/vbrief/dag-cli.ts",
+            "src/lib/vbrief/dag.ts",
+            "src/lib/pan-dir/specs.ts",
+            "src/lib/vbrief/__tests__/io.test.ts",
+            "src/lib/pan-dir/__tests__/pan-dir.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/vbrief/__tests__/io.test.ts src/lib/vbrief/__tests__/lifecycle-io.test.ts src/lib/vbrief/__tests__/dag.test.ts src/lib/pan-dir/__tests__/pan-dir.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "named vitest files pass including new xBRIEFInfo acceptance cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add exported normalizeVBriefEnvelope<T>(parsed: T): T to src/lib/vbrief/io.ts (exact implementation in PRD WI-2 step 1: if the object has xBRIEFInfo and no vBRIEFInfo, destructure and return { vBRIEFInfo: xBRIEFInfo, ...rest }; otherwise return unchanged). Apply it to freshly parsed JSON at all seven read sites: (1) readPlanSync at io.ts:191 (wrap JSON.parse(raw)); (2) io.ts:465 (wrap parsed before the envelope check); (3) vbrief-index.ts:188-199 (import helper, wrap parsed); (4) parsePanSpecDocumentFromString in pan-dir/specs.ts - normalize the parsed doc before the envelope check at specs.ts:103, importing from ../vbrief/io.js matching existing import style; (5) readSpecFileSync in lifecycle-io.ts:48-64 (normalize before the cast to PanSpecDocument); (6) readPlanFile in dag-cli.ts:98 (normalize before the cast); (7) readPlanFileFromDisk in dag.ts:1044 (normalize before the cast). Sites 5-7 are load-bearing: dag-cli.ts:168, dag.ts:620, dag.ts:1068, lifecycle-io.ts:236 mutate doc.vBRIEFInfo.updated and throw on un-normalized xBRIEFInfo docs. Update the two error messages that enumerate accepted shapes (io.ts:200-202 and specs.ts:105-106) to mention both keys and versions 0.5-0.8. doctor.ts:550 reads only spec.plan.* - do not change it. Locate sites by quoted code, not line numbers (they drift). Tests: extend io.test.ts (readPlanSync accepts an xBRIEFInfo v0.8 document and exposes it as doc.vBRIEFInfo; still accepts a vBRIEFInfo v0.6 document; normalizeVBriefEnvelope is a no-op when vBRIEFInfo is present) and the pan-dir specs test (a v0.8 xBRIEFInfo fixture with top-level status parses to a PanSpecDocument)."
+        },
+        "items": [
+          {
+            "id": "read-compat.ac1",
+            "title": "readPlanSync accepts an xBRIEFInfo v0.8 document and returns it with the internal vBRIEFInfo field populated (new io.test.ts case passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "read-compat.ac2",
+            "title": "readPlanSync still accepts vBRIEFInfo v0.5/v0.6 documents unchanged - all pre-existing io.test.ts and fixture-based tests stay green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "read-compat.ac3",
+            "title": "parsePanSpecDocumentFromString parses a v0.8 xBRIEFInfo fixture carrying a top-level status key and returns a PanSpecDocument (new pan-dir test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "read-compat.ac4",
+            "title": "A v0.8 xBRIEFInfo document loaded via dag-cli readPlanFile, dag readPlanFileFromDisk, or lifecycle-io readSpecFileSync accepts the doc.vBRIEFInfo.updated mutation without throwing (covered by test exercising one of these paths)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "read-compat.ac5",
+            "title": "Given a document missing both envelope keys, readPlanSync rejects it with an error message that contains both vBRIEFInfo and xBRIEFInfo as accepted keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "write-door",
+        "title": "Write door: version-keyed serializeVBriefDocument applied at all seven spec write sites",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-07T16:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2426",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vbrief/io.ts",
+            "src/lib/vbrief/auto-synthesize.ts",
+            "src/lib/vbrief/dag-cli.ts",
+            "src/lib/vbrief/dag.ts",
+            "src/lib/vbrief/lifecycle-io.ts",
+            "src/lib/pan-dir/specs.ts",
+            "src/lib/vbrief/__tests__/io.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/vbrief/__tests__/io.test.ts",
+            "git grep -n 'JSON.stringify(doc, null, 2)' src/lib/vbrief src/lib/pan-dir",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "io.test.ts passes including the four new serializer/round-trip cases",
+            "the git grep returns only the exempt non-spec sites enumerated in PRD D-6 (clone at dag.ts, byte-count at dag.ts), no disk-write spec sites",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Add exported serializeVBriefDocument(doc: { vBRIEFInfo: { version: string } }): string to src/lib/vbrief/io.ts (exact implementation in PRD WI-3 step 1: parseFloat the version; if finite and >= 0.7, destructure vBRIEFInfo out and JSON.stringify({ xBRIEFInfo: vBRIEFInfo, ...rest }, null, 2); else JSON.stringify(doc, null, 2). The loose parameter type is deliberate - PanSpecDocument carries an extra top-level status key that must pass through untouched). Replace JSON.stringify(<doc>, null, 2) with serializeVBriefDocument(<doc>) at exactly these seven disk-write sites: auto-synthesize.ts:147 (projectDocument), dag-cli.ts:104 (doc, in writePlanFileAtomic), dag.ts:856 (doc), lifecycle-io.ts:76 (nextDocument, in updateSpecStatusSync), lifecycle-io.ts:96 (specDocument), lifecycle-io.ts:238 (doc, in updatePlanStatus), pan-dir/specs.ts:143 (doc, inside the Effect fs.writeFileString). Per PRD D-6 do NOT touch: dag.ts:578 and io.ts:212 (deep clones), dag.ts:1085 (byte count), dag-cli.ts:47 and dag.ts:788 (lock files), io.ts:297 (tier-override state). Locate sites by quoted code, not line numbers. Tests (extend io.test.ts): serializeVBriefDocument emits xBRIEFInfo for version 0.8; emits vBRIEFInfo for version 0.6; round-trip v0.8 file -> readPlanSync -> serialize -> still keyed xBRIEFInfo; round-trip v0.6 file -> readPlanSync -> serialize -> still keyed vBRIEFInfo; extra top-level keys (status) pass through serialization."
+        },
+        "items": [
+          {
+            "id": "write-door.ac1",
+            "title": "serializeVBriefDocument emits the xBRIEFInfo key for a version 0.8 document and the vBRIEFInfo key for a version 0.6 document (unit tests pass)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "write-door.ac2",
+            "title": "Round-trip preserves the envelope key in both directions: a v0.8 file read then serialized stays xBRIEFInfo, a v0.6 file stays vBRIEFInfo (tests pass)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "write-door.ac3",
+            "title": "A PanSpecDocument's extra top-level status key survives serialization unchanged (test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "write-door.ac4",
+            "title": "git grep 'JSON.stringify(doc, null, 2)' over src/lib/vbrief and src/lib/pan-dir returns no spec-document disk-write sites - only the D-6-exempt clone/byte-count/lock/state sites remain",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "writer-bump",
+        "title": "Writer bump: builder and auto-synthesize emit version 0.8",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-07T16:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2426",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vbrief/builder.ts",
+            "src/lib/vbrief/auto-synthesize.ts",
+            "src/lib/vbrief/__tests__/auto-synthesize.test.ts",
+            "src/lib/vbrief/__tests__/io.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/vbrief/__tests__/auto-synthesize.test.ts src/lib/vbrief/__tests__/io.test.ts",
+            "npm test"
+          ],
+          "expected_outputs": [
+            "both named test files pass with assertions now pinning version '0.8'",
+            "full npm test green with no new failures (v0.6 fixtures elsewhere still load)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Two one-line changes: src/lib/vbrief/builder.ts:141 version: '0.6' -> version: '0.8'; src/lib/vbrief/auto-synthesize.ts:88 version: '0.6' -> version: '0.8'. Update existing test assertions pinning '0.6' in src/lib/vbrief/__tests__/auto-synthesize.test.ts and src/lib/vbrief/__tests__/io.test.ts (grep those two files for '0.6'). Fixture documents elsewhere that construct v0.6 docs (e.g. tests/unit/lib/cloister/deacon-swarm-*.test.ts) stay untouched - readers still accept them per FR-2. Add one assertion: a planBuilder(...).build() document serialized via serializeVBriefDocument is keyed xBRIEFInfo."
+        },
+        "items": [
+          {
+            "id": "writer-bump.ac1",
+            "title": "planBuilder().build() produces a document with vBRIEFInfo.version === '0.8' that serializeVBriefDocument emits keyed xBRIEFInfo (new assertion passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "writer-bump.ac2",
+            "title": "autoSynthesizeVBrief writes a spec whose parsed envelope carries version '0.8' (updated auto-synthesize.test.ts passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "writer-bump.ac3",
+            "title": "readPlanSync still accepts the untouched v0.6 fixture documents across the suite (e.g. tests/unit/lib/cloister/deacon-swarm-*.test.ts) - npm test produces no new failures",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "template-bump",
+        "title": "Bump planning prompt template and write-vbrief skill to xBRIEFInfo v0.8",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T16:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2426",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/prompts/planning.md",
+            "sync-sources/skills/write-vbrief/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'xBRIEFInfo' src/lib/cloister/prompts/planning.md sync-sources/skills/write-vbrief/SKILL.md",
+            "grep -rn '\"version\": \"0.6\"' src/lib/cloister/prompts/planning.md sync-sources/skills/write-vbrief/SKILL.md || true",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "both files contain xBRIEFInfo occurrences (grep -c prints a nonzero count for each)",
+            "the version-0.6 grep prints nothing (no remaining v0.6 instructions)",
+            "npm run lint (including scripts/lint-skills.sh) completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Operator-approved scope addition (continue.json D7, PRD amendment A-2). In src/lib/cloister/prompts/planning.md: the 'vBRIEF Plan Format (REQUIRED)' section (near line 288) - change the JSON template's envelope key vBRIEFInfo -> xBRIEFInfo and \"version\": \"0.6\" -> \"0.8\"; update the surrounding prose ('MUST conform to vBRIEF v0.6 spec' -> xBRIEF v0.8, upstream link deftai/vBRIEF -> deftai/xBRIEF) and the CRITICAL-rules bullet near line 361 ('MUST have vBRIEFInfo and plan as the ONLY top-level keys' -> xBRIEFInfo and plan). In sync-sources/skills/write-vbrief/SKILL.md: same translation - description line ('vBRIEF v0.6 schema' -> 'xBRIEF v0.8 schema'), the 'MUST conform to vBRIEF v0.6' sentence, and the example document's envelope key and version (near line 61). Edit ONLY sync-sources/ - .claude/skills/ and ~/.claude/skills/ are pan sync targets (H5). Internal timestamps/field references like 'same as vBRIEFInfo.created' in the template become 'same as xBRIEFInfo.created'. Do not rename either file (PRD D-5). Note: finalize's read path already accepts what these templates now instruct because read-compat lands in the same PR (D-4)."
+        },
+        "items": [
+          {
+            "id": "template-bump.ac1",
+            "title": "src/lib/cloister/prompts/planning.md instructs xBRIEFInfo + version 0.8 and contains no '\"version\": \"0.6\"' instruction (grep returns nothing)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "template-bump.ac2",
+            "title": "sync-sources/skills/write-vbrief/SKILL.md renders its example spec keyed xBRIEFInfo with version 0.8, and the diff applies changes only under sync-sources/ (no hand edits to .claude/skills copies)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "template-bump.ac3",
+            "title": "npm run lint (which runs scripts/lint-skills.sh) exits 0 after the skill edit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "schema-checkpoint",
+        "title": "Upstream-schema validation checkpoint for a freshly emitted v0.8 document",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T16:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-2426",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vbrief/__tests__/io.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/vbrief/__tests__/io.test.ts"
+          ],
+          "expected_outputs": [
+            "either the ajv checkpoint output shows the emitted document valid against xbrief-core-0.8.schema.json, or the fallback structural assertions pass in io.test.ts"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-3"
+          ],
+          "acJustification": "A checkpoint with a stated fallback has exactly two mutually exclusive success conditions; 2 ACs express them."
+        },
+        "narrative": {
+          "Action": "Implementation checkpoint (PRD WI-5), run after writer-bump. Emit one freshly built document to a temp file, then: curl -sL https://raw.githubusercontent.com/deftai/xBRIEF/master/schemas/xbrief-core-0.8.schema.json -o /tmp/xbrief-0.8.schema.json && bunx ajv-cli validate -s /tmp/xbrief-0.8.schema.json -d <emitted-doc.json> --spec=draft2020. FALLBACK (if ajv-cli or the schema fetch fails): add structural assertions to the writer-bump tests in io.test.ts instead - the emitted document has xBRIEFInfo.version === '0.8', a plan object, and no subItems keys in emitted items - and note the skipped schema check in the PR body. Do NOT add ajv as a package dependency (H7). Record which path was taken."
+        },
+        "items": [
+          {
+            "id": "schema-checkpoint.ac1",
+            "title": "A planBuilder-emitted document passes bunx ajv-cli validation against upstream schemas/xbrief-core-0.8.schema.json (checkpoint output recorded), OR",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schema-checkpoint.ac2",
+            "title": "Fallback: io.test.ts asserts the built document emits xBRIEFInfo.version '0.8', a plan object, and no subItems keys in items, and the PR body notes the skipped schema validation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-update",
+        "title": "Docs: xBRIEF v0.8 compat section and reference updates in docs/VBRIEF.md",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-07T16:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2426",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/VBRIEF.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'xBRIEF' docs/VBRIEF.md | head -5",
+            "grep -n 'deftai/vBRIEF\\|eltmon/vBRIEF' docs/VBRIEF.md || true"
+          ],
+          "expected_outputs": [
+            "docs/VBRIEF.md contains an xBRIEF v0.8 section near the top",
+            "the stale-link grep prints nothing (no remaining deftai/vBRIEF or eltmon/vBRIEF links)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-2"
+          ],
+          "acJustification": "Docs-only item; 2 ACs cover both files' observable end states."
+        },
+        "narrative": {
+          "Action": "docs/VBRIEF.md only (PRD amendment A-4). 1) Add a short 'xBRIEF v0.8' section at the top: upstream rename (deftai/vBRIEF -> deftai/xBRIEF, 2026-06-26), the envelope-key compatibility rule (version >= 0.7 writes xBRIEFInfo, < 0.7 writes vBRIEFInfo; round-trip preserving, never up-converts - PRD D-2), which versions Overdeck reads (0.5-0.8) and writes (0.8). Do not rename the file (D-5). 2) Update the stale references at lines 3, 7, 9, and 374 (locate by the quoted links, lines drift): github.com/deftai/vBRIEF -> github.com/deftai/xBRIEF; github.com/eltmon/vBRIEF -> github.com/eltmon/xBRIEF; the extension proposal deftai/vBRIEF#1 -> deftai/xBRIEF#40 (superseding #1; draft PR deftai/xBRIEF#41). Do NOT edit CLAUDE.md's link block - it was already updated on main in commit 6240cf4a4f and arrives in this workspace via sync-main; re-editing would create merge conflicts. The fork sync + rename itself is DONE (verified 2026-07-07: both masters at SHA 56824ed4da99) - no gh ops in this item."
+        },
+        "items": [
+          {
+            "id": "docs-update.ac1",
+            "title": "docs/VBRIEF.md renders an 'xBRIEF v0.8' section documenting the rename, the version-keyed envelope rule, and the read (0.5-0.8) / write (0.8) version ranges",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-update.ac2",
+            "title": "grep for deftai/vBRIEF and eltmon/vBRIEF in docs/VBRIEF.md returns nothing; the extension-proposal link resolves to deftai/xBRIEF#40 and the diff contains no CLAUDE.md changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "read-compat",
+        "to": "write-door",
+        "type": "blocks"
+      },
+      {
+        "from": "write-door",
+        "to": "writer-bump",
+        "type": "blocks"
+      },
+      {
+        "from": "read-compat",
+        "to": "writer-bump",
+        "type": "blocks"
+      },
+      {
+        "from": "read-compat",
+        "to": "template-bump",
+        "type": "blocks"
+      },
+      {
+        "from": "writer-bump",
+        "to": "schema-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "read-compat",
+        "to": "schema-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "write-door",
+        "to": "schema-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "read-compat",
+        "to": "docs-update",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "completed"
+}

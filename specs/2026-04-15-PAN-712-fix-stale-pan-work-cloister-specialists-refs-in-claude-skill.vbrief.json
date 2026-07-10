@@ -1,0 +1,124 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-15T01:58:14Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-712: fix stale pan work/cloister/specialists refs in .claude/skills/"
+  },
+  "plan": {
+    "id": "pan-712",
+    "title": "fix: stale pan work/cloister/specialists refs in .claude/skills/",
+    "status": "approved",
+    "uid": "bf82ed53-bd83-4fcb-952f-f027a47b06d2",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-04-15T01:58:14Z",
+    "updated": "2026-04-15T01:58:14Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/712",
+        "label": "PAN-712",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/705",
+        "label": "PAN-705",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "docs",
+      "skills",
+      "cleanup",
+      "pan-705-followup"
+    ],
+    "narratives": {
+      "Problem": "Project-level skill files under .claude/skills/ still reference the pre-PAN-705 command taxonomy (pan work <verb>, pan cloister, pan specialists). These references mislead any agent that loads the affected skills about correct CLI syntax. A grep audit found 5 stale occurrences in exactly 2 files: .claude/skills/test-specialist-workflow/SKILL.md (4 refs) and .claude/skills/update-panopticon-docs/resources/EXAMPLES.md (1 ref).",
+      "Proposal": "Two trivial, independent doc edits — one bead per file. Bead 1 rewrites the test-specialist-workflow skill to use `pan admin cloister start` and `pan admin specialists wake ...`. Bead 2 rewrites the pan-work example in the update-panopticon-docs skill to reflect the flat lifecycle taxonomy (no `pan work` namespace). A final anchored grep (\\bpan (work|cloister|specialists)\\b) over .claude/skills/ must return zero hits; `pan workspace` references are intentionally preserved because that command group still exists post-PAN-705."
+    },
+    "items": [
+      {
+        "id": "fix-test-specialist-workflow-skill",
+        "title": "Update test-specialist-workflow SKILL.md to pan admin cloister/specialists",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-15T01:58:14Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-712"
+        },
+        "narrative": {
+          "Action": "Edit .claude/skills/test-specialist-workflow/SKILL.md. Replace `pan cloister start` (line 40) with `pan admin cloister start`. Replace the three `pan specialists wake <agent>` lines (163, 164, 165) and the `pan specialists wake test-agent --task \"...\"` line (174) with their `pan admin specialists wake ...` equivalents. Do not change any other content. Verify by running `pan admin cloister --help` and `pan admin specialists --help` against the resulting command strings."
+        },
+        "subItems": [
+          {
+            "id": "fix-test-specialist-workflow-skill.ac1",
+            "title": "File .claude/skills/test-specialist-workflow/SKILL.md contains zero occurrences of `pan cloister` or `pan specialists` (as standalone commands, not `pan admin cloister`/`pan admin specialists`)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-test-specialist-workflow-skill.ac2",
+            "title": "Every rewritten command in the file is a valid subcommand of `pan admin cloister` or `pan admin specialists` as shown by `pan admin cloister --help` and `pan admin specialists --help`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-test-specialist-workflow-skill.ac3",
+            "title": "No unrelated changes in the file (diff is limited to the 5 stale command references and minimal surrounding whitespace)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fix-update-panopticon-docs-examples",
+        "title": "Update update-panopticon-docs EXAMPLES.md Pattern 6 to drop pan work namespace",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-15T01:58:14Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-712"
+        },
+        "narrative": {
+          "Action": "Edit .claude/skills/update-panopticon-docs/resources/EXAMPLES.md. Replace the `pan work --help` verify step (line 294) with `pan --help` (or a more specific command like `pan start --help` if the surrounding example is about the `start` verb). Review Pattern 6's surrounding prose and update any wording that still implies a `pan work` command namespace — after PAN-705, lifecycle verbs (`start`, `done`, `kill`, `recover`, `tell`, `resume`, `approve`, `close`, `reopen`, `sync-main`, `wipe`) are top-level, not subcommands of `pan work`. Keep the example's original teaching intent intact."
+        },
+        "subItems": [
+          {
+            "id": "fix-update-panopticon-docs-examples.ac1",
+            "title": "File .claude/skills/update-panopticon-docs/resources/EXAMPLES.md contains zero occurrences of `pan work ` (trailing space, to exclude `pan workspace`)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-update-panopticon-docs-examples.ac2",
+            "title": "Pattern 6 prose and example commands are consistent with the post-PAN-705 flat lifecycle taxonomy — no text implies lifecycle verbs live under a `pan work` group",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-update-panopticon-docs-examples.ac3",
+            "title": "Repo-wide audit `grep -rn -E '\\bpan (work|cloister|specialists)\\b' .claude/skills/` returns zero hits across all files under .claude/skills/ (this is the issue-level acceptance criterion and must be re-run after both beads land)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "proposed"
+}

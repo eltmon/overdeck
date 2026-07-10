@@ -1,0 +1,296 @@
+{
+  "issueId": "PAN-2373",
+  "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-07T02:53:23.873Z",
+      "reason": "end",
+      "note": "No deviations in code fix. Fixed verification test hook timeout by rejecting server listen errors and giving conversation supervisor UAT setup a 20s timeout; gates passed and branch is pushed."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-07T02:53:52.784Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-07T02:55Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-07T02:55:13.760Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-07T02:55:13.811Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-07T02:57Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-07-07T02:57:00.579Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-07T03:18Z] verification-gate → FAILED — seq 4",
+      "timestamp": "2026-07-07T03:18:59.443Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-07T03:23Z] verification-gate → FAILED — seq 5",
+      "timestamp": "2026-07-07T03:23:48.076Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-07T05:23:13.498Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-07T05:38:50.231Z"
+    }
+  ],
+  "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/drafts/PAN-2373.md",
+      ".pan/records/pan-2373.json",
+      "scripts/run-flake-lane.sh",
+      "src/dashboard/frontend/tsconfig.json",
+      "tests/playwright/conversation-supervisor-uat.test.ts",
+      "tests/unit/lib/test-infra/quarantine.test.ts",
+      "tests/unit/scripts/lint-quarantine-audit.test.ts",
+      "tests/unit/vitest-config.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/lib/test-infra/__tests__/quarantine.test.ts",
+      "tests/unit/lib/cloister/verification-gate-env.test.ts"
+    ],
+    "declaredScope": [
+      ".github/workflows/ci.yml",
+      "package.json",
+      "scripts/flaky-quarantine.txt",
+      "scripts/lint-quarantine-audit.sh",
+      "src/lib/cloister/validation.ts",
+      "src/lib/test-infra/__tests__/quarantine.test.ts",
+      "src/lib/test-infra/quarantine.ts",
+      "tests/unit/lib/cloister/verification-gate-env.test.ts",
+      "vitest.config.ts"
+    ],
+    "actualChangedFiles": [
+      ".github/workflows/ci.yml",
+      ".pan/drafts/PAN-2373.md",
+      ".pan/records/pan-2373.json",
+      "package.json",
+      "scripts/flaky-quarantine.txt",
+      "scripts/lint-quarantine-audit.sh",
+      "scripts/run-flake-lane.sh",
+      "src/dashboard/frontend/tsconfig.json",
+      "src/lib/cloister/validation.ts",
+      "src/lib/test-infra/quarantine.ts",
+      "tests/playwright/conversation-supervisor-uat.test.ts",
+      "tests/unit/lib/test-infra/quarantine.test.ts",
+      "tests/unit/scripts/lint-quarantine-audit.test.ts",
+      "tests/unit/vitest-config.test.ts",
+      "vitest.config.ts"
+    ],
+    "recordedAt": "2026-07-07T02:53:14.005Z"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "pan-2373-flake-lane": "completed",
+    "pan-2373-flake-lane.ac1": "completed",
+    "pan-2373-flake-lane.ac2": "completed",
+    "pan-2373-flake-lane.ac3": "completed",
+    "pan-2373-flake-lane.ac4": "completed",
+    "pan-2373-vitest-flake-config": "completed",
+    "pan-2373-vitest-flake-config.ac1": "completed",
+    "pan-2373-vitest-flake-config.ac2": "completed",
+    "pan-2373-vitest-flake-config.ac3": "completed",
+    "pan-2373-vitest-flake-config.ac4": "completed",
+    "pan-2373-vitest-flake-config.ac5": "completed",
+    "pan-2373-verify-gate-env": "completed",
+    "pan-2373-verify-gate-env.ac1": "completed",
+    "pan-2373-verify-gate-env.ac2": "completed",
+    "pan-2373-verify-gate-env.ac3": "completed",
+    "pan-2373-quarantine-file": "completed",
+    "pan-2373-quarantine-file.ac1": "completed",
+    "pan-2373-quarantine-file.ac2": "completed",
+    "pan-2373-quarantine-file.ac3": "completed",
+    "pan-2373-quarantine-file.ac4": "completed",
+    "pan-2373-quarantine-file.ac5": "completed"
+  },
+  "pipeline": {
+    "issueId": "PAN-2373",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "mergeStatus": "merged",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-07T22:10:26.760Z",
+    "reviewNotes": "Approved: flake policy, quarantine audit, verification env, and non-blocking flake lane satisfy the review requirements",
+    "testNotes": "Reconciled from green GitHub Actions CI on af5f24ae: lint (https://github.com/eltmon/overdeck/actions/runs/28838994706/job/85528807838)",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "mergeNotes": "Work agent agent-pan-2373 stopped before completing the rebase onto main",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2419",
+    "reviewedAtCommit": "af5f24ae48635a8f4c5805ad8c34462f6434f4dd",
+    "lastVerifiedCommit": "0b462104234bbe78d64e87e72d31026ee028f3ac",
+    "reviewRequestedAt": "2026-07-07T05:18:41.766Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        ".pan/drafts/PAN-2373.md",
+        ".pan/records/pan-2373.json",
+        "scripts/run-flake-lane.sh",
+        "src/dashboard/frontend/tsconfig.json",
+        "tests/playwright/conversation-supervisor-uat.test.ts",
+        "tests/unit/lib/test-infra/quarantine.test.ts",
+        "tests/unit/scripts/lint-quarantine-audit.test.ts",
+        "tests/unit/vitest-config.test.ts"
+      ],
+      "declaredScopeUntouched": [
+        "src/lib/test-infra/__tests__/quarantine.test.ts",
+        "tests/unit/lib/cloister/verification-gate-env.test.ts"
+      ],
+      "declaredScope": [
+        ".github/workflows/ci.yml",
+        "package.json",
+        "scripts/flaky-quarantine.txt",
+        "scripts/lint-quarantine-audit.sh",
+        "src/lib/cloister/validation.ts",
+        "src/lib/test-infra/__tests__/quarantine.test.ts",
+        "src/lib/test-infra/quarantine.ts",
+        "tests/unit/lib/cloister/verification-gate-env.test.ts",
+        "vitest.config.ts"
+      ],
+      "actualChangedFiles": [
+        ".github/workflows/ci.yml",
+        ".pan/drafts/PAN-2373.md",
+        ".pan/records/pan-2373.json",
+        "package.json",
+        "scripts/flaky-quarantine.txt",
+        "scripts/lint-quarantine-audit.sh",
+        "scripts/run-flake-lane.sh",
+        "src/dashboard/frontend/tsconfig.json",
+        "src/lib/cloister/validation.ts",
+        "src/lib/test-infra/quarantine.ts",
+        "tests/playwright/conversation-supervisor-uat.test.ts",
+        "tests/unit/lib/test-infra/quarantine.test.ts",
+        "tests/unit/scripts/lint-quarantine-audit.test.ts",
+        "tests/unit/vitest-config.test.ts",
+        "vitest.config.ts"
+      ],
+      "recordedAt": "2026-07-07T02:53:14.005Z"
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-07T22:10:26.760Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 1274,
+            "output": 9951,
+            "cacheRead": 6970292,
+            "cacheWrite": 6821
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 55653,
+            "output": 4832,
+            "cacheRead": 1280,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 14631,
+            "output": 9603,
+            "cacheRead": 1284496,
+            "cacheWrite": 128102
+          },
+          "anthropic/claude-opus-4-8": {
+            "input": 18730,
+            "output": 34796,
+            "cacheRead": 3946371,
+            "cacheWrite": 149608
+          }
+        },
+        "planning": {
+          "anthropic/claude-opus-4-8": {
+            "input": 2,
+            "output": 617,
+            "cacheRead": 165443,
+            "cacheWrite": 1287
+          }
+        },
+        "review": {
+          "unknown": {
+            "input": 3360880,
+            "output": 17455,
+            "cacheRead": 2842240,
+            "cacheWrite": 0
+          }
+        },
+        "work": {
+          "custom/kimi-k2.7-code": {
+            "input": 2228806,
+            "output": 159275,
+            "cacheRead": 84485120,
+            "cacheWrite": 0
+          },
+          "unknown": {
+            "input": 21561738,
+            "output": 36592,
+            "cacheRead": 20145920,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-fable-5": {
+          "input": 15905,
+          "output": 19554,
+          "cacheRead": 8254788,
+          "cacheWrite": 134923
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 55653,
+          "output": 4832,
+          "cacheRead": 1280,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 18732,
+          "output": 35413,
+          "cacheRead": 4111814,
+          "cacheWrite": 150895
+        },
+        "unknown": {
+          "input": 24922618,
+          "output": 54047,
+          "cacheRead": 22988160,
+          "cacheWrite": 0
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 2228806,
+          "output": 159275,
+          "cacheRead": 84485120,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 53.90384025,
+        "pricingAsOf": "2026-07-07T22:09:04.258Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2419"
+    ],
+    "ranOn": "eltmon-z790"
+  },
+  "swarm": {
+    "finalizedAt": "2026-07-06T17:49:27.751Z"
+  },
+  "created": "2026-07-07T01:35:12.280Z",
+  "updated": "2026-07-07T22:10:26.760Z"
+}

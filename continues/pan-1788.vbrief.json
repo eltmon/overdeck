@@ -1,0 +1,119 @@
+{
+  "version": "1",
+  "issueId": "PAN-1642",
+  "created": "2026-06-12T18:35:00.000Z",
+  "updated": "2026-06-13T02:50:34.054Z",
+  "gitState": {
+    "branch": "feature/pan-1642",
+    "sha": "97be8cb6e",
+    "dirty": false
+  },
+  "decisions": [
+    {
+      "id": "D8",
+      "summary": "Fix review blocker: guard the ConversationPanel HTTP messages query so an in-flight fetch cannot overwrite newer WebSocket-streamed state. Use a ref tracking the latest streaming state and, when it is true at queryFn resolution, return the existing cache value (or empty fallback) instead of the stale HTTP response.",
+      "recordedAt": "2026-06-12T18:35:00.000Z"
+    },
+    {
+      "id": "D9",
+      "summary": "Merging origin/main into feature/pan-1642 introduced a tracked .pan/continue.json from PAN-1788 that overwrote the workspace continue file. Restored the PAN-1642 workspace continue file after the merge commit.",
+      "recordedAt": "2026-06-12T18:55:00.000Z"
+    },
+    {
+      "id": "D10",
+      "summary": "Post-merge ChatMarkdown Streamdown test was flaky because the lazy Streamdown renderer can render a ReactMarkdown fallback before the lazy chunk loads; made the Streamdown assertions async with waitFor so they resolve after the renderer loads.",
+      "recordedAt": "2026-06-12T18:55:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H6",
+      "summary": "Returning empty messages/workLog when streaming is active but the cache is still empty could briefly flash an empty state before the WS initial snapshot arrives.",
+      "mitigation": "The stream hook already sets discovering=true on first connect; downstream UI treats streamMessagesEnabled + empty as discovering/loading. The fallback is only used for in-flight HTTP races, not the steady state."
+    },
+    {
+      "id": "H7",
+      "summary": ".pan/continue.json appears to be tracked on origin/main (PAN-1788 workspace copy), so future merges may clobber the PAN-1642 workspace continue file again.",
+      "mitigation": "Restore the PAN-1642 continue file immediately after any merge that touches it; consider untracking .pan/continue.json on main if it is indeed tracked."
+    }
+  ],
+  "resumePoint": {
+    "description": "Merge from origin/main committed, all quality gates pass. Push to origin/feature/pan-1642 and call pan done PAN-1642.",
+    "beadId": null,
+    "filesToRead": [
+      ".pan/continue.json"
+    ]
+  },
+  "beadsMapping": {},
+  "statusOverrides": {
+    "p2-theme": "completed",
+    "p2-theme.ac1": "completed",
+    "p2-theme.ac2": "completed",
+    "p2-renderer": "completed",
+    "p2-renderer.ac1": "completed",
+    "p2-renderer.ac2": "completed",
+    "p2-renderer.ac3": "completed",
+    "p2-renderer.ac4": "completed",
+    "p2-settings-toggle": "completed",
+    "p2-settings-toggle.ac1": "completed",
+    "p2-settings-toggle.ac2": "completed",
+    "p1-wire-panels": "completed",
+    "p1-wire-panels.ac1": "completed",
+    "p1-wire-panels.ac2": "completed",
+    "p1-wire-panels.ac3": "completed",
+    "p1-wire-panels.ac4": "completed",
+    "p3-table-css": "completed",
+    "p3-table-css.ac1": "completed",
+    "p3-table-css.ac2": "completed",
+    "p2-add-dep": "completed",
+    "p2-add-dep.ac1": "completed",
+    "p2-add-dep.ac2": "completed",
+    "p2-flag-config": "completed",
+    "p2-flag-config.ac1": "completed",
+    "p2-flag-config.ac2": "completed",
+    "p1-pi-guard": "completed",
+    "p1-pi-guard.ac1": "completed",
+    "p1-pi-guard.ac2": "completed",
+    "p1-stream-hook": "completed",
+    "p1-stream-hook.ac1": "completed",
+    "p1-stream-hook.ac2": "completed",
+    "p1-stream-hook.ac3": "completed",
+    "p1-stream-hook.ac4": "completed"
+  },
+  "agentModel": "claude-opus-4",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-06-12T18:35:00.000Z",
+      "reason": "resume",
+      "note": "Resumed PAN-1642 to address unaddressed review feedback (stale HTTP fetch overwriting WS stream cache) and verification test failures. Workspace .pan/continue.json was missing; recreated from project-side continue state.",
+      "agentModel": "claude-opus-4"
+    },
+    {
+      "timestamp": "2026-06-12T18:55:00.000Z",
+      "reason": "resume",
+      "note": "Implemented the review fix in ConversationPanel.tsx. pan done then required a merge from origin/main; resolved conflicts in ConversationPanel.tsx, MessagesTimeline.test.tsx, and took origin/main for three unrelated context-overflow test files. Post-merge, fixed a flaky Streamdown assertion in ChatMarkdown.test.tsx by awaiting/waitFor the lazy-loaded renderer. Final gate: typecheck pass, lint pass, root tests pass (6003), frontend tests pass (1537).",
+      "agentModel": "claude-opus-4"
+    },
+    {
+      "timestamp": "2026-06-12T18:53:22.468Z",
+      "reason": "end",
+      "note": "Fixed review blocker: guarded ConversationPanel HTTP messages query so in-flight fetches cannot overwrite newer WS-streamed state. Merged origin/main to resolve rebase; fixed post-merge Streamdown test flakiness in ChatMarkdown.test.tsx. Typecheck, lint, root tests (6003), and frontend tests (1537) all pass."
+    },
+    {
+      "timestamp": "2026-06-12T19:11:20.968Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-06-12T19:30:36.037Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-06-12T20:01:01.883Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    }
+  ],
+  "feedback": []
+}

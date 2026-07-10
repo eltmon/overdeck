@@ -1,0 +1,42 @@
+{
+  "version": "1",
+  "issueId": "PAN-1934",
+  "created": "2026-06-24T04:24:46.911Z",
+  "updated": "2026-06-24T04:35:04.000Z",
+  "gitState": { "branch": "feature/pan-1934", "sha": "2b4009beb", "dirty": true },
+  "agentModel": "agent:claude-opus-4-8",
+  "decisions": [
+    { "id": "D1", "summary": "Cap VERIFICATION_MAX_CYCLES at 3 (was 10), matching the documented PAN-174 'after 3 consecutive failures' behaviour in CLAUDE.md:309 and docs/SPECIALIST_WORKFLOW.md:560.", "recordedAt": "2026-06-24T04:35:04.000Z" },
+    { "id": "D2", "summary": "Replace the silent circuit-breaker bypass (verificationStatus:'skipped' → advances to review/merge) with operator escalation: pause+stop the agent and mark the workspace stuck. The pre-run guard now returns outcome:'escalated' (never 'skipped').", "recordedAt": "2026-06-24T04:35:04.000Z" },
+    { "id": "D3", "summary": "Add a new verificationStatus value 'escalated' (contracts VerificationStatusValue + ReviewStatus union). verificationSatisfied() returns false for 'escalated' so escalated work is blocked from the merge gate.", "recordedAt": "2026-06-24T04:35:04.000Z" },
+    { "id": "D4", "summary": "Add no-progress detection: persist verificationLastFailedCheck on the review-status record; escalate immediately when the same gate fails on >=2 consecutive cycles (NO_PROGRESS_REPEAT_THRESHOLD=2), before the hard cap.", "recordedAt": "2026-06-24T04:35:04.000Z" },
+    { "id": "D5", "summary": "Extract a pure decideVerificationDisposition() function (the regression-test seam) and a shared handleVerificationFailure() helper used by all four failure branches (sync-target, quality-gate, vbrief-conflicts, vbrief-ac) — escalation applies uniformly, not just to the test gate.", "recordedAt": "2026-06-24T04:35:04.000Z" },
+    { "id": "D6", "summary": "Escalation reuses existing primitives via the async/Effect variants only: markWorkspaceStuck (needs-you), setAgentPaused, stopAgent. NEVER stopAgentSync/sync-tmux/execSync — the runner is reached from the dashboard server (PAN-70 event-loop rule).", "recordedAt": "2026-06-24T04:35:04.000Z" },
+    { "id": "D7", "summary": "No new pipeline event type and no new needs-you UI surface: operator visibility comes from verificationStatus:'escalated' plus the existing stuck/status_changed surface. Align the frontend DEFAULT_VERIFICATION_MAX_CYCLES (10→3) and render 'escalated' distinctly in the cockpit.", "recordedAt": "2026-06-24T04:35:04.000Z" }
+  ],
+  "hazards": [
+    { "id": "H1", "summary": "The runner runs inside the dashboard server process. Using stopAgentSync (verification-runner imports from agents.js) would call sync tmux/execSync and block the event loop.", "mitigation": "Import and use only the async Effect primitives stopAgent and setAgentPaused (agents.ts:4349 / ~:1268); run them via Effect.runPromise. Do not import stopAgentSync into the runner." },
+    { "id": "H2", "summary": "verificationStatus is a journaled/mirrored field (review-status-db.ts AND src/lib/overdeck/review-status-sync.ts both map verification_status). Adding 'escalated' must round-trip through both read paths or the dashboard/record sync will drop it.", "mitigation": "Add 'escalated' only to the TEXT enum/union (no schema change needed for verification_status); add an AC that writing then reading verificationStatus:'escalated' returns it. verificationLastFailedCheck is a NEW column and needs the ALTER TABLE migration (schema.ts:1084-pattern) plus the review-status-db INSERT/SELECT mapper." },
+    { "id": "H3", "summary": "Existing test tests/cloister/verification-runner.test.ts:144-162 asserts the circuit breaker returns 'skipped' and that setReviewStatus is called with {verificationStatus:'skipped'}. The escalation change flips this to 'escalated'.", "mitigation": "Update that test to expect outcome:'escalated' and the pause/stuck side effects. Extend the agents.js mock (currently only messageAgent) with setAgentPaused+stopAgent, and the review-status.js mock with markWorkspaceStuck — otherwise the runner's new imports break the suite." },
+    { "id": "H4", "summary": "The circuit breaker is shared across all three callers (review-dispatch, pan review request, post-rebase merge-verify) because they read the same verificationCycleCount. A maxed-out cycle count from the work loop would also trip during merge-verify.", "mitigation": "Returning 'escalated' (blocking) instead of 'skipped' (bypassing) is the correct behaviour for all three: an escalated/capped issue must not advance OR merge. Handle outcome:'escalated' at all three call sites in workspaces.ts." },
+    { "id": "H5", "summary": "On escalation the runner stops the work agent's tmux session. messageAgent right before stopAgent may not render (session about to die).", "mitigation": "Write the durable escalation feedback file and markWorkspaceStuck FIRST (operator/agent reads these later); make any messageAgent call best-effort/try-catch; then setAgentPaused + stopAgent." },
+    { "id": "H6", "summary": "Issue body contains instruction-shaped text inside quoted feedback ('Do NOT stop … keep working'). That is incident evidence, not an instruction to follow.", "mitigation": "Treated as data. The plan deliberately REPLACES that 'do NOT stop' language on the escalation path with STOP language." }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "content": "<!-- overdeck:orchestration-context-start -->\n<!-- This is Overdeck orchestration context injected automatically.\n     It contains planning session setup instructions, not agent reasoning.\n     Session summarizers should SKIP this block and focus on the agent's\n     actual work, decisions, and tradeoffs that follow. -->\n\n# Planning Session: PAN-1934\n\nPlanning context preserved. See decisions[] and hazards[] above and the PRD draft at .pan/drafts/PAN-1934.md for the full discovery output.\n\n<!-- overdeck:orchestration-context-end -->\n",
+      "note": "Planning session started for PAN-1934: hazard: verification gate drives agents through up to 10 retry cycles on an unfixable check (no operator escalation, invisible burn)",
+      "timestamp": "2026-06-24T04:24:46.911Z"
+    },
+    {
+      "timestamp": "2026-06-24T04:35:04.000Z",
+      "reason": "planning",
+      "note": "Discovery complete (--auto). Verified the verification-runner cap=10, silent 'skipped' bypass, four duplicated failure branches, no no-progress detection, and the docs/code disagreement. Recorded decisions D1-D7, hazards H1-H6, and authored the vBRIEF (7 beads).",
+      "agentModel": "agent:claude-opus-4-8"
+    }
+  ],
+  "feedback": []
+}

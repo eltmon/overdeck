@@ -1,0 +1,560 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-13T23:33:23.412Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1868: Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend",
+    "updated": "2026-06-13T23:51:52.038Z"
+  },
+  "plan": {
+    "id": "pan-1868",
+    "title": "Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend",
+    "status": "proposed",
+    "uid": "7f3c2a91-6b4e-4d18-9e2a-1c5f8b0d3a47",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-13T23:33:23.412Z",
+    "updated": "2026-06-13T23:51:52.038Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1868",
+        "label": "PAN-1868",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "cloister",
+      "deacon",
+      "cost",
+      "circuit-breaker",
+      "reliability"
+    ],
+    "narratives": {
+      "Problem": "An agent can silently burn unbounded cost when stuck in a loop with no forward progress. On 2026-06-13 four Kimi work agents were mis-spawned on the claude-code harness (PAN-1826 flagless-harness bug); on claude-code Kimi routes via CLIProxy and hit 'API Error: 400 ... exceeded model token limit: 262144', then sat in a /loop wakeup -> 400 -> retry cycle at 100% context. PAN-1834 burned $22.33 before a human noticed. Nothing stopped it. We need an always-on guard that makes silent cost-bleeds impossible without killing legitimately expensive deep work. The discriminator is high burn-rate + flat progress: cost is acceptable only if it buys progress.",
+      "Proposal": "Add a Deacon patrol costBleedMonitor() (sibling of recoverOrphanedAgents/checkStuckAgentRemediation, inside runPatrol(), ~60s cadence) that samples each running agent's cumulative cost from the cost-events ledger (readEventsSync), tracks progress proxies (workspace HEAD-sha change + lastActivity), and applies a graduated response: WARN (high burn + flat progress -> dashboard + TTS), TRIP (sustained bleed OR a deadlock signature -> pause+stop+troubled+operator alert with diagnosis), and AUTO-REMEDIATE (harness-deadlock signature -> restart on the resolved provider-default harness). A fleet-level guard alerts (and optionally brakes) when total burn exceeds a $/hr threshold. New module family src/lib/cloister/cost-bleed*.ts mirrors the stuck-remediation layout. Thresholds live in a configurable cost_bleed block with documented defaults. The guard is idempotent and cannot self-loop (createInFlightGuard + skip-already-tripped, locked by a test).",
+      "NonGoals": "- No new CLI verb and no new dashboard UI; alerts flow through the existing activity/TTS event pipeline.\n- No change to state.json.costSoFar semantics and no new runtime writer for costSoFar (it is vestigial; the cost-events ledger is the source of truth).\n- No change to the existing flat-cap cost-monitor.ts / checkCostLimits visibility layer.\n- No change to harness resolution or the ToS gate canUseHarnessSync.\n- Remote (Fly.io) agents are skipped for the deadlock-signature tmux scan (no local pane); accurate remote-agent signature/cost handling is out of scope and documented as a limitation.\n- Does not replace stuck-remediation (idle detection); cost-bleed is orthogonal (high burn, not idleness).\n- Fleet auto-brake is NOT on by default (alert-only unless fleet_auto_brake is set)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Burn-rate cost source is the cost-events ledger (readEventsSync), not state.json.costSoFar.",
+        "rationale": "costSoFar is initialized to 0 at spawn and copied at handoff but has no runtime writer (verified across src/lib + src/dashboard); it is vestigial. The append-only events.jsonl ledger (src/lib/costs/events.ts) is the authoritative live per-agent cost — it captured the full $22.33 of the incident."
+      },
+      {
+        "summary": "Default thresholds: warn_usd_per_min=0.50, trip_usd=5.00, no_progress_minutes=10, fleet_usd_per_hour=30, sample_window_count=10, auto_remediate=true, fleet_auto_brake=false, enabled=true.",
+        "rationale": "The incident burned ~$0.74/min and $22 over ~30min. Warn at $0.50/min catches it early; trip at $5 with zero progress over 10min bounds worst-case waste to a few dollars; the harness-deadlock signature trips within ~60s regardless of the dollar threshold."
+      },
+      {
+        "summary": "Progress proxies = workspace HEAD-sha change + lastActivity advance; output-token/cost growth is NOT a progress proxy.",
+        "rationale": "A retry storm produces output tokens and cost without progress — that growth IS the bleed. Commits are the strong proxy; lastActivity is weak (retry storms advance it via tmux/jsonl heartbeats), so the deadlock-signature instant-trip backstops the case where lastActivity falsely advances."
+      },
+      {
+        "summary": "Fleet response defaults to alert-only (fleet_auto_brake=false).",
+        "rationale": "Auto-halting the whole fleet is high-impact; alert-first respects the recoverable-vs-one-way-door principle. Operators opt into the brake."
+      },
+      {
+        "summary": "New module family split into four cost-bleed*.ts files rather than one monolith.",
+        "rationale": "Keeps each bead independently reviewable and mirrors the existing stuck-remediation.ts + stuck-remediation-state.ts layout."
+      }
+    ],
+    "items": [
+      {
+        "id": "config-cost-bleed",
+        "title": "Add cost_bleed config block (CostBleedConfig + defaults)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T23:33:23.412Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1868",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-11",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/config.ts add a CostBleedConfig interface and an optional `cost_bleed?: CostBleedConfig` field on CloisterConfig (alongside `cost_limits?` at config.ts:275), and add a `cost_bleed` block to DEFAULT_CLOISTER_CONFIG (alongside the existing defaults near config.ts:300). Fields: enabled:boolean, warn_usd_per_min:number, trip_usd:number, no_progress_minutes:number, fleet_usd_per_hour:number, fleet_auto_brake:boolean, auto_remediate:boolean, sample_window_count:number. Consumers read `loadCloisterConfigSync().cost_bleed ?? DEFAULT_CLOISTER_CONFIG.cost_bleed` (the same fallback pattern checkCostLimits uses at cost-monitor.ts:190). Each field carries a one-line doc comment in the codebase's style."
+        },
+        "items": [
+          {
+            "id": "config-cost-bleed.ac1",
+            "title": "Given the new types, npm run typecheck passes and CloisterConfig.cost_bleed references CostBleedConfig (both exist in config.ts).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-cost-bleed.ac2",
+            "title": "DEFAULT_CLOISTER_CONFIG.cost_bleed defaults to enabled:true, warn_usd_per_min:0.5, trip_usd:5, no_progress_minutes:10, fleet_usd_per_hour:30, fleet_auto_brake:false, auto_remediate:true, sample_window_count:10.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-cost-bleed.ac3",
+            "title": "DEFAULT_CLOISTER_CONFIG.cost_bleed defaults to the documented values, verified by a deep-equal assertion in src/lib/cloister/__tests__/config.test.ts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cost-bleed-state",
+        "title": "Create cost-bleed-state.ts per-agent ring-buffer side-state",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T23:33:23.412Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1868",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "cost-bleed-monitor"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/cost-bleed-state.ts mirroring stuck-remediation-state.ts. Persist at `${getPanopticonHome()}/agents/<id>/cost-bleed.json`. Define CostBleedSample = { ts:string; cumulativeCostUsd:number; headSha:string|null; lastActivity:string|null } and CostBleedState = { stage:'none'|'warn'|'tripped'; firstFlaggedAt:string|null; samples:CostBleedSample[]; remediation?:{ attemptedAt:string; attempts:number } }. Export readCostBleedState(agentId):CostBleedState|null, writeCostBleedState(agentId,state):void, clearCostBleedState(agentId):void, and appendSample(state,sample,maxSamples):CostBleedState (returns a new state with samples truncated to the last maxSamples, oldest dropped). Use the same fs sync helpers and try/catch-returns-null pattern as stuck-remediation-state.ts."
+        },
+        "items": [
+          {
+            "id": "cost-bleed-state.ac1",
+            "title": "writeCostBleedState then readCostBleedState round-trips the persisted state; reading a missing file returns null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-bleed-state.ac2",
+            "title": "appendSample(state, sample, n) returns a state whose samples array length never exceeds n, preserving the newest n samples.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-bleed-state.ac3",
+            "title": "clearCostBleedState removes the file; a subsequent readCostBleedState returns null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-bleed-state.ac4",
+            "title": "A co-located unit test (cost-bleed-state.test.ts) covers round-trip, ring-buffer truncation, and clear against a temp HOME.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cost-bleed-signals",
+        "title": "Create cost-bleed-signals.ts: cost sampling, burn rate, progress proxies",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T23:33:23.412Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1868",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "cost-bleed-monitor",
+            "fleet-burn-guard"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/cost-bleed-signals.ts. sampleAgentCostUsd(agentId, startedAt, readEvents = readEventsSync): number sums `.cost` of readEvents({ agentId, startDate: startedAt }) from src/lib/costs/events.ts (DECISION D1: the events ledger is the cost source, NEVER state.costSoFar). computeBurnRateUsdPerMin(samples: CostBleedSample[]): number returns (newest.cumulativeCostUsd - oldest.cumulativeCostUsd) / minutes(newest.ts - oldest.ts), returning 0 when fewer than two samples or Δt is ~0. readWorkspaceHeadSha(workspacePath): Promise<string|null> runs git via async execFile+promisify (NEVER execSync — NFR-1) ['-C', workspacePath, 'rev-parse', 'HEAD'] and returns null on error. evaluateProgress(prev: CostBleedSample, cur: CostBleedSample): boolean returns true when (cur.headSha && prev.headSha && cur.headSha !== prev.headSha) OR cur.lastActivity advanced past prev.lastActivity, else false. Inject the cost reader so tests need no real ledger."
+        },
+        "items": [
+          {
+            "id": "cost-bleed-signals.ac1",
+            "title": "sampleAgentCostUsd returns the summed .cost of the agent's cost events since startedAt using an injected reader, and returns 0 when the reader yields no events.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-bleed-signals.ac2",
+            "title": "computeBurnRateUsdPerMin returns Δcost/Δminutes across the sample window and returns 0 for fewer than two samples.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-bleed-signals.ac3",
+            "title": "evaluateProgress returns true when headSha changed, true when lastActivity advanced, and false when neither moved.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-bleed-signals.ac4",
+            "title": "readWorkspaceHeadSha invokes git via async execFile (no execSync anywhere in the module) and returns null on error instead of throwing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cost-bleed-signatures",
+        "title": "Create cost-bleed-signatures.ts deadlock-signature scanner",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T23:33:23.412Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1868",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/cost-bleed-signatures.ts. Export detectDeadlockSignature(tail: string, ctx: { harness?: string; model: string }): { kind: 'harness-deadlock'|'context-overflow'|'rate-limit-storm'|null; diagnosis: string }. Reuse CONTEXT_OVERFLOW_PATTERNS / isContextOverflowTail from src/lib/context-overflow.ts. harness-deadlock = ctx.harness === 'claude-code' AND getProviderForModelSync(ctx.model) is NOT the anthropic provider AND the tail matches /exceeded model token limit|token limit: \\d+|400[^\\n]*token limit/i. rate-limit-storm = the tail contains at least K (e.g. 3) occurrences of /rate.?limit|\\b429\\b|retrying in/i. context-overflow = isContextOverflowTail(tail). Precedence: harness-deadlock > context-overflow > rate-limit-storm > null. diagnosis is a human-readable string naming the model, harness, and cause (e.g. 'context-limit deadlock — model kimi-k2.7-code on harness claude-code, expected provider-default pi')."
+        },
+        "items": [
+          {
+            "id": "cost-bleed-signatures.ac1",
+            "title": "Given a tail with repeated 'exceeded model token limit: 262144' and ctx { harness:'claude-code', model:'kimi-k2.7-code' }, returns kind 'harness-deadlock' with a diagnosis naming the model and harness.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-bleed-signatures.ac2",
+            "title": "Given the same tail but ctx { harness:'pi', ... } or an Anthropic model on claude-code, returns kind 'context-overflow' or null — never 'harness-deadlock'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-bleed-signatures.ac3",
+            "title": "Given a tail with at least K '429 ... retrying in' lines and no overflow, returns kind 'rate-limit-storm'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-bleed-signatures.ac4",
+            "title": "Given a clean tail with no signatures, returns kind null with an empty diagnosis.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cost-bleed-monitor",
+        "title": "Create costBleedMonitor patrol (warn/trip state machine) and wire into runPatrol",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T23:33:23.412Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1868",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "FR-9",
+            "FR-10",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/cost-bleed.ts exporting `async function costBleedMonitor(opts?: { now?: number; config?: CostBleedConfig; agents?: AgentState[] }): Promise<string[]>`. Default now=Date.now(), config=loadCloisterConfigSync().cost_bleed ?? DEFAULT_CLOISTER_CONFIG.cost_bleed, agents=listRunningAgentsSync(). If config.enabled is false, return []. For each running agent: skip remote agents (location:'remote') and agents already paused/troubled/stopped or already in stage 'tripped'. Build the current sample (cumulativeCostUsd via sampleAgentCostUsd, headSha via readWorkspaceHeadSha(workspace), lastActivity) and appendSample(state, sample, config.sample_window_count). Compute burnRate (computeBurnRateUsdPerMin) and progress (evaluateProgress vs the prior sample). Scan the tmux tail via the async capturePane(agentId, 80) and detectDeadlockSignature(tail, { harness, model }). Decide: TRIP when signature.kind !== null OR (no progress AND cost accrued since firstFlaggedAt >= config.trip_usd AND elapsed since firstFlaggedAt >= no_progress_minutes); else WARN when burnRate >= warn_usd_per_min AND !progress (set firstFlaggedAt if unset); else reset stage to 'none' and clearCostBleedState. WARN emits emitActivityEntrySync({source:'cloister',level:'warn',...}) + emitActivityTtsSync({priority:1,...}) naming agent, $/min, 'no progress'. TRIP: setAgentPausedSync(id, reason, true) + stopAgentSync(id) + markAgentTroubled(id) + emitActivityEntrySync({level:'error', details: diagnosis}) + emitActivityTtsSync({priority:0,...}); set stage 'tripped'. Guard trip side-effects per agent with a module-level createInFlightGuard() keyed by agentId. Return an action string per warn/trip. Then in deacon.ts: import costBleedMonitor and call it in runPatrol() immediately after the checkStuckAgentRemediation block (deacon.ts:5210-5212) using the existing pattern: `const costBleedActions = await costBleedMonitor(); actions.push(...costBleedActions); for (const a of costBleedActions) addLog('action', a, state.patrolCycle);`. costBleedMonitor itself is inside runPatrol so it is already gated by isDeaconGloballyPaused(). Tests inject now/config/agents and mock readEvents/git/capturePane/setAgentPausedSync/stopAgentSync/markAgentTroubled/emit* via vi.hoisted (mirror stuck-remediation.test.ts); use vi.useFakeTimers only if a real setTimeout is introduced."
+        },
+        "items": [
+          {
+            "id": "cost-bleed-monitor.ac1",
+            "title": "Given a synthetic agent with rising cumulative cost, unchanged headSha and unchanged lastActivity across the no_progress window, the patrol pauses and stops the agent, marks it troubled, and emits an error-level activity entry + TTS naming the cause.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-bleed-monitor.ac2",
+            "title": "A synthetic agent whose headSha changes between samples is never paused or troubled, even when its burn rate exceeds warn_usd_per_min and accrued cost exceeds trip_usd (proves progress-awareness, not a flat cap).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-bleed-monitor.ac3",
+            "title": "An agent crossing warn_usd_per_min with flat progress but below trip_usd / the window emits a warn-level activity entry + TTS and is NOT paused.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-bleed-monitor.ac4",
+            "title": "Given an already-tripped (paused+troubled) agent, a second costBleedMonitor pass marks and pauses it at most once and emits no new trip side effects (idempotency spies asserted called exactly once across both passes).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-bleed-monitor.ac5",
+            "title": "runPatrol() invokes costBleedMonitor() and pushes its returned action strings into the patrol actions and addLog stream (wiring verified by reading deacon.ts).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cost-bleed-auto-remediate",
+        "title": "Auto-remediate harness-deadlock: restart on resolved provider-default harness",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T23:33:23.412Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1868",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/cost-bleed.ts TRIP path, when config.auto_remediate is true AND the detected signature.kind === 'harness-deadlock', instead of leaving the agent in the troubled terminal state, resolve the provider-default harness via `await resolveHarness({ explicit: undefined, role: state.role, model: state.model })` (src/lib/harness-resolve.ts:62 — this enforces canUseHarnessSync, so NEVER hardcode 'pi'; NFR-4) and call `await restartAgent(agentId, { harness: resolvedHarness, message: <diagnosis + 'restarting on provider-default harness'> })` (src/lib/agents.ts:4959). Record remediation { attemptedAt, attempts } in cost-bleed-state and cap attempts at 1 (a second harness-deadlock detection for an agent that already has a remediation attempt must NOT restart again — H4 loop guard). Emit an activity entry naming old->new harness. Still pause/stop the agent before restart per restartAgent's own lifecycle; do not double-trouble after a successful remediation."
+        },
+        "items": [
+          {
+            "id": "cost-bleed-auto-remediate.ac1",
+            "title": "On a harness-deadlock trip with auto_remediate=true, the patrol spawns a restart (restartAgent) using the harness resolveHarness({explicit:undefined,...}) returns, and the agent is not left in the troubled terminal state.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-bleed-auto-remediate.ac2",
+            "title": "With auto_remediate=false, a harness-deadlock trip marks the agent troubled and refuses to call restartAgent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-bleed-auto-remediate.ac3",
+            "title": "A second harness-deadlock detection for an agent whose cost-bleed-state already records a remediation attempt does NOT call restartAgent again (attempt cap prevents a restart loop).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-bleed-auto-remediate.ac4",
+            "title": "restartAgent receives the harness that resolveHarness returns (verified via spy), so the ToS gate is respected and 'pi' is never hardcoded.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fleet-burn-guard",
+        "title": "Fleet-level burn-rate guard (alert; optional brake)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T23:33:23.412Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1868",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-8",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/cost-bleed.ts add `async function evaluateFleetBurnRate(opts?: { now?: number; config?: CostBleedConfig; agents?: AgentState[] }): Promise<string[]>` that aggregates per-agent burn into a fleet USD/hour figure (sum of recent cost-events across all running agents over the trailing hour, or the sum of per-agent burn rates scaled to /hr). When the figure exceeds config.fleet_usd_per_hour, emit a global error-level emitActivityEntrySync + emitActivityTtsSync(priority:0) naming the fleet $/hr; when config.fleet_auto_brake is true, also call emergencyBrake() (src/lib/cloister/concurrency.ts:170). Add a cooldown (module-level lastFleetAlertMs vs now) so the alert fires at most once per fleet-alert window rather than every 60s. Call evaluateFleetBurnRate() as a final aggregate step inside costBleedMonitor() after the per-agent loop, concatenating its actions into the returned array."
+        },
+        "items": [
+          {
+            "id": "fleet-burn-guard.ac1",
+            "title": "When aggregate fleet burn exceeds fleet_usd_per_hour, an error-level activity entry + TTS naming the fleet $/hr are emitted.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fleet-burn-guard.ac2",
+            "title": "With fleet_auto_brake=false (default), the guard emits the fleet alert but refuses to call emergencyBrake.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fleet-burn-guard.ac3",
+            "title": "With fleet_auto_brake=true, exceeding the threshold emits the alert and applies the brake via emergencyBrake().",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fleet-burn-guard.ac4",
+            "title": "When aggregate fleet burn is under the threshold, neither an alert nor a brake is produced.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cost-bleed-docs",
+        "title": "Document the cost-bleed circuit breaker and cost_bleed config",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-06-13T23:33:23.412Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1868",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Document the cost-bleed circuit breaker in operator-facing docs (extend the relevant cloister/cost configuration doc under docs/ and/or configuration/*.mdx). Cover: every cost_bleed field with its default and one-line meaning (a defaults table), the warn -> trip -> auto-remediate progression, the deadlock-signature instant-trip (including the harness-deadlock self-heal), the fleet $/hr guard and that it defaults to alert-only, and the statement that progress-making agents are never tripped. Docs only — no code, no tests. If a wrapper skill references the touched config doc, update it in the same commit per the skills<->CLI lockstep rule (none expected here since no CLI verb changes)."
+        },
+        "items": [
+          {
+            "id": "cost-bleed-docs.ac1",
+            "title": "A docs page contains a defaults table that lists every cost_bleed field with its default value and one-line meaning.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-bleed-docs.ac2",
+            "title": "The docs page contains a section covering the warn -> trip -> auto-remediate progression and stating that progress-making agents are never tripped.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-bleed-docs.ac3",
+            "title": "The docs state that the fleet $/hr guard defaults to alert-only (fleet_auto_brake=false).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "config-cost-bleed",
+        "to": "cost-bleed-monitor",
+        "type": "blocks"
+      },
+      {
+        "from": "config-cost-bleed",
+        "to": "fleet-burn-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "cost-bleed-state",
+        "to": "cost-bleed-monitor",
+        "type": "blocks"
+      },
+      {
+        "from": "cost-bleed-signals",
+        "to": "cost-bleed-monitor",
+        "type": "blocks"
+      },
+      {
+        "from": "cost-bleed-signals",
+        "to": "fleet-burn-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "cost-bleed-signatures",
+        "to": "cost-bleed-monitor",
+        "type": "blocks"
+      },
+      {
+        "from": "cost-bleed-signatures",
+        "to": "cost-bleed-auto-remediate",
+        "type": "blocks"
+      },
+      {
+        "from": "cost-bleed-monitor",
+        "to": "cost-bleed-auto-remediate",
+        "type": "blocks"
+      },
+      {
+        "from": "cost-bleed-monitor",
+        "to": "fleet-burn-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "config-cost-bleed",
+        "to": "cost-bleed-docs",
+        "type": "informs"
+      },
+      {
+        "from": "cost-bleed-monitor",
+        "to": "cost-bleed-docs",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-13-PAN-1868-cost-bleed-circuit-breaker-progress-aware-always-on-guard-against-runaway-agent-spend.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

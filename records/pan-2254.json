@@ -1,0 +1,90 @@
+{
+  "issueId": "PAN-2254",
+  "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-03T04:19:13.849Z",
+      "reason": "end",
+      "note": "No deviations. Full npm test initially failed under sandbox EPERM; escalated rerun passed. Delivered non-destructive unstick git repair classification and removed reset-hard advice from unstick, approve, and dashboard stuck surfaces."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T04:20Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-03T04:20:50.628Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T04:20Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-03T04:20:53.232Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T04:22:02.322Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T04:34:56.512Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T04:52:58.498Z"
+    }
+  ],
+  "feedback": [],
+  "created": "2026-07-03T04:02:51.756Z",
+  "updated": "2026-07-07T03:10:49.461Z",
+  "pipeline": {
+    "issueId": "PAN-2254",
+    "reviewStatus": "reviewing",
+    "testStatus": "pending",
+    "mergeStatus": "merged",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-07T03:10:49.460Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed test failures",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2272",
+    "lastVerifiedCommit": "83476fb582dd42304a64cb4cb443bf93b1b221fc",
+    "reviewRequestedAt": "2026-07-03T04:19:13.851Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-07T03:10:49.460Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 8353,
+            "output": 660,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 8353,
+          "output": 660,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 0,
+        "pricingAsOf": "2026-07-03T04:53:03.046Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2272"
+    ],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "auto-start": "completed",
+    "auto-start.ac1": "completed"
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "issueId": "PAN-2158",
+  "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T15:32:13.254Z"
+    },
+    {
+      "timestamp": "2026-07-03T15:35:02.465Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T15:35:03.886Z"
+    },
+    {
+      "timestamp": "2026-07-03T16:22:34.008Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T16:22:35.126Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T20:45:20.813Z"
+    }
+  ],
+  "feedback": [],
+  "harness": "codex",
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "auto-start": "completed",
+    "auto-start.ac1": "completed",
+    "auto-start.ac2": "completed",
+    "auto-start.ac3": "completed",
+    "auto-start.ac4": "completed"
+  },
+  "pipeline": {
+    "issueId": "PAN-2158",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "mergeStatus": "merged",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-06T14:15:25.113Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2303",
+    "lastVerifiedCommit": "6a0c3b2cdfb5abbe67e5bad51b3decf4a9344314",
+    "closedOut": true,
+    "closedOutAt": "2026-07-06T14:15:25.113Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 18554,
+            "output": 2679,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 1569152,
+            "output": 34089,
+            "cacheRead": 11666688,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 18554,
+          "output": 2679,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 1569152,
+          "output": 34089,
+          "cacheRead": 11666688,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 3.843719,
+        "pricingAsOf": "2026-07-03T20:04:16.214Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2303"
+    ],
+    "ranOn": "eltmon-z790"
+  },
+  "created": "2026-07-03T15:32:13.088Z",
+  "updated": "2026-07-06T14:15:25.113Z"
+}

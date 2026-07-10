@@ -1,0 +1,671 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-06-11T09:49:45.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1776: feat(supervisor): hot-updatable delivery path — version-stamped supervisors, rolling refresh, and dumb-shim primitives with server-side delivery logic",
+    "updated": "2026-06-11T09:53:21.415Z"
+  },
+  "plan": {
+    "id": "pan-1776",
+    "title": "feat(supervisor): hot-updatable delivery path — version-stamped supervisors, rolling refresh, and dumb-shim primitives with server-side delivery logic",
+    "status": "proposed",
+    "uid": "a16762a4-f118-4fc0-aafb-41830874715c",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-06-11T09:49:45.000Z",
+    "updated": "2026-06-11T09:53:21.415Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1776",
+        "label": "PAN-1776",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/blob/main/.pan/drafts/PAN-1776.md",
+        "label": "PRD: Hot-Updatable Supervisor Delivery Path",
+        "type": "spec"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1769",
+        "label": "PAN-1769",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1700",
+        "label": "PAN-1700",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "supervisor",
+      "pty",
+      "delivery",
+      "cli",
+      "deacon",
+      "observability"
+    ],
+    "narratives": {
+      "Problem": "The PTY supervisor (dist/pty-supervisor.js) is pinned per session: Node loads the script once at spawn and running sessions keep executing that code until respawned. When a supervisor bug is fixed (e.g. the PAN-1769 duplicate-paste fix), the running fleet silently keeps the broken behavior, and nothing can even enumerate which sessions run stale supervisors. The supervisor owns the PTY master fd (H1 lifecycle), so it cannot be restarted in place without killing the wrapped Claude session.",
+      "Proposal": "Two complementary parts, both deliverables. Part A: each supervisor writes a supervisor.json identity sidecar (pid, script sha256, capabilities) at startup; a new src/lib/supervisor-status.ts module compares against the current dist/ hash and surfaces staleness via agent/conversation status APIs and pan doctor; a new `pan supervisor` CLI verb (status / refresh <id> / refresh --all-stale) rolls stale sessions through the existing stop→resume machinery (idle-gated, paused/troubled-gated, PAN-1700 landing-verified), plus an optional app-settings-gated deacon patrol (default OFF). Part B: the supervisor socket grows versioned primitive endpoints (/v1/info, /v1/write, /v1/output, /v1/resize) backed by a 64KiB ring buffer with absolute offsets; the delivery policy (echo confirmation, purge, retry, Enter) moves into a server-side engine (deliverViaPrimitives) that restarts freely with pan reload; capability negotiation keeps the legacy single-POST path working for old supervisors. The PRD at .pan/drafts/PAN-1776.md is normative for every JSON shape, endpoint, constant, and function signature."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Doctor row goes in src/cli/commands/doctor.ts (CheckResult[] pattern), not the PRD's src/commands/doctor.ts.",
+        "rationale": "The PRD itself says 'verify path with grep'. Grep confirms the doctor command lives at src/cli/commands/doctor.ts and exposes check functions returning CheckResult[]; there is no src/commands/ directory."
+      },
+      {
+        "summary": "supervisor.autoRefresh is an app-settings (SQLite) boolean — key 'supervisor.auto_refresh' with isSupervisorAutoRefreshEnabled()/setSupervisorAutoRefreshEnabled() in src/lib/database/app-settings.ts — not a config-yaml/projects.yaml key.",
+        "rationale": "The PRD says 'follow how existing booleans like merge_train_enabled are wired'. merge_train_enabled is actually FLYWHEEL_MERGE_TRAIN_ENABLED_KEY in src/lib/database/app-settings.ts (default false, Effect-based getter with DatabaseError fallback), not in src/lib/config-yaml.ts. Following the real wiring of the named exemplar over the PRD's stale file pointer."
+      },
+      {
+        "summary": "Capability staging: the A1 sidecar bead ships capabilities: [\"legacy-post\"]; the B1 endpoints bead adds \"primitives-v1\" to the shared capabilities constant (sidecar + /v1/info) in the same commit that implements the endpoints.",
+        "rationale": "The PRD shows the final capabilities array [\"legacy-post\", \"primitives-v1\"] but beads land sequentially. A supervisor must never advertise primitives-v1 before the endpoints exist — the ladder negotiates via GET /v1/info, and a false advertisement would route deliveries onto 404s. Staging the constant keeps every intermediate commit truthful."
+      },
+      {
+        "summary": "Refresh core logic lives in a shared lib module (src/lib/supervisor-refresh.ts) consumed by both the pan supervisor CLI and the A4 deacon patrol.",
+        "rationale": "The PRD specifies refresh semantics once (A3) and says the patrol applies 'same guards as A3'. A single exported refreshSupervisor function avoids duplicating idle/pause/troubled/Docker gating in two places and keeps the patrol bead small."
+      },
+      {
+        "summary": "Decomposed the PRD's 8 suggested beads into 13 smaller beads (status module / API fields / doctor row split; ring / endpoints split; engine / ladder-routing split; CLI status / CLI refresh split).",
+        "rationale": "Planning guidance requires aggressively decomposed, independently reviewable and mergeable beads. Each split point is a separate file or surface with its own tests; landing any prefix of the DAG leaves the tree working because all changes are additive and capability-gated."
+      },
+      {
+        "summary": "Docs entry is a sub-item of the final end-to-end verification bead rather than its own bead.",
+        "rationale": "It is a single docs-index entry describing the finished feature; it cannot be written meaningfully before the verification bead confirms the behavior, and a standalone bead for one doc page would be tracking trivia."
+      }
+    ],
+    "items": [
+      {
+        "id": "a1-identity-sidecar",
+        "title": "Supervisor identity sidecar (supervisor.json) + computeScriptSha256",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-11T09:49:45.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1776",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "a2-status-module",
+            "b1-socket-endpoints"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/channels/pty-supervisor.ts, write ~/.panopticon/agents/<agentId>/supervisor.json immediately after the socket binds, atomically (write tmp + rename), per PRD §A1: { schemaVersion: 1, pid, scriptPath (process.argv[1]), scriptSha256 (sha256 of the file at process.argv[1] read at startup), capabilities, startedAt }. capabilities is a module-level constant set to [\"legacy-post\"] in this bead (b1-socket-endpoints later appends \"primitives-v1\"). Implement async writeSupervisorIdentity(agentId) — best-effort, never throws (same posture as the log appenders) — and export computeScriptSha256(path) for tests. Do NOT delete the file on shutdown: staleness checks validate liveness independently and the stale file is useful post-mortem. The rebuild-between-load-and-hash race is tolerable; document it in a comment, don't engineer around it."
+        },
+        "subItems": [
+          {
+            "id": "a1-identity-sidecar.ac1",
+            "title": "Integration test (existing subprocess harness in src/lib/channels/__tests__/pty-supervisor.test.ts) spawns the supervisor and asserts supervisor.json exists with schemaVersion 1, the supervisor's pid, capabilities [\"legacy-post\"], and scriptSha256 matching computeScriptSha256 of the spawned script",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a1-identity-sidecar.ac2",
+            "title": "computeScriptSha256 is exported and unit-tested (64-hex-char sha256 of file contents)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a1-identity-sidecar.ac3",
+            "title": "Sidecar write is atomic (tmp + rename), never throws on failure, and is NOT removed on SIGTERM/shutdown (assert file survives the existing unlinks-socket-on-SIGTERM test flow)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "a2-status-module",
+        "title": "supervisor-status.ts: getSupervisorStatus + getCurrentDistSha",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-11T09:49:45.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1776",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "New module src/lib/supervisor-status.ts per PRD §A2: export interface SupervisorStatus { running, identityPresent, stale, capabilities, runningSha?, distSha? }; export async getSupervisorStatus(agentId); export async getCurrentDistSha() — sha256 of resolvePtySupervisorScriptPath() (src/lib/agents.ts:1766), cached by (path, mtimeMs). running = socket exists AND identity pid alive (process.kill(pid, 0) in try/catch). stale = running && (no identity || scriptSha256 !== current dist sha) — a running socket with no supervisor.json is a pre-PAN-1776 supervisor: legacy-only AND unknown version, treated as stale. capabilities = [] when unknown. All IO async; this module is server-reachable so no execSync anywhere."
+        },
+        "subItems": [
+          {
+            "id": "a2-status-module.ac1",
+            "title": "Unit tests with tmpdir fixtures cover: missing supervisor.json (running socket ⇒ stale, capabilities []), dead pid (running false), sha match (stale false), sha mismatch (stale true)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a2-status-module.ac2",
+            "title": "getCurrentDistSha caches by (path, mtimeMs): second call with unchanged mtime does not re-read the file; mtime change invalidates (testable via injected/fixture path)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "a2b-status-api-fields",
+        "title": "Surface supervisorStale/supervisorSha in agent + conversation status payloads",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-11T09:49:45.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1776",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add optional supervisorStale?: boolean and supervisorSha?: string to the agent status payload (src/dashboard/server/routes/agents.ts status route) and to the conversation payload (src/dashboard/server/routes/conversations.ts, computed in the same place sessionAlive is, ~line 1987). Populate from getSupervisorStatus ONLY for claude-code sessions that have a supervisor socket; omit the fields entirely otherwise. Keep the lookups async and cheap (the dist-sha is cached by a2-status-module)."
+        },
+        "subItems": [
+          {
+            "id": "a2b-status-api-fields.ac1",
+            "title": "Agent status payload includes supervisorStale/supervisorSha for a claude-code agent with a supervisor socket, and omits both fields for pi/codex/no-socket sessions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a2b-status-api-fields.ac2",
+            "title": "Conversation payload includes the same fields under the same conditions, computed alongside sessionAlive",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "a2c-doctor-row",
+        "title": "pan doctor: PTY supervisors staleness row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-11T09:49:45.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1776",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add one doctor row in src/cli/commands/doctor.ts (NOT src/commands/ — PRD path corrected by grep) following the existing CheckResult[] check-function pattern: \"PTY supervisors: N running, M stale\", level warn when M > 0, ok when M === 0. Enumerate sessions by scanning ~/.panopticon/agents/*/ for pty sockets / supervisor.json and calling getSupervisorStatus."
+        },
+        "subItems": [
+          {
+            "id": "a2c-doctor-row.ac1",
+            "title": "pan doctor output contains the \"PTY supervisors: N running, M stale\" row; it reports warn-level when at least one running supervisor is stale and ok when none are",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b2-output-ring",
+        "title": "OutputRing: 64KiB ring buffer with absolute offsets",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-11T09:49:45.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1776",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Per PRD §B2: export class OutputRing { append(s: string): void; slice(since: number): {startOffset, endOffset, data} } in src/lib/channels/pty-supervisor.ts. Capacity 64 KiB; tracks absoluteOffset = total bytes ever seen. slice(since) returns from max(since, bufferStart) — when since < buffer start, return from buffer start so the caller detects the gap via startOffset > since. Pure class, no IO."
+        },
+        "subItems": [
+          {
+            "id": "b2-output-ring.ac1",
+            "title": "Direct unit tests cover: append+slice happy path, wrap-around past 64KiB preserving absolute offsets, gap behavior (since < bufferStart ⇒ startOffset > since), and empty buffer (start === end, data '')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b1-socket-endpoints",
+        "title": "Socket protocol v1: URL-path routing + /v1/info, /v1/write, /v1/output, /v1/resize",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-11T09:49:45.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1776",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "b4-delivery-engine",
+            "b4b-ladder-routing"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend createPtySupervisorServer() (src/lib/channels/pty-supervisor.ts:319) from POST-/-only to routing by req.method + url.pathname per PRD §B1 table. Legacy POST / stays byte-for-byte compatible ({content, echo?, caller?, meta?} → injectPtyMessage). New: GET /v1/info → {schemaVersion, pid, scriptSha256, capabilities, outputEndOffset}; POST /v1/write {data, echoToStdout?} → raw child.write(data), echoToStdout mirrors to supervisor stdout exactly like payload.echo does today, returns {ok: true, outputEndOffset}; GET /v1/output?since=<n> → ring slice {startOffset, endOffset, data}; POST /v1/resize {cols, rows} → child.resize bounds-checked 1..1000. Wire ONE child.onData subscription in main() appending to an OutputRing instance. All endpoints require the existing x-pan-pty-token header; unknown paths → 404; socket stays mode 0600 with no new listening surface. Append \"primitives-v1\" to the shared capabilities constant (sidecar + /v1/info now advertise [\"legacy-post\", \"primitives-v1\"])."
+        },
+        "subItems": [
+          {
+            "id": "b1-socket-endpoints.ac1",
+            "title": "Subprocess integration tests: /v1/info returns identity + monotonically increasing outputEndOffset; /v1/write injects raw bytes into the child PTY and mirrors to stdout when echoToStdout; /v1/output?since returns the slice with correct offsets; /v1/resize resizes within bounds and rejects 0 or >1000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-socket-endpoints.ac2",
+            "title": "All /v1 endpoints reject requests without a matching pty token; unknown paths return 404; legacy POST / behavior is unchanged (all 12 pre-existing tests still green)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-socket-endpoints.ac3",
+            "title": "Sidecar and /v1/info both advertise capabilities [\"legacy-post\", \"primitives-v1\"] from a single shared constant",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b3-echo-helpers-extraction",
+        "title": "Extract shared echo/purge helpers into src/lib/channels/pty-echo.ts (pure move)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-11T09:49:45.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1776",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Pure move per PRD §B3: relocate the delivery constants (INPUT_ECHO_CONFIRM_TIMEOUT_MS/INTERVAL_MS/ATTEMPTS/PREFIX_CHARS, INPUT_SETTLE_MS, INPUT_PURGE_MAX_CHARS, INPUT_PURGE_SETTLE_MS, PASTE_PLACEHOLDER_RE — currently pty-supervisor.ts:35-41,223) and pure functions (stripAnsi, normalizePtyText, normalizeForEchoMatch, confirmationPrefix at :192-228, plus a purgeBackspaces(charCount) helper extracted from the existing purge logic at :254 — '\\x7f'.repeat(min(n, MAX) + 8)) into new src/lib/channels/pty-echo.ts, exported. pty-supervisor.ts imports them; behavior identical. No logic changes — this is the one-source-of-truth that b4-delivery-engine will import server-side."
+        },
+        "subItems": [
+          {
+            "id": "b3-echo-helpers-extraction.ac1",
+            "title": "All 12 pre-existing pty-supervisor.test.ts tests pass unchanged (no test edits)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-echo-helpers-extraction.ac2",
+            "title": "pty-echo.ts exports exactly the PRD §B3 surface (constants + stripAnsi, normalizePtyText, normalizeForEchoMatch, confirmationPrefix, purgeBackspaces, PASTE_PLACEHOLDER_RE) and pty-supervisor.ts contains no duplicate definitions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b4-delivery-engine",
+        "title": "Server-side delivery engine: deliverViaPrimitives in pty-delivery-client.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-11T09:49:45.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1776",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "New src/lib/channels/pty-delivery-client.ts per PRD §B4: export async deliverViaPrimitives({socketPath, token, agentId, content, echoToStdout, caller?}) — throws on failure. Algorithm is the exact injectPtyMessage state machine over HTTP primitives, importing every constant/helper from pty-echo.ts: (1) GET /v1/info → baseOffset = outputEndOffset; (2) prefix = confirmationPrefix(trimmed), empty prefix skips to Enter; (3) attempts 1..INPUT_ECHO_CONFIRM_ATTEMPTS: attempt>1 first purges (POST /v1/write purgeBackspaces(len)) + sleep INPUT_PURGE_SETTLE_MS, then POST /v1/write {data: trimmedContent, echoToStdout} (transcript echo rides the CONTENT write), then poll GET /v1/output?since=baseOffset every INTERVAL_MS until TIMEOUT_MS — confirmed when normalizeForEchoMatch(accumulated) contains prefix OR PASTE_PLACEHOLDER_RE matches stripAnsi(accumulated); (4) unconfirmed → purge once more, log, throw (ladder falls back to tmux; purge keeps that single-copy-safe); (5) sleep INPUT_SETTLE_MS then POST /v1/write {data: '\\r'} WITHOUT stdout echo; (6) appendChannelDeliveryLog with path 'supervisor-primitives'. Each primitive HTTP call timeout ≤ 2s; total engine budget must respect the ladder invariant documented at src/lib/agents.ts:1405 (client budget > worst-case write/confirm path)."
+        },
+        "subItems": [
+          {
+            "id": "b4-delivery-engine.ac1",
+            "title": "Unit test vs fake unix-socket shim, happy path: exactly one content write (with echoToStdout), confirmation via /v1/output polling, then exactly one '\\r' write — assert the exact ordered write sequence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b4-delivery-engine.ac2",
+            "title": "Late-echo retry test: echo appears only after the purged second attempt — assert exact write sequence content → purge → content → '\\r' (one purge between writes, single final submit)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b4-delivery-engine.ac3",
+            "title": "Full-failure test: never-confirming output ⇒ exactly 2 purges total, deliverViaPrimitives throws, and NO '\\r' is ever written",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b4-delivery-engine.ac4",
+            "title": "Placeholder confirmation test: '[Pasted text #N' output confirms without prefix match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b4-delivery-engine.ac5",
+            "title": "All delay/poll paths use vi.useFakeTimers + advanceTimersByTimeAsync (fake-timers rule); no real setTimeout waits in unit tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b4b-ladder-routing",
+        "title": "deliverAgentMessage capability routing: primitives-v1 → server-side engine, else legacy POST",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-11T09:49:45.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1776",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In the supervisor tier of deliverAgentMessage (src/lib/agents.ts:1396-1426): first tryGetInfo(socketPath, token, 1_000) — returns null on ANY error (404 from old supervisor, timeout, connection refused). If info?.capabilities?.includes('primitives-v1'): await deliverViaPrimitives({...}) and return { ok: true, path: 'supervisor-primitives' }. Otherwise fall through to the existing legacy postUnixSocketJson with the 8s timeout (keep the worst-case-budget comment intact). A deliverViaPrimitives throw sets supervisorFailure and falls down the ladder exactly like a legacy socket-post failure (purge already left the composer clean, so the tmux fallback stays single-copy-safe). Extend the DeliveryResult path union and bridge-log values with 'supervisor-primitives'."
+        },
+        "subItems": [
+          {
+            "id": "b4b-ladder-routing.ac1",
+            "title": "Test: fake socket advertising primitives-v1 ⇒ delivery goes through deliverViaPrimitives and the bridge log records path 'supervisor-primitives'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b4b-ladder-routing.ac2",
+            "title": "Test: fake socket returning 404 on /v1/info (old supervisor) ⇒ delivery uses the legacy POST / path with the existing 8s budget, path 'supervisor'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b4b-ladder-routing.ac3",
+            "title": "Test: deliverViaPrimitives failure falls through to the next ladder tier with supervisorFailure recorded, same as a legacy socket-post failure today",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "a3-cli-status",
+        "title": "pan supervisor status subcommand + skills-lint exclusion entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-11T09:49:45.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1776",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "New command file src/cli/commands/supervisor.ts registered in src/cli/index.ts as a subcommand group (follow the existing `pan backup` group pattern: program.command('supervisor') with nested .command('status')). `pan supervisor status` prints a table: id | kind (agent/conv) | sha (8 chars) | stale | idle | gates (paused/troubled), built from getSupervisorStatus across agent-* and conv-* state dirs plus the idle/gate signals (state.json paused/troubled fields; agents idle via the runtime-mirror signal behind waitForAgentIdle, conversations via summarizeConversationActivity). Per docs/SKILLS-CONVENTION.md, add `supervisor` to the exclusion list (line ~48) instead of writing a wrapper skill — --help is self-explanatory — and keep scripts/lint-skills.sh (runs in npm run lint) green."
+        },
+        "subItems": [
+          {
+            "id": "a3-cli-status.ac1",
+            "title": "pan supervisor status lists every running claude-code session (agents and conversations) with its 8-char sha, staleness, idle state, and pause/troubled gates",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a3-cli-status.ac2",
+            "title": "npm run lint passes — the supervisor verb is on the SKILLS-CONVENTION exclusion list with a rationale, and lint-skills.sh stays green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "a3b-cli-refresh",
+        "title": "pan supervisor refresh <id> / --all-stale: gated rolling refresh with verification",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-11T09:49:45.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1776",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Implement the refresh core as an exported function in a new src/lib/supervisor-refresh.ts (shared later by the A4 patrol), with CLI subcommands `pan supervisor refresh <id> [--force]` and `pan supervisor refresh --all-stale [--max <n>]` (default max 3). Per-session semantics in order (PRD §A3): (1) SKIP with printed reason if not claude-code, Docker workspace, paused or troubled gate in state.json, or not stale (unless --force); (2) IDLE GATE — agents require idle via the runtime-mirror signal used by waitForAgentIdle (src/lib/agents.ts:763); conversations require summarizeConversationActivity(...).isWorking === false (src/dashboard/server/services/conversation-service.ts:836); --force overrides; NEVER interrupt a mid-turn session; (3) ROLL — agents: existing stop path then resumeAgent (regenerates launcher → new supervisor; auto-continue is PAN-1700 landing-verified); conversations: the internal function behind POST /api/conversations/:name/resume — call it directly, do not shell out to HTTP; (4) VERIFY — poll getSupervisorStatus until stale === false, 60s timeout, report per-session success/failure. --all-stale processes strictly sequentially (resume storms are how PAN-821-style thrash starts), capped by --max."
+        },
+        "subItems": [
+          {
+            "id": "a3b-cli-refresh.ac1",
+            "title": "Integration test: refresh on a stale idle test conversation ends with getSupervisorStatus stale === false and a landed auto-continue (transcript check per PAN-1700 machinery)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a3b-cli-refresh.ac2",
+            "title": "Paused, troubled, mid-turn, Docker, and non-claude-code sessions are skipped with explicit printed reasons (unit tests over the gate logic, fake timers for any waits)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a3b-cli-refresh.ac3",
+            "title": "--all-stale processes sessions sequentially with --max cap (default 3); --force bypasses staleness and idle gates for a single explicit <id> only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a3b-cli-refresh.ac4",
+            "title": "Conversation roll goes through the internal resume function (no HTTP self-call), and agent roll goes through the existing stop→resumeAgent path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "a4-deacon-patrol",
+        "title": "Deacon auto-refresh patrol (app-settings-gated, default OFF, agents only)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-11T09:49:45.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1776",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add SUPERVISOR_AUTO_REFRESH_KEY = 'supervisor.auto_refresh' with isSupervisorAutoRefreshEnabled() (default false) / setSupervisorAutoRefreshEnabled() to src/lib/database/app-settings.ts, following the isMergeTrainEnabled pattern exactly (Effect getter, DatabaseError → false). Register a patrol in the deacon tick (alongside recoverOrphanedAgents / autoResumeStoppedWorkAgents, src/lib/cloister/deacon.ts ~4905): when enabled, refresh at most ONE stale supervisor per tick, oldest startedAt first, scope strictly agent-* (NEVER conversations — unsubmitted composer state cannot be detected), reusing the supervisor-refresh.ts core so idle/pause/troubled/Docker gates and skip-reason logging are identical to the CLI. Respect the global deacon freeze (deacon.globally_paused) and PANOPTICON_NO_RESUME."
+        },
+        "subItems": [
+          {
+            "id": "a4-deacon-patrol.ac1",
+            "title": "Patrol is inert by default: with supervisor.auto_refresh unset/false it performs zero refreshes and logs nothing noisy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a4-deacon-patrol.ac2",
+            "title": "When enabled, at most one refresh per tick, oldest startedAt first, agent-* only; conversations are never touched (unit tests with fake timers)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a4-deacon-patrol.ac3",
+            "title": "Patrol is suppressed by the global deacon freeze and by PANOPTICON_NO_RESUME",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e2e-verification-docs",
+        "title": "End-to-end verification (PAN-1769 recipe) + docs entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-11T09:49:45.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1776",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Close the loop per PRD §5 acceptance + §6 step 7. (1) Subprocess integration test: spawn the real supervisor, deliver via deliverViaPrimitives, assert the child PTY saw exactly one copy of the content plus one Enter, and the stdout transcript echo appears exactly once. (2) End-to-end test: spawn a fresh conversation, send a message via POST /api/conversations/:name/message, assert the transcript contains exactly one user record with exactly one copy of the text (replicating the PAN-1769 verification recipe), and the bridge log records path 'supervisor-primitives'. (3) Write the docs entry per the docs index (pan docs / docs/ conventions) covering: supervisor identity sidecar, staleness detection, pan supervisor status/refresh, the deacon patrol gate, the /v1 primitives protocol, and the legacy-coexistence story (legacy POST / retained; removal is a telemetry-gated follow-up)."
+        },
+        "subItems": [
+          {
+            "id": "e2e-verification-docs.ac1",
+            "title": "Subprocess test proves single-copy delivery via primitives: one content copy + one Enter at the child, one transcript stdout echo",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-verification-docs.ac2",
+            "title": "Conversation e2e: POST /api/conversations/:name/message lands exactly one user record with one copy of the text; bridge log shows supervisor-primitives",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-verification-docs.ac3",
+            "title": "Docs entry added and indexed per the docs-index convention; npm run typecheck, npm run lint, npm test all green at issue completion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "a1-identity-sidecar",
+        "to": "a2-status-module",
+        "type": "blocks"
+      },
+      {
+        "from": "a1-identity-sidecar",
+        "to": "b1-socket-endpoints",
+        "type": "blocks"
+      },
+      {
+        "from": "a2-status-module",
+        "to": "a2b-status-api-fields",
+        "type": "blocks"
+      },
+      {
+        "from": "a2-status-module",
+        "to": "a2c-doctor-row",
+        "type": "blocks"
+      },
+      {
+        "from": "a2-status-module",
+        "to": "a3-cli-status",
+        "type": "blocks"
+      },
+      {
+        "from": "a2-status-module",
+        "to": "a3b-cli-refresh",
+        "type": "blocks"
+      },
+      {
+        "from": "b2-output-ring",
+        "to": "b1-socket-endpoints",
+        "type": "blocks"
+      },
+      {
+        "from": "b3-echo-helpers-extraction",
+        "to": "b4-delivery-engine",
+        "type": "blocks"
+      },
+      {
+        "from": "b1-socket-endpoints",
+        "to": "b4-delivery-engine",
+        "type": "blocks"
+      },
+      {
+        "from": "b4-delivery-engine",
+        "to": "b4b-ladder-routing",
+        "type": "blocks"
+      },
+      {
+        "from": "a3-cli-status",
+        "to": "a3b-cli-refresh",
+        "type": "blocks"
+      },
+      {
+        "from": "a3b-cli-refresh",
+        "to": "a4-deacon-patrol",
+        "type": "blocks"
+      },
+      {
+        "from": "b4b-ladder-routing",
+        "to": "e2e-verification-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "a3b-cli-refresh",
+        "to": "e2e-verification-docs",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-11-PAN-1776-feat-supervisor-hot-updatable-delivery-path-version-stamped-supervisors-rolling-refresh-and-dumb-shim-primitives-with-server-side-delivery-logic.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

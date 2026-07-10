@@ -1,0 +1,378 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-04T00:00:00.000Z"
+  },
+  "plan": {
+    "id": "PAN-416",
+    "title": "Mission Control: conversation launcher with t3code-informed UX",
+    "status": "approved",
+    "items": [
+      {
+        "id": "conversations-table",
+        "title": "Add conversations table to SQLite schema",
+        "status": "completed",
+        "narrative": {
+          "Action": "Add a `conversations` table to src/lib/database/schema.ts with columns: id, name (UNIQUE), tmux_session, status (active/ended), cwd, issue_id (nullable), created_at, ended_at, last_attached_at. Use CREATE TABLE IF NOT EXISTS for migration safety."
+        },
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-416"
+        },
+        "subItems": [
+          {
+            "id": "conversations-table.ac1",
+            "title": "Table created with all columns: id, name, tmux_session, status, cwd, issue_id, created_at, ended_at, last_attached_at",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversations-table.ac2",
+            "title": "name column has UNIQUE constraint",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversations-table.ac3",
+            "title": "Uses CREATE TABLE IF NOT EXISTS pattern consistent with other tables",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversations-api",
+        "title": "Create conversation REST API routes",
+        "status": "completed",
+        "narrative": {
+          "Action": "Create src/dashboard/server/routes/conversations.ts with four endpoints: GET /api/conversations (list all sessions from SQLite), POST /api/conversations (spawn new tmux session via createSession + insert SQLite row), DELETE /api/conversations/:name (kill tmux session + mark ended), POST /api/conversations/:name/resume (check tmux existence — reattach if alive, respawn if dead). Wire routes into src/dashboard/server/server.ts. All operations MUST be async (no execSync). Session naming: conv-{name}. Spawn command: 'claude' in ~/Projects cwd."
+        },
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-416"
+        },
+        "subItems": [
+          {
+            "id": "conversations-api.ac1",
+            "title": "GET /api/conversations returns list with name, status, created_at, last_attached_at",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversations-api.ac2",
+            "title": "POST /api/conversations spawns tmux session conv-{name} with 'claude' command in ~/Projects",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversations-api.ac3",
+            "title": "DELETE /api/conversations/:name kills tmux session and sets status to 'ended' with ended_at timestamp",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversations-api.ac4",
+            "title": "POST /api/conversations/:name/resume reattaches if tmux session alive, respawns if dead",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversations-api.ac5",
+            "title": "No execSync or other blocking calls — all async",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversations-api.ac6",
+            "title": "Routes wired into server.ts route composition",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-list-component",
+        "title": "Create ConversationList sidebar component",
+        "status": "completed",
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/MissionControl/ConversationList.tsx — a collapsible section rendered at the top of the Mission Control sidebar (above ProjectTree). Shows active sessions with green dot, ended sessions with gray dot. Includes [+] button that reveals an inline text input for naming new sessions. Enter spawns (POST /api/conversations), Escape cancels. Auto-generates name if blank (conv-YYYYMMDD-N). Clicking a session calls onSelect(name). Uses TanStack Query to poll GET /api/conversations every 5s."
+        },
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-416"
+        },
+        "subItems": [
+          {
+            "id": "conversation-list-component.ac1",
+            "title": "Collapsible section with header 'Conversations' and [+] button",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-list-component.ac2",
+            "title": "Active sessions show green dot, ended sessions show gray dot",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-list-component.ac3",
+            "title": "Inline name input appears on [+] click, Enter spawns, Escape cancels",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-list-component.ac4",
+            "title": "Auto-generates name if input left blank",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-list-component.ac5",
+            "title": "Polls /api/conversations via TanStack Query (5s refetch interval)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-terminal-component",
+        "title": "Create ConversationTerminal panel component",
+        "status": "completed",
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/MissionControl/ConversationTerminal.tsx — wraps the existing XTerminal component for conversation context. When conversation is active, renders XTerminal with session='conv-{name}'. When conversation is ended, shows 'Session ended' message with a 'Resume' button that calls POST /api/conversations/:name/resume and then reattaches the terminal. Include a small toolbar with session name display and a Stop button (DELETE /api/conversations/:name)."
+        },
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-416"
+        },
+        "subItems": [
+          {
+            "id": "conversation-terminal-component.ac1",
+            "title": "Renders XTerminal with correct session name (conv-{name}) for active sessions",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-terminal-component.ac2",
+            "title": "Shows 'Session ended' state with Resume button for ended sessions",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-terminal-component.ac3",
+            "title": "Resume button calls /api/conversations/:name/resume and reattaches terminal",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-terminal-component.ac4",
+            "title": "Toolbar shows session name and Stop button",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mission-control-integration",
+        "title": "Integrate conversation components into Mission Control layout",
+        "status": "completed",
+        "narrative": {
+          "Action": "Modify src/dashboard/frontend/src/components/MissionControl/index.tsx to: (1) Add selectedConversation state (string | null). (2) Render ConversationList as first child in sidebar, above ProjectTree. (3) When selectedConversation is set, render ConversationTerminal in the right panel instead of the feature detail view. (4) When selectedConversation is null, render existing content as normal. (5) Clicking a project feature clears selectedConversation. (6) Clicking a conversation clears selectedFeature."
+        },
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-416"
+        },
+        "subItems": [
+          {
+            "id": "mission-control-integration.ac1",
+            "title": "ConversationList renders above ProjectTree in sidebar",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mission-control-integration.ac2",
+            "title": "Selecting a conversation switches right panel to ConversationTerminal",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mission-control-integration.ac3",
+            "title": "Selecting a project feature clears conversation selection and shows feature detail",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mission-control-integration.ac4",
+            "title": "Empty state shows when nothing is selected",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "session-lifecycle-polling",
+        "title": "Add session lifecycle polling to detect ended sessions",
+        "status": "completed",
+        "narrative": {
+          "Action": "Add a periodic check (every 10s) in the conversations API route or as a lightweight service function that runs tmux list-sessions (async), compares against SQLite active conversations, and marks any missing tmux sessions as 'ended' with current timestamp. This ensures the UI shows correct status when a user types 'exit' in Claude or the session otherwise terminates outside the dashboard."
+        },
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-416"
+        },
+        "subItems": [
+          {
+            "id": "session-lifecycle-polling.ac1",
+            "title": "Polls tmux list-sessions every 10s (async, non-blocking)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-lifecycle-polling.ac2",
+            "title": "Marks conversations as 'ended' when their tmux session disappears",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-lifecycle-polling.ac3",
+            "title": "Only checks conv-* sessions — does not interfere with agent/planning sessions",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "quality-gates",
+        "title": "Verify typecheck, lint, and tests pass",
+        "status": "completed",
+        "narrative": {
+          "Action": "Run npm run typecheck, npm run lint, and npm test. Fix any issues. Ensure no regressions in existing Mission Control functionality."
+        },
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-416"
+        },
+        "subItems": [
+          {
+            "id": "quality-gates.ac1",
+            "title": "npm run typecheck passes",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quality-gates.ac2",
+            "title": "npm run lint passes",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quality-gates.ac3",
+            "title": "npm test passes with no regressions",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "conversations-table",
+        "to": "conversations-api",
+        "type": "blocks"
+      },
+      {
+        "from": "conversations-api",
+        "to": "conversation-list-component",
+        "type": "blocks"
+      },
+      {
+        "from": "conversations-api",
+        "to": "conversation-terminal-component",
+        "type": "blocks"
+      },
+      {
+        "from": "conversations-api",
+        "to": "session-lifecycle-polling",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-list-component",
+        "to": "mission-control-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-terminal-component",
+        "to": "mission-control-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "mission-control-integration",
+        "to": "quality-gates",
+        "type": "blocks"
+      },
+      {
+        "from": "session-lifecycle-polling",
+        "to": "quality-gates",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

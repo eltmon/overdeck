@@ -1,0 +1,347 @@
+{
+  "issueId": "PAN-1644",
+  "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-08T03:36:53.778Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T04:08:43.112Z"
+    },
+    {
+      "timestamp": "2026-07-08T04:10:13.822Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T04:10:17.815Z"
+    }
+  ],
+  "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/records/pan-1644.json",
+      "scripts/file-size-baseline.txt",
+      "src/cli/commands/__tests__/done.test.ts",
+      "tests/unit/dashboard/routes/issues-no-loss.test.ts",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts"
+    ],
+    "declaredScopeUntouched": [
+      "skills/pan-admin-config/SKILL.md",
+      "src/cli/index.ts"
+    ],
+    "declaredScope": [
+      "docs/SKILLS-CONVENTION.md",
+      "packages/contracts/src/event-reducers.ts",
+      "packages/contracts/src/events.ts",
+      "skills/pan-admin-config/SKILL.md",
+      "src/cli/commands/admin/conversations-handler.ts",
+      "src/cli/commands/admin/index.ts",
+      "src/cli/index.ts",
+      "src/dashboard/server/routes/__tests__/admin-backfill-titles.test.ts",
+      "src/dashboard/server/routes/__tests__/hooks-turn-complete.test.ts",
+      "src/dashboard/server/routes/__tests__/hooks-user-prompt.test.ts",
+      "src/dashboard/server/routes/admin.ts",
+      "src/dashboard/server/routes/hooks.ts",
+      "src/lib/conversations/transcript-summary.ts",
+      "src/lib/overdeck/conversation-message.ts",
+      "src/lib/overdeck/conversation-reads.ts",
+      "src/lib/overdeck/conversations.ts",
+      "src/lib/overdeck/title-refinement.ts",
+      "sync-sources/hooks/stop-hook*",
+      "sync-sources/hooks/user-prompt-submit-hook*",
+      "tests/dashboard/event-reducers.test.ts",
+      "tests/unit/lib/conversations/derive-prompt-title.test.ts",
+      "tests/unit/lib/overdeck/conversation-message-title.test.ts",
+      "tests/unit/lib/overdeck/title-events.test.ts",
+      "tests/unit/lib/overdeck/title-refinement.test.ts",
+      "tests/unit/lib/overdeck/title-sources.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".pan/records/pan-1644.json",
+      "docs/SKILLS-CONVENTION.md",
+      "packages/contracts/src/event-reducers.ts",
+      "packages/contracts/src/events.ts",
+      "scripts/file-size-baseline.txt",
+      "src/cli/commands/__tests__/done.test.ts",
+      "src/cli/commands/admin/conversations-handler.ts",
+      "src/cli/commands/admin/index.ts",
+      "src/dashboard/server/routes/__tests__/admin-backfill-titles.test.ts",
+      "src/dashboard/server/routes/__tests__/hooks-turn-complete.test.ts",
+      "src/dashboard/server/routes/__tests__/hooks-user-prompt.test.ts",
+      "src/dashboard/server/routes/admin.ts",
+      "src/dashboard/server/routes/hooks.ts",
+      "src/lib/conversations/transcript-summary.ts",
+      "src/lib/overdeck/conversation-message.ts",
+      "src/lib/overdeck/conversation-reads.ts",
+      "src/lib/overdeck/conversations.ts",
+      "src/lib/overdeck/title-refinement.ts",
+      "sync-sources/hooks/stop-hook",
+      "sync-sources/hooks/user-prompt-submit-hook",
+      "tests/dashboard/event-reducers.test.ts",
+      "tests/unit/dashboard/routes/issues-no-loss.test.ts",
+      "tests/unit/lib/conversations/derive-prompt-title.test.ts",
+      "tests/unit/lib/overdeck/conversation-message-title.test.ts",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts",
+      "tests/unit/lib/overdeck/title-events.test.ts",
+      "tests/unit/lib/overdeck/title-refinement.test.ts",
+      "tests/unit/lib/overdeck/title-sources.test.ts"
+    ],
+    "recordedAt": "2026-07-08T04:09:41.701Z"
+  },
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
+  "statusOverrides": {
+    "title-source-ai-explicit": "completed",
+    "hook-script-stop": "completed",
+    "hook-script-stop.ac1": "completed",
+    "hook-script-stop.ac2": "completed",
+    "hook-script-user-prompt": "completed",
+    "hook-script-user-prompt.ac1": "completed",
+    "hook-script-user-prompt.ac2": "completed",
+    "turn-complete-endpoint": "completed",
+    "turn-complete-endpoint.ac1": "completed",
+    "turn-complete-endpoint.ac2": "completed",
+    "turn-complete-endpoint.ac3": "completed",
+    "backfill-endpoint-cli": "completed",
+    "backfill-endpoint-cli.ac1": "completed",
+    "backfill-endpoint-cli.ac2": "completed",
+    "backfill-endpoint-cli.ac3": "completed",
+    "backfill-endpoint-cli.ac4": "completed",
+    "backfill-endpoint-cli.ac5": "completed",
+    "http-message-deterministic-title": "completed",
+    "http-message-deterministic-title.ac1": "completed",
+    "http-message-deterministic-title.ac2": "completed",
+    "http-message-deterministic-title.ac3": "completed",
+    "user-prompt-submit-endpoint": "completed",
+    "user-prompt-submit-endpoint.ac1": "completed",
+    "user-prompt-submit-endpoint.ac2": "completed",
+    "user-prompt-submit-endpoint.ac3": "completed",
+    "user-prompt-submit-endpoint.ac4": "completed",
+    "refinement-service": "completed",
+    "refinement-service.ac1": "completed",
+    "refinement-service.ac2": "completed",
+    "refinement-service.ac3": "completed",
+    "refinement-service.ac4": "completed",
+    "derive-prompt-title": "completed",
+    "derive-prompt-title.ac1": "completed",
+    "derive-prompt-title.ac2": "completed",
+    "derive-prompt-title.ac3": "completed",
+    "title-changed-event": "completed",
+    "title-changed-event.ac1": "completed",
+    "title-changed-event.ac2": "completed",
+    "title-changed-event.ac3": "completed",
+    "title-source-ai-explicit.ac1": "completed",
+    "title-source-ai-explicit.ac2": "completed",
+    "title-source-ai-explicit.ac3": "completed"
+  },
+  "pipeline": {
+    "issueId": "PAN-1644",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
+    "inspectStatus": "passed",
+    "mergeStatus": "merged",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-08T05:37:31.866Z",
+    "reviewNotes": "No blocking findings; focused title hook tests passed",
+    "testNotes": "npm run typecheck passed; npm run lint passed (skills/prompts/file-size/source-introspection/circular/ratchet/quarantine/state-writes/permissions/overdeck-boundaries); npm test passed (8879 tests passed, 52 skipped, 0 failed); frontend tests passed (32 passed). No browser UAT required — all PAN-1644 acceptance criteria are covered by unit tests for title sources, title-changed event, derivePromptTitle, hook endpoints, hook scripts, refinement service, HTTP message deterministic title, and backfill endpoint/CLI.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "inspectNotes": "Bead title-changed-event ack: ConversationTitleChangedEvent schema added to DomainEvent union with {conversationName,title,titleSource} payload, reducer case bumps conversationsListRevision by 1 (test confirms 7->8), and updateConversationTitle() emits via getEventStore().emitOnly() (sequence auto-assigned by Omit<DomainEvent,\"sequence\"> signature) wrapped in try/catch so persistence never throws when the event store is uninitialized (both paths unit-tested). All 3 ACs met.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2480",
+    "reviewedAtCommit": "e955f37345b9232380b5d2e9a493850bf03a85e7",
+    "lastVerifiedCommit": "db1a8e02df0dca4e7d1a11b659b6cede4768a248",
+    "reviewRequestedAt": "2026-07-08T04:10:09.462Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        ".pan/records/pan-1644.json",
+        "scripts/file-size-baseline.txt",
+        "src/cli/commands/__tests__/done.test.ts",
+        "tests/unit/dashboard/routes/issues-no-loss.test.ts",
+        "tests/unit/lib/overdeck/no-loss-matrix.ts"
+      ],
+      "declaredScopeUntouched": [
+        "skills/pan-admin-config/SKILL.md",
+        "src/cli/index.ts"
+      ],
+      "declaredScope": [
+        "docs/SKILLS-CONVENTION.md",
+        "packages/contracts/src/event-reducers.ts",
+        "packages/contracts/src/events.ts",
+        "skills/pan-admin-config/SKILL.md",
+        "src/cli/commands/admin/conversations-handler.ts",
+        "src/cli/commands/admin/index.ts",
+        "src/cli/index.ts",
+        "src/dashboard/server/routes/__tests__/admin-backfill-titles.test.ts",
+        "src/dashboard/server/routes/__tests__/hooks-turn-complete.test.ts",
+        "src/dashboard/server/routes/__tests__/hooks-user-prompt.test.ts",
+        "src/dashboard/server/routes/admin.ts",
+        "src/dashboard/server/routes/hooks.ts",
+        "src/lib/conversations/transcript-summary.ts",
+        "src/lib/overdeck/conversation-message.ts",
+        "src/lib/overdeck/conversation-reads.ts",
+        "src/lib/overdeck/conversations.ts",
+        "src/lib/overdeck/title-refinement.ts",
+        "sync-sources/hooks/stop-hook*",
+        "sync-sources/hooks/user-prompt-submit-hook*",
+        "tests/dashboard/event-reducers.test.ts",
+        "tests/unit/lib/conversations/derive-prompt-title.test.ts",
+        "tests/unit/lib/overdeck/conversation-message-title.test.ts",
+        "tests/unit/lib/overdeck/title-events.test.ts",
+        "tests/unit/lib/overdeck/title-refinement.test.ts",
+        "tests/unit/lib/overdeck/title-sources.test.ts"
+      ],
+      "actualChangedFiles": [
+        ".pan/records/pan-1644.json",
+        "docs/SKILLS-CONVENTION.md",
+        "packages/contracts/src/event-reducers.ts",
+        "packages/contracts/src/events.ts",
+        "scripts/file-size-baseline.txt",
+        "src/cli/commands/__tests__/done.test.ts",
+        "src/cli/commands/admin/conversations-handler.ts",
+        "src/cli/commands/admin/index.ts",
+        "src/dashboard/server/routes/__tests__/admin-backfill-titles.test.ts",
+        "src/dashboard/server/routes/__tests__/hooks-turn-complete.test.ts",
+        "src/dashboard/server/routes/__tests__/hooks-user-prompt.test.ts",
+        "src/dashboard/server/routes/admin.ts",
+        "src/dashboard/server/routes/hooks.ts",
+        "src/lib/conversations/transcript-summary.ts",
+        "src/lib/overdeck/conversation-message.ts",
+        "src/lib/overdeck/conversation-reads.ts",
+        "src/lib/overdeck/conversations.ts",
+        "src/lib/overdeck/title-refinement.ts",
+        "sync-sources/hooks/stop-hook",
+        "sync-sources/hooks/user-prompt-submit-hook",
+        "tests/dashboard/event-reducers.test.ts",
+        "tests/unit/dashboard/routes/issues-no-loss.test.ts",
+        "tests/unit/lib/conversations/derive-prompt-title.test.ts",
+        "tests/unit/lib/overdeck/conversation-message-title.test.ts",
+        "tests/unit/lib/overdeck/no-loss-matrix.ts",
+        "tests/unit/lib/overdeck/title-events.test.ts",
+        "tests/unit/lib/overdeck/title-refinement.test.ts",
+        "tests/unit/lib/overdeck/title-sources.test.ts"
+      ],
+      "recordedAt": "2026-07-08T04:09:41.701Z"
+    }
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "codex": {
+          "openai/gpt-5.5": {
+            "input": 17825808,
+            "output": 40351,
+            "cacheRead": 16288128,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 271,
+            "output": 200,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 21475,
+            "output": 65365,
+            "cacheRead": 7278754,
+            "cacheWrite": 213261
+          }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 8749,
+            "output": 3922,
+            "cacheRead": 418620,
+            "cacheWrite": 86241
+          }
+        },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 2750737,
+            "output": 58192,
+            "cacheRead": 28708330,
+            "cacheWrite": 0
+          }
+        },
+        "work": {
+          "custom/kimi-k2.7-code": {
+            "input": 6321632,
+            "output": 365671,
+            "cacheRead": 193014016,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.5": {
+          "input": 17825808,
+          "output": 40351,
+          "cacheRead": 16288128,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-haiku-4-5": {
+          "input": 271,
+          "output": 200,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 21475,
+          "output": 65365,
+          "cacheRead": 7278754,
+          "cacheWrite": 213261
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 8749,
+          "output": 3922,
+          "cacheRead": 418620,
+          "cacheWrite": 86241
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 9072369,
+          "output": 423863,
+          "cacheRead": 221722346,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 83.26929200000001,
+        "pricingAsOf": "2026-07-08T05:37:31.965Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2480"
+    ],
+    "ranOn": "eltmon-z790"
+  },
+  "swarm": {
+    "slotAssignments": [
+      {
+        "slotIndex": 1,
+        "itemId": "title-source-ai-explicit",
+        "agentId": "agent-pan-1644-slot-1",
+        "branch": "feature/pan-1644-slot-1",
+        "assignedAt": "2026-07-07T22:45:23.393Z"
+      }
+    ],
+    "failedMergeBlock": {
+      "issueId": "PAN-1644",
+      "itemId": "title-source-ai-explicit",
+      "slotIndex": 1,
+      "branch": "feature/pan-1644-slot-1",
+      "note": "Slot branch feature/pan-1644-slot-1 did not merge cleanly"
+    }
+  },
+  "created": "2026-07-08T03:36:53.748Z",
+  "updated": "2026-07-08T05:37:31.965Z"
+}

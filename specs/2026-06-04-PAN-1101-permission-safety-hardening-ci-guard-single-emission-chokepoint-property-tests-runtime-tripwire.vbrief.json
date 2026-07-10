@@ -1,0 +1,166 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-06-04T06:09:57.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1101: Permission safety hardening: CI guard, single emission chokepoint, property tests, runtime tripwire",
+    "updated": "2026-06-04T06:13:21.182Z"
+  },
+  "plan": {
+    "id": "pan-1101",
+    "title": "Permission safety hardening: CI guard, single emission chokepoint, property tests, runtime tripwire",
+    "status": "proposed",
+    "uid": "563105b8-9c98-445e-bd98-148cb2111e81",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-04T06:09:57.000Z",
+    "updated": "2026-06-04T06:13:21.182Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1101",
+        "label": "PAN-1101",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "permissions",
+      "security",
+      "hardening",
+      "tests",
+      "launcher"
+    ],
+    "narratives": {
+      "Problem": "PAN-1084 fixed a trust violation where Fly.io provisioning hardcoded permissions.defaultMode: 'bypassPermissions', silently escalating unflagged claude invocations. The issue proposed five hardening layers to prevent regressions. Since it was filed, downstream work has already landed three of them: item 1 (CI grep guard) is scripts/lint-permissions.sh, wired into `npm run lint` with an allowlist plus a bonus resolver-omission guard; item 2 (single DSP emission chokepoint) is moot because the --dangerously-skip-permissions CLI flag was removed entirely and emission is centralized in claude-permissions.ts; item 5 (settings.json snapshot) is covered by claude-permissions.test.ts asserting the exact settings object for both modes, with both provisioners delegating to the single buildClaudeUserSettings builder. Two genuine gaps remain.",
+      "Proposal": "Deliver the two remaining hardening layers and nothing else. (1) A property/matrix test over generateLauncherScriptSync covering {permission mode, harness, role, spawnMode}, asserting the claude invocation never carries a bypass token under auto and always does under bypass. (2) A runtime tripwire in the generated launcher script, emitted only in auto mode, that refuses to exec (exit 70) if a bypass token leaked into the baked claude invocation. The tripwire is adapted to the current baked-command launcher architecture and builds its forbidden-token pattern from the BYPASS_PERMISSION_MODE constant so it does not self-trip lint-permissions.sh. Items 1, 2, and 5 are intentionally not re-implemented; see autoDecisions."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Scope reduced from 5 proposed items to 2 (items 3 and 4). Items 1, 2, and 5 are already satisfied by downstream work and are not re-implemented.",
+        "rationale": "Verified directly against the current code: (1) scripts/lint-permissions.sh implements the CI grep guard with the exact allowlist the issue described plus a positive-shape resolver-omission guard, is wired into `npm run lint` via lint:permissions, and passes green now. (2) The --dangerously-skip-permissions CLI flag was removed; bypassPrefixForAgentFlagSync returns '' and the only bypass emission is `--permission-mode bypassPermissions` produced by getClaudePermissionFlagsSync inside claude-permissions.ts, so the 3 inline literals item 2 targeted no longer exist. (5) claude-permissions.test.ts asserts the exact settings.json object for both auto ('default') and bypass ('bypassPermissions') modes plus PAN_YOLO precedence and a JSON-has-no-bypass check; both provisioning paths (fly-provider.ts, workspace.ts) delegate to the single buildClaudeUserSettings builder, enforced by remote-settings-no-leak.test.ts. Re-implementing these would be duplicate/makework, violating the no-bandaids and simplicity-first rules."
+      },
+      {
+        "summary": "Item 4's runtime tripwire is redesigned for the current architecture instead of using the issue's literal $RESOLVED_MODE/$ORIGINAL_ARGS shell-variable snippet.",
+        "rationale": "The issue's snippet assumed a launcher that kept the resolved mode and the original args as independent runtime shell variables. The current generateLauncherScriptSync bakes a fully-resolved `exec claude ...` command string at generation time; there is no independent runtime mode variable to cross-check. The defensible adaptation is a guard emitted only when the resolved mode is auto (permissionFlags includes 'auto'), placed immediately before the exec line, that panics (exit 70) if a bypass token is present in the baked claude invocation. This preserves the issue's intent — a production-runtime layer that fires even if tests miss a leak — within the real code shape."
+      },
+      {
+        "summary": "Item 4 builds its forbidden-token pattern from the BYPASS_PERMISSION_MODE constant, and item 3 asserts against the claude invocation line specifically.",
+        "rationale": "Writing the bypass token as a quoted literal in launcher-generator.ts would self-trip scripts/lint-permissions.sh. Importing BYPASS_PERMISSION_MODE keeps the source literal-free. Item 3's property assertion is scoped to the claude invocation (exec line / commandParts) rather than the whole script so it remains correct even though item 4's guard line legitimately mentions the token in its grep pattern."
+      }
+    ],
+    "items": [
+      {
+        "id": "launcher-matrix-property-test",
+        "title": "Add a property/matrix test for generateLauncherScriptSync permission safety",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-04T06:09:57.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1101",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/lib/__tests__/launcher-generator.test.ts, add a matrix/property test that feeds generateLauncherScriptSync a grid of LauncherConfig shapes varying permission mode (auto via permissionFlags ['--permission-mode','auto'] vs bypass via ['--permission-mode','bypassPermissions']) across harness (claude-code, pi), role (work, plan, review), and spawnMode (work/resume/conversation/remote). For each combination, assert the property: when the mode is auto, the claude invocation line (the exec/command-parts portion, not the whole script) contains neither '--dangerously-skip-permissions' nor 'bypassPermissions'; when the mode is bypass, the claude invocation contains 'bypassPermissions'. Include the --agent launcher shape (no permissionFlags) as an explicitly covered case where no bypass token appears. Reuse existing config fixtures in the test file for each harness/role/spawnMode shape so configs are valid (Pi requires piExtensionPath/piFifoPath/piSessionDir; review sub-role requires reviewSignal). This closes the gap between the unit-level command builder tests and the assembled launcher script across the full spawn matrix."
+        },
+        "subItems": [
+          {
+            "id": "launcher-matrix-property-test.ac1",
+            "title": "A new matrix/property test exists in launcher-generator.test.ts iterating over permission mode × harness × role × spawnMode and exercising generateLauncherScriptSync for each combination.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-matrix-property-test.ac2",
+            "title": "For every auto-mode combination, the test asserts the claude invocation line contains neither '--dangerously-skip-permissions' nor 'bypassPermissions'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-matrix-property-test.ac3",
+            "title": "For every bypass-mode combination, the test asserts the claude invocation line contains 'bypassPermissions'; the --agent (no-permissionFlags) shape is covered as a case with no bypass token.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-matrix-property-test.ac4",
+            "title": "Assertions target the claude invocation (exec line / commandParts), not a naive whole-script not.toMatch, so they remain valid alongside item 4's auto-mode guard line. `npm test` passes and `npm run lint` stays green.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "auto-mode-runtime-tripwire",
+        "title": "Emit a runtime permission tripwire in auto-mode launcher scripts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-04T06:09:57.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1101",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/lib/launcher-generator.ts (generateLauncherScriptSync), when the resolved permission mode is auto (permissionFlags includes the 'auto' token), emit a small bash guard immediately before the baked `exec claude ...` line. The guard inspects the baked claude invocation and, if a bypass token is present, prints a PANIC message to stderr and exits 70 (refusing to run). Build the forbidden-token pattern from the BYPASS_PERMISSION_MODE constant imported from claude-permissions.ts — do NOT write the literal 'bypassPermissions' string into launcher-generator.ts, or scripts/lint-permissions.sh will self-trip. The guard must be emitted ONLY for auto mode (bypass-mode launchers legitimately carry the token and must not be guarded). --agent launchers carry no permissionFlags and therefore correctly receive no guard. This is the only production-runtime hardening layer: it fires on every auto-mode agent start even if tests miss a future leak."
+        },
+        "subItems": [
+          {
+            "id": "auto-mode-runtime-tripwire.ac1",
+            "title": "Auto-mode launcher scripts (permissionFlags include 'auto') contain a bash guard immediately before the exec line that exits 70 with a PANIC-to-stderr message if a bypass token is present in the baked claude invocation.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-mode-runtime-tripwire.ac2",
+            "title": "Bypass-mode launcher scripts and --agent launcher scripts (no permissionFlags) do NOT contain the guard.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-mode-runtime-tripwire.ac3",
+            "title": "The forbidden-token pattern is constructed from the BYPASS_PERMISSION_MODE constant (no quoted bypass literal added to launcher-generator.ts); `bash scripts/lint-permissions.sh` and `npm run lint` stay green without modifying the lint allowlist.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-mode-runtime-tripwire.ac4",
+            "title": "A unit test proves the guard fires: feeding an auto config whose baked command contains a bypass token produces a guard that exits non-zero when run in bash (or, equivalently, the test asserts the guard block greps for the token and exits 70).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-mode-runtime-tripwire.ac5",
+            "title": "Existing launcher-generator.test.ts auto-mode expectations are updated for the new guard lines; the full test file passes and bypass-mode expectations are unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-06-04-PAN-1101-permission-safety-hardening-ci-guard-single-emission-chokepoint-property-tests-runtime-tripwire.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

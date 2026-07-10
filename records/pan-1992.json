@@ -1,0 +1,24 @@
+{
+  "issueId": "PAN-1992",
+  "schemaVersion": 2,
+  "created": "2026-07-07T03:04:43.680Z",
+  "updated": "2026-07-07T03:04:43.680Z",
+  "pipeline": {
+    "issueId": "PAN-1992",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-07T03:04:43.680Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-07T03:04:43.680Z",
+    "mergeStatus": "merged"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {}
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "issueId": "PAN-2013",
+  "schemaVersion": 2,
+  "feedback": [],
+  "created": "2026-06-23T11:34:09.457Z",
+  "updated": "2026-06-23T14:24:10.568Z",
+  "pipeline": {
+    "issueId": "PAN-2013",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "mergeStatus": "merged",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-23T14:24:10.546Z",
+    "testNotes": "Skipped: issue is already merged"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 638,
+            "output": 200,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 638,
+          "output": 200,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 0,
+        "pricingAsOf": "2026-06-23T14:24:10.568Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5"
+}

@@ -1,0 +1,131 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-06T14:47:14.825Z",
+    "updated": "2026-07-07T20:43:37.684Z",
+    "author": "overdeck/auto-start",
+    "description": "Auto-synthesized minimal plan for PAN-2405: feat(dashboard): 'Restart agents with current config' header control — explicit opt-in re-staffing; resume keeps original model by design",
+    "inspectionPolicy": "never"
+  },
+  "plan": {
+    "id": "pan-2405",
+    "title": "feat(dashboard): 'Restart agents with current config' header control — explicit opt-in re-staffing; resume keeps original model by design",
+    "status": "completed",
+    "uid": "1e72b7b0-1f15-4033-be58-1887b85d77bf",
+    "author": "overdeck/auto-start",
+    "sequence": 4,
+    "created": "2026-07-06T14:47:14.825Z",
+    "updated": "2026-07-07T20:43:37.684Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2405",
+        "label": "PAN-2405",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "auto-start"
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-06-PAN-2405-feat-dashboard-restart-agents-with-current-config-header-control-explicit-opt-in-re-staffing-resume-keeps-original-model-by-design.vbrief.json"
+    },
+    "narratives": {
+      "Problem": "## Operator intent (2026-07-06)\n\n> If the dashboard restarts agents that were configured with one model, and I then change configuration, they should still restart with the model they started with — that is the correct behavior. But we need a mechanism to restart all agents with the new model if I want to. This needs to be a button — maybe up by the freeze / stop-all / memory display area of the dashboard.\n\n## Current behavior (correct, keep it)\n\nResume/auto-restart reuses the agent's recorded model + harness from its runtime state — `resumeAgent` logs `harness=unchanged` and resumes the recorded session. A config change never silently re-staffs an existing agent. This issue does NOT change that default; it adds the explicit opt-in path.\n\n## Requirements\n\n- FR-1: A header control near the existing Deacon-freeze / stop-all / memory chips: **\"Restart with current config\"**.\n- FR-2: Clicking opens a confirm dialog listing every affected agent as a row: id, issue, current model/harness → the model/harness it would get from CURRENT config (roles + tier table via `resolveStaffing`). Rows where nothing would change are shown but marked \"unchanged\".\n- FR-3: Operator can deselect rows; confirm restarts the selected agents: graceful stop → fresh spawn through the normal staffing resolvers (NOT session resume — a model/harness change requires a fresh session, per the model-change ⇒ fresh-session rule).\n- FR-4: Per-agent scope too: the same action on a single agent from the issue cockpit's crew/agents lane context menu.\n- FR-5: Never touches paused or troubled agents (their gates stand); never touches conversations.\n- FR-6: The restart goes through existing lifecycle doors (stop + spawn) — no new state plane; each restart logged to the agent's lifecycle log with before→after staffing.\n\n## Non-requirements\n\n- No automatic re-staffing on config save (explicitly rejected — the operator may NOT want it).\n\n## Notes\n\n- Fresh spawn must preserve the agent's work context (workspace, beads, continue state) — same contract as a normal fresh start after `pan kill`.\n- Placement: the header status-chip cluster (Deacon frozen · N agents · Stop all · N stopped · memory).",
+      "Proposal": "Implement the issue directly from the tracker-provided title and body."
+    },
+    "items": [
+      {
+        "id": "auto-start",
+        "title": "Implement issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-06T14:47:14.825Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2405",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "## Operator intent (2026-07-06)\n\n> If the dashboard restarts agents that were configured with one model, and I then change configuration, they should still restart with the model they started with — that is the correct behavior. But we need a mechanism to restart all agents with the new model if I want to. This needs to be a button — maybe up by the freeze / stop-all / memory display area of the dashboard.\n\n## Current behavior (correct, keep it)\n\nResume/auto-restart reuses the agent's recorded model + harness from its runtime state — `resumeAgent` logs `harness=unchanged` and resumes the recorded session. A config change never silently re-staffs an existing agent. This issue does NOT change that default; it adds the explicit opt-in path.\n\n## Requirements\n\n- FR-1: A header control near the existing Deacon-freeze / stop-all / memory chips: **\"Restart with current config\"**.\n- FR-2: Clicking opens a confirm dialog listing every affected agent as a row: id, issue, current model/harness → the model/harness it would get from CURRENT config (roles + tier table via `resolveStaffing`). Rows where nothing would change are shown but marked \"unchanged\".\n- FR-3: Operator can deselect rows; confirm restarts the selected agents: graceful stop → fresh spawn through the normal staffing resolvers (NOT session resume — a model/harness change requires a fresh session, per the model-change ⇒ fresh-session rule).\n- FR-4: Per-agent scope too: the same action on a single agent from the issue cockpit's crew/agents lane context menu.\n- FR-5: Never touches paused or troubled agents (their gates stand); never touches conversations.\n- FR-6: The restart goes through existing lifecycle doors (stop + spawn) — no new state plane; each restart logged to the agent's lifecycle log with before→after staffing.\n\n## Non-requirements\n\n- No automatic re-staffing on config save (explicitly rejected — the operator may NOT want it).\n\n## Notes\n\n- Fresh spawn must preserve the agent's work context (workspace, beads, continue state) — same contract as a normal fresh start after `pan kill`.\n- Placement: the header status-chip cluster (Deacon frozen · N agents · Stop all · N stopped · memory)."
+        },
+        "items": [
+          {
+            "id": "auto-start.ac1",
+            "title": "FR-1: A header control near the existing Deacon-freeze / stop-all / memory chips: **\"Restart with current config\"**.",
+            "status": "pending",
+            "created": "2026-07-06T14:47:14.825Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac2",
+            "title": "FR-2: Clicking opens a confirm dialog listing every affected agent as a row: id, issue, current model/harness → the model/harness it would get from CURRENT config (roles + tier table via resolveStaffing). Rows where nothing would change are shown but marked \"unchanged\".",
+            "status": "pending",
+            "created": "2026-07-06T14:47:14.825Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac3",
+            "title": "FR-3: Operator can deselect rows; confirm restarts the selected agents: graceful stop → fresh spawn through the normal staffing resolvers (NOT session resume — a model/harness change requires a fresh session, per the model-change ⇒ fresh-session rule).",
+            "status": "pending",
+            "created": "2026-07-06T14:47:14.825Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac4",
+            "title": "FR-4: Per-agent scope too: the same action on a single agent from the issue cockpit's crew/agents lane context menu.",
+            "status": "pending",
+            "created": "2026-07-06T14:47:14.825Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac5",
+            "title": "FR-5: Never touches paused or troubled agents (their gates stand); never touches conversations.",
+            "status": "pending",
+            "created": "2026-07-06T14:47:14.825Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac6",
+            "title": "FR-6: The restart goes through existing lifecycle doors (stop + spawn) — no new state plane; each restart logged to the agent's lifecycle log with before→after staffing.",
+            "status": "pending",
+            "created": "2026-07-06T14:47:14.825Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac7",
+            "title": "No automatic re-staffing on config save (explicitly rejected — the operator may NOT want it).",
+            "status": "pending",
+            "created": "2026-07-06T14:47:14.825Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac8",
+            "title": "Fresh spawn must preserve the agent's work context (workspace, beads, continue state) — same contract as a normal fresh start after pan kill.",
+            "status": "pending",
+            "created": "2026-07-06T14:47:14.825Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "completed"
+}

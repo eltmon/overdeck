@@ -1,0 +1,486 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-06-11T06:09:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1767: feat(stats): surface 'awaiting close-out' (verifying-on-main) count in flywheel stats, pan status, and dashboard headline",
+    "updated": "2026-06-11T06:11:02.506Z"
+  },
+  "plan": {
+    "id": "pan-1767",
+    "title": "feat(stats): surface 'awaiting close-out' (verifying-on-main) count in flywheel stats, pan status, and dashboard headline",
+    "status": "proposed",
+    "uid": "ce338180-3832-4532-a02f-053c086824b0",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-06-11T06:09:00.000Z",
+    "updated": "2026-06-11T06:11:02.506Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1767",
+        "label": "PAN-1767",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1746",
+        "label": "PAN-1746 (misfire dispatch on merged issues)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1487",
+        "label": "PAN-1487 (v1.0 readiness telemetry)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "stats",
+      "cli",
+      "dashboard",
+      "flywheel",
+      "close-out"
+    ],
+    "narratives": {
+      "Problem": "The merged-but-not-closed-out queue (verifying_on_main) reached 21 issues with no first-class surface showing it. Each awaiting issue pins a workspace, branches, paused agent state, and review-status rows, and is a misfire-dispatch surface (PAN-1746). Operators have no headline number in `pan flywheel stats`, `pan status`, or the dashboard.",
+      "Proposal": "Define 'awaiting close-out' as review-status rows with mergeStatus === 'merged' (pan close deletes the row, so the set is exactly the queue — same predicate issue-data-service already uses to derive verifying_on_main). Add a shared lib helper, expose the count as a required top-level field on the server-computed FlywheelStats contract (NOT the orchestrator-emitted FlywheelStatus), print it in `pan flywheel stats` and as a `pan status` headline line (before the no-agents early return), and add a clickable chip on the FlywheelPage header next to the agents chip that navigates to a new 'Awaiting close-out' section on the Awaiting Merge page listing each issue with its pinned resources (workspace presence, paused agent sessions) and a Close out action."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Source of truth = review-status rows with mergeStatus === 'merged' (sync SQLite read via getAllReviewStatusesFromDb), not tracker labels or GitHub API.",
+        "rationale": "pan close deletes the review-status row, so the predicate is exactly the queue; it matches the dashboard's existing verifying_on_main derivation in issue-data-service.ts, works offline, and needs no network calls in pan status."
+      },
+      {
+        "summary": "awaitingCloseOut added as a required top-level number on FlywheelStats (server-computed stats payload); FlywheelStatus/FlywheelHeadline (orchestrator-emitted) left untouched.",
+        "rationale": "It is an instantaneous gauge, not a windowed criterion, so it sits next to window/generatedAt rather than inside criteria. Changing the orchestrator-emitted contract would break payload validation for running flywheel orchestrators and would make the gauge depend on an active run. CLI and server ship together, so a required field is safe; contract test fixtures are updated in the same bead."
+      },
+      {
+        "summary": "pan status: human-readable headline line only; --json output (agents array) unchanged.",
+        "rationale": "The --json shape is a bare agents array; wrapping it or appending a non-agent object would break existing consumers. The ask names the human headline."
+      },
+      {
+        "summary": "Dashboard chip lives on the FlywheelPage header strip next to the agents chip, rendered whenever count > 0 even with no active flywheel run; clicking navigates to the Awaiting Merge page's new close-out section.",
+        "rationale": "The FlywheelPage header is the only 'agents-active' headline in the dashboard. The queue exists independently of a run, so the chip must not be gated on effectiveStatus. The Awaiting Merge page is the existing queue page and currently filters verifying issues out entirely — adding the section there gives the 'filtered list' click target without a new tab."
+      },
+      {
+        "summary": "Pinned-resources display (optional ask #3) shows cheap signals only: workspace presence/path, paused agent session count, feature branch. No du-based disk sizing.",
+        "rationale": "Workspaces hold multi-GB node_modules; du across ~21 workspaces takes minutes and would block or mislead. Presence + paused sessions communicates the cost; byte-accurate disk accounting can be a follow-up issue if wanted."
+      },
+      {
+        "summary": "No Sidebar nav badge for the count.",
+        "rationale": "The Awaiting Merge nav item naturally implies ready-to-merge work; overloading its badge with close-out depth would confuse two queues. The issue asks for a headline chip, which the FlywheelPage header provides."
+      }
+    ],
+    "items": [
+      {
+        "id": "lib-awaiting-close-out",
+        "title": "Add shared lib helper listing issues awaiting close-out",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-11T06:09:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1767",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "server-stats-field",
+            "cli-status-headline",
+            "frontend-closeout-selector"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/awaiting-close-out.ts exporting listAwaitingCloseOut(statuses?: Record<string, ReviewStatus>): Array<{ issueId: string; prUrl?: string; updatedAt: string }> and countAwaitingCloseOut(): number. The list filters review statuses to mergeStatus === 'merged', sorted oldest-first by updatedAt. Default data source is loadReviewStatuses() from src/lib/review-status.ts (sync SQLite via getAllReviewStatusesFromDb — the established pattern; no execSync, no network). The optional statuses parameter exists for tests and for callers that already hold the map. This helper is THE definition of 'awaiting close-out' — every other bead consumes it or mirrors its predicate."
+        },
+        "subItems": [
+          {
+            "id": "lib-awaiting-close-out.ac1",
+            "title": "listAwaitingCloseOut returns exactly the review-status entries with mergeStatus === 'merged', sorted ascending by updatedAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lib-awaiting-close-out.ac2",
+            "title": "Entries with mergeStatus pending/queued/merging/verifying/failed or absent are excluded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lib-awaiting-close-out.ac3",
+            "title": "Unit tests cover empty store, mixed statuses, and sort order; suite passes via vitest",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lib-awaiting-close-out.ac4",
+            "title": "No execSync and no async network calls in the helper; safe to import from both CLI commands and dashboard server code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "contracts-stats-field",
+        "title": "Add awaitingCloseOut field to FlywheelStats contract",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-11T06:09:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1767",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In packages/contracts/src/flywheel-stats.ts, add `awaitingCloseOut: Schema.Number` as a REQUIRED top-level field on the FlywheelStats Schema.Struct and the FlywheelStats interface (sibling of window/generatedAt/criteria — NOT inside criteria, it is a point-in-time gauge, not a windowed criterion). Update packages/contracts/src/flywheel-stats.test.ts fixtures to include the field and add a decode-rejection case for payloads missing it. Do NOT touch FlywheelStatus/FlywheelHeadline in flywheel.ts — those are orchestrator-emitted. Rebuild contracts (cd packages/contracts && npm run build) so dependent workspaces resolve the new type."
+        },
+        "subItems": [
+          {
+            "id": "contracts-stats-field.ac1",
+            "title": "FlywheelStats schema and interface include required top-level awaitingCloseOut: number; decodeFlywheelStats rejects payloads missing it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-stats-field.ac2",
+            "title": "flywheel.ts (FlywheelStatus/FlywheelHeadline) is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-stats-field.ac3",
+            "title": "Contracts test suite passes with updated fixtures",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "server-stats-field",
+        "title": "Populate awaitingCloseOut in computeFlywheelStats",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-11T06:09:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1767",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/flywheel-telemetry.ts, extend FlywheelStatsOptions with `awaitingCloseOut?: number` and have computeFlywheelStats return `awaitingCloseOut: options.awaitingCloseOut ?? listAwaitingCloseOut().length` (helper from lib-awaiting-close-out bead). The options override keeps tests hermetic. Update flywheel-telemetry tests and any routes/flywheel.ts test fixtures that decode stats payloads. GET /api/flywheel/stats then returns the field with no route changes (decodeFlywheelStats already validates the computed object)."
+        },
+        "subItems": [
+          {
+            "id": "server-stats-field.ac1",
+            "title": "computeFlywheelStats output includes awaitingCloseOut; defaults to live count from listAwaitingCloseOut() and honors the options override",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-stats-field.ac2",
+            "title": "GET /api/flywheel/stats response body includes awaitingCloseOut (verified by route test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-stats-field.ac3",
+            "title": "flywheel-telemetry and routes/flywheel test suites pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-flywheel-stats-line",
+        "title": "Print awaiting close-out line in pan flywheel stats",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-11T06:09:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1767",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/flywheel.ts formatFlywheelStats(), print `Awaiting close-out: N` in the header block (after the Generated line, before criteria). `pan flywheel stats --json` includes the field automatically via the contract. Update src/cli/commands/__tests__/flywheel.test.ts fixtures/assertions."
+        },
+        "subItems": [
+          {
+            "id": "cli-flywheel-stats-line.ac1",
+            "title": "pan flywheel stats human output contains 'Awaiting close-out: <N>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-flywheel-stats-line.ac2",
+            "title": "pan flywheel stats --json output includes awaitingCloseOut",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-flywheel-stats-line.ac3",
+            "title": "CLI flywheel test suite passes with updated fixtures",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-status-headline",
+        "title": "Add awaiting close-out headline to pan status",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-11T06:09:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1767",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/status.ts statusCommand(), print a headline line using countAwaitingCloseOut()/listAwaitingCloseOut(): e.g. `Awaiting close-out: 21 — run 'pan close <id>' or open the dashboard Awaiting Merge page` (chalk.yellow when N > 0, chalk.dim 'Awaiting close-out: 0' otherwise). CRITICAL: the line must print BEFORE the early return at the 'No running agents' branch (status.ts ~line 150) — the motivating scenario is a deep queue while zero agents run. Wrap the count read in try/catch so a DB error degrades gracefully (skip the line, do not crash pan status). --json output unchanged. Add/extend a unit test covering both the agents-running and no-agents paths."
+        },
+        "subItems": [
+          {
+            "id": "cli-status-headline.ac1",
+            "title": "pan status prints 'Awaiting close-out: <N>' with a pan close hint when N > 0, including when zero agents are running",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-status-headline.ac2",
+            "title": "pan status --json output shape is unchanged (still a bare agents array)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-status-headline.ac3",
+            "title": "A review-status DB read failure does not crash pan status (headline silently skipped)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-status-headline.ac4",
+            "title": "Unit test covers headline rendering in both the no-agents and agents-running paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-closeout-selector",
+        "title": "Add selectAwaitingCloseOut store selector",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-11T06:09:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1767",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/lib/store.ts, add selectAwaitingCloseOut as a memoizeArraySelector over reviewStatusByIssueId filtering mergeStatus === 'merged', sorted ascending by updatedAt (mirror selectAwaitingMerge style and the lib helper's predicate exactly). Add a unit test alongside existing store selector tests."
+        },
+        "subItems": [
+          {
+            "id": "frontend-closeout-selector.ac1",
+            "title": "selectAwaitingCloseOut returns review statuses with mergeStatus === 'merged', oldest-first, memoized like sibling selectors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-closeout-selector.ac2",
+            "title": "Selector unit test passes (empty map, mixed mergeStatus values, sort order)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-awaiting-closeout-section",
+        "title": "Add 'Awaiting close-out' section to Awaiting Merge page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-11T06:09:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1767",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/AwaitingMergePage.tsx, add an 'Awaiting close-out (N)' section fed by selectAwaitingCloseOut. Each row shows: issue id + title (from selectIssues via issuesById, falling back to bare id), PR link when prUrl present, age since merge (updatedAt), and pinned resources — workspace presence/path (reuse the existing fetchWorkspace useQueries pattern) and paused/stopped agent session count for that issue from the store's agents. Row click calls onNavigateIssue (existing prop pattern); include a per-row 'Close out' action reusing the existing issueActions closeOut machinery (POST /api/issues/:id/close-out) with its existing destructive-action confirmation semantics. Empty state: section hidden or shows 'No issues awaiting close-out'. Note: this page's existing merge sections deliberately filter verifying issues OUT — do not change that filtering; the new section is where those issues now appear."
+        },
+        "subItems": [
+          {
+            "id": "frontend-awaiting-closeout-section.ac1",
+            "title": "Awaiting Merge page shows an 'Awaiting close-out (N)' section listing exactly the mergeStatus==='merged' issues, oldest-first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-awaiting-closeout-section.ac2",
+            "title": "Each row shows issue id/title, PR link when available, merge age, workspace presence, and paused agent session count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-awaiting-closeout-section.ac3",
+            "title": "Per-row Close out action triggers the existing close-out endpoint with confirmation; row click navigates to the issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-awaiting-closeout-section.ac4",
+            "title": "Existing merge-queue sections still exclude verifying issues (no regression in their filters); frontend tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-flywheel-chip",
+        "title": "Add clickable 'N awaiting close-out' chip to FlywheelPage header",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-11T06:09:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1767",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/pages/FlywheelPage.tsx, add a chip in the header strip next to the agents/in-flight stats showing '<N> awaiting close-out', sourced from selectAwaitingCloseOut. CRITICAL: render it OUTSIDE the `{effectiveStatus && ...}` guard — the chip must be visible when N > 0 even with no active flywheel run (hide when N === 0). Clicking navigates to the Awaiting Merge page: add an onNavigateAwaitingMerge (or equivalent) prop to FlywheelPageProps and wire it in App.tsx using the same pattern as onNavigateIssue/onNavigateAgent, switching the active tab to 'awaiting-merge'. Match the existing chip styling (uppercase micro-label, stacked value)."
+        },
+        "subItems": [
+          {
+            "id": "frontend-flywheel-chip.ac1",
+            "title": "Chip shows the awaiting close-out count next to the agents chip and renders when N > 0 even with no active flywheel run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-flywheel-chip.ac2",
+            "title": "Chip is hidden when N === 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-flywheel-chip.ac3",
+            "title": "Clicking the chip navigates to the Awaiting Merge page (close-out section visible), wired through App.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-flywheel-chip.ac4",
+            "title": "Browser UAT via isolated Playwright instance: with seeded merged review statuses, the chip renders with the correct count and click lands on the Awaiting close-out section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "lib-awaiting-close-out",
+        "to": "server-stats-field",
+        "type": "blocks"
+      },
+      {
+        "from": "lib-awaiting-close-out",
+        "to": "cli-status-headline",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-stats-field",
+        "to": "server-stats-field",
+        "type": "blocks"
+      },
+      {
+        "from": "server-stats-field",
+        "to": "cli-flywheel-stats-line",
+        "type": "blocks"
+      },
+      {
+        "from": "lib-awaiting-close-out",
+        "to": "frontend-closeout-selector",
+        "type": "informs"
+      },
+      {
+        "from": "frontend-closeout-selector",
+        "to": "frontend-awaiting-closeout-section",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-closeout-selector",
+        "to": "frontend-flywheel-chip",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-awaiting-closeout-section",
+        "to": "frontend-flywheel-chip",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-11-PAN-1767-feat-stats-surface-awaiting-close-out-verifying-on-main-count-in-flywheel-stats-pan-status-and-dashboard-headline.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

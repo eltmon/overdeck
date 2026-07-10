@@ -1,0 +1,227 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-13T21:33:31.082Z"
+  },
+  "plan": {
+    "title": "Refactor route handlers to idiomatic Effect — extract shared services, eliminate imperative wrappers",
+    "status": "proposed",
+    "items": [
+      {
+        "id": "pan-449-1",
+        "title": "Define typed error types for all services",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "simple",
+          "files": [
+            "src/dashboard/server/services/typed-errors.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/typed-errors.ts with Data.TaggedError types: TrackerNotConfigured, IssueNotFound, RateLimited, WorkspaceNotFound, AgentAlreadyRunning, BeadsNotInitialized, PlanEmpty. These are shared across all new services and route error handlers."
+        }
+      },
+      {
+        "id": "pan-449-2",
+        "title": "Extract LinearClient Effect service + tests",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "complex",
+          "files": [
+            "src/dashboard/server/services/linear-client.ts",
+            "tests/services/linear-client.test.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "Create LinearClient service using ServiceMap.Service pattern. Methods: getIssue, updateState, getTeamStates, addComment. Extracts ~25 inline fetch() calls to Linear GraphQL from issues.ts, agents.ts, mission-control.ts, misc.ts. Includes API key management, retry on 429, typed errors."
+        }
+      },
+      {
+        "id": "pan-449-3",
+        "title": "Extract GitHubClient Effect service + tests",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "complex",
+          "files": [
+            "src/dashboard/server/services/github-client.ts",
+            "tests/services/github-client.test.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "Create GitHubClient service. Methods: getIssue, addLabel, removeLabel, createComment, closeIssue. Extracts GitHub REST API calls from issues.ts, specialists.ts, agents.ts. Rate limit header tracking."
+        }
+      },
+      {
+        "id": "pan-449-4",
+        "title": "Extract RallyClient Effect service + tests",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "medium",
+          "files": [
+            "src/dashboard/server/services/rally-client.ts",
+            "tests/services/rally-client.test.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "Create RallyClient service. Methods: getIssue, updateState. Maps canonical statuses to Rally state values. Extracts Rally WSAPI calls from issues.ts."
+        }
+      },
+      {
+        "id": "pan-449-5",
+        "title": "Extract IssueLifecycle Effect service + tests",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "expert",
+          "files": [
+            "src/dashboard/server/services/issue-lifecycle.ts",
+            "tests/services/issue-lifecycle.test.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "Create IssueLifecycle service that unifies 'move issue to status X + patch cache + emit event' pattern duplicated across 9+ endpoints. Methods: transitionTo, addLabel, removeLabel, close. Depends on tracker clients, EventStoreService, and issue-data-service cache."
+        }
+      },
+      {
+        "id": "pan-449-6",
+        "title": "Extract WorkspaceService Effect service + tests",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "complex",
+          "files": [
+            "src/dashboard/server/services/workspace-service.ts",
+            "tests/services/workspace-service.test.ts",
+            "src/lib/workspace-manager.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "Create WorkspaceService to replace src/lib/workspace-manager.ts (1030L). Methods: create, clean, containerize. Handles git worktree creation, project workspace_command, Docker containers."
+        }
+      },
+      {
+        "id": "pan-449-7",
+        "title": "Extract AgentSpawner Effect service + tests",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "expert",
+          "files": [
+            "src/dashboard/server/services/agent-spawner.ts",
+            "tests/services/agent-spawner.test.ts",
+            "src/lib/agents.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "Create AgentSpawner to replace src/lib/agents.ts (1222L). Methods: startWork, startPlanning, kill, deepWipe. Depends on IssueLifecycle and WorkspaceService."
+        }
+      },
+      {
+        "id": "pan-449-8",
+        "title": "Refactor major route files to use Effect services",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "expert",
+          "files": [
+            "src/dashboard/server/routes/agents.ts",
+            "src/dashboard/server/routes/issues.ts",
+            "src/dashboard/server/routes/specialists.ts",
+            "src/dashboard/server/routes/workspaces.ts",
+            "src/dashboard/server/routes/mission-control.ts",
+            "src/dashboard/server/routes/misc.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "Refactor the 6 largest route files (agents.ts 1741L, issues.ts 2230L, specialists.ts 2193L, workspaces.ts 3711L, mission-control.ts 1222L, misc.ts 1702L) to use the new Effect services instead of inline imperative code. Replace Effect.tryPromise wrappers with Effect.gen + service calls + typed error handling."
+        }
+      },
+      {
+        "id": "pan-449-9",
+        "title": "Refactor minor route files + wire service layers in server.ts",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "complex",
+          "files": [
+            "src/dashboard/server/routes/settings.ts",
+            "src/dashboard/server/routes/remote.ts",
+            "src/dashboard/server/routes/costs.ts",
+            "src/dashboard/server/routes/metrics.ts",
+            "src/dashboard/server/routes/resources.ts",
+            "src/dashboard/server/routes/conversations.ts",
+            "src/dashboard/server/routes/cloister.ts",
+            "src/dashboard/server/server.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "Refactor remaining 7 route files (settings, remote, costs, metrics, resources, conversations, cloister) and update server.ts to compose all new service layers."
+        }
+      },
+      {
+        "id": "pan-449-10",
+        "title": "Update CLI callers to use Effect services",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "complex",
+          "files": [
+            "src/cli/commands/work/issue.ts",
+            "src/cli/commands/work/kill.ts",
+            "src/cli/commands/work/tell.ts",
+            "src/cli/commands/work/status.ts",
+            "src/cli/commands/work/health.ts",
+            "src/cli/commands/work/pending.ts",
+            "src/cli/commands/work/recover.ts",
+            "src/cli/commands/work/approve.ts",
+            "src/cli/commands/work/wipe.ts",
+            "src/cli/commands/work/done.ts",
+            "src/cli/commands/workspace.ts",
+            "src/cli/commands/workspace-migrate.ts",
+            "src/dashboard/server/services/agent-enrichment-service.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "Update ~15 CLI command files that import from src/lib/agents.ts and src/lib/workspace-manager.ts to use the new Effect services with runPromise/runSync. Remove or deprecate old lib modules."
+        }
+      },
+      {
+        "id": "pan-449-11",
+        "title": "Integration tests + error channel tests",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "complex",
+          "files": [
+            "tests/integration/issue-routes.test.ts",
+            "tests/integration/agent-routes.test.ts",
+            "tests/integration/specialist-routes.test.ts",
+            "tests/services/error-handling.test.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "Write integration tests verifying route→service→Effect chains and error channel tests ensuring consistent JSON error responses across all error types."
+        }
+      },
+      {
+        "id": "pan-449-12",
+        "title": "Final quality gates — typecheck, lint, full test suite",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "medium",
+          "files": []
+        },
+        "narrative": {
+          "Action": "Run all quality gates, fix any remaining issues, ensure clean build."
+        }
+      }
+    ],
+    "edges": []
+  },
+  "status": "proposed"
+}

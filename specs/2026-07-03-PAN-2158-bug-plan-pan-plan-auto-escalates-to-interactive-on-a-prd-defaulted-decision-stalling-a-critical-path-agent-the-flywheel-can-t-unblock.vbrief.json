@@ -1,0 +1,95 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-03T13:54:06.377Z",
+    "updated": "2026-07-03T21:04:02.897Z",
+    "author": "overdeck/auto-start",
+    "description": "Auto-synthesized minimal plan for PAN-2158: bug(plan): pan plan --auto escalates to interactive on a PRD-defaulted decision, stalling a critical-path agent the flywheel can't unblock",
+    "inspectionPolicy": "never"
+  },
+  "plan": {
+    "id": "pan-2158",
+    "title": "bug(plan): pan plan --auto escalates to interactive on a PRD-defaulted decision, stalling a critical-path agent the flywheel can't unblock",
+    "status": "completed",
+    "uid": "e2981851-cee3-4874-a036-21acf9604c41",
+    "author": "overdeck/auto-start",
+    "sequence": 4,
+    "created": "2026-07-03T13:54:06.377Z",
+    "updated": "2026-07-03T21:04:02.897Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2158",
+        "label": "PAN-2158",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "auto-start"
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-03-PAN-2158-bug-plan-pan-plan-auto-escalates-to-interactive-on-a-prd-defaulted-decision-stalling-a-critical-path-agent-the-flywheel-can-t-unblock.vbrief.json"
+    },
+    "narratives": {
+      "Problem": "## Symptom\n\nObserved RUN-33 (2026-06-29) on PAN-2157 (the merge-unblocker fix). `pan plan PAN-2157 --auto` ran the analysis, produced a strong recommendation, then **stopped and asked the operator** — the agent pane ends with literal text *\"Which way do you want me to go?\"* and sits idle (\"Baked for 4m 11s\", blank prompt). The critical-path producer is stalled indefinitely.\n\n## Why this is wrong\n\n1. **The decision was already defaulted in the PRD.** PAN-2157's body enumerated 3 options (gh/installation token; provision GitHub App; warn-only) and the agent itself strongly recommended option 2 (gh token) as the smallest change that satisfies AC-1. `pan plan --auto` is documented to *\"run end-to-end without prompting; if it encounters a contradiction it can't resolve, escalate to interactive; record inferred choices in plan.autoDecisions[]\"*. A documented set of options with a clear best choice is **not** an unresolvable contradiction — auto-mode should have picked option 2, recorded it in autoDecisions, and proceeded.\n2. **The flywheel cannot unblock it.** `pan tell` is forbidden from the flywheel role, so a single unanswered planning question stalls a producer with no autonomous recovery path. Combined with the --no-resume boot (no overflow-respawn), the agent just sits there.\n\n## Fix direction (do not patch from flywheel role)\n\n- **Primary:** `--auto` must NOT escalate to interactive when the PRD/issue documents the options and a defensible default exists. Pick the recommended option, record it in `plan.autoDecisions[]` with rationale, and continue. Reserve interactive escalation for genuine contradictions (conflicting requirements with no documented resolution).\n- **Secondary (defense-in-depth):** when an --auto agent does ask a question, the deacon stuck-detector / a sanctioned advance path should be able to deliver the recorded default (or a 'proceed with your recommendation' nudge) so an unanswered question can't indefinitely strand a critical-path agent.\n\n## Acceptance\n\n- AC-1: `pan plan <id> --auto` on an issue whose body lists options + a recommended default produces a vBRIEF without prompting, with the chosen option recorded in `plan.autoDecisions[]`.\n- AC-2: A simulated agent question under --auto is auto-advanced (or never asked), not left idle.\n\nDiscovered while orchestrating PAN-2157. Filed by the Flywheel orchestrator (RUN-33).\n\n---\nFlywheel-Run-Id: RUN-33\nFlywheel-Filed-By: agent\nFlywheel-Discovered-In: RUN-33",
+      "Proposal": "Implement the issue directly from the tracker-provided title and body."
+    },
+    "items": [
+      {
+        "id": "auto-start",
+        "title": "Implement issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T13:54:06.377Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2158",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "## Symptom\n\nObserved RUN-33 (2026-06-29) on PAN-2157 (the merge-unblocker fix). `pan plan PAN-2157 --auto` ran the analysis, produced a strong recommendation, then **stopped and asked the operator** — the agent pane ends with literal text *\"Which way do you want me to go?\"* and sits idle (\"Baked for 4m 11s\", blank prompt). The critical-path producer is stalled indefinitely.\n\n## Why this is wrong\n\n1. **The decision was already defaulted in the PRD.** PAN-2157's body enumerated 3 options (gh/installation token; provision GitHub App; warn-only) and the agent itself strongly recommended option 2 (gh token) as the smallest change that satisfies AC-1. `pan plan --auto` is documented to *\"run end-to-end without prompting; if it encounters a contradiction it can't resolve, escalate to interactive; record inferred choices in plan.autoDecisions[]\"*. A documented set of options with a clear best choice is **not** an unresolvable contradiction — auto-mode should have picked option 2, recorded it in autoDecisions, and proceeded.\n2. **The flywheel cannot unblock it.** `pan tell` is forbidden from the flywheel role, so a single unanswered planning question stalls a producer with no autonomous recovery path. Combined with the --no-resume boot (no overflow-respawn), the agent just sits there.\n\n## Fix direction (do not patch from flywheel role)\n\n- **Primary:** `--auto` must NOT escalate to interactive when the PRD/issue documents the options and a defensible default exists. Pick the recommended option, record it in `plan.autoDecisions[]` with rationale, and continue. Reserve interactive escalation for genuine contradictions (conflicting requirements with no documented resolution).\n- **Secondary (defense-in-depth):** when an --auto agent does ask a question, the deacon stuck-detector / a sanctioned advance path should be able to deliver the recorded default (or a 'proceed with your recommendation' nudge) so an unanswered question can't indefinitely strand a critical-path agent.\n\n## Acceptance\n\n- AC-1: `pan plan <id> --auto` on an issue whose body lists options + a recommended default produces a vBRIEF without prompting, with the chosen option recorded in `plan.autoDecisions[]`.\n- AC-2: A simulated agent question under --auto is auto-advanced (or never asked), not left idle.\n\nDiscovered while orchestrating PAN-2157. Filed by the Flywheel orchestrator (RUN-33).\n\n---\nFlywheel-Run-Id: RUN-33\nFlywheel-Filed-By: agent\nFlywheel-Discovered-In: RUN-33"
+        },
+        "items": [
+          {
+            "id": "auto-start.ac1",
+            "title": "**Primary:** --auto must NOT escalate to interactive when the PRD/issue documents the options and a defensible default exists. Pick the recommended option, record it in plan.autoDecisions[] with rationale, and continue. Reserve interactive escalation for genuine contradictions (conflicting requirements with no documented resolution).",
+            "status": "pending",
+            "created": "2026-07-03T13:54:06.377Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac2",
+            "title": "**Secondary (defense-in-depth):** when an --auto agent does ask a question, the deacon stuck-detector / a sanctioned advance path should be able to deliver the recorded default (or a 'proceed with your recommendation' nudge) so an unanswered question can't indefinitely strand a critical-path agent.",
+            "status": "pending",
+            "created": "2026-07-03T13:54:06.377Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac3",
+            "title": "AC-1: pan plan <id> --auto on an issue whose body lists options + a recommended default produces a vBRIEF without prompting, with the chosen option recorded in plan.autoDecisions[].",
+            "status": "pending",
+            "created": "2026-07-03T13:54:06.377Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac4",
+            "title": "AC-2: A simulated agent question under --auto is auto-advanced (or never asked), not left idle.",
+            "status": "pending",
+            "created": "2026-07-03T13:54:06.377Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "completed"
+}

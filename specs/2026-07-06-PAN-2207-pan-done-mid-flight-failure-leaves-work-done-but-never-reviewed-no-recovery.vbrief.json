@@ -1,0 +1,274 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-06T16:46:52Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2207: pan done that fails mid-flight (e.g. GraphQL rate limit at PR creation) leaves an issue done-but-never-reviewed — no recovery",
+    "updated": "2026-07-07T18:48:19.602Z"
+  },
+  "plan": {
+    "id": "pan-2207",
+    "title": "pan done mid-flight failure leaves work done-but-never-reviewed — no recovery",
+    "status": "completed",
+    "uid": "550deb2a-d0c8-402d-bdd3-ce65d59613a0",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 7,
+    "created": "2026-07-06T16:46:52Z",
+    "updated": "2026-07-07T18:48:19.602Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2207",
+        "label": "PAN-2207",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2376",
+        "label": "PAN-2376 (epic)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "reliability",
+      "deacon",
+      "pan-done",
+      "review-dispatch",
+      "self-heal"
+    ],
+    "narratives": {
+      "Problem": "A work agent finishes and runs `pan done`, but `pan done` fails mid-flight — e.g. a GitHub GraphQL rate limit during PR creation (Step 2, done.ts:742). Execution falls into the catch block at done.ts:988 (process.exit(1)) BEFORE the completed marker (Step 4, done.ts:780) and `reviewRequestedAt` (Step 6, done.ts:840) are written. Result: PR is open + mergeable and all beads are closed, yet reviewStatus=pending and reviewRequestedAt is empty, so the review convoy is never dispatched and nothing re-dispatches it. The issue sits done-but-never-reviewed forever. Observed on PAN-2203 (2026-07-01): agent created the PR via REST by hand but never re-ran `pan done`; operator noticed only by asking. Compounding the fragility, createReviewArtifactsForIssue's own idempotency guard (getExistingGitHubArtifact) uses GraphQL when GitHub App is configured, so it ALSO throws under the same rate limit.",
+      "Proposal": "Two independent layers, matching the PAN-2143/PAN-2200 reconciler shape. (1) Resilience in `pan done`: wrap Step 2 in try-catch; on failure, detect an already-open PR via the REST CLI (`gh pr list`, which survives GraphQL rate limits) and, if found, record the PR URL and proceed to write the completed marker + reviewRequestedAt instead of exiting. Also clear the recovery tombstone on every `pan done` re-run. (2) Recovery in the deacon: a new `checkOrphanedCompletions` patrol detects `reviewStatus=pending + reviewRequestedAt empty + open PR on GitHub (via REST)` and writes `reviewRequestedAt` to trigger the existing `needsReviewDispatch` auto-dispatch path, guarded by a durable `panDoneRecoveredAt` tombstone in the per-issue record so it fires at most once per stuck issue.",
+      "NonGoals": "- Making `pan done` atomic/transactional (rollback on any step failure) — the sequential-idempotent approach is sufficient and less invasive.\n- Fixing or working around GitHub GraphQL rate limits themselves (external constraint).\n- Reconciling the historical PAN-2203 incident's data — the patrol self-heals going forward only.\n- Changing the strike-completion path (`pan done --strike`, done.ts ~480-511) — it bypasses PR creation entirely.\n- Using GraphQL for either the fallback or the patrol PR-existence check — REST `gh pr list` only (it must survive the rate limit)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Merged the PRD's W1 (FR-1 resilient step 2) and FR-4 (clear tombstone on re-run) into ONE done.ts bead instead of splitting.",
+        "rationale": "Both edit src/cli/commands/done.ts; splitting would force serialization to avoid a merge/file conflict for zero reviewability gain. The PRD authored them as a single work item (W1) with one test file."
+      },
+      {
+        "summary": "Use `ensureIssueRecordSync` (record.ts:439) to obtain-or-default the per-issue record; do NOT call the PRD's `buildDefaultRecord` or `updateIssueRecordForReviewStatusSync`.",
+        "rationale": "Grep-verified on 2026-07-06: neither helper exists. `ensureIssueRecordSync` returns an existing record or a fully-formed default, which is exactly what the tombstone write needs before `writeIssueRecordSync`."
+      },
+      {
+        "summary": "Wire the patrol into `runPatrol()` (deacon.ts:2599), not `runScheduledPatrol` as the PRD text states.",
+        "rationale": "The `checkMissingReviewStatuses()` anchor (deacon.ts:2861) lives inside runPatrol; runScheduledPatrol merely calls runPatrol. The grep anchor is unambiguous regardless of the PRD's function-name error."
+      },
+      {
+        "summary": "No bead uses the work.inspect gate (0 inspection beads).",
+        "rationale": "Every bead is mechanically specified with before/after code and a dedicated regression test; no bead consumes another's internal structure beyond a trivial optional type field, so a wrong implementation surfaces at typecheck/test rather than as silent foundation rot."
+      }
+    ],
+    "items": [
+      {
+        "id": "b1-tombstone-field",
+        "title": "Add `panDoneRecoveredAt` tombstone field to PanIssuePipelineRecord",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-06T16:46:52Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-2207",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pan-dir/record.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes with no new any"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In `src/lib/pan-dir/record.ts`, add an optional `panDoneRecoveredAt?: string` field to the `PanIssuePipelineRecord` interface (grep anchor `export interface PanIssuePipelineRecord {` at record.ts:84; insert after the `deaconIgnoredReason?: string;` line at record.ts:110). This durable tombstone is written by the deacon patrol (b3) when it recovers a stuck-pending issue, and cleared by `pan done` (b2) on re-run. Add a doc comment citing PAN-2207. No helper functions are needed — existing `readIssueRecordSync`/`writeIssueRecordSync`/`ensureIssueRecordSync` already round-trip arbitrary pipeline sub-fields."
+        },
+        "items": [
+          {
+            "id": "b1-tombstone-field.ac1",
+            "title": "Given a per-issue record whose `pipeline.panDoneRecoveredAt` is set to an ISO string, when it is written via `writeIssueRecordSync` and read back via `readIssueRecordSync`, then the field persists (round-trips) and `npm run typecheck` completes without errors.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-tombstone-field.ac2",
+            "title": "No new explicit `any` is introduced; `npm run lint` passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b2-done-resilient",
+        "title": "pan done: REST fallback on PR-creation failure + clear recovery tombstone on re-run",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-06T16:46:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2207",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/done.ts",
+            "tests/unit/cli/commands/done-resilient-step2.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/cli/commands/done-resilient-step2.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "done-resilient-step2.test.ts passes (both fallback-success and fallback-empty cases)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In `src/cli/commands/done.ts`, make the review-artifact step resilient and clear the recovery tombstone on re-run.\n\n(FR-1) Wrap the `createReviewArtifactsForIssue` call (grep anchor `const artifactResult = await Effect.runPromise(createReviewArtifactsForIssue(issueId, workspacePath));` at done.ts:742) in try-catch. On failure, run a REST-only PR lookup: `gh pr list --head feature/<issueLower> --state open --json url --jq '.[0].url'` via the existing `execAsync` (done.ts:8) with `cwd: workspacePath`. If a URL is found, log a warning, call `setReviewStatusSync(issueId, { prUrl })`, and synthesize a minimal `artifactResult` (`{ mergeSet: null, artifacts: [{ repoKey: 'primary', created: false, skipped: false, url: existingPrUrl }] }`) so downstream reads (`artifactResult.mergeSet?.repos.find(...)`, `artifactResult.artifacts.filter(a => !a.skipped && a.url)`, and `isMergeSetMergedIntoTargets(workspacePath, null)` — verified null-safe at done.ts:307) continue to Step 3/4/6. If no URL is found, re-throw the original error (preserve exit-1 behavior).\n\n(FR-4) After the closed-issue guard and before the pre-flight block (near done.ts:574), clear any stale recovery tombstone: import `resolveProjectForIssue`/`readIssueRecordSync`/`writeIssueRecordSync` from `../../lib/pan-dir/record.js`; if the per-issue record's `pipeline.panDoneRecoveredAt` is set, write the record back with that field removed. Wrap in try-catch (non-fatal). A re-run of `pan done` supersedes any patrol recovery.\n\nWrite `tests/unit/cli/commands/done-resilient-step2.test.ts`: (a) mock createReviewArtifactsForIssue to throw + mock execAsync so `gh pr list` returns a URL → assert setReviewStatusSync is called with the prUrl and execution reaches the completed-marker write (exit 0); (b) mock createReviewArtifactsForIssue to throw + execAsync returns empty → assert the original error is re-thrown (exit non-zero)."
+        },
+        "items": [
+          {
+            "id": "b2-done-resilient.ac1",
+            "title": "Given createReviewArtifactsForIssue throws and `gh pr list --head feature/<id> --state open` returns a PR URL, when `pan done` runs, then it records the URL via setReviewStatusSync, writes the completed marker, sets reviewRequestedAt, and exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-done-resilient.ac2",
+            "title": "Given createReviewArtifactsForIssue throws and `gh pr list` returns empty, when `pan done` runs, then it re-throws the original error and exits non-zero.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-done-resilient.ac3",
+            "title": "Given a per-issue record with `pipeline.panDoneRecoveredAt` set, when `pan done` re-runs, then it clears panDoneRecoveredAt from the record before the pre-flight checks.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-done-resilient.ac4",
+            "title": "`tests/unit/cli/commands/done-resilient-step2.test.ts` exercises the fallback-success and fallback-empty paths and passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b3-deacon-patrol",
+        "title": "Deacon checkOrphanedCompletions patrol: recover PR-open + review-pending issues",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-06T16:46:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2207",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon.ts",
+            "tests/unit/lib/cloister/deacon-orphaned-completions.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/lib/cloister/deacon-orphaned-completions.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "deacon-orphaned-completions.test.ts passes (recover / tombstone-skip / reviewing-and-merged-skip)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In `src/lib/cloister/deacon.ts`, add `export async function checkOrphanedCompletions(): Promise<string[]>` (alongside the sibling patrols). For each entry from `loadReviewStatuses()`: skip unless `reviewStatus === 'pending'`; skip if `mergeStatus === 'merged'`; skip if `needsReviewDispatch(status)` is already true (reviewRequestedAt already set); resolve the project via `resolveProjectFromIssueSync` (src/lib/projects.ts:411) and skip if unresolved; read the per-issue record via `readIssueRecordSync` and skip if `pipeline.panDoneRecoveredAt` is set (tombstone). Then do a REST-only PR check: `gh pr list --head feature/<issueLower> --state open --json url --jq '.[0].url'` via the module-level `execAsync` (deacon.ts:50) with a 15s timeout; on exec error, `continue` (skip this cycle). If a PR URL is found, call `setReviewStatusSync(issueId, { reviewRequestedAt: now, prUrl })`, then obtain the record via `ensureIssueRecordSync(project, issueId)` (record.ts:439 — do NOT use the non-existent `buildDefaultRecord`) and `writeIssueRecordSync` it back with `pipeline.panDoneRecoveredAt = now`. Log via `logDeaconEventSync` and console. Wrap the whole loop body defensively so one bad issue never throws the patrol.\n\nWire it into `runPatrol()` (deacon.ts:2599) immediately after the anchor `const missingStatusActions = await checkMissingReviewStatuses();` (deacon.ts:2861): `const orphanCompletionActions = await checkOrphanedCompletions(); actions.push(...orphanCompletionActions); for (const a of orphanCompletionActions) addLog('action', a, state.patrolCycle);`. (The PRD's `runScheduledPatrol` reference is incorrect.)\n\nWrite `tests/unit/lib/cloister/deacon-orphaned-completions.test.ts`: (a) pending + reviewRequestedAt empty + no tombstone + `gh pr list` returns a URL → setReviewStatusSync called with reviewRequestedAt+prUrl, tombstone written; second call with tombstone present → no action; (b) reviewStatus 'reviewing' → skipped; (c) mergeStatus 'merged' → skipped."
+        },
+        "items": [
+          {
+            "id": "b3-deacon-patrol.ac1",
+            "title": "Given an issue with reviewStatus='pending', reviewRequestedAt empty, no tombstone, and `gh pr list` returns an open PR URL, when checkOrphanedCompletions runs, then it sets reviewRequestedAt+prUrl via setReviewStatusSync and writes `panDoneRecoveredAt` into the per-issue record.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-deacon-patrol.ac2",
+            "title": "Given that same issue after recovery (panDoneRecoveredAt set), when checkOrphanedCompletions runs again, then it takes no action (setReviewStatusSync not called a second time).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-deacon-patrol.ac3",
+            "title": "Given an issue with reviewStatus='reviewing' or mergeStatus='merged', when checkOrphanedCompletions runs, then it skips the issue and performs no gh/API call for it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-deacon-patrol.ac4",
+            "title": "checkOrphanedCompletions is wired into runPatrol (deacon.ts) and its recovery actions are pushed to the patrol action log; `tests/unit/lib/cloister/deacon-orphaned-completions.test.ts` passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "b1-tombstone-field",
+        "to": "b2-done-resilient",
+        "type": "blocks"
+      },
+      {
+        "from": "b1-tombstone-field",
+        "to": "b3-deacon-patrol",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-06-PAN-2207-pan-done-mid-flight-failure-leaves-work-done-but-never-reviewed-no-recovery.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

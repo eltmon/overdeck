@@ -1,0 +1,1646 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-07T15:49:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2468: OKF knowledge skill v1 — Karpathy-loop wiki + okf-embeddings vector extension (/okf)",
+    "updated": "2026-07-09T05:47:50.117Z"
+  },
+  "plan": {
+    "id": "pan-2468",
+    "title": "OKF knowledge skill v1 — Karpathy-loop wiki + okf-embeddings vector extension (/okf)",
+    "status": "running",
+    "uid": "c0eabff2-59cf-4439-8452-e0a5cda24850",
+    "author": "agent:claude-fable-5",
+    "sequence": 9,
+    "created": "2026-07-07T15:49:00Z",
+    "updated": "2026-07-09T05:47:50.117Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2468",
+        "label": "PAN-2468",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-2468.md",
+        "label": "PRD v2 (2026-07-07)",
+        "type": "spec"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2066",
+        "label": "PAN-2066 (deferred v2)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1641",
+        "label": "PAN-1641 (Ollama sidecar)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1115",
+        "label": "PAN-1115 (injection reconcile)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "skill",
+      "knowledge",
+      "okf",
+      "embeddings",
+      "roles",
+      "track-a",
+      "track-b"
+    ],
+    "narratives": {
+      "Problem": "Project knowledge lives only in heads and transcripts; agents re-derive context every session — slowly, expensively, sometimes wrongly. There is no maintained, searchable, conformant knowledge bundle per project, and no pipeline loop that keeps one current.",
+      "Proposal": "Ship one portable Claude Code skill (/okf, sources at skills/okf/ in this repo) that maintains a per-project OKF v0.1 bundle in a PR-gated peer-directory knowledge repo, with Karpathy-style study/retro/sync/lint loops, a deterministic Python conformance gate, and the okf-embeddings v0.1 extension (committed manifest + committed per-profile vector shards + gitignored SQLite FTS5/sqlite-vec index, hybrid BM25+vector RRF with BM25-only degradation, keyless Ollama default). Track B integrates Overdeck: a first-class `knowledge` agent role (pan knowledge <id>, live TUI, Command Deck visible), mnemos + Ollama on-demand installers, mega-brain-style session-start concept injection inside the existing prompt-time injection path, and opt-in post-merge auto-retro. Execute PRD work items WI-1..WI-22 exactly as specified in .pan/drafts/pan-2468.md; each work item is one bead.",
+      "NonGoals": "- Graph visualizer, lease-based writes, and an own MCP server (stay deferred in PAN-2066; mnemos covers MCP read meanwhile)\n- Section-level chunking and multimodal embeddings (okf-embeddings v0.2)\n- Dashboard knowledge-health surface (concept count, staleness, conformance status) — separate follow-up issue after v1\n- kcmd / Google Knowledge Catalog cloud sync (compatibility posture only, PRD §5.6)\n- PAN-1641's Pi-harness agent execution via Ollama — separate issue; this plan only builds the shared install substrate (src/lib/ollama.ts)\n- WI-23 upstream okf-embeddings proposal — post-v1, after ≥2 real bundles run it\n- No new PipelineIssuePhase for knowledge agents — they render as agents under the issue, not as a pipeline stage\n- The knowledge role never enters the code-repo review/merge pipeline, never runs pan done\n- Silent model substitution — unservable --model is a hard error (D-8), never a warn-and-continue\n- No vectors in frontmatter, ever (single optional x_embed: exclude key only)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Adopted all twelve PRD decisions D-1..D-12 verbatim (name /okf + pan knowledge, skill home skills/okf/, committed default-profile shards, extension-standard posture, deterministic gate, whole-concept chunking, kcmd compatibility-only, hard-error on unservable --model, mega-brain replicated in-injection-path, mnemos on-demand never hard dependency, keyless Ollama default profile, knowledge role model mirrors plan's ref).",
+        "rationale": "PRD §5.7 explicitly states these are 'made here, not re-litigated later'; auto mode honors documented decisions instead of re-asking."
+      },
+      {
+        "summary": "Bead granularity = one bead per PRD work item WI-1..WI-22 (22 beads); WI-23 excluded as post-v1.",
+        "rationale": "The PRD's work items are already tracer-bullet slices with named tests and verified file anchors; finer splitting would break the commit-per-work-item contract in PRD §6, and WI-23 is explicitly gated on ≥2 real bundles existing."
+      },
+      {
+        "summary": "requiresInspection: true only on okf-common-parser (foundation for validate/reindex/embed/search) and knowledge-role-registration (foundation for CLI verb, Command Deck, auto-retro); all other beads false.",
+        "rationale": "These two beads' interfaces (parser/hash contract, Role union + spawn semantics) are what downstream beads encode assumptions about; everything else is pinned exactly by the PRD spec text or surfaces defects at typecheck/lint/test."
+      },
+      {
+        "summary": "Track A beads verify via bash skills/okf/scripts/selftest.sh (grown incrementally from WI-1); Track B beads verify via targeted vitest + npm run typecheck/lint.",
+        "rationale": "PRD §5.2 makes selftest.sh the end-to-end harness including negative tests; Track B acceptance criterion 12 names the standard quality gates."
+      }
+    ],
+    "items": [
+      {
+        "id": "okf-scaffold-skillmd",
+        "title": "WI-1: Scaffold skills/okf/ tree + SKILL.md",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-07T15:49:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-2468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "skills/okf/SKILL.md",
+            "skills/okf/references/spec.md",
+            "skills/okf/references/conformance.md",
+            "skills/okf/references/taxonomy.md",
+            "skills/okf/references/conversion.md",
+            "skills/okf/references/workflow.md",
+            "skills/okf/templates/concept.md",
+            "skills/okf/scripts/selftest.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash skills/okf/scripts/selftest.sh"
+          ],
+          "expected_outputs": [
+            "selftest.sh exits 0, asserting SKILL.md parses and every one of the 10 commands has a section"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "Create the exact skills/okf/ tree from PRD §5.2: SKILL.md (trigger, 10-command table for init/author/convert/sync/study/retro/extract/validate/lint/embed, guardrails, reading rules per FR-15, FR-16 model-ladder summary), references/spec.md (OKF v0.1 vendored verbatim from https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md with source SHA + Apache-2.0 ATTRIBUTION), references/{conformance,taxonomy,conversion,workflow}.md, templates/concept.md, and scripts/selftest.sh as the growing end-to-end test harness. Zero Overdeck imports anywhere under skills/okf/ (FR-13/FR-14)."
+        },
+        "items": [
+          {
+            "id": "okf-scaffold-skillmd.ac1",
+            "title": "Given a fresh checkout, running bash skills/okf/scripts/selftest.sh exits 0 and its output names a check that SKILL.md contains a section for each of the 10 commands",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-scaffold-skillmd.ac2",
+            "title": "references/spec.md contains the vendored OKF v0.1 spec text plus the upstream source commit SHA and an Apache-2.0 attribution line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-scaffold-skillmd.ac3",
+            "title": "SKILL.md contains the FR-15 reading rules as guardrails: read index.md first, load only relevant concepts, answer only from loaded concepts, cite concept IDs, never invent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-scaffold-skillmd.ac4",
+            "title": "grep -r for overdeck/pan imports under skills/okf/ produces no code dependency on Overdeck (documentation mentions allowed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "okf-common-parser",
+        "title": "WI-2: okf_common.py shared parser + normalized-content hashing",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-07T15:49:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2468",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "okf-validate-difflint",
+            "okf-reindex",
+            "okf-embed-shards",
+            "okf-index-search"
+          ],
+          "files_scope": [
+            "skills/okf/scripts/okf_common.py",
+            "skills/okf/scripts/selftest.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash skills/okf/scripts/selftest.sh"
+          ],
+          "expected_outputs": [
+            "selftest fixture round-trip passes; hash stable across timestamp-only edits; code-fenced links ignored"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-1",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement skills/okf/scripts/okf_common.py — the ONE shared parser used by validate/diff_lint/reindex/embed/search: PyYAML frontmatter parsing, code-fence-aware relative-link extraction, concept-ID resolution (path minus .md), and normalized-content SHA-256 hashing per PRD §5.3 (frontmatter minus timestamp, plus body, LF-normalized, trailing whitespace stripped). Plain CPython stdlib + PyYAML only (NFR-6). This is the foundation every other script imports — its function signatures and hash rule are load-bearing."
+        },
+        "items": [
+          {
+            "id": "okf-common-parser.ac1",
+            "title": "Given a fixture concept, parsing then re-serializing round-trips frontmatter and body without loss, preserving unknown keys (OKF §4.1)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-common-parser.ac2",
+            "title": "Given two copies of a concept differing only in the timestamp frontmatter field, the normalized-content hash returns identical digests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-common-parser.ac3",
+            "title": "Given a concept whose only [link](other.md) occurrence sits inside a fenced code block, link extraction returns an empty list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-common-parser.ac4",
+            "title": "selftest passes a check that okf_common.py imports only Python stdlib and yaml (PyYAML), verified by grepping its import lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "okf-validate-difflint",
+        "title": "WI-3: validate.py two-tier gate + diff_lint.py",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-07T15:49:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "skills/okf/scripts/validate.py",
+            "skills/okf/scripts/diff_lint.py",
+            "skills/okf/references/conformance.md",
+            "skills/okf/scripts/selftest.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash skills/okf/scripts/selftest.sh"
+          ],
+          "expected_outputs": [
+            "missing-type fixture exits 2; diff-lint tolerates pre-existing warnings and fails newly introduced breakage"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8",
+            "FR-12",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement validate.py (deterministic two-tier gate: ERROR codes = unparseable frontmatter, missing/empty type, reserved-file misuse; LINT codes = missing description, broken links, stale index; exit 0 clean / 1 lint-only / 2 errors; --strict promotes lint to failure) and diff_lint.py (was-clean-now-broken: compares validation between PR base and head so pre-existing warnings never block but new breakage does). Codes documented in references/conformance.md. No LLM anywhere in the gate (NFR-1). Identical code runs locally and in CI."
+        },
+        "items": [
+          {
+            "id": "okf-validate-difflint.ac1",
+            "title": "Given a fixture concept missing the type frontmatter field, validate.py exits 2 and names the ERROR code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-validate-difflint.ac2",
+            "title": "Given a bundle with only lint-tier findings, validate.py exits 1 without --strict and exits 2 with --strict",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-validate-difflint.ac3",
+            "title": "Given a base ref containing a pre-existing warning and a head adding no new findings, diff_lint.py exits 0; given a head introducing a new ERROR, it exits nonzero naming the new finding",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-validate-difflint.ac4",
+            "title": "validate.py accepts a bundle containing okf-embeddings.yaml, embeddings/ shards, and x_embed frontmatter keys without warnings about unknown fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "okf-init",
+        "title": "WI-4: /okf init — peer-directory knowledge repo scaffold",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-07T15:49:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "skills/okf/SKILL.md",
+            "skills/okf/templates/repo/README.md",
+            "skills/okf/templates/repo/CONTRIBUTING.md",
+            "skills/okf/templates/repo/CODEOWNERS*",
+            "skills/okf/templates/repo/.github/workflows/conformance.yml",
+            "skills/okf/templates/repo/index.md",
+            "skills/okf/templates/repo/log.md",
+            "skills/okf/templates/repo/.gitignore",
+            "skills/okf/templates/okf-embeddings.yaml",
+            "skills/okf/references/workflow.md",
+            "skills/okf/scripts/selftest.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash skills/okf/scripts/selftest.sh"
+          ],
+          "expected_outputs": [
+            "selftest scaffolds to a temp dir; validate exits 0; conformance.yml parses as YAML; .okf.yml points at the peer path; manifest default profile is ollama"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-11",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement the init command: default target is a peer directory (code repo ~/Projects/<name> → ~/Projects/<name>-knowledge, new git repo + gh repo create), with --dir <path> and --local <subdir> overrides. Init writes templates/repo/* (README, CONTRIBUTING, CODEOWNERS, .github/workflows/conformance.yml running validate.py --strict + diff_lint.py, index.md, log.md, .gitignore covering .okf-index/ and unshared shards), seeds starter concepts (Overview + first Decision), writes the default keyless Ollama okf-embeddings.yaml manifest (PRD §5.3 exact content), writes the pointer file .okf.yml at the code-repo root (bundle + remote keys, PRD §5.1), and appends one discovery line to the code repo's CLAUDE.md/AGENTS.md. Resolution order for later commands: projects.yaml knowledge_repo: → .okf.yml → error with init instructions."
+        },
+        "items": [
+          {
+            "id": "okf-init.ac1",
+            "title": "Given a temp code repo named acme, running init with no flags creates ../acme-knowledge as a peer directory whose bundle passes validate.py --strict with exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-init.ac2",
+            "title": "The generated .github/workflows/conformance.yml parses as valid YAML and contains invocations of validate.py --strict and diff_lint.py",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-init.ac3",
+            "title": "The generated okf-embeddings.yaml contains default_profile pointing at an ollama/nomic-embed-text/768 profile with share: true, and the generated .gitignore contains .okf-index/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-init.ac4",
+            "title": "The written .okf.yml records bundle: ../acme-knowledge and the created remote; --local <subdir> instead produces an in-repo bundle and no companion repo",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-init.ac5",
+            "title": "Given a code repo, init writes exactly one discovery line to CLAUDE.md or AGENTS.md and a second init run preserves it without duplication",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "okf-author-convert",
+        "title": "WI-5: /okf author + /okf convert",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T15:49:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "skills/okf/SKILL.md",
+            "skills/okf/references/conversion.md",
+            "skills/okf/references/taxonomy.md",
+            "skills/okf/scripts/selftest.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash skills/okf/scripts/selftest.sh"
+          ],
+          "expected_outputs": [
+            "fixture docs convert; no README deleted; converted output passes validate.py"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement author (write/update exactly one concept: infer type from references/taxonomy.md and confirm, skill-managed frontmatter, relative cross-links, index/log regeneration via reindex, local validation before offering the change) and convert <path> (non-destructive onboarding of existing docs: dry-run plan first, frontmatter-first edits, renames only after confirmation, never deletes a README — per references/conversion.md edge cases for Notion/Obsidian/CSV/loose markdown)."
+        },
+        "items": [
+          {
+            "id": "okf-author-convert.ac1",
+            "title": "Given the fixture bundle, authoring a new concept produces a file whose frontmatter contains type plus recommended fields and whose bundle passes validate.py exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-author-convert.ac2",
+            "title": "Given fixture loose-markdown docs, convert first emits a dry-run plan and applies renames only on confirmation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-author-convert.ac3",
+            "title": "Given a directory with a README.md, convert preserves the README at its original path (never deletes or renames it)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "okf-reindex",
+        "title": "WI-6: reindex.py marker-delimited index/log regeneration",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T15:49:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "skills/okf/scripts/reindex.py",
+            "skills/okf/scripts/selftest.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash skills/okf/scripts/selftest.sh"
+          ],
+          "expected_outputs": [
+            "two successive edits regenerate index.md without touching prose outside the markers"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement reindex.py: regenerate index.md directory listings between <!-- OKF:INDEX:BEGIN --> / <!-- OKF:INDEX:END --> markers (progressive-disclosure listing per OKF reserved-file rules) and support appending dated log.md entries (## YYYY-MM-DD headings, newest first). Prose outside markers is never modified."
+        },
+        "items": [
+          {
+            "id": "okf-reindex.ac1",
+            "title": "Given an index.md with hand-written prose above the BEGIN marker, running reindex.py twice after two different concept additions preserves that prose byte-identically",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-reindex.ac2",
+            "title": "Adding a concept and reindexing produces an index entry for it between the markers; removing the concept and reindexing removes the entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-reindex.ac3",
+            "title": "Appending a log entry produces a ## YYYY-MM-DD heading as the first dated section, preserving newest-first ordering",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "okf-sync",
+        "title": "WI-7: /okf sync [--topic] diff-driven update pass",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T15:49:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "skills/okf/SKILL.md",
+            "skills/okf/references/workflow.md",
+            "skills/okf/scripts/selftest.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash skills/okf/scripts/selftest.sh"
+          ],
+          "expected_outputs": [
+            "fixture change yields a PR branch that validates with one new dated log entry"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement sync: map code changes since the last log entry (or PR base) to affected concepts, update them, append one dated log.md entry, regenerate index.md, run validate.py, and open a PR against the knowledge repo (all bundle writes PR-gated per FR-12). --topic \"<focus>\" restricts the pass to concepts matching by tag and search."
+        },
+        "items": [
+          {
+            "id": "okf-sync.ac1",
+            "title": "Given a fixture code change, sync produces a knowledge-repo branch whose bundle passes validate.py and whose log.md gained exactly one new dated entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-sync.ac2",
+            "title": "sync opens a PR (gh pr create) rather than pushing to the default branch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-sync.ac3",
+            "title": "Given --topic \"<focus>\", sync preserves concepts not matching the focus by tag or search byte-identically",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "okf-study",
+        "title": "WI-8: /okf study — pre-feature codebase documentation pass",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T15:49:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "skills/okf/SKILL.md",
+            "skills/okf/scripts/selftest.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash skills/okf/scripts/selftest.sh"
+          ],
+          "expected_outputs": [
+            "fixture codebase (toy overtime.py) yields ≥1 validating concept tagged with the focus"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement study \"<focus>\": research the current codebase for the named topic (e.g. \"overtime calculations\") and create/refresh the concepts describing today's behavior, delivered via PR using the author + reindex + validate machinery. SKILL.md instructions define the pass: enumerate relevant code, write one concept per idea, tag with the kebab-cased focus, cross-link related concepts."
+        },
+        "items": [
+          {
+            "id": "okf-study.ac1",
+            "title": "Given the fixture toy codebase containing overtime.py, study \"overtime calculations\" produces at least one concept tagged overtime-calculations whose bundle passes validate.py",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-study.ac2",
+            "title": "study opens a PR branch for the produced concepts rather than pushing to the knowledge repo's default branch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-study.ac3",
+            "title": "Re-running study on an unchanged fixture updates existing concepts in place rather than creating duplicate concept files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "okf-retro",
+        "title": "WI-9: /okf retro — post-implementation knowledge capture",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T15:49:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "skills/okf/SKILL.md",
+            "skills/okf/references/overdeck.md",
+            "skills/okf/scripts/selftest.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash skills/okf/scripts/selftest.sh"
+          ],
+          "expected_outputs": [
+            "fixture observations JSONL yields ≥1 concept citing a recorded decision"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement retro: review the change (diff + available session context) and answer \"what would have made this work easier if documented?\", filing answers as concepts via PR. Two feedstock paths: with Overdeck detected, mine the issue's Observations via `pan memory search --issue <id>`; standalone, use git diff + the current transcript. Overdeck detection contract documented in references/overdeck.md (detection = `pan` on PATH responding, never an import)."
+        },
+        "items": [
+          {
+            "id": "okf-retro.ac1",
+            "title": "Given a fixture observations JSONL, retro produces at least one validating concept whose body cites a decision recorded in the observations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-retro.ac2",
+            "title": "Given pan stripped from PATH, retro still produces concepts using git diff + transcript feedstock (no Overdeck dependency)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-retro.ac3",
+            "title": "Retro output lands on a PR branch and passes validate.py",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "okf-embed-shards",
+        "title": "WI-10: embed.py + okf-embeddings manifest/shard implementation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-07T15:49:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "skills/okf/scripts/embed.py",
+            "skills/okf/templates/okf-embeddings.yaml",
+            "skills/okf/scripts/selftest.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash skills/okf/scripts/selftest.sh"
+          ],
+          "expected_outputs": [
+            "fake-provider test: one edited concept re-embeds exactly one shard line; shard round-trips; non-localhost ollama refused"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-10",
+            "FR-11",
+            "NFR-4",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement embed.py driven by okf-embeddings.yaml exactly per PRD §5.3: four provider adapters (ollama default with a localhost-only endpoint guard, openai, voyage, custom OpenAI-compatible endpoint + env-var key) behind the contract embed(texts) -> list of L2-normalized vectors, batched. Hash-gated incremental embedding (unchanged concept never re-embedded, NFR-4), sorted-by-id JSONL shard writer replacing lines in place (6-decimal precision, one line per chunk: id, concept, hash, dim, v), x_embed: exclude honored, whole-concept chunking with max_tokens truncation (D-6). Plain CPython + PyYAML (NFR-6). No hardcoded model fallback: an unconfigured profile errors loudly."
+        },
+        "items": [
+          {
+            "id": "okf-embed-shards.ac1",
+            "title": "Given a fake provider and one edited concept among many, embed rewrites exactly one shard line and all other lines remain byte-identical",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-embed-shards.ac2",
+            "title": "A written shard contains lines sorted by id with L2-normalized 6-decimal vectors, and parsing it back returns every line unchanged (round-trip)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-embed-shards.ac3",
+            "title": "embed refuses an ollama profile with a non-localhost endpoint, exiting with an explicit error before any network call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-embed-shards.ac4",
+            "title": "A concept carrying x_embed: exclude produces no shard line; removing the key and re-running embed adds one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-embed-shards.ac5",
+            "title": "Running embed with a profile missing provider or model exits nonzero naming the missing manifest field (no fallback model)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "okf-index-search",
+        "title": "WI-11: build_index.py + search.py — hybrid BM25+vector RRF",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-07T15:49:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "skills/okf/scripts/build_index.py",
+            "skills/okf/scripts/search.py",
+            "skills/okf/scripts/selftest.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash skills/okf/scripts/selftest.sh"
+          ],
+          "expected_outputs": [
+            "BM25-only ranking with no vector backend; hybrid changes ranking; token budget respected; mnemos path exercised when binary present, skipped cleanly when absent"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "NFR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement build_index.py (markdown + shards → gitignored .okf-index/okf.db: SQLite FTS5 for BM25 plus sqlite-vec when importable, BLOB-cosine fallback otherwise; rebuildable from markdown+shards via --rebuild and from markdown alone by re-embedding, NFR-5) and search.py (hybrid RRF with K=60 merging BM25 and vector lists; degradation ladder hybrid → BM25-only → index-guided reading per NFR-2; --format prompt|json; --budget <tokens>). When mnemos is on PATH with the bundle ingested, search MAY delegate to `mnemos search` as the retrieval backend, mapping its file#section citations to concept IDs; the built-in path remains the guaranteed floor. Deleting .okf-index/ and searching transparently rebuilds it."
+        },
+        "items": [
+          {
+            "id": "okf-index-search.ac1",
+            "title": "With no vector shard present, search returns BM25-ranked results and reports the BM25-only tier; adding vectors changes the ranking for a semantic query",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-index-search.ac2",
+            "title": "search --budget N returns concepts whose summed token estimate stays within N",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-index-search.ac3",
+            "title": "After deleting .okf-index/, the next search rebuilds the index and returns results (exit 0) without manual steps",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-index-search.ac4",
+            "title": "Given a stub mnemos on PATH, search routes retrieval through the mnemos backend and its citations resolve to concept IDs; with no mnemos, the built-in path produces results with no warning noise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-index-search.ac5",
+            "title": "On a Python without sqlite-vec importable, hybrid search still returns vector-influenced results via the BLOB-cosine fallback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "okf-extract",
+        "title": "WI-12: /okf extract — ranked, budgeted, cited prompt concepts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T15:49:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "skills/okf/SKILL.md",
+            "skills/okf/scripts/selftest.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash skills/okf/scripts/selftest.sh"
+          ],
+          "expected_outputs": [
+            "extract output cites existing concept IDs"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement extract \"<query>\" [--budget <tokens>]: SKILL.md command that runs search.py --format prompt with the budget, returning ranked cited concepts formatted for prompt inclusion, honoring the FR-15 reading rules (cite concept IDs, never invent). The command surfaces which retrieval tier served the result."
+        },
+        "items": [
+          {
+            "id": "okf-extract.ac1",
+            "title": "extract output contains citations of only concept IDs that exist as files in the bundle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-extract.ac2",
+            "title": "extract --budget 500 produces output whose token estimate is ≤500 and states the retrieval tier used",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "okf-lint-advisory",
+        "title": "WI-13: /okf lint — advisory LLM semantic patrol",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-07T15:49:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "skills/okf/SKILL.md",
+            "skills/okf/scripts/selftest.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash skills/okf/scripts/selftest.sh"
+          ],
+          "expected_outputs": [
+            "lint prompt fixture check passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement lint as a SKILL.md advisory prompt: the LLM patrols the bundle for contradictions, staleness, orphans, and oversized concepts (embedding-truncation split candidates from max_tokens). Output is advisory findings only — it is never the merge gate (D-5) and writes nothing without confirmation."
+        },
+        "items": [
+          {
+            "id": "okf-lint-advisory.ac1",
+            "title": "SKILL.md's lint section contains instructions to surface contradictions, staleness, orphans, and oversized-concept split candidates, and states lint never gates merges",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-lint-advisory.ac2",
+            "title": "selftest passes a check that the lint prompt fixture exists and contains the four patrol categories",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "okf-model-bridges",
+        "title": "WI-14: --model delegation ladder + bridge error template",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T15:49:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-2468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "skills/okf/references/model-bridges.md",
+            "skills/okf/SKILL.md",
+            "skills/okf/scripts/selftest.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash skills/okf/scripts/selftest.sh"
+          ],
+          "expected_outputs": [
+            "stub codex on PATH: invocation shape verified; no bridges: foreign-model request produces the D-8 error template verbatim"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-16",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Write references/model-bridges.md and the SKILL.md ladder for --model on study/retro/sync/author, per PRD §5.4: (1) native harness support; (2) vendor CLI on PATH — `codex exec -m <model> --sandbox workspace-write --output-last-message <f> \"<prompt>\"` after `codex login status`, `gemini -p \"<prompt>\" -m <model>` after ADC/GOOGLE_API_KEY check; (3) bridge plugin commands (/codex:rescue, /gemini:task); (4) MCP bridge tools (mcp__codex__*, mcp__gemini__*, ai-cli-mcp); (5) hard ERROR naming the model, the bridge that would serve it, its install command, and the auth step (D-8). Never silently substitute another vendor's model."
+        },
+        "items": [
+          {
+            "id": "okf-model-bridges.ac1",
+            "title": "Given a stub codex on PATH, a --model pass spawns codex exec with -m <model> and the documented sandbox/output flags (selftest asserts the invocation shape)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-model-bridges.ac2",
+            "title": "With no bridges available, requesting a foreign model produces the error template verbatim containing all four elements: model, bridge, install command, auth step",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-model-bridges.ac3",
+            "title": "The ladder documentation states that under Overdeck, pan knowledge --model bypasses the ladder in favor of Overdeck model routing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "okf-user-docs",
+        "title": "WI-15: README, USAGE, okf-embeddings standalone standard doc",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T15:49:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-2468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "skills/okf/README.md",
+            "skills/okf/docs/USAGE.md",
+            "skills/okf/references/okf-embeddings.md",
+            "skills/okf/scripts/selftest.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash skills/okf/scripts/selftest.sh"
+          ],
+          "expected_outputs": [
+            "selftest drift-check of README command names passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-13",
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "Write skills/okf/README.md (install including non-Overdeck copy-install to ~/.claude/skills/okf/, 5-minute quickstart, the three loops study/retro/sync), docs/USAGE.md (per-command reference including --model), and references/okf-embeddings.md (the §5.3 extension standard as a standalone citable document with the manifest schema, shard format rules, and succession clause). Add a selftest drift-check that README command names match SKILL.md's command table."
+        },
+        "items": [
+          {
+            "id": "okf-user-docs.ac1",
+            "title": "selftest's drift-check compares README command names against SKILL.md's table and exits nonzero when they diverge (verified with a deliberate mismatch fixture or inline negative check)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-user-docs.ac2",
+            "title": "references/okf-embeddings.md reproduces the manifest schema, shard line format, sorting/normalization rules, and the okf_embeddings_version succession clause as a standalone doc",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-user-docs.ac3",
+            "title": "README contains the standalone copy-install path requiring only git+gh+python3+PyYAML",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "knowledge-role-registration",
+        "title": "WI-16: knowledge role — Role union, defaults, spawn semantics",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-07T15:49:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2468",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "pan-knowledge-verb",
+            "knowledge-command-deck",
+            "postmerge-auto-retro"
+          ],
+          "files_scope": [
+            "packages/contracts/src/types.ts",
+            "src/lib/config-yaml/roles.ts",
+            "src/lib/__tests__/config-yaml-roles.test.ts",
+            "roles/knowledge.md",
+            "src/lib/agents/spawn.ts",
+            "src/lib/agents/spawn-prep.ts",
+            "src/lib/__tests__/role-definitions.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/config-yaml-roles.test.ts src/lib/__tests__/role-definitions.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors; role exhaustiveness and role-definitions suites pass with the knowledge role included"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-17",
+            "NFR-7"
+          ],
+          "readinessReason": "Root of the Track B chain with no incoming dependencies; its files_scope (contracts Role union, config-yaml roles, roles/knowledge.md, spawn paths) is disjoint from every Track A skills/okf/ item."
+        },
+        "narrative": {
+          "Action": "Register the knowledge role per PRD §5.5.2: (1) add \"knowledge\" to the Role literals union at packages/contracts/src/types.ts:21; (2) DEFAULT_MODEL_REFS.knowledge = 'workhorse:expensive' (same ref as plan, D-12) and a DEFAULT_ROLES.knowledge entry in src/lib/config-yaml/roles.ts — never a hardcoded model literal; unresolvable config errors loudly; (3) extend the exhaustiveness assertion in config-yaml-roles.test.ts; (4) create roles/knowledge.md (frontmatter per roles/work.md pattern; mission = run /okf study/retro/sync; PR to the knowledge repo only; never pan done; never merge; cite concept IDs); (5) spawn semantics: add knowledge to the specialist-style spawn check at src/lib/agents/spawn.ts:174 region and session prefix handling near spawn.ts:418 (live TUI, never one-shot); beads-gate skip via `role === 'knowledge'` early return alongside the plan check at src/lib/agents/spawn-prep.ts:653 region; (6) role-definitions.test.ts validation case. Rebuild packages/contracts after the union change."
+        },
+        "items": [
+          {
+            "id": "knowledge-role-registration.ac1",
+            "title": "npm run typecheck passes with \"knowledge\" in the Role union and the config-yaml-roles exhaustiveness test enumerates it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "knowledge-role-registration.ac2",
+            "title": "roles/knowledge.md exists, passes role-definitions.test.ts validation, and instructs PR-to-knowledge-repo-only, never pan done, never merge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "knowledge-role-registration.ac3",
+            "title": "A spawn test passes asserting a knowledge run spawns a live tmux session (specialist-style) and never triggers the verification gate or the beads 422 gate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "knowledge-role-registration.ac4",
+            "title": "Given roles.knowledge.model unset and workhorses unresolvable, resolution throws an error naming the missing configuration instead of using a hardcoded literal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-knowledge-verb",
+        "title": "WI-17: pan knowledge CLI verb + wrapper skill",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-07T15:49:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/index.ts",
+            "src/cli/commands/knowledge.ts",
+            "skills/pan-knowledge/SKILL.md",
+            "roles/knowledge.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint",
+            "npx vitest run --testNamePattern knowledge"
+          ],
+          "expected_outputs": [
+            "lint-skills.sh passes (wrapper skill matches pan knowledge --help); pan knowledge --help snapshot test passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-17"
+          ]
+        },
+        "narrative": {
+          "Action": "Add `pan knowledge <id> [--focus \"<topic>\"] [--retro] [--model <m>] [--effort <e>]` as src/cli/commands/knowledge.ts following the src/cli/commands/strike.ts shape, registered in src/cli/index.ts, calling spawnRun(id, 'knowledge', opts). roles/knowledge.md instructs the agent to drive /okf study|retro|sync (study when --focus, retro when --retro). Ship skills/pan-knowledge/SKILL.md in the same commit per the Skills↔CLI convention — scripts/lint-skills.sh enforces flag/help drift. Model flag flows through Overdeck routing (provider-default harness; the skill's bridge ladder is bypassed under Overdeck)."
+        },
+        "items": [
+          {
+            "id": "pan-knowledge-verb.ac1",
+            "title": "pan knowledge --help prints the id argument and --focus/--retro/--model/--effort flags (snapshot test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-knowledge-verb.ac2",
+            "title": "npm run lint passes including lint-skills.sh cross-checking skills/pan-knowledge/SKILL.md against pan knowledge --help",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-knowledge-verb.ac3",
+            "title": "The command spawns via spawnRun with role 'knowledge' and passes focus/retro/model options through (unit test with spawnRun mocked)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "knowledge-command-deck",
+        "title": "WI-18: Command Deck visibility for knowledge agents",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T15:49:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/pipeline-helpers.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/pipeline-helpers.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm test -- --project frontend",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "frontend unit test for the role→label map passes; Playwright screenshot self-verified showing a knowledge agent nested under its issue"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-17"
+          ]
+        },
+        "narrative": {
+          "Action": "Add the knowledge role to the Command Deck role→label map in src/dashboard/frontend/src/components/CommandDeck/pipeline-helpers.ts so auto-discovered knowledge agents (tmux session prefix from WI-16, discovery at src/dashboard/server/routes/command-deck.ts:166) render nested under their issue with a role label. Explicitly NOT a new PipelineIssuePhase — knowledge agents are agents under the issue, not a pipeline stage. Verify rendering yourself via Playwright screenshot in an isolated browser instance (repo rule: never ask the operator to eyeball)."
+        },
+        "items": [
+          {
+            "id": "knowledge-command-deck.ac1",
+            "title": "Frontend unit test asserts the role→label map renders a distinct label for role 'knowledge'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "knowledge-command-deck.ac2",
+            "title": "A Playwright screenshot (isolated browser instance, self-inspected) shows a spawned knowledge agent nested under its issue in the Command Deck tree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "knowledge-command-deck.ac3",
+            "title": "The diff preserves the PipelineIssuePhase enum unchanged — no new phase value for knowledge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mnemos-installer",
+        "title": "WI-19: mnemos on-demand installer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T15:49:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-2468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/installers/mnemos.ts",
+            "src/lib/installers/__tests__/mnemos.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/installers"
+          ],
+          "expected_outputs": [
+            "installer unit tests pass with mocked fetch; fake timers used for any retry/delay logic"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-18",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/installers/mnemos.ts: on-demand release-binary download from github.com/arhuman/mnemos releases (platform/arch selection, checksum verification, install to ~/.overdeck/bin/, executable bit), triggered the first time a knowledge feature needs it, plus first-use `mnemos ingest` of the resolved bundle. Follow the existing on-demand installer pattern in the repo. Async I/O only (no execSync — server-reachable). Tests mock fetch; any retry/backoff logic uses vi.useFakeTimers()."
+        },
+        "items": [
+          {
+            "id": "mnemos-installer.ac1",
+            "title": "Given fetch mocked, ensureMnemos() downloads the correct platform asset, validates the checksum, and creates an executable at ~/.overdeck/bin/mnemos",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mnemos-installer.ac2",
+            "title": "When the binary already exists and passes a version check, ensureMnemos() performs no download (no fetch call recorded)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mnemos-installer.ac3",
+            "title": "A checksum mismatch rejects the install with an explicit error and leaves no partial binary on disk",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ollama-ensure",
+        "title": "WI-20: shared src/lib/ollama.ts on-demand ensure",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T15:49:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-2468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/ollama.ts",
+            "src/lib/__tests__/ollama.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/ollama.test.ts"
+          ],
+          "expected_outputs": [
+            "unit tests pass with mocked binary/HTTP; no-op when server already healthy; fake timers for wait/retry"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-19",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Create the shared src/lib/ollama.ts (PAN-1641 substrate — include an in-file coordination note naming PAN-1641 as the second consumer): detect a healthy server on localhost:11434 → if absent, offer/perform install → `ollama pull nomic-embed-text` → health check. Consumed by the Track B embed flow when the default Ollama profile has no answering server. Async only, no execSync; delay/retry tests use fake timers per repo rule."
+        },
+        "items": [
+          {
+            "id": "ollama-ensure.ac1",
+            "title": "When localhost:11434 answers healthy, ensureOllama() returns without installing or pulling (no spawn calls recorded)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ollama-ensure.ac2",
+            "title": "With binary and HTTP mocked, the absent-server path performs install, pulls nomic-embed-text, and resolves only after the health check passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ollama-ensure.ac3",
+            "title": "The file contains the PAN-1641 coordination note and exports a surface usable by both the embed flow and a future Pi-harness sidecar",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "session-start-injection",
+        "title": "WI-21: session-start concept-index injection (mega-brain replicated)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-07T15:49:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/memory/injection.ts",
+            "src/lib/memory/__tests__/injection.test.ts",
+            "src/lib/config-yaml/schema.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/memory"
+          ],
+          "expected_outputs": [
+            "injection unit tests pass: budget respected; absent bundle = zero-token no-op completing in <5ms"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-20",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend injectPromptTimeMemory (src/lib/memory/injection.ts:64) with a knowledgeIndex budget (default ~1500 tokens, config-gated alongside prompt_time_injection at src/lib/config-yaml/schema.ts:60): when the project resolves a bundle (projects.yaml knowledge_repo: → .okf.yml), inject a compact concept index — concept ID, type, one-line description, recent log.md entries — at the spawn and user-prompt surfaces (callers spawn-prep.ts:600, runtime-command.ts:334, hooks.ts:243 pick this up automatically). Budgeted alongside observation context; absent bundle is a zero-cost no-op. Reads go through the existing resolver paths (two-door rule). Reconcile PAN-1115: comment on the issue and close or re-scope it to the doc-retrieval remainder (PAN-1117 stays separate)."
+        },
+        "items": [
+          {
+            "id": "session-start-injection.ac1",
+            "title": "Given a fixture bundle resolved, the injection result contains the concept index and its token estimate respects the knowledgeIndex budget",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-start-injection.ac2",
+            "title": "Given no bundle resolvable, injection returns zero added tokens and the added code path completes in under 5ms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-start-injection.ac3",
+            "title": "When the config gate is disabled, injection emits no concept index and the existing observation-injection tests still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-start-injection.ac4",
+            "title": "PAN-1115 receives a reconciliation comment and is closed or re-scoped to the doc-retrieval remainder",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "postmerge-auto-retro",
+        "title": "WI-22: opt-in post-merge auto-retro hook",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-07T15:49:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2468",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/merge-agent.ts",
+            "src/lib/config-yaml/schema.ts",
+            "tests/unit/lib/cloister/in-flight-guard.test.ts",
+            "tests/unit/lib/cloister/postmerge-auto-retro.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/in-flight-guard.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "in-flight-guard suite stays green; new unit asserts single fire per merge when enabled and no fire when disabled"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-21",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Add an opt-in config key (default OFF) under which postMergeLifecycle (src/lib/cloister/merge-agent.ts:283) spawns `pan knowledge <id> --retro` after an issue merges, so the wiki learns from every shipped feature. The trigger must live inside the existing once-per-merge execution (in-flight guard + _completedPostMerge) so it inherits idempotency — tests/unit/lib/cloister/in-flight-guard.test.ts MUST stay green. New unit test: exactly one retro spawn per merge when enabled, zero when disabled; spawn failures logged, never blocking merge completion."
+        },
+        "items": [
+          {
+            "id": "postmerge-auto-retro.ac1",
+            "title": "Given the config enabled, one merge completion spawns exactly one pan knowledge --retro run, and a concurrent duplicate lifecycle call spawns none (unit test with spawn mocked)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "postmerge-auto-retro.ac2",
+            "title": "Given the config disabled or absent, merge completion spawns no retro run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "postmerge-auto-retro.ac3",
+            "title": "tests/unit/lib/cloister/in-flight-guard.test.ts passes unmodified (guard not weakened)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "postmerge-auto-retro.ac4",
+            "title": "A failing retro spawn logs the error and merge completion still finishes (test asserts no thrown rejection reaches postMergeLifecycle's caller)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "okf-scaffold-skillmd",
+        "to": "okf-common-parser",
+        "type": "blocks"
+      },
+      {
+        "from": "okf-common-parser",
+        "to": "okf-validate-difflint",
+        "type": "blocks"
+      },
+      {
+        "from": "okf-common-parser",
+        "to": "okf-reindex",
+        "type": "blocks"
+      },
+      {
+        "from": "okf-common-parser",
+        "to": "okf-embed-shards",
+        "type": "blocks"
+      },
+      {
+        "from": "okf-validate-difflint",
+        "to": "okf-init",
+        "type": "blocks"
+      },
+      {
+        "from": "okf-validate-difflint",
+        "to": "okf-author-convert",
+        "type": "blocks"
+      },
+      {
+        "from": "okf-reindex",
+        "to": "okf-author-convert",
+        "type": "blocks"
+      },
+      {
+        "from": "okf-validate-difflint",
+        "to": "okf-sync",
+        "type": "blocks"
+      },
+      {
+        "from": "okf-reindex",
+        "to": "okf-sync",
+        "type": "blocks"
+      },
+      {
+        "from": "okf-author-convert",
+        "to": "okf-study",
+        "type": "blocks"
+      },
+      {
+        "from": "okf-author-convert",
+        "to": "okf-retro",
+        "type": "blocks"
+      },
+      {
+        "from": "okf-embed-shards",
+        "to": "okf-index-search",
+        "type": "blocks"
+      },
+      {
+        "from": "okf-index-search",
+        "to": "okf-extract",
+        "type": "blocks"
+      },
+      {
+        "from": "okf-scaffold-skillmd",
+        "to": "okf-lint-advisory",
+        "type": "blocks"
+      },
+      {
+        "from": "okf-scaffold-skillmd",
+        "to": "okf-model-bridges",
+        "type": "blocks"
+      },
+      {
+        "from": "okf-extract",
+        "to": "okf-user-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "okf-model-bridges",
+        "to": "okf-user-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "knowledge-role-registration",
+        "to": "pan-knowledge-verb",
+        "type": "blocks"
+      },
+      {
+        "from": "knowledge-role-registration",
+        "to": "knowledge-command-deck",
+        "type": "blocks"
+      },
+      {
+        "from": "knowledge-role-registration",
+        "to": "postmerge-auto-retro",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-knowledge-verb",
+        "to": "postmerge-auto-retro",
+        "type": "blocks"
+      },
+      {
+        "from": "okf-init",
+        "to": "session-start-injection",
+        "type": "blocks"
+      },
+      {
+        "from": "okf-study",
+        "to": "pan-knowledge-verb",
+        "type": "informs"
+      },
+      {
+        "from": "okf-retro",
+        "to": "pan-knowledge-verb",
+        "type": "informs"
+      },
+      {
+        "from": "okf-index-search",
+        "to": "mnemos-installer",
+        "type": "informs"
+      },
+      {
+        "from": "okf-embed-shards",
+        "to": "ollama-ensure",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "active"
+}

@@ -1,0 +1,112 @@
+{
+  "version": "1",
+  "issueId": "PAN-1616",
+  "created": "2026-06-05T18:51:38.452Z",
+  "updated": "2026-06-07T18:16:43.436Z",
+  "gitState": {
+    "branch": "feature/pan-1616",
+    "sha": "ff30c9259",
+    "dirty": false
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Class-1 (inspect-* sessions not covered by the auto-approve hook) is ALREADY FIXED in source by commit b8960b6dc (2026-06-04 01:59), which added strike-*/inspect-*/flywheel-* to the prefix case in sync-sources/hooks/auto-approve-hook. The installed copy at ~/.panopticon/bin/auto-approve-hook is byte-identical. The inspect launcher (inspect-agent.ts:209) already exports PANOPTICON_AGENT_ID=inspect-<issue>-<bead>, which the hook keys on. So no scope change is needed — instead we ADD A REGRESSION TEST that asserts the hook grants permissionDecision:allow for agent-*/planning-*/flywheel-*/strike-*/inspect-* and stays silent (exit 0, no allow) for conv-* and unset. This locks the fix so the DSP-removal-era regression (auto-approve scoped to only agent-*/planning-*) can never recur silently.",
+      "recordedAt": "2026-06-05T18:56:01.899Z"
+    },
+    {
+      "id": "D2",
+      "summary": "The parent work agent's wait is unbounded BY DESIGN: work.md steps 7/9 (lines 187, 308) instruct the agent to WAIT for a pan tell verdict with no bound, and the inspect prompt's '10 minute timeout' (inspect-agent.md:144) is unenforced prose — nothing in the orchestrator watches an inspect-* session for a hang. A blocked Claude Code session cannot run its own timer while idle, so the correct place for the bound is ORCHESTRATOR-SIDE: a Deacon watchdog that guarantees a terminal verdict is delivered within a timeout. The watchdog provides the bound; the work prompt only needs to (a) know a verdict is guaranteed to arrive and (b) handle a new INSPECTION ERROR verdict.",
+      "recordedAt": "2026-06-05T18:56:01.899Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Watchdog needs a started-at timestamp to measure elapsed inspection time. review-status.ts inspect fields (line 50) are only 'pending'|'inspecting'|'passed'|'failed' + inspectNotes — no timestamp, no bead reference, no terminal error state. So we extend the schema first (add inspectStartedAt, inspectBeadId, and an 'error' inspectStatus value), set them in spawnInspectAgentPromise at the 'inspecting' transition, THEN build the watchdog on top. Schema is the foundation; watchdog and verdict delivery consume it.",
+      "recordedAt": "2026-06-05T18:56:01.899Z"
+    },
+    {
+      "id": "D4",
+      "summary": "The Deacon (src/lib/cloister/deacon.ts) is the home for the watchdog — it already runs a 60s patrol cycle with stuck-work-agent, orphan, API-error, and unhealthy-test-stack patrols. We add an inspect-timeout patrol: scan inspect-* sessions where inspectStatus==='inspecting' and (now - inspectStartedAt > INSPECT_TIMEOUT_MS) OR the inspect tmux session has died without a verdict; on trip, kill the session, set inspectStatus='error', and deliver an 'INSPECTION ERROR' verdict to the parent via pan tell. Timeout is a plain constant (~12 min, slightly over the prompt's stated 10) — configurability is not requested (Karpathy simplicity).",
+      "recordedAt": "2026-06-05T18:56:01.899Z"
+    },
+    {
+      "id": "D5",
+      "summary": "SCOPE DECISION (auto-mode): Class-2 (Claude Code's native .claude/** settings-edit protection blocking even in-scope agent-* work sessions — the agent-pan-1579 case in the issue comment) is OUT OF SCOPE for this issue and recorded as a follow-up. Rationale: (1) it is a genuinely distinct root cause — a Claude Code native gate the issue comment asserts a PreToolUse allow hook cannot override — not the inspect-session-scope/verdict-hang this issue is titled for; (2) it affects WORK agents editing .claude/**, NOT inspect agents, which are read-only (inspect-agent.md only runs git diff/cat/grep); (3) the original filer explicitly offered 'splitting class 2 into its own issue' as acceptable; (4) PAN-1491 is v1.0-required and bundling an un-overridable-native-gate investigation would delay the inspect-gate unblock. The fix surface for class-2 (pre-seed permissions.allow for workspace .claude/**, or redirect agents to edit sync-sources/rules/ instead of the rendered .claude/rules/ copy) is separate and needs its own investigation. Filed as a distinct follow-up issue PAN-1627 (#1627) during this planning session so it is not lost.",
+      "recordedAt": "2026-06-05T18:56:01.899Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "The watchdog must target the PARENT work agent, not the inspect session, when delivering the error verdict. pan tell {{ISSUE_ID}} routes to the issue's work agent (agent-<issue>), which is what is blocked. Delivering to the inspect-* session (already dead/killed) would be a no-op and leave the work agent hung.",
+      "mitigation": "Use pan tell with the ISSUE id (uppercase) so it routes to the work agent's session, exactly as the inspect-agent.md verdict step already does (inspect-agent.md:101,106). Verify the parent agent session exists before/after delivery; if it is gone too, log and set review status so a human/Deacon patrol surfaces it."
+    },
+    {
+      "id": "H2",
+      "summary": "Crash-without-verdict is a second hang mode distinct from the permission-prompt hang: the inspect session could exit (OOM, killed, API error) after setting inspectStatus='inspecting' but before calling /api/specialists/done or pan tell. A pure time-based watchdog still catches it (it stays 'inspecting' forever), but session-liveness is a faster signal.",
+      "mitigation": "Watchdog trips on EITHER elapsed > INSPECT_TIMEOUT_MS OR (inspectStatus==='inspecting' AND inspect tmux session no longer exists). Both deliver the same INSPECTION ERROR verdict + set inspectStatus='error'."
+    },
+    {
+      "id": "H3",
+      "summary": "Avoid double-delivery / oscillation. Once the watchdog delivers an error verdict and sets inspectStatus='error', the next patrol cycle (60s later) must NOT re-trip on the same inspection. The 'error' terminal state guards this (the patrol only scans 'inspecting').",
+      "mitigation": "Set inspectStatus='error' atomically as part of the trip action, before/with the pan tell delivery, so the next patrol skips it. Mirror the idempotency discipline of postMergeLifecycle (CLAUDE.md PAN-328)."
+    },
+    {
+      "id": "H4",
+      "summary": "INSPECT_TIMEOUT_MS must exceed the inspect agent's legitimate worst-case runtime, or a slow-but-healthy inspection on a large diff gets killed mid-flight, producing a false ERROR verdict that wrongly blocks/escalates the work agent.",
+      "mitigation": "Set the constant comfortably above the prompt's stated 10-minute budget (~12 min) and document it next to the inspect-agent.md '10 minutes' line so the two never drift. The work prompt treats ERROR as 'infrastructure could not verify — escalate to supervisor', not as a spec-violation BLOCK, so a rare false trip surfaces to a human rather than silently corrupting the bead flow."
+    },
+    {
+      "id": "H5",
+      "summary": "review-status is a cross-cutting schema consumed by the dashboard read model and specialists routes. Adding inspectStartedAt/inspectBeadId/'error' must not break existing consumers (e.g. dashboard rendering of inspectStatus, /api/specialists/done writing 'passed'/'failed').",
+      "mitigation": "New fields are optional; 'error' is an additive enum member. Grep all readers of inspectStatus (dashboard read-model, specialists.ts:381, frontend) and confirm they handle an unknown/new state gracefully (fall through to a neutral render). Add the 'error' case where a switch would otherwise miss it."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-8",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-06-05T18:56:01.899Z",
+      "reason": "planning",
+      "note": "Auto-mode planning for PAN-1616. Established that class-1 (inspect auto-approve scope) is already fixed (b8960b6dc) and needs only a regression test; the real remaining gaps are (a) no started-at timestamp on inspectStatus, (b) no Deacon watchdog to bound a hung inspection and deliver a fail-loud verdict, (c) work prompt unbounded WAIT + no ERROR-verdict handling. Class-2 (.claude/** settings-edit gate) scoped OUT as a distinct follow-up issue.",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-05T19:50Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-05T19:50:36.643Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-07T04:59:26.520Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T05:11Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-07T05:11:43.264Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T05:20Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-07T05:20:04.857Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T14:31Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-07T14:31:57.458Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T14:59Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-07T14:59:13.900Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "sonnet",
+      "timestamp": "2026-06-07T14:59:14.109Z"
+    }
+  ],
+  "feedback": []
+}

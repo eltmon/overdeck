@@ -1,0 +1,78 @@
+{
+  "version": "1",
+  "issueId": "PAN-1799",
+  "created": "2026-06-12T19:53:19.297Z",
+  "updated": "2026-06-12T20:04:22Z",
+  "gitState": { "branch": "feature/pan-1799", "sha": "7b81ab3ea", "dirty": false },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Do not re-implement the boot-death fixes already on origin/main (163e63c01 sandbox translate, eb79b04cf work-tui mode, 5e05abc06 config-driven permissions, b0a223c72 readiness detection, 31760795c kickoff pointer, 9857b1ac1 reset-session). This issue now covers the remaining fail-fast, truthfulness, diagnostics, and thread-id gaps.",
+      "recordedAt": "2026-06-12T20:04:22Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Boot-outcome contract: spawnAgent THROWS a typed AgentBootError (agentId, harness, phase, diagnostic tail) when the tmux session is dead after kickoff delivery resolution, after marking agent state stopped. Kickoff-failed-but-ALIVE keeps the existing ghost lifecycle (status running, kickoffDelivered false, deacon redelivers) — locked by tests/integration/agent-spawning.test.ts:357-512.",
+      "recordedAt": "2026-06-12T20:04:22Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Boot diagnostics use a bounded tmux remain-on-exit window: set on at work-agent session creation, capture dead-pane tail to <agentDir>/boot-failure.log on boot death then kill the session, flip the option off immediately after readiness succeeds. Chosen over stderr redirection, which risks breaking TUI rendering.",
+      "recordedAt": "2026-06-12T20:04:22Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Codex thread-id for work-tui agents resolves lazily (read codex-thread-id file, else scan per-agent codex-home/sessions for newest rollout, write back) instead of a background poller at spawn — a post-spawn poller would hold the CLI process open, the very hang this issue fixes.",
+      "recordedAt": "2026-06-12T20:04:22Z"
+    },
+    {
+      "id": "D5",
+      "summary": "pan start ends with explicit process.exit(0) after the success summary (precedent: close.ts:217, health.ts:175, dev.ts:678). The fire-and-forget tracker transition is not flushed first — it has had the whole boot duration to land and is best-effort by design.",
+      "recordedAt": "2026-06-12T20:04:22Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "feature/pan-1803 has unmerged changes to deliverInitialPromptWithRetry (kickoff file moved to agent dir) and buildCodexCommand (--skip-git-repo-check removal). Rebase conflicts in agents.ts/launcher-generator.ts are likely.",
+      "mitigation": "Do not reimplement PAN-1803's changes. Keep this issue's edits surgical; on conflict, preserve 1803's hunks and re-apply ours around them."
+    },
+    {
+      "id": "H2",
+      "summary": "remain-on-exit changes 'tmux session missing' semantics the deacon orphan patrol relies on: during the boot window a dead agent's session still exists (pane dead).",
+      "mitigation": "Keep the window bounded: flip remain-on-exit off right after readiness; kill the remained session immediately after capturing the pane tail. Patrol cadence is 60s, boot window is ≤~60s + capture, so at most one patrol cycle sees the remained pane — verify it does not mis-classify (it checks session existence, so a remained session reads as 'running'; acceptable for one cycle)."
+    },
+    {
+      "id": "H3",
+      "summary": "spawnAgent is reachable from the dashboard start route — throwing AgentBootError there must surface as a clean non-2xx, not a crash, and state must already be 'stopped' before the throw so no half-spawned 'running' record lingers.",
+      "mitigation": "Mark state stopped BEFORE throwing; add a route-level assertion in tests (legacy field rejection tests in tests/integration/agent-spawning.test.ts:836+ show the route test pattern)."
+    },
+    {
+      "id": "H4",
+      "summary": "Delay-based tests (readiness polls, retry loops) OOM the suite if they use real timers (repo rule).",
+      "mitigation": "vi.useFakeTimers() + vi.advanceTimersByTimeAsync() in every new test; never real setTimeout waits; never maxForks workarounds."
+    },
+    {
+      "id": "H5",
+      "summary": "Work-tui codex resume ignores resumeSessionId — buildCodexCommand's work-tui branch always launches a fresh TUI, losing session context on deacon auto-resume.",
+      "mitigation": "Out of scope here (NonGoal). The work agent should NOT fix it in this issue; surface it as a follow-up issue candidate during review if not already tracked."
+    },
+    {
+      "id": "H6",
+      "summary": "Workspace .pan/spec.vbrief.json contained a stale PAN-1788 plan at planning start (inherited from branch point).",
+      "mitigation": "Overwritten by this planning session's PAN-1799 vBRIEF; pan start's validatePlanMatchesIssue would otherwise have refused to spawn."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-fable-5",
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "note": "Auto planning session for PAN-1799. Established that the boot-death root causes were hotfixed on main same-day (see D1); planned the remaining fail-fast/truthful-exit/diagnostics/thread-id work. PRD draft at .pan/drafts/PAN-1799.md.",
+      "timestamp": "2026-06-12T20:04:22Z",
+      "agentModel": "agent:claude-fable-5"
+    }
+  ],
+  "feedback": []
+}

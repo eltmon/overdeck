@@ -1,0 +1,679 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-03T12:15:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2265: fix GitHub GraphQL quota exhaustion — route remaining pollers off gh GraphQL",
+    "updated": "2026-07-05T03:20:29.048Z"
+  },
+  "plan": {
+    "id": "pan-2265",
+    "title": "fix: GitHub GraphQL quota exhaustion — top burners and remediation plan",
+    "status": "completed",
+    "uid": "7b2e4c9a-1d3f-4a6b-8c5e-2f9a0b1c3d4e",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 5,
+    "created": "2026-07-03T12:15:00.000Z",
+    "updated": "2026-07-05T03:20:29.048Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2265",
+        "label": "PAN-2265",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "github",
+      "graphql",
+      "rate-limit",
+      "github-app",
+      "cloister",
+      "flywheel"
+    ],
+    "narratives": {
+      "Problem": "GitHub GraphQL quota on the personal eltmon/overdeck token is exhausted. The GitHub App + smee webhook backend is now provisioned (isGitHubAppConfigured() is true, App REST available), but several automated pollers still call gh GraphQL (gh pr view/list, gh issue view/list) UNCONDITIONALLY — they never branch on App config — so they keep burning the GraphQL budget every tick. This routes those remaining pollers onto the App REST path (installation token, separate quota, no GraphQL), replicating the canonical template refreshMergeStateFromGitHub (webhook-handlers.ts:206-257) that already landed in this branch as a5d4148d28.",
+      "Proposal": "Add shared App-REST helpers to github-app.ts (foundation bead), then route each remaining gh-GraphQL poller through them with the exact isGitHubAppConfigured() branch the template uses (App REST when configured, existing gh fallback otherwise). The flywheel label fetch drops its GraphQL path entirely (App REST -> gh api REST fallback). The PR/Discussions display tabs get a server-side webhook-aware cache so they refetch from GitHub only on relevant webhooks, not a blind 30s timer. A GraphQL cool-down gate provides defense-in-depth against hammering a depleted budget.",
+      "NonGoals": "- Provisioning the GitHub App / smee relay, or any HMAC / webhook-secret change (ops, already done by the operator).\n- Re-implementing refreshMergeStateFromGitHub (already landed as commit a5d4148d28 in this branch).\n- Full App-REST reconstruction of the heavy PR/Diff display field set (gh pr view --json files,statusCheckRollup,body,reviewDecision) — deferred to a follow-up issue; the webhook-aware cache already collapses its call frequency and full reconstruction is expert-risk UI work needing dedicated UAT.\n- Any frontend change: refetchInterval mechanics, webhook-driven query invalidation, or tab-visibility gating (the cache is server-side; the frontend is untouched).\n- auto-merge-eligibility.ts and forge.ts mergeReviewArtifact — already App-aware, verified in scope review.\n- Reconciling this branch's local-main vs origin/main divergence (the sync pipeline's job)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "All shared App-REST helpers live in one foundation bead (app-rest-helpers) in github-app.ts.",
+        "rationale": "listPullRequestsForHead/getIssueState/listOpenIssuesWithLabels are shared by six consumers; centralizing them mirrors the existing getPullRequestStatePromise and reduces each consumer to a one-branch diff. A wrong return shape would infect all consumers, so the bead is requiresInspection:true."
+      },
+      {
+        "summary": "The flywheel fallback is gh api REST pagination, not gh issue list GraphQL.",
+        "rationale": "The list op has a trivial REST equivalent; removing the GraphQL path entirely guarantees FR-1 even without the App — the sandbox constraint that originally justified gh is satisfied by gh api REST."
+      },
+      {
+        "summary": "Full App-REST reconstruction of the heavy PR display field set is deferred to a follow-up (NonGoal).",
+        "rationale": "It only burns quota while a human has a Command Deck tab open (bounded, self-limiting), the webhook-aware cache collapses its frequency, and reconstructing files/statusCheckRollup/body/reviewDecision across multiple REST endpoints is expert-risk UI work deserving its own issue with UAT."
+      },
+      {
+        "summary": "The cool-down gate is wired only into the one observed-failing fallback (refreshMergeStateFromGitHub) and exported for later adoption.",
+        "rationale": "That gh fallback is the path dashboard.log showed failing repeatedly during exhaustion; over-wiring the gate across every call site would bloat the bead past independent reviewability. Export makes later adoption cheap."
+      }
+    ],
+    "items": [
+      {
+        "id": "app-rest-helpers",
+        "title": "Add shared App-REST helpers to github-app.ts (PR-by-head, issue-state, open-issue-labels)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T12:15:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2265",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "flywheel-labels",
+            "forge-artifact-rest",
+            "merge-verify-rest",
+            "deacon-openpr-rest",
+            "issue-closed-rest",
+            "pr-resolution-rest"
+          ],
+          "files_scope": [
+            "src/lib/github-app.ts",
+            "tests/unit/lib/github-app.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/github-app.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "github-app helper tests pass, asserting the owner-qualified head param and REST paths"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/github-app.ts, mirror the existing getPullRequestStatePromise (:398) / getPullRequestState Effect wrapper (:691) — both built on the internal githubApi<T>() helper (:257) — to add three exported App-REST helpers, each with a *Promise form and an Effect-wrapped form: (1) listPullRequestsForHead(owner, repo, branch, state:'open'|'closed'|'all') -> Array<{number,state,merged,mergedAt}> via GET /repos/{owner}/{repo}/pulls?head={owner}:{branch}&state={state}; (2) getIssueState(owner, repo, number) -> {state:'open'|'closed'} via GET /repos/{owner}/{repo}/issues/{number}; (3) listOpenIssuesWithLabels(owner, repo) -> Array<{number,labels:string[]}> via paginated GET /repos/{owner}/{repo}/issues?state=open&per_page=100, filtering out entries that are pull requests. Add unit tests mocking githubApi that assert each request path and return shape, including that the pulls head param is OWNER-qualified (owner:branch)."
+        },
+        "items": [
+          {
+            "id": "app-rest-helpers.ac1",
+            "title": "listPullRequestsForHead returns PRs via GET /pulls?head={owner}:{branch}&state={state} (App REST), and its test asserts the head param is owner-qualified — no GraphQL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-rest-helpers.ac2",
+            "title": "getIssueState returns {state} from GET /repos/{owner}/{repo}/issues/{number} (App REST)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-rest-helpers.ac3",
+            "title": "listOpenIssuesWithLabels returns each open issue's number and labels via paginated REST and excludes pull-request entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-rest-helpers.ac4",
+            "title": "importing each helper returns both a Promise form and an Effect-wrapped form, matching the getPullRequestState convention",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "flywheel-labels",
+        "title": "Route flywheel open-issue-label fetch off gh GraphQL (App REST, gh api REST fallback)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T12:15:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2265",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/flywheel-surfaces.ts",
+            "tests/unit/cli/commands/flywheel-surfaces.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/commands/flywheel-surfaces.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "flywheel-surfaces test passes and no gh issue list GraphQL call remains in fetchOpenIssueLabels"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/flywheel-surfaces.ts, rewrite fetchOpenIssueLabels (30-39) to eliminate the gh issue list --state open --json GraphQL call. When isGitHubAppConfigured(), source labels from listOpenIssuesWithLabels (App REST). Otherwise fall back to gh api REST pagination (gh api 'repos/{owner}/{repo}/issues?state=open&per_page=100' with page traversal), NOT gh issue list. Preserve the existing try/catch degrade-to-empty posture exactly — the function must never throw when run in a credential-less sandbox."
+        },
+        "items": [
+          {
+            "id": "flywheel-labels.ac1",
+            "title": "fetchOpenIssueLabels emits no GraphQL request — it issues only App REST or gh api REST calls, and no gh issue list command remains",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-labels.ac2",
+            "title": "when isGitHubAppConfigured() is true, labels are sourced from listOpenIssuesWithLabels (App REST)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-labels.ac3",
+            "title": "when the App is not configured, labels are sourced via gh api REST pagination, still issuing no GraphQL call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-labels.ac4",
+            "title": "on any fetch error the function returns an empty label map and propagates no exception",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deacon-openpr-rest",
+        "title": "Route deacon open-PR-for-branch check through App REST when configured",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T12:15:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2265",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/orphan-proposed-reconciler.ts",
+            "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/cloister/__tests__"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "orphan-proposed-reconciler tests pass covering the App-REST and gh-fallback branches"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/orphan-proposed-reconciler.ts, change defaultHasOpenPrForBranch (194-207) to branch on isGitHubAppConfigured(): when true, return (await listPullRequestsForHead(owner, repo, 'feature/'+issueId.toLowerCase(), 'open')).length > 0 via App REST; otherwise keep the existing gh pr list --head --state open GraphQL call. Preserve the return-false-on-error degraded behavior."
+        },
+        "items": [
+          {
+            "id": "deacon-openpr-rest.ac1",
+            "title": "defaultHasOpenPrForBranch returns its boolean from listPullRequestsForHead(state:'open') when isGitHubAppConfigured() is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-openpr-rest.ac2",
+            "title": "when the App is not configured it falls back to the existing gh pr list --head --state open call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-openpr-rest.ac3",
+            "title": "on a lookup error defaultHasOpenPrForBranch returns false (degraded) and propagates no exception",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "issue-closed-rest",
+        "title": "Route tracker issue-closed check through App REST, preserving the TTL cache",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T12:15:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2265",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/issue-closed.ts",
+            "tests/unit/lib/cloister/issue-closed.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/issue-closed.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "issue-closed tests pass covering App-REST branch, gh fallback, and cache short-circuit"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/issue-closed.ts, change isTrackerIssueClosed (21-50) to read issue state via getIssueState (App REST) when isGitHubAppConfigured() is true, else keep the existing gh issue view --json state GraphQL call. Do NOT alter the 5-minute TTL cache (lines 9-10, 22-24) or the in-memory shadow-state short-circuit in isIssueClosed (52-59) — only the network read swaps."
+        },
+        "items": [
+          {
+            "id": "issue-closed-rest.ac1",
+            "title": "isTrackerIssueClosed reads issue state via getIssueState (App REST) when isGitHubAppConfigured() is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-closed-rest.ac2",
+            "title": "isTrackerIssueClosed preserves the 5-minute TTL cache and shadow-state short-circuit, issuing no network read for a warm/known issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-closed-rest.ac3",
+            "title": "when the App is not configured it falls back to gh issue view --json state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-verify-rest",
+        "title": "Route merge-agent merged-verification through App REST when configured",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T12:15:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2265",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/merge-agent.ts",
+            "src/lib/cloister/__tests__/merge-agent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/cloister/__tests__"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "merge-agent tests pass and the in-flight-guard test stays green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/merge-agent.ts, change verifyMergedBeforeLifecycle (297-316) to resolve merged state via listPullRequestsForHead(owner, repo, 'feature/'+issueId.toLowerCase(), 'all') and treat a PR with merged (or mergedAt/mergeCommit) as merged, when isGitHubAppConfigured() is true; otherwise keep the existing gh pr list --head --json number,mergedAt,mergeCommit call. Touch ONLY the PR lookup — do not change lifecycle triggering or the postMergeLifecycle in-flight guard."
+        },
+        "items": [
+          {
+            "id": "merge-verify-rest.ac1",
+            "title": "verifyMergedBeforeLifecycle determines merged state from listPullRequestsForHead when isGitHubAppConfigured() is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-verify-rest.ac2",
+            "title": "when the App is not configured it falls back to the existing gh pr list --head merged-check",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-verify-rest.ac3",
+            "title": "verifyMergedBeforeLifecycle returns the same merged/not-merged verdict as the gh path for a merged branch and does not alter when postMergeLifecycle fires",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "forge-artifact-rest",
+        "title": "Route forge existing-artifact lookup through App REST when configured",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T12:15:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2265",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/forge.ts",
+            "tests/unit/lib/forge.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/forge.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "forge tests pass covering both the App-REST and gh-fallback artifact-lookup branches"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/forge.ts, change getExistingGitHubArtifact (around line 133) to resolve the existing PR (url+number) via listPullRequestsForHead when isGitHubAppConfigured() is true, else keep the existing gh pr view --json url,number GraphQL call. Return the same artifact shape from both branches so callers are unaffected."
+        },
+        "items": [
+          {
+            "id": "forge-artifact-rest.ac1",
+            "title": "getExistingGitHubArtifact resolves the existing PR via listPullRequestsForHead (App REST) when isGitHubAppConfigured() is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "forge-artifact-rest.ac2",
+            "title": "when the App is not configured it falls back to the existing gh pr view --json url,number call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "forge-artifact-rest.ac3",
+            "title": "getExistingGitHubArtifact returns the same {url, number} artifact shape from both branches that callers already consume",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pr-resolution-rest",
+        "title": "Route PR + Discussions tab PR-number resolution through App REST when configured",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T12:15:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2265",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/issues.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "no gh pr list --head PR-number resolution remains on the App-configured path in issues.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/issues.ts, change resolveIssuePullRequestRef (3303-3315) and the Discussions handler's PR-number resolver (3767-3779) to resolve the PR number via listPullRequestsForHead(owner, repo, 'feature/'+id.toLowerCase(), 'all') when isGitHubAppConfigured() is true, else keep the existing gh pr list --head --jq .[0].number GraphQL call. This bead touches ONLY the number-resolution calls, not the heavy gh pr view fetch (that is bead tab-webhook-cache)."
+        },
+        "items": [
+          {
+            "id": "pr-resolution-rest.ac1",
+            "title": "resolveIssuePullRequestRef resolves the PR number via listPullRequestsForHead (App REST) when isGitHubAppConfigured() is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-resolution-rest.ac2",
+            "title": "the Discussions handler resolves its PR number via the same App REST path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-resolution-rest.ac3",
+            "title": "both resolvers fall back to gh pr list --head only when the App is not configured",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tab-webhook-cache",
+        "title": "Serve PR + Discussions tab data from a webhook-aware server cache",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T12:15:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2265",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/issues.ts",
+            "src/lib/webhook-handlers.ts",
+            "src/dashboard/server/services/pr-tab-cache.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/webhook-handlers.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "cache tests show a cached hit avoids a GitHub fetch and a webhook bump forces a refetch"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a per-issue cache-generation map (new src/dashboard/server/services/pr-tab-cache.ts, or an in-module singleton) that webhook handlers bump. In src/lib/webhook-handlers.ts, have handlePullRequest, handlePullRequestReview, and the issue_comment handler bump the affected issue's generation. In src/dashboard/server/routes/issues.ts, make the /api/issues/:id/pr and /api/issues/:id/discussions handlers cache their response keyed by (issueId, generation): serve the cache and skip the GitHub fetch when the generation is unchanged; refetch and re-cache when it bumps or the cache is cold. Do NOT change the heavy gh pr view field set or the frontend refetchInterval — only gate when GitHub is actually hit."
+        },
+        "items": [
+          {
+            "id": "tab-webhook-cache.ac1",
+            "title": "GET /api/issues/:id/pr serves the cached response without calling GitHub when the issue's cache generation is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-webhook-cache.ac2",
+            "title": "after a pull_request / pull_request_review / issue_comment webhook bumps the issue's generation, the next /pr fetch emits a fresh GitHub request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-webhook-cache.ac3",
+            "title": "GET /api/issues/:id/discussions serves its cache on an unchanged generation and emits a fresh GitHub request after a webhook bump",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-webhook-cache.ac4",
+            "title": "a cold cache (no prior fetch) still produces a full response on the first request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "graphql-cooldown",
+        "title": "Add a GraphQL rate-limit cool-down gate (defense-in-depth)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T12:15:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2265",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/github-graphql-cooldown.ts",
+            "src/lib/webhook-handlers.ts",
+            "tests/unit/lib/github-graphql-cooldown.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/github-graphql-cooldown.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "cool-down tests pass using fake timers — true within 60s, false after"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/github-graphql-cooldown.ts exporting noteGraphQLRateLimit(err: unknown) — records a cool-down start when the error message matches a GraphQL-quota-exceeded pattern (e.g. /rate limit already exceeded/i or /API rate limit/i) — and isInGraphQLCooldown(): boolean — true for COOLDOWN_MS (~60000) after the last note. Wire it into refreshMergeStateFromGitHub's gh fallback (src/lib/webhook-handlers.ts:239): skip the doomed gh pr view GraphQL call and note the rate-limit when isInGraphQLCooldown() is true / on a caught rate-limit error. The timing test MUST use vi.useFakeTimers() + vi.advanceTimersByTimeAsync() — no real setTimeout waits."
+        },
+        "items": [
+          {
+            "id": "graphql-cooldown.ac1",
+            "title": "after noteGraphQLRateLimit() with a quota-exceeded error, isInGraphQLCooldown() returns true within ~60s and false thereafter (verified with fake timers)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "graphql-cooldown.ac2",
+            "title": "while isInGraphQLCooldown() is true, refreshMergeStateFromGitHub's gh fallback emits no gh GraphQL call and returns without hitting GitHub",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "graphql-cooldown.ac3",
+            "title": "after noteGraphQLRateLimit() with an unrelated (non-rate-limit) error, isInGraphQLCooldown() returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "app-rest-helpers",
+        "to": "flywheel-labels",
+        "type": "blocks"
+      },
+      {
+        "from": "app-rest-helpers",
+        "to": "deacon-openpr-rest",
+        "type": "blocks"
+      },
+      {
+        "from": "app-rest-helpers",
+        "to": "issue-closed-rest",
+        "type": "blocks"
+      },
+      {
+        "from": "app-rest-helpers",
+        "to": "merge-verify-rest",
+        "type": "blocks"
+      },
+      {
+        "from": "app-rest-helpers",
+        "to": "forge-artifact-rest",
+        "type": "blocks"
+      },
+      {
+        "from": "app-rest-helpers",
+        "to": "pr-resolution-rest",
+        "type": "blocks"
+      },
+      {
+        "from": "pr-resolution-rest",
+        "to": "tab-webhook-cache",
+        "type": "blocks"
+      },
+      {
+        "from": "graphql-cooldown",
+        "to": "tab-webhook-cache",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-03-PAN-2265-fix-github-graphql-quota-exhaustion-top-burners-and-remediation-plan.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

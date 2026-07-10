@@ -1,0 +1,1264 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-03T12:00:00Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-946: Adopt deft vBRIEF lifecycle model for scope vBRIEFs",
+    "updated": "2026-05-05T02:02:56.914340Z"
+  },
+  "plan": {
+    "id": "pan-946",
+    "title": "Adopt deft vBRIEF lifecycle model for scope vBRIEFs",
+    "status": "completed",
+    "uid": "bb9afa10-315b-409a-a625-02d14573e029",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 742,
+    "created": "2026-05-03T12:00:00Z",
+    "updated": "2026-05-05T02:02:56.914340Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/946",
+        "label": "PAN-946",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/deftai/vBRIEF",
+        "label": "deft vBRIEF spec",
+        "type": "spec"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/944",
+        "label": "PAN-944",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/945",
+        "label": "PAN-945",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "vbrief",
+      "lifecycle",
+      "architecture",
+      "cli"
+    ],
+    "narratives": {
+      "Problem": "Panopticon vBRIEF plans are ephemeral workspace artifacts with no structured lifecycle. Plans disappear after close-out, there's no cross-issue visibility, and the only lifecycle gate is a boolean .planning-complete marker file. STATE.md is unstructured prose that wastes agent context.",
+      "Proposal": "Adopt deft's filesystem-as-state lifecycle model with per-project ./vbrief/ directories, lifecycle subdirectories (proposed/active/completed/cancelled), issue-keyed filenames, plan.status as lifecycle gate, and a separate continue.vbrief.json for structured session state. Hybrid git model: proposed/approved on main for visibility, running/updates on feature branch, completed/cancelled on main after merge. Automatic transitions as side effects of existing pipeline events; pan scope commands as manual overrides."
+    },
+    "items": [
+      {
+        "id": "vbrief-lifecycle-foundation",
+        "title": "vBRIEF lifecycle foundation: types, filename convention, directory helpers",
+        "status": "completed",
+        "priority": "critical",
+        "created": "2026-05-03T12:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-946"
+        },
+        "narrative": {
+          "Action": "Create the foundational module for vBRIEF lifecycle management. Add lifecycle directory types, implement the YYYY-MM-DD-ISSUE-ID-slug.vbrief.json filename convention (generate and parse), and create helpers to scaffold and resolve ./vbrief/ lifecycle directories per project. This module is imported by everything else."
+        },
+        "subItems": [
+          {
+            "id": "vbrief-lifecycle-foundation.ac1",
+            "title": "VBriefLifecycleDir type exported from src/lib/vbrief/ with values: proposed, active, completed, cancelled",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vbrief-lifecycle-foundation.ac2",
+            "title": "generateVBriefFilename(issueId, slug, createdDate) returns YYYY-MM-DD-ISSUE-ID-slug.vbrief.json",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vbrief-lifecycle-foundation.ac3",
+            "title": "parseVBriefFilename(filename) extracts {issueId, slug, date} or returns null for non-matching filenames",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vbrief-lifecycle-foundation.ac4",
+            "title": "ensureVBriefDirs(projectRoot) creates ./vbrief/{proposed,active,completed,cancelled}/ and returns the root path",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vbrief-lifecycle-foundation.ac5",
+            "title": "resolveVBriefDir(projectRoot, lifecycleDir) returns absolute path to the specified lifecycle directory",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-04T04:34:59.295Z"
+      },
+      {
+        "id": "continue-state-module",
+        "title": "Continue state module: types and IO for continue.vbrief.json",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-05-03T12:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-946"
+        },
+        "narrative": {
+          "Action": "Create the continue state module that replaces STATE.md. Define ContinueState type with structured fields for git state, decisions, hazards, resume point, beads mapping, agent model, and session history. Implement atomic read/write and session history append. The continue file lives alongside the scope vBRIEF in the same lifecycle directory as continue-{issue-id}.vbrief.json."
+        },
+        "subItems": [
+          {
+            "id": "continue-state-module.ac1",
+            "title": "ContinueState type exported with fields: gitState, decisions[], hazards[], resumePoint, beadsMapping, agentModel, sessionHistory[]",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "continue-state-module.ac2",
+            "title": "writeContinueState(dir, issueId, state) writes continue-{issueId}.vbrief.json atomically (temp + rename)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "continue-state-module.ac3",
+            "title": "readContinueState(dir, issueId) reads and validates the continue file, returns null if missing",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "continue-state-module.ac4",
+            "title": "appendSessionEntry(dir, issueId, entry) adds timestamped entry to sessionHistory array with reason, crash info, agent model",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-04T04:34:59.294Z"
+      },
+      {
+        "id": "vbrief-lifecycle-io",
+        "title": "vBRIEF lifecycle IO: find by issue, move between dirs, update status",
+        "status": "completed",
+        "priority": "critical",
+        "created": "2026-05-03T12:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-946"
+        },
+        "narrative": {
+          "Action": "Implement core lifecycle IO operations. findVBriefByIssue searches all lifecycle directories (proposed → active → completed → cancelled) for a vBRIEF matching an issue ID. moveVBrief atomically moves scope vBRIEF + continue file between lifecycle directories and runs git add. updatePlanStatus updates plan.status with sequence increment."
+        },
+        "subItems": [
+          {
+            "id": "vbrief-lifecycle-io.ac1",
+            "title": "findVBriefByIssue(projectRoot, issueId) returns {path, lifecycleDir, document} searching proposed → active → completed → cancelled",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vbrief-lifecycle-io.ac2",
+            "title": "moveVBrief(projectRoot, issueId, targetDir) atomically moves scope vBRIEF + continue file to target lifecycle directory",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vbrief-lifecycle-io.ac3",
+            "title": "moveVBrief runs git add on both source removal and destination addition",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vbrief-lifecycle-io.ac4",
+            "title": "updatePlanStatus(filePath, newStatus) updates plan.status atomically with plan.sequence increment and plan.updated timestamp",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-04T04:34:59.294Z"
+      },
+      {
+        "id": "plan-finalize-lifecycle",
+        "title": "Update plan-finalize to set proposed status and generate canonical filename",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-04T04:34:59.294Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-946"
+        },
+        "narrative": {
+          "Action": "Update the plan-finalize command to generate a canonical filename in YYYY-MM-DD-ISSUE-SLUG format (stored in plan metadata as canonicalFilename), set plan.status to 'proposed', and still write .planning-complete for backward compat during transition. The vBRIEF stays in .planning/ during planning — complete-planning promotes it to proposed/."
+        },
+        "subItems": [
+          {
+            "id": "plan-finalize-lifecycle.ac1",
+            "title": "plan-finalize generates canonical filename and stores it in plan.metadata.canonicalFilename",
+            "status": "completed",
+            "completed": "2026-05-03T09:25:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-finalize-lifecycle.ac2",
+            "title": "plan.status set to 'proposed' after finalization",
+            "status": "completed",
+            "completed": "2026-05-03T09:25:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-finalize-lifecycle.ac3",
+            "title": ".planning-complete marker still written for backward compat during transition",
+            "status": "completed",
+            "completed": "2026-05-03T09:25:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "complete-planning-to-proposed",
+        "title": "Update complete-planning to copy vBRIEF to main's ./vbrief/proposed/",
+        "status": "completed",
+        "priority": "critical",
+        "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-04T04:34:59.290Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-946"
+        },
+        "narrative": {
+          "Action": "Update the complete-planning endpoint in issues.ts to copy the vBRIEF from workspace .planning/ to the project root's ./vbrief/proposed/ with the canonical filename. Also copy continue file if it exists. Ensure lifecycle dirs exist. Commit to main branch and push. Remove the old docs/prds/active/ copy step for plan artifacts (keep PRD discovery from docs/prds/planned/)."
+        },
+        "subItems": [
+          {
+            "id": "complete-planning-to-proposed.ac1",
+            "title": "vBRIEF copied from workspace .planning/plan.vbrief.json to project root's ./vbrief/proposed/<canonical-filename>",
+            "status": "completed",
+            "completed": "2026-05-03T10:10:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "complete-planning-to-proposed.ac2",
+            "title": "continue file copied from workspace .planning/ to ./vbrief/proposed/ if it exists",
+            "status": "completed",
+            "completed": "2026-05-03T10:10:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "complete-planning-to-proposed.ac3",
+            "title": "Changes committed to main branch with message 'scope: propose PAN-XXX vBRIEF'",
+            "status": "completed",
+            "completed": "2026-05-03T10:10:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "complete-planning-to-proposed.ac4",
+            "title": "Old docs/prds/active/ copy step removed for vBRIEF/STATE.md artifacts",
+            "status": "completed",
+            "completed": "2026-05-03T10:10:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "plan-status-gate",
+        "title": "Replace .planning-complete marker with plan.status check",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-04T04:34:59.286Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-946"
+        },
+        "narrative": {
+          "Action": "Replace all .planning-complete marker file checks with plan.status field checks. Dashboard Done button enabled when plan.status is 'proposed'. Add backward compat shim: if .planning-complete exists but plan.status is missing, treat as proposed. Update all call sites."
+        },
+        "subItems": [
+          {
+            "id": "plan-status-gate.ac1",
+            "title": "Dashboard Done button enabled when plan.status is 'proposed' instead of .planning-complete file existence",
+            "status": "completed",
+            "completed": "2026-05-03T09:55:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-status-gate.ac2",
+            "title": "Backward compat: if .planning-complete exists but plan.status missing, treated as 'proposed'",
+            "status": "completed",
+            "completed": "2026-05-03T09:55:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-status-gate.ac3",
+            "title": "All code paths that check for .planning-complete updated to use plan.status",
+            "status": "completed",
+            "completed": "2026-05-03T09:55:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "approve-to-active",
+        "title": "Approval transition: move vBRIEF from proposed/ to active/ on main",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-04T04:34:59.292Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-946"
+        },
+        "narrative": {
+          "Action": "When the user approves a plan (clicking Start in the dashboard or running pan scope approve), move the vBRIEF from proposed/ to active/ on main. Set plan.status to 'approved'. Commit to main. This must happen before the feature branch worktree is created so the worktree inherits the active vBRIEF."
+        },
+        "subItems": [
+          {
+            "id": "approve-to-active.ac1",
+            "title": "Start-agent flow (or explicit approve) moves vBRIEF from proposed/ to active/ on main before worktree creation",
+            "status": "completed",
+            "completed": "2026-05-03T10:25:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "approve-to-active.ac2",
+            "title": "plan.status updated to 'approved' with sequence increment",
+            "status": "completed",
+            "completed": "2026-05-03T10:25:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "approve-to-active.ac3",
+            "title": "Git commit on main with message 'scope: approve PAN-XXX vBRIEF'",
+            "status": "completed",
+            "completed": "2026-05-03T10:25:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "start-agent-running",
+        "title": "Set plan.status to running on pan start",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-04T04:34:59.289Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-946"
+        },
+        "narrative": {
+          "Action": "When pan start spawns the work agent, locate the vBRIEF in the worktree's ./vbrief/active/ and set plan.status to 'running'. This happens in the worktree (feature branch)."
+        },
+        "subItems": [
+          {
+            "id": "start-agent-running.ac1",
+            "title": "pan start locates vBRIEF in worktree ./vbrief/active/ and sets plan.status to 'running'",
+            "status": "completed",
+            "completed": "2026-05-03T10:30:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-agent-running.ac2",
+            "title": "plan.sequence incremented and plan.updated set",
+            "status": "completed",
+            "completed": "2026-05-03T10:30:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-continue-integration",
+        "title": "Write/update continue.vbrief.json during agent sessions",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-04T04:34:59.285Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-946"
+        },
+        "narrative": {
+          "Action": "Integrate continue state into the agent lifecycle. On agent session start, write initial continue state (git branch, sha, agent model). On session end, update with latest decisions and resume point. On crash recovery, read continue state for context and append resume entry with reason."
+        },
+        "subItems": [
+          {
+            "id": "agent-continue-integration.ac1",
+            "title": "Agent start writes initial continue state (branch, sha, agent model) to ./vbrief/active/continue-{issue}.vbrief.json",
+            "status": "completed",
+            "completed": "2026-05-03T13:40:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-continue-integration.ac2",
+            "title": "Agent session end updates continue state with latest resume point",
+            "status": "completed",
+            "completed": "2026-05-03T13:40:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-continue-integration.ac3",
+            "title": "Agent resume reads continue state and appends session entry with resume reason",
+            "status": "completed",
+            "completed": "2026-05-03T13:40:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-complete-transition",
+        "title": "Post-merge: move vBRIEF from active/ to completed/ on main",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-04T04:34:59.291Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-946"
+        },
+        "narrative": {
+          "Action": "In postMergeLifecycle, after the PR merges, move the vBRIEF + continue file from active/ to completed/ on main. Set plan.status to 'completed'. This replaces archive-planning's movePrd() for vBRIEF artifacts. The old docs/prds archive path is left alone for legacy artifacts."
+        },
+        "subItems": [
+          {
+            "id": "merge-complete-transition.ac1",
+            "title": "postMergeLifecycle moves vBRIEF + continue file from active/ to completed/ on main",
+            "status": "completed",
+            "completed": "2026-05-03T10:35:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-complete-transition.ac2",
+            "title": "plan.status set to 'completed' with timestamp",
+            "status": "completed",
+            "completed": "2026-05-03T10:35:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-complete-transition.ac3",
+            "title": "Git commit on main with message 'scope: complete PAN-XXX vBRIEF'",
+            "status": "completed",
+            "completed": "2026-05-03T10:35:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "close-cancel-transition",
+        "title": "Close/cancel: move vBRIEF to cancelled/ on main",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-04T04:34:59.291Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-946"
+        },
+        "narrative": {
+          "Action": "On issue close without merge (pan close), move the vBRIEF from active/ (or proposed/) to cancelled/ on main. Set plan.status to 'cancelled'. Move continue file alongside."
+        },
+        "subItems": [
+          {
+            "id": "close-cancel-transition.ac1",
+            "title": "pan close moves vBRIEF from active/ or proposed/ to cancelled/ on main",
+            "status": "completed",
+            "completed": "2026-05-03T10:35:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-cancel-transition.ac2",
+            "title": "plan.status set to 'cancelled'",
+            "status": "completed",
+            "completed": "2026-05-03T10:35:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-cancel-transition.ac3",
+            "title": "continue file moved to cancelled/ alongside scope vBRIEF",
+            "status": "completed",
+            "completed": "2026-05-03T10:35:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "workspace-plan-from-lifecycle",
+        "title": "Update workspace plan resolution to read from ./vbrief/active/",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-04T04:34:59.291Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-946"
+        },
+        "narrative": {
+          "Action": "Update findPlan() and readWorkspacePlan() in io.ts to resolve plans from ./vbrief/active/ first, falling back to .planning/plan.vbrief.json for in-progress planning sessions. All callers (task-readiness, beads sync, etc.) work transparently with the new path."
+        },
+        "subItems": [
+          {
+            "id": "workspace-plan-from-lifecycle.ac1",
+            "title": "findPlan() checks ./vbrief/active/ for issue-keyed vBRIEF before .planning/plan.vbrief.json",
+            "status": "completed",
+            "completed": "2026-05-03T10:40:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-plan-from-lifecycle.ac2",
+            "title": "readWorkspacePlan() resolves from lifecycle dir transparently",
+            "status": "completed",
+            "completed": "2026-05-03T10:40:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-plan-from-lifecycle.ac3",
+            "title": "Fallback to .planning/plan.vbrief.json preserved for in-progress planning sessions",
+            "status": "completed",
+            "completed": "2026-05-03T10:40:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard-plan-from-lifecycle",
+        "title": "Update dashboard plan endpoint to resolve from lifecycle dirs",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-04T04:34:59.289Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-946"
+        },
+        "narrative": {
+          "Action": "Update GET /api/workspaces/:issueId/plan to use findVBriefByIssue() for plan resolution. Falls back to .planning/plan.vbrief.json for in-progress planning. Response includes lifecycleDir field so the dashboard knows the plan's state."
+        },
+        "subItems": [
+          {
+            "id": "dashboard-plan-from-lifecycle.ac1",
+            "title": "Endpoint uses findVBriefByIssue() to locate plan across lifecycle dirs",
+            "status": "completed",
+            "completed": "2026-05-03T10:40:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-plan-from-lifecycle.ac2",
+            "title": "Falls back to .planning/plan.vbrief.json for in-progress planning sessions",
+            "status": "completed",
+            "completed": "2026-05-03T10:40:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-plan-from-lifecycle.ac3",
+            "title": "Response includes lifecycleDir field indicating plan lifecycle state",
+            "status": "completed",
+            "completed": "2026-05-03T10:40:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "planning-prompt-continue",
+        "title": "Update planning prompt to write continue.vbrief.json instead of STATE.md",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-04T04:34:59.293Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-946"
+        },
+        "narrative": {
+          "Action": "Update PLANNING_PROMPT.md template and planning session generation to instruct the planning agent to write continue.vbrief.json in .planning/ instead of STATE.md. The continue file captures decisions, hazards, approach context. Also update the complete-planning copy to include the continue file."
+        },
+        "subItems": [
+          {
+            "id": "planning-prompt-continue.ac1",
+            "title": "PLANNING_PROMPT.md template instructs agent to write continue.vbrief.json instead of STATE.md",
+            "status": "completed",
+            "completed": "2026-05-03T13:10:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "planning-prompt-continue.ac2",
+            "title": "Continue file written to .planning/ during planning, moved to proposed/ by complete-planning",
+            "status": "completed",
+            "completed": "2026-05-03T13:10:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "planning-prompt-continue.ac3",
+            "title": "Planning prompt no longer references STATE.md creation",
+            "status": "completed",
+            "completed": "2026-05-03T13:10:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "work-agent-read-continue",
+        "title": "Update work agent to read continue.vbrief.json for context",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-04T04:34:59.293Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-946"
+        },
+        "narrative": {
+          "Action": "Update work agent prompt template and startup to read continue.vbrief.json from ./vbrief/active/ for decisions, hazards, and resume context. The work agent should reference the continue file instead of STATE.md for planning handoff context."
+        },
+        "subItems": [
+          {
+            "id": "work-agent-read-continue.ac1",
+            "title": "Work agent prompt template references continue.vbrief.json in ./vbrief/active/ for planning context",
+            "status": "completed",
+            "completed": "2026-05-03T13:10:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "work-agent-read-continue.ac2",
+            "title": "Agent resume flow reads continue state for decisions, hazards, resume point",
+            "status": "completed",
+            "completed": "2026-05-03T13:10:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remove-state-md-refs",
+        "title": "Remove all STATE.md references from codebase",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-04T04:34:59.289Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-946"
+        },
+        "narrative": {
+          "Action": "Remove all STATE.md references from prompt templates, lifecycle code, dashboard server, and clean-planning. Update docs/VBRIEF.md to document continue.vbrief.json. Remove STATE.md from the planning artifact copy/clean/archive flows."
+        },
+        "subItems": [
+          {
+            "id": "remove-state-md-refs.ac1",
+            "title": "No references to STATE.md in any prompt template (planning, work, specialist)",
+            "status": "completed",
+            "completed": "2026-05-03T13:25:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-state-md-refs.ac2",
+            "title": "No references to STATE.md in lifecycle code (clean-planning, archive-planning, complete-planning)",
+            "status": "completed",
+            "completed": "2026-05-03T13:25:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-state-md-refs.ac3",
+            "title": "No references to STATE.md in dashboard server routes",
+            "status": "completed",
+            "completed": "2026-05-03T13:25:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-state-md-refs.ac4",
+            "title": "docs/VBRIEF.md updated to document continue.vbrief.json as the replacement for STATE.md",
+            "status": "completed",
+            "completed": "2026-05-03T13:25:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "scope-command-group",
+        "title": "Create pan scope command group skeleton",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-04T04:34:59.290Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-946"
+        },
+        "narrative": {
+          "Action": "Create the pan scope command group following the same pattern as pan admin. Register in cli/index.ts. pan scope --help shows available subcommands."
+        },
+        "subItems": [
+          {
+            "id": "scope-command-group.ac1",
+            "title": "src/cli/commands/scope/index.ts exports registerScopeCommands() following admin pattern",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-command-group.ac2",
+            "title": "pan scope registered in cli/index.ts and pan scope --help lists subcommands",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "scope-list",
+        "title": "pan scope list — show all vBRIEFs with lifecycle status",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-04T04:34:59.288Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-946"
+        },
+        "narrative": {
+          "Action": "Implement pan scope list to show all vBRIEFs across all registered projects and lifecycle dirs. Display issue ID, title, status, lifecycle dir, created date. Scan worktrees for in-flight active vBRIEFs not yet on main."
+        },
+        "subItems": [
+          {
+            "id": "scope-list.ac1",
+            "title": "Lists vBRIEFs from all lifecycle dirs for all registered projects",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-list.ac2",
+            "title": "Output shows issue ID, title, plan.status, lifecycle dir, created date in table format",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-list.ac3",
+            "title": "Scans active worktrees for in-flight vBRIEFs not yet on main",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "scope-show",
+        "title": "pan scope show <issue> — display plan details",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-04T04:34:59.288Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-946"
+        },
+        "narrative": {
+          "Action": "Implement pan scope show to display detailed plan info for a specific issue. Show title, status, items with completion percentages, narratives, and continue state summary if present."
+        },
+        "subItems": [
+          {
+            "id": "scope-show.ac1",
+            "title": "Resolves vBRIEF by issue ID using findVBriefByIssue()",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-show.ac2",
+            "title": "Displays plan title, status, lifecycle dir, items with completion, and narratives",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-show.ac3",
+            "title": "Shows continue state summary (last session, decisions count, hazards) if continue file exists",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "scope-propose",
+        "title": "pan scope propose <issue> — manual move to proposed/",
+        "status": "completed",
+        "priority": "low",
+        "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-04T04:34:59.288Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-946"
+        },
+        "narrative": {
+          "Action": "Manual override: move a vBRIEF to proposed/ and set plan.status to 'proposed'. Commit to current branch."
+        },
+        "subItems": [
+          {
+            "id": "scope-propose.ac1",
+            "title": "Moves vBRIEF to proposed/ and sets plan.status to 'proposed'",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-propose.ac2",
+            "title": "Commits change to current branch with descriptive message",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "scope-approve",
+        "title": "pan scope approve <issue> — manual move to active/",
+        "status": "completed",
+        "priority": "low",
+        "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-04T04:34:59.287Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-946"
+        },
+        "narrative": {
+          "Action": "Manual override: move a vBRIEF from proposed/ to active/ and set plan.status to 'approved'. Commit to current branch."
+        },
+        "subItems": [
+          {
+            "id": "scope-approve.ac1",
+            "title": "Moves vBRIEF from proposed/ to active/ and sets plan.status to 'approved'",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-approve.ac2",
+            "title": "Commits change to current branch with descriptive message",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "scope-complete",
+        "title": "pan scope complete <issue> — manual move to completed/",
+        "status": "completed",
+        "priority": "low",
+        "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-04T04:34:59.287Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-946"
+        },
+        "narrative": {
+          "Action": "Manual override: move a vBRIEF from active/ to completed/ and set plan.status to 'completed'. Commit to current branch."
+        },
+        "subItems": [
+          {
+            "id": "scope-complete.ac1",
+            "title": "Moves vBRIEF from active/ to completed/ and sets plan.status to 'completed'",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-complete.ac2",
+            "title": "Commits change to current branch with descriptive message",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "scope-cancel",
+        "title": "pan scope cancel <issue> — manual move to cancelled/",
+        "status": "completed",
+        "priority": "low",
+        "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-04T04:34:59.287Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-946"
+        },
+        "narrative": {
+          "Action": "Manual override: move a vBRIEF to cancelled/ and set plan.status to 'cancelled'. Commit to current branch."
+        },
+        "subItems": [
+          {
+            "id": "scope-cancel.ac1",
+            "title": "Moves vBRIEF to cancelled/ and sets plan.status to 'cancelled'",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-cancel.ac2",
+            "title": "Commits change to current branch with descriptive message",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "scope-restore",
+        "title": "pan scope restore <issue> — restore from completed/cancelled to active/",
+        "status": "completed",
+        "priority": "low",
+        "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-04T04:34:59.286Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-946"
+        },
+        "narrative": {
+          "Action": "Manual override: move a vBRIEF from completed/ or cancelled/ back to active/ and set plan.status to 'approved'. Commit to current branch."
+        },
+        "subItems": [
+          {
+            "id": "scope-restore.ac1",
+            "title": "Moves vBRIEF from completed/ or cancelled/ back to active/",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-restore.ac2",
+            "title": "Sets plan.status to 'approved' and commits with descriptive message",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sync-vbrief-audit",
+        "title": "Extend pan sync with vBRIEF state disagreement detection",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-04T04:34:59.290Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-946"
+        },
+        "narrative": {
+          "Action": "Extend the pan sync command to detect vBRIEF/tracker/workspace state disagreements. Three checks: (1) vBRIEF in active/ but tracker says closed, (2) vBRIEF in completed/ but workspace still exists, (3) tracker says in-progress but no vBRIEF in active/ (scanning worktrees). Print audit results with suggested pan scope fix commands."
+        },
+        "subItems": [
+          {
+            "id": "sync-vbrief-audit.ac1",
+            "title": "Flags vBRIEF in active/ but GitHub issue is closed",
+            "status": "completed",
+            "completed": "2026-05-03T14:00:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-vbrief-audit.ac2",
+            "title": "Flags vBRIEF in completed/ but workspace worktree still exists",
+            "status": "completed",
+            "completed": "2026-05-03T14:00:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-vbrief-audit.ac3",
+            "title": "Flags tracker shows in-progress but no vBRIEF found in active/ (main or worktrees)",
+            "status": "completed",
+            "completed": "2026-05-03T14:00:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-vbrief-audit.ac4",
+            "title": "Each disagreement prints suggested pan scope command to fix it",
+            "status": "completed",
+            "completed": "2026-05-03T14:00:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "vbrief-lifecycle-foundation",
+        "to": "vbrief-lifecycle-io",
+        "type": "blocks"
+      },
+      {
+        "from": "vbrief-lifecycle-foundation",
+        "to": "plan-finalize-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "vbrief-lifecycle-io",
+        "to": "complete-planning-to-proposed",
+        "type": "blocks"
+      },
+      {
+        "from": "vbrief-lifecycle-io",
+        "to": "approve-to-active",
+        "type": "blocks"
+      },
+      {
+        "from": "vbrief-lifecycle-io",
+        "to": "merge-complete-transition",
+        "type": "blocks"
+      },
+      {
+        "from": "vbrief-lifecycle-io",
+        "to": "close-cancel-transition",
+        "type": "blocks"
+      },
+      {
+        "from": "vbrief-lifecycle-io",
+        "to": "workspace-plan-from-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "vbrief-lifecycle-io",
+        "to": "scope-command-group",
+        "type": "blocks"
+      },
+      {
+        "from": "vbrief-lifecycle-io",
+        "to": "sync-vbrief-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "plan-finalize-lifecycle",
+        "to": "complete-planning-to-proposed",
+        "type": "blocks"
+      },
+      {
+        "from": "complete-planning-to-proposed",
+        "to": "plan-status-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "approve-to-active",
+        "to": "start-agent-running",
+        "type": "blocks"
+      },
+      {
+        "from": "continue-state-module",
+        "to": "agent-continue-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "continue-state-module",
+        "to": "planning-prompt-continue",
+        "type": "blocks"
+      },
+      {
+        "from": "continue-state-module",
+        "to": "work-agent-read-continue",
+        "type": "blocks"
+      },
+      {
+        "from": "start-agent-running",
+        "to": "agent-continue-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-plan-from-lifecycle",
+        "to": "dashboard-plan-from-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "planning-prompt-continue",
+        "to": "remove-state-md-refs",
+        "type": "blocks"
+      },
+      {
+        "from": "work-agent-read-continue",
+        "to": "remove-state-md-refs",
+        "type": "blocks"
+      },
+      {
+        "from": "scope-command-group",
+        "to": "scope-list",
+        "type": "blocks"
+      },
+      {
+        "from": "scope-command-group",
+        "to": "scope-show",
+        "type": "blocks"
+      },
+      {
+        "from": "scope-command-group",
+        "to": "scope-propose",
+        "type": "blocks"
+      },
+      {
+        "from": "scope-command-group",
+        "to": "scope-approve",
+        "type": "blocks"
+      },
+      {
+        "from": "scope-command-group",
+        "to": "scope-complete",
+        "type": "blocks"
+      },
+      {
+        "from": "scope-command-group",
+        "to": "scope-cancel",
+        "type": "blocks"
+      },
+      {
+        "from": "scope-command-group",
+        "to": "scope-restore",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "completed"
+}

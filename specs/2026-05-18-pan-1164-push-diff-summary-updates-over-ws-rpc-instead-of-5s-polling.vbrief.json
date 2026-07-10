@@ -1,0 +1,400 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-18T02:45:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1164: Push diff summary updates over /ws/rpc instead of 5s polling",
+    "updated": "2026-05-18T02:41:03.433Z"
+  },
+  "plan": {
+    "id": "pan-1164",
+    "title": "Push diff summary updates over /ws/rpc instead of 5s polling",
+    "status": "proposed",
+    "uid": "cf4ff498-f61e-43c6-95d0-75a29351094c",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-18T02:45:00.000Z",
+    "updated": "2026-05-18T02:41:03.433Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1164",
+        "label": "PAN-1164",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "websocket",
+      "rpc",
+      "performance",
+      "conversations"
+    ],
+    "narratives": {
+      "Problem": "ConversationPanel polls `/api/conversations/:name/diffs` every 5s via `refetchInterval: 5000`. After Claude completes a turn, the new file edit can take 5-6s end-to-end to appear in the 'Changed files' header — users who open the diff panel during that gap see a stale or empty list. The polling also runs unconditionally for every open panel, regardless of whether anything changed.",
+      "Proposal": "Push diff-summary updates as in-memory domain events over the existing `/ws/rpc` Effect RPC stream. Server side: when `getCachedMessages` finishes parsing JSONL on a messages poll, diff the new `fileEditsByAssistantId` against the cached snapshot, compute a per-turn `TurnDiffSummary` for any new/changed assistant turn (via a helper extracted from the existing diffs route), and fire-and-forget `getEventStore().emitOnly({ type: 'conversation.diff_summary_updated', ... })` with the full summary payload. Frontend side: add a reducer that maintains `conversationDiffSummariesByName: Record<string, TurnDiffSummary[]>` in the dashboard store; ConversationPanel reads from the store, keeps the on-mount HTTP fetch (seeded into React Query) for initial state, and drops `refetchInterval: 5000` entirely. End-to-end propagation drops from ~5s to ~2s (bounded by the existing messages poll, ~1s average), with no extra polling traffic."
+    },
+    "items": [
+      {
+        "id": "extract-diff-helper",
+        "title": "Extract per-turn diff computation into a shared helper",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-18T02:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1164",
+          "requiresInspection": true,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extract the per-assistant-turn diff-computation block currently inlined in `getConversationDiffsRoute` (src/dashboard/server/routes/conversations.ts lines ~2585-2683) into a reusable helper, e.g. `computeConversationTurnDiffSummary(opts: { assistantId, edits, assistantMessage, conv, repoRootCache, baseCommitCache }): Promise<TurnDiffSummaryWithFiles | null>` in a new file `src/dashboard/server/services/conversation-diff-summary.ts` (or alongside `conversation-service.ts`). The helper takes one assistant message's edits, returns a single summary (or null if no diff). The HTTP route loops over `fileEditsByAssistantId` and calls the helper for each entry — its public response is byte-identical to today. The emit hook (next bead) will reuse the same helper for the new turn(s) only."
+        },
+        "subItems": [
+          {
+            "id": "extract-diff-helper.ac1",
+            "title": "Helper function is exported from a new (or existing) services module and accepts `repoRootCache` + `baseCommitCache` as inputs so the caller controls cache lifetime",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-diff-helper.ac2",
+            "title": "`getConversationDiffsRoute` is refactored to call the helper inside its loop; the HTTP response shape, ordering, and contents are unchanged (snapshot test or manual byte-compare)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-diff-helper.ac3",
+            "title": "Unit test in `src/dashboard/server/__tests__/conversation-diff-summary.test.ts` covers (a) successful per-file numstat parsing, (b) empty-edit input returns null, (c) repo-resolution failure path returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-diff-helper.ac4",
+            "title": "All git/exec calls are async (`promisify(exec)`); no `execSync` or other blocking calls introduced (per CLAUDE.md `no-execsync-server` rule)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-diff-helper.ac5",
+            "title": "`npm run typecheck`, `npm run lint`, and `npm test` all pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "event-contract",
+        "title": "Add `conversation.diff_summary_updated` event to contracts and reducer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-18T02:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1164",
+          "requiresInspection": true,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Wire the new domain event end-to-end in `packages/contracts/`. (1) In `events.ts`, define `ConversationDiffSummaryUpdatedEvent` next to the other `ConversationXxx` events with payload `{ conversationName, assistantMessageId, completedAt, files: TurnDiffFileChange[] }`. Mark in the JSDoc as in-memory-only (mirrors `ConversationCompactingChangedEvent`). Add it to the `DomainEvent` schema union. (2) In `event-reducers.ts`, extend `ReadModelState` with `conversationDiffSummariesByName: Record<string, TurnDiffSummary[]>` (default `{}`), update `initialReadModelState`, and add a reducer case that builds a `TurnDiffSummary` (using `turnId = \\`conv-turn-${assistantMessageId}\\`` to match the HTTP route's id scheme), deduplicates by `assistantMessageId` (replace-if-exists, append-otherwise), and trims via the existing `trimTurnDiffSummaries`. (3) Rebuild contracts: `cd packages/contracts && npm run build`. (4) Add reducer test mirroring the `agent.turn_diff_completed` test."
+        },
+        "subItems": [
+          {
+            "id": "event-contract.ac1",
+            "title": "`ConversationDiffSummaryUpdatedEvent` is defined in `events.ts` with `type: 'conversation.diff_summary_updated'`, payload schema as specified, and exported type",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "event-contract.ac2",
+            "title": "The event is added to the `DomainEvent` union and the contracts package builds (`cd packages/contracts && npm run build`)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "event-contract.ac3",
+            "title": "`ReadModelState.conversationDiffSummariesByName: Record<string, TurnDiffSummary[]>` is added, defaulted in `initialReadModelState`, and the reducer dedupes by `assistantMessageId` (replace-if-exists, append-otherwise)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "event-contract.ac4",
+            "title": "Reducer test asserts: (a) first event appends a new summary; (b) second event for the same `assistantMessageId` replaces in-place; (c) events for different `conversationName`s do not cross-pollute",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "event-contract.ac5",
+            "title": "`getSnapshot` returns `conversationDiffSummariesByName` so reconnects preserve the state (verify in `DashboardSnapshot` schema or snapshot construction code)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "event-contract.ac6",
+            "title": "`npm run typecheck`, `npm run lint`, and `npm test` all pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "server-emit",
+        "title": "Emit `conversation.diff_summary_updated` from getCachedMessages parse hook",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-18T02:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1164",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Hook the emit into `getCachedMessages` (src/dashboard/server/routes/conversations.ts). After the parse result is computed (incremental or full), compare its `fileEditsByAssistantId` against the previous cache snapshot's edits to find new or grown entries. For each new assistantId, look up the merged assistant message (skip if not present — guards against orphan UUIDs per H2), then fire-and-forget call the helper from bead `extract-diff-helper` and emit `getEventStore().emitOnly({ type: 'conversation.diff_summary_updated', ... })` with the resulting `TurnDiffSummary` fields. Pass `conversationName` into `getCachedMessages` (currently it only takes `sessionFile` + `isSpecialist`) — derive it from the route caller. Skip emit when `isSpecialist === true` (per H4) or when the conversation lookup fails. Maintain a per-`sessionFile` Map<assistantId, fileCount> in module scope to dedup across concurrent pollers (per H1) and clear it on cache eviction."
+        },
+        "subItems": [
+          {
+            "id": "server-emit.ac1",
+            "title": "`getCachedMessages` accepts an optional `conversationName?: string` argument; when present and `isSpecialist === false`, the function performs the diff-detect-and-emit step after computing `result`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-emit.ac2",
+            "title": "The `/api/conversations/:name/messages` route passes the conversation name into `getCachedMessages`; the `/api/conversations/:name/diffs` route and any other callers continue to work (compile + run)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-emit.ac3",
+            "title": "Detect-and-emit logic is fire-and-forget (`void (async () => {...})()`) so the HTTP response is not delayed; the inner work uses `await` for git/exec calls and handles errors via try/catch + console.error (no unhandled rejections)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-emit.ac4",
+            "title": "Per-`sessionFile` last-emit tracking dedupes events: the same assistantId with the same file count emits exactly once across multiple concurrent `/messages` polls (verified by an integration test that simulates two parallel calls)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-emit.ac5",
+            "title": "Orphan tool_use UUIDs (those not present as keys in `result.messages.find(m => m.role === 'assistant')`) do NOT trigger an emit; once re-keying merges them into the real assistant message UUID, that real UUID DOES emit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-emit.ac6",
+            "title": "Specialist sessions (`isSpecialist=true`) and sessions for which `getConversationByName` returns null do not emit (silent skip, no error)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-emit.ac7",
+            "title": "Integration test in `src/dashboard/server/__tests__/`: append a tool_use entry for `Edit` to a fixture JSONL between two `getCachedMessages` calls; assert exactly one `conversation.diff_summary_updated` event is captured from `getEventStore()` with the correct `conversationName`, `assistantMessageId`, and `files[]`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-emit.ac8",
+            "title": "`npm run typecheck`, `npm run lint`, `npm test`, and `npm run build` all pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-consume",
+        "title": "Consume store summaries in ConversationPanel and drop refetchInterval",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-18T02:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1164",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In `src/dashboard/frontend/src/components/chat/ConversationPanel.tsx`: (1) remove `refetchInterval: 5000` from the `conversation-diffs` useQuery (keep the on-mount fetch so older turns hydrate React Query). (2) Read `conversationDiffSummariesByName[conversation.name]` from the dashboard store via `useDashboardStore`. (3) Replace the current `turnDiffSummaryByAssistantMessageId` derivation so it merges store summaries (live deltas) over the React Query summaries (initial seed), then maps by `assistantMessageId` using the same fallback timestamp-matching logic. (4) Optional polish: after the initial HTTP fetch resolves, write its summaries into the store too so the merge is naturally deduped — or leave them separate and merge at read time. Pick the simpler one. Verify the diff click-through (`handleOpenTurnDiff`) is unchanged."
+        },
+        "subItems": [
+          {
+            "id": "frontend-consume.ac1",
+            "title": "`refetchInterval: 5000` is removed from the `['conversation-diffs', conversation.name]` useQuery in `ConversationPanel.tsx`; the on-mount fetch still runs once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-consume.ac2",
+            "title": "ConversationPanel subscribes to `conversationDiffSummariesByName[conversation.name]` from the dashboard store; new summaries appear in the 'Changed files' header without any additional HTTP fetch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-consume.ac3",
+            "title": "Existing click-through behavior — opening a per-file turn diff via `handleOpenTurnDiff` and the `diffUrlPrefix` — is unchanged; the `TurnDiffPanel` still loads from `/api/conversations/:name/diffs/:turnId`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-consume.ac4",
+            "title": "Component unit test (Vitest + RTL) renders ConversationPanel with mocked store + React Query, dispatches a `conversation.diff_summary_updated` event into the store, asserts the new file appears in the rendered DOM without invalidating the React Query cache",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-consume.ac5",
+            "title": "`npm run typecheck`, `npm run lint`, and `npm test` (root + frontend) all pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uat",
+        "title": "Playwright UAT — live edit propagates within ~1s, no /diffs polling",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-18T02:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1164",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a Playwright UAT in `src/dashboard/frontend/tests/` that exercises the acceptance criteria from the issue end-to-end using an isolated browser instance (no shared profile/session per the Panopticon isolation rule). Test flow: (a) spin up dashboard + create or attach to a test conversation with a known JSONL fixture path; (b) open the ConversationPanel and wait for initial load; (c) record network requests via `page.on('request')`; (d) append a synthetic `Edit` tool_use entry to the JSONL file from the test harness; (e) assert the new file appears in the 'Changed files' header within 2.5s (covers the 2s messages poll + event roundtrip + render); (f) over the following 6s, assert there is exactly ONE `/api/conversations/:name/diffs` GET request — the on-mount fetch — and zero periodic refetches. The test uses its own browser context (`browser.newContext()`) and does not depend on any other agent's Playwright session."
+        },
+        "subItems": [
+          {
+            "id": "uat.ac1",
+            "title": "Playwright test file lives under `src/dashboard/frontend/tests/conversation-diff-push.spec.ts` and runs as part of the dashboard frontend test command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat.ac2",
+            "title": "Test uses an isolated `browser.newContext()` — does not rely on any other agent's Playwright session, profile, or login state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat.ac3",
+            "title": "Appending a tool_use Edit entry to the test JSONL causes the new file path to render in the 'Changed files' header within 2.5s of the JSONL write",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat.ac4",
+            "title": "Over a 6-second observation window after the panel opens, exactly one HTTP GET to `/api/conversations/:name/diffs` is observed (the on-mount fetch) — no periodic polling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat.ac5",
+            "title": "Clicking a file in the 'Changed files' header still opens the per-turn unified diff (existing behavior unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat.ac6",
+            "title": "Test passes locally and in the project's standard test command (`npm test` or whichever entry runs Playwright frontend tests)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "extract-diff-helper",
+        "to": "server-emit",
+        "type": "blocks"
+      },
+      {
+        "from": "event-contract",
+        "to": "server-emit",
+        "type": "blocks"
+      },
+      {
+        "from": "event-contract",
+        "to": "frontend-consume",
+        "type": "blocks"
+      },
+      {
+        "from": "server-emit",
+        "to": "uat",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-consume",
+        "to": "uat",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-18-PAN-1164-push-diff-summary-updates-over-ws-rpc-instead-of-5s-polling.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

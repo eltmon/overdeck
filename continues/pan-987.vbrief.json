@@ -1,0 +1,64 @@
+{
+  "version": "1",
+  "issueId": "PAN-987",
+  "created": "2026-05-07T19:05:14.815Z",
+  "updated": "2026-05-10T04:54:26.763Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "feedback": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-05-07T19:05Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-07T19:05:14.816Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-07T19:05Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-07T19:05:41.588Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-07T20:00Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-07T20:00:25.793Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-07T21:27Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-07T21:27:34.584Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-08T08:02Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-08T08:02:36.097Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-08T08:05Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-05-08T08:05:53.713Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.4",
+      "timestamp": "2026-05-08T09:40:09.221Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.4",
+      "timestamp": "2026-05-08T09:40:09.225Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-08T09:42Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-08T09:42:03.312Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-08T10:20Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-08T10:20:12.537Z"
+    }
+  ]
+}

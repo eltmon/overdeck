@@ -1,0 +1,29 @@
+{
+  "version": "1",
+  "issueId": "PAN-1896",
+  "created": "2026-06-14T19:05:59.746Z",
+  "updated": "2026-06-14T19:18:20.000Z",
+  "gitState": { "branch": "feature/pan-1896", "sha": "2c5292376", "dirty": false },
+  "decisions": [
+    { "id": "D1", "summary": "Deliverable = new opt-in Codex permission mode 'workspace-net' (workspace-write + network_access=true + approval_policy=never) PLUS a security/tradeoffs doc. Confirmed by operator ('open up the network … add it to codex's allow list so it doesn't have to get the auto classifier's permission').", "recordedAt": "2026-06-14T19:18:20.000Z" },
+    { "id": "D2", "summary": "Codex 0.139.0 has NO static command/command-prefix allowlist (verified: trusted_commands/allowed_commands/approval_rules = 0 hits in the native binary). The operator's 'add it to codex's allow list … no classifier permission' is satisfied by approval_policy=never (no escalation ⇒ no reviewer sub-agent ⇒ no token/latency cost), not by a literal allowlist.", "recordedAt": "2026-06-14T19:18:20.000Z" },
+    { "id": "D3", "summary": "New mode is OPT-IN; the global default codex.permissionMode stays 'auto-review'. This keeps the issue's 'do not broadly disable network restrictions' invariant — the default posture is untouched; operator selects workspace-net in Settings to activate it.", "recordedAt": "2026-06-14T19:18:20.000Z" },
+    { "id": "D4", "summary": "Harness scope = Codex ONLY (auto-decided; operator's whole response was Codex-scoped). Claude Code uses a different permission model and already auto-approves for agent-*/planning-* sessions; no Claude Code change in this issue.", "recordedAt": "2026-06-14T19:18:20.000Z" },
+    { "id": "D5", "summary": "Extract a single resolveCodexSandboxConfig(permMode) helper in src/lib/runtimes/codex.ts as the one source of truth for the mode→{approvalPolicy, sandboxMode, networkAccess, approvalsReviewer} mapping. Today the mapping is duplicated verbatim in agents.ts and conversations.ts ('EXACTLY like the conversation path') — a drift hazard that already caused PAN-1799/PAN-1803 regressions.", "recordedAt": "2026-06-14T19:18:20.000Z" },
+    { "id": "D6", "summary": "approval_policy=never with sandbox_mode=workspace-write means filesystem sandbox escapes FAIL (returned to the model as errors), they do NOT run un-sandboxed — only danger-full-access removes the sandbox. So workspace-net is strictly safer than full-access (filesystem stays confined) while removing all approval prompts.", "recordedAt": "2026-06-14T19:18:20.000Z" }
+  ],
+  "hazards": [
+    { "id": "H1", "summary": "Network-egress security tradeoff: workspace-net opens outbound network with no prompts, so an agent could push to any remote / call any API / exfiltrate. The filesystem sandbox does NOT constrain network.", "mitigation": "Keep it opt-in (never the default). Document the tradeoff verbatim in the doc bead. Frame it as 'for trusted dev sessions'. It remains strictly safer than full-access." },
+    { "id": "H2", "summary": "No-leak invariant: existing modes (read-only/workspace/auto-review/full-access) must NOT gain a network_access line. A bug that always emits the [sandbox_workspace_write] block would silently open network for everyone.", "mitigation": "networkAccess defaults to undefined/false in initCodexHome; emit the block only when explicitly true. Add a test asserting initCodexHome() with no networkAccess emits NO [sandbox_workspace_write] block, and that each existing mode's config.toml is unchanged." },
+    { "id": "H3", "summary": "Mapping duplication drift: agents.ts and conversations.ts currently map the mode independently. Adding the 5th value to only one path would make work agents and conversations behave differently.", "mitigation": "Land resolveCodexSandboxConfig() (D5) FIRST as the foundation; both call sites consume it. A unit test pins all 5 modes' resolved config." },
+    { "id": "H4", "summary": "sandbox_mode is also passed at launch via the `-s` flag (launcher-generator toCodexSandboxValue), but network_access has NO launch flag — it lives only in config.toml. If initCodexHome stops writing config.toml on resume, network_access would be lost.", "mitigation": "initCodexHome always (re)writes config.toml (existing behavior, see code comment at codex.ts:180). workspace-net returns sandboxMode='workspace-write' so the -s flag stays consistent with the config.toml block." },
+    { "id": "H5", "summary": "Codex config keys are flat top-level scalars EXCEPT sandbox tables. Writing network_access as a top-level scalar (instead of under [sandbox_workspace_write]) would be ignored or rejected.", "mitigation": "Emit it as a TOML table: a line '[sandbox_workspace_write]' followed by 'network_access = true'. Mirror the existing [projects.\"…\"] table-emission pattern in initCodexHome." }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-8",
+  "sessionHistory": [
+    { "timestamp": "2026-06-14T19:05:59.746Z", "reason": "planning", "note": "Planning session started for PAN-1896", "agentModel": "agent:claude-opus-4-8" },
+    { "timestamp": "2026-06-14T19:18:20.000Z", "reason": "planning", "note": "Investigation complete (Codex 0.139.0 sandbox/approval model verified against binary). Operator confirmed approach: new opt-in workspace-net mode + tradeoffs doc, Codex-only. vBRIEF authored.", "agentModel": "agent:claude-opus-4-8" }
+  ]
+}

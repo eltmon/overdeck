@@ -1,0 +1,184 @@
+{
+  "issueId": "PAN-2426",
+  "schemaVersion": 2,
+  "feedback": [],
+  "harness": "codex",
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "schema-checkpoint": "completed",
+    "schema-checkpoint.ac1": "completed",
+    "schema-checkpoint.ac2": "completed",
+    "writer-bump": "completed",
+    "writer-bump.ac1": "completed",
+    "writer-bump.ac2": "completed",
+    "writer-bump.ac3": "completed",
+    "template-bump": "completed",
+    "template-bump.ac1": "completed",
+    "template-bump.ac2": "completed",
+    "template-bump.ac3": "completed",
+    "write-door": "completed",
+    "write-door.ac1": "completed",
+    "write-door.ac2": "completed",
+    "write-door.ac3": "completed",
+    "write-door.ac4": "completed",
+    "docs-update": "completed",
+    "docs-update.ac1": "completed",
+    "docs-update.ac2": "completed",
+    "read-compat": "completed",
+    "read-compat.ac1": "completed",
+    "read-compat.ac2": "completed",
+    "read-compat.ac3": "completed",
+    "read-compat.ac4": "completed",
+    "read-compat.ac5": "completed"
+  },
+  "pipeline": {
+    "issueId": "PAN-2426",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
+    "mergeStatus": "merged",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-08T03:57:08.747Z",
+    "reviewNotes": "Verification failed at test",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2481",
+    "reviewedAtCommit": "4f3b8909281b5687a8313c74cf45882e160c2e5d",
+    "lastVerifiedCommit": "4f3b8909281b5687a8313c74cf45882e160c2e5d",
+    "reviewRequestedAt": "2026-07-07T23:35:32.505Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        ".pan/drafts/pan-2426.md",
+        ".pan/records/pan-2426.json",
+        "src/lib/vbrief/__tests__/create-beads.test.ts",
+        "src/lib/vbrief/__tests__/dag-pan977.test.ts",
+        "src/lib/vbrief/__tests__/dag.test.ts",
+        "src/lib/vbrief/__tests__/lifecycle-io.test.ts",
+        "src/lib/vbrief/types.ts",
+        "tests/integration/agent-spawning.test.ts",
+        "tests/vbrief/full-spec.test.ts"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/VBRIEF.md",
+        "src/lib/cloister/prompts/planning.md",
+        "src/lib/pan-dir/__tests__/pan-dir.test.ts",
+        "src/lib/pan-dir/specs.ts",
+        "src/lib/vbrief/__tests__/auto-synthesize.test.ts",
+        "src/lib/vbrief/__tests__/io.test.ts",
+        "src/lib/vbrief/auto-synthesize.ts",
+        "src/lib/vbrief/builder.ts",
+        "src/lib/vbrief/dag-cli.ts",
+        "src/lib/vbrief/dag.ts",
+        "src/lib/vbrief/io.ts",
+        "src/lib/vbrief/lifecycle-io.ts",
+        "src/lib/vbrief/vbrief-index.ts",
+        "sync-sources/skills/write-vbrief/SKILL.md"
+      ],
+      "actualChangedFiles": [
+        ".pan/drafts/pan-2426.md",
+        ".pan/records/pan-2426.json",
+        "docs/VBRIEF.md",
+        "src/lib/cloister/prompts/planning.md",
+        "src/lib/pan-dir/__tests__/pan-dir.test.ts",
+        "src/lib/pan-dir/specs.ts",
+        "src/lib/vbrief/__tests__/auto-synthesize.test.ts",
+        "src/lib/vbrief/__tests__/create-beads.test.ts",
+        "src/lib/vbrief/__tests__/dag-pan977.test.ts",
+        "src/lib/vbrief/__tests__/dag.test.ts",
+        "src/lib/vbrief/__tests__/io.test.ts",
+        "src/lib/vbrief/__tests__/lifecycle-io.test.ts",
+        "src/lib/vbrief/auto-synthesize.ts",
+        "src/lib/vbrief/builder.ts",
+        "src/lib/vbrief/dag-cli.ts",
+        "src/lib/vbrief/dag.ts",
+        "src/lib/vbrief/io.ts",
+        "src/lib/vbrief/lifecycle-io.ts",
+        "src/lib/vbrief/types.ts",
+        "src/lib/vbrief/vbrief-index.ts",
+        "sync-sources/skills/write-vbrief/SKILL.md",
+        "tests/integration/agent-spawning.test.ts",
+        "tests/vbrief/full-spec.test.ts"
+      ],
+      "recordedAt": "2026-07-07T23:34:17.286Z"
+    }
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 7524402,
+            "output": 7534,
+            "cacheRead": 6803328,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.5": {
+            "input": 43569571,
+            "output": 84081,
+            "cacheRead": 42007936,
+            "cacheWrite": 0
+          }
+        },
+        "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 6,
+            "output": 2642,
+            "cacheRead": 457161,
+            "cacheWrite": 1465
+          }
+        },
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 24552,
+            "output": 52852,
+            "cacheRead": 8556920,
+            "cacheWrite": 498081
+          }
+        },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 412749,
+            "output": 8398,
+            "cacheRead": 3632640,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/codex-auto-review": {
+          "input": 7524402,
+          "output": 7534,
+          "cacheRead": 6803328,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.5": {
+          "input": 43569571,
+          "output": 84081,
+          "cacheRead": 42007936,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 24558,
+          "output": 55494,
+          "cacheRead": 9014081,
+          "cacheWrite": 499546
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 412749,
+          "output": 8398,
+          "cacheRead": 3632640,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 51.389654,
+        "pricingAsOf": "2026-07-08T03:57:08.771Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2481"
+    ],
+    "ranOn": "eltmon-z790"
+  },
+  "created": "2026-07-07T23:45:09.633Z",
+  "updated": "2026-07-08T03:57:08.771Z"
+}

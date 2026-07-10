@@ -1,0 +1,200 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-03T12:06:09.324Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2294: notify the flywheel orchestrator when the operator promotes/merges a UAT train",
+    "updated": "2026-07-04T18:14:15.258Z"
+  },
+  "plan": {
+    "id": "pan-2294",
+    "title": "feat(flywheel): notify the flywheel orchestrator when the operator promotes/merges a UAT train",
+    "status": "completed",
+    "uid": "a2e8bb70-af12-4211-b226-1c97715ef267",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 3,
+    "created": "2026-07-03T12:06:09.324Z",
+    "updated": "2026-07-04T18:14:15.258Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2294",
+        "label": "PAN-2294",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "flywheel",
+      "uat",
+      "notification"
+    ],
+    "narratives": {
+      "Problem": "On a successful UAT batch promote, postUatGenerationPromotePayload runs firePostMergeLifecycle per member but never signals the running flywheel-orchestrator, which only learns of the merge on its next tick (~1000s later). In that gap the 60s UAT reconciler rebuilds a batch from the stale last-emitted ready set (merged member still shows shipping; the main move regresses remaining ready PRs to pending), so a not-ready train surfaces merge-clickable and clicking it is rejected by the PAN-1759 member-state gate. The gate is correct; the defect is the missing immediate notification.",
+      "Proposal": "Add an additive notification hook (no new transport). New module src/lib/cloister/uat-promote-notify.ts exports notifyFlywheelOfUatPromote(result) which, on a successful promote with an active un-paused flywheel run, records a durable JSONL breadcrumb (recordDeaconNudge) and — when the orchestrator tmux session is live — delivers a promote-specific nudge via messageAgent instructing it to re-run its Observe->Act loop immediately (re-derive ready set excluding merged members, re-assemble a clean review+test-passed batch, close out merged issues). All branching lives in the helper; postUatGenerationPromotePayload calls it in one unconditional best-effort awaited line after promote. Reuses the proven stuck-remediation poke mechanism.",
+      "NonGoals": "- Do not change the PAN-1759 promote member-state gate or the promote/merge git logic.\n- Do not change the 60s reconciler cadence or its batch-assembly algorithm.\n- Do not build a new message transport, socket, or event bus.\n- Do not notify on any event other than a successful UAT generation promote (e.g. individual PR merges).\n- Do not guarantee the orchestrator's subsequent actions succeed; this issue only guarantees the notification is delivered/recorded.\n- Do not change the PromoteResult shape or the promote HTTP response contract."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Put all branching (success/active-run/paused/live-session) inside the helper so the call site is one unconditional best-effort line.",
+        "rationale": "Makes every branch unit-testable via injected deps and keeps the wiring change trivial and low-risk — an additive hook, not a refactor."
+      },
+      {
+        "summary": "Reuse messageAgent + recordDeaconNudge; build no new transport.",
+        "rationale": "Directly satisfies the issue's explicit constraint and matches the proven stuck-remediation stage-1 orchestrator poke (stuck-remediation.ts:344-345)."
+      },
+      {
+        "summary": "Always record the JSONL breadcrumb when a flywheel run is active, even if the orchestrator session is momentarily dead (delivered=false).",
+        "rationale": "Guarantees the merge is recoverable on the orchestrator's next boot and cleanly satisfies the 'no-op safely when no live session' criterion without losing the signal."
+      },
+      {
+        "summary": "Await the notification (with .catch) rather than fire-and-forget.",
+        "rationale": "Deterministic ordering and non-racy tests; the bounded ~5s idle-wait is acceptable latency for a manual operator Merge click."
+      }
+    ],
+    "items": [
+      {
+        "id": "notify-helper",
+        "title": "Create notifyFlywheelOfUatPromote helper module reusing messageAgent + recordDeaconNudge",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T12:06:09.324Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2294",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/uat-promote-notify.ts",
+            "src/lib/cloister/__tests__/uat-promote-notify.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/uat-promote-notify.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "uat-promote-notify.test.ts passes all cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/uat-promote-notify.ts exporting `notifyFlywheelOfUatPromote(result: PromoteResult, deps?: NotifyDeps): Promise<void>`. Import PromoteResult as a type-only import from './uat-promote.js', FLYWHEEL_ORCHESTRATOR_AGENT_ID from './flywheel.js', messageAgent from '../agents.js', recordDeaconNudge from './deacon-nudge-log.js', getFlywheelActiveRunId + isFlywheelGloballyPaused from '../overdeck/control-settings.js', and sessionExistsSync from '../tmux.js' (mirror the imports stuck-remediation.ts already uses). Define NotifyDeps with optional injectable overrides { getActiveRunId, isPaused, sessionExists, message, recordNudge } defaulting to the real implementations, so tests inject fakes. Behavior, all wrapped in a try/catch that swallows errors (best-effort — never rethrow): (1) if result.success !== true, return; (2) if !getActiveRunId(), return; (3) if isPaused(), return; (4) narrow to the success arm and read generation, members, mergeSha; (5) compute delivered = sessionExists(FLYWHEEL_ORCHESTRATOR_AGENT_ID); (6) if delivered, await message(FLYWHEEL_ORCHESTRATOR_AGENT_ID, <nudge>, 'uat-promote-notify') where <nudge> is the promote-specific Observe->Act instruction from the PRD (re-derive ready set EXCLUDING merged members, re-assemble a clean review+test-passed UAT batch, close out merged issues, re-arm next tick, do not ask/pause); (7) always recordNudge({ patrol: 'uat-promote-notify', issueId: members[0] ?? generation, action: 'notified flywheel-orchestrator to re-derive ready set after UAT promote', reason: 'operator promoted a UAT batch; flywheel must immediately rebuild to drop merged + regressed members before its next tick', state: { generation, members, mergeSha, delivered } }). Do NOT wire it into any caller in this bead — that is the next bead."
+        },
+        "items": [
+          {
+            "id": "notify-helper.ac1",
+            "title": "Given result.success===true with an active un-paused flywheel run AND a live orchestrator session, notifyFlywheelOfUatPromote delivers a nudge via the injected message dep to FLYWHEEL_ORCHESTRATOR_AGENT_ID and records a deacon nudge with delivered:true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "notify-helper.ac2",
+            "title": "Given result.success===true with an active run but NO live orchestrator session, the helper records a deacon nudge with delivered:false and does NOT call the message dep.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "notify-helper.ac3",
+            "title": "Given result.success===false, OR no active flywheel run, OR the flywheel globally paused, the helper returns without calling the message dep or the recordNudge dep.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "notify-helper.ac4",
+            "title": "When the injected message dep throws, notifyFlywheelOfUatPromote resolves without throwing (error swallowed, best-effort).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-promote",
+        "title": "Call notifyFlywheelOfUatPromote from postUatGenerationPromotePayload after a successful promote",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T12:06:09.324Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2294",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/uat-train.ts",
+            "src/dashboard/server/services/__tests__/uat-train.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/uat-train.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "uat-train.test.ts passes including the new promote-notify wiring test",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/uat-train.ts, import notifyFlywheelOfUatPromote from '../../../lib/cloister/uat-promote-notify.js' and, inside postUatGenerationPromotePayload, capture the promoteUatGeneration(...) result in a const, then before returning it add `await notifyFlywheelOfUatPromote(result).catch(() => {});` (belt-and-suspenders on top of the helper's own internal error swallowing). Return the same result unchanged — the promote HTTP response contract must be identical. Add a test in the existing src/dashboard/server/services/__tests__/uat-train.test.ts (new describe block for postUatGenerationPromotePayload) that mocks '../../../lib/cloister/uat-promote.js' promoteUatGeneration and '../../../lib/cloister/uat-promote-notify.js' notifyFlywheelOfUatPromote via vi.mock, asserting notifyFlywheelOfUatPromote is invoked with the promote result and that postUatGenerationPromotePayload returns that same result object untouched."
+        },
+        "items": [
+          {
+            "id": "wire-promote.ac1",
+            "title": "postUatGenerationPromotePayload passes the PromoteResult returned by promoteUatGeneration to notifyFlywheelOfUatPromote (verified by a vi.mock spy in uat-train.test.ts that records the argument).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-promote.ac2",
+            "title": "postUatGenerationPromotePayload returns the exact PromoteResult from promoteUatGeneration, unchanged, whether the promote succeeds or fails (the notification never mutates the response).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-promote.ac3",
+            "title": "When notifyFlywheelOfUatPromote rejects, postUatGenerationPromotePayload still resolves with the promote result (the .catch swallows it), verified by a mock that rejects.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "notify-helper",
+        "to": "wire-promote",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-03-PAN-2294-feat-flywheel-notify-the-flywheel-orchestrator-when-the-operator-promotes-merges-a-uat-train.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

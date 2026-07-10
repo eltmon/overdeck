@@ -1,0 +1,80 @@
+{
+  "version": "1",
+  "issueId": "PAN-1549",
+  "created": "2026-05-28T14:47:58.446Z",
+  "updated": "2026-05-29T02:02:17.655Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-4-7",
+      "timestamp": "2026-05-28T14:47:58.446Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-4-7",
+      "timestamp": "2026-05-28T19:05:29.378Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-28T20:35Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-28T20:35:01.085Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-4-7",
+      "timestamp": "2026-05-28T20:35:01.128Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-28T20:37Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-28T20:37:23.149Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-28T20:43Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-05-28T20:43:04.025Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-4-7",
+      "timestamp": "2026-05-28T20:43:04.074Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-28T21:28Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-28T21:28:14.104Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-28T21:31Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-28T21:31:38.972Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-28T21:59Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-28T21:59:40.829Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-4-7",
+      "timestamp": "2026-05-28T21:59:41.523Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-28T22:25Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-28T22:25:41.857Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-4-7",
+      "timestamp": "2026-05-28T22:25:42.581Z"
+    }
+  ],
+  "feedback": []
+}

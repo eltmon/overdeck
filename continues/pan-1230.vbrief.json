@@ -1,0 +1,54 @@
+{
+  "version": "1",
+  "issueId": "PAN-1230",
+  "created": "2026-05-20T08:48:41.283Z",
+  "updated": "2026-05-20T09:39:00.245Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "feedback": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-05-20T08:48Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-20T08:48:41.284Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-20T08:48:41.323Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-20T08:52Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-20T08:52:24.955Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-20T08:52:24.987Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-20T08:55Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-05-20T08:55:35.309Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-20T08:55:35.330Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-20T09:13Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-20T09:13:59.176Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-20T09:33Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-20T09:33:32.198Z"
+    }
+  ]
+}

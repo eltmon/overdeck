@@ -1,0 +1,33 @@
+{
+  "version": "1",
+  "issueId": "PAN-806",
+  "created": "2026-06-23T08:44:07.952Z",
+  "updated": "2026-06-23T08:55:20.000Z",
+  "gitState": { "branch": "feature/pan-806", "sha": "7b3fb349c", "dirty": true },
+  "decisions": [
+    { "id": "D1", "summary": "Sentinel env var OVERDECK_PAN_GIT_OP=1 is the contract: pan sets it around its own history ops (only rebase-helper.ts needs it); both guards bypass when present. Without it, pan done's internal `git rebase` (done.ts:357 → rebase-helper.ts:97) gets blocked and the submit flow bricks. The PRD missed this entirely.", "recordedAt": "2026-06-23T08:55:20.000Z" },
+    { "id": "D2", "summary": "pre-rebase hook installs into the git-RESOLVED hooks path (`git rev-parse --git-path hooks`), NOT `.git/hooks/`. This repo sets core.hooksPath=.husky/_ (Husky v9), so git ignores .git/hooks entirely — the PRD's path would never fire. Resolved path is correct for husky (→.husky/_/pre-rebase) and plain-git (→.git/hooks/pre-rebase) projects.", "recordedAt": "2026-06-23T08:55:20.000Z" },
+    { "id": "D3", "summary": "Hook install moves from start.ts (PRD) to workspace-manager.ts createWorktree (after `git worktree add`, ~:342-351). That is the single real worktree-creation chokepoint covering `pan start`, the dashboard start route, and strike agents.", "recordedAt": "2026-06-23T08:55:20.000Z" },
+    { "id": "D4", "summary": "Hook is gated on OVERDECK_AGENT_ID (only blocks inside an agent session) and bypasses on the sentinel. A human shell in the workspace or on main can still rebase (NFR-1). Same gating logic the PATH wrapper uses.", "recordedAt": "2026-06-23T08:55:20.000Z" },
+    { "id": "D5", "summary": "PATH wrapper goes in launcher-generator.ts generateLauncherScriptSync (single generator for all harnesses), after env exports (:268-281), before cd/command. Installed only for issue-bound agent sessions (overdeckEnv.agentId present, not conversation panels). Guard dir is a DETERMINISTIC per-agent path (<AGENTS_DIR>/agent-<id>/git-guard) baked into the script — NOT mktemp — so stopAgentSync can clean it.", "recordedAt": "2026-06-23T08:55:20.000Z" },
+    { "id": "D6", "summary": "rebase-and-submit skill edits are OUT OF SCOPE: SKILLS-INVENTORY.md:109 marks it User scope; its only copy is ~/.claude/skills/rebase-and-submit/SKILL.md with no source in this repo, so a commit here cannot change it. work.md (pipeline-owned) already carries correct merge-not-rebase / no-stash guidance.", "recordedAt": "2026-06-23T08:55:20.000Z" },
+    { "id": "D7", "summary": "work.md prose at :46/:48/:50 already forbids stash/rebase/reset (Epic D likely landed this). The remaining defect is the contradictory raw-rebase restart block at :241-246 — that is the only prompt edit needed plus adding an explicit permitted/forbidden table.", "recordedAt": "2026-06-23T08:55:20.000Z" },
+    { "id": "D8", "summary": "pan sync-main is safe and unchanged: syncMainIntoWorkspace (merge-agent.ts:1183) auto-commits then `git merge` — never rebase/reset/stash — so neither guard affects it. No sentinel needed there.", "recordedAt": "2026-06-23T08:55:20.000Z" }
+  ],
+  "hazards": [
+    { "id": "H1", "summary": "If the hook (B3) or PATH wrapper (B4) lands before the sentinel (B1), every agent's `pan done` internal rebase is blocked and the submit flow bricks.", "mitigation": "Bead edges: B1 (rebase-helper-sentinel) blocks B3 (prerebase-hook-install) and B4 (git-path-wrapper). Land B1 first." },
+    { "id": "H2", "summary": "Husky regenerates .husky/_/ on a mid-session `bun install`, clobbering the installed _/pre-rebase stub back to a no-op.", "mitigation": "The PATH wrapper (B4) independently blocks rebase; the clobber window is narrow (installs rarely re-run mid-session). Defense-in-depth holds." },
+    { "id": "H3", "summary": "PATH wrapper is bypassable via absolute path (e.g. /usr/bin/git reset --hard). PRD-acknowledged.", "mitigation": "The pre-rebase HOOK covers the higher-risk rebase even via absolute path (git always runs hooks). reset/stash wrapper is defense-in-depth behind the prompt (the primary control)." },
+    { "id": "H4", "summary": "Adding the PATH wrapper changes the toMatchInlineSnapshot snapshots in src/lib/__tests__/launcher-generator.test.ts.", "mitigation": "Update those snapshots in B4 (same commit). Run `npm test -- launcher-generator` and accept the new snapshots intentionally, verifying the diff is only the guard block." },
+    { "id": "H5", "summary": "The sentinel var name must be byte-identical across B1/B3/B4. A typo means the bypass never triggers and pan done breaks.", "mitigation": "Literal string is OVERDECK_PAN_GIT_OP everywhere. B1 is requiresInspection:true to catch a mismatch before the guards go live." },
+    { "id": "H6", "summary": "Remote (Fly.io) worktrees are created by the Fly provider, not createWorktree, so the hook won't install there.", "mitigation": "Out of scope (NonGoal). The launcher PATH wrapper still applies wherever the generator runs; remote substrate has its own discipline." }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-8",
+  "sessionHistory": [
+    { "timestamp": "2026-06-23T08:44:07.952Z", "reason": "planning", "note": "Planning session started for PAN-806: Epic B: Agents use pan primitives for git history ops — never raw git commands", "agentModel": "agent:claude-opus-4-8" },
+    { "timestamp": "2026-06-23T08:55:20.000Z", "reason": "planning", "note": "Discovery complete (--auto). Verified all PRD code refs; found 3 corrections (Husky core.hooksPath makes .git/hooks dead; rebase-and-submit is User-scoped/no repo source; pan done's internal rebase would be blocked) and added the OVERDECK_PAN_GIT_OP sentinel as the foundation. 5 beads authored.", "agentModel": "agent:claude-opus-4-8" }
+  ],
+  "feedback": []
+}

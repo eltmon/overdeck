@@ -1,0 +1,23 @@
+{
+  "issueId": "PAN-1781",
+  "schemaVersion": 2,
+  "created": "2026-06-27T02:50:44.578Z",
+  "updated": "2026-06-27T02:50:44.578Z",
+  "pipeline": {
+    "issueId": "PAN-1781",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-27T02:50:44.578Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {}
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "claude-opus-4-8"
+}

@@ -1,0 +1,321 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-23T08:40:00.000Z",
+    "updated": "2026-05-23T08:40:40.999Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1410: Beads duplicate-pile-on-finalize across pan plan finalize, complete-planning, and pan start auto-recovery"
+  },
+  "plan": {
+    "id": "pan-1410",
+    "title": "Beads duplicate-pile-on-finalize: pan plan finalize, complete-planning, and pan start auto-recovery each create beads without deduping",
+    "status": "proposed",
+    "uid": "d4e1c9a2-7b85-4f6c-9d12-3a8f5e7b1c40",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-23T08:40:00.000Z",
+    "updated": "2026-05-23T08:40:40.999Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1410",
+        "label": "PAN-1410",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1396",
+        "label": "PAN-1396",
+        "type": "related"
+      }
+    ],
+    "tags": [
+      "beads",
+      "vbrief",
+      "idempotency",
+      "dedup",
+      "bug-fix"
+    ],
+    "narratives": {
+      "Problem": "createBeadsFromVBrief in src/lib/vbrief/beads.ts has a dedup block (lines 167-189) that silently swallows every failure: a bd list failure short-circuits to 'proceed with creation' (no dedup), and individual bd delete failures are caught by an empty handler inside the per-bead loop. The dedup log line claims 'Cleared N existing beads' based on the listed count, never verifying the deletes succeeded. As a result, any transient bd contention or partial failure on one of the three code paths that call createBeadsFromVBrief (pan plan finalize, POST /api/issues/:id/complete-planning, POST /api/issues/:id/start-agent auto-recovery, plus pan start CLI recovery) leaves stale beads behind and adds N more on top. Hit four times in one session (PAN-748, PAN-1132, PAN-1370, PAN-1408). Compounding the silent dedup: three of the six call sites (plan-finalize.ts:62, start.ts:932, start.ts:976, agents.ts:2406) do NOT acquire withBdMutex, so concurrent invocations across CLI and dashboard further race.",
+      "Proposal": "Make createBeadsFromVBrief the single owner of dedup with strict, observable semantics: (1) extract clearBeadsForIssue helper that lists, deletes, and re-lists to VERIFY emptiness, collecting every failure rather than swallowing it; (2) replace the silent dedup block in createBeadsFromVBriefPromise with a call to the new helper, aborting creation immediately if dedup reports any error; (3) acquire withBdMutexPromise inside createBeadsFromVBriefPromise itself and remove the now-redundant outer withBdMutex wrappers at the four dashboard call sites so all callers (CLI + dashboard + recovery) are serialized automatically and non-reentrant deadlock is avoided; (4) add unit tests asserting idempotency across N consecutive invocations and verifying every dedup failure mode aborts creation. After this change, createBeadsFromVBrief is idempotent: calling it N times in any order from any call site yields exactly planItemCount beads, or fails loudly with a specific dedup error rather than accumulating duplicates."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose delete-then-recreate over diff-and-update for dedup",
+        "rationale": "Matches existing semantics (the current code already deletes); update-in-place would require complex title-to-bead-id mapping and dependency-edge reconciliation, expanding scope well beyond the duplicate-pile-on bug."
+      },
+      {
+        "summary": "Chose abort-on-dedup-failure over retry-with-backoff",
+        "rationale": "The bd-mutex Promise queue already serializes contended calls; remaining failures (db corruption, bd binary missing) are not transient and should surface to the operator rather than retry-loop. CLI and HTTP callers already propagate result.errors to the user."
+      },
+      {
+        "summary": "Kept the existing in-process bd-mutex; cross-process serialization is out of scope",
+        "rationale": "Cross-process races (CLI plan finalize concurrent with dashboard start-agent) are rare in practice and would require file-locking on the bd db, which is a much bigger change. The four observed pile-ons all came from in-process repeated invocations."
+      },
+      {
+        "summary": "Folded the new contract documentation into the mutex bead rather than a separate bead",
+        "rationale": "The contract (idempotent + internally mutexed + aborts on dedup failure) is what the mutex change introduces; documenting it elsewhere would drift from the code that implements it."
+      },
+      {
+        "summary": "Did not refactor pan start CLI's execSync bd create call (start.ts:954-960)",
+        "rationale": "That code path is the 'no planning state' fallback that creates a single ad-hoc bead — it does not call createBeadsFromVBrief and is not part of the duplicate-pile-on bug. CLI execSync is permitted by project rules (sync calls are acceptable in CLI commands since they run in their own process)."
+      }
+    ],
+    "items": [
+      {
+        "id": "clear-beads-helper",
+        "title": "Add strict clearBeadsForIssue helper in src/lib/vbrief/beads.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T08:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1410",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "dedup-strict-semantics",
+            "internal-mutex-and-audit-callsites",
+            "unit-tests-idempotency"
+          ]
+        },
+        "narrative": {
+          "Action": "Add an exported helper clearBeadsForIssue(workspacePath: string, issueLabel: string): Promise<{ cleared: number; errors: string[] }> to src/lib/vbrief/beads.ts. The helper must: (1) run `bd list --json -l <label> --status all --limit 0` and return errors:['list failed: <message>'] on throw rather than swallowing; (2) iterate the parsed list, running `bd delete <id> --force` for each, collecting failures as errors:['delete <id>: <message>'] rather than swallowing; (3) after the delete loop, re-run `bd list` and if the result is non-empty, return errors:['residual <N> beads after delete: <ids>']; (4) return { cleared: <count actually deleted>, errors: [...] }. Empty errors means dedup succeeded cleanly. The helper must use execFileAsync (not exec) for argv safety. Export it from src/lib/vbrief/beads.ts and from src/lib/vbrief/index.ts. No call-site changes in this bead."
+        },
+        "subItems": [
+          {
+            "id": "clear-beads-helper.ac1",
+            "title": "clearBeadsForIssue returns { cleared: 0, errors: [] } when initial bd list returns []",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clear-beads-helper.ac2",
+            "title": "clearBeadsForIssue returns errors containing 'list failed:' when the initial bd list invocation throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clear-beads-helper.ac3",
+            "title": "clearBeadsForIssue returns errors containing 'delete <bead-id>:' for each individual bd delete that fails",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clear-beads-helper.ac4",
+            "title": "clearBeadsForIssue runs a post-delete bd list and returns errors containing 'residual' when any beads remain",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clear-beads-helper.ac5",
+            "title": "clearBeadsForIssue is exported from src/lib/vbrief/beads.ts and re-exported from src/lib/vbrief/index.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dedup-strict-semantics",
+        "title": "Replace silent dedup block in createBeadsFromVBriefPromise with strict clearBeadsForIssue call",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T08:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1410",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/lib/vbrief/beads.ts, replace the dedup try/catch at lines 167-189 of createBeadsFromVBriefPromise with: `const clearResult = await clearBeadsForIssue(workspacePath, issueLabel); if (clearResult.errors.length > 0) { return { success: false, created: [], errors: clearResult.errors.map(e => 'dedup failed: ' + e), beadIds: new Map() }; } if (clearResult.cleared > 0) console.log('[beads] Cleared ' + clearResult.cleared + ' existing beads for ' + issueLabel + ' (verified)');`. The function must NOT proceed to the create loop if dedup reported any error. The outer try/catch that previously swallowed all dedup errors must be removed entirely — replaced by the explicit early return."
+        },
+        "subItems": [
+          {
+            "id": "dedup-strict-semantics.ac1",
+            "title": "When clearBeadsForIssue returns non-empty errors, createBeadsFromVBrief returns success:false, created:[], and errors prefixed with 'dedup failed:'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dedup-strict-semantics.ac2",
+            "title": "When clearBeadsForIssue succeeds with cleared > 0, the log line reads '[beads] Cleared N existing beads for <label> (verified)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dedup-strict-semantics.ac3",
+            "title": "When clearBeadsForIssue succeeds (errors empty), createBeadsFromVBriefPromise proceeds to the create loop as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dedup-strict-semantics.ac4",
+            "title": "The previous try/catch at lines 167-189 (silent swallow of bd list and bd delete failures) is fully removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "internal-mutex-and-audit-callsites",
+        "title": "Acquire bd-mutex inside createBeadsFromVBriefPromise and remove redundant outer wrappers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T08:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1410",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Wrap the entire body of createBeadsFromVBriefPromise in withBdMutexPromise(async () => { ... }) imported from src/lib/bd-mutex.ts so every caller is serialized automatically. Because withBdMutexPromise is a non-reentrant Promise-queue mutex, all existing outer wrappers must be removed in the same change to avoid deadlock: (1) src/dashboard/server/routes/issues.ts line 130 — change `withBdMutex(() => mod.createBeadsFromVBrief(path))` to `mod.createBeadsFromVBrief(path)` (still inside Effect.runPromise); (2) src/dashboard/server/routes/issues.ts line 1567 — same pattern; (3) src/dashboard/server/routes/issues.ts line 2740 — same pattern; (4) src/dashboard/server/routes/agents.ts line 2406 — already calls without withBdMutex, leave as-is. Verify each call site still typechecks and returns the same error-result shape; existing error-propagation paths (plan-finalize.ts:64-72, issues.ts:134-139, agents.ts:2411-2422, start.ts:933-944/977-1011) already surface result.errors to the user so the new 'dedup failed:' messages flow through without further changes. Add a JSDoc header on createBeadsFromVBrief documenting the new contract: 'Idempotent and internally serialized via bd-mutex. Calling N times yields exactly planItemCount beads or returns success:false with errors. Do NOT wrap callers in withBdMutex — it will deadlock.'"
+        },
+        "subItems": [
+          {
+            "id": "internal-mutex-and-audit-callsites.ac1",
+            "title": "createBeadsFromVBriefPromise's entire body runs inside withBdMutexPromise so all callers share one queue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "internal-mutex-and-audit-callsites.ac2",
+            "title": "Outer withBdMutex wrappers at issues.ts:130, issues.ts:1567, issues.ts:2740 are removed; the calls go through Effect.runPromise(createBeadsFromVBrief(...)) directly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "internal-mutex-and-audit-callsites.ac3",
+            "title": "agents.ts:2406, plan-finalize.ts:62, start.ts:932, start.ts:976 remain unchanged at their call sites but now get serialized via the internal mutex",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "internal-mutex-and-audit-callsites.ac4",
+            "title": "createBeadsFromVBrief has a JSDoc header stating it is idempotent, internally mutexed, and must not be wrapped in withBdMutex by callers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "internal-mutex-and-audit-callsites.ac5",
+            "title": "npm run typecheck and npm run build both pass with the outer-wrapper removal in place",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "unit-tests-idempotency",
+        "title": "Add idempotency and dedup-failure tests in src/lib/vbrief/__tests__/create-beads.test.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-23T08:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1410",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a new describe block 'idempotency and dedup failure semantics' to src/lib/vbrief/__tests__/create-beads.test.ts with four tests, all using the existing mockExecAsync vi.hoisted pattern: (1) 'three consecutive calls leave exactly planItemCount beads' — script mockExecAsync so bd list reflects the running bead set (initially [], then [N beads after first run], then [N beads before second run runs dedup, then [] after delete, then [N beads after second create]] etc.); after three invocations assert the net mock-recorded state has exactly N beads with no duplicates by title. (2) 'aborts when bd list throws during dedup' — script mockExecAsync to throw on the dedup `bd list -l <label>` call; assert result.success===false, result.errors[0] contains 'dedup failed:' and 'list failed:', and no `bd create` calls were issued (mockExecAsync recorded no create args). (3) 'aborts when any bd delete fails during dedup' — script mockExecAsync so list returns 3 beads then one of the three deletes throws; assert result.success===false, result.errors[0] contains 'dedup failed:' and 'delete <bead-id>:', and no create calls fired. (4) 'aborts when post-delete verification finds residual beads' — script mockExecAsync so list returns 2 beads, both deletes succeed, but the verification list still returns 1 bead; assert result.success===false, errors contains 'residual', and no create calls fired. Each test must complete in milliseconds — no real setTimeouts. Tests must follow the existing mocking pattern in the file (vi.hoisted, vi.mock for child_process and util.promisify)."
+        },
+        "subItems": [
+          {
+            "id": "unit-tests-idempotency.ac1",
+            "title": "Test 'three consecutive calls leave exactly planItemCount beads' is added and passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unit-tests-idempotency.ac2",
+            "title": "Test 'aborts when bd list throws during dedup' is added and passes; asserts no bd create calls fired",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unit-tests-idempotency.ac3",
+            "title": "Test 'aborts when any bd delete fails during dedup' is added and passes; asserts no bd create calls fired",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unit-tests-idempotency.ac4",
+            "title": "Test 'aborts when post-delete verification finds residual beads' is added and passes; asserts no bd create calls fired",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unit-tests-idempotency.ac5",
+            "title": "`npm test src/lib/vbrief/__tests__/create-beads.test.ts` runs green with no real-time delays",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "clear-beads-helper",
+        "to": "dedup-strict-semantics",
+        "type": "blocks"
+      },
+      {
+        "from": "dedup-strict-semantics",
+        "to": "internal-mutex-and-audit-callsites",
+        "type": "blocks"
+      },
+      {
+        "from": "internal-mutex-and-audit-callsites",
+        "to": "unit-tests-idempotency",
+        "type": "blocks"
+      },
+      {
+        "from": "clear-beads-helper",
+        "to": "unit-tests-idempotency",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-23-PAN-1410-beads-duplicate-pile-on-finalize-pan-plan-finalize-complete-planning-and-pan-start-auto-recovery-each-create-beads-without-deduping.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

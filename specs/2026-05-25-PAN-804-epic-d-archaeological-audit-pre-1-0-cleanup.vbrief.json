@@ -1,0 +1,782 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-25T18:00:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-804: Epic D: Archaeological audit & pre-1.0 cleanup",
+    "updated": "2026-05-25T17:53:20.523Z"
+  },
+  "plan": {
+    "id": "pan-804",
+    "title": "Epic D: Archaeological audit & pre-1.0 cleanup",
+    "status": "proposed",
+    "uid": "7d8b9e3a-4f2c-4d1e-9b6a-3c8e5f7a2d4b",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-25T18:00:00.000Z",
+    "updated": "2026-05-25T17:53:20.523Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/804",
+        "label": "PAN-804",
+        "type": "issue"
+      },
+      {
+        "uri": "docs/prds/active/1.0-stabilization-plan.md",
+        "label": "1.0 Stabilization Plan",
+        "type": "prd"
+      },
+      {
+        "uri": "docs/prds/active/1.0-audit-results.md",
+        "label": "1.0 Audit Results",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "cleanup",
+      "pre-1.0",
+      "git-hygiene",
+      "archaeology",
+      "no-production-code"
+    ],
+    "narratives": {
+      "Problem": "Repo carries accumulated debris (234 stashes vs 106 at audit time, ~7 stale ahead-of-remote branches, local main behind origin, 9 flagged 'orphaned' artifacts) that must be reconciled before 1.0 ships. The 2026-04-23 audit (docs/prds/active/1.0-audit-results.md) already disposed the 9 flagged items: 5 of 6 unique items are FULLY INTEGRATED, stash@{18} is recommended DROP + 2 follow-up issues. What remains is ACTING on those dispositions plus the broader cleanup ACs in the issue body.",
+      "Proposal": "Sequential cleanup in three waves: (1) branch triage — re-verify current state of the 7 named branches, then push-or-abandon each independently; (2) main reconcile — fast-forward local main to origin/main via update-ref; (3) stash cleanup — re-classify the 234 current stashes with a conservative pattern filter, human-review the drop list (work.inspect gate), then drop drop-safe stashes, then handle stash@{18} per audit recommendation. Finalize with policy verification, git gc safety check (dry-run only), and an updated audit-results doc committed to main."
+    },
+    "autoDecisions": [
+      {
+        "summary": "stash@{18} disposition = DROP + file 2 follow-up GitHub issues (event-backed review status; unknown-phase diagnostic UI).",
+        "rationale": "Per docs/prds/active/1.0-audit-results.md §6: the stash regresses 8 HEAD features (inline/embedded props, pinned-session validation, planningState query, ready-to-start sort, 5 shared component extractions, deliberately-disabled DnD). The only 2 real wins are small standalone tickets. The audit explicitly recommends DROP + follow-ups."
+      },
+      {
+        "summary": "Stash drop classifier = strict allowlist of label prefixes (pre-merge:, pre-spawn:, pre-ship:, pre-sync:, pre-release:, pre-rebase:, wip-auto:, spawn-stash:, retry-debris:, release-scratch:, temp-stash-*, rebase-temp-*, swarm-overlap-rebase-temp, lockfile-temp, merge-verify-fix-stash, *-pipeline-state-files-*).",
+        "rationale": "Conservative — false positives (dropping a salvageable stash) are recoverable only via 90-day reflog grace; false negatives (preserving a drop-safe stash) are cheap. The classifier emits an explicit DROP / PRESERVE / UNKNOWN list, and work.inspect must validate the DROP list before the drop bead runs."
+      },
+      {
+        "summary": "review-temp:PAN-NNN stash filter = drop only when (a) PR for PAN-NNN is merged/closed AND (b) no active workspace at workspaces/feature-pan-NNN/ exists.",
+        "rationale": "Active review cycles still need their temp stashes. The 188 review-temp stashes dominate the list; safe culling of completed-cycle ones is the highest-impact mechanical drop."
+      },
+      {
+        "summary": "Default branch triage decision = abandon (delete local ref) unless the unique-to-local commits represent un-shipped work AND the underlying issue is still open.",
+        "rationale": "Named branches (pan-428, pan-446, pan-711, pan-714, pan-698, pan-598-integration) have been stale 4+ weeks and are now 1k+ commits diverged from main as main moved forward. The 'ahead by 1' from the original audit means 1 unique commit, almost certainly already absorbed or superseded. Bias toward delete; reflog preserves recoverability for 90 days."
+      },
+      {
+        "summary": "pan-598-integration (now feature/pan-598 locally) = DELETE if any remaining unique commits are reachable from a merged PR or have equivalent content already on main; otherwise rebase the genuinely-unique commits to a fresh branch named integration/pan-598-leftovers and push.",
+        "rationale": "Original audit: '12 of 85 commits don't match main messages'. By now those 12 are either integrated (we've seen other PAN-598-adjacent disposition above) or weren't deemed important enough to land. Default delete; salvage only verified-unique work."
+      },
+      {
+        "summary": "CLAUDE.md stash-hygiene policy bead = verify-only, not rewrite.",
+        "rationale": "CLAUDE.md already documents naming categories (pre-merge:/pre-spawn:/review-temp:/salvageable:), drop-on-completion rules, 4-week triage cadence, and 90-day reflog recovery — added 2026-04-23 as part of this Epic D work. Avoid drift; the existing policy already covers all required elements."
+      },
+      {
+        "summary": "git gc safety check = dry-run via `git fsck --unreachable --no-reflogs` + `git reflog expire --dry-run --expire=now --all` + `git gc --dry-run`. Do NOT run actual `git gc`.",
+        "rationale": "The CLAUDE.md policy explicitly relies on the 90-day reflog grace for recovery. Actual gc would shorten that window. Dry-run gives us the data we need (what would be lost) without destroying it."
+      },
+      {
+        "summary": "Final audit-results doc updates committed in-place at docs/prds/active/1.0-audit-results.md.",
+        "rationale": "PRD docs are checked-in. Updating in place keeps history reviewable in git log. Post-1.0, a separate cleanup can move 'active' PRDs to 'completed/'."
+      },
+      {
+        "summary": "Main-branch reconcile uses `git update-ref refs/heads/main origin/main` (no checkout).",
+        "rationale": "main is checked out in the parent repo at /home/eltmon/Projects/panopticon-cli/. Attempting `git checkout main` from the worktree would fail. update-ref is safe — it moves the ref without touching any working copy."
+      }
+    ],
+    "items": [
+      {
+        "id": "verify-branch-state",
+        "title": "Re-verify current state of all 7 named ahead-of-remote branches",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-804",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Check each of the 7 originally-flagged branches against current refs. For each: does the local branch still exist? What's the current ahead/behind vs origin/main? What unique commits (`git log --oneline origin/main..<branch>`) remain? Output an updated table in 1.0-audit-results.md mapping original-audit-state → 2026-05-25 state → recommended action (push / delete / salvage)."
+        },
+        "subItems": [
+          {
+            "id": "verify-branch-state.ac1",
+            "title": "For each of feature/pan-428, feature/pan-446, feature/pan-711, feature/pan-714 (or fix/pan-714-specialist-session-recovery), feature/pan-698, pan-598-integration (or feature/pan-598): record exists/missing, ahead/behind counts vs origin/main, and the list of unique-to-local commits.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-branch-state.ac2",
+            "title": "Updated branch-state table is appended to docs/prds/active/1.0-audit-results.md under a new section '## 2026-05-25 Branch state re-verification'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-branch-state.ac3",
+            "title": "For each branch the table names a recommended action (push / delete / salvage) consistent with the autoDecision defaults (abandon unless verified-unique work + open issue).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "triage-pan-428",
+        "title": "Triage feature/pan-428 (push or delete per branch-state report)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-804",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Execute the verify-branch-state recommendation for feature/pan-428. Default abandon: `git branch -D feature/pan-428` + delete any backup/pan-428-* siblings reachable from current main. If push: `git push origin feature/pan-428` and link the resulting PR/state in audit-results."
+        },
+        "subItems": [
+          {
+            "id": "triage-pan-428.ac1",
+            "title": "feature/pan-428 local ref either deleted or pushed to origin per branch-state report.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triage-pan-428.ac2",
+            "title": "Any backup/pan-428-* branches reachable from current main are also deleted (or explicitly preserved with reason recorded in audit-results).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triage-pan-428.ac3",
+            "title": "Action and final state for feature/pan-428 recorded in audit-results table.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "triage-pan-446",
+        "title": "Triage feature/pan-446 (push or delete per branch-state report)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-804",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Execute the verify-branch-state recommendation for feature/pan-446. Default abandon: `git branch -D feature/pan-446` + delete any backup/pan-446-* siblings. The 1.0-stabilization-plan also flagged: 'closing feature/pan-446 left an orphan worktree at .claude/worktrees/pan-446-merge + temp branch temp/pan-446-merge' — clean both if still present."
+        },
+        "subItems": [
+          {
+            "id": "triage-pan-446.ac1",
+            "title": "feature/pan-446 local ref either deleted or pushed to origin per branch-state report.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triage-pan-446.ac2",
+            "title": ".claude/worktrees/pan-446-merge and temp/pan-446-merge — if present — are removed (worktree pruned, temp branch deleted).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triage-pan-446.ac3",
+            "title": "Action and final state for feature/pan-446 recorded in audit-results table.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "triage-pan-711",
+        "title": "Triage feature/pan-711 (push or delete per branch-state report)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-804",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Execute the verify-branch-state recommendation for feature/pan-711 (was 8 ahead in original audit — the largest of the simple branches). Default abandon if all unique commits are already on main in equivalent form; push if genuinely unique unshipped work."
+        },
+        "subItems": [
+          {
+            "id": "triage-pan-711.ac1",
+            "title": "feature/pan-711 local ref either deleted or pushed to origin per branch-state report.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triage-pan-711.ac2",
+            "title": "Any backup/pan-711-* or fix/pan-711-* branches reachable from current main are also deleted.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triage-pan-711.ac3",
+            "title": "Action and final state for feature/pan-711 recorded in audit-results table.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "triage-pan-714",
+        "title": "Triage feature/pan-714 (and fix/pan-714-specialist-session-recovery)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-804",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Resolve PAN-714 branch lineage. fix/pan-714-specialist-session-recovery exists locally — confirm whether this is a successor/rename of feature/pan-714 or a separate branch. Execute push-or-delete per branch-state report for whichever ref still exists locally."
+        },
+        "subItems": [
+          {
+            "id": "triage-pan-714.ac1",
+            "title": "fix/pan-714-specialist-session-recovery (and feature/pan-714 if it exists) either deleted or pushed per branch-state report.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triage-pan-714.ac2",
+            "title": "The relationship between fix/pan-714-* and feature/pan-714 (if any) documented in audit-results.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "triage-pan-698",
+        "title": "Confirm feature/pan-698 is fully cleaned (already absent locally per current state)",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-25T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-804",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "feature/pan-698 is not in current `git branch` output — already cleaned. Confirm via reflog/branch listing; also verify the salvaged refactor/issue-status-events branch (commit 812cc2cf per PRD) still exists locally OR on origin (per PAN-808 follow-up). Record final state in audit-results."
+        },
+        "subItems": [
+          {
+            "id": "triage-pan-698.ac1",
+            "title": "feature/pan-698 confirmed absent from local branch list and from origin (or status documented if it reappeared).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triage-pan-698.ac2",
+            "title": "refactor/issue-status-events branch confirmed present (local or origin) with commit 812cc2cf — salvaged edits not lost.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triage-pan-698.ac3",
+            "title": "Any remaining .claude/worktrees/pan-698-* artifacts or temp branches removed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "triage-pan-598-integration",
+        "title": "Triage pan-598-integration / feature/pan-598",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-804",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "feature/pan-598 exists locally (renamed/successor to pan-598-integration). Original audit: 85 ahead, 26 behind; 12 of 85 commits don't match main commit messages. Re-check the 12 — if all 12 are now equivalent to commits on main (by patch-id or content), delete the branch. If any unique work remains, cherry-pick those commits onto a fresh integration/pan-598-leftovers branch, push, link from audit-results, then delete feature/pan-598."
+        },
+        "subItems": [
+          {
+            "id": "triage-pan-598-integration.ac1",
+            "title": "Each of the unique-to-feature/pan-598 commits compared against current main; verdict 'integrated' or 'unique' recorded for each.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triage-pan-598-integration.ac2",
+            "title": "If any commits are genuinely unique: integration/pan-598-leftovers branch created with those commits, pushed to origin, link recorded in audit-results.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "triage-pan-598-integration.ac3",
+            "title": "feature/pan-598 local ref deleted after disposition recorded.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reconcile-main",
+        "title": "Fast-forward local main to origin/main",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-804",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Local main is 0 ahead / 1 behind origin/main (confirmed 2026-05-25). Run `git fetch origin main` then `git update-ref refs/heads/main origin/main` to fast-forward local main without touching any worktree. Do NOT `git checkout main` (it's checked out in the parent repo)."
+        },
+        "subItems": [
+          {
+            "id": "reconcile-main.ac1",
+            "title": "`git rev-list --left-right --count origin/main...main` reports 0 0 after the operation.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-main.ac2",
+            "title": "Parent-repo working tree at /home/eltmon/Projects/panopticon-cli/ is unaffected (no checkout occurred from this worktree).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "classify-stashes",
+        "title": "Re-classify the 234 current stashes into DROP / PRESERVE / UNKNOWN lists",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-804",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "drop-safe-stashes"
+          ]
+        },
+        "narrative": {
+          "Action": "Stash count has grown from 106 (audit time) to 234. Re-classify by label prefix using the conservative allowlist from autoDecisions: DROP if label starts with one of the enumerated safe prefixes (pre-merge:, pre-spawn:, pre-ship:, pre-sync:, pre-release:, pre-rebase:, wip-auto:, spawn-stash:, retry-debris:, release-scratch:, temp-stash-*, rebase-temp-*, swarm-overlap-rebase-temp, lockfile-temp, merge-verify-fix-stash). For review-temp:PAN-NNN: DROP only when PAN-NNN's PR is merged/closed AND no active feature/pan-NNN workspace exists. PRESERVE all salvageable:* and any label not matching a known pattern (mark UNKNOWN). Emit the three lists as a section in docs/prds/active/1.0-audit-results.md so the inspect gate can review before any drops happen."
+        },
+        "subItems": [
+          {
+            "id": "classify-stashes.ac1",
+            "title": "Three explicit lists (DROP / PRESERVE / UNKNOWN) appended to docs/prds/active/1.0-audit-results.md with each stash's index, label, and on-branch.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "classify-stashes.ac2",
+            "title": "Every salvageable:* stash appears in PRESERVE.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "classify-stashes.ac3",
+            "title": "For each review-temp:PAN-NNN stash in DROP, the doc cites evidence that PAN-NNN's PR is merged/closed AND no active workspace at workspaces/feature-pan-NNN/ exists.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "classify-stashes.ac4",
+            "title": "Any stash whose label doesn't match an enumerated safe prefix is in UNKNOWN (and therefore NOT dropped), not in DROP.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "classify-stashes.ac5",
+            "title": "Classification table totals reconcile: DROP + PRESERVE + UNKNOWN equals the live `git stash list | wc -l` at the time the bead runs.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drop-safe-stashes",
+        "title": "Drop the classify-stashes DROP list (newest-index-first batch)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-804",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Resolve each DROP-list stash to its commit SHA via `git rev-parse stash@{N}`, then drop newest-index-first (so earlier indices remain valid throughout the batch). After the batch, record the new total stash count in audit-results and verify the remaining list matches PRESERVE + UNKNOWN."
+        },
+        "subItems": [
+          {
+            "id": "drop-safe-stashes.ac1",
+            "title": "Every stash in the classify-stashes DROP list is removed from `git stash list`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-safe-stashes.ac2",
+            "title": "Post-drop `git stash list | wc -l` equals (PRESERVE + UNKNOWN) from the classification.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-safe-stashes.ac3",
+            "title": "Each dropped stash's commit SHA is logged in audit-results so reflog recovery within 90 days is possible if needed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "handle-stash-18",
+        "title": "File 2 follow-up issues for stash@{18}, then drop the stash",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-804",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Per docs/prds/active/1.0-audit-results.md §6 recommendation: (1) Use `gh issue create` to file 'Inspector: use event-backed review status instead of 15s polling' (references DetailPanelLayout.tsx, selectReviewStatus, KanbanBoard.tsx pattern). (2) Use `gh issue create` to file 'Inspector: unknown-phase diagnostic UI' (references InspectorPanel, showUnknownPhaseDiagnostic). (3) Verify both issue URLs exist and record them in audit-results. (4) Resolve stash@{18}'s commit SHA and `git stash drop`. Strict order: never drop before both issues are filed and recorded."
+        },
+        "subItems": [
+          {
+            "id": "handle-stash-18.ac1",
+            "title": "GitHub issue 'Inspector: use event-backed review status instead of 15s polling' filed with body referencing DetailPanelLayout polled fallback, useDashboardStore(selectReviewStatus(...)) pattern already in KanbanBoard.tsx, and refetchInterval: eventReviewStatus ? false : 15000 target.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handle-stash-18.ac2",
+            "title": "GitHub issue 'Inspector: unknown-phase diagnostic UI' filed with body referencing InspectorPanel, showUnknownPhaseDiagnostic, containers count + lifecycle reason when phase is unknown.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handle-stash-18.ac3",
+            "title": "Both issue URLs added to docs/prds/active/1.0-audit-results.md §6 BEFORE the stash is dropped.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handle-stash-18.ac4",
+            "title": "stash@{18}'s commit SHA logged in audit-results, then the stash dropped.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verify-stash-hygiene-policy",
+        "title": "Verify CLAUDE.md stash-hygiene policy is complete (no rewrite)",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-25T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-804",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "CLAUDE.md already documents stash-hygiene policy (added 2026-04-23). Verify it covers: (a) naming categories with prefixes (pre-merge:, pre-spawn:, review-temp:, salvageable:), (b) drop-on-completion rules per category, (c) 4-week triage cadence for non-salvageable stashes, (d) 90-day reflog recovery window. If any of these elements are missing or have drifted, add them with a single, surgical edit. If all four elements are present and correct, this bead is a no-op verify — record the verification in audit-results and close."
+        },
+        "subItems": [
+          {
+            "id": "verify-stash-hygiene-policy.ac1",
+            "title": "CLAUDE.md '## Stash Hygiene' section contains all four required elements (naming categories, drop-on-completion rules, triage cadence, reflog recovery).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-stash-hygiene-policy.ac2",
+            "title": "If verification passes with no changes: audit-results notes 'CLAUDE.md stash-hygiene policy verified, no changes required'. If edits were needed: the diff is minimal and targeted to the missing elements only.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verify-gc-safety",
+        "title": "Verify git gc would not lose anything valuable (dry-run only)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-804",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Run `git fsck --unreachable --no-reflogs`, `git reflog expire --dry-run --expire=now --all`, and `git gc --dry-run` from the workspace. Compare unreachable-commit output against the PRESERVE + UNKNOWN stash lists and against any salvaged commits we deliberately want to keep (e.g. 812cc2cf for PAN-808). Confirm none of those would be reaped. Do NOT run actual `git gc` — the 90-day reflog grace per CLAUDE.md is the user's recovery window."
+        },
+        "subItems": [
+          {
+            "id": "verify-gc-safety.ac1",
+            "title": "Output of `git fsck --unreachable --no-reflogs` captured and appended to audit-results.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-gc-safety.ac2",
+            "title": "Cross-check confirms no PRESERVE or UNKNOWN stash commits, and no salvaged commits (812cc2cf and others noted in dispositions), appear in the gc dry-run reap list.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-gc-safety.ac3",
+            "title": "No actual `git gc` was executed — only dry-run / fsck / expire-dry-run.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "finalize-audit-doc",
+        "title": "Finalize docs/prds/active/1.0-audit-results.md and commit",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T18:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-804",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Update audit-results doc with: (1) header 'Status: Epic D complete', (2) re-verification of original 6 unique dispositions still valid, (3) the new 2026-05-25 branch state table and final branch dispositions, (4) the stash classification + drop log, (5) stash@{18} follow-up issue URLs and drop confirmation, (6) git gc dry-run output and safety verdict, (7) updated stash count (post-cleanup). Commit the doc update. Do NOT close PAN-804 issue here — that's the pipeline's job after merge."
+        },
+        "subItems": [
+          {
+            "id": "finalize-audit-doc.ac1",
+            "title": "docs/prds/active/1.0-audit-results.md has 'Status: Epic D complete' at the top and contains all seven listed sections.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "finalize-audit-doc.ac2",
+            "title": "Doc lists final post-cleanup stash count and post-cleanup branch count.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "finalize-audit-doc.ac3",
+            "title": "Doc update is committed to the feature/pan-804 branch with a commit message referencing PAN-804.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "finalize-audit-doc.ac4",
+            "title": "All seven issue-body acceptance criteria from PAN-804 are mapped to specific sections of the audit-results doc (traceability).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "verify-branch-state",
+        "to": "triage-pan-428",
+        "type": "blocks"
+      },
+      {
+        "from": "verify-branch-state",
+        "to": "triage-pan-446",
+        "type": "blocks"
+      },
+      {
+        "from": "verify-branch-state",
+        "to": "triage-pan-711",
+        "type": "blocks"
+      },
+      {
+        "from": "verify-branch-state",
+        "to": "triage-pan-714",
+        "type": "blocks"
+      },
+      {
+        "from": "verify-branch-state",
+        "to": "triage-pan-698",
+        "type": "blocks"
+      },
+      {
+        "from": "verify-branch-state",
+        "to": "triage-pan-598-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "classify-stashes",
+        "to": "drop-safe-stashes",
+        "type": "blocks"
+      },
+      {
+        "from": "triage-pan-428",
+        "to": "verify-gc-safety",
+        "type": "blocks"
+      },
+      {
+        "from": "triage-pan-446",
+        "to": "verify-gc-safety",
+        "type": "blocks"
+      },
+      {
+        "from": "triage-pan-711",
+        "to": "verify-gc-safety",
+        "type": "blocks"
+      },
+      {
+        "from": "triage-pan-714",
+        "to": "verify-gc-safety",
+        "type": "blocks"
+      },
+      {
+        "from": "triage-pan-698",
+        "to": "verify-gc-safety",
+        "type": "blocks"
+      },
+      {
+        "from": "triage-pan-598-integration",
+        "to": "verify-gc-safety",
+        "type": "blocks"
+      },
+      {
+        "from": "reconcile-main",
+        "to": "verify-gc-safety",
+        "type": "blocks"
+      },
+      {
+        "from": "drop-safe-stashes",
+        "to": "verify-gc-safety",
+        "type": "blocks"
+      },
+      {
+        "from": "handle-stash-18",
+        "to": "verify-gc-safety",
+        "type": "blocks"
+      },
+      {
+        "from": "verify-gc-safety",
+        "to": "finalize-audit-doc",
+        "type": "blocks"
+      },
+      {
+        "from": "verify-stash-hygiene-policy",
+        "to": "finalize-audit-doc",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-25-PAN-804-epic-d-archaeological-audit-pre-1-0-cleanup.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

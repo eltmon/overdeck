@@ -1,0 +1,1510 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-26T01:33:53Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-826: Conversation/terminal integration refactor — instant-start + parser correctness + tmux delivery verification + thinking-block UX + signature prevention + outbox + favorite-star reposition + T3Code structural alignment"
+  },
+  "plan": {
+    "id": "pan-826",
+    "title": "Conversation/terminal integration refactor: instant-start + parser correctness + T3Code structural alignment",
+    "status": "approved",
+    "uid": "3714243b-00ac-42c3-b8bb-482b2339d320",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 1,
+    "created": "2026-04-26T01:33:53Z",
+    "updated": "2026-04-26T01:33:53Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/826",
+        "label": "PAN-826",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/691",
+        "label": "#691 — Out-of-order tool activities",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/696",
+        "label": "#696 — Duplicate assistant message ids",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/612",
+        "label": "#612 — Corrupted thinking signatures",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/823",
+        "label": "#823 — Fork thinking-block handling",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/739",
+        "label": "#739 — Failed sends disappear",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-826/docs/prds/active/pan-826-conversation-integration-refactor-spec.md",
+        "label": "pan-826-conversation-integration-refactor-spec.md",
+        "type": "prd"
+      },
+      {
+        "uri": "/home/eltmon/Projects/panopticon-cli/docs/prds/active/pan-826-conversation-integration-refactor-spec.md",
+        "label": "pan-826-conversation-integration-refactor-spec.md",
+        "type": "prd"
+      },
+      {
+        "uri": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-826/.planning/STATE.md",
+        "label": "STATE.md (planning)",
+        "type": "doc"
+      },
+      {
+        "uri": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-826/docs/prds/active/pan-826/STATE.md",
+        "label": "STATE.md (mirrored)",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "conversation",
+      "terminal",
+      "parser",
+      "outbox",
+      "tmux",
+      "forks",
+      "thinking-blocks",
+      "t3code-alignment",
+      "refactor"
+    ],
+    "narratives": {
+      "Problem": "The Mission Control conversation viewer drifts from the live terminal in ways that share underlying machinery: orphaned tool_results when paired tool_use lives in a prior poll, duplicate rows from message.id collisions, a five-layer startup dance for new conversations, fixed-delay tmux delivery that loses Enter under busy state, thinking blocks that can't be expanded and whose signatures get corrupted by compaction or cross-model forks, and silently dropped failed user sends. The chat module's structure has also drifted from T3Code's, making future ports expensive.",
+      "Proposal": "Single coordinated refactor sequenced foundation-first: (1) make the parser stateful across incremental parses + fix all sort sites + audit message-id keying; (2) replace fixed-delay sendKeysAsync with capture-pane verification on both paste and Enter, with busy-state detection and a structured MessageDeliveryFailed error surfaced to a dashboard error channel; (3) make POST /api/conversations synchronous to tmux+Claude readiness so clicking + mounts a live conversation immediately and DraftConversationPanel/sessionAlive grace/message-arrival polling are deleted; (4) ship thinking-block expand UX, prevent signature corruption at write-time by stripping signature fields in copySessionFromCompactBoundary and forcing --no-resume on every specialist spawn, plus surface fork options (localSummaryOnly, includeThinkingInSummary) and a model-switch warning; (5) add a SQLite-backed outbox for HTTP-layer optimistic-send failures with retry/edit/copy/discard and merge it into the conversation timeline; (6) reposition the persistent favorited star into the right-aligned actions slot; (7) finish with a mechanical T3Code structural alignment (rename session-logic→MessagesTimeline.logic, WorkLogEntryRow→SimpleWorkEntryRow, adopt MessagesTimelineRow union, align .chat-markdown* class names). Critically: NO Panopticon code writes to user JSONL files — recovery is prevention-only; deacon detects and surfaces the corruption error but never repairs the file."
+    },
+    "items": [
+      {
+        "id": "parser-state-persistence",
+        "title": "Persist ParseState across incremental parses in conversation-service",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/conversation-service.ts, move pendingToolUse and pendingAssistant maps from per-call ParseState into a per-conversation cache keyed by conversationId. Cache lives for the lifetime of the conversation (clear on conversation deletion). Each incremental parseConversationMessages call loads the cached state, mutates it during processing, and persists the updated state. Two-pass tool_use/tool_result pairing within a single poll continues to operate on top of this. Add a unit test that parses a JSONL split across multiple invocations and asserts no tool activities are dropped."
+        },
+        "subItems": [
+          {
+            "id": "parser-state-persistence.ac1",
+            "title": "ParseState (pendingToolUse, pendingAssistant) survives across multiple parseConversationMessages invocations for the same conversationId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parser-state-persistence.ac2",
+            "title": "tool_result entries arriving in a later poll than their matching tool_use are correctly paired and rendered, not dropped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parser-state-persistence.ac3",
+            "title": "Cache is cleared when a conversation is deleted; no memory leak across conversation lifecycle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parser-state-persistence.ac4",
+            "title": "Vitest unit test splits a known JSONL into N chunks, parses each in turn, and asserts the final timeline has the same tool activities as a single-pass parse",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sort-tiebreaker-sweep",
+        "title": "Replace lexicographic createdAt comparisons with (createdAt, sequence) tiebreaker everywhere in the timeline pipeline",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "Audit every .sort( site in src/dashboard/server/services/conversation-service.ts, src/dashboard/frontend/src/components/chat/session-logic.ts (or its renamed successor), src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx, and any other timeline-adjacent module surfaced by `git grep 'createdAt' src/dashboard/`. Replace lexicographic localeCompare/string-compare on createdAt with a comparator that compares (createdAt, sequence) where sequence is the monotonic field already present on entries. ConversationList localeCompare on conversation names is out of scope (different domain)."
+        },
+        "subItems": [
+          {
+            "id": "sort-tiebreaker-sweep.ac1",
+            "title": "git grep 'localeCompare' src/dashboard/ shows no hits in timeline-adjacent code (server conversation-service or frontend chat module)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sort-tiebreaker-sweep.ac2",
+            "title": "Every .sort( on conversation timeline entries uses a single shared comparator that ties on sequence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sort-tiebreaker-sweep.ac3",
+            "title": "Unit test asserts deterministic ordering of three entries with identical createdAt and distinct sequence values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "compact-boundary-offset",
+        "title": "Handle compact_boundary offset so pre-compact tool calls remain visible",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "Detect compact_boundary entries during parse. The post-compact JSONL begins with a synthetic summary entry whose timestamp resets the apparent ordering. Propagate an `offset` field on subsequent entries so the renderer preserves pre-compact tool history rather than hiding it behind the new low-timestamp summary. Add a parser test that exercises a JSONL with a compact_boundary."
+        },
+        "subItems": [
+          {
+            "id": "compact-boundary-offset.ac1",
+            "title": "Pre-compact tool calls remain visible in the rendered transcript when the JSONL contains a compact_boundary",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compact-boundary-offset.ac2",
+            "title": "Parser unit test loads a fixture JSONL with a compact_boundary and asserts the timeline contains both pre- and post-compact entries in correct order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "duplicate-id-audit",
+        "title": "Switch all message.id keying to entry.uuid ?? message.id and add regression test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "git grep for sites that key by message.id, msg.id, or `id` derived from a JSON message envelope across server + frontend timeline code. Switch each to entry.uuid ?? message.id ?? <synthetic-stable-id>. Add a Vitest regression test that loads the captured duplicate-id fixture and asserts N distinct rows for N distinct entries (no row collapsing)."
+        },
+        "subItems": [
+          {
+            "id": "duplicate-id-audit.ac1",
+            "title": "Every site that previously keyed by message.id is updated to entry.uuid ?? message.id (audit comment in commit body lists the sites)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "duplicate-id-audit.ac2",
+            "title": "Regression test loads the captured duplicate-id JSONL fixture (or a minimal synthetic equivalent) and asserts no rows collapse or overlap",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "duplicate-id-audit.ac3",
+            "title": "Decision recorded in commit body: committed full fixture vs synthesized minimal fixture, with rationale",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tmux-verify-helpers",
+        "title": "Add tmux paste/submit verification helpers in src/lib/tmux.ts with capture-pane polling and busy-state detection",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "Replace the fixed 600-3000ms delay in sendKeysAsync with a verification loop. (1) Paste via load-buffer + paste-buffer (existing pattern). (2) Poll capture-pane at 50ms intervals up to a 3s cap until the pasted text is visible in the input region. (3) Send C-m. (4) Poll capture-pane until the input region is empty / text moved out, with a bounded retry budget. (5) On failure, raise a structured MessageDeliveryFailed error with the captured pane state attached. (6) Detect Claude-busy state (e.g. 'Whirring…' indicator) before paste and route to a busy-aware path that does NOT immediately paste-then-Enter, since the TUI buffers text without submitting in that state. The new helpers must be drop-in replacements at the call-site level."
+        },
+        "subItems": [
+          {
+            "id": "tmux-verify-helpers.ac1",
+            "title": "sendKeysAsync (or its replacement) verifies pasted text is visible in the input region before sending Enter",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tmux-verify-helpers.ac2",
+            "title": "After Enter, the helper verifies the input region cleared (message submitted) within a bounded retry budget",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tmux-verify-helpers.ac3",
+            "title": "On verification failure, raises MessageDeliveryFailed with captured pane state in the error payload",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tmux-verify-helpers.ac4",
+            "title": "Detects Claude-busy state from the capture and routes to the busy-aware path rather than paste-then-Enter",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tmux-verify-helpers.ac5",
+            "title": "No fixed-delay-then-fire-and-forget path remains in src/lib/tmux.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tmux-verify-helpers.ac6",
+            "title": "Integration test using a real tmux session asserts MessageDeliveryFailed is raised when the input region never clears",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tmux-verify-callers",
+        "title": "Migrate every server-reachable sendKeysAsync caller to the verified path",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "git grep sendKeysAsync in src/dashboard/server/, src/lib/cloister/, src/lib/conversations/, src/lib/forks/, etc. Update every caller to use the verified helpers and to handle MessageDeliveryFailed appropriately. Conversation route surfaces it through the dashboard error channel; specialist callers may also retry once before propagating."
+        },
+        "subItems": [
+          {
+            "id": "tmux-verify-callers.ac1",
+            "title": "Every server-reachable sendKeysAsync caller uses the new verified helpers (zero callers of the legacy fixed-delay path)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tmux-verify-callers.ac2",
+            "title": "Each caller has an explicit MessageDeliveryFailed handler — propagate, retry-once, or surface as a dashboard error event as appropriate for its context",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tmux-failure-dashboard-surface",
+        "title": "Surface MessageDeliveryFailed as a distinct dashboard error event (not via the user-prompt outbox)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "Per the explicit decision to keep tmux-delivery failures separate from the user-prompt outbox: when a server-side sendKeys fails verification, emit a structured event (workspace inspector entry + transient toast in the dashboard) with the captured pane state, the failing caller, and a timestamp. Do NOT enter the user-prompt outbox. Define the event payload in @panopticon/contracts and route through the existing event store + RPC stream."
+        },
+        "subItems": [
+          {
+            "id": "tmux-failure-dashboard-surface.ac1",
+            "title": "MessageDeliveryFailed events are emitted to the dashboard event stream and visible in the workspace inspector",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tmux-failure-dashboard-surface.ac2",
+            "title": "A toast notification appears in the dashboard when a tmux delivery failure occurs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tmux-failure-dashboard-surface.ac3",
+            "title": "No tmux delivery failure ever lands in the user-prompt outbox",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "synchronous-conversation-spawn",
+        "title": "Make POST /api/conversations synchronous to tmux + waitForClaudeReady; return live conversation record",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/conversations.ts, await spawnConversationSession() and waitForClaudeReady() before returning. The 201 response carries the live conversation record. Remove the fire-and-forget background void task that paste-buffers a queued message — there is no queued message in the new flow. The request body becomes { model, effort } only (no `message`). Honor the existing 30s waitForClaudeReady timeout; on timeout return 504 with the partial conversation record so the user can retry or inspect tmux. All work must use execAsync / fs.promises per the dashboard server no-blocking-calls rule."
+        },
+        "subItems": [
+          {
+            "id": "synchronous-conversation-spawn.ac1",
+            "title": "POST /api/conversations does not return until tmux exists and Claude is at its prompt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "synchronous-conversation-spawn.ac2",
+            "title": "Response body is the live conversation record; no queued-message background task exists in the route",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "synchronous-conversation-spawn.ac3",
+            "title": "Request body schema is { model, effort } only — no `message` field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "synchronous-conversation-spawn.ac4",
+            "title": "On waitForClaudeReady timeout, returns 504 with the partial conversation record",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "synchronous-conversation-spawn.ac5",
+            "title": "No execSync, readFileSync, writeFileSync, readdirSync, or statSync introduced in the new code path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delete-draft-panel",
+        "title": "Delete DraftConversationPanel and its supporting state in MissionControl",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "Delete src/dashboard/frontend/src/components/chat/DraftConversationPanel.tsx and remove draftKey state, handleDraftCreated, and isDraft branching from src/dashboard/frontend/src/components/MissionControl/index.tsx. Clicking + now POSTs /api/conversations directly and mounts the returned live conversation. The composer renders empty in the live conversation; user types whenever they want. Verify with `git grep -i draft src/dashboard/frontend/src/components/chat/` that no draft-related code remains."
+        },
+        "subItems": [
+          {
+            "id": "delete-draft-panel.ac1",
+            "title": "src/dashboard/frontend/src/components/chat/DraftConversationPanel.tsx is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-draft-panel.ac2",
+            "title": "draftKey, handleDraftCreated, and isDraft branching are removed from MissionControl/index.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-draft-panel.ac3",
+            "title": "git grep -i draft src/dashboard/frontend/src/components/chat/ returns no hits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-draft-panel.ac4",
+            "title": "Clicking + opens a live conversation with terminal + transcript visible in under 1s (manual verification)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remove-session-alive-grace",
+        "title": "Remove sessionAlive 30s grace window for newly-created conversations",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "Remove the GRACE_MS / sessionAlive grace window logic in src/dashboard/server/routes/conversations.ts (around lines 874, 910-911, 1095-1097). With synchronous spawn, the tmux session always exists by the time the 201 returns; the grace window is no longer needed."
+        },
+        "subItems": [
+          {
+            "id": "remove-session-alive-grace.ac1",
+            "title": "GRACE_MS constant and its usages are removed from src/dashboard/server/routes/conversations.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-session-alive-grace.ac2",
+            "title": "sessionAlive checks for newly-created conversations now return true based purely on tmux session existence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remove-frontend-message-polling",
+        "title": "Remove frontend message-arrival polling for new conversations",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "The frontend currently polls /messages every ~2s waiting for a queued first message to appear. With synchronous spawn there's no queued message and the live /ws/rpc + /ws/terminal streams are sufficient. Remove the polling effect from the conversation panel."
+        },
+        "subItems": [
+          {
+            "id": "remove-frontend-message-polling.ac1",
+            "title": "No setInterval / setTimeout polling /messages remains in the conversation panel for new-conversation message arrival",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-frontend-message-polling.ac2",
+            "title": "Live messages still render via /ws/rpc subscription as today",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "instant-start-uat",
+        "title": "Playwright UAT: parallel tool calls + thinking block across an incremental parse boundary match terminal scrollback exactly",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "Write a Playwright UAT that (a) clicks + and asserts the conversation mounts in under 1s with terminal + transcript visible, (b) sends a prompt that triggers three parallel tool calls plus a thinking block, (c) forces an incremental parse boundary mid-stream, (d) snapshots the rendered transcript order, (e) captures the terminal scrollback via the existing terminal stream, (f) asserts the transcript order matches the scrollback. The browser instance/profile MUST be isolated — do not depend on or share state with another agent's Playwright session. Any required login/setup must be reproducible inside the isolated session."
+        },
+        "subItems": [
+          {
+            "id": "instant-start-uat.ac1",
+            "title": "UAT runs in an isolated browser profile with no shared state with other agents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "instant-start-uat.ac2",
+            "title": "After click +, the conversation pane (terminal + transcript) is interactable in under 1s",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "instant-start-uat.ac3",
+            "title": "Three parallel tool calls and a thinking block are exercised across an incremental parse boundary",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "instant-start-uat.ac4",
+            "title": "Rendered transcript order matches terminal scrollback order exactly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "thinking-block-expand",
+        "title": "Add expand/collapse affordance to thinking blocks in the work-log row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "Extend the per-row toggle pattern used for isTerminal entries to tone === 'thinking' rows in WorkLogEntryRow (will be SimpleWorkEntryRow after the rename — pick whichever name exists at implementation time and let the rename bead carry the change). Render the expanded body using the same container Bash uses, with prose-friendly styling for reasoning text (no monospace if not appropriate). Persist expansion state via the same expandedWorkGroups mechanism if T3Code does, otherwise per-row local state."
+        },
+        "subItems": [
+          {
+            "id": "thinking-block-expand.ac1",
+            "title": "Thinking blocks (tone === 'thinking') show an expand/collapse affordance with parity to Bash entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "thinking-block-expand.ac2",
+            "title": "Expanded thinking renders the full reasoning text legibly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "thinking-block-expand.ac3",
+            "title": "Collapsed-by-default; expansion state persists for the lifetime of the panel session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-strip-thinking-signature",
+        "title": "Strip signature fields from thinking blocks in copySessionFromCompactBoundary",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "In src/lib/conversations/summary-fork.ts, walk message content arrays inside copySessionFromCompactBoundary and strip the `signature` field from any block with type === 'thinking' before writing the fork's destination JSONL. This is the canonical write-time fix for cross-model fork failures. The destination JSONL is written by Panopticon (not the user's source session JSONL), so this complies with the no-write-to-user-JSONL rule."
+        },
+        "subItems": [
+          {
+            "id": "fork-strip-thinking-signature.ac1",
+            "title": "copySessionFromCompactBoundary writes thinking blocks without signature fields in the destination JSONL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-strip-thinking-signature.ac2",
+            "title": "Source JSONL is unchanged (no writes to the user's session file)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-strip-thinking-signature.ac3",
+            "title": "Cross-model fork end-to-end test: fork from Opus session to Sonnet, resume the fork, no signature error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "specialists-no-resume",
+        "title": "Force --no-resume on every specialist spawn path (review, test, merge, inspect, uat)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "In spawnEphemeralSpecialist (or whichever utility centralizes specialist spawn), set --no-resume unconditionally. Specialists pick up context via STATE.md + beads + role-prompt templates, never via session resume. Audit each direct spawn site in src/lib/cloister/{review,test,merge,inspect,uat}-agent.ts to confirm none bypass the helper."
+        },
+        "subItems": [
+          {
+            "id": "specialists-no-resume.ac1",
+            "title": "spawnEphemeralSpecialist always passes --no-resume to claude",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "specialists-no-resume.ac2",
+            "title": "No specialist spawn path bypasses the helper to call claude with --resume",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-options-api-and-modal",
+        "title": "Wire localSummaryOnly and includeThinkingInSummary through the fork API and ForkModal.tsx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "Add localSummaryOnly (default false) and includeThinkingInSummary (default false) to the fork request schema in @panopticon/contracts. Plumb through the fork service (src/lib/conversations/) so localSummaryOnly skips re-uploading the source transcript and includeThinkingInSummary passes thinking content into the summary. Add two checkboxes to ForkModal.tsx with brief tooltips explaining each."
+        },
+        "subItems": [
+          {
+            "id": "fork-options-api-and-modal.ac1",
+            "title": "Fork request schema in @panopticon/contracts includes localSummaryOnly and includeThinkingInSummary booleans",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-options-api-and-modal.ac2",
+            "title": "ForkModal.tsx exposes both options as checkboxes with tooltips",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-options-api-and-modal.ac3",
+            "title": "Server-side fork honors both flags end-to-end",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-model-switch-warning",
+        "title": "Show a model-switch warning in ForkModal when a plain fork crosses launch models",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "When the user selects a plain fork (not summary fork) and the chosen launch model differs from the source conversation's model, show an inline warning banner in ForkModal explaining the implication (signature/capability mismatch risk; suggest summary fork instead)."
+        },
+        "subItems": [
+          {
+            "id": "fork-model-switch-warning.ac1",
+            "title": "Inline warning banner appears in ForkModal when plain fork + different model is selected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-model-switch-warning.ac2",
+            "title": "No warning shown for summary fork with model change (signatures stripped) or for same-model plain fork",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deacon-detect-signature-corruption",
+        "title": "Deacon detects 'Invalid signature in thinking block' and surfaces a dashboard event (no JSONL writes)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "In the deacon patrol loop (src/lib/cloister/deacon.ts), scan recent agent output for the literal 'Invalid signature in thinking block' error string. On detection, emit a structured `recovery.signature_corruption` event to the dashboard event stream with the workspace id, agent id, and a short user-facing message describing the corruption. Per the user's explicit decision: deacon performs NO automatic repair — no rename, no move, no JSONL writes. The dashboard surface tells the user the error occurred and (optionally) suggests next steps. Prevention via fork-strip-thinking-signature + specialists-no-resume removes the corruption source going forward; this detector only catches pre-existing corrupted JSONLs."
+        },
+        "subItems": [
+          {
+            "id": "deacon-detect-signature-corruption.ac1",
+            "title": "Deacon emits recovery.signature_corruption event when 'Invalid signature in thinking block' appears in agent output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-detect-signature-corruption.ac2",
+            "title": "The event surfaces in the dashboard workspace inspector with the corruption message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-detect-signature-corruption.ac3",
+            "title": "Deacon performs NO automatic JSONL writes, renames, moves, or restarts in response to the corruption",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-forks-rewrite",
+        "title": "Rewrite docs/FORKS.md with summary-vs-plain semantics, thinking-block behavior, token cost, cross-model gotchas",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "Refresh docs/FORKS.md to cover: (1) summary fork vs plain fork — behavior and when to use each, (2) thinking-block behavior across forks (signatures stripped on summary, preserved on same-model plain), (3) token cost implications (summary much cheaper, plain re-uploads transcript), (4) cross-model gotchas (signatures, capability mismatches, why summary is safer across models), (5) the new localSummaryOnly and includeThinkingInSummary options."
+        },
+        "subItems": [
+          {
+            "id": "docs-forks-rewrite.ac1",
+            "title": "docs/FORKS.md covers summary vs plain semantics with concrete examples",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-forks-rewrite.ac2",
+            "title": "Thinking-block behavior, token cost, and cross-model considerations documented",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-forks-rewrite.ac3",
+            "title": "New fork options (localSummaryOnly, includeThinkingInSummary) documented with use cases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-mission-control-forks",
+        "title": "Add a Forks section to docs/MISSION-CONTROL.md linking out to FORKS.md",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "Add a `## Forks` section to docs/MISSION-CONTROL.md describing how to invoke forks from the conversation menu and linking to docs/FORKS.md for the deep dive."
+        },
+        "subItems": [
+          {
+            "id": "docs-mission-control-forks.ac1",
+            "title": "docs/MISSION-CONTROL.md has a Forks section with a link to docs/FORKS.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "outbox-sqlite-schema",
+        "title": "Add SQLite conversation_outbox table + migration + service module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "Add a new SQLite migration creating a conversation_outbox table with columns: id (uuid), conversation_id (fk), prompt_id (client-generated stable id for reconciliation), prompt_text, status enum('pending','failed','accepted'), error_message nullable, created_at, last_attempt_at. Add a service module (e.g. src/dashboard/server/services/conversation-outbox.ts) exposing async insert/update/list/delete operations using fs/promises and the existing SQLite layer (no execSync/readFileSync). Provide a startup self-heal that creates the table if the migration has not run."
+        },
+        "subItems": [
+          {
+            "id": "outbox-sqlite-schema.ac1",
+            "title": "New SQLite migration creates conversation_outbox table with the documented schema",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "outbox-sqlite-schema.ac2",
+            "title": "Outbox service module exposes async insert/update/list/delete with no blocking calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "outbox-sqlite-schema.ac3",
+            "title": "Startup self-heal creates the table if missing (no manual migration step required)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "outbox-sqlite-schema.ac4",
+            "title": "Outbox entries survive server restart (verified by Vitest integration test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "outbox-api-merge",
+        "title": "Conversation API merges JSONL + outbox; reconcile accepted prompts automatically",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "Update the conversation timeline endpoint to merge JSONL entries with outbox entries using the same (createdAt, sequence) sort comparator. Outbox entries with status='accepted' reconcile away automatically when matching prompt_text + timestamp window appears in JSONL (mark accepted, remove from response after a short retention window). Failed outbox entries remain in the response with their status and error_message. The frontend timeline assembles in one place and does not need to know which source produced the row."
+        },
+        "subItems": [
+          {
+            "id": "outbox-api-merge.ac1",
+            "title": "Conversation timeline endpoint returns merged JSONL + outbox entries in correct sort order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "outbox-api-merge.ac2",
+            "title": "Outbox entries reconcile to accepted automatically when their prompt appears in the JSONL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "outbox-api-merge.ac3",
+            "title": "Failed entries persist in the response with status and error_message until the user discards or retries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "outbox-frontend-failed-prompts",
+        "title": "Render failed prompts in the timeline with inline retry/edit/copy/discard controls",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "Update MessagesTimeline rendering so outbox entries with status='failed' display the original prompt text, an error indicator with the error_message (if available), and inline action buttons: Retry (re-attempts send), Edit (loads prompt back into composer), Copy (copies prompt text), Discard (deletes the outbox entry). Pending entries are visually distinct from persisted (e.g. muted styling, spinner). Failed-prompt local state survives normal UI re-render paths and reload (it lives in SQLite, so reload reads it back from the API). Applies equally to the first message of a new conversation and to follow-ups."
+        },
+        "subItems": [
+          {
+            "id": "outbox-frontend-failed-prompts.ac1",
+            "title": "Failed outbox prompts render in the timeline with the original prompt text and an error state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "outbox-frontend-failed-prompts.ac2",
+            "title": "Inline Retry / Edit / Copy / Discard controls are visible (not hidden behind a menu)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "outbox-frontend-failed-prompts.ac3",
+            "title": "Pending prompts are visually distinct from persisted prompts (e.g. muted style, spinner)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "outbox-frontend-failed-prompts.ac4",
+            "title": "Reload preserves failed entries (verified manually and via Vitest integration if feasible)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "favorite-star-position",
+        "title": "Render the persistent favorited star in the same right-aligned column as the hover star",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/MissionControl/ConversationList.tsx (lines ~524-583), move the persistent favorited star out of the inline meta row and into the right-aligned .conversationActions group, occupying the same column as the hover-only 'favorite this' star. The persistent star remains always-visible (no hover fade applied to the persistent variant) but in the same horizontal slot. Toggling favorited state must not shift any other element left or right."
+        },
+        "subItems": [
+          {
+            "id": "favorite-star-position.ac1",
+            "title": "Persistent favorited star renders in the .conversationActions slot (same column as the hover star)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "favorite-star-position.ac2",
+            "title": "Persistent star is always visible (no hover fade) when conv.isFavorited is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "favorite-star-position.ac3",
+            "title": "Toggling favorited does not shift the star or any other element horizontally",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "t3code-rename-session-logic",
+        "title": "Rename src/dashboard/frontend/src/components/chat/session-logic.ts → MessagesTimeline.logic.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "Rename the file using `git mv` to preserve history. Update every importer to the new path. No content changes (other than minor import sweeps in callers). T3Code reference: /home/eltmon/Projects/t3code/apps/web/src/components/chat/MessagesTimeline.logic.ts."
+        },
+        "subItems": [
+          {
+            "id": "t3code-rename-session-logic.ac1",
+            "title": "session-logic.ts is renamed to MessagesTimeline.logic.ts via git mv (history preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "t3code-rename-session-logic.ac2",
+            "title": "Every import is updated; typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "t3code-rename-worklog-row",
+        "title": "Rename WorkLogEntryRow → SimpleWorkEntryRow and sweep all callers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "Rename the WorkLogEntryRow component (and its file if filename matches) to SimpleWorkEntryRow. Sweep every caller in the chat module and elsewhere. T3Code reference: /home/eltmon/Projects/t3code/apps/web/src/components/chat/SimpleWorkEntryRow.tsx (or equivalent)."
+        },
+        "subItems": [
+          {
+            "id": "t3code-rename-worklog-row.ac1",
+            "title": "WorkLogEntryRow is renamed to SimpleWorkEntryRow at definition and all call sites",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "t3code-rename-worklog-row.ac2",
+            "title": "Typecheck and lint pass after the rename",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "t3code-messages-timeline-row-union",
+        "title": "Adopt T3Code's MessagesTimelineRow discriminated union",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "Replace ad-hoc row branching in MessagesTimeline with a `MessagesTimelineRow` discriminated union (`kind: 'message' | 'work' | 'proposed-plan' | 'working'` — confirm the exact variants by reading T3Code's chat module). Update the renderer to switch on `kind`. No feature regressions; pure structural alignment."
+        },
+        "subItems": [
+          {
+            "id": "t3code-messages-timeline-row-union.ac1",
+            "title": "MessagesTimelineRow discriminated union is defined matching T3Code's variants",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "t3code-messages-timeline-row-union.ac2",
+            "title": "MessagesTimeline renderer branches on row.kind exhaustively (no default-fallback path)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "t3code-messages-timeline-row-union.ac3",
+            "title": "No conversation feature regresses (manual smoke + Playwright UAT continues to pass)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "t3code-css-class-alignment",
+        "title": "Align CSS class names with T3Code: .chat-markdown, .chat-markdown-codeblock, .chat-markdown-copy-button, .chat-markdown-shiki",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "Rename CSS classes in the chat module's CSS module to match T3Code: .chat-markdown, .chat-markdown-codeblock, .chat-markdown-copy-button, .chat-markdown-shiki. Update all consumers. Markdown / Shiki rendering behavior is unchanged — only class names align."
+        },
+        "subItems": [
+          {
+            "id": "t3code-css-class-alignment.ac1",
+            "title": "Chat module CSS uses .chat-markdown* class names matching T3Code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "t3code-css-class-alignment.ac2",
+            "title": "Markdown / Shiki rendering behavior is unchanged (visual smoke verifies parity)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "quality-gates-pass",
+        "title": "All quality gates pass (typecheck, lint, test) before pan done",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-26T01:33:53Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-826"
+        },
+        "narrative": {
+          "Action": "Final guard: npm run typecheck, npm run lint, and npm test all pass on the merged branch. Workspace is built (npm run build) so the dashboard runs under Node 22 from dist/."
+        },
+        "subItems": [
+          {
+            "id": "quality-gates-pass.ac1",
+            "title": "npm run typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quality-gates-pass.ac2",
+            "title": "npm run lint passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quality-gates-pass.ac3",
+            "title": "npm test passes (root + frontend)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quality-gates-pass.ac4",
+            "title": "npm run build succeeds; dashboard runs under Node 22 from dist/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "parser-state-persistence",
+        "to": "duplicate-id-audit",
+        "type": "informs"
+      },
+      {
+        "from": "parser-state-persistence",
+        "to": "instant-start-uat",
+        "type": "blocks"
+      },
+      {
+        "from": "sort-tiebreaker-sweep",
+        "to": "instant-start-uat",
+        "type": "blocks"
+      },
+      {
+        "from": "duplicate-id-audit",
+        "to": "instant-start-uat",
+        "type": "blocks"
+      },
+      {
+        "from": "compact-boundary-offset",
+        "to": "instant-start-uat",
+        "type": "informs"
+      },
+      {
+        "from": "tmux-verify-helpers",
+        "to": "tmux-verify-callers",
+        "type": "blocks"
+      },
+      {
+        "from": "tmux-verify-helpers",
+        "to": "tmux-failure-dashboard-surface",
+        "type": "blocks"
+      },
+      {
+        "from": "tmux-verify-callers",
+        "to": "synchronous-conversation-spawn",
+        "type": "informs"
+      },
+      {
+        "from": "synchronous-conversation-spawn",
+        "to": "delete-draft-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "synchronous-conversation-spawn",
+        "to": "remove-session-alive-grace",
+        "type": "blocks"
+      },
+      {
+        "from": "synchronous-conversation-spawn",
+        "to": "remove-frontend-message-polling",
+        "type": "blocks"
+      },
+      {
+        "from": "delete-draft-panel",
+        "to": "instant-start-uat",
+        "type": "blocks"
+      },
+      {
+        "from": "remove-session-alive-grace",
+        "to": "instant-start-uat",
+        "type": "informs"
+      },
+      {
+        "from": "remove-frontend-message-polling",
+        "to": "instant-start-uat",
+        "type": "informs"
+      },
+      {
+        "from": "fork-strip-thinking-signature",
+        "to": "fork-options-api-and-modal",
+        "type": "informs"
+      },
+      {
+        "from": "fork-options-api-and-modal",
+        "to": "fork-model-switch-warning",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-options-api-and-modal",
+        "to": "docs-forks-rewrite",
+        "type": "informs"
+      },
+      {
+        "from": "docs-forks-rewrite",
+        "to": "docs-mission-control-forks",
+        "type": "blocks"
+      },
+      {
+        "from": "outbox-sqlite-schema",
+        "to": "outbox-api-merge",
+        "type": "blocks"
+      },
+      {
+        "from": "outbox-api-merge",
+        "to": "outbox-frontend-failed-prompts",
+        "type": "blocks"
+      },
+      {
+        "from": "sort-tiebreaker-sweep",
+        "to": "outbox-api-merge",
+        "type": "informs"
+      },
+      {
+        "from": "thinking-block-expand",
+        "to": "t3code-rename-worklog-row",
+        "type": "informs"
+      },
+      {
+        "from": "t3code-rename-session-logic",
+        "to": "t3code-messages-timeline-row-union",
+        "type": "informs"
+      },
+      {
+        "from": "t3code-rename-worklog-row",
+        "to": "t3code-messages-timeline-row-union",
+        "type": "informs"
+      },
+      {
+        "from": "parser-state-persistence",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "sort-tiebreaker-sweep",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "compact-boundary-offset",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "duplicate-id-audit",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "tmux-verify-helpers",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "tmux-verify-callers",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "tmux-failure-dashboard-surface",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "synchronous-conversation-spawn",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "delete-draft-panel",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "remove-session-alive-grace",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "remove-frontend-message-polling",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "instant-start-uat",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "thinking-block-expand",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-strip-thinking-signature",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "specialists-no-resume",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-options-api-and-modal",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-model-switch-warning",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "deacon-detect-signature-corruption",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-forks-rewrite",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-mission-control-forks",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "outbox-sqlite-schema",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "outbox-api-merge",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "outbox-frontend-failed-prompts",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "favorite-star-position",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "t3code-rename-session-logic",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "t3code-rename-worklog-row",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "t3code-messages-timeline-row-union",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      },
+      {
+        "from": "t3code-css-class-alignment",
+        "to": "quality-gates-pass",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

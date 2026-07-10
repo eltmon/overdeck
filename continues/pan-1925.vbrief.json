@@ -1,0 +1,107 @@
+{
+  "version": "1",
+  "issueId": "PAN-1925",
+  "created": "2026-06-16T19:49:39.227Z",
+  "updated": "2026-06-16T20:38:28.370Z",
+  "gitState": {
+    "branch": "feature/pan-1925",
+    "sha": "5df8456021",
+    "dirty": false
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Adopt issue Option 1 (preferred): stop persisting agent.output_received durably; emit it stream-only via eventStore.emitOnly() instead of appendAsync(). Rejected Option 2 (per-type shortened retention) — it keeps the write churn.",
+      "recordedAt": "2026-06-16T20:00:13.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Reuse existing primitives: emitOnly (event-store.ts:304) for stream-only delivery and purgeType (event-store.ts:334) for the one-time cleanup of ~264k existing rows, mirroring the issues.snapshot purge already in initEventStore (event-store.ts:378).",
+      "recordedAt": "2026-06-16T20:00:13.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Reclaim freed disk via PRAGMA incremental_vacuum immediately after the one-time purge (only when rows were purged). Node production DB already has auto_vacuum=INCREMENTAL (src/lib/database/index.ts:96); the 15-min periodic reclaimer is the backstop. Do not add a second full VACUUM.",
+      "recordedAt": "2026-06-16T20:00:13.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Keep agent.output_received in the public SSE catalog as LIVE-ONLY (not replayable). Fix formatFrame in routes/events.ts to omit the SSE id: line for sequence < 0 so emitOnly frames never poison a consumer's Last-Event-ID resume cursor. Update docs/EXTERNAL-EVENT-STREAM.md accordingly.",
+      "recordedAt": "2026-06-16T20:00:13.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Do NOT add agent.output_received to the readFromStmt exclusion list (event-store.ts:187). After emitOnly + purge there are no rows to exclude; that would be downstream defensive code against a purge-failed scenario, which the no-bandaids rule forbids.",
+      "recordedAt": "2026-06-16T20:00:13.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Live UI must keep working after the switch. Risk: a work agent deletes the event emission entirely instead of switching to emitOnly, breaking the dashboard god view / RPC subscribeAgentOutput.",
+      "mitigation": "MUST use eventStore.emitOnly(event). Verified: streamEvents (domain-services.ts:280) is backed by store.subscribe(), so emitOnly reaches subscribeAgentOutput (ws-rpc.ts:627), subscribeIssueEvents, and the SSE live tail. The producer test asserts emitOnly is called with the correct event."
+    },
+    {
+      "id": "H2",
+      "summary": "emitOnly events carry sequence -1. Risk of poisoning SSE Last-Event-ID resume for any unfiltered consumer (since-guard requires since >= 0).",
+      "mitigation": "formatFrame must omit the id: line when sequence < 0. AC covers both branches. Persisted rows are AUTOINCREMENT >= 1, so this can never affect real-event resume."
+    },
+    {
+      "id": "H3",
+      "summary": "Frontend gap/resync coordinator could spam replay on the high-frequency sequence -1 stream (every 3s x every agent).",
+      "mitigation": "Already safe: recoveryCoordinator.classifyDomainEvent (recoveryCoordinator.ts:72-75) returns 'apply' for sequence === -1 with no replay; reducer uses Math.max(state.sequence, -1) (no-op). issues.snapshot already exercises this path. No frontend change needed."
+    },
+    {
+      "id": "H4",
+      "summary": "Immediate disk reclaim is runtime-dependent. Under Bun (dev only) auto_vacuum is not set on the event-store's own connection, so incremental_vacuum is a no-op; production is Node 22 only.",
+      "mitigation": "Phrase the reclaim AC for the Node production path (freelist returns to OS). The unit test verifies the PURGE (rows -> 0), not the VACUUM, to avoid fragile auto_vacuum-mode test scaffolding."
+    },
+    {
+      "id": "H5",
+      "summary": "No secondary bloat source. mapDomainEventToDetailed (domain-services.ts:188) auto-emits activity.detailed for many event types.",
+      "mitigation": "Verified there is NO agent.output_received case in mapDomainEventToDetailed (returns null) — switching to emitOnly does not strand a secondary persisted activity.detailed stream. No change needed."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-8",
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "note": "Planning session started for PAN-1925: perf(dashboard): events table ~1 GB — agent.output_received (721 MB of terminal output) persisted durably",
+      "timestamp": "2026-06-16T19:49:39.227Z"
+    },
+    {
+      "timestamp": "2026-06-16T20:00:13.000Z",
+      "reason": "planning",
+      "note": "Auto-planning complete: 3-bead plan (emitOnly switch + one-time purge/reclaim + SSE Last-Event-ID safety). Option 1 chosen. All consumers traced; emitOnly path verified end-to-end (server stream, RPC, SSE, frontend coordinator, reducer).",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-16T20:37Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-16T20:37:32.936Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-16T20:38Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-16T20:38:28.370Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-06-16T20:37:32Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-1925 (attempt 1/10):\n\nFailed check: build\n\nVerification FAILED at build (30270ms):\n\ns, src/index.ts, src/supervisor/server.ts, src/lib/channels/pty-supervisor.ts, src/lib/memory/fts-worker.ts\u001b[39m\n\u001b[34mℹ\u001b[39m target: \u001b[34mnode18\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m Cleaning 484 files\n\n<--- Last few GCs --->\n\n[1703351:0x28309000]    23221 ms: Mark-Compact 4043.9 (4136.3) -> 4033.8 (4142.5) MB, pooled: 0 MB, 710.94 / 0.00 ms  (average mu = 0.402, current mu = 0.050) allocation failure; scavenge might not succeed\n[1703351:0x28309000]    24371 ms: Mark-Compact 4050.4 (4143.3) -> 4039.3 (4147.3) MB, pooled: 2 MB, 1127.37 / 0.00 ms  (average mu = 0.203, current mu = 0.019) allocation failure; scavenge might not succeed\n\n\n<--- JS stacktrace --->\n\nFATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory\n----- Native stack trace -----\n\n 1: 0xe40d24 node::OOMErrorHandler(char const*, v8::OOMDetails const&) [node]\n 2: 0x1216be0 v8::Utils::ReportOOMFailure(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [node]\n 3: 0x1216eb7 v8::internal::V8::FatalProcessOutOfMemory(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [node]\n 4: 0x1444875  [node]\n 5: 0x145e109 v8::internal::Heap::CollectGarbage(v8::internal::AllocationSpace, v8::internal::GarbageCollectionReason, v8::GCCallbackFlags) [node]\n 6: 0x14327b8 v8::internal::HeapAllocator::AllocateRawWithLightRetrySlowPath(int, v8::internal::AllocationType, v8::internal::AllocationOrigin, v8::internal::AllocationAlignment) [node]\n 7: 0x14336e5 v8::internal::HeapAllocator::AllocateRawWithRetryOrFailSlowPath(int, v8::internal::AllocationType, v8::internal::AllocationOrigin, v8::internal::AllocationAlignment) [node]\n 8: 0x140c3be v8::internal::Factory::NewFillerObject(int, v8::internal::AllocationAlignment, v8::internal::AllocationType, v8::internal::AllocationOrigin) [node]\n 9: 0x186da1c v8::internal::Runtime_AllocateInYoungGeneration(int, unsigned long*, v8::internal::Isolate*) [node]\n10: 0x738031e6c476 \nAborted (core dumped)\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-1925 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-1925 -m \"Fixed build\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
+    },
+    {
+      "seq": 2,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-06-16T20:38:28Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-1925 (attempt 1/10):\n\nFailed check: test\n\nVerification FAILED at test (28316ms):\n\n Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| src/lib/cloister/__tests__/reactive-scheduler.test.ts > reactive Cloister scheduler > routes agent.stopped events to the deacon resume handler\nAssertionError: expected \"vi.fn()\" to be called with arguments: [ 'agent-pan-503' ]\n\nNumber of calls: 0\n\n ❯ src/lib/cloister/__tests__/reactive-scheduler.test.ts:379:25\n    377|     }));\n    378|\n    379|     expect(resumeAgent).toHaveBeenCalledWith('agent-pan-503');\n       |                         ^\n    380|   });\n    381|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-1925 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-1925 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
+    }
+  ]
+}

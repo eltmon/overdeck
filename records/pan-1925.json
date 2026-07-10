@@ -1,0 +1,39 @@
+{
+  "issueId": "PAN-1925",
+  "schemaVersion": 2,
+  "created": "2026-06-16T20:21:33.137Z",
+  "updated": "2026-06-16T21:45:00.000Z",
+  "pipeline": {
+    "issueId": "PAN-1925",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-16T20:21:33.137Z"
+  },
+  "statusOverrides": {
+    "sse-frame-id": "completed",
+    "sse-frame-id.ac1": "completed",
+    "sse-frame-id.ac2": "completed",
+    "sse-frame-id.ac3": "completed",
+    "emit-only": "completed",
+    "emit-only.ac1": "completed",
+    "emit-only.ac2": "completed",
+    "emit-only.ac3": "completed",
+    "emit-only.ac4": "completed",
+    "purge-migration": "completed",
+    "purge-migration.ac1": "completed",
+    "purge-migration.ac2": "completed",
+    "purge-migration.ac3": "completed",
+    "purge-migration.ac4": "completed"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {}
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "pi",
+  "model": "kimi-k2.7-code"
+}

@@ -1,0 +1,246 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-06-08T17:35:46.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1681: test agents narrate 'tests pass' but never run pan specialists done test → strand at test=pending",
+    "updated": "2026-06-08T17:37:58.860Z"
+  },
+  "plan": {
+    "id": "pan-1681",
+    "title": "Test-completion failsafe: deterministic verdict artifact + checkCompletedButUnsignaledTests + 3-retry strand surfacing",
+    "status": "proposed",
+    "uid": "4506c440-1097-4562-95ae-2ec6bab09cc4",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-08T17:35:46.000Z",
+    "updated": "2026-06-08T17:37:58.860Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1681",
+        "label": "PAN-1681",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "pipeline",
+      "deacon",
+      "test-role",
+      "reliability",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "In-review PRs strand at test=pending even though their tests pass. The Haiku 4.5 test agent runs the gates, narrates 'All tests pass' / 'testStatus: passed', but never executes the POST (or `pan specialists done test`) that persists review_status.test_status. There is no test-completion failsafe (checkCompletedButUnsignaledReviews exists for review but has no test twin), the only recovery — checkPendingTestDispatch — re-dispatches a FRESH agent and is hard-capped at retryCount>=3 (silent permanent strand), and the broad completion nudges are disabled. PAN-1455 (#1611) is stranded at test_retry_count=3; PAN-1242 (#1516) at test_retry_count=1.",
+      "Proposal": "Mirror review's CURRENT (post-PAN-1557) failsafe architecture, NOT the issue's primary recommendation. The issue suggests resurrecting the launcher-owned signal (buildReviewSubRoleCommand), but that pattern is dead for review — convoy reviewers are now interactive with reviewSignal: undefined (agents.ts:3046); the live backstop is the Stop-hook + the deacon failsafe checkCompletedButUnsignaledReviews (deacon.ts:2441) which reads the synthesis.md work-product, nudges once, then auto-completes setReviewStatus. We apply the same live pattern to test: (1) the test role writes a deterministic verdict artifact .pan/test/result.json as a required step; (2) a new deacon failsafe checkCompletedButUnsignaledTests reads it to recover the verdict for an idle/dead test agent (nudge-once → auto-complete, never guessing pass/fail); (3) checkPendingTestDispatch stops burning the 3-retry budget on a live idle agent and surfaces a visible stuck marker instead of silently capping. The launcher-owned signal path is left untouched."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose to mirror review's CURRENT failsafe (artifact + deacon recovery) rather than the issue's primary recommendation to resurrect the launcher-owned signal (buildReviewSubRoleCommand).",
+        "rationale": "PAN-1557 abandoned the launcher-owned signal for review (reviewSignal: undefined at agents.ts:3046; convoy reviewers are interactive). The live, proven pattern is the Stop-hook + deacon failsafe reading a work-product artifact. Re-adding the dead pattern only for test would diverge from the live architecture and is the safer thing to avoid. Recorded as decision D1 and hazard H1."
+      },
+      {
+        "summary": "Verdict source of truth is a small work-product artifact .pan/test/result.json = {status, notes}, written by the test agent before it POSTs.",
+        "rationale": "Symmetric with reviewers writing report files / synthesis.md, which the review failsafe already reads. Captures BOTH gate result and UAT verdict in one place. Decision D2."
+      },
+      {
+        "summary": "Rejected re-running quality gates inside the deacon patrol to derive the verdict agent-independently.",
+        "rationale": "Simplicity-First: it duplicates the entire test role, is heavyweight inside the 60s patrol, and cannot capture the browser-UAT portion of the verdict. Decision D3."
+      },
+      {
+        "summary": "The failsafe never guesses pass/fail; it auto-completes only from an existing artifact, otherwise surfaces a stuck state.",
+        "rationale": "A false 'passed' would ship unverified code. A surfaced stuck state is the safe failure mode. Decisions D5/D6, hazard H2."
+      },
+      {
+        "summary": "The scoped test-completion nudge is consistent with the existing review failsafe nudge and is NOT the disabled broad nudge (deacon.ts:4828).",
+        "rationale": "checkCompletedButUnsignaledReviews already sends a deduplicated once-per-cycle scoped nudge in exactly this situation. The test twin mirrors that bounded behavior, so it does not re-open the flaky broad-nudge surface. Decision D4."
+      }
+    ],
+    "items": [
+      {
+        "id": "pan-1681-verdict-artifact",
+        "title": "Test role writes a deterministic verdict artifact (.pan/test/result.json) and clears it on dispatch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-08T17:35:46.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1681",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "pan-1681-failsafe"
+          ]
+        },
+        "narrative": {
+          "Action": "Establish the verdict-artifact contract that the deacon failsafe will read. In buildTestRolePrompt (src/lib/cloister/test-agent-queue.ts), add a REQUIRED step instructing the test agent to write the workspace file .pan/test/result.json with shape {\"status\":\"passed\"|\"failed\",\"notes\":\"...\"} immediately after it decides the verdict and BEFORE the existing curl POST to /api/review/:id/status. Clear any stale .pan/test/result.json at every test-dispatch site so a previous cycle's verdict can never be misread: in dispatchTestAgentAndNotifyPromise / the Effect dispatchTestAgentAndNotify (test-agent-queue.ts) and in the re-dispatch branch of checkPendingTestDispatch (src/lib/cloister/deacon.ts ~2262), mirroring how reviewer report/signal files are cleared at review-agent.ts:240-242. Do NOT touch launcher-generator.ts or the reviewSignal path (hazard H1)."
+        },
+        "subItems": [
+          {
+            "id": "pan-1681-verdict-artifact.ac1",
+            "title": "buildTestRolePrompt output contains a REQUIRED step to write .pan/test/result.json as {status,notes}, placed before the curl POST step",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1681-verdict-artifact.ac2",
+            "title": "Stale .pan/test/result.json is deleted before spawning a test agent at BOTH dispatch sites (test-agent-queue dispatch and deacon checkPendingTestDispatch re-dispatch)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1681-verdict-artifact.ac3",
+            "title": "A unit test asserts buildTestRolePrompt includes the .pan/test/result.json write instruction and its JSON shape",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1681-verdict-artifact.ac4",
+            "title": "launcher-generator.ts and the reviewSignal/buildReviewSubRoleCommand path are NOT modified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-1681-failsafe",
+        "title": "Add checkCompletedButUnsignaledTests deacon failsafe (mirrors checkCompletedButUnsignaledReviews)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-08T17:35:46.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1681",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add an exported async function checkCompletedButUnsignaledTests() in src/lib/cloister/deacon.ts, structurally mirroring checkCompletedButUnsignaledReviews (deacon.ts:2441): a SETTLE window (reuse the 5-minute constant pattern), a module-level dedup Map (mirror unsignaledReviewNudges) so each test cycle is nudged at most once, and the same guard discipline. For each issue with reviewStatus==='passed' and testStatus in {'testing','pending'}: resolve the workspace, locate .pan/test/result.json, and recover the verdict. When the test session agent-<id>-test is dead and the artifact exists → auto-complete via setReviewStatusSync({ testStatus: <status>, testNotes: <notes or default> }). When the session is alive but isAgentIdleForNudge reports idle past the settle window: on first pass nudge once (pan admin specialists done test <id> --status <status> [--notes ...], mirroring deacon.ts:2525); on a subsequent pass with the verdict still unsignaled, auto-complete from the artifact. When the artifact is ABSENT, never auto-complete to passed/failed — at most nudge once to write+POST. Skip closed issues (isIssueClosed) and stuck/ignored issues. Wire the function into the patrol loop in deacon.ts right after checkCompletedButUnsignaledReviews (~line 4790), pushing+logging its actions like the neighbours. Use vi.useFakeTimers in tests per the project's retry/delay test rule."
+        },
+        "subItems": [
+          {
+            "id": "pan-1681-failsafe.ac1",
+            "title": "checkCompletedButUnsignaledTests() is exported from deacon.ts with settle-window + dedup-Map structure mirroring checkCompletedButUnsignaledReviews",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1681-failsafe.ac2",
+            "title": "Only acts on issues with reviewStatus==='passed' && testStatus∈{'testing','pending'}; skips closed (isIssueClosed) and stuck/ignored issues; gates on isAgentIdleForNudge(agent-<id>-test) + settle window",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1681-failsafe.ac3",
+            "title": "Dead session + verdict artifact present → setReviewStatusSync auto-completes testStatus from the file; alive+idle → nudge once then auto-complete on the next pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1681-failsafe.ac4",
+            "title": "Absent verdict artifact never produces a guessed passed/failed; at most one scoped nudge per cycle (deduplicated)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1681-failsafe.ac5",
+            "title": "Function is invoked in the patrol loop right after checkCompletedButUnsignaledReviews, with actions pushed and addLog'd",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1681-failsafe.ac6",
+            "title": "Unit tests (vi.useFakeTimers) cover: passed-file+dead→auto-complete passed; failed-file→auto-complete failed; idle-alive+file→nudge-once-then-complete; missing-file→no passed/failed mutation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-1681-strand-surface",
+        "title": "Stop burning the 3-retry budget on a live idle test agent; surface the strand instead of silently capping",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-08T17:35:46.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1681",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Fix checkPendingTestDispatch (src/lib/cloister/deacon.ts:2205) so it no longer wastes the retry budget on an idle-but-alive test agent and no longer strands silently. (1) Only re-dispatch a fresh test agent AND increment testRetryCount when there is NO live test session (agent-<id>-test) for the issue; when a live session exists, do not spawn and do not increment — defer recovery to checkCompletedButUnsignaledTests. (2) When testRetryCount >= 3 and testStatus is still pending/dispatch_failed, replace the silent `if (retryCount >= 3) continue;` with a ONE-TIME visible stuck marker: setReviewStatusSync({ stuck: true, stuckReason: 'test_signal_strand', stuckAt: <iso>, testNotes: 'Test stranded at pending after 3 re-dispatches — test agent never signaled. See agent-<id>-test.' }) plus a pushed/logged action, set only once (don't re-stamp every patrol). Keep the existing PAN-1665 tryReserveAdvancingSlot() reservation and PAN-1496/PAN-1613 isIssueClosed() guards intact (hazard H5)."
+        },
+        "subItems": [
+          {
+            "id": "pan-1681-strand-surface.ac1",
+            "title": "checkPendingTestDispatch re-dispatches + increments testRetryCount ONLY when no live agent-<id>-test session exists; a live session is left for the failsafe (no spawn, no counter bump)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1681-strand-surface.ac2",
+            "title": "retryCount>=3 with testStatus still pending/dispatch_failed sets a one-time stuck marker (stuck:true, stuckReason:'test_signal_strand', actionable testNotes) instead of a silent continue, and does not re-stamp on every patrol",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1681-strand-surface.ac3",
+            "title": "Existing PAN-1665 advancing-slot reservation and PAN-1496/PAN-1613 closed-issue guard are preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1681-strand-surface.ac4",
+            "title": "Unit test asserts: retryCount>=3 → stuck marker set (not silent); a live idle test session is neither re-dispatched nor counted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "pan-1681-verdict-artifact",
+        "to": "pan-1681-failsafe",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-1681-failsafe",
+        "to": "pan-1681-strand-surface",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-08-PAN-1681-test-completion-failsafe-deterministic-verdict-artifact-checkcompletedbutunsignaledtests-3-retry-strand-surfacing.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

@@ -1,0 +1,125 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-08T23:20:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2359: reapMergedStrikeWorkspaces reaps FRESH strike workspaces (0 commits ahead of main looks 'merged')",
+    "updated": "2026-07-09T00:21:50.815Z"
+  },
+  "plan": {
+    "id": "pan-2359",
+    "title": "bug(deacon): reapMergedStrikeWorkspaces reaps FRESH strike workspaces (0 commits ahead of main looks 'merged')",
+    "status": "completed",
+    "uid": "f73e5cdb-dd13-405c-9130-14ca640d80f3",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 5,
+    "created": "2026-07-08T23:20:00.000Z",
+    "updated": "2026-07-09T00:21:50.815Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2359",
+        "label": "PAN-2359",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "deacon",
+      "strike",
+      "bugfix",
+      "cloister"
+    ],
+    "narratives": {
+      "Problem": "reapMergedStrikeWorkspaces (src/lib/cloister/strike-workspace-reaper.ts:79) reaps a strike/<id> worktree when its branch is `ahead == 0` (git rev-list --count origin/main..branch). But a freshly-created strike branch — `git worktree add -b strike/<id> <ws> origin/main` in src/cli/commands/strike.ts:116 — sits at origin/main's HEAD with 0 authored commits, so it is also `ahead == 0` and indistinguishable from a merged branch by ancestry. Because runOne creates the worktree (strike.ts:180) BEFORE spawning the tmux session (strike.ts:187), a deacon patrol landing in that window sees `ahead == 0` and no live strike session, and reaps the worktree out from under the spawning agent — dumping it onto `main` (worktree-drift). Observed 2026-07-04: strike-pan-2357 reaped seconds after spawn, agent landed on main, refused to edit, escalated, produced nothing. The harm is not lost commits (there are none) but yanking an in-use worktree.",
+      "Proposal": "Fix the reap predicate to require positive evidence the strike authored work that reached main, never merely `ahead == 0`. After the existing ahead check, add an authored-commits guard using `git rev-list --walk-reflogs --count <branch>`: skip (continue) when the count is <= 1. Empirically verified: a fresh branch has walk-reflogs count 1 (only 'branch: Created from origin/main'); a branch that authored a commit and ff-merged has count 2 while ahead stays 0 (the reflog is append-only and never shrinks on merge). So the reaper reaps only when `ahead == 0` AND `walk-reflogs count > 1`. Correct the module-header safety comment to describe the new invariant ('authored commits, all now in origin/main'). Extend the unit test exec mock to answer the new command and add regression tests. The guard errs safe: if the reflog is unavailable/expired the count reads 1 or the command errors (existing catch -> continue), so a merged branch would merely leak, never a fresh branch wrongly reaped.",
+      "NonGoals": "- No worktree-age grace window / timer (a band-aid on the spawn-race symptom; the reflog guard fixes the predicate at root cause).\n- No change to strike spawn ordering (ensureStrikeWorktree before spawnAgent).\n- No GitHub PR merged-state lookup (strikes ff-merge and open no PR, so PR state is not a usable signal).\n- No fix for the narrow reused-stale-branch corner (a prior merged strike/<id> branch whose `git branch -D` was skipped, re-checked-out for a new strike during the spawn window) — pre-existing, out of scope, recorded as a hazard.\n- Never touch feature/* worktrees or any non-strike branch."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Use `git rev-list --walk-reflogs --count <branch>` (authored-commits count) as the fresh-vs-merged discriminator.",
+        "rationale": "Ancestry (ahead==0) cannot distinguish a fresh branch from a ff-merged one; both have their tip contained in origin/main. The issue explicitly directs 'Guard on had-commits AND they are all in main'. The reflog count is exactly that signal and was empirically verified (fresh=1, merged=2 while ahead stays 0). Rejected GitHub PR-state (strikes open no PR) and a worktree-age grace window (a timer band-aid)."
+      },
+      {
+        "summary": "Keep the fix surgical: one predicate guard + module-header comment + regression tests, in one bead.",
+        "rationale": "The change is a genuinely indivisible unit — the tests prove the guard and the comment is the same diff. The spawn-race and reused-stale-branch corners are captured as hazards/NonGoals rather than expanded into scope, per surgical-change discipline."
+      }
+    ],
+    "items": [
+      {
+        "id": "guard-authored-commits",
+        "title": "Guard strike reap on authored commits (walk-reflogs > 1), not just ahead==0",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-08T23:20:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2359",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/strike-workspace-reaper.ts",
+            "src/lib/cloister/__tests__/strike-workspace-reaper.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/cloister/__tests__/strike-workspace-reaper.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "strike-workspace-reaper.test.ts passes including the new fresh-branch regression tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/strike-workspace-reaper.ts, inside reapMergedStrikeWorkspaces, AFTER the existing `if (ahead !== '0') continue;` check (line ~79), add an authored-commits guard. Run `git rev-list --walk-reflogs --count <branch>` (quote the branch with JSON.stringify, cwd: projectRoot, encoding: 'utf-8'); on error `continue` (leave for a future patrol). Parse the trimmed stdout as a number; if it is <= 1 `continue` (a never-committed branch — fresh strike, e.g. worktree add -b strike/<id> ... origin/main sits at main with a single 'Created from origin/main' reflog entry). Only when the count > 1 proceed to the existing `git worktree remove` + `git branch -D` reap. Update the module-header block comment (lines ~1-16) so the safety invariant reads that a worktree is reaped only when its branch AUTHORED commits that are now all in origin/main (walk-reflogs > 1 AND ahead == 0) and no live strike session exists — replacing the current '0 commits ahead — nothing unmerged is ever lost' wording which conflates fresh with merged. In src/lib/cloister/__tests__/strike-workspace-reaper.test.ts, extend wireExec to answer the new command: match `cmd.includes('--walk-reflogs --count')` BEFORE the existing `cmd.includes('rev-list --count')` branch (the new command also contains 'rev-list' but not the contiguous 'rev-list --count'); return a per-branch reflog count from a new `reflogByBranch` param defaulting to '2' (merged-like) so existing tests keep reaping. Add regression tests per the acceptance criteria."
+        },
+        "items": [
+          {
+            "id": "guard-authored-commits.ac1",
+            "title": "Given a strike branch with ahead==0 and walk-reflogs count '1' (fresh, never committed) and no live session, reapMergedStrikeWorkspaces does NOT run `git worktree remove` for it and returns no action for that worktree.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-authored-commits.ac2",
+            "title": "Given a strike branch with ahead==0 and walk-reflogs count '2' (authored+merged) and no live session, reapMergedStrikeWorkspaces still runs `git worktree remove` AND `git branch -D` for it (PAN-1882 cleanup preserved).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-authored-commits.ac3",
+            "title": "Given the `git rev-list --walk-reflogs --count` command throws for a branch, reapMergedStrikeWorkspaces skips that worktree (does not run `git worktree remove`) and continues to other worktrees.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-authored-commits.ac4",
+            "title": "The module-header comment in strike-workspace-reaper.ts states the reap condition as authored commits now all in origin/main (walk-reflogs > 1 AND ahead == 0), not '0 commits ahead'; npm run typecheck completes without errors.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-07-08-PAN-2359-bug-deacon-reapmergedstrikeworkspaces-reaps-fresh-strike-workspaces-0-commits-ahead-of-main-looks-merged.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

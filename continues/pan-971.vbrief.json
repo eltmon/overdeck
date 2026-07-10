@@ -1,0 +1,39 @@
+{
+  "version": "1",
+  "issueId": "PAN-971",
+  "created": "2026-05-07T18:36:41.511Z",
+  "updated": "2026-05-10T04:54:25.259Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "feedback": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-05-07T18:36Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-07T18:36:41.511Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-07T18:48Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-05-07T18:48:06.251Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-07T20:02Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-07T20:02:06.166Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-07T20:52Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-07T20:52:50.355Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-07T21:34Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-07T21:34:23.179Z"
+    }
+  ]
+}

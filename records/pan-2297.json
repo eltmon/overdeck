@@ -1,0 +1,225 @@
+{
+  "issueId": "PAN-2297",
+  "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T00:24:07.790Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T01:15:17.059Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T01:15:17.317Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-08T01:32:33.593Z"
+    },
+    {
+      "timestamp": "2026-07-08T01:52:29.009Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    }
+  ],
+  "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".beads/export-state.json",
+      ".beads/issues.jsonl",
+      ".pan/drafts/pan-2297.md",
+      ".pan/records/pan-2296.json",
+      ".pan/records/pan-2297.json",
+      "sync-sources/hooks/record-cost-event.js.map"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "src/lib/cloister/file-size-reconcile.ts",
+      "src/lib/cloister/uat-promote.ts",
+      "tests/unit/lib/cloister/file-size-reconcile.test.ts",
+      "tests/unit/lib/cloister/uat-promote-baseline.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".beads/export-state.json",
+      ".beads/issues.jsonl",
+      ".pan/drafts/pan-2297.md",
+      ".pan/records/pan-2296.json",
+      ".pan/records/pan-2297.json",
+      "src/lib/cloister/file-size-reconcile.ts",
+      "src/lib/cloister/uat-promote.ts",
+      "sync-sources/hooks/record-cost-event.js.map",
+      "tests/unit/lib/cloister/file-size-reconcile.test.ts",
+      "tests/unit/lib/cloister/uat-promote-baseline.test.ts"
+    ],
+    "recordedAt": "2026-07-08T01:52:00.005Z"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "reconcile-helper": "completed",
+    "reconcile-helper.ac1": "completed",
+    "reconcile-helper.ac2": "completed",
+    "reconcile-helper.ac3": "completed",
+    "reconcile-helper.ac4": "completed",
+    "wire-into-promote": "completed",
+    "wire-into-promote.ac1": "completed",
+    "wire-into-promote.ac2": "completed",
+    "wire-into-promote.ac3": "completed",
+    "wire-into-promote.ac4": "completed",
+    "reproduce-integration-test": "completed",
+    "reproduce-integration-test.ac1": "completed",
+    "reproduce-integration-test.ac2": "completed",
+    "reproduce-integration-test.ac3": "completed"
+  },
+  "pipeline": {
+    "issueId": "PAN-2297",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
+    "inspectStatus": "passed",
+    "mergeStatus": "merged",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-08T03:57:09.409Z",
+    "testNotes": "typecheck passed; lint passed (skills, prompts, file-size, source-introspection, no-coderabbit-merge-gate, circular, ratchet-audit, quarantine-audit); tests passed: file-size-reconcile.test.ts (3/3), uat-promote.test.ts (10/10), uat-promote-baseline.test.ts (1/1 real-git integration reproducing PAN-2296). No browser UAT required — acceptance criteria are backend/git/CI only.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2482",
+    "reviewedAtCommit": "272061e8ce421bc5984ef00abbc8501c5ab78341",
+    "lastVerifiedCommit": "f10d394daf193102f72494a95069720ae1f3c7ee",
+    "reviewRequestedAt": "2026-07-08T01:32:20.693Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 7957645,
+            "output": 12037,
+            "cacheRead": 7053312,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.5": {
+            "input": 37011301,
+            "output": 75911,
+            "cacheRead": 34975104,
+            "cacheWrite": 0
+          },
+          "unknown": {
+            "input": 8749389,
+            "output": 21363,
+            "cacheRead": 8237696,
+            "cacheWrite": 0
+          }
+        },
+        "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 4751,
+            "output": 18761,
+            "cacheRead": 23483673,
+            "cacheWrite": 30050
+          },
+          "openai/gpt-5.5": {
+            "input": 54508,
+            "output": 581,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "inspect": {
+          "openai/gpt-5.5": {
+            "input": 266142,
+            "output": 7236,
+            "cacheRead": 977920,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 8690,
+            "output": 268,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 15732,
+            "output": 32515,
+            "cacheRead": 3068380,
+            "cacheWrite": 145060
+          }
+        },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 450375,
+            "output": 5719,
+            "cacheRead": 2189568,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/codex-auto-review": {
+          "input": 7957645,
+          "output": 12037,
+          "cacheRead": 7053312,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.5": {
+          "input": 37331951,
+          "output": 83728,
+          "cacheRead": 35953024,
+          "cacheWrite": 0
+        },
+        "unknown": {
+          "input": 8749389,
+          "output": 21363,
+          "cacheRead": 8237696,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 4751,
+          "output": 18761,
+          "cacheRead": 23483673,
+          "cacheWrite": 30050
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 8690,
+          "output": 268,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 15732,
+          "output": 32515,
+          "cacheRead": 3068380,
+          "cacheWrite": 145060
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 450375,
+          "output": 5719,
+          "cacheRead": 2189568,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 66.575753,
+        "pricingAsOf": "2026-07-08T03:57:09.432Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2482"
+    ],
+    "ranOn": "eltmon-z790"
+  },
+  "swarm": {
+    "slotAssignments": [],
+    "finalizedAt": "2026-07-08T01:15:23.672Z"
+  },
+  "created": "2026-07-07T23:25:44.874Z",
+  "updated": "2026-07-08T03:57:09.433Z"
+}

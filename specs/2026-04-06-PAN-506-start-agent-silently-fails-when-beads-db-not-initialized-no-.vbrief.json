@@ -1,0 +1,191 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-06T20:00:00Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-506: Start Agent silently fails when beads DB not initialized — no error shown to user"
+  },
+  "plan": {
+    "id": "pan-506",
+    "title": "Start Agent silently fails when beads DB not initialized — no error shown to user",
+    "status": "approved",
+    "uid": "3b98c7fa-5962-47f0-a8cd-234336f4826f",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-04-06T20:00:00Z",
+    "updated": "2026-04-06T20:00:00Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/506",
+        "label": "PAN-506",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "bug",
+      "ux",
+      "beads",
+      "dashboard"
+    ],
+    "narratives": {
+      "Problem": "Clicking Start Agent silently fails when the beads Dolt DB is not initialized. The API returns 422 but the frontend shows only tiny inline text — no toast. The root cause is complete-planning silently swallowing beads creation failures.",
+      "Proposal": "Fix at all layers: (1) complete-planning surfaces beads warnings in its response, (2) Start Agent shows toast.error on failure, (3) auto-recovery includes specific error details in the 422, (4) beads.ts auto-init is more robust."
+    },
+    "items": [
+      {
+        "id": "frontend-toast",
+        "title": "Add toast.error() to Start Agent mutation and complete-planning response handling",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-06T20:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-506"
+        },
+        "narrative": {
+          "Action": "In InspectorPanel.tsx, add onError callback to startAgentMutation that calls toast.error() with the error message. In the complete-planning success handler, check for beadsWarning in the response and show toast.warning() if present. Keep existing inline error display in ActionsSection.tsx as fallback."
+        },
+        "subItems": [
+          {
+            "id": "frontend-toast.ac1",
+            "title": "Start Agent 422 shows a toast.error() notification visible without scrolling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-toast.ac2",
+            "title": "Toast message includes the specific error reason from the API response",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-toast.ac3",
+            "title": "Inline error display still renders below the button as backup",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "complete-planning-warning",
+        "title": "Surface beads creation failure as warning in complete-planning response",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-06T20:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-506"
+        },
+        "narrative": {
+          "Action": "In issues.ts complete-planning handler, when createBeadsFromVBrief fails or returns success:false, include a beadsWarning field in the JSON response with the specific error. Don't fail the endpoint (planning artifacts are valid), but make the problem visible so the frontend can alert the user immediately rather than waiting until Start Agent."
+        },
+        "subItems": [
+          {
+            "id": "complete-planning-warning.ac1",
+            "title": "complete-planning response includes beadsWarning when beads creation fails",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "complete-planning-warning.ac2",
+            "title": "Endpoint still returns 200 (planning succeeded) but with warning payload",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-422-detail",
+        "title": "Include auto-recovery failure reason in Start Agent 422 response",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-06T20:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-506"
+        },
+        "narrative": {
+          "Action": "In agents.ts POST /api/agents, capture the specific error from createBeadsFromVBrief auto-recovery and include it in the 422 response body. Currently the error is only console.warn'd. Add a recoveryError field so the toast can show 'bd CLI not found' or 'database init failed' instead of generic 'beads creation failed'."
+        },
+        "subItems": [
+          {
+            "id": "agent-422-detail.ac1",
+            "title": "422 response includes recoveryError field with the specific failure reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-422-detail.ac2",
+            "title": "Frontend toast displays the recovery error detail when available",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "beads-init-harden",
+        "title": "Harden beads.ts auto-initialization when redirect exists but DB is missing",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-06T20:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-506"
+        },
+        "narrative": {
+          "Action": "In beads.ts createBeadsFromVBrief, the current flow skips bd init if .beads/redirect exists (line 52), then catches DB connectivity failure (line 87-102) and attempts bd init --prefix. But if that init also fails, it logs a warning and continues to attempt bead creation which inevitably fails. Fix: when redirect exists but DB connectivity fails AND bd init --prefix fails, return early with a clear error instead of attempting doomed bead creation. Also ensure the error messages are specific enough for callers to surface to users."
+        },
+        "subItems": [
+          {
+            "id": "beads-init-harden.ac1",
+            "title": "When redirect exists but DB is unreachable and init fails, function returns early with specific error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "beads-init-harden.ac2",
+            "title": "Error messages distinguish between 'bd not in PATH', 'Dolt server not running', and 'database init failed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "beads-init-harden",
+        "to": "agent-422-detail",
+        "type": "informs"
+      },
+      {
+        "from": "complete-planning-warning",
+        "to": "frontend-toast",
+        "type": "informs"
+      },
+      {
+        "from": "agent-422-detail",
+        "to": "frontend-toast",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "proposed"
+}

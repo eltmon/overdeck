@@ -1,0 +1,580 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-05T17:59:46.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2383: editable per-issue Standing Crew toggle on the issue view — upgrade PAN-2378's read-only chip",
+    "updated": "2026-07-05T18:07:10.830Z"
+  },
+  "plan": {
+    "id": "pan-2383",
+    "title": "feat(dashboard): editable per-issue Standing Crew toggle on the issue view — upgrade PAN-2378's read-only chip",
+    "status": "proposed",
+    "uid": "e18b3e29-6d92-4543-9f2f-d405902d5f2d",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-07-05T17:59:46.000Z",
+    "updated": "2026-07-05T18:07:10.830Z",
+    "metadata": {
+      "tiered_execution": "on",
+      "canonicalFilename": "2026-07-05-PAN-2383-feat-dashboard-editable-per-issue-standing-crew-toggle-on-the-issue-view-upgrade-pan-2378-s-read-only-chip.vbrief.json"
+    },
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2383",
+        "label": "PAN-2383",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2378",
+        "label": "PAN-2378",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "tiered-execution",
+      "standing-crew",
+      "frontend",
+      "backend"
+    ],
+    "narratives": {
+      "Problem": "The per-issue tiered-execution override already resolves (resolveTieredExecutionEnabled, tier-table.ts:124) and PAN-2378 shipped a READ-ONLY chip on the issue view (PlanCard.tsx:66-75). But there is no way to flip the override from the UI and no write door for it: the vBRIEF spec on main is immutable after planning (PAN-1124), so plan.metadata.tiered_execution cannot be edited in place. Operators can only set the override at planning time; they need to turn the Standing Crew on/off for a single issue AFTER planning.",
+      "Proposal": "Give the per-issue override a mutable home in the per-issue record (.pan/records/<issue>.json), new field tieredExecutionOverride?: 'on'|'off' (unset = inherit), persisted through the existing writeRecord* write-door family. Extend resolveTieredExecutionEnabled so precedence is record override > plan.metadata.tiered_execution > global flag (fail-loud, no hardcoded fallback), add an issue-aware wrapper mirroring resolveReviewMode, thread it into dispatch, surface resolved effective state + source through the plan read door, add a PATCH write door, and make the issue-view chip an editable on/off/inherit control. Storage home is the record (not continue.json) because it is durable, git-traveling, and already the home for per-issue overrides that beat global config (reviewMode). Mid-flight flips affect subsequent dispatches only.",
+      "NonGoals": "- Editing the tier table / schema / dispatch behavior (PAN-1791 / PAN-2222 / PAN-2283 territory).\n- Per-project tiered-execution editing or a per-project Settings surface (global Settings is PAN-2378's, unchanged).\n- A second 'issue inspector' surface for the control — InspectorPanel is a defunct era (StatusHistoryTab.tsx:29); the canonical control lives in the cockpit PlanCard.tsx (the issue view).\n- Mutating plan.metadata in place or writing to the vBRIEF spec file (PAN-1124); the inspection-policy PATCH's direct-spec-write is a structural template only, not the storage target.\n- Retroactively re-dispatching or killing in-flight tier sessions on a flip (mid-flight = subsequent dispatches only).\n- A pan CLI command for the override (UI toggle is the requirement; a CLI can follow later mirroring pan review mode)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Storage home = the per-issue record (.pan/records/<issue>.json), new field tieredExecutionOverride — not continue.json.",
+        "rationale": "Durable, travels with git, already the canonical home for per-issue overrides that beat global config (reviewMode). continue.json is workspace-scoped/ephemeral and its tierOverrides map is a different escalation concept. Matches the issue's candidate-#1 preference."
+      },
+      {
+        "summary": "Single control surface = the cockpit PlanCard.tsx (issue view); no separate inspector bead.",
+        "rationale": "InspectorPanel is a defunct era (StatusHistoryTab.tsx:29 comment); no live inspector renders issue tiered state. Acceptance criterion #1 targets the issue view where the chip renders."
+      },
+      {
+        "summary": "Read door computes precedence server-side and returns { effective, source, override }.",
+        "rationale": "Single-source-of-truth: the frontend stops computing precedence client-side; the resolver is the one read path for effective state."
+      },
+      {
+        "summary": "Write door persists to the RECORD via writeRecord*, not to the spec file.",
+        "rationale": "The inspection-policy PATCH direct-spec-write is a structural template only; copying its storage target would violate PAN-1124 spec immutability."
+      },
+      {
+        "summary": "Mid-flight = subsequent dispatches only; no kill/re-dispatch of in-flight tier sessions on a flip.",
+        "rationale": "Dispatch reads the record fresh at each spawn (mirroring resolveReviewMode); the PATCH mutates the record and returns without touching tmux/agents."
+      },
+      {
+        "summary": "New field named tieredExecutionOverride (not tierOverride/tierOverrides).",
+        "rationale": "Avoids conflation with escalation's per-bead effective-difficulty tierOverrides map (tier-replay.ts:60)."
+      },
+      {
+        "summary": "This issue dogfoods the override: plan.metadata.tiered_execution = 'on'.",
+        "rationale": "Operator mandate (RUN-56): PAN-2383 is built BY the Standing Crew via the per-issue override, exercising all three tiers + escalation on film."
+      }
+    ],
+    "items": [
+      {
+        "id": "design-override-home",
+        "title": "Record-backed override home + resolver precedence extension",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-05T17:59:46.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2383",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "dispatch-wiring",
+            "api-read-door",
+            "api-write-door"
+          ],
+          "files_scope": [
+            "src/lib/pan-dir/record.ts",
+            "src/lib/agents/tier-table.ts",
+            "src/lib/agents/__tests__/per-issue-tier-override.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/per-issue-tier-override.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "per-issue-tier-override.test.ts passes including new record-precedence cases"
+          ],
+          "readiness": "ready",
+          "readinessReason": "Foundation bead runs first in wave 0; no sibling touches record.ts or tier-table.ts, so it is parallel-safe by construction.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a mutable per-issue override field tieredExecutionOverride?: 'on' | 'off' to interface PanIssueRecord in src/lib/pan-dir/record.ts (next to reviewMode at :139, unset = inherit). Add write-door setters writeRecordTieredExecutionOverrideSync (+ async) modeled on writeRecordScopeDriftSync (record.ts:607: ensureIssueRecordSync -> mutate field -> writeIssueRecordSync -> queueIssueRecordCommit); passing null/undefined clears the field (back to inherit). Extend resolveTieredExecutionEnabled (tier-table.ts:124) to accept the record override with precedence record override > planMetadata.tiered_execution > config.enabled — reuse the existing 'on'/'off'/throw fail-loud logic for the record value; unset record override must preserve today's behavior byte-for-byte. Add an issue-aware wrapper resolveTieredExecutionEnabledForIssue(issueId, planMetadata) that reads the record via readIssueRecordSync (mirroring resolveReviewMode at review-agent.ts:890) and calls the extended core. Extend per-issue-tier-override.test.ts with the record-precedence matrix. Foundation: dispatch-wiring, api-read-door, and api-write-door all encode assumptions about this field name, value domain, and precedence."
+        },
+        "items": [
+          {
+            "id": "design-override-home.ac1",
+            "title": "PanIssueRecord exposes tieredExecutionOverride?: 'on' | 'off'; the new writeRecord* setter persists it and queues the record auto-commit; passing null clears it back to inherit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "design-override-home.ac2",
+            "title": "resolveTieredExecutionEnabled returns the record override when set ('on'->true, 'off'->false) regardless of plan-metadata or global flag; when record override is unset it returns exactly the pre-existing plan-metadata>global result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "design-override-home.ac3",
+            "title": "An invalid stored override value throws TieredExecutionConfigError rather than silently inheriting (fail-loud, no hardcoded fallback)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "design-override-home.ac4",
+            "title": "resolveTieredExecutionEnabledForIssue reads the per-issue record via readIssueRecordSync and applies record>plan-metadata>global; per-issue-tier-override.test.ts passes with the added record-precedence cases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dispatch-wiring",
+        "title": "Honor the record override in live agent dispatch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-05T17:59:46.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2383",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/spawn-prep.ts",
+            "src/lib/agents/dispatch-tier.ts",
+            "src/lib/cloister/inspect-agent.ts",
+            "src/dashboard/server/routes/tiered-inspect-escalation.ts",
+            "src/dashboard/server/routes/tiered-callouts.ts",
+            "src/lib/agents/__tests__/dispatch-record-override.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/dispatch-record-override.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "dispatch-record-override.test.ts asserts the record override flips the resolved enabled state on the next spawn"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Thread the issue id + record override into the two dispatch functions in src/lib/agents/spawn-prep.ts — resolveSlotTierSpawnParams (:211-236, resolve call :225) and resolveSingleWorkTierSpawnParams (:246-265, resolve call :257) — so live dispatch honors the record override on the next spawn. These functions currently receive workspace/baseWorkspace but not the issue id; derive or pass it (the issue id is recoverable from the workspace path / plan doc) and call resolveTieredExecutionEnabledForIssue instead of the bare resolver. Apply the same issue-aware resolution at the other issue-scoped call sites for consistency: dispatch-tier.ts:66, cloister/inspect-agent.ts:156, routes/tiered-inspect-escalation.ts:51, routes/tiered-callouts.ts:137. Add/extend a dispatch unit test proving a record override 'off' disables tiered dispatch even when global+plan-metadata say on (and vice-versa)."
+        },
+        "items": [
+          {
+            "id": "dispatch-wiring.ac1",
+            "title": "Both spawn-prep dispatch functions resolve tiered-enabled via the issue-aware resolver so a record override 'off' disables tiered dispatch on the next spawn even when the global flag and plan-metadata are 'on'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dispatch-wiring.ac2",
+            "title": "A record override 'on' enables tiered dispatch on the next spawn even when the global flag is off, matching resolveTieredExecutionEnabledForIssue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dispatch-wiring.ac3",
+            "title": "For a given record override, the inspect-agent, tiered-inspect-escalation, and tiered-callouts paths each return the same effective enabled value as the dispatch path (a test flips the override and asserts all sites agree)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "api-read-door",
+        "title": "Plan read door returns resolved tieredExecution block",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-05T17:59:46.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-2383",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/workspace-data.ts",
+            "src/dashboard/server/routes/workspaces/__tests__/tiered-execution-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/routes/workspaces/__tests__/tiered-execution-route.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tiered-execution-route.test.ts asserts the tieredExecution block with correct source for record-override / plan-metadata / global cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend getWorkspacePlanRoute (GET /api/workspaces/:issueId/plan, src/dashboard/server/routes/workspaces/workspace-data.ts:763-786) so its JSON response includes a computed tieredExecution: { effective: boolean, source: 'issue-override' | 'plan-metadata' | 'global', override: 'on' | 'off' | null } block. Compute effective via resolveTieredExecutionEnabledForIssue(issueId, plan.metadata) with the global tieredExecution config; compute source by precedence: record override set -> 'issue-override'; else plan.metadata.tiered_execution set -> 'plan-metadata'; else 'global'; override = the raw record value or null. Keep the existing spread response shape intact (additive field). Add a route test covering all three source cases."
+        },
+        "items": [
+          {
+            "id": "api-read-door.ac1",
+            "title": "GET /api/workspaces/:issueId/plan returns a tieredExecution { effective, source, override } object alongside the existing plan doc fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-read-door.ac2",
+            "title": "The response returns source 'issue-override' when a record override is set, 'plan-metadata' when only plan.metadata.tiered_execution is set, and 'global' when neither is set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-read-door.ac3",
+            "title": "The response returns effective equal to resolveTieredExecutionEnabledForIssue for the issue and override equal to the raw record value or null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "api-write-door",
+        "title": "PATCH write door persists the override to the record",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-05T17:59:46.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-2383",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/workspace-data.ts",
+            "src/dashboard/server/routes/workspaces/__tests__/tiered-execution-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/routes/workspaces/__tests__/tiered-execution-route.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tiered-execution-route.test.ts asserts persist round-trip, 400 on invalid input, and that no agent is signalled"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a new route patchWorkspaceTieredExecutionRoute = PATCH /api/workspaces/:issueId/tiered-execution, mirroring the structure of patchWorkspacePlanInspectionPolicyRoute (workspace-data.ts:822-870): requireTrustedMutationOrigin(request) first, parseIssueIdSync, readJsonBody, then validate body.override against the allow-list 'on' | 'off' | null (400 'Invalid tiered-execution override' otherwise). Persist via the writeRecordTieredExecutionOverride setter from design-override-home (null clears -> inherit) — NOT by writing the spec file. Return the updated computed tieredExecution block (same shape as the read door). Register the route in the workspaceDataRouteLayer Layer.mergeAll list (:917-925). The handler must NOT signal, kill, or resume any agent (mid-flight = subsequent dispatches only). Add a route test: valid persist round-trip, invalid value -> 400, and an assertion that no agent lifecycle call is made."
+        },
+        "items": [
+          {
+            "id": "api-write-door.ac1",
+            "title": "PATCH /api/workspaces/:issueId/tiered-execution with { override: 'on' | 'off' | null } persists via the record write door and returns the updated tieredExecution block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-write-door.ac2",
+            "title": "The PATCH rejects an override value outside 'on' | 'off' | null with HTTP 400 and preserves the existing record (no mutation)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-write-door.ac3",
+            "title": "A persisted override survives a fresh read (round-trip via readIssueRecordSync / the read door) and the handler makes no agent lifecycle call (no kill/signal/resume)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-write-door.ac4",
+            "title": "A PATCH without a trusted mutation origin returns the origin-error response, while a valid PATCH through the registered route returns HTTP 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fe-effective-chip",
+        "title": "Chip renders server-computed effective state + source",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-05T17:59:46.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2383",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "PlanCard.test.tsx passes with the server-sourced label assertions"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In cockpit PlanCard.tsx, stop computing the label from plan.metadata + settings client-side (drop the tieredChipLabel(override, globalEnabled) precedence compute at :21-25/:38-39) and instead read the server-computed tieredExecution.{effective,source} block now returned by useWorkspacePlanQuery (api-read-door). Render the same muted chip text (e.g. 'tiered: on (issue override)' / 'tiered: off (global)') derived from effective+source. Keep it read-only in THIS bead (still the <a>/muted display); the interactive control is fe-editable-toggle. Update PlanCard.test.tsx assertions to the server-sourced shape."
+        },
+        "items": [
+          {
+            "id": "fe-effective-chip.ac1",
+            "title": "PlanCard renders the chip text from the server tieredExecution.{effective,source} block, not from a client-side precedence compute over plan.metadata + settings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-effective-chip.ac2",
+            "title": "The chip shows the correct label for each source: 'issue override', 'plan metadata', and 'global', matching the server block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-effective-chip.ac3",
+            "title": "PlanCard.test.tsx passes with assertions against the server-sourced label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fe-editable-toggle",
+        "title": "Editable on/off/inherit control on the issue view",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-05T17:59:46.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2383",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/Stage/cockpit/PlanCard.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "PlanCard.test.tsx passes including the toggle round-trip test"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Turn the read-only chip in PlanCard.tsx into an editable on/off/inherit control (a muted <select> or small button group per pan-style-guide — no decorative color). On change, PATCH /api/workspaces/:issueId/tiered-execution via a useMutation modeled on updateInspectionPolicy (VBriefTab.tsx:34-47): raw fetch PATCH with { override }, and on success queryClient.setQueryData(['workspace-plan', issueId], updated) for an optimistic/live update so the effective label reflects the new value immediately. Keep the docs link accessible (e.g. a small adjacent link or tooltip) so the read-only-era doc affordance is not lost. Add a toggle round-trip test to PlanCard.test.tsx: render, change the control to 'off', assert the PATCH fetch fired with { override: 'off' } and the label updated from the mutation response."
+        },
+        "items": [
+          {
+            "id": "fe-editable-toggle.ac1",
+            "title": "The issue-view control renders on / off / inherit options and, on selection, emits a PATCH /api/workspaces/:issueId/tiered-execution carrying the chosen { override } ('on' | 'off' | null)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-editable-toggle.ac2",
+            "title": "On a successful PATCH the effective label updates immediately via setQueryData on ['workspace-plan', issueId] without a manual refetch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-editable-toggle.ac3",
+            "title": "The control renders with muted styling (no decorative color, pan-style-guide) and renders a reachable docs link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-editable-toggle.ac4",
+            "title": "Selecting 'off' and re-rendering from the mutation response renders the 'off' label (round-trip test in PlanCard.test.tsx passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-note",
+        "title": "Document the editable per-issue override",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-05T17:59:46.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-2383",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TIERED-EXECUTION.md",
+            "CHANGELOG.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git diff --name-only"
+          ],
+          "expected_outputs": [
+            "docs/TIERED-EXECUTION.md and CHANGELOG.md show the editable-override edits"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Update docs/TIERED-EXECUTION.md: rewrite the read-only-chip note (currently at :70, 'Editing that override from the UI is intentionally not supported...') to state the per-issue override is now editable from the issue view, persisted to the per-issue record (.pan/records/<issue>.json), and that precedence is record override > plan.metadata.tiered_execution > global flag. Add a bullet to the Resolution Chain / configuration section documenting the record home and precedence. Add a CHANGELOG.md entry under the current unreleased/next section noting the editable per-issue Standing Crew toggle on the issue view (PAN-2383)."
+        },
+        "items": [
+          {
+            "id": "docs-note.ac1",
+            "title": "Grepping docs/TIERED-EXECUTION.md returns matches for the record-backed editable override and the record>plan-metadata>global precedence, and returns no match for the old 'intentionally not supported' sentence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-note.ac2",
+            "title": "Grepping CHANGELOG.md returns a PAN-2383 entry for the editable per-issue Standing Crew toggle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "design-override-home",
+        "to": "dispatch-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "design-override-home",
+        "to": "api-read-door",
+        "type": "blocks"
+      },
+      {
+        "from": "design-override-home",
+        "to": "api-write-door",
+        "type": "blocks"
+      },
+      {
+        "from": "api-read-door",
+        "to": "api-write-door",
+        "type": "blocks"
+      },
+      {
+        "from": "api-read-door",
+        "to": "fe-effective-chip",
+        "type": "blocks"
+      },
+      {
+        "from": "api-read-door",
+        "to": "fe-editable-toggle",
+        "type": "blocks"
+      },
+      {
+        "from": "api-write-door",
+        "to": "fe-editable-toggle",
+        "type": "blocks"
+      },
+      {
+        "from": "fe-effective-chip",
+        "to": "fe-editable-toggle",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

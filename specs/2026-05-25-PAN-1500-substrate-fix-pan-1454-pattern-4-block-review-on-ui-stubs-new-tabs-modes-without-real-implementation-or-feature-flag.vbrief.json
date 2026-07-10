@@ -1,0 +1,465 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-25T14:55:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1500: Substrate fix (PAN-1454 pattern 4): block review on UI stubs (new tabs/modes without real implementation or feature flag)",
+    "updated": "2026-05-25T14:51:32.336Z"
+  },
+  "plan": {
+    "id": "pan-1500",
+    "title": "Substrate fix (PAN-1454 pattern 4): block review on UI stubs (new tabs/modes without real implementation or feature flag)",
+    "status": "proposed",
+    "uid": "af8a0c59-6246-4fa7-8a2f-0f270673b2ef",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-25T14:55:00.000Z",
+    "updated": "2026-05-25T14:51:32.336Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1500",
+        "label": "PAN-1500",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1454",
+        "label": "PAN-1454 (parent META)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1389",
+        "label": "PAN-1389 (audit example)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1231",
+        "label": "PAN-1231 (audit example)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "substrate-improvement",
+      "review-pipeline",
+      "lint",
+      "scope-creep"
+    ],
+    "narratives": {
+      "Problem": "Issues close with merged UI affordances (new tabs, segmented-control modes, top-level views) whose data hooks return [] or null, whose handlers no-op, or whose templates carry 'coming soon' copy. The operator sees the chrome and assumes the feature works. The 80-issue audit caught at least three live examples (PAN-1389 Files/Comments tabs, PAN-1231 Table/Timeline modes, PAN-1148 orphan tabs). Neither the correctness reviewer (looking for runtime bugs) nor the requirements reviewer (looking for missing ACs) currently has a mechanical signal that 'a new tab exists but does nothing' is happening — both readers can miss it inside a large diff. The review pipeline needs a deterministic scan that flags these additions and a reviewer prompt that BLOCKS unless the diff also shows a feature-flag check, surface removal, or non-stub implementation.",
+      "Proposal": "Add a typed pattern catalog (STUB_UI_PATTERNS) and a workspace-scoped scanner (scanStubUi) under src/lib/cloister/. The scanner reads the PR diff via git, restricts to UI-affordance file globs (*Tab.tsx, *Mode.tsx, *View.tsx and dashboard component additions), and emits structured findings against added (+) lines only. Wire the scanner into buildReviewContextPromise so each review run persists findings on the manifest as 'stubUiFindings' and surfaces them in the Tier-1 inline summary all four convoy reviewers receive. Extend roles/review-requirements.md with a Stub UI BLOCKING rule that names the manifest field, enumerates the three valid mitigations (feature flag, removal, non-stub implementation), and slots findings into the existing Coverage Matrix output. Synthetic git-fixture tests prove the scanner flags PAN-1389-style and PAN-1231-style additions and stays quiet on mitigated/non-UI diffs. Scope is intentionally limited to PR additions — no whole-repo static analysis."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Owner reviewer is review-requirements.md (not review-correctness.md).",
+        "rationale": "Stubs are scope creep — already named in review-requirements.md's scope list. Correctness covers runtime/logic bugs; a stub that compiles is a scope failure, not a correctness failure. The issue body left the choice open between the two prompts; requirements is the better fit."
+      },
+      {
+        "summary": "Findings flow through the existing review-context manifest, not a new IPC channel or new tmux signal.",
+        "rationale": "policyNotes is already a precedent for review-time advisory signals carried on the manifest. Adding stubUiFindings as a sibling field reuses the existing buildReviewContext → manifest → Tier-1 summary → convoy reviewer plumbing. One scan per run instead of four."
+      },
+      {
+        "summary": "Scanner is library-only (no new 'pan lint stub-ui' CLI verb).",
+        "rationale": "Skills↔CLI convention requires every meaningful pan verb to have a wrapper skill. The scanner has exactly one production caller (buildReviewContext). Adding a verb would create skill maintenance burden without a user-facing workflow."
+      },
+      {
+        "summary": "Patterns scoped to *Tab.tsx, *Mode.tsx, *View.tsx + dashboard component additions; no whole-repo recursive descent.",
+        "rationale": "The issue's out-of-scope note is explicit: 'only flags additions in the current PR'. Adding files matching frontend UI affordance globs aligns with that scope and keeps the false-positive surface small."
+      },
+      {
+        "summary": "Scanner emits findings only; mitigation detection is the reviewer's job.",
+        "rationale": "Detecting whether a feature flag really gates a tab requires walking the parent component tree, route registry, and runtime data flow — brittle and over-reaching for a regex scanner. The requirements reviewer already inspects diffs and can apply the three mitigation criteria. The prompt instructs the reviewer to do so explicitly."
+      },
+      {
+        "summary": "Tests use synthetic tempdir git fixtures, not reconstructions of real merged PRs.",
+        "rationale": "Real PR diffs rot when branches are rewritten. Synthetic fixtures document the patterns we want to flag, stay green across history rewrites, and exercise both positive (must flag) and negative (must stay quiet) cases."
+      },
+      {
+        "summary": "Scanner failures degrade gracefully — internal exceptions yield [] and log a warning, never block the review run.",
+        "rationale": "readPolicyNotes uses the same try/catch posture in buildReviewContextPromise. A flaky scanner that broke every review would be a worse outcome than missing the occasional stub."
+      }
+    ],
+    "items": [
+      {
+        "id": "stub-patterns",
+        "title": "Define STUB_UI_PATTERNS catalog and file-glob filter",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T14:55:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1500",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "stub-scanner",
+            "review-context-wire",
+            "requirements-prompt"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/stub-ui-patterns.ts that exports (a) STUB_UI_FILE_GLOBS — micromatch-compatible globs naming the file types in scope (frontend UI affordances under src/dashboard/frontend/), (b) STUB_UI_PATTERNS — an array of { id, label, regex, severity } records covering: 'coming soon' / 'Coming soon' / 'Not yet implemented' copy; bare `return [];` / `return null;` from a hook in an added file; `useState(false)` for a tab/mode with no other writer; new <Tab>/<TabPanel>/<Route> JSX entries; segmented-control entries with handlers that are arrow-function no-ops (`() => {}`, `() => null`); explicit onClick no-op handlers. Each record carries a stable id (e.g. 'coming-soon-copy', 'empty-array-return', 'noop-handler') so findings are linkable. (c) StubUiFinding TypeScript type: { patternId: string; patternLabel: string; filePath: string; lineNumber: number; addedLine: string; severity: 'block' | 'advisory' }. Unit tests assert each pattern matches its target line and rejects close-but-not-quite lines (e.g. `return [...prev];` must NOT match the empty-array-return pattern). Foundation bead — every downstream bead depends on these exports."
+        },
+        "subItems": [
+          {
+            "id": "stub-patterns.ac1",
+            "title": "src/lib/cloister/stub-ui-patterns.ts exists and exports STUB_UI_FILE_GLOBS, STUB_UI_PATTERNS, and the StubUiFinding type",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stub-patterns.ac2",
+            "title": "STUB_UI_PATTERNS covers at least: coming-soon copy, empty-array/null returns, no-op handlers, new Tab/TabPanel/Route JSX entries, segmented-control mode entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stub-patterns.ac3",
+            "title": "STUB_UI_FILE_GLOBS restricts scope to frontend UI affordance files (*Tab.tsx, *Mode.tsx, *View.tsx, and net-new files under src/dashboard/frontend/src/components/)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stub-patterns.ac4",
+            "title": "Unit test file src/lib/cloister/__tests__/stub-ui-patterns.test.ts covers positive matches AND negative non-matches for every pattern (per-pattern table of cases)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stub-patterns.ac5",
+            "title": "Pattern records use stable ids that are exported in the type so downstream beads (scanner, prompt) can reference them by name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stub-patterns.ac6",
+            "title": "Module header docblock explicitly states the catalog is 'best-effort, not exhaustive — extend when new stub shapes escape post-merge audits' and references PAN-1454 pattern 4",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stub-scanner",
+        "title": "Implement scanStubUi() — workspace + diff-base → StubUiFinding[]",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T14:55:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/lint-stub-ui.ts exporting async scanStubUi(workspace: string, diffBase: string): Promise<StubUiFinding[]>. Internally: (1) shell out to `git diff --name-status <diffBase>...HEAD` via execAsync to list changed files, (2) filter by STUB_UI_FILE_GLOBS — only added (A) files match initially; modified (M) files match only if their additions introduce new UI affordances per the pattern set, (3) for each matching file, run `git diff -U0 <diffBase>...HEAD -- <path>` and parse hunks to extract added lines only (lines starting with `+` but not `+++`), tracking the file's destination line number from hunk headers, (4) apply each STUB_UI_PATTERN regex to each added line and emit StubUiFinding records. The function MUST use execAsync (never execSync — see no-execsync-server.md). Any internal failure (git non-zero exit, malformed hunk header, filesystem error) returns [] and logs a single non-fatal warning via console.warn, matching readPolicyNotes posture (review-context.ts:251-254). Unit tests use temp directories seeded via `git init`, write files mirroring PAN-1389 (a new FilesTab.tsx whose hook returns []) and PAN-1231 (a new TableMode.tsx in FleetAgentsView with a no-op handler), commit baseline + add the stubs, then call scanStubUi and assert the expected findings. Negative test: a workspace where the same file has a real implementation calling a fetch hook must produce zero findings."
+        },
+        "subItems": [
+          {
+            "id": "stub-scanner.ac1",
+            "title": "src/lib/cloister/lint-stub-ui.ts exports async scanStubUi(workspace: string, diffBase: string): Promise<StubUiFinding[]>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stub-scanner.ac2",
+            "title": "Scanner uses execAsync only — no execSync, no readFileSync. Verified by grep in the test or a static guard.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stub-scanner.ac3",
+            "title": "Scanner restricts inspection to added (+) lines from git diff -U0, never flags pre-existing lines untouched by the PR",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stub-scanner.ac4",
+            "title": "Scanner test fixture covering PAN-1389 pattern (new *Tab.tsx with hook returning []) produces at least one StubUiFinding tagged with the empty-array-return patternId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stub-scanner.ac5",
+            "title": "Scanner test fixture covering PAN-1231 pattern (new segmented-control mode with no-op handler in FleetAgentsView-equivalent) produces at least one StubUiFinding tagged with the noop-handler patternId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stub-scanner.ac6",
+            "title": "Negative test: a workspace whose diff adds a new tab with a real fetch hook + non-empty render returns ZERO findings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stub-scanner.ac7",
+            "title": "Failure mode test: scanner returns [] (not throw) when git command exits non-zero or the workspace is not a git repo",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stub-scanner.ac8",
+            "title": "No new top-level dependencies added to package.json — scanner relies on existing execAsync + micromatch (or a hand-rolled glob match if micromatch is not already a dependency)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "review-context-wire",
+        "title": "Wire stubUiFindings into ReviewContextManifest and Tier-1 inline summary",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T14:55:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Modify src/lib/cloister/review-context.ts: (1) add `stubUiFindings: StubUiFinding[]` to the ReviewContextManifest interface, (2) in buildReviewContextPromise, await scanStubUi(workspace, diffBase) alongside the existing extractAcceptanceCriteria + readPolicyNotes Promise.all, (3) persist the field on the manifest JSON, (4) update formatTier1Summary to render a 'Stub UI findings (BLOCKING if unmitigated)' section listing up to 10 findings as `  - <patternLabel> @ <filePath>:<lineNumber>` with overflow text '... and N more (see manifest)' matching the policyNotes truncation idiom, (5) add the field to the Pick<...> on formatTier1Summary's typed parameter. Test additions to existing review-context test file (or a new one) assert: manifest contains stubUiFindings field, Tier-1 summary text includes the new section when findings are non-empty, Tier-1 summary OMITS the section entirely when findings are empty (don't add noise to clean diffs)."
+        },
+        "subItems": [
+          {
+            "id": "review-context-wire.ac1",
+            "title": "ReviewContextManifest type in src/lib/cloister/review-context.ts gains stubUiFindings: StubUiFinding[] field (imported from lint-stub-ui)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-context-wire.ac2",
+            "title": "buildReviewContextPromise invokes scanStubUi(workspace, diffBase) once per review run and writes the result to manifest.stubUiFindings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-context-wire.ac3",
+            "title": "formatTier1Summary renders a 'Stub UI findings (BLOCKING if unmitigated):' section when findings.length > 0, with up to 10 entries and a '... and N more (see manifest)' overflow line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-context-wire.ac4",
+            "title": "formatTier1Summary omits the Stub UI section entirely when findings.length === 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-context-wire.ac5",
+            "title": "Integration test: a temp-workspace fixture with a PAN-1389-pattern stub produces a manifest JSON whose stubUiFindings array is non-empty and whose Tier-1 summary string contains 'Stub UI findings'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-context-wire.ac6",
+            "title": "Integration test: a clean fixture (no stubs) produces a manifest with stubUiFindings: [] and a Tier-1 summary that does NOT contain 'Stub UI findings'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-context-wire.ac7",
+            "title": "If scanStubUi throws (defensive belt+suspenders), buildReviewContextPromise still produces a valid manifest with stubUiFindings: [] — same posture as readPolicyNotes failure handling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "requirements-prompt",
+        "title": "Extend roles/review-requirements.md with Stub UI BLOCKING rule",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T14:55:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Edit roles/review-requirements.md in THREE locations so the BLOCK rule fires reliably (per hazard H3): (1) add a bullet 'Stub UI scope creep — new tabs, modes, segmented-control entries, or routed views whose data hooks return [] / null, whose handlers no-op, or whose copy is `coming soon` without (a) a feature flag check gating them off, (b) removal from user-facing surface, or (c) a non-stub implementation calling real data' to the Scope list (currently lines 17-25), (2) add a new subsection under Method titled 'Stub UI BLOCKING rule' that explicitly says: 'If the shared context summary or context manifest lists `stubUiFindings`, treat each entry as `!` BLOCKING (scope: in_pr_scope) unless the PR diff also shows one of the three mitigations: a feature flag check guarding the new affordance off, removal of the affordance from the user-facing surface, or a non-stub implementation calling real data. Mitigated findings move to Non-blocking Notes with a one-line explanation of which mitigation applies.', (3) add a new row to the Coverage Matrix example output: `| Stub UI: <patternLabel> @ <file>:<line> | stubUiFindings (manifest) | in_pr_scope | Missing (BLOCKING) | Stub introduced — no feature flag, no removal, no real implementation |`. Add a snapshot/landmark test (extend src/lib/__tests__/code-review-agent-definitions.test.ts or create a sibling) that reads the prompt file and asserts all three landmarks are present: the Scope bullet ('Stub UI scope creep'), the Method subsection header ('Stub UI BLOCKING rule'), and the Coverage Matrix row template ('Stub UI:'). Test failure means a future edit accidentally regressed one of the three insertion points."
+        },
+        "subItems": [
+          {
+            "id": "requirements-prompt.ac1",
+            "title": "roles/review-requirements.md Scope list contains a 'Stub UI scope creep' bullet naming the three valid mitigations (feature flag, removal, non-stub implementation)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "requirements-prompt.ac2",
+            "title": "roles/review-requirements.md Method section contains a 'Stub UI BLOCKING rule' subsection that names the manifest field `stubUiFindings` and instructs the reviewer to emit `!` MUST findings (scope: in_pr_scope) for any unmitigated entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "requirements-prompt.ac3",
+            "title": "Coverage Matrix example output in the prompt includes a stub-UI row template so the reviewer's emitted report has a natural slot for each finding",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "requirements-prompt.ac4",
+            "title": "Landmark/snapshot test asserts the three textual anchors above remain present in roles/review-requirements.md — fails loudly if a future edit removes them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "requirements-prompt.ac5",
+            "title": "Prompt explicitly states that mitigated findings are downgraded to Non-blocking Notes with a one-line mitigation explanation, NOT silently dropped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "requirements-prompt.ac6",
+            "title": "The BLOCKING rule is bounded to in_pr_scope per the existing per-AC scope classification — out-of-PR stubs already present on main are not this PR's responsibility",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-fixtures",
+        "title": "End-to-end audit-example fixtures (PAN-1389 and PAN-1231) prove the full pipeline flags both",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T14:55:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1500",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a test file (src/lib/cloister/__tests__/lint-stub-ui-audit-examples.test.ts) that materializes two named git-fixture workspaces and runs buildReviewContext end-to-end against them: (1) 'pan-1389-files-tab': seeds a baseline commit then adds frontend/src/components/Inspector/FilesTab.tsx whose useFiles hook returns [] and frontend/src/components/Inspector/CommentsTab.tsx whose useComments hook returns [], asserts the resulting manifest's stubUiFindings array contains entries for both files, AND asserts the Tier-1 summary string mentions both. (2) 'pan-1231-fleet-modes': seeds a baseline then adds frontend/src/components/Fleet/FleetAgentsView.tsx wiring a SegmentedControl with TableMode and TimelineMode entries whose onChange handlers are no-op arrow functions, asserts findings for both mode entries. These fixtures lock in the PAN-1454 audit's stated examples as regression coverage — if a future edit weakens the scanner or the manifest wiring, these tests fail by name and the bisect points straight at PAN-1500. Tests are described with the relevant audit example so failures are self-explanatory."
+        },
+        "subItems": [
+          {
+            "id": "audit-fixtures.ac1",
+            "title": "PAN-1389 fixture test passes: a workspace adding stub FilesTab + CommentsTab produces manifest.stubUiFindings with at least 2 entries, and Tier-1 summary references both filenames",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-fixtures.ac2",
+            "title": "PAN-1231 fixture test passes: a workspace adding stub TableMode + TimelineMode segmented-control entries produces manifest.stubUiFindings flagging both mode entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-fixtures.ac3",
+            "title": "Each fixture test's describe/it text names the source audit issue (PAN-1389, PAN-1231) so a failure trace points back to the original pattern",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-fixtures.ac4",
+            "title": "Fixtures clean up their tempdir on teardown (afterAll / afterEach) to avoid leaving git scratch dirs in /tmp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-fixtures.ac5",
+            "title": "npm run typecheck, npm run lint, and npm test all pass after this bead — including the new audit fixtures",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "stub-patterns",
+        "to": "stub-scanner",
+        "type": "blocks"
+      },
+      {
+        "from": "stub-scanner",
+        "to": "review-context-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "review-context-wire",
+        "to": "requirements-prompt",
+        "type": "blocks"
+      },
+      {
+        "from": "review-context-wire",
+        "to": "audit-fixtures",
+        "type": "blocks"
+      },
+      {
+        "from": "stub-patterns",
+        "to": "requirements-prompt",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-25-PAN-1500-substrate-fix-pan-1454-pattern-4-block-review-on-ui-stubs-new-tabs-modes-without-real-implementation-or-feature-flag.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

@@ -1,0 +1,613 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-04T00:40:06.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2338: Boot Reconciliation lists every historical stopped agent as a resume candidate; 'Resume all' is a silent no-op",
+    "updated": "2026-07-04T18:13:54.557Z"
+  },
+  "plan": {
+    "id": "pan-2338",
+    "title": "Boot Reconciliation lists every historical stopped agent as a resume candidate; 'Resume all' is a silent no-op",
+    "status": "completed",
+    "uid": "d5aa4595-41ff-43c2-99fe-d025861b7111",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 5,
+    "created": "2026-07-04T00:40:06.000Z",
+    "updated": "2026-07-04T18:13:54.557Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2338",
+        "label": "PAN-2338",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2076",
+        "label": "PAN-2076 fail-safe boot reconciliation",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1791",
+        "label": "PAN-1791 swarm runaway (44 dead rows)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "boot-reconciliation",
+      "deacon",
+      "cli",
+      "dashboard",
+      "agent-state"
+    ],
+    "narratives": {
+      "Problem": "isBootReconciliationCandidate (src/lib/cloister/boot-reconciliation.ts:47-52) gates only on role/status/paused/troubled/stoppedByUser, so every all-time 'stopped' work agent (weeks old, workspace gone, issue merged/closed) is offered as a boot resume candidate. 'Resume all' then attempts each, the resume path declines terminal agents, and the route returns count:0 while the modal prints a bare 'No agents were resumed.' The agents table also grows unbounded (44 dead PAN-1791 swarm-slot rows) because terminal rows are never reaped.",
+      "Proposal": "FR-1: gate candidates to genuinely-interrupted, resumable work — recent lastActivity relative to a stamped bootStartedAt within a new reconciliation_max_candidate_age_secs window, a workspace that still exists on disk, and a non-terminal issue stage (verifying_on_main/closed/cancelled). Also tighten the GET display so old non-candidate stopped rows disappear. FR-2: applyBootReconciliationDecision returns per-agent {outcome, reason} results surfaced through both routes and rendered as a real summary in the modal. FR-3: add pan admin db gc-agents to reap terminal/orphaned work-agent rows + state dirs through the write door (removeAgentSync).",
+      "NonGoals": "- Do NOT change the grace-window timer or the resume_all-on-grace-expiry default.\n- Do NOT reap paused/troubled rows (intentionally held).\n- Do NOT add recency/terminal gates to autoResumeStoppedWorkAgents (steady-state patrol); scope is boot reconciliation only.\n- Do NOT modify resume.ts session-resolution logic.\n- Do NOT bootstrap .pan/context/codebase/*.md in this issue."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Predicate reads bootStartedAt from boot state and max-age from config internally rather than changing isBootReconciliationCandidate's signature.",
+        "rationale": "The predicate is called from three sites; the two non-boot sites run after boot stamping so reading state keeps one predicate and avoids threading context through unrelated call sites."
+      },
+      {
+        "summary": "Recency source = lastActivity (fallback stoppedAt, then startedAt); agents with no timestamp are excluded.",
+        "rationale": "Fail-closed: an agent that can't be proven recently-active must not be offered for resume — that is the exact bug being fixed."
+      },
+      {
+        "summary": "reconciliation_max_candidate_age_secs default = 240 (2x the 120s grace default).",
+        "rationale": "The PRD suggests ~2x grace; 240s comfortably covers a genuine crash-interruption window without admitting weeks-old rows."
+      },
+      {
+        "summary": "Terminal-issue detection uses the local overdeck issues.stage cache via a new sync helper, treating verifying_on_main/closed/cancelled as terminal.",
+        "rationale": "The candidate predicate is synchronous and must stay inside the read door; the issues table stage column is the sync-accessible source already written by the pipeline."
+      },
+      {
+        "summary": "GET /api/boot-reconciliation keeps showing paused/troubled/remote rows (read-only) but drops the blanket stopped clause.",
+        "rationale": "FR-1's 'empty list on a fresh boot with only old agents' targets resume candidates; paused/troubled are a separate, already read-only operator concern and removing them would be scope creep."
+      },
+      {
+        "summary": "Skip bootstrapping .pan/context/codebase/*.md this session.",
+        "rationale": "This is a bounded bug fix touching known files; a full codebase-context bootstrap is out of proportion to the change."
+      }
+    ],
+    "items": [
+      {
+        "id": "config-bootstarted-plumbing",
+        "title": "Add reconciliation_max_candidate_age_secs config + bootStartedAt boot state plumbing",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-04T00:40:06.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2338",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "gate-candidates-predicate",
+            "gc-agents-cli"
+          ],
+          "files_scope": [
+            "src/lib/cloister/config.ts",
+            "src/lib/overdeck/control-settings.ts",
+            "src/lib/cloister/boot-reconciliation.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add the primitives FR-1 depends on. (1) config.ts: add reconciliation_max_candidate_age_secs:number to StartupConfig (after reconciliation_grace_secs) and default 240 in DEFAULT_CLOISTER_CONFIG.startup. (2) control-settings.ts: add BOOT_RECONCILIATION_BOOT_STARTED_AT_KEY, add bootStartedAt:string|null to BootReconciliationState, populate it in getBootReconciliationState, and extend stampBootReconciliation(bootId, graceDeadline, bootStartedAt) to persist it. (3) boot-reconciliation.ts: add getBootReconciliationMaxCandidateAgeSeconds() mirroring getBootReconciliationGraceSeconds (falling back to 2x grace when unset/invalid), and stamp bootStartedAt at the START of startBootReconciliation (before listBootReconciliationCandidateIds at ~:116), preserving it across the idempotent existing-bootId branch. All additions are unused-until-consumed so the tree stays green."
+        },
+        "items": [
+          {
+            "id": "config-bootstarted-plumbing.ac1",
+            "title": "loadCloisterConfigSync().startup.reconciliation_max_candidate_age_secs defaults to 240 when the config value is unset",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-bootstarted-plumbing.ac2",
+            "title": "getBootReconciliationState() returns a bootStartedAt field and stampBootReconciliation persists the value passed to it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-bootstarted-plumbing.ac3",
+            "title": "After startBootReconciliation runs on a fresh boot, getBootReconciliationState().bootStartedAt returns a non-null ISO timestamp stamped before candidate listing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-bootstarted-plumbing.ac4",
+            "title": "getBootReconciliationMaxCandidateAgeSeconds() returns the configured value and falls back to 2x grace when the config value is missing or non-positive",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "terminal-stage-sync-helper",
+        "title": "Add sync getIssueStageSync + isTerminalIssueStage helper",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-04T00:40:06.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2338",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/agents.ts",
+            "src/lib/overdeck/__tests__/agents-issue-stage.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/agents-issue-stage.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "getIssueStageSync test file passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a synchronous read helper getIssueStageSync(issueId: string): string | null in src/lib/overdeck/agents.ts (co-located with listAllAgentsSync, using getOverdeckDatabaseSync) that SELECTs stage from the issues table for the given id, returning null when absent. Add isTerminalIssueStage(stage: string | null): boolean returning true for verifying_on_main, closed, and cancelled (the terminal Stage literals from src/lib/overdeck/issues.ts). Add a small unit test exercising both. Read-only DB access via the existing sync database accessor keeps this inside the read door."
+        },
+        "items": [
+          {
+            "id": "terminal-stage-sync-helper.ac1",
+            "title": "getIssueStageSync returns the stored stage string for a known issue and null for an unknown id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terminal-stage-sync-helper.ac2",
+            "title": "isTerminalIssueStage returns true for verifying_on_main, closed, and cancelled, and false for working, planned, and null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-candidates-predicate",
+        "title": "Gate isBootReconciliationCandidate to recent + live-workspace + non-terminal work",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-04T00:40:06.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2338",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/boot-reconciliation.ts",
+            "src/lib/cloister/__tests__/boot-reconciliation.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/cloister/__tests__/boot-reconciliation.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "boot-reconciliation.test.ts passes including new gate cases"
+          ],
+          "readiness": "ready",
+          "readinessReason": "Touches only boot-reconciliation.ts and its own test file; its inputs (config max-age, bootStartedAt, terminal-stage helper) land in blocking predecessor beads, so it runs in its own wave with no shared-file writer.",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend isBootReconciliationCandidate in boot-reconciliation.ts to additionally require, after the existing role/status/paused/troubled/stoppedByUser checks: (a) recency — the newest of lastActivity/stoppedAt/startedAt parses to a time >= (Date.parse(bootStartedAt) - getBootReconciliationMaxCandidateAgeSeconds()*1000), reading bootStartedAt from getBootReconciliationState(); an agent with no usable timestamp is excluded; (b) workspace — agent.workspace is set and existsSync(agent.workspace); (c) non-terminal — !isTerminalIssueStage(getIssueStageSync(agent.issueId)). Update the existing boot-reconciliation.test.ts: extend the hoisted control-settings mock with bootStartedAt, add a config mock for reconciliation_max_candidate_age_secs, mkdir the workspaces used by the existing 'lists only ... resumable candidates' test and give them recent activity + non-terminal stage so it stays green, and ADD gate cases: (1) status=stopped + lastActivity 300h ago + workspace missing is NOT a candidate; (2) stopped seconds before boot + live workspace + open (working) issue IS a candidate; (3) merged/verifying_on_main (terminal) stopped agent is NOT a candidate."
+        },
+        "items": [
+          {
+            "id": "gate-candidates-predicate.ac1",
+            "title": "isBootReconciliationCandidate rejects a stopped work agent whose newest timestamp is 300h before bootStartedAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-candidates-predicate.ac2",
+            "title": "isBootReconciliationCandidate rejects a stopped work agent whose workspace directory is absent from disk",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-candidates-predicate.ac3",
+            "title": "isBootReconciliationCandidate rejects a stopped work agent whose issue stage is verifying_on_main, closed, or cancelled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-candidates-predicate.ac4",
+            "title": "isBootReconciliationCandidate accepts a work agent stopped seconds before bootStartedAt with an existing workspace and a non-terminal issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-candidates-predicate.ac5",
+            "title": "listBootReconciliationCandidates() returns an empty array when every stopped work agent is stale/terminal/workspace-gone",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tighten-route-display",
+        "title": "Tighten GET /api/boot-reconciliation display to drop stale non-candidate stopped rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-04T00:40:06.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-2338",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/boot-reconciliation.ts",
+            "src/dashboard/server/routes/__tests__/boot-reconciliation.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In the GET /api/boot-reconciliation handler (routes/boot-reconciliation.ts:59-91), remove the blanket `agent.status === 'stopped'` clause from the `set` filter so that only candidates (candidateIds.has(agent.id)), paused, troubled, or remote work agents are returned. This makes the modal's `set` empty when a fresh boot has only old cleanly-stopped non-candidate agents, while preserving read-only paused/troubled/remote context rows. Add or extend a route-level test asserting a stale non-candidate stopped agent is excluded from `set` while a paused agent is retained."
+        },
+        "items": [
+          {
+            "id": "tighten-route-display.ac1",
+            "title": "GET /api/boot-reconciliation returns a set array that does not contain a stale non-candidate stopped work agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tighten-route-display.ac2",
+            "title": "GET /api/boot-reconciliation returns paused, troubled, and remote work agents in set with readOnly true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "outcomes-core",
+        "title": "Return per-agent outcomes from applyBootReconciliationDecision",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-04T00:40:06.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2338",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "outcomes-routes",
+            "outcomes-modal"
+          ],
+          "files_scope": [
+            "src/lib/cloister/deacon-auto-resume.ts",
+            "src/lib/cloister/deacon.ts",
+            "src/dashboard/server/main.ts",
+            "src/lib/cloister/__tests__/pan-871-auto-resume.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/cloister/__tests__/pan-871-auto-resume.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "pan-871-auto-resume.test.ts passes with the new return shape and skip-reason assertions"
+          ],
+          "readiness": "ready",
+          "readinessReason": "Confined to the deacon auto-resume return type and its direct callers/tests; no other bead writes these files, so it runs first in its FR-2 chain with no concurrent writer.",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Change applyBootReconciliationDecision in deacon-auto-resume.ts to return { resumed: string[]; outcomes: Array<{ id: string; issueId: string; outcome: 'resumed' | 'skipped'; reason: string }> } instead of string[]. For each attempted candidate: push {outcome:'resumed'} when handleAgentStoppedEvent returns an id, else {outcome:'skipped', reason:'no-resumable-session'}; for the concurrency-cap break emit {outcome:'skipped', reason:'deferred-concurrency'} and for the load-gate break {outcome:'skipped', reason:'deferred-load'} for each remaining candidate. Update the deacon.ts wrapper applyBootReconciliationDecision() return type accordingly, and the two main.ts call sites (they ignore the value — keep them compiling). Update pan-871-auto-resume.test.ts: existing assertions that read the returned array must read .resumed; ADD a test that applyBootReconciliationDecision over a set of unresumable candidates returns resumed:[] and an outcomes array where every entry is outcome:'skipped' with reason:'no-resumable-session' (no silent no-op)."
+        },
+        "items": [
+          {
+            "id": "outcomes-core.ac1",
+            "title": "applyBootReconciliationDecision returns an object with resumed:string[] and outcomes:{id,issueId,outcome,reason}[]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "outcomes-core.ac2",
+            "title": "Over a set of candidates with no resumable session, it returns resumed:[] and one outcome per candidate with outcome='skipped' and reason='no-resumable-session'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "outcomes-core.ac3",
+            "title": "A candidate that resumes produces an outcome with outcome='resumed' and its id present in resumed[]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "outcomes-core.ac4",
+            "title": "npm run typecheck exits 0 with the deacon.ts wrapper and both main.ts call sites updated to the new return type",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "outcomes-routes",
+        "title": "Surface boot-reconciliation outcomes in both decision routes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-04T00:40:06.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-2338",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/boot-reconciliation.ts",
+            "src/dashboard/server/routes/misc/deacon.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Update POST /api/boot-reconciliation/decision (routes/boot-reconciliation.ts:122-123) to consume the new object: const result = await applyBootReconciliationDecision(); return { ok:true, decision, perAgent, resumed: result.resumed, outcomes: result.outcomes, count: result.resumed.length }. Apply the same change to routes/misc/deacon.ts:32 so both endpoints expose outcomes and a resumed count. No behavior change beyond the added outcomes field."
+        },
+        "items": [
+          {
+            "id": "outcomes-routes.ac1",
+            "title": "POST /api/boot-reconciliation/decision returns a JSON body containing an outcomes array and count equal to resumed.length",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "outcomes-routes.ac2",
+            "title": "The routes/misc/deacon.ts endpoint returns the same resumed/outcomes/count shape",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "outcomes-modal",
+        "title": "Render a real resumed/skipped summary in BootReconciliationModal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-04T00:40:06.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2338",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/BootReconciliationModal.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In BootReconciliationModal.tsx, extend the decision mutation result type to include outcomes: Array<{id;issueId;outcome;reason}>. Replace the bare onSuccess message (\"Boot decision saved. No agents were resumed.\", ~:170) with a summary derived from the outcomes: when count>0 show 'Resumed {count} agent(s).'; when count===0 and there were skipped outcomes, summarize by reason (e.g. 'Resumed 0 — {n} skipped (no resumable session).'), grouping counts per reason rather than printing the opaque no-op. Keep the message concise and operator-readable. Defensively tolerate a missing outcomes field (older server) by falling back to the count-based message."
+        },
+        "items": [
+          {
+            "id": "outcomes-modal.ac1",
+            "title": "After 'Resume all' with zero resumed and N skipped, the modal renders a summary naming the skip count and reason instead of the bare 'No agents were resumed.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "outcomes-modal.ac2",
+            "title": "After 'Resume all' with M>0 resumed, the modal renders the resumed count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "outcomes-modal.ac3",
+            "title": "When the response omits outcomes, the modal falls back to the count-based message without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gc-agents-cli",
+        "title": "Add pan admin db gc-agents to reap terminal/orphaned agent rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-04T00:40:06.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2338",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/db.ts",
+            "src/cli/commands/__tests__/db-gc-agents.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/cli/commands/__tests__/db-gc-agents.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "gc-agents test passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add db.command('gc-agents') in src/cli/commands/db.ts (mounted as `pan admin db gc-agents`) with a --dry-run option. Enumerate rows via listAllAgentsSync(), select role==='work' rows whose issue stage isTerminalIssueStage(getIssueStageSync(issueId)) as reapable (this covers the 44 dead PAN-1791 swarm-slot rows whose issue is terminal). With --dry-run, print the ids/count that WOULD be reaped and make no changes. Without --dry-run, remove each via removeAgentSync(id) (write door: deletes the row AND ~/.overdeck/agents/<id>/) and print a summary. Add a unit test asserting: terminal work rows are reaped, a running/non-terminal-issue work row is preserved, a non-work row is preserved, and --dry-run reaps nothing while still reporting the candidates."
+        },
+        "items": [
+          {
+            "id": "gc-agents-cli.ac1",
+            "title": "After pan admin db gc-agents runs, listAllAgentsSync returns none of the previously-terminal work-role rows and their ~/.overdeck/agents/<id>/ state dirs are deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gc-agents-cli.ac2",
+            "title": "gc-agents preserves running agents, non-terminal-issue agents, and non-work rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gc-agents-cli.ac3",
+            "title": "gc-agents --dry-run prints the reapable ids and count and deletes nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "config-bootstarted-plumbing",
+        "to": "gate-candidates-predicate",
+        "type": "blocks"
+      },
+      {
+        "from": "terminal-stage-sync-helper",
+        "to": "gate-candidates-predicate",
+        "type": "blocks"
+      },
+      {
+        "from": "gate-candidates-predicate",
+        "to": "tighten-route-display",
+        "type": "blocks"
+      },
+      {
+        "from": "terminal-stage-sync-helper",
+        "to": "gc-agents-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "outcomes-core",
+        "to": "outcomes-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "outcomes-routes",
+        "to": "outcomes-modal",
+        "type": "blocks"
+      },
+      {
+        "from": "outcomes-routes",
+        "to": "tighten-route-display",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-04-PAN-2338-boot-reconciliation-lists-every-historical-stopped-agent-as-a-resume-candidate-resume-all-is-a-silent-no-op.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

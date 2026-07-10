@@ -1,0 +1,387 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-06T15:59:15.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2373: feat(test-infra): flake policy — CI retry semantics, quarantine mechanism, and non-blocking flake lane",
+    "updated": "2026-07-07T06:15:53.315Z"
+  },
+  "plan": {
+    "id": "pan-2373",
+    "title": "feat(test-infra): flake policy — CI retry semantics, quarantine mechanism, and non-blocking flake lane",
+    "status": "completed",
+    "uid": "ba30d21e-beee-41e1-aff4-b99e2a41ba4a",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 7,
+    "created": "2026-07-06T15:59:15.000Z",
+    "updated": "2026-07-07T06:15:53.315Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2373",
+        "label": "PAN-2373",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2371",
+        "label": "PAN-2371",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2336",
+        "label": "PAN-2336",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "test-infra",
+      "ci",
+      "flake-policy",
+      "verification-gate"
+    ],
+    "narratives": {
+      "Problem": "There is no mechanism for handling a flaky test today: vitest has no retry config, no quarantine list exists, and a single intermittent test (PAN-2371, PAN-2336) blocks the verification gate for unrelated PRs, reddens main, and stalls releases. Every flake becomes an operator incident.",
+      "Proposal": "Add a flake policy in four cohesive pieces. (1) An audited quarantine source of truth: scripts/flaky-quarantine.txt with an inline tracker-issue ref required next to each entry, guarded by scripts/lint-quarantine-audit.sh wired into `npm run lint` (shrink-preferred — adding needs a ref, removing is free). (2) A CI-aware vitest config: retry:1 when process.env.CI || OVERDECK_VERIFICATION || OVERDECK_FLAKE_LANE (local dev stays retry:0 so flakes remain visible); and config-level exclusion of quarantined files when (CI || OVERDECK_VERIFICATION) && !OVERDECK_FLAKE_LANE — a single source of truth that covers BOTH the verification gate AND the blocking CI `test` job. (3) A non-blocking flake-lane CI job (continue-on-error:true) that runs ONLY the quarantined files under OVERDECK_FLAKE_LANE=1 and writes a GitHub Actions job summary listing each quarantined test + its issue ref + this run's result (the always-current accounting ledger). (4) The Cloister verification gate sets env OVERDECK_VERIFICATION=1 on DEFAULT_GATES.test so the config activates retry + exclusion during the pre-merge gate.",
+      "NonGoals": "- Do NOT fix PAN-2371 or PAN-2336 themselves; they are separate issues and leave quarantine once fixed.\n- Do NOT retry deterministic failures beyond one attempt; retry stays at 1 and a retried-pass is always surfaced, never silenced.\n- Do NOT quarantine a real-timer retry/backoff test to dodge the fake-timers repo rule; a retried-pass there means the test needs vi.useFakeTimers(), not quarantine.\n- Do NOT make the flake-lane job a required GitHub check; it must stay non-blocking by design.\n- Do NOT change maxForks or serialize the suite to mask OOM.\n- Do NOT apply quarantine/exclusion to the frontend vitest suite (npm --prefix ./src/dashboard/frontend run test); root vitest only.\n- Do NOT add a committed docs/ci-cd/FLAKES.md or an issue-comment bot; the job summary + the quarantine file are the ledger surfaces."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Config-level quarantine exclusion in vitest.config.ts instead of gate-level --exclude injection.",
+        "rationale": "The draft excluded quarantined tests only in the verification gate, leaving the blocking CI `test` job (`npm test`) still running them — an FR-4 gap. Reading the quarantine list in vitest.config.ts is a single source of truth that covers the verification gate, the CI test job, and any vitest invocation, and aligns with the repo's single-source-of-truth tenet."
+      },
+      {
+        "summary": "Deliverable 4 (flake accounting) included as a GitHub Actions job summary in the flake-lane job.",
+        "rationale": "The draft deferred it, but CLAUDE.md 'Deliver Complete Features' forbids shipping a subset. A $GITHUB_STEP_SUMMARY table listing quarantined tests + refs + results is always current, zero-infra, and prevents a quarantine graveyard without a bot or committed doc."
+      },
+      {
+        "summary": "Flake-lane runs under OVERDECK_FLAKE_LANE=1 (not CI=1) and passes explicit file args.",
+        "rationale": "Config-level exclusion keyed on CI would drop the very files the flake-lane must run. A distinct env var inverts the exclusion cleanly and still activates retry:1."
+      },
+      {
+        "summary": "Inline per-entry issue-ref audit (dedicated script) rather than a commit-message ratchet.",
+        "rationale": "The issue asks for 'a tracker-issue reference next to each quarantine entry'; an inline per-line ref makes each entry self-documenting and is the literal satisfaction. The shrink-preferred property (add needs ref, remove free) is preserved."
+      },
+      {
+        "summary": "Retry and quarantine-exclusion share one bead (vitest-flake-config).",
+        "rationale": "Both edit the same vitest.config.ts test block gated by the same env logic; splitting them yields two beads racing on one config region with no clean independent-merge story."
+      }
+    ],
+    "items": [
+      {
+        "id": "pan-2373-quarantine-file",
+        "title": "Add audited quarantine source of truth: scripts/flaky-quarantine.txt + lint-quarantine-audit.sh + lint wiring",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-06T15:59:15.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-2373",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/flaky-quarantine.txt",
+            "scripts/lint-quarantine-audit.sh",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-quarantine-audit.sh",
+            "npm run lint:quarantine-audit"
+          ],
+          "expected_outputs": [
+            "lint-quarantine-audit prints OK and exits 0 on the seed file",
+            "npm run lint:quarantine-audit resolves via package.json"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Create scripts/flaky-quarantine.txt as the single source of truth for quarantined tests, seeded with the two known flakes each carrying an inline tracker-issue ref. Line format: `<relative-path-from-repo-root>  # PAN-<n>` (or `# #<n>`); comment lines start with `#`. Seed entries (verified present at plan time): `tests/playwright/conversation-supervisor-uat.test.ts  # PAN-2371` and `src/lib/vbrief/__tests__/create-beads.test.ts  # PAN-2336`. Create scripts/lint-quarantine-audit.sh (set -euo pipefail; cd repo root) that, for every non-empty non-comment line, requires an inline ref matching `([A-Z]+-[0-9]+|#[0-9]+)`, exits 1 listing any offending line, and exits 0 (with an OK count) when all entries are valid or the file is absent/empty. In package.json add script `\"lint:quarantine-audit\": \"bash scripts/lint-quarantine-audit.sh\"` and append `&& npm run lint:quarantine-audit` to the end of the existing `\"lint\"` chain (currently ends with `... && npm run lint:ratchet-audit`). Because CI's lint job runs `npm run lint`, this gates every PR automatically."
+        },
+        "items": [
+          {
+            "id": "pan-2373-quarantine-file.ac1",
+            "title": "Given the seed scripts/flaky-quarantine.txt, when `bash scripts/lint-quarantine-audit.sh` runs, then it exits 0 and prints an OK line reporting the validated entry count.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-2373-quarantine-file.ac2",
+            "title": "Given a quarantine line with a path but no inline issue ref, when the audit runs, then it exits 1 and names the offending line on stderr.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-2373-quarantine-file.ac3",
+            "title": "Given an absent or empty quarantine file, when the audit runs, then it exits 0 (removal is always free).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-2373-quarantine-file.ac4",
+            "title": "Given package.json, when `npm run lint` runs, then it invokes lint:quarantine-audit as part of the chain (grep of the lint script contains `lint:quarantine-audit`).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-2373-quarantine-file.ac5",
+            "title": "Given the seed file, when its two entries are read, then they reference existing test files `tests/playwright/conversation-supervisor-uat.test.ts` (PAN-2371) and `src/lib/vbrief/__tests__/create-beads.test.ts` (PAN-2336).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-2373-vitest-flake-config",
+        "title": "Make root vitest.config CI-aware: retry:1 in CI/verification/flake-lane and config-level quarantine exclusion",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-06T15:59:15.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-2373",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "pan-2373-flake-lane",
+            "pan-2373-verify-gate-env"
+          ],
+          "files_scope": [
+            "src/lib/test-infra/quarantine.ts",
+            "src/lib/test-infra/__tests__/quarantine.test.ts",
+            "vitest.config.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/test-infra/__tests__/quarantine.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "quarantine.test.ts passes covering parse + exclusion truth table",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Extract a dependency-free parser module at src/lib/test-infra/quarantine.ts (imports only node:fs/node:path) exporting `parseQuarantineList(contents: string): string[]` (strips comments after `#` and whitespace, drops empty lines, returns the path tokens) and `readQuarantineList(projectRoot: string): string[]` (reads scripts/flaky-quarantine.txt, returns [] when absent), plus a helper `shouldExcludeQuarantine(env): boolean` = `!!(env.CI || env.OVERDECK_VERIFICATION) && env.OVERDECK_FLAKE_LANE !== '1'`. In vitest.config.ts: (a) add `retry: (process.env.CI || process.env.OVERDECK_VERIFICATION || process.env.OVERDECK_FLAKE_LANE) ? 1 : 0` to the root `test` block, with a comment that local dev stays 0 so flakes remain visible and that the default reporter's retry output must remain visible (do not switch to a reporter that hides retried-pass lines — FR-2/H3); (b) when `shouldExcludeQuarantine(process.env)`, append `readQuarantineList(__dirname)` to the existing `test.exclude` array. Do NOT exclude under OVERDECK_FLAKE_LANE=1 (flake-lane runs exactly those files). Unit-test the parser + truth table in src/lib/test-infra/__tests__/quarantine.test.ts. Restate the fake-timers rule in a comment: a retried-pass on a real-timer test means the test needs vi.useFakeTimers(), not quarantine."
+        },
+        "items": [
+          {
+            "id": "pan-2373-vitest-flake-config.ac1",
+            "title": "Given process.env.CI or OVERDECK_VERIFICATION or OVERDECK_FLAKE_LANE is set, when the config resolves retry, then retry === 1; given none set, retry === 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-2373-vitest-flake-config.ac2",
+            "title": "Given a quarantine file with comment lines and `<path>  # PAN-<n>` entries, when parseQuarantineList runs, then it returns only the path tokens (comments/refs/blank lines stripped).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-2373-vitest-flake-config.ac3",
+            "title": "Given env {CI:1} or {OVERDECK_VERIFICATION:1} without OVERDECK_FLAKE_LANE, when shouldExcludeQuarantine runs, then it returns true and the quarantined paths are appended to test.exclude.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-2373-vitest-flake-config.ac4",
+            "title": "Given env {OVERDECK_FLAKE_LANE:'1', CI:1}, when shouldExcludeQuarantine runs, then it returns false so quarantined files are NOT excluded (flake-lane runs them).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-2373-vitest-flake-config.ac5",
+            "title": "Given no CI/verification/flake-lane env (local dev), when the config resolves, then quarantined files are NOT excluded and retry is 0 (flakes stay visible during development).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-2373-flake-lane",
+        "title": "Add non-blocking flake-lane CI job that runs only quarantined tests and posts a flake-accounting summary",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-06T15:59:15.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-2373",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/ci.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'flake-lane' .github/workflows/ci.yml",
+            "grep -n 'continue-on-error' .github/workflows/ci.yml"
+          ],
+          "expected_outputs": [
+            "flake-lane job present in ci.yml",
+            "flake-lane declares continue-on-error: true"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In .github/workflows/ci.yml add a new `flake-lane` job (after `clean-install`) with `continue-on-error: true` and a 30-min timeout: checkout, Node 22, Bun, `bun install --frozen-lockfile`, `npm run build`, `npx playwright install --with-deps chromium` (a seed entry is a playwright test). A run step parses scripts/flaky-quarantine.txt (strip inline comments, skip empty/comment lines via `grep -Ev '^\\s*(#|$)'` then `awk '{print $1}'`); if the file is absent or the list is empty, echo a message and exit 0. Otherwise run `OVERDECK_FLAKE_LANE=1 npx vitest run \"${FILES[@]}\"` and capture the result. Then write a GitHub Actions job summary to `$GITHUB_STEP_SUMMARY`: a markdown table with columns Test | Issue | Result, one row per quarantine entry (path + inline ref parsed from the file) plus this run's pass/fail, satisfying Deliverable 4 (the always-current flake ledger). A vitest failure emits `::warning::` and exits the step non-zero, but `continue-on-error: true` keeps the job non-blocking for merges."
+        },
+        "items": [
+          {
+            "id": "pan-2373-flake-lane.ac1",
+            "title": "Given .github/workflows/ci.yml, when parsed, then a `flake-lane` job exists with `continue-on-error: true` (non-blocking) and does not appear as a required status.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-2373-flake-lane.ac2",
+            "title": "Given the flake-lane run step, when it executes, then it runs ONLY the paths parsed from scripts/flaky-quarantine.txt under OVERDECK_FLAKE_LANE=1 (not the full suite).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-2373-flake-lane.ac3",
+            "title": "Given an absent or empty quarantine file, when the flake-lane step runs, then it exits 0 without invoking vitest.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-2373-flake-lane.ac4",
+            "title": "Given quarantine entries, when the flake-lane job completes, then it writes a $GITHUB_STEP_SUMMARY table listing each quarantined test with its issue ref and this run's result.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-2373-verify-gate-env",
+        "title": "Verification gate sets OVERDECK_VERIFICATION=1 so the config activates retry + quarantine exclusion",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-06T15:59:15.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2373",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/validation.ts",
+            "tests/unit/lib/cloister/verification-gate-env.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/verification-gate-env.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "verification-gate-env.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/validation.ts add `env: { OVERDECK_VERIFICATION: '1' }` to the `test` entry of DEFAULT_GATES (currently `test: { command: 'npx vitest run --changed {{CHANGED_BASE}} && npm --prefix ./src/dashboard/frontend run test -- ...' }`). The existing local-exec path already merges gate.env into the child process env via buildQualityGateEnv(gate.env) (validation.ts:441), so this env reaches vitest and vitest.config.ts (from pan-2373-vitest-flake-config) activates retry:1 and quarantine exclusion during the pre-merge verification gate. Add a comment referencing the config consumer. Add tests/unit/lib/cloister/verification-gate-env.test.ts asserting DEFAULT_GATES.test.env.OVERDECK_VERIFICATION === '1'. Do NOT add any {{EXCLUDE_QUARANTINE}} placeholder plumbing — exclusion is entirely config-driven (decision D1)."
+        },
+        "items": [
+          {
+            "id": "pan-2373-verify-gate-env.ac1",
+            "title": "Given DEFAULT_GATES in validation.ts, when the test gate is read, then its `env` object sets OVERDECK_VERIFICATION to '1'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-2373-verify-gate-env.ac2",
+            "title": "Given the verification gate runs the test command locally, when buildQualityGateEnv merges gate.env, then OVERDECK_VERIFICATION=1 is present in the vitest child process env.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-2373-verify-gate-env.ac3",
+            "title": "Given the change, when the codebase is searched, then validation.ts contains no {{EXCLUDE_QUARANTINE}} template token and no buildQuarantineExcludes helper (exclusion stays config-driven).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "pan-2373-quarantine-file",
+        "to": "pan-2373-vitest-flake-config",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-2373-quarantine-file",
+        "to": "pan-2373-flake-lane",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-2373-vitest-flake-config",
+        "to": "pan-2373-flake-lane",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-2373-vitest-flake-config",
+        "to": "pan-2373-verify-gate-env",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-06-PAN-2373-feat-test-infra-flake-policy-ci-retry-semantics-quarantine-mechanism-and-non-blocking-flake-lane.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

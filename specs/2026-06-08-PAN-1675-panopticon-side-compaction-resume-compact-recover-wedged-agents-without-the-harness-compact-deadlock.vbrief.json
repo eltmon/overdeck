@@ -1,0 +1,523 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-06-08T03:57:31.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1675: feat: Panopticon-side compaction (resume --compact) — recover wedged agents without the harness /compact deadlock",
+    "updated": "2026-06-08T03:59:46.414Z"
+  },
+  "plan": {
+    "id": "pan-1675",
+    "title": "Panopticon-side compaction (resume --compact) — recover wedged agents without the harness /compact deadlock",
+    "status": "proposed",
+    "uid": "aab31111-c8c5-455f-91ee-7bc3739b0d38",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-08T03:57:31.000Z",
+    "updated": "2026-06-08T03:59:46.414Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1675",
+        "label": "PAN-1675",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1672",
+        "label": "PAN-1672",
+        "type": "related"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1615",
+        "label": "PAN-1615",
+        "type": "related"
+      }
+    ],
+    "tags": [
+      "compaction",
+      "context-overflow",
+      "deacon",
+      "recovery",
+      "cliproxy",
+      "resume"
+    ],
+    "narratives": {
+      "Problem": "When a gpt-5.5/CLIProxy work agent overflows its context window, the harness's own /compact deadlocks: it re-sends the entire over-limit transcript to produce the summary, which re-400s with 'input exceeds the context window'. The deacon's only working escalation is /clear, which drops the whole transcript and loses all in-session reasoning. PAN-1672 fix #1 lowered the window to fire proactive compaction earlier, but the underlying recovery still depends on the deadlock-prone harness compaction path.",
+      "Proposal": "Wire Panopticon's EXISTING out-of-band compaction into the work-agent resume path. compactConversationNative() already reads an agent's JSONL, runs a chunked smart summary via the configured compaction_model (independent of the wedged session), and appends a compact_boundary so `claude --resume` continues from a small window — this is proven for conversations (manual_compact_mode='panopticon-native'). Add one primitive compactAgentSession(agentId) wrapping it for work agents; expose it as resumeAgent({ compact:true }); surface it as `pan resume --compact`, a dashboard 'Resume (compact)' action, and the deacon's fresh-overflow recovery tier (falling back to /clear only if Panopticon-side compaction fails). Because summarization is out-of-band and chunked, the over-limit transcript is never re-sent through the deadlocked model — the deadlock is structurally impossible."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Reuse compactConversationNative()/generateSmartSummary() rather than writing new summarization.",
+        "rationale": "The exact out-of-band, chunked, boundary-appending mechanism the issue describes already exists and is proven for conversations. Reimplementing it would duplicate ~1100 lines and risk re-introducing the deadlock. Issue is a wiring task."
+      },
+      {
+        "summary": "Scope the deacon change to the wedged-RECOVERY tier only; leave the proactive 85% tier on harness /compact.",
+        "rationale": "Issue Surface section names the recovery tier specifically ('use this as its escalation instead of the harness /compact, falling back to /clear'). Proactive compaction fires below the ceiling where /compact still works; converting it is a separate follow-up."
+      },
+      {
+        "summary": "Frontend action goes on IssueAgentCard (work agents) only, not SpecialistAgentCard.",
+        "rationale": "The wedge is a gpt-5.5/CLIProxy work-agent problem (agent-pan-1641 live observation). Specialists rarely overflow and are not the issue's target."
+      },
+      {
+        "summary": "compactAgentSession returns { compacted, error } and never throws; compaction runs before the zombie-kill with early-return-on-failure.",
+        "rationale": "Preserves the live wedged session for the /clear fallback when compaction fails, matching the issue's fallback requirement, and keeps the primitive trivially testable."
+      }
+    ],
+    "items": [
+      {
+        "id": "compact-agent-session-helper",
+        "title": "Add compactAgentSession(agentId) primitive — out-of-band native compaction of a work agent's JSONL",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-08T03:57:31.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1675",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "resume-compact-option",
+            "deacon-native-recovery-tier",
+            "test-compact-agent-session"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/agents.ts add and export `compactAgentSession(agentId: string): Promise<{ compacted: boolean; error?: string }>`. It resolves the agent state (getAgentStateSync) and saved Claude session id (getLatestSessionIdSync), derives the JSONL path with sessionFilePath(workspace, sessionId), and runs compaction by DYNAMICALLY importing compactConversationNative from ../dashboard/server/services/conversation-compaction.js (mirrors the deacon's dynamic-import pattern to avoid the known circular dependency — see hazard H1). Call compactConversationNative(sessionFile) WITHOUT a conversationName so no conversation.compacting events fire for a work-agent JSONL (H5). Catch all errors and return { compacted:false, error } — never throw. If no workspace or no saved sessionId, return { compacted:false, error } without attempting compaction (H4)."
+        },
+        "subItems": [
+          {
+            "id": "compact-agent-session-helper.ac1",
+            "title": "compactAgentSession is exported from src/lib/agents.ts with signature (agentId) => Promise<{ compacted: boolean; error?: string }> and never throws (all failure paths return { compacted:false, error }).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compact-agent-session-helper.ac2",
+            "title": "It resolves the SAME session file the harness resumes from: sessionFilePath(agentState.workspace, getLatestSessionIdSync(agentId)); when sessionId or workspace is missing it returns { compacted:false } without calling compaction.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compact-agent-session-helper.ac3",
+            "title": "compactConversationNative is loaded via dynamic import (no new top-level import of conversation-compaction in agents.ts) and called WITHOUT a conversationName argument.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compact-agent-session-helper.ac4",
+            "title": "npm run typecheck and npm run lint pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resume-compact-option",
+        "title": "Add compact option to resumeAgent() — compact JSONL before relaunch, fail-safe before zombie-kill",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-08T03:57:31.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1675",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extend resumeAgent(agentId, message?, opts?) in src/lib/agents.ts with `compact?: boolean` on opts. When opts.compact is true, at the very START of the try block (BEFORE the existing zombie tmux-session kill at ~line 4188) call compactAgentSession(normalizedId). If it returns { compacted:false, error }, return { success:false, error: `Panopticon-side compaction failed: ${error}` } immediately — do NOT kill the session or relaunch, so the live wedged session survives for a /clear fallback (H2/H3). If compaction succeeds, continue the normal kill + `claude --resume` relaunch unchanged. When opts.compact is falsy, behaviour is byte-for-byte identical to today."
+        },
+        "subItems": [
+          {
+            "id": "resume-compact-option.ac1",
+            "title": "resumeAgent opts accepts compact?: boolean; passing { compact:true } invokes compactAgentSession before the zombie-session kill.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-compact-option.ac2",
+            "title": "When compaction fails, resumeAgent returns { success:false, error } WITHOUT killing the tmux session or building a launcher (the wedged session is left live for /clear fallback).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-compact-option.ac3",
+            "title": "When opts.compact is omitted/false, the resume path is unchanged (no compaction call).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-compact-option.ac4",
+            "title": "npm run typecheck and npm run lint pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-resume-compact-flag",
+        "title": "Add `--compact` flag to `pan resume`",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-08T03:57:31.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1675",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/cli/index.ts add `.option('--compact', 'Run Panopticon-side out-of-band compaction on the agent JSONL before resuming (recovers context-window-wedged agents)')` to the `resume <id>` command. In src/cli/commands/resume.ts add `compact?: boolean` to ResumeOptions and pass it through to resumeAgent(id, undefined, { ..., compact: options.compact === true }). On a compaction failure, surface the returned error and exit non-zero. No pan-resume wrapper skill exists, so no skill needs updating."
+        },
+        "subItems": [
+          {
+            "id": "cli-resume-compact-flag.ac1",
+            "title": "`pan resume <id> --compact` calls resumeAgent with { compact:true }; `pan resume <id>` (no flag) calls it without compact.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-resume-compact-flag.ac2",
+            "title": "`pan resume --help` lists the --compact flag with a description.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-resume-compact-flag.ac3",
+            "title": "A compaction failure prints the error and exits with a non-zero code.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "route-resume-compact-passthrough",
+        "title": "Thread `compact` through POST /api/agents/:id/resume",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-08T03:57:31.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1675",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/agents.ts, postAgentResumeRoute: read `compact` from the JSON body alongside message/model/harness, and include it in resumeOpts passed to resumeAgent (resumeOpts = { ...model, ...harness, ...(compact ? { compact:true } : {}) }). Keep the existing lifecycle gate and event emission unchanged."
+        },
+        "subItems": [
+          {
+            "id": "route-resume-compact-passthrough.ac1",
+            "title": "POST /api/agents/:id/resume with body { compact:true } calls resumeAgent with opts.compact === true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-resume-compact-passthrough.ac2",
+            "title": "Body without compact resumes exactly as before (compact undefined).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-resume-compact-passthrough.ac3",
+            "title": "npm run typecheck passes; npm run build of the server succeeds.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-resume-compact-action",
+        "title": "Add 'Resume (compact)' action to IssueAgentCard",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-08T03:57:31.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1675",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/IssueAgentCard.tsx extend the resumeAgent() fetch helper to accept an optional { compact?: boolean } and include it in the POST body. Add a secondary 'Resume (compact)' control next to the existing Resume button (or a menu item) that calls the mutation with compact:true. Show it for resumable agents; a tooltip should explain it recovers a context-window-wedged agent via out-of-band compaction. Reuse the existing resume mutation's loading/error handling (showAlert on failure)."
+        },
+        "subItems": [
+          {
+            "id": "frontend-resume-compact-action.ac1",
+            "title": "IssueAgentCard renders a 'Resume (compact)' action for resumable work agents that POSTs /api/agents/:id/resume with { compact:true }.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-resume-compact-action.ac2",
+            "title": "The plain Resume button still POSTs without compact; both share loading/error handling.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-resume-compact-action.ac3",
+            "title": "Frontend typecheck/lint pass and the action has an accessible label/tooltip describing the out-of-band recovery.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deacon-native-recovery-tier",
+        "title": "Deacon: use Panopticon-side compaction for the fresh-overflow recovery tier (fallback to /clear)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-08T03:57:31.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1675",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/deacon.ts checkApiErrorAgents(), the FRESH-overflow branch for agent-* sessions (currently `await sendKeys(sessionName, '/compact')` followed by setting contextOverflowRecoveryState phase 'compact', around lines 1052-1074) is replaced: call resumeAgent(sessionName, undefined, { compact:true }). On result.success, set contextOverflowRecoveryState phase 'compact' (so the existing 'previous tier cleared the overflow' branch nudges the resumed agent to continue) and emit a 'recovering via Panopticon-side compaction' activity entry; push an action string. On failure (result.success false), DO NOT record a compact attempt — fall straight through to the existing /clear + reseed tier in the SAME patrol pass (so a failed native compaction immediately escalates to /clear, matching the issue's fallback semantics). The /clear tier, the MAX_CONTEXT_CLEAR_ATTEMPTS ceiling, the markWorkspaceStuck escalation, and the contextSaturatedAt bookkeeping are all unchanged. Restrict native compaction to agent-* sessions (specialists/planning keep the old /compact behaviour). Leave a code comment at maybeProactivelyCompactContext noting the proactive 85% tier still uses harness /compact by design (PAN-1675, H6)."
+        },
+        "subItems": [
+          {
+            "id": "deacon-native-recovery-tier.ac1",
+            "title": "On a fresh context-overflow for an agent-* session, the deacon calls resumeAgent(session, undefined, { compact:true }) instead of sendKeys('/compact').",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-native-recovery-tier.ac2",
+            "title": "When resumeAgent({compact:true}) fails, the same patrol pass falls through to the existing /clear + reseed tier (no compact attempt recorded, /clear sent against the still-live session).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-native-recovery-tier.ac3",
+            "title": "On success, contextOverflowRecoveryState records phase 'compact' so the next patrol's 'overflow cleared' branch nudges the resumed agent; an activity entry naming Panopticon-side compaction is emitted.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-native-recovery-tier.ac4",
+            "title": "The /clear ceiling, markWorkspaceStuck escalation, contextSaturatedAt bookkeeping, and the proactive 85% tier are unchanged; non-agent (specialist/planning) sessions keep the old /compact path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-compact-agent-session",
+        "title": "Unit test: compactAgentSession resolves the right JSONL and returns a non-throwing result",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-08T03:57:31.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1675",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a Vitest unit test for compactAgentSession that mocks compactConversationNative (the dynamically-imported module) and the agent-state/session-id resolvers. Assert: (1) it calls compactConversationNative with sessionFilePath(workspace, sessionId) and no conversationName; (2) it returns { compacted:true } on success; (3) it returns { compacted:false, error } (never throws) when compactConversationNative rejects; (4) it returns { compacted:false } without calling compaction when no sessionId/workspace is resolvable."
+        },
+        "subItems": [
+          {
+            "id": "test-compact-agent-session.ac1",
+            "title": "Test asserts compactConversationNative is called with the agent's resolved sessionFilePath and no conversationName.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-compact-agent-session.ac2",
+            "title": "Test asserts a rejecting compactConversationNative yields { compacted:false, error } and does not throw.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-compact-agent-session.ac3",
+            "title": "Test asserts missing sessionId/workspace short-circuits to { compacted:false } with no compaction call. Test passes under npm test.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-deacon-recovery-tier",
+        "title": "Unit test: deacon fresh-overflow tier uses native compaction and falls back to /clear",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-08T03:57:31.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1675",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a Vitest test (alongside the existing deacon/context-overflow tests) that drives checkApiErrorAgents with a mocked agent-* session whose tmux tail contains a context-overflow error. Mock resumeAgent and sendKeys. Assert: (1) fresh overflow → resumeAgent called with { compact:true } and NO sendKeys('/compact'); (2) when resumeAgent resolves { success:false }, sendKeys('/clear') + reseed is sent in the same pass; (3) when resumeAgent resolves { success:true }, no /clear is sent and contextOverflowRecoveryState records phase 'compact'. Use fake timers if any settle/cooldown windows are involved (per the fake-timers rule)."
+        },
+        "subItems": [
+          {
+            "id": "test-deacon-recovery-tier.ac1",
+            "title": "Test: fresh agent-* overflow triggers resumeAgent({compact:true}) and never sendKeys('/compact').",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-deacon-recovery-tier.ac2",
+            "title": "Test: resumeAgent failure → /clear + reseed sent in the same patrol pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-deacon-recovery-tier.ac3",
+            "title": "Test: resumeAgent success → no /clear; recovery state phase is 'compact'. Suite uses fake timers for any delay windows and passes under npm test.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-resume-compact",
+        "title": "Document `resume --compact` and the deacon native-compaction recovery tier",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-06-08T03:57:31.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1675",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Document the new recovery path where the existing context-overflow / compaction behaviour is described (the doc that covers the deacon overflow tiers and conversation-compaction — locate via grep for 'panopticon-native' / 'context-window overflow' in docs/). Add a short section: `pan resume <id> --compact` and the dashboard 'Resume (compact)' action run out-of-band native compaction (compactConversationNative via compactAgentSession) on the agent JSONL before `claude --resume`; the deacon's fresh-overflow recovery tier now uses this instead of harness /compact, falling back to /clear only if Panopticon-side compaction fails; the proactive 85% tier still uses harness /compact by design. No code behaviour changes in this bead."
+        },
+        "subItems": [
+          {
+            "id": "docs-resume-compact.ac1",
+            "title": "The relevant existing doc gains a section describing pan resume --compact, the dashboard action, and the deacon recovery-tier change with the /clear fallback.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-resume-compact.ac2",
+            "title": "The doc states the proactive 85% tier intentionally still uses harness /compact (scope note).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "compact-agent-session-helper",
+        "to": "resume-compact-option",
+        "type": "blocks"
+      },
+      {
+        "from": "compact-agent-session-helper",
+        "to": "deacon-native-recovery-tier",
+        "type": "blocks"
+      },
+      {
+        "from": "compact-agent-session-helper",
+        "to": "test-compact-agent-session",
+        "type": "blocks"
+      },
+      {
+        "from": "resume-compact-option",
+        "to": "cli-resume-compact-flag",
+        "type": "blocks"
+      },
+      {
+        "from": "resume-compact-option",
+        "to": "route-resume-compact-passthrough",
+        "type": "blocks"
+      },
+      {
+        "from": "resume-compact-option",
+        "to": "deacon-native-recovery-tier",
+        "type": "blocks"
+      },
+      {
+        "from": "route-resume-compact-passthrough",
+        "to": "frontend-resume-compact-action",
+        "type": "blocks"
+      },
+      {
+        "from": "deacon-native-recovery-tier",
+        "to": "test-deacon-recovery-tier",
+        "type": "blocks"
+      },
+      {
+        "from": "resume-compact-option",
+        "to": "docs-resume-compact",
+        "type": "informs"
+      },
+      {
+        "from": "deacon-native-recovery-tier",
+        "to": "docs-resume-compact",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-08-PAN-1675-panopticon-side-compaction-resume-compact-recover-wedged-agents-without-the-harness-compact-deadlock.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

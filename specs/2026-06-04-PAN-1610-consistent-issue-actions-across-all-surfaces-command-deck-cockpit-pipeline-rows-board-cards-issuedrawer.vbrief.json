@@ -1,0 +1,518 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-06-04T04:53:28Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1610: Consistent issue actions across all surfaces (Command Deck cockpit, Pipeline rows, Board cards, IssueDrawer)",
+    "updated": "2026-06-04T04:56:24.193Z"
+  },
+  "plan": {
+    "id": "pan-1610",
+    "title": "Consistent issue actions across all surfaces (Command Deck cockpit, Pipeline rows, Board cards, IssueDrawer)",
+    "status": "proposed",
+    "uid": "ae2b89a7-aa35-4acb-90c7-86dd80d15d44",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-04T04:53:28Z",
+    "updated": "2026-06-04T04:56:24.193Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1610",
+        "label": "PAN-1610",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "issue-actions",
+      "parity",
+      "refactor"
+    ],
+    "narratives": {
+      "Problem": "After the Command Deck remodel an issue appears on four surfaces — Command Deck cockpit, Pipeline rows, Board (Kanban) cards, and the shared IssueDrawer — but the available action set is not consistent. Investigation shows the shared machinery already exists (lib/issueActions.ts catalog + useIssueActions hook + IssueActionMenu component, rendered on all four surfaces). The inconsistency comes from exactly TWO issue actions that bypass the catalog: `merge` (a standalone MergeButton imported only by DrawerActionBar, so merge is reachable only in the drawer) and `viewVbrief` (a bespoke button on board cards + a cockpit dig tab, absent from pipeline rows and the shared menu). Every other action the issue lists is already catalog-driven and reaches all surfaces. The existing parity test even enshrines the gap by listing Merge and View vBRIEF as 'non-issue-scoped'.",
+      "Proposal": "Close the two catalog gaps so ALL issue actions flow through the single shared source of truth. (1) Promote `merge` to a first-class ISSUE_ACTIONS entry with gating mirroring MergeButton (readyForMerge && mergeStatus!=='merged' && state!=='verifying_on_main'), a dialog-host confirm branch, dynamic label (Merge/Queued/Rebasing/Verifying) and the >2min stuck-merge retry; wire it to the existing POST /api/issues/:id/merge endpoint (no server work). (2) Promote `viewVbrief` (issue plan view) to a catalog entry gated on hasPlan, opening VBriefDialog via the dialog host. (3) Retire the two escape hatches: drop the standalone MergeButton from DrawerActionBar and the bespoke vBRIEF button from KanbanBoard, then delete MergeButton.tsx once unreferenced. (4) Update the parity test to the new contract and ADD a render-level parity assertion proving the same enabled action keys appear on board/pipeline/cockpit/drawer for a ready_to_merge state. (5) Add a human-readable enumeration doc of the full action set and its state gating. Frontend-only; the agent-fleet view (agentScopeOnly) and session-scoped ZONE_B vBRIEF are intentionally untouched."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Promote issue-scoped `merge` to ISSUE_ACTIONS (overturning the existing parity test's 'non-issue-scoped' classification of Merge).",
+        "rationale": "Merge is the single largest parity gap the issue calls out — reachable only from the drawer. Making it a catalog action is the only way every surface gets it from one source of truth."
+      },
+      {
+        "summary": "Reproduce MergeButton's full UX inside the catalog action (confirm dialog, dynamic mergeStatus label, >2min stuck-merge retry) rather than shipping a plain safe action.",
+        "rationale": "Users rely on the Queued/Rebasing/Verifying/Retry feedback; a static label would be a UX regression. The dialog-host branch + dynamic view-label pattern already exists for open/tell/inspectBead."
+      },
+      {
+        "summary": "Add `viewVbrief` meaning the ISSUE's vBRIEF plan view (VBriefDialog), gated on hasPlan; leave the session-scoped ZONE_B 'View vBRIEF' alone.",
+        "rationale": "The issue asks for issue-action parity; the issue plan is the issue-scoped artifact. The session vBRIEF is agent-session-scoped and correctly outside the issue catalog."
+      },
+      {
+        "summary": "Treat hybrid-vs-overflow-only mode divergence as acceptable layout, not a parity defect; define parity as 'same enabled action set reachable on every surface'.",
+        "rationale": "Every surface's overflow menu already exposes the full enabled set; forcing identical layouts would fight the deliberate density choices per surface."
+      },
+      {
+        "summary": "No server/contract changes; confine all work to src/dashboard/frontend/src.",
+        "rationale": "The /api/issues/:id/merge endpoint already exists and MergeButton already posts to it. This is a pure frontend consolidation."
+      }
+    ],
+    "items": [
+      {
+        "id": "catalog-merge-vbrief",
+        "title": "Add `merge` and `viewVbrief` to the shared ISSUE_ACTIONS catalog",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-04T04:53:28Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1610",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "merge-invocation",
+            "vbrief-invocation",
+            "drawer-drop-mergebutton",
+            "board-drop-vbrief-button",
+            "delete-mergebutton",
+            "update-parity-test",
+            "render-parity-test",
+            "actions-reference-doc"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/lib/issueActions.ts add two new keys to the IssueActionKey union: `merge` and `viewVbrief`. Add their ISSUE_ACTIONS entries. `merge`: panVerb 'merge', endpoint '/api/issues/:id/merge', kind 'dialog', group 'review', enabledWhen = readyForMerge===true && reviewStatus.mergeStatus!=='merged' && normalizeCanonicalState(state)!=='verifying_on_main', phasePrimary READY_TO_MERGE (add to PHASE_PRIMARY_KEYS, joining or replacing viewPr as the ready-to-merge primary). `viewVbrief`: panVerb null, endpoint null, kind 'safe' (opens a viewer via dialog host like `open`), group 'artifacts', enabledWhen = state.hasPlan===true, phasePrimary []. Add any IssueActionState fields the merge gating needs that are not already present (mergeStatus/readyForMerge already arrive via reviewStatus; do NOT add redundant fields). This bead is catalog-shape only — invocation wiring is later beads."
+        },
+        "subItems": [
+          {
+            "id": "catalog-merge-vbrief.ac1",
+            "title": "IssueActionKey union includes 'merge' and 'viewVbrief'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "catalog-merge-vbrief.ac2",
+            "title": "ISSUE_ACTIONS contains a `merge` entry whose enabledWhen returns true only when readyForMerge===true AND mergeStatus!=='merged' AND canonical state is not verifying_on_main, and false otherwise (unit test over IssueActionState fixtures)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "catalog-merge-vbrief.ac3",
+            "title": "ISSUE_ACTIONS contains a `viewVbrief` entry whose enabledWhen returns true iff state.hasPlan===true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "catalog-merge-vbrief.ac4",
+            "title": "PHASE_PRIMARY_KEYS maps READY_TO_MERGE to include `merge` as a primary action; deriveIssueActionPhase still returns READY_TO_MERGE for a ready-to-merge state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "catalog-merge-vbrief.ac5",
+            "title": "npm run typecheck and npm run lint pass; no other ISSUE_ACTIONS entries changed beyond the two additions and the phase-map edit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-invocation",
+        "title": "Wire `merge` invocation in useIssueActions + dialog host (confirm, dynamic label, stuck retry)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-04T04:53:28Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1610",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In useIssueActions.ts and IssueActionMenu.tsx (IssueActionDialogHost), implement merge end to end, porting MergeButton's logic: clicking `merge` opens a confirm dialog ('Merge <id> to main?' with the review/tests-passed message and confirmLabel 'Merge'), then POSTs /api/issues/:id/merge and calls refreshDashboardState. Compute a DYNAMIC label/disabled for the merge view from reviewStatus.mergeStatus: 'Queued' (queued), 'Rebasing…'/'Merging' (merging), 'Verifying…' (verifying), 'Retry Merge' when merging has elapsed >2min (PAN-490 stuck detection via reviewStatus.updatedAt), otherwise 'Merge'. Disable while queued/merging/verifying unless stuck. Add the bodyForAction case if needed (merge needs no body). Route via the existing dialog-host branch pattern (activeDialog.key === 'merge')."
+        },
+        "subItems": [
+          {
+            "id": "merge-invocation.ac1",
+            "title": "Invoking the merge action opens a confirm dialog; confirming POSTs to /api/issues/:id/merge and triggers refreshDashboardState (asserted with a mocked fetch)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-invocation.ac2",
+            "title": "The merge action's rendered label reflects reviewStatus.mergeStatus: Queued/Rebasing/Verifying/Merge, matching the prior MergeButton states",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-invocation.ac3",
+            "title": "After mergeStatus==='merging' for >2min the action shows a 'Retry Merge' affordance and becomes enabled; before 2min it is disabled (test uses vi.useFakeTimers()/vi.setSystemTime — no real wall-clock)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-invocation.ac4",
+            "title": "A failed merge POST surfaces the server error via the alert dialog (mirrors MergeButton error handling)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vbrief-invocation",
+        "title": "Wire `viewVbrief` to open VBriefDialog via the dialog host",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-04T04:53:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1610",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In IssueActionDialogHost (IssueActionMenu.tsx), add a branch for activeDialog.key === 'viewVbrief' that renders the existing VBriefDialog (components/vbrief/VBriefDialog.tsx) for the issueId, following the same pattern as the `open` -> IssueOpenInDialog branch. Ensure invoking `viewVbrief` from useIssueActions sets the active dialog. No new endpoint."
+        },
+        "subItems": [
+          {
+            "id": "vbrief-invocation.ac1",
+            "title": "Invoking the viewVbrief action from the shared menu opens VBriefDialog scoped to the issue (asserted via render test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vbrief-invocation.ac2",
+            "title": "Closing the dialog (Escape/backdrop) dismisses VBriefDialog without unmounting the menu",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drawer-drop-mergebutton",
+        "title": "Refactor DrawerActionBar to source merge from the shared menu (remove standalone MergeButton)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-04T04:53:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1610",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In components/drawer/DrawerActionBar.tsx remove the standalone <MergeButton> and its import. Merge now comes from the shared IssueActionMenu (pin it right alongside viewPr, e.g. pinRight={['merge','viewPr']}, or rely on its READY_TO_MERGE primary placement). Drawer behaviour for a ready-to-merge issue must still show a Merge affordance — now catalog-driven. Update DrawerActionBar.test if it asserts the old MergeButton presence."
+        },
+        "subItems": [
+          {
+            "id": "drawer-drop-mergebutton.ac1",
+            "title": "DrawerActionBar.tsx no longer imports or renders MergeButton",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-drop-mergebutton.ac2",
+            "title": "For a ready_to_merge issue, the drawer still surfaces a Merge action, now rendered by IssueActionMenu (render test asserts issue-action-merge testid present)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "board-drop-vbrief-button",
+        "title": "Refactor KanbanBoard to source vBRIEF (and merge) from the shared menu (remove bespoke vBRIEF button)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-04T04:53:28Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1610",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In components/KanbanBoard.tsx remove the bespoke vBRIEF button on cards (the action-vbrief-* button) and the onViewVBrief prop chain / setVbriefDialogIssue plumbing that exists solely to drive it. vBRIEF viewing now comes from the shared IssueActionMenu's viewVbrief action (the card already renders IssueActionMenu mode=hybrid). Remove orphaned props/state/imports the change creates. Merge likewise becomes available on board cards automatically via the catalog (no bespoke MergeButton was on cards). Keep VBriefDialog as the renderer opened by the dialog host."
+        },
+        "subItems": [
+          {
+            "id": "board-drop-vbrief-button.ac1",
+            "title": "KanbanBoard.tsx no longer renders a bespoke vBRIEF button (no data-testid=action-vbrief-*) and the onViewVBrief/setVbriefDialogIssue plumbing that only fed it is removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "board-drop-vbrief-button.ac2",
+            "title": "vBRIEF is still reachable from a board card via the shared menu's viewVbrief action when the issue hasPlan (render test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "board-drop-vbrief-button.ac3",
+            "title": "For a ready_to_merge issue, a board card surfaces the Merge action via the shared menu (render test asserts issue-action-merge testid)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "board-drop-vbrief-button.ac4",
+            "title": "No orphaned imports/props/state remain; npm run typecheck and npm run lint pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delete-mergebutton",
+        "title": "Delete the now-unused MergeButton component",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-04T04:53:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1610",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Once DrawerActionBar no longer imports MergeButton, delete components/MergeButton.tsx and any MergeButton-specific test. First grep the whole frontend for remaining importers (non-test) and confirm none exist. If a test-only importer remains, update or remove it. Do not delete if any non-test consumer still references it — surface that instead."
+        },
+        "subItems": [
+          {
+            "id": "delete-mergebutton.ac1",
+            "title": "grep for 'MergeButton' across src/dashboard/frontend/src returns no non-test importers before deletion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-mergebutton.ac2",
+            "title": "components/MergeButton.tsx is deleted; npm run typecheck and npm run lint pass with no dangling imports",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "update-parity-test",
+        "title": "Update action-parity.test.ts to the new contract (merge + viewVbrief are catalog actions)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-04T04:53:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1610",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In components/CommandDeck/__tests__/action-parity.test.ts: change legacyIssueActionMap entry 'Merge' from null to 'merge'; add a 'View vBRIEF' -> 'viewVbrief' mapping; remove 'Merge' and 'View vBRIEF' from nonIssueScopedActionLabels (keep the genuinely session-scoped entries like Stop session, View terminal, Copy Session ID). Add explicit assertions that ISSUE_ACTIONS contains both new keys. This documents the overturned classification (continue.json D3)."
+        },
+        "subItems": [
+          {
+            "id": "update-parity-test.ac1",
+            "title": "Parity test maps legacy 'Merge' -> 'merge' and 'View vBRIEF' -> 'viewVbrief' and asserts both keys exist in ISSUE_ACTIONS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-parity-test.ac2",
+            "title": "nonIssueScopedActionLabels no longer lists 'Merge' or 'View vBRIEF'; the test file still passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "render-parity-test",
+        "title": "Add render-level cross-surface parity test for a ready_to_merge issue",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-04T04:53:28Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1610",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a test that renders the shared IssueActionMenu as each of the four surfaces use it — board (hybrid), cockpit/IssueStatusBand (hybrid), pipeline (overflow-only), drawer (hybrid) — for the SAME ready_to_merge IssueActionState (the state where merge + vBRIEF were previously missing on most surfaces). Assert the set of enabled issue-action testids (including issue-action-merge and issue-action-viewVbrief) reachable (inline + opened overflow) is IDENTICAL across the four configurations. This is the regression guard that prevents future surface drift. Use fake timers if the ready_to_merge fixture exercises the stuck-merge clock.",
+          "Notes": "Layout differs by mode but the reachable enabled set must match. FleetAgentsView (agentScopeOnly) is intentionally excluded — it is not one of the four issue surfaces."
+        },
+        "subItems": [
+          {
+            "id": "render-parity-test.ac1",
+            "title": "Test renders the menu in board(hybrid), cockpit(hybrid), pipeline(overflow-only), drawer(hybrid) configs for one ready_to_merge fixture and asserts identical sets of enabled issue-action keys reachable on each",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "render-parity-test.ac2",
+            "title": "The asserted set includes issue-action-merge and issue-action-viewVbrief on every surface (proving the closed gaps)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "render-parity-test.ac3",
+            "title": "Test passes under the default vitest run (no maxForks=1, fake timers used for any clock-based assertion)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "actions-reference-doc",
+        "title": "Document the full issue-action set and its state gating",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-06-04T04:53:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1610",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add docs/ISSUE-ACTIONS.md enumerating every ISSUE_ACTIONS entry: key, label, panVerb, kind, group, the lifecycle phase(s) it is primary in, and a plain-English statement of its enabledWhen gating. State that all four surfaces (cockpit, pipeline rows, board cards, IssueDrawer) render this set via the shared IssueActionMenu, that parity is enforced by action-parity.test.ts + the render-parity test, and that FleetAgentsView/ZONE_B session actions are intentional exceptions. This satisfies the issue's first scope bullet (enumerate the action set + gating) as a living human-readable contract."
+        },
+        "subItems": [
+          {
+            "id": "actions-reference-doc.ac1",
+            "title": "docs/ISSUE-ACTIONS.md exists and lists every current ISSUE_ACTIONS key (including merge and viewVbrief) with its gating summary and primary phase(s)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "actions-reference-doc.ac2",
+            "title": "The doc names the four surfaces, the shared IssueActionMenu as the single source, and the two intentional exceptions (FleetAgentsView agentScopeOnly, ZONE_B session vBRIEF)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "catalog-merge-vbrief",
+        "to": "merge-invocation",
+        "type": "blocks"
+      },
+      {
+        "from": "catalog-merge-vbrief",
+        "to": "vbrief-invocation",
+        "type": "blocks"
+      },
+      {
+        "from": "catalog-merge-vbrief",
+        "to": "drawer-drop-mergebutton",
+        "type": "blocks"
+      },
+      {
+        "from": "catalog-merge-vbrief",
+        "to": "board-drop-vbrief-button",
+        "type": "blocks"
+      },
+      {
+        "from": "catalog-merge-vbrief",
+        "to": "update-parity-test",
+        "type": "blocks"
+      },
+      {
+        "from": "merge-invocation",
+        "to": "drawer-drop-mergebutton",
+        "type": "blocks"
+      },
+      {
+        "from": "merge-invocation",
+        "to": "board-drop-vbrief-button",
+        "type": "informs"
+      },
+      {
+        "from": "vbrief-invocation",
+        "to": "board-drop-vbrief-button",
+        "type": "blocks"
+      },
+      {
+        "from": "drawer-drop-mergebutton",
+        "to": "delete-mergebutton",
+        "type": "blocks"
+      },
+      {
+        "from": "merge-invocation",
+        "to": "render-parity-test",
+        "type": "blocks"
+      },
+      {
+        "from": "vbrief-invocation",
+        "to": "render-parity-test",
+        "type": "blocks"
+      },
+      {
+        "from": "drawer-drop-mergebutton",
+        "to": "render-parity-test",
+        "type": "informs"
+      },
+      {
+        "from": "board-drop-vbrief-button",
+        "to": "render-parity-test",
+        "type": "informs"
+      },
+      {
+        "from": "catalog-merge-vbrief",
+        "to": "actions-reference-doc",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-04-PAN-1610-consistent-issue-actions-across-all-surfaces-command-deck-cockpit-pipeline-rows-board-cards-issuedrawer.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

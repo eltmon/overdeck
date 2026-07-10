@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>UAT-in-tree redesign — interactive mockup</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#151a21; --panel2:#1b222b; --divider:#262d38;
+    --fg:#e6edf3; --muted:#8b949e; --muted2:#6e7681;
+    --green:#3fb950; --amber:#d29922; --red:#f85149; --gray:#6e7681; --blue:#58a6ff;
+    --accent:#f0883e; --rowhover:#1d242e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:1180px;margin:0 auto;padding:22px}
+  h1{font-size:19px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 18px}
+  .controls{display:flex;flex-wrap:wrap;gap:18px;align-items:center;background:var(--panel);border:1px solid var(--divider);border-radius:10px;padding:12px 16px;margin-bottom:18px}
+  .controls label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-right:8px}
+  .seg{display:inline-flex;border:1px solid var(--divider);border-radius:8px;overflow:hidden}
+  .seg button{background:transparent;color:var(--muted);border:0;padding:6px 11px;font-size:12px;cursor:pointer}
+  .seg button.on{background:var(--accent);color:#1a1206;font-weight:600}
+  .seg button:not(.on):hover{background:var(--rowhover);color:var(--fg)}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:880px){.cols{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--divider);border-radius:10px;overflow:hidden}
+  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0;padding:10px 14px;border-bottom:1px solid var(--divider);display:flex;justify-content:space-between;align-items:center}
+  .tag-old{color:var(--red)} .tag-new{color:var(--green)}
+  .tree{padding:8px 6px 12px}
+
+  /* feature row */
+  .frow{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:6px;cursor:default}
+  .frow:hover{background:var(--rowhover)}
+  .dot{width:8px;height:8px;border-radius:50%;flex:none}
+  .fname{font-weight:600}
+  .fmeta{color:var(--muted);font-size:12px}
+  .chip{font-size:10.5px;padding:1px 7px;border-radius:10px;border:1px solid var(--divider);color:var(--muted);white-space:nowrap}
+  .chip.warn{color:var(--amber);border-color:#5a4711}
+  .chip.ok{color:var(--green);border-color:#1f5128}
+  .chip.merge{color:var(--blue);border-color:#1b3a5b}
+  .spacer{flex:1}
+
+  /* generic child rows (sessions / resources) for context */
+  .kids{margin-left:14px;border-left:1px solid var(--divider);padding-left:0}
+  .krow{display:flex;align-items:center;gap:7px;padding:4px 8px 4px 14px;color:var(--muted);font-size:12.5px;border-radius:6px}
+  .krow:hover{background:var(--rowhover)}
+  .ic{width:14px;height:14px;flex:none;color:var(--muted2)}
+
+  /* ===== OLD: paper card ===== */
+  .old-uatgroup{margin-top:2px;border-top:1px solid var(--divider);padding:4px 8px 6px 28px}
+  .old-uathdr{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  .old-uathdr .sum{font-size:10px;font-weight:400;text-transform:none;letter-spacing:normal}
+  .old-paper{margin-top:6px;border:1px solid var(--divider);background:rgba(255,255,255,.025);border-radius:8px;padding:10px;font-size:12px}
+  .old-paper .line{display:flex;align-items:center;gap:8px;font-weight:600}
+  .old-cont{margin-top:8px;display:grid;gap:6px}
+  .old-crow{display:grid;grid-template-columns:14px 1fr auto;align-items:center;gap:8px;border:1px solid var(--divider);background:rgba(0,0,0,.25);border-radius:6px;padding:6px 8px;font-size:11.5px}
+  .old-note{color:var(--muted2);font-size:11px;margin-top:6px}
+
+  /* ===== NEW: real tree child ===== */
+  .uat-node{}
+  .uat-row{display:flex;align-items:center;gap:7px;padding:4px 8px 4px 14px;border-radius:6px;cursor:pointer;position:relative}
+  .uat-row:hover{background:var(--rowhover)}
+  .caret{width:12px;height:12px;flex:none;color:var(--muted2);transition:transform .12s;display:inline-flex;align-items:center;justify-content:center}
+  .uat-node.open .caret{transform:rotate(90deg)}
+  .uat-row .ic{color:var(--muted)}
+  .uat-label{font-size:12.5px;color:var(--fg)}
+  .statuschip{font-size:10.5px;padding:1px 8px;border-radius:10px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+  .sc-dot{width:7px;height:7px;border-radius:50%}
+  .actions{display:flex;gap:4px;align-items:center;margin-left:auto}   /* always visible — collapsed AND expanded */
+  .btn{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:6px;border:1px solid var(--divider);background:var(--panel2);color:var(--fg);cursor:pointer;white-space:nowrap}
+  .btn:hover{background:var(--rowhover)}
+  .btn.primary{border-color:var(--accent);color:var(--accent)}
+  .btn.danger:hover{border-color:var(--red);color:var(--red)}
+  .btn .gi{width:12px;height:12px}
+  .uat-kids{margin-left:28px;border-left:1px solid var(--divider);display:none}
+  .uat-node.open .uat-kids{display:block}
+  .crow{display:flex;align-items:center;gap:8px;padding:3px 8px 3px 12px;font-size:11.5px;color:var(--muted);border-radius:5px}
+  .crow:hover{background:var(--rowhover)}
+  .crow .cd{width:7px;height:7px;border-radius:50%;flex:none}
+  .crow .cname{color:var(--fg);font-weight:500;min-width:78px}
+  .crow .cstat{color:var(--muted2)}
+  .reason{padding:4px 8px 6px 34px;color:var(--amber);font-size:11px}
+  /* right-click context menu */
+  .ctxmenu{position:fixed;z-index:50;min-width:200px;background:var(--panel2);border:1px solid var(--divider);border-radius:8px;padding:4px;box-shadow:0 10px 28px rgba(0,0,0,.55);font-size:12.5px;display:none}
+  .ctxmenu.show{display:block}
+  .ctxmenu .mlabel{padding:5px 10px 3px;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted2)}
+  .ctxmenu .mi{display:flex;align-items:center;gap:9px;padding:6px 10px;border-radius:6px;color:var(--fg);cursor:pointer;white-space:nowrap}
+  .ctxmenu .mi:hover{background:var(--rowhover)}
+  .ctxmenu .mi.muted{color:var(--muted)}
+  .ctxmenu .mi.primary{color:var(--accent)}
+  .ctxmenu .mi.danger{color:var(--red)}
+  .ctxmenu .mi .gi{width:13px;height:13px;flex:none}
+  .ctxmenu .sep{height:1px;background:var(--divider);margin:4px 4px}
+  .hint{padding:10px 14px;color:var(--muted2);font-size:11.5px;border-top:1px solid var(--divider);background:rgba(0,0,0,.15)}
+  .legend{margin-top:18px;background:var(--panel);border:1px solid var(--divider);border-radius:10px;padding:14px 16px;font-size:12.5px}
+  .legend h3{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+  .legend table{width:100%;border-collapse:collapse}
+  .legend td{padding:5px 8px;border-bottom:1px solid var(--divider);vertical-align:top}
+  .legend td:first-child{white-space:nowrap;color:var(--fg);font-weight:600;width:150px}
+  .legend code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:11px}
+  svg{display:block}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>UAT environment in the issue tree — redesign mockup</h1>
+  <p class="sub">Same data, two renderings. Flip the <b>stack scenario</b> to see how status semantics + contextual actions adapt. Toggle <b>Old vs New</b> to compare. In the NEW tree, click the <b>UAT environment</b> row to expand/collapse (collapsed by default).</p>
+
+  <div class="controls">
+    <div><label>Stack scenario</label>
+      <span class="seg" id="scen">
+        <button data-s="healthy">Healthy 7/7</button>
+        <button data-s="starting">Starting</button>
+        <button data-s="unhealthy" class="on">Unhealthy 2/7</button>
+        <button data-s="stopped">Stopped (idle)</button>
+        <button data-s="stale">Stale (merged 4d)</button>
+      </span>
+    </div>
+    <div><label>View</label>
+      <span class="seg" id="view">
+        <button data-v="both" class="on">Both</button>
+        <button data-v="old">Old only</button>
+        <button data-v="new">New only</button>
+      </span>
+    </div>
+  </div>
+
+  <div class="cols" id="cols">
+    <!-- OLD -->
+    <div class="card" id="card-old">
+      <h2>Current <span class="tag-old">● paper card, always open, no actions</span></h2>
+      <div class="tree">
+        <div class="frow">
+          <span class="dot" style="background:var(--blue)"></span>
+          <span class="fname">MIN-846</span>
+          <span class="fmeta">Fizzy Integration: Bi-directional sync</span>
+          <span class="spacer"></span>
+          <span class="chip ok">In Review</span>
+          <span class="chip merge">⎇ Merge</span>
+          <span class="chip warn" id="old-featchip">UAT starting</span>
+        </div>
+        <div class="kids">
+          <div class="krow">${ICON_test}<span>Test</span><span class="spacer"></span><span style="color:var(--muted2);font-size:11px">haiku-4-5</span></div>
+          <div class="krow">${ICON_box}<span>workspace</span></div>
+          <div class="krow">${ICON_bead}<span>beads</span></div>
+        </div>
+        <!-- old uat paper -->
+        <div class="old-uatgroup">
+          <div class="old-uathdr">${ICON_chevdown}<span>UAT environment</span><span class="sum" id="old-sum">2/7 healthy</span></div>
+          <div class="old-paper">
+            <div class="line"><span id="old-spin">${ICON_spin}</span><span id="old-line">UAT stack 2/7 healthy</span></div>
+            <div class="old-cont" id="old-cont"></div>
+            <div class="old-note" id="old-note">myn-feature-min-846-api-1 service exited (255)</div>
+          </div>
+        </div>
+      </div>
+      <div class="hint">Problems: the <code>ChevronDown</code> is decorative (no toggle); the card self-borders so it floats like a sheet; "0/7 healthy" shown red even when the stack was cleanly <i>stopped</i>; zero action buttons.</div>
+    </div>
+
+    <!-- NEW -->
+    <div class="card" id="card-new">
+      <h2>Proposed <span class="tag-new">● tree child, collapsible, contextual actions</span></h2>
+      <div class="tree">
+        <div class="frow">
+          <span class="dot" style="background:var(--blue)"></span>
+          <span class="fname">MIN-846</span>
+          <span class="fmeta">Fizzy Integration: Bi-directional sync</span>
+          <span class="spacer"></span>
+          <span class="chip ok">In Review</span>
+          <span class="chip merge">⎇ Merge</span>
+          <span class="chip" id="new-featchip">UAT 2/7</span>
+        </div>
+        <div class="kids">
+          <div class="krow">${ICON_test}<span>Test</span><span class="spacer"></span><span style="color:var(--muted2);font-size:11px">haiku-4-5</span></div>
+          <div class="krow">${ICON_box}<span>workspace</span></div>
+          <div class="krow">${ICON_bead}<span>beads</span></div>
+
+          <!-- UAT as real tree child -->
+          <div class="uat-node" id="uatNode">
+            <div class="uat-row" id="uatRow">
+              <span class="caret">${ICON_caret}</span>
+              ${ICON_layers}
+              <span class="uat-label">UAT environment</span>
+              <span class="statuschip" id="new-chip"><span class="sc-dot"></span><span id="new-chip-text">2/7 unhealthy</span></span>
+              <span class="actions" id="new-actions"></span>
+            </div>
+            <div class="reason" id="new-reason"></div>
+            <div class="uat-kids" id="uatKids"></div>
+          </div>
+        </div>
+      </div>
+      <div class="hint">Collapsed by default; the row IS the status (color = real state). The 1–2 most relevant actions sit inline (always visible); <b>right-click the row</b> for the full action menu. Containers expand as plain tree rows — no paper.</div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <h3>Contextual action resolver — what surfaces, when</h3>
+    <table>
+      <tr><td>Healthy</td><td>Open <b>UAT</b> ↗ &nbsp; <b>API</b> ↗ &nbsp;·&nbsp; (Restart in overflow). Chip = <span style="color:var(--green)">green</span>.</td></tr>
+      <tr><td>Starting</td><td><b>Logs</b> (watch boot) &nbsp;·&nbsp; spinner. Chip = <span style="color:var(--amber)">amber</span>. No destructive actions while transient.</td></tr>
+      <tr><td>Unhealthy</td><td><b>Logs</b> (primary — diagnose) &nbsp; <b>Rebuild</b>. Chip = <span style="color:var(--red)">red</span> "N/M unhealthy" + the first failure reason inline.</td></tr>
+      <tr><td>Stopped (idle)</td><td><b>Start</b> (primary — bring back up) &nbsp; <b>Reap</b>. Chip = <span style="color:var(--gray)">gray</span> "stopped 4d" — <i>not</i> red. This is the screenshot case.</td></tr>
+      <tr><td>Stale (merged)</td><td><b>Reap workspace</b> (primary). Chip = <span style="color:var(--gray)">gray</span> "merged · idle 4d". The issue's done; stop showing it as a health problem.</td></tr>
+    </table>
+    <p style="color:var(--muted2);margin:10px 0 0;font-size:11.5px">The action set is derived from <b>(stack state × issue lifecycle)</b> — the same "surface the right operator action for the context" principle generalizes to other error rows (red main, troubled agent, orphaned resources).</p>
+  </div>
+</div>
+<div class="ctxmenu" id="ctx"></div>
+
+<script>
+/* ---- inline icons ---- */
+const I={
+  test:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3h6M10 3v6l-5 9a2 2 0 002 3h10a2 2 0 002-3l-5-9V3"/></svg>',
+  box:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8l-9-5-9 5 9 5 9-5zM3 8v8l9 5 9-5V8"/></svg>',
+  bead:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="18" cy="12" r="2"/></svg>',
+  layers:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l9 5-9 5-9-5 9-5zM3 12l9 5 9-5M3 17l9 5 9-5"/></svg>',
+  caret:'<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 6l6 6-6 6"/></svg>',
+  chevdown:'<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>',
+  spin:'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#d29922" stroke-width="2"><path d="M12 3a9 9 0 109 9"/></svg>',
+};
+const G={
+  ext:'<svg class="gi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M10 14L20 4M19 13v6a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1h6"/></svg>',
+  logs:'<svg class="gi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M4 10h16M4 15h10"/></svg>',
+  rebuild:'<svg class="gi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-3-6.7M21 4v5h-5"/></svg>',
+  play:'<svg class="gi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4l14 8-14 8V4z"/></svg>',
+  trash:'<svg class="gi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>',
+};
+/* replace ${ICON_*} placeholders rendered as text */
+document.body.innerHTML=document.body.innerHTML
+  .replaceAll('${ICON_test}',I.test).replaceAll('${ICON_box}',I.box).replaceAll('${ICON_bead}',I.bead)
+  .replaceAll('${ICON_layers}',I.layers).replaceAll('${ICON_caret}',I.caret)
+  .replaceAll('${ICON_chevdown}',I.chevdown).replaceAll('${ICON_spin}',I.spin);
+
+const C={green:'#3fb950',amber:'#d29922',red:'#f85149',gray:'#6e7681'};
+const containers=['postgres','redis','api','frontend','dev','init-fe','test-unit'];
+
+const SCEN={
+  healthy:{color:C.green,chip:'7/7 healthy',feat:'UAT 7/7',featcls:'ok',reason:'',force:false,
+    actions:[['Open UAT',G.ext,'primary'],['API',G.ext,'']],
+    states:()=>containers.map(n=>['healthy','Up 2h']) },
+  starting:{color:C.amber,chip:'starting…',feat:'UAT starting',featcls:'warn',reason:'Waiting for api healthcheck (38s)',force:true,
+    actions:[['Logs',G.logs,'']],
+    states:()=>containers.map((n,i)=> i<3?['starting','booting']:['healthy','Up 1m']) },
+  unhealthy:{color:C.red,chip:'2/7 unhealthy',feat:'UAT 2/7',featcls:'warn',reason:'api exited (255): FizzyProvisioningService missing @Value default under dev profile',force:true,
+    actions:[['Logs',G.logs,'primary'],['Rebuild',G.rebuild,'']],
+    states:()=>containers.map((n,i)=> (n==='api'||n==='frontend')?['unhealthy','exited (255)']:(i<2?['healthy','Up 9m']:['stopped','—'])) },
+  stopped:{color:C.gray,chip:'stopped · 4d',feat:'UAT stopped',featcls:'',reason:'Stack cleanly stopped 4 days ago (idle reap). Not a failure.',force:true,
+    actions:[['Start',G.play,'primary'],['Reap',G.trash,'danger']],
+    states:()=>containers.map(n=>['stopped','exited (0) 4d ago']) },
+  stale:{color:C.gray,chip:'merged · idle 4d',feat:'UAT idle',featcls:'',reason:'Issue merged 4 days ago — workspace + stack can be reaped.',force:true,
+    actions:[['Reap workspace',G.trash,'primary']],
+    states:()=>containers.map(n=>['stopped','exited (0) 4d ago']) },
+};
+
+let scen='unhealthy', view='both';
+
+function dotColor(s){return s==='healthy'?C.green:s==='starting'?C.amber:s==='unhealthy'?C.red:C.gray}
+
+function render(){
+  const s=SCEN[scen];
+  /* OLD */
+  document.getElementById('old-sum').textContent=s.chip.replace('unhealthy','healthy').replace('stopped · 4d','0/7 healthy').replace('merged · idle 4d','0/7 healthy').replace('starting…','rebuilding');
+  document.getElementById('old-line').textContent='UAT stack '+(scen==='healthy'?'7/7 healthy':scen==='starting'?'rebuilding':scen==='unhealthy'?'2/7 healthy':'0/7 healthy');
+  document.getElementById('old-spin').innerHTML = scen==='healthy'? '<span style="color:#3fb950">✔</span>' : I.spin;
+  document.getElementById('old-featchip').textContent = scen==='healthy'?'UAT healthy':'UAT starting';
+  document.getElementById('old-note').textContent = scen==='healthy'? '' : 'myn-feature-min-846-api-1 service exited (255)';
+  const oc=document.getElementById('old-cont'); oc.innerHTML='';
+  s.states().forEach(([st,txt],i)=>{
+    oc.insertAdjacentHTML('beforeend',
+      `<div class="old-crow"><span style="width:8px;height:8px;border-radius:50%;background:${dotColor(scen==='stopped'||scen==='stale'?'stopped':st)}"></span>
+      <span>${containers[i]}</span><span style="color:var(--muted2)">${scen==='stopped'||scen==='stale'?'exited (255) 4 days ago':txt}</span></div>`);
+  });
+
+  /* NEW */
+  const chip=document.getElementById('new-chip');
+  chip.style.background = s.color+'22'; chip.style.color=s.color;
+  chip.querySelector('.sc-dot').style.background=s.color;
+  document.getElementById('new-chip-text').textContent=s.chip;
+  const fc=document.getElementById('new-featchip'); fc.textContent=s.feat; fc.className='chip '+(s.featcls||'');
+  const rs=document.getElementById('new-reason'); rs.textContent=s.reason; rs.style.display=s.reason?'block':'none';
+  rs.style.color = (scen==='stopped'||scen==='stale')?'var(--muted2)':'var(--amber)';
+  const act=document.getElementById('new-actions');
+  act.className='actions';
+  act.innerHTML=s.actions.map(([label,icon,cls])=>`<button class="btn ${cls}">${icon}${label}</button>`).join('');
+  const kids=document.getElementById('uatKids'); kids.innerHTML='';
+  s.states().forEach(([st,txt],i)=>{
+    const real=(scen==='stopped'||scen==='stale')?'stopped':st;
+    kids.insertAdjacentHTML('beforeend',
+      `<div class="crow"><span class="cd" style="background:${dotColor(real)}"></span><span class="cname">${containers[i]}</span><span class="cstat">${txt}</span></div>`);
+  });
+
+  /* view toggle */
+  document.getElementById('card-old').style.display = view==='new'?'none':'';
+  document.getElementById('card-new').style.display = view==='old'?'none':'';
+  document.getElementById('cols').style.gridTemplateColumns = view==='both'?'1fr 1fr':'1fr';
+}
+
+document.getElementById('scen').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  scen=b.dataset.s; [...e.currentTarget.children].forEach(x=>x.classList.toggle('on',x===b)); render();
+});
+document.getElementById('view').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  view=b.dataset.v; [...e.currentTarget.children].forEach(x=>x.classList.toggle('on',x===b)); render();
+});
+document.getElementById('uatRow').addEventListener('click',()=>{
+  document.getElementById('uatNode').classList.toggle('open');
+});
+
+/* right-click: full action menu — primary contextual action(s) on top, then everything available */
+function buildMenu(scen){
+  const prim={
+    healthy:[{l:'Open UAT ↗',i:G.ext,cls:'primary'},{l:'Open API ↗',i:G.ext}],
+    starting:[{l:'View logs',i:G.logs,cls:'primary'}],
+    unhealthy:[{l:'View logs',i:G.logs,cls:'primary'},{l:'Rebuild stack',i:G.rebuild}],
+    stopped:[{l:'Start stack',i:G.play,cls:'primary'}],
+    stale:[{l:'Reap workspace',i:G.trash,cls:'primary danger'}],
+  }[scen]||[];
+  const primL=new Set(prim.map(x=>x.l));
+  const idle=(scen==='stopped'||scen==='stale');
+  const all=[
+    {l:'Open UAT ↗',i:G.ext},{l:'Open API ↗',i:G.ext},
+    {l:'View logs',i:G.logs},
+    {l:'Restart stack',i:G.rebuild},{l:'Rebuild stack',i:G.rebuild},
+    {l:idle?'Start stack':'Stop stack',i:idle?G.play:G.trash,cls:'muted'},
+    {l:'Open state dir',i:G.logs,cls:'muted'},{l:'Copy stack name',i:G.logs,cls:'muted'},
+  ].filter(x=>!primL.has(x.l));
+  const tail = primL.has('Reap workspace')?[]:[{sep:1},{l:'Reap workspace',i:G.trash,cls:'danger'}];
+  return [...prim,{sep:1},...all,...tail];
+}
+const ctx=document.getElementById('ctx');
+document.getElementById('uatRow').addEventListener('contextmenu',e=>{
+  e.preventDefault();
+  ctx.innerHTML='<div class="mlabel">UAT environment · '+scen+'</div>'+
+    buildMenu(scen).map(it=>it.sep?'<div class="sep"></div>':`<div class="mi ${it.cls||''}">${it.i||''}${it.l}</div>`).join('');
+  ctx.style.left=Math.min(e.clientX,window.innerWidth-224)+'px';
+  ctx.style.top=Math.min(e.clientY,window.innerHeight-380)+'px';
+  ctx.classList.add('show');
+});
+document.addEventListener('click',()=>ctx.classList.remove('show'));
+window.addEventListener('scroll',()=>ctx.classList.remove('show'),true);
+render();
+</script>
+</body>
+</html>

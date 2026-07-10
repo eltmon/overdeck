@@ -1,0 +1,197 @@
+{
+  "issueId": "PAN-2147",
+  "schemaVersion": 2,
+  "feedback": [],
+  "harness": "claude-code",
+  "model": "claude-opus-4-8",
+  "statusOverrides": {
+    "b12-barrel-verify": "completed",
+    "b12-barrel-verify.ac1": "completed",
+    "b12-barrel-verify.ac2": "completed",
+    "b12-barrel-verify.ac3": "completed",
+    "b12-barrel-verify.ac4": "completed",
+    "b11-spawn": "completed",
+    "b11-spawn.ac1": "completed",
+    "b11-spawn.ac2": "completed",
+    "b11-spawn.ac3": "completed",
+    "b10-spawn-helpers": "completed",
+    "b10-spawn-helpers.ac1": "completed",
+    "b10-spawn-helpers.ac2": "completed",
+    "b10-spawn-helpers.ac3": "completed",
+    "b9-control": "completed",
+    "b9-control.ac1": "completed",
+    "b9-control.ac2": "completed",
+    "b9-control.ac3": "completed",
+    "b8-lifecycle-restart": "completed",
+    "b8-lifecycle-restart.ac1": "completed",
+    "b8-lifecycle-restart.ac2": "completed",
+    "b8-lifecycle-restart.ac3": "completed",
+    "b7-lifecycle-stop": "completed",
+    "b7-lifecycle-stop.ac1": "completed",
+    "b7-lifecycle-stop.ac2": "completed",
+    "b7-lifecycle-stop.ac3": "completed",
+    "b6-runtime-events": "completed",
+    "b6-runtime-events.ac1": "completed",
+    "b6-runtime-events.ac2": "completed",
+    "b6-runtime-events.ac3": "completed",
+    "b5-permissions": "completed",
+    "b5-permissions.ac1": "completed",
+    "b5-permissions.ac2": "completed",
+    "b5-permissions.ac3": "completed",
+    "b4-messaging": "completed",
+    "b4-messaging.ac1": "completed",
+    "b4-messaging.ac2": "completed",
+    "b4-messaging.ac3": "completed",
+    "b3-conversation": "completed",
+    "b3-conversation.ac1": "completed",
+    "b3-conversation.ac2": "completed",
+    "b3-conversation.ac3": "completed",
+    "b2-listing": "completed",
+    "b2-listing.ac1": "completed",
+    "b2-listing.ac2": "completed",
+    "b2-listing.ac3": "completed",
+    "b1-shared": "completed",
+    "b1-shared.ac1": "completed",
+    "b1-shared.ac2": "completed",
+    "b1-shared.ac3": "completed",
+    "b1-shared.ac4": "completed"
+  },
+  "pipeline": {
+    "issueId": "PAN-2147",
+    "reviewStatus": "passed",
+    "testStatus": "failed",
+    "inspectStatus": "passed",
+    "mergeStatus": "merged",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-07T03:05:50.794Z",
+    "reviewNotes": "No blocking findings; route split preserves route set/exports and focused gates passed",
+    "testNotes": "Ran workspace gates from /home/eltmon/Projects/overdeck/workspaces/feature-pan-2147: bun install, npm run typecheck (passed), npm run lint (passed incl. file-size guard), npm run build (passed), and npx vitest run --configLoader runner. Full suite result: 1 failed | 8170 passed | 52 skipped. Failure: tests/unit/dashboard/routes/dashboard-continue-readers.test.ts:26 'AC1: appendSessionEntry is used in routes/agents.ts' expected a grep hit in src/dashboard/server/routes/agents.ts but got none, because appendSessionEntry is now used in src/dashboard/server/routes/agents/spawn.ts after decomposition. This test needs repointing to the new submodule (issue requirement: 'Repoint any test importing moved internals in the same commit'). No browser UAT required: PAN-2147 is a backend behavior-preserving refactor with no UI/dashboard acceptance criteria.",
+    "inspectNotes": "INSPECTION PASSED for bead workspace-2ua1s. b10-spawn-helpers matches the plan: remote spawn and container orchestration moved into spawn-helpers.ts, postAgentsRoute calls the helpers, captured locals are threaded explicitly, statement order is preserved, spawn-helpers.ts is under 1000 lines, moved any usage is allowlisted, and no execSync/sendKeys violations were found.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2316",
+    "reviewedAtCommit": "e467682149b125816e2993a46a28d69aa6c9ec18",
+    "lastVerifiedCommit": "e467682149b125816e2993a46a28d69aa6c9ec18",
+    "reviewRequestedAt": "2026-07-03T17:35:12.519Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        ".pan/drafts/pan-2147.md",
+        ".pan/records/pan-2147.json",
+        "tests/unit/dashboard/routes/agents-no-loss.test.ts",
+        "tests/unit/lib/pan-1908-no-loss-audit.test.ts"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "eslint-any-allowlist.json",
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/server/routes/agents.ts",
+        "src/dashboard/server/routes/agents/control.ts",
+        "src/dashboard/server/routes/agents/conversation.ts",
+        "src/dashboard/server/routes/agents/lifecycle-restart.ts",
+        "src/dashboard/server/routes/agents/lifecycle-stop.ts",
+        "src/dashboard/server/routes/agents/listing.ts",
+        "src/dashboard/server/routes/agents/messaging.ts",
+        "src/dashboard/server/routes/agents/permissions.ts",
+        "src/dashboard/server/routes/agents/runtime-events.ts",
+        "src/dashboard/server/routes/agents/shared.ts",
+        "src/dashboard/server/routes/agents/spawn-helpers.ts",
+        "src/dashboard/server/routes/agents/spawn.ts"
+      ],
+      "actualChangedFiles": [
+        ".pan/drafts/pan-2147.md",
+        ".pan/records/pan-2147.json",
+        "eslint-any-allowlist.json",
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/server/routes/agents.ts",
+        "src/dashboard/server/routes/agents/control.ts",
+        "src/dashboard/server/routes/agents/conversation.ts",
+        "src/dashboard/server/routes/agents/lifecycle-restart.ts",
+        "src/dashboard/server/routes/agents/lifecycle-stop.ts",
+        "src/dashboard/server/routes/agents/listing.ts",
+        "src/dashboard/server/routes/agents/messaging.ts",
+        "src/dashboard/server/routes/agents/permissions.ts",
+        "src/dashboard/server/routes/agents/runtime-events.ts",
+        "src/dashboard/server/routes/agents/shared.ts",
+        "src/dashboard/server/routes/agents/spawn-helpers.ts",
+        "src/dashboard/server/routes/agents/spawn.ts",
+        "tests/unit/dashboard/routes/agents-no-loss.test.ts",
+        "tests/unit/lib/pan-1908-no-loss-audit.test.ts"
+      ],
+      "recordedAt": "2026-07-03T17:35:03.775Z"
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-07T03:05:50.794Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "inspect": {
+          "openai/gpt-5.5": {
+            "input": 654441,
+            "output": 36726,
+            "cacheRead": 6989824,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 25380,
+            "output": 605,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 27141,
+            "output": 90006,
+            "cacheRead": 10823939,
+            "cacheWrite": 233984
+          }
+        },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 297080,
+            "output": 8610,
+            "cacheRead": 2148864,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.5": {
+          "input": 654441,
+          "output": 36726,
+          "cacheRead": 6989824,
+          "cacheWrite": 0
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 25380,
+          "output": 605,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 27141,
+          "output": 90006,
+          "cacheRead": 10823939,
+          "cacheWrite": 233984
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 297080,
+          "output": 8610,
+          "cacheRead": 2148864,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 17.85408,
+        "pricingAsOf": "2026-07-03T17:44:26.820Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2316"
+    ],
+    "ranOn": "eltmon-z790"
+  },
+  "created": "2026-07-03T17:44:26.833Z",
+  "updated": "2026-07-08T16:01:27.620Z"
+}

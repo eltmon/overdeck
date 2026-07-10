@@ -1,0 +1,49 @@
+{
+  "version": "1",
+  "issueId": "PAN-1139",
+  "created": "2026-05-17T15:45:59.770Z",
+  "updated": "2026-05-17T16:23:27.007Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "feedback": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T15:45Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T15:45:59.770Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T15:57Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-17T15:57:40.942Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T16:06Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-05-17T16:06:46.335Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T16:09Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T16:09:22.669Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T16:09Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-05-17T16:09:35.047Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T16:11Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-05-17T16:11:01.290Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T16:13Z] review-agent → CHANGES-REQUESTED — seq 4",
+      "timestamp": "2026-05-17T16:13:52.441Z"
+    }
+  ]
+}

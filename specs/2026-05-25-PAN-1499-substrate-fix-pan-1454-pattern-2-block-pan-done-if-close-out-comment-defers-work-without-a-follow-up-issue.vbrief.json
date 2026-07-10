@@ -1,0 +1,375 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-25T14:50:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1499: Substrate fix (PAN-1454 pattern 2): block pan done if close-out comment defers work without a follow-up issue",
+    "updated": "2026-05-25T14:55:24.113Z"
+  },
+  "plan": {
+    "id": "pan-1499",
+    "title": "Substrate fix (PAN-1454 pattern 2): block pan done if close-out comment defers work without a follow-up issue",
+    "status": "proposed",
+    "uid": "17135e56-f25a-4777-b325-84534e9b258c",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-25T14:50:00.000Z",
+    "updated": "2026-05-25T14:55:24.113Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1499",
+        "label": "PAN-1499",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1454",
+        "label": "PAN-1454 (parent META)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/829",
+        "label": "PAN-829 (audit example)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1158",
+        "label": "PAN-1158 (audit example)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1146",
+        "label": "PAN-1146 (audit example)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1249",
+        "label": "PAN-1249 (audit example)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "substrate",
+      "close-out",
+      "audit-gate",
+      "pan-1454"
+    ],
+    "narratives": {
+      "Problem": "PAN-1454 pattern 2 — agent close-out comments honestly admit deferral (\"will come later\", \"out of scope\", \"partial\", \"TODO:\") but no follow-up issue is filed and the original closes. Audited in PAN-829, PAN-1158, PAN-1146, PAN-1249. The pipeline currently has no mechanical gate that prevents this: pan done and pan close accept any --comment string and any AC list, so a deferred-but-unlinked close-out succeeds silently.",
+      "Proposal": "Add a hard substrate gate. A pure helper detectDeferralLanguage(commentBody, acList) returns suspected deferral phrases (phrase corpus + AC-status checks). pan done and pan close call the helper after their existing preflight; if any deferrals are found, the close refuses unless a follow-up issue is linked (PAN-NNNN, MIN-NNNN, or a github.com/.../issues/N URL) or the AC list has been amended (deferred items struck through, status=cancelled, or metadata.deferred=true). Operator override --allow-unlinked-deferral \"<reason>\" bypasses with a reason logged via the activity logger so the audit trail still shows the override. Strike-role short-circuit is preserved (strikes have already merged on main; gate does not apply). Tests cover a corpus drawn from the four PAN-1454 audit examples."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Place the new helper at src/lib/close-out/deferral-detection.ts (creating the src/lib/close-out/ directory).",
+        "rationale": "Issue body says 'src/lib/close-out/ or wherever close-out lives'. Close-out logic today is fragmented (src/lib/close-out.ts legacy monolith + src/lib/lifecycle/). Creating src/lib/close-out/ as a new directory matches the issue's preferred location and gives future substrate fixes a coherent home without disturbing the lifecycle/ module."
+      },
+      {
+        "summary": "Follow-up link regex accepts any [A-Z]+-\\d+ tracker prefix plus https?://github.com/<owner>/<repo>/issues/\\d+.",
+        "rationale": "Panopticon supports multiple trackers (PAN-, MIN-, KRUX-, etc. — see projects.yaml resolution in src/lib/projects.ts). Restricting to PAN- only would break cross-tracker follow-up links and create a false-negative audit gap."
+      },
+      {
+        "summary": "AC amendment counts as: subItem.status in {cancelled, deferred} OR metadata.deferred === true OR title contains GitHub strikethrough (~~...~~).",
+        "rationale": "Reuses the existing isDeferredOrCancelledItem() semantics from src/lib/vbrief/acceptance-criteria.ts (line 52-56), plus a strikethrough check covers manual markdown edits where the agent kept the AC item but visually crossed it out. Three concrete signals beat one fuzzy check."
+      },
+      {
+        "summary": "--allow-unlinked-deferral <reason> is mandatory-reason (string arg, not boolean) and is the ONLY sanctioned bypass; --force does NOT bypass the deferral gate.",
+        "rationale": "Without this, an agent could fall back to pan done --force and silently sidestep the substrate fix — exactly the failure mode PAN-1454 catalogs. A reason-required override forces the operator to articulate intent, and the activity event captures the reason for later audit (matches PAN-1454 audit philosophy)."
+      },
+      {
+        "summary": "For pan done, the comment scanned is options.comment (the agent's --comment passed at done time, since that becomes the close-out comment posted via the In-Review transition). For pan close, the gate scans the most-recent agent-authored issue comment fetched via gh issue view --json comments (best-effort; failure-to-fetch falls through with a warning emitted to activity, not a hard block).",
+        "rationale": "The deferral language we care about is posted by the agent during done, not by the human running close. pan close's own comment is the generic 'Closed via close-out ceremony' boilerplate (workflows.ts:206) — scanning it would be useless. Scanning the latest agent comment on the tracker for pan close catches the case where done went through without the gate (pre-PAN-1499 done invocations or external comment edits)."
+      },
+      {
+        "summary": "Strike role (pan done --strike) is exempt from the gate. The gate runs AFTER the strike short-circuit at done.ts:192-201.",
+        "rationale": "Strike agents have already merged to main and verified there before pan done is called; their --comment, if any, is an acknowledgement event, not a close-out summary. Treating strikes the same way the existing closed-issue guard treats them keeps the gate orthogonal to strike semantics."
+      },
+      {
+        "summary": "Bead inspection: only the helper bead (foundation) has requiresInspection: true (depth: fast). The two integration beads consume the helper's API mechanically.",
+        "rationale": "Helper API shape (input types, output structure, phrase corpus boundaries) is the only judgment call that would force rework downstream if wrong. Integration beads are wire-up — option flag, call site, branch on result, emit activity — verifiable from the diff. More than one inspection on a 3-bead plan would burn cost without catching anything."
+      }
+    ],
+    "items": [
+      {
+        "id": "deferral-detection-helper",
+        "title": "Add detectDeferralLanguage helper at src/lib/close-out/deferral-detection.ts with corpus tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T14:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1499",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "wire-pan-done-gate",
+            "wire-pan-close-gate"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/close-out/deferral-detection.ts exporting a pure function detectDeferralLanguage(input: { commentBody: string | null | undefined; acList: VBriefSubItem[] | null | undefined }) returning DeferralDetectionResult: { suspectedPhrases: Array<{ phrase: string; context: string }>; hasFollowUpLink: boolean; followUpLinks: string[]; acAmendments: Array<{ itemId: string; reason: 'cancelled' | 'deferred-status' | 'metadata-deferred' | 'strikethrough' }>; shouldBlock: boolean }. shouldBlock is true iff suspectedPhrases.length > 0 AND hasFollowUpLink === false AND acAmendments.length === 0. Phrase corpus (case-insensitive, word-boundary): 'deferred', 'punt', 'punted', 'follow-up', 'follow up' (with hyphen optional), 'out of scope', 'did not deliver', 'didn\\'t deliver', 'will come later', 'partial', 'TODO:'. Follow-up link regexes: /[A-Z]+-\\d+/g (any tracker prefix) and /https?:\\/\\/github\\.com\\/[\\w.-]+\\/[\\w.-]+\\/issues\\/\\d+/g. AC amendment detection reuses isDeferredOrCancelledItem from src/lib/vbrief/acceptance-criteria.ts plus a strikethrough check (title matches /~~.+~~/). Also scan AC item titles for the phrase corpus (issue body: 'TODO: near an AC item'). Write unit tests in src/lib/close-out/__tests__/deferral-detection.test.ts: (a) synthetic positive cases for each phrase, (b) synthetic negative cases (e.g. 'partial credit' should match — that's how the audit catches false-honest agents — but 'partially indexed by Google' must be flagged too, since substrate is a tripwire not a semantic classifier — record this conservatism in a JSDoc note on the helper), (c) follow-up link extraction across all supported prefixes (PAN-, MIN-, KRUX-) and GitHub URL form, (d) AC amendment detection via status and metadata.deferred and ~~strikethrough~~, (e) corpus regression: include verbatim close-out comment excerpts from PAN-829, PAN-1158, PAN-1146, PAN-1249 (fetch with gh issue view --comments at implementation time) and assert shouldBlock === true on each. Helper is pure (no I/O, no fs, no exec) so it remains trivially unit-testable."
+        },
+        "subItems": [
+          {
+            "id": "deferral-detection-helper.ac1",
+            "title": "src/lib/close-out/deferral-detection.ts exists and exports detectDeferralLanguage and DeferralDetectionResult",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deferral-detection-helper.ac2",
+            "title": "Helper detects every phrase in the documented corpus on a synthetic comment containing that phrase",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deferral-detection-helper.ac3",
+            "title": "Helper extracts PAN-NNNN, MIN-NNNN, KRUX-NNNN, and https://github.com/.../issues/NNNN as follow-up links",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deferral-detection-helper.ac4",
+            "title": "Helper recognizes AC amendments via status in {cancelled, deferred}, metadata.deferred === true, and ~~strikethrough~~ titles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deferral-detection-helper.ac5",
+            "title": "shouldBlock === true iff at least one suspected phrase AND no follow-up link AND no AC amendment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deferral-detection-helper.ac6",
+            "title": "Corpus regression test: verbatim excerpts from PAN-829, PAN-1158, PAN-1146, PAN-1249 close-out comments are each detected (shouldBlock === true)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deferral-detection-helper.ac7",
+            "title": "Helper is pure (no fs, no exec, no network) — verified by import-side scan in the test file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deferral-detection-helper.ac8",
+            "title": "npm run typecheck and the new test file pass under vitest",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-pan-done-gate",
+        "title": "Wire deferral gate into pan done with --allow-unlinked-deferral override",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T14:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/done.ts, add allowUnlinkedDeferral?: string to the DoneOptions interface (line ~24-35). After the existing preflight block at line 260-306, and BEFORE the rebase step at line 310, add the deferral gate: (1) skip entirely if options.strike is true (strike role short-circuits at line 192-201 anyway — the gate sits after preflight, so strike never reaches it; double-check ordering); (2) load AC list via extractAcceptanceCriteriaSync from src/lib/vbrief/acceptance-criteria.ts using the workspace path resolved from agent state; (3) call detectDeferralLanguage({ commentBody: options.comment ?? null, acList }); (4) if result.shouldBlock === true AND !options.allowUnlinkedDeferral, exit 1 with a chalk.red message listing the detected phrases, instructing the operator to either link a follow-up issue (PAN-NNNN or github URL), amend the AC list, or pass --allow-unlinked-deferral \"<reason>\"; (5) if options.allowUnlinkedDeferral is provided, emit an activity event source: 'pan-done', level: 'warn', message: `Deferral gate bypassed via --allow-unlinked-deferral: ${reason}` so the audit trail captures the override and reason; (6) if shouldBlock === false, emit a debug-level activity event noting the gate passed (so audits can also see legitimate close-outs were evaluated). Add --allow-unlinked-deferral <reason> as a CLI option in src/cli/index.ts on the pan done command at line 458-464 (description: 'Bypass deferral gate with required reason — logged to audit trail'). --force does NOT bypass the deferral gate (autoDecision 4); the existing --force preflight bypass at line 204+ stays unchanged but the deferral gate sits in its own block that only respects --allow-unlinked-deferral. Tests: extend tests/cli/commands/work/done.test.ts (or add tests/cli/commands/work/done-deferral-gate.test.ts) with: (a) deferred comment + no follow-up link → process exits 1, activity event emitted; (b) deferred comment + 'follow up in PAN-9999' → passes; (c) deferred comment + amended AC list (one item status=cancelled) → passes; (d) clean comment + clean AC list → passes; (e) --allow-unlinked-deferral 'AC amended in a way the regex missed' → passes, activity 'warn' event emitted with the reason; (f) --strike + deferred comment → passes (strike exemption); (g) --force alone does NOT bypass (must combine with --allow-unlinked-deferral or remove deferral language). Mock the activity logger and process.exit in tests."
+        },
+        "subItems": [
+          {
+            "id": "wire-pan-done-gate.ac1",
+            "title": "DoneOptions interface (done.ts) gains allowUnlinkedDeferral?: string field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-pan-done-gate.ac2",
+            "title": "src/cli/index.ts wires --allow-unlinked-deferral <reason> as a string CLI option on pan done",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-pan-done-gate.ac3",
+            "title": "Deferral gate runs after preflight and before rebase in doneCommand; deferred-and-unlinked invocation exits 1 with phrase list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-pan-done-gate.ac4",
+            "title": "Linked follow-up (PAN-NNNN, cross-tracker, or github URL) passes the gate without override",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-pan-done-gate.ac5",
+            "title": "Amended AC list (item status cancelled/deferred or metadata.deferred or ~~title~~) passes the gate without override",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-pan-done-gate.ac6",
+            "title": "--allow-unlinked-deferral \"<reason>\" bypasses the gate and emits a warn-level activity event containing the reason string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-pan-done-gate.ac7",
+            "title": "--force alone does NOT bypass the deferral gate — verified by a dedicated test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-pan-done-gate.ac8",
+            "title": "--strike short-circuits before the deferral gate — strike + deferred comment passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-pan-done-gate.ac9",
+            "title": "npm run typecheck, npm run lint, and the relevant test file pass under vitest",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-pan-close-gate",
+        "title": "Wire deferral gate into pan close with --allow-unlinked-deferral override",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T14:50:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/close.ts, add allowUnlinkedDeferral?: string to CloseOutOptions (line ~21-24). After the existing canonical-state read at line 112-120 and BEFORE the y/N confirmation prompt at line 122-156, add the deferral gate: (1) fetch the most-recent agent-authored comment for the issue via gh issue view <number> --repo <owner>/<repo> --json comments --jq '.comments[-5:]' (last 5, then filter to those whose author login matches the panopticon-agent bot pattern). If the fetch errors, emit an activity 'warn' event and FALL THROUGH (do not hard-block — pan close is human-gated and we don't want a tracker fetch failure to break close-out); (2) load the AC list from the workspace if it still exists (findPlan() handles main-side resolution after teardown for cross-workspace cases), otherwise pass acList: null; (3) call detectDeferralLanguage({ commentBody: latestAgentComment ?? null, acList }); (4) if result.shouldBlock === true AND !options.allowUnlinkedDeferral, console.error the detected phrases and process.exit(1) with the same override instructions as pan done; (5) if options.allowUnlinkedDeferral is provided, emit warn-level activity 'Close-out deferral gate bypassed: ${reason}'. Add --allow-unlinked-deferral <reason> as a CLI option in src/cli/index.ts on the pan close command at line 493-497. The existing --force flag on close stays as-is (skip confirmation prompt only) and does NOT bypass the deferral gate. Tests: extend src/cli/commands/__tests__/close.test.ts: (a) latest agent comment contains deferral phrase, no follow-up link → exit 1; (b) deferred comment + linked follow-up → passes; (c) deferred comment + --allow-unlinked-deferral 'reason' → passes with warn activity; (d) clean comment → passes; (e) gh fetch error → warn activity, falls through to confirmation prompt (does not block); (f) --force alone → does NOT bypass the deferral gate. Mock execFileAsync for gh calls and the activity logger."
+        },
+        "subItems": [
+          {
+            "id": "wire-pan-close-gate.ac1",
+            "title": "CloseOutOptions interface (close.ts) gains allowUnlinkedDeferral?: string field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-pan-close-gate.ac2",
+            "title": "src/cli/index.ts wires --allow-unlinked-deferral <reason> as a string CLI option on pan close",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-pan-close-gate.ac3",
+            "title": "Deferral gate runs after canonical-state read and before y/N confirmation in closeOutCommand",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-pan-close-gate.ac4",
+            "title": "Latest agent comment containing deferral phrase with no follow-up link causes exit 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-pan-close-gate.ac5",
+            "title": "Linked follow-up issue in the agent comment passes the gate without override",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-pan-close-gate.ac6",
+            "title": "--allow-unlinked-deferral \"<reason>\" bypasses the gate and emits a warn-level activity event containing the reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-pan-close-gate.ac7",
+            "title": "gh comment fetch failure falls through with a warn activity (does NOT hard-block close-out)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-pan-close-gate.ac8",
+            "title": "--force alone does NOT bypass the deferral gate on pan close",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-pan-close-gate.ac9",
+            "title": "npm run typecheck, npm run lint, and src/cli/commands/__tests__/close.test.ts pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "deferral-detection-helper",
+        "to": "wire-pan-done-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "deferral-detection-helper",
+        "to": "wire-pan-close-gate",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-25-PAN-1499-substrate-fix-pan-1454-pattern-2-block-pan-done-if-close-out-comment-defers-work-without-a-follow-up-issue.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

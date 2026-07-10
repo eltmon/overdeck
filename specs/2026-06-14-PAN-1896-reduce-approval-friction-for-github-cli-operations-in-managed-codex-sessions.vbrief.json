@@ -1,0 +1,437 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-14T19:18:20.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1896: Reduce approval friction for GitHub CLI operations in managed Codex sessions",
+    "updated": "2026-06-14T19:42:27.704Z"
+  },
+  "plan": {
+    "id": "pan-1896",
+    "title": "Reduce approval friction for GitHub CLI operations in managed Codex sessions",
+    "status": "proposed",
+    "uid": "c44ca1b9-280d-4693-96e3-dfef786ddf6c",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-14T19:18:20.000Z",
+    "updated": "2026-06-14T19:42:27.704Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1896",
+        "label": "PAN-1896",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "codex",
+      "permissions",
+      "sandbox",
+      "harness",
+      "developer-experience"
+    ],
+    "narratives": {
+      "Problem": "Routine GitHub/git operations in managed Codex sessions (gh issue create/view/comment, git push of already-committed work) need network access. Under every Panopticon Codex mode except full-access, sessions run sandbox_mode=workspace-write where the Codex sandbox blocks network, so each such command trips the sandbox and, with approval_policy=on-request, raises an approval escalation — repeated prompts in interactive sessions, reviewer-token cost or stalls in autonomous work agents. The only existing no-prompt escape is full-access, which removes ALL restrictions (filesystem + network) — too broad. Verified finding: Codex 0.139.0 has NO config-level per-command allowlist (trusted_commands/allowed_commands/approval_rules absent from the binary), so command-prefix scoping is not achievable via Codex config; the narrowest config lever is filesystem-sandboxed + network-open + approval_policy=never.",
+      "Proposal": "Add one new OPT-IN Codex permission mode 'workspace-net' resolving to approval_policy=never + sandbox_mode=workspace-write + [sandbox_workspace_write] network_access=true. Filesystem stays confined to the working directory (sandbox escapes fail rather than run un-sandboxed — only danger-full-access removes the sandbox); network egress opens; zero approval prompts and zero reviewer-sub-agent invocations. The global default stays auto-review, so the default network posture is untouched. Extract a single resolveCodexSandboxConfig() helper so the work-agent and conversation spawn paths cannot drift (the mapping is currently duplicated). Ship a doc capturing the sandbox/approval model, the new mode, the security tradeoffs, the command-prefix-scope limitation, and the network-sandbox interaction.",
+      "NonGoals": "- Do NOT change the global default codex.permissionMode (stays auto-review)\n- Do NOT add network_access to the existing read-only / workspace / auto-review / full-access modes (they keep their current config.toml byte-for-byte; no network leak)\n- Do NOT implement a per-command or command-prefix allowlist (Codex 0.139.0 has none; this is documented as a finding, not built)\n- Do NOT pursue the experimental Codex network_proxy / host-allowlist feature\n- Do NOT modify Claude Code's permission model or allow-list (Codex-only issue)\n- Do NOT broadly disable network restrictions or weaken the workspace-write filesystem sandbox in the new mode\n- Do NOT change the full-access mode's behavior"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Harness scope = Codex only.",
+        "rationale": "The sandbox-network escalation friction is Codex-specific; Claude Code uses a classifier + settings.json allow/deny and already auto-approves agent-*/planning-* sessions. The operator's entire response was Codex-scoped."
+      },
+      {
+        "summary": "New mode is opt-in; default stays auto-review.",
+        "rationale": "Honors the issue's 'do not broadly disable network restrictions' — the default posture is unchanged; the operator selects workspace-net in Settings to activate it."
+      },
+      {
+        "summary": "approval_policy=never (not on-failure) for the new mode.",
+        "rationale": "Satisfies the operator's explicit 'doesn't have to get the auto classifier's permission to save time/tokens' — never means no escalation and no reviewer sub-agent. With network open, network commands succeed in-sandbox; filesystem escapes simply fail (safe)."
+      }
+    ],
+    "items": [
+      {
+        "id": "codex-mode-enum",
+        "title": "Add 'workspace-net' to the codex.permissionMode enum (config + settings API)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-14T19:18:20.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1896",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Widen the Codex permission-mode union to include 'workspace-net' wherever the 4 existing values are enumerated, and ensure config load/normalize and the settings GET/PUT API preserve it. In src/lib/config-yaml.ts: the codex?.permissionMode type (~line 589 and ~844), the normalization allow-set in the config validator (~line 2215, the `=== 'read-only' || ... || 'full-access'` chain), and the doc comment block (~576-590). Leave DEFAULT_CONFIG.codex.permissionMode = 'auto-review' (~line 1130) UNCHANGED. In src/lib/settings-api.ts: the type (~line 249) and the GET cast (~line 692); the PUT mapping (~line 874) already passes the value through. No behavior wiring in this bead — only widen the accepted set so the value is not silently dropped."
+        },
+        "items": [
+          {
+            "id": "codex-mode-enum.ac1",
+            "title": "Given ~/.panopticon/config.yaml with codex.permissionMode: workspace-net, when the config is loaded and normalized, the loaded value equals 'workspace-net' (it is NOT dropped or coerced to the default).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-mode-enum.ac2",
+            "title": "The settings GET payload returns codex.permissionMode === 'workspace-net' when persisted, and a PUT carrying 'workspace-net' persists it back to config.yaml.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-mode-enum.ac3",
+            "title": "When no codex.permissionMode is configured, the resolved default remains 'auto-review' (unchanged).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-init-network",
+        "title": "initCodexHome: emit [sandbox_workspace_write] network_access=true when requested",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-14T19:18:20.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1896",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "codex-workagent-wire",
+            "codex-conversation-wire"
+          ],
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/runtimes/codex.ts, add `networkAccess?: boolean` to InitCodexHomeOpts and have initCodexHome() (~line 176) emit a TOML table — a '[sandbox_workspace_write]' line followed by 'network_access = true' — ONLY when opts.networkAccess === true. Mirror the existing table-emission style used for [projects.\"…\"] trust. This is a security boundary: the block must NEVER be emitted when networkAccess is omitted/false, so existing modes keep network OFF. Add unit tests in src/lib/runtimes/__tests__/codex.test.ts alongside the existing initCodexHome tests (~line 100)."
+        },
+        "items": [
+          {
+            "id": "codex-init-network.ac1",
+            "title": "Given initCodexHome(dir, { networkAccess: true }), the written config.toml contains a line '[sandbox_workspace_write]' followed by 'network_access = true'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-init-network.ac2",
+            "title": "Given initCodexHome(dir) with networkAccess omitted or false, the written config.toml contains NO '[sandbox_workspace_write]' block and NO 'network_access' line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-init-network.ac3",
+            "title": "With networkAccess omitted, initCodexHome still emits the same approval_policy / sandbox_mode / trusted-project lines as before this change (existing test assertions remain green).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-sandbox-resolver",
+        "title": "Extract resolveCodexSandboxConfig() — single source of truth for mode→config",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-14T19:18:20.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1896",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "codex-workagent-wire",
+            "codex-conversation-wire"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/runtimes/codex.ts (next to toCodexSandboxValue, ~line 253), add an exported resolveCodexSandboxConfig(permMode: CodexPermissionMode) that returns { approvalPolicy, sandboxMode, networkAccess?, approvalsReviewer? }. Encode all five modes, reproducing today's behavior for the four existing ones (read-only → on-request+read-only; workspace → on-request+workspace-write; auto-review → on-request+workspace-write+approvalsReviewer:auto_review; full-access → never+danger-full-access) and adding workspace-net → { approvalPolicy:'never', sandboxMode:'workspace-write', networkAccess:true }. This is the cross-cutting security mapping both spawn paths will consume (foundation), replacing the verbatim-duplicated inline mappings in agents.ts and conversations.ts. Add a unit test pinning the resolved config of all five modes."
+        },
+        "items": [
+          {
+            "id": "codex-sandbox-resolver.ac1",
+            "title": "resolveCodexSandboxConfig('workspace-net') returns approvalPolicy 'never', sandboxMode 'workspace-write', and networkAccess true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-sandbox-resolver.ac2",
+            "title": "resolveCodexSandboxConfig for 'read-only', 'workspace', 'auto-review', 'full-access' returns the exact same approvalPolicy/sandboxMode/approvalsReviewer pairs the inline mappings in agents.ts/conversations.ts produced before this change, with networkAccess falsy for all four.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-sandbox-resolver.ac3",
+            "title": "resolveCodexSandboxConfig('auto-review') returns approvalsReviewer 'auto_review'; resolveCodexSandboxConfig('full-access') returns sandboxMode 'danger-full-access'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-workagent-wire",
+        "title": "Work-agent spawn path consumes resolveCodexSandboxConfig + networkAccess",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-14T19:18:20.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1896",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/agents.ts (the codex work-agent setup, ~lines 222-234), replace the inline approvalPolicy/sandboxMode/approvalsReviewer derivation with a call to resolveCodexSandboxConfig(codexPermMode), and pass the resolved networkAccess into initCodexHome(). No inline mode→config mapping should remain in this path."
+        },
+        "items": [
+          {
+            "id": "codex-workagent-wire.ac1",
+            "title": "With codex.permissionMode set to 'workspace-net', a spawned codex work agent's CODEX_HOME/config.toml contains approval_policy = \"never\" and a [sandbox_workspace_write] block with network_access = true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-workagent-wire.ac2",
+            "title": "The work-agent codex path in agents.ts resolves its sandbox config via resolveCodexSandboxConfig and contains no inline ternary mode→config mapping.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-workagent-wire.ac3",
+            "title": "Given the default mode (auto-review), the work agent's config.toml contains approvals_reviewer = \"auto_review\" and contains no network_access line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-conversation-wire",
+        "title": "Conversation spawn path consumes resolveCodexSandboxConfig + networkAccess",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-14T19:18:20.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1896",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/conversations.ts (the codex branch, ~lines 1522-1535), replace the inline approvalPolicy/sandboxMode/approvalsReviewer derivation with resolveCodexSandboxConfig(codexPermMode) and pass the resolved networkAccess into initCodexHome(). No inline mode→config mapping should remain in this path."
+        },
+        "items": [
+          {
+            "id": "codex-conversation-wire.ac1",
+            "title": "With codex.permissionMode set to 'workspace-net', a codex conversation session's CODEX_HOME/config.toml contains approval_policy = \"never\" and a [sandbox_workspace_write] block with network_access = true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-conversation-wire.ac2",
+            "title": "The conversation codex branch resolves its sandbox config via resolveCodexSandboxConfig and contains no inline ternary mode→config mapping.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-conversation-wire.ac3",
+            "title": "Given an existing mode (e.g. auto-review or workspace), a conversation session's config.toml contains no network_access line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-settings-ui",
+        "title": "Settings → Permissions → Codex: add the workspace-net option card",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-14T19:18:20.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1896",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/Settings/SettingsPage.tsx, add a fifth option to the Codex permission-mode options array (~lines 2140-2168) with value 'workspace-net', a clear title (e.g. 'Workspace + network'), flag string 'approval_policy=never + sandbox=workspace-write + network on', and a description stating routine gh/git push work with no prompts while the filesystem stays confined to the working directory. Extend the handleCodexPermissionModeChange signature (~line 1579) to accept 'workspace-net'. In src/dashboard/frontend/src/components/Settings/types.ts, add 'workspace-net' to the union (~line 215) and the doc comment (~209-212). Follow the existing card markup/style (pan-style-guide: no pill badges, no decorative color)."
+        },
+        "items": [
+          {
+            "id": "codex-settings-ui.ac1",
+            "title": "Settings → Permissions → Codex renders a fifth selectable card with data-testid 'codex-permission-mode-workspace-net' whose text conveys network-on, no prompts, filesystem still workspace-sandboxed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-settings-ui.ac2",
+            "title": "When the workspace-net card is clicked, the settings PUT payload contains codex.permissionMode = 'workspace-net'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-settings-ui.ac3",
+            "title": "The Codex section renders the four pre-existing cards (read-only, workspace, auto-review, full-access), each individually selectable.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-permissions-doc",
+        "title": "Document Codex permission modes, network access, and security tradeoffs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-14T19:18:20.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1896",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a 'Codex permission modes & network access' section to configuration/harnesses.mdx documenting all five modes and their resolved Codex config. Capture, per the issue: (1) the security tradeoffs of workspace-net (open network egress, no prompts, filesystem still workspace-sandboxed, strictly safer than full-access, opt-in not default); (2) the command-prefix-scope finding — Codex 0.139.0 has no per-command allowlist, so approval_policy=never is the mechanism that removes the classifier/reviewer step; (3) how this interacts with Codex's restricted network sandbox (workspace-write blocks network unless [sandbox_workspace_write] network_access=true). Reference PAN-1896."
+        },
+        "items": [
+          {
+            "id": "codex-permissions-doc.ac1",
+            "title": "configuration/harnesses.mdx contains a section listing all five Codex permission modes including workspace-net and its resolved config (approval_policy=never, sandbox_mode=workspace-write, network_access=true).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-permissions-doc.ac2",
+            "title": "The harnesses.mdx Codex section contains the workspace-net security tradeoff: network egress open with no prompts, filesystem confined to the working directory, strictly safer than full-access, opt-in (default stays auto-review).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-permissions-doc.ac3",
+            "title": "The doc records that Codex has no per-command/command-prefix allowlist and explains that approval_policy=never is what removes the auto-classifier/reviewer step (saving time/tokens).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "codex-mode-enum",
+        "to": "codex-sandbox-resolver",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-mode-enum",
+        "to": "codex-settings-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-mode-enum",
+        "to": "codex-workagent-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-mode-enum",
+        "to": "codex-conversation-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-init-network",
+        "to": "codex-workagent-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-init-network",
+        "to": "codex-conversation-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-sandbox-resolver",
+        "to": "codex-workagent-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-sandbox-resolver",
+        "to": "codex-conversation-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-sandbox-resolver",
+        "to": "codex-permissions-doc",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-14-PAN-1896-reduce-approval-friction-for-github-cli-operations-in-managed-codex-sessions.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

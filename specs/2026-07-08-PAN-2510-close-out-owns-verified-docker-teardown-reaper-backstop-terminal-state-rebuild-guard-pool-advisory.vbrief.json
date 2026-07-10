@@ -1,0 +1,547 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-08T23:18:27Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2510: merged/closed workspaces leak Docker containers+networks → 'all predefined address pools fully subnetted' blocks new spawns",
+    "updated": "2026-07-09T00:45:00.168Z"
+  },
+  "plan": {
+    "id": "pan-2510",
+    "title": "Close-out owns verified Docker teardown; reaper backstop; terminal-state rebuild guard; pool advisory",
+    "status": "completed",
+    "uid": "110dce80-47ea-48dd-8b63-23ba04907fc3",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 5,
+    "created": "2026-07-08T23:18:27Z",
+    "updated": "2026-07-09T00:45:00.168Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2510",
+        "label": "PAN-2510",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "infra",
+      "docker",
+      "close-out",
+      "deacon",
+      "workspace"
+    ],
+    "narratives": {
+      "Problem": "Merged/closed workspaces leave their Docker stacks running, so their _devnet bridge networks are never freed (docker network prune only frees container-less networks). Networks accumulate until Docker's ~31-network default address pool is exhausted, at which point every new work-agent spawn fails with 'all predefined address pools have been fully subnetted' — halting the drain. Primary root cause: close-out's local findWorkspacePath (src/lib/close-out.ts:557-570) never checks workspaces/feature-<issue>, so workspacePath resolves to null and Step 3's Docker stop + worktree removal are silently skipped. Operator-bypass merges also strand postMergeLifecycle's merge-time Docker stop.",
+      "Proposal": "Make close-out the durable owner of verified Docker teardown (per operator direction), backed by a shared name-based teardown primitive that both close-out and the deacon's closed-issue reaper call. Add a terminal-state guard to the single rebuildWorkspaceStack chokepoint so patrols never recreate a closed issue's stack. Add an advisory pan doctor check for the network-pool width. All teardown is name-scoped (never a global prune) and best-effort within close-out (the reaper is the retry backstop).",
+      "NonGoals": "- Do NOT auto-edit /etc/docker/daemon.json or restart the Docker daemon (needs root; bounces all containers).\n- Do NOT block or alter stack rebuild for verifying-on-main issues that may re-activate.\n- Do NOT change postMergeLifecycle's existing merge-time Docker stop (it already uses the correct resolver).\n- Do NOT run a global 'docker network prune -f' (would remove non-Overdeck networks).\n- Do NOT fail/abort close-out when Docker teardown or verification does not fully succeed (record a warning; the reaper retries).\n- Do NOT delete JSONL session files or workspace .pan/ planning artifacts."
+    },
+    "autoDecisions": [
+      {
+        "summary": "One shared name-based verified teardown primitive in workspace-manager/docker.ts, consumed by both close-out (FR-1) and the reaper (FR-3).",
+        "rationale": "Single source of truth; both consumers need workspace-dir-independent teardown with network verification, so duplicating compose-down logic would drift."
+      },
+      {
+        "summary": "FR-2 terminal guard lives in the single chokepoint rebuildWorkspaceStack, not in each of its four callers.",
+        "rationale": "rebuildWorkspaceStack takes issueId and is the one point all autonomous + manual rebuilds pass through; guarding once is minimal and complete."
+      },
+      {
+        "summary": "FR-2 terminal predicate = isIssueClosed (closed/merged) only; verifying-on-main is not guarded.",
+        "rationale": "A verifying-on-main issue can be legitimately re-activated and needs its stack; the narrow closed/merged guard is the clearly-safe subset."
+      },
+      {
+        "summary": "NFR-1 is advisory (pan doctor check + docs), not an automated daemon.json edit.",
+        "rationale": "Editing /etc/docker/daemon.json and restarting the daemon requires root and bounces every running container — unsafe for an agent."
+      },
+      {
+        "summary": "Close-out Docker verification is best-effort — record a warning step but never fail close-out.",
+        "rationale": "Close-out is a terminal ceremony that also closes the tracker issue; a down daemon must not block closure. The FR-3 reaper is the retry backstop."
+      }
+    ],
+    "items": [
+      {
+        "id": "teardown-primitive",
+        "title": "Add shared name-based verified Docker teardown primitive to workspace-manager/docker.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-08T23:18:27Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-2510",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "closeout-verified-teardown",
+            "reaper-teardown"
+          ],
+          "files_scope": [
+            "src/lib/workspace-manager/docker.ts",
+            "src/lib/workspace-manager/types.ts",
+            "src/lib/workspace-manager/__tests__/docker.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/workspace-manager/__tests__/docker.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "docker teardown primitive test passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a new exported async function to src/lib/workspace-manager/docker.ts that tears a workspace Docker stack down BY NAME (independent of whether the workspace dir still exists), given the lowercase issue id. It computes the compose project name overdeck-feature-<issueLower> and network name overdeck-feature-<issueLower>_devnet, then: (1) runs `docker compose -p <project> down -v --remove-orphans` via execAsync (60s timeout); (2) runs `docker network rm <network>` and treats 'not found'/'no such network' as success; (3) verifies the network is absent via `docker network ls --format '{{.Name}}'` and does NOT contain <network>. Return { networkRemoved: boolean; steps: string[] }. Use promisify(exec) (execAsync) exactly like the existing functions in this file — never execSync. Never run a global prune. Reuse/extend the DockerCleanupResult shape in types.ts if a new return type is cleaner."
+        },
+        "items": [
+          {
+            "id": "teardown-primitive.ac1",
+            "title": "Given a running stack for overdeck-feature-pan-9999, when the primitive is called with 'pan-9999', it invokes `docker compose -p \"overdeck-feature-pan-9999\" down -v --remove-orphans` (asserted against a mocked execAsync).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "teardown-primitive.ac2",
+            "title": "The primitive runs `docker network rm \"overdeck-feature-pan-9999_devnet\"` and resolves successfully (does not throw) when docker reports the network is not found.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "teardown-primitive.ac3",
+            "title": "The primitive returns networkRemoved:true when `docker network ls` no longer lists the _devnet network, and networkRemoved:false when it still lists it (asserted with mocked ls output).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "teardown-primitive.ac4",
+            "title": "Every docker command the primitive emits names the overdeck-feature-<issue> project or network, and the recorded mock calls contain no bare `docker network prune` or `docker system prune`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "closeout-resolver-fix",
+        "title": "Replace close-out's buggy local findWorkspacePath with the canonical resolver",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-08T23:18:27Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2510",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/close-out.ts",
+            "src/lib/lifecycle/archive-planning.ts",
+            "src/lib/__tests__/close-out.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/close-out.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "close-out workspace-resolution test passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/close-out.ts, remove the local findWorkspacePath (src/lib/close-out.ts:557-570) — whose only feature fallback is join(dirname(projectPath), `feature-${issueLower}`), a path that never exists — and import and use findWorkspacePath from src/lib/lifecycle/archive-planning.ts (line 67), which checks workspaces/feature-<issueLower>. This restores Step 3's workspacePath so the existing worktree-removal block (src/lib/close-out.ts:300-311) runs for real workspaces. Do not otherwise change Step 3 behavior in this bead."
+        },
+        "items": [
+          {
+            "id": "closeout-resolver-fix.ac1",
+            "title": "Given a workspace at <projectPath>/workspaces/feature-pan-9999, close-out resolves workspacePath to that directory (asserted by a test that creates the dir and checks the resolved path is non-null and ends with workspaces/feature-pan-9999).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closeout-resolver-fix.ac2",
+            "title": "src/lib/close-out.ts no longer contains a local findWorkspacePath definition and instead contains an import of findWorkspacePath from src/lib/lifecycle/archive-planning.ts (asserted by source grep and typecheck).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closeout-resolver-fix.ac3",
+            "title": "Given no workspace on disk for the issue, the resolver returns null and close-out's Clean up workspace step records status 'skipped' rather than throwing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "closeout-verified-teardown",
+        "title": "Close-out Step 3 runs verified name-based Docker teardown",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-08T23:18:27Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2510",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/close-out.ts",
+            "src/lib/__tests__/close-out.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/close-out.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "close-out docker-teardown test passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/close-out.ts Step 3 (src/lib/close-out.ts:293-298), replace the workspace-dir-gated `stopWorkspaceDocker(workspacePath, issueLower)` call with a call to the shared name-based teardown primitive from bead teardown-primitive, keyed on issueLower and NOT gated on existsSync(workspacePath) — so teardown runs even if the dir is already gone. Run teardown BEFORE the worktree-removal block. Record a close-out step 'Docker stack removed' when the primitive returns networkRemoved:true, or a warning step 'Docker network <name> still present' when false. Per AD-5, do NOT fail the overall close-out on a false result. Add a unit test that mocks the compose-down (execAsync) and asserts it was invoked with -p overdeck-feature-<issue>, and that an explicit docker network rm for <issue>_devnet ran."
+        },
+        "items": [
+          {
+            "id": "closeout-verified-teardown.ac1",
+            "title": "Given `pan close pan-9999`, close-out invokes the shared Docker teardown primitive with 'pan-9999' and the mocked compose-down receives -p \"overdeck-feature-pan-9999\" (asserted).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closeout-verified-teardown.ac2",
+            "title": "When the teardown primitive returns networkRemoved:false, close-out records a warning step naming the surviving network and still returns success:true for the ceremony (does not abort).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closeout-verified-teardown.ac3",
+            "title": "Step 3 emits the compose-down docker call before it emits the `git worktree remove` call (asserted by recorded mock call ordering).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closeout-verified-teardown.ac4",
+            "title": "When the workspace dir does not exist, close-out still invokes the name-based teardown primitive (teardown is not gated on existsSync(workspacePath)).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reaper-teardown",
+        "title": "Closed-issue reaper stops + removes leaked Docker stacks by name",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-08T23:18:27Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2510",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/reap-issue-residue.ts",
+            "src/lib/cloister/__tests__/reap-issue-residue.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/cloister/__tests__/reap-issue-residue.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "reaper docker-teardown test passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/reapIssueResidue (src/lib/cloister/reap-issue-residue.ts:17), after the branch-merged guard (line 43-47) and before/independent of the worktree-removal block (lines 50-62), invoke the shared name-based Docker teardown primitive from bead teardown-primitive with the lowercase issue id, and push a descriptive action string (e.g. 'removed Docker stack overdeck-feature-<issue>' / 'Docker network still present'). This runs via reconcileClosedIssueAgents (src/lib/cloister/closed-issue-reaper.ts:53), the deacon's periodic + boot patrol (src/lib/cloister/deacon.ts:2783), so it frees any stack that leaked before FR-1/FR-2. Because the worktree may already be gone, the primitive's name-based teardown is required (do not rely on on-disk compose files)."
+        },
+        "items": [
+          {
+            "id": "reaper-teardown.ac1",
+            "title": "Given a closed, merged issue pan-9999, reapIssueResidue invokes the Docker teardown primitive with 'pan-9999' (asserted against a mocked primitive/execAsync).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reaper-teardown.ac2",
+            "title": "reapIssueResidue returns an actions array that contains a string describing the Docker teardown outcome.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reaper-teardown.ac3",
+            "title": "Given the branch is unmerged, reapIssueResidue returns early and does NOT invoke Docker teardown (preserves the existing unmerged-skip guard).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rebuild-terminal-guard",
+        "title": "rebuildWorkspaceStack no-ops for terminal (closed/merged) issues",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-08T23:18:27Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2510",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace/rebuild-stack.ts",
+            "src/lib/workspace/__tests__/rebuild-stack.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/workspace/__tests__/rebuild-stack.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "rebuild terminal-guard test passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/workspace/rebuildWorkspaceStack (src/lib/workspace/rebuild-stack.ts:135), add a terminal-state guard as the FIRST statement inside the returned Effect.gen block: `const closed = yield* Effect.promise(() => isIssueClosed(issueId)); if (closed) return { success: false, error: 'issue is terminal (closed/merged) — skipping stack rebuild' };`. Import isIssueClosed from src/lib/cloister/issue-closed.js. This single chokepoint covers all four callers (src/lib/agents/spawn-prep.ts:778, src/lib/cloister/deacon-review-status.ts:169, src/lib/cloister/verification-runner.ts:496, src/cli/commands/workspace-rebuild.ts:18). Do NOT guard verifying-on-main. Do not add the check before the existing synchronous Effect.succeed guards — it must be inside Effect.gen because isIssueClosed is async."
+        },
+        "items": [
+          {
+            "id": "rebuild-terminal-guard.ac1",
+            "title": "Given isIssueClosed returns true for the issue, rebuildWorkspaceStack returns { success:false } with an error mentioning 'terminal' and runs no `docker compose ... up` (asserted with mocked isIssueClosed + docker).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rebuild-terminal-guard.ac2",
+            "title": "Given isIssueClosed returns false, rebuildWorkspaceStack proceeds to its existing rebuild path (the guard does not alter behavior for non-terminal issues).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rebuild-terminal-guard.ac3",
+            "title": "The guard is evaluated inside the returned Effect.gen (async isIssueClosed), so no caller of rebuildWorkspaceStack throws a synchronous error (typecheck passes and existing callers compile unchanged).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-pool-advisory",
+        "title": "pan doctor warns on _devnet network-pool exhaustion + missing default-address-pools",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-08T23:18:27Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2510",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor.ts",
+            "src/cli/commands/__tests__/doctor.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/cli/commands/__tests__/doctor.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "doctor pool-advisory test passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/doctor.ts add a helper checkDevnetNetworkPool() (alongside checkComposeLabelDrift at line 194) that: counts `docker network ls --format '{{.Name}}'` entries matching /^overdeck-feature-.*_devnet$/; reads /etc/docker/daemon.json and detects whether default-address-pools is present. Return a CheckResult that is a warning when the count is within ~5 of the ~31-network default limit OR when default-address-pools is absent, including a fix string with the recommended daemon.json snippet (a wider pool, e.g. base 10.200.0.0/16 size 24). Wire it into doctorCommand() (src/cli/commands/doctor.ts:648) near the existing Docker compose label-drift push (src/cli/commands/doctor.ts:829-841) by pushing the CheckResult into the checks array. Use execAsync/spawn — never execSync. Do NOT edit daemon.json."
+        },
+        "items": [
+          {
+            "id": "doctor-pool-advisory.ac1",
+            "title": "Given 28 overdeck-feature-*_devnet networks exist, checkDevnetNetworkPool returns a CheckResult with status 'warn' whose message names the count and the ~31 pool limit (asserted with mocked docker network ls output).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-pool-advisory.ac2",
+            "title": "Given daemon.json lacks default-address-pools, the check emits a warning whose fix string contains a default-address-pools snippet (asserted against mocked file contents).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-pool-advisory.ac3",
+            "title": "Given few networks and a daemon.json that already declares default-address-pools, the check returns status 'ok' (no false-positive warning).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-update",
+        "title": "Document close-out Docker teardown, reaper backstop, rebuild guard, and pool snippet",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-08T23:18:27Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2510",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/WORKSPACE-CONTAINERS.md",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Update docs/WORKSPACE-CONTAINERS.md with a section stating: close-out (pan close / dashboard Close Out) removes the workspace Docker stack + overdeck-feature-<issue>_devnet network deterministically and verifies removal; the deacon closed-issue reaper (reconcileClosedIssueAgents → reapIssueResidue) is the backstop that frees leaked stacks by name; autonomous stack rebuild (rebuildWorkspaceStack) no-ops for terminal (closed/merged) issues; and include the recommended /etc/docker/daemon.json default-address-pools snippet with a note that pan doctor warns when it is missing. Update root CLAUDE.md: the 'postMergeLifecycle Verify Handoff and Docker Cleanup' section (CLAUDE.md:418) and the close-out note (~CLAUDE.md:540) to state close-out now owns verified Docker stack + _devnet teardown, the reaper backstop, and the terminal-state rebuild guard."
+        },
+        "items": [
+          {
+            "id": "docs-update.ac1",
+            "title": "docs/WORKSPACE-CONTAINERS.md contains a section stating close-out removes the Docker stack + _devnet network and verifies removal, and names the reaper as the backstop (asserted by grep for the section heading and key phrases).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-update.ac2",
+            "title": "docs/WORKSPACE-CONTAINERS.md contains a recommended default-address-pools daemon.json snippet (asserted by grep for 'default-address-pools').",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-update.ac3",
+            "title": "Root CLAUDE.md contains the added phrasing that close-out owns verified _devnet teardown and that rebuild no-ops for terminal issues (asserted by grep for the phrasing).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "teardown-primitive",
+        "to": "closeout-verified-teardown",
+        "type": "blocks"
+      },
+      {
+        "from": "teardown-primitive",
+        "to": "reaper-teardown",
+        "type": "blocks"
+      },
+      {
+        "from": "closeout-resolver-fix",
+        "to": "closeout-verified-teardown",
+        "type": "blocks"
+      },
+      {
+        "from": "closeout-verified-teardown",
+        "to": "docs-update",
+        "type": "informs"
+      },
+      {
+        "from": "reaper-teardown",
+        "to": "docs-update",
+        "type": "informs"
+      },
+      {
+        "from": "rebuild-terminal-guard",
+        "to": "docs-update",
+        "type": "informs"
+      },
+      {
+        "from": "doctor-pool-advisory",
+        "to": "docs-update",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-08-PAN-2510-close-out-owns-verified-docker-teardown-reaper-backstop-terminal-state-rebuild-guard-pool-advisory.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

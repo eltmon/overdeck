@@ -1,0 +1,209 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-03T12:00:00Z"
+  },
+  "plan": {
+    "id": "PAN-426",
+    "title": "Tasks panel and DAG: add toggle to show acceptance criteria subtasks",
+    "status": "approved",
+    "author": "plan",
+    "tags": [
+      "dashboard",
+      "frontend",
+      "vbrief",
+      "socket.io"
+    ],
+    "narratives": {
+      "Problem": "The Tasks panel and DAG visualization show beads (top-level plan items) but not their acceptance criteria subtasks. Users cannot see AC progress without clicking into individual DAG nodes. There is no real-time update when AC status changes.",
+      "Proposal": "Add AC visibility to both views: (1) List view gets expand/collapse per bead with AC checklist and count badge, (2) DAG gets a Show AC toggle that expands nodes to show inline checklists plus an always-visible AC progress badge, (3) New socket.io event for real-time subitem status updates.",
+      "Constraint": "Must reuse existing plan data (already fetched via useQuery). No new API endpoints. Follow existing patterns for socket.io events (parallel to plan:item-status-changed). DAG node height must be dynamic when AC is shown.",
+      "Risk": "DAG layout must re-run when AC toggle changes (dagre recompute). Large plans with many ACs per node could make the DAG visually busy — mitigated by off-by-default toggle. Bead-to-plan-item matching relies on title convention which could fail for renamed items.",
+      "Alternative": "Child nodes in DAG (rejected — makes DAG too large/busy). Always-visible AC in list (rejected — list becomes too long). Global toggle for list view (rejected — per-bead expand gives more control)."
+    },
+    "items": [
+      {
+        "id": "list-ac-expand",
+        "title": "Add expand/collapse AC sections to list view TaskItem",
+        "status": "completed",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-426"
+        },
+        "narrative": {
+          "Action": "Modify TaskItem in BeadsTasksPanel.tsx to accept plan data, match bead to plan item by title convention, and render an expandable AC checklist. Add chevron toggle (collapsed by default) and AC count badge (e.g., '2/3 AC'). AC items show three states: green check (completed), yellow dot (in_progress), gray circle (pending). Requires passing planDoc down to TaskItem or creating a lookup context."
+        },
+        "subItems": [
+          {
+            "id": "list-ac-expand.badge-visible",
+            "title": "Each bead row shows AC count badge (e.g., '2/4 AC') when the bead has AC subtasks",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-ac-expand.chevron-toggle",
+            "title": "Clicking chevron expands/collapses AC checklist under the bead row, collapsed by default",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-ac-expand.three-states",
+            "title": "AC items render with three visual states: green check (completed), yellow dot (in_progress), gray circle (pending/blocked)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-ac-expand.bead-matching",
+            "title": "Beads are correctly matched to plan items using the '{planId}: {itemTitle}' title convention",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dag-ac-badge",
+        "title": "Add always-visible AC progress badge to DAG nodes",
+        "status": "completed",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-426"
+        },
+        "narrative": {
+          "Action": "Modify PlanItemNode in PlanDAG.tsx to show an AC progress badge (e.g., '2/4 AC') in the badge row. The badge appears regardless of the Show AC toggle state. Filter subItems where metadata.kind === 'acceptance_criterion' and count completed vs total."
+        },
+        "subItems": [
+          {
+            "id": "dag-ac-badge.shows-count",
+            "title": "DAG nodes with AC subtasks display a compact progress badge (e.g., '2/4 AC') in the badge row",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dag-ac-badge.always-visible",
+            "title": "AC badge is visible even when the Show AC toggle is off",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dag-ac-toggle",
+        "title": "Add Show AC toggle with inline checklist in DAG nodes",
+        "status": "completed",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-426"
+        },
+        "narrative": {
+          "Action": "Add a 'Show AC' / 'Hide AC' toggle button to the PlanDAG component (near the controls or as a header button). When toggled on: (1) each node expands vertically to show AC items as a mini checklist below the badges, (2) node height computed dynamically as 80 + (acCount * 18), (3) dagre layout re-runs with new node heights, (4) AC items show status via colored indicators (green check, yellow dot, gray circle). The toggle state can be stored in component state or localStorage."
+        },
+        "subItems": [
+          {
+            "id": "dag-ac-toggle.button-present",
+            "title": "A 'Show AC' / 'Hide AC' toggle button is visible in the DAG header or controls area",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dag-ac-toggle.nodes-expand",
+            "title": "When toggled on, nodes with AC subtasks expand to show inline checklist with status indicators",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dag-ac-toggle.dynamic-height",
+            "title": "Node height adjusts dynamically based on number of AC items; dagre layout re-runs correctly",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dag-ac-toggle.off-by-default",
+            "title": "Toggle is off by default — current compact node behavior preserved",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "socket-subitem",
+        "title": "Wire up socket.io event for real-time AC subitem status changes",
+        "status": "completed",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-426"
+        },
+        "narrative": {
+          "Action": "Server side: emit 'plan:subitem-status-changed' event (with issueId, itemId, subItemId, status) wherever subitem status is updated — find the call sites for updateSubItemStatus in dashboard server code. Frontend side: in PlanDAGViewer, add a socket listener for 'plan:subitem-status-changed' that updates the React Query cache in-place (updating the specific subItem's status within the matching item). BeadsTasksPanel already shares the same query key so both views update."
+        },
+        "subItems": [
+          {
+            "id": "socket-subitem.server-emits",
+            "title": "Server emits 'plan:subitem-status-changed' event with {issueId, itemId, subItemId, status} when AC status changes",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "socket-subitem.frontend-listens",
+            "title": "PlanDAGViewer listens for the event and updates React Query cache in-place for the matching subItem",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "socket-subitem.both-views-update",
+            "title": "Both list view and DAG view reflect subitem status changes in real-time without page refresh",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "dag-ac-badge",
+        "to": "dag-ac-toggle",
+        "type": "blocks"
+      },
+      {
+        "from": "socket-subitem",
+        "to": "list-ac-expand",
+        "type": "informs"
+      },
+      {
+        "from": "socket-subitem",
+        "to": "dag-ac-toggle",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "proposed"
+}
