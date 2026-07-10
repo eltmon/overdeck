@@ -2301,3 +2301,23 @@ stale (written 2026-07-08); re-verified all order-book items against live GitHub
 - **Agent count:** min target 2 met and exceeded (1 Lane B work + 4 Lane A swarm + agent-min-865
   MYN). NEXT: shepherd B7 to `pan done`→review→test→merge (TENET-10 full suite); watch A9 swarm
   slots complete + assemble. When B7 lands+closed-out+main-green → dispatch B8 = PAN-2364.
+
+## RUN-62 tick 4 (2026-07-10 ~16:50Z) — B7 confirmed on-task (7-bead root-cause fix); A9 swarm advancing
+
+- **Main CI fully GREEN** (v0.45.0 release build done: test/build(22)/lint/smoke/guard all success).
+- **B7 = PAN-2372: on-task, NOT scope drift.** First commit `8771977f51 fix(state-home):
+  resolveStateReadHomeSync uses the registered projects.yaml key` looked off-scope vs the issue
+  title ("atomic statusOverrides on slot done"), but the vBRIEF decomposed PAN-2372 into **7 beads**
+  and this commit maps to the bead *"Re-home the workspace record door onto canonical
+  migration-aware resolution."* Planning correctly root-caused the "empty continue.json" symptom:
+  continue.json/statusOverrides are written by the state door; a wrong-home resolution writes them
+  where the deacon can't read → looks empty. (This also explains tick-3's missing 2372/2229 specs —
+  they landed in legacy `.pan/`.) Remaining beads incl. "Slot pan done writes+verifies durable
+  swarm.slotCompletions marker" (the atomicity fix), clean-predicate, classifyInFlightSlots,
+  infer_completion default. 1/7 committed, 1 in_progress. agent-pan-2372 (glm-5.2) alive, ~9% to
+  auto-compact (PAN-1781 handles). **This is a bigger-than-"small-fix" effort — B7 lands over
+  several ticks, not one.** No intervention; review gate enforces AC-match.
+- **A9 = PAN-2229 swarm advancing** — slot-1 at 77% ctx (+1293/-17, working beads), slot-2/3 alive,
+  review-supervisor (Sonnet 5) idle-waiting for slots. Healthy.
+- NEXT: watch B7 progress bead-by-bead through compacts → pan done → review→test→merge (TENET-10
+  full suite). Watch A9 slots complete + assemble PR. Hold B8=PAN-2364 until B7 lands+closed-out.
