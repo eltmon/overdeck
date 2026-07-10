@@ -12,7 +12,7 @@
  * invariant) while still making it portable via `git push`.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, promises as fsp } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync, promises as fsp } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { hostname } from 'node:os';
 
@@ -258,6 +258,53 @@ function preserveCloseOutSync(path: string, record: PanIssueRecord): PanIssueRec
   return record;
 }
 
+/**
+ * FR-2 (PAN-2372): before a record write, if the existing file is non-empty and
+ * fails JSON.parse, preserve the corrupt bytes as a sidecar rather than
+ * silently overwriting them. A truncated/malformed record (the "empty/malformed
+ * at char 0" symptom that stranded PAN-2253) used to be quietly replaced by the
+ * next write, destroying every accumulated statusOverride. Non-empty + unparseable
+ * is the only case sidecarred — an absent or empty file is a normal fresh write.
+ */
+function preserveCorruptRecordSync(path: string): void {
+  let raw: string;
+  try {
+    raw = readFileSync(path, 'utf-8');
+  } catch {
+    return; // No existing file — nothing to preserve.
+  }
+  if (raw.length === 0) return; // Empty file is a normal fresh-write state, not corruption.
+  try {
+    JSON.parse(raw);
+    return; // Existing file parses — the rename below atomically replaces it.
+  } catch {
+    // Non-empty and unparseable — fall through to sidecar.
+  }
+  const sidecar = `${path}.corrupt-${Date.now()}`;
+  try {
+    renameSync(path, sidecar);
+    console.warn(`[record] Preserved corrupt record at ${sidecar} (existing file failed JSON.parse before write)`);
+  } catch (error) {
+    console.warn(`[record] Could not preserve corrupt record at ${path}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * FR-1 (PAN-2372): atomic, verified record write. Writes to a same-directory
+ * temp file, atomically renames it into place, then read-back verifies the
+ * renamed file parses as JSON. A mid-write crash can no longer truncate the
+ * record in place (rename is atomic); a write that somehow produces unparseable
+ * bytes throws instead of leaving a corrupt record for readers to silently
+ * fabricate over. Modeled on writePlanFileAtomic (src/lib/vbrief/dag-cli.ts:101).
+ */
+function writeRecordFileAtomicSync(path: string, record: PanIssueRecord): void {
+  preserveCorruptRecordSync(path);
+  const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
+  writeFileSync(tmp, JSON.stringify(record, null, 2), 'utf-8');
+  renameSync(tmp, path);
+  JSON.parse(readFileSync(path, 'utf-8')); // read-back verification; throws if the renamed file is unparseable
+}
+
 export function writeIssueRecordSync(
   project: ProjectConfig,
   issueId: string,
@@ -276,7 +323,7 @@ export function writeIssueRecordSync(
     created: record.created || now,
     updated: now,
   };
-  writeFileSync(path, JSON.stringify(next, null, 2), 'utf-8');
+  writeRecordFileAtomicSync(path, next);
   return path;
 }
 
@@ -303,7 +350,7 @@ export function writeIssueRecordForWorkspaceSync(
     created: record.created || now,
     updated: now,
   };
-  writeFileSync(path, JSON.stringify(next, null, 2), 'utf-8');
+  writeRecordFileAtomicSync(path, next);
   return path;
 }
 
