@@ -2576,3 +2576,20 @@ stale (written 2026-07-08); re-verified all order-book items against live GitHub
 - **Main green** (bd18ee8c64, all success).
 - NEXT: B8 bead progress → pan done → review→test→merge (TENET-10 full suite; PAN-2567 remedy if
   stuck-after-review recurs). B8 lands → A9 unfreezes → B9-B13 (re-verify PRDs vs main).
+
+## RUN-62 tick 21 (2026-07-10 ~17:55 local) — B8 4/6 beads; B7 resting in verifying-on-main (close-out is interactive)
+
+- **B8 = PAN-2364** healthy — 4/6 beads (+`ad15d1bf` recover failed-merge slot targets specific slot
+  + archives before retry). agent-pan-2364 alive. No action.
+- **B7 = PAN-2372: DONE (merged + main-verified-green), resting in `verifying-on-main` / awaiting
+  close-out.** NOT stuck — deacon correctly holds it verify-paused. `pan close PAN-2372` requires
+  INTERACTIVE [y/N] confirmation (teardown gate: workspace/Docker/branch cleanup) — did NOT
+  force autonomously; a valid resting state, not blocking B8. Operator or a later deliberate step can
+  run close-out. (Note: `pan close` has no obvious non-interactive path in this build; if the flywheel
+  should auto-close merged items, that needs a --yes flag — minor.)
+- **A9 = PAN-2229** hold state SHIFTED: deacon now "held by boot reconciliation decision" (was
+  "blocked failed-merge slot 1"). Still stuck, will clear when B8's per-slot isolation lands. No
+  manual recovery.
+- **Main green** (708c993760, building on latest).
+- NEXT: B8 remaining beads → pan done → review→test→merge (TENET-10 full suite; PAN-2567 manual-squash
+  remedy if stuck-after-review recurs). B8 lands → A9 unfreezes → B9-B13 (re-verify PRDs vs main).
