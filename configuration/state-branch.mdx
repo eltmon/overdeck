@@ -130,6 +130,29 @@ affects another, and the mechanism is plain git — GitHub and GitLab remotes
 behave identically.
 </Info>
 
+### Polyrepo projects
+
+A polyrepo project can designate one of its sub-repositories as the
+**state-host repo**, even when the project root is not itself a Git repository.
+Set `pan_records.repo` to the sub-repository's name from `workspace.repos`:
+
+```yaml
+workspace:
+  type: polyrepo
+  repos:
+    - name: infra
+      path: infra
+pan_records:
+  repo: infra
+```
+
+In this example, the `infra` repository hosts `overdeck-state` and its remote
+stores the durable pipeline state. Migration reads the existing `.pan/` and
+`.beads/` directories from the project root, publishes them to the state-host
+repo's orphan branch, and removes the legacy root copies. The host repo's
+`main` branch remains unchanged. GitHub and GitLab host remotes use the same
+migration flow.
+
 ## What changes day to day
 
 Almost nothing, by design. Plans finalize, records update, and beads tasks
