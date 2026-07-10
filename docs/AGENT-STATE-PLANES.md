@@ -17,6 +17,14 @@ Durable portable state is committed through domain writers to the orphan
 - `backlog/` and `notes/` — sequencing and preserved operator notes.
 - `.beads/` — the shared beads database/export surface.
 
+The per-issue record under `records/` is also the permanent home for swarm
+durable state: `slotCompletions`, `finalizedAt`, `failedMergeBlock`,
+`slotAssignments`, and `supersededAttempts` all live there rather than in a
+sidecar runtime file. The workspace record door resolves the record through the
+canonical, migration-aware paths — one record, read through the per-domain
+resolver and written through the single record writer — so a slot's durable
+completion is never silently lost to a stale workspace-local copy.
+
 `migration-complete.json` at the remote branch tip proves cutover. Before that
 marker exists, read doors use the legacy project `.pan/` and `.beads/` layout.
 Afterward, legacy paths are fallback reads only and their recreation trips
