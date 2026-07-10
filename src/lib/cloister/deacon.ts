@@ -191,6 +191,7 @@ import { decideAgentAutonomousRedrive } from './redrive-gate.js';
 import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { reconcilePipelineLabelsPatrol } from './label-reconciler.js';
+import { pruneTerminalStoppedAgents } from './agent-gc.js';
 import { reconcileOrphanProposedSpecs, spawnWorkAgentThroughAgentsEndpoint, triggerRebuildAndStart } from './orphan-proposed-reconciler.js';
 import { reconcileTestStatusFromGreenCiWithDeps } from './test-status-green-ci-reconciler.js';
 import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
@@ -3167,10 +3168,9 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...apiErrorActions);
   for (const a of apiErrorActions) addLog('action', a, state.patrolCycle);
   if (state.patrolCycle % 10 === 0) for (const action of await reconcilePipelineLabelsPatrol()) { actions.push(action); addLog('action', action, state.patrolCycle); }
-  // PAN-1625: reap orphaned dashboard-server processes (failed-restart leftovers
-  // that lost the port but keep running — and can run a second Deacon). Low
-  // cadence (~10 min). Never touches the live server, the port owner, a
-  // just-spawned server, or a workspace-container server — see the reaper module.
+  if (state.patrolCycle % 60 === 0) for (const id of pruneTerminalStoppedAgents().removed) actions.push(`[agents-gc] pruned ${id}`);
+  // PAN-1625: reap orphaned dashboard-server processes. Low cadence (~10 min).
+  // Never touches the live server, port owner, or workspace-container server.
   const serverReaperEveryCycles = Math.max(1, Math.round((10 * 60 * 1000) / config.patrolIntervalMs));
   if (state.patrolCycle % serverReaperEveryCycles === 0) {
     const reaperActions = await reapOrphanedDashboardServers();

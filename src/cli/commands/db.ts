@@ -20,6 +20,7 @@ import {
   type DatabaseProvisionerLogger,
 } from '../../lib/db-provisioners/index.js';
 import type { DatabaseConfig, ProjectConfig as FullProjectConfig } from '../../lib/workspace-config.js';
+import { readIssueRecordForWorkspaceSync } from '../../lib/pan-dir/record.js';
 
 const execAsync = promisify(exec);
 
@@ -146,11 +147,9 @@ export function registerDbCommands(program: Command): void {
 async function gcAgentsCommand(options: { dryRun?: boolean }): Promise<void> {
   const candidates = listAllAgentsSync()
     .filter((agent) =>
-      agent.role === 'work'
-      && agent.status === 'stopped'
-      && agent.paused !== true
-      && agent.troubled !== true
-      && isTerminalIssueStage(getIssueStageSync(agent.issueId)),
+      agent.status === 'stopped'
+      && ((agent.workspace && readIssueRecordForWorkspaceSync(agent.workspace, agent.issueId)?.pipeline?.closedOut === true)
+        || isTerminalIssueStage(getIssueStageSync(agent.issueId))),
     );
   const ids = candidates.map((agent) => agent.id);
 

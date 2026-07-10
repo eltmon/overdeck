@@ -31,6 +31,7 @@ import { loadCloisterConfig } from '../cloister/config.js';
 import { extractNumberSync, extractPrefixSync } from '../issue-id.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
 import { getProjectConfigFromWorkspacePath, markRecordPipelineClosedOutSync } from '../pan-dir/record.js';
+import { pruneStoppedAgentsForIssue } from '../cloister/agent-gc.js';
 
 const execAsync = promisify(exec);
 
@@ -216,6 +217,12 @@ export function closeOut(
     // 8. Mark durable pipeline terminal before clearing the DB cache.
     const markTerminal = yield* markPipelineClosedOutStep(ctx);
     allSteps.push(markTerminal);
+    if (markTerminal.success) {
+      const pruned = pruneStoppedAgentsForIssue(ctx.issueId);
+      allSteps.push(pruned.preserved.length > 0
+        ? stepSkipped('close-out:prune-agent-rows', [`WARNING: preserved live/non-stopped agents: ${pruned.preserved.join(', ')}`])
+        : stepOk('close-out:prune-agent-rows', [`Pruned ${pruned.removed.length} stopped agent row(s)`]));
+    }
 
     // 9. Clear review status
     const clearResult = yield* clearReviewStatusStep(ctx.issueId);
