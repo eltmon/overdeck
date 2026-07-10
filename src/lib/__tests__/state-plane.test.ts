@@ -8,7 +8,31 @@ import {
   isStatePlaneOnlyDiff,
   isStatePlaneOnlyStatus,
   parsePorcelainStatusPaths,
+  STATE_BRANCH_PATHS,
+  STATE_PLANE_PATHS,
 } from '../state-plane.js';
+
+describe('STATE_BRANCH_PATHS', () => {
+  it('enumerates exactly the ten flat overdeck-state root directories', () => {
+    expect(STATE_BRANCH_PATHS).toEqual([
+      'records/',
+      'continues/',
+      'specs/',
+      'drafts/',
+      'review/',
+      'test/',
+      'feedback/',
+      'backlog/',
+      'notes/',
+      '.beads/',
+    ]);
+  });
+
+  it('keeps workspace-local continue.json in legacy diff classification only', () => {
+    expect(STATE_PLANE_PATHS).toContain('.pan/continue.json');
+    expect(STATE_BRANCH_PATHS).not.toContain('.pan/continue.json' as never);
+  });
+});
 
 function git(root: string, args: string[]): string {
   return execFileSync('git', args, { cwd: root, encoding: 'utf-8' }).trim();
@@ -71,7 +95,7 @@ describe('isStatePlaneOnlyDiff', () => {
     await expect(isStatePlaneOnlyDiff(base, tip, root)).resolves.toBe(false);
   });
 
-  it('returns false for a diff that touches only .pan/drafts/', async () => {
+  it('keeps legacy diff classification unchanged for .pan/drafts/', async () => {
     mkdirSync(join(root, '.pan', 'drafts'), { recursive: true });
     writeFileSync(join(root, '.pan', 'drafts', 'PAN-2375.md'), '# Draft\n');
     const tip = commitAll(root, 'draft only');

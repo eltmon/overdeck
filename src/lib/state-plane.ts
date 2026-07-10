@@ -3,6 +3,27 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
+/**
+ * Canonical paths allowed at the root of `overdeck-state` (PAN-2541 D2).
+ * This list describes branch content only. Workspace-local runtime paths such
+ * as `.pan/continue.json` remain in STATE_PLANE_PATHS for legacy diff
+ * classification and must never be added here.
+ */
+export const STATE_BRANCH_PATHS = [
+  'records/',
+  'continues/',
+  'specs/',
+  'drafts/',
+  'review/',
+  'test/',
+  'feedback/',
+  'backlog/',
+  'notes/',
+  '.beads/',
+] as const;
+
+export type StateBranchPath = typeof STATE_BRANCH_PATHS[number];
+
 export const STATE_PLANE_PATHS = [
   '.pan/records/',
   '.pan/continues/',
