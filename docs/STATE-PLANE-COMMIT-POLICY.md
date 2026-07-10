@@ -35,3 +35,42 @@ The old permanent locations (`.pan/records/`, `.pan/continues/`,
 during migration. Doctor and the Deacon flag their recreation after the marker
 lands because that indicates a stray writer. They report the data and never
 delete it.
+
+## Migration runbook
+
+The Overdeck/panopticon-cli cutover completed on 2026-07-09 after eight
+resume-safe attempts. Its valid marker is at the tip of
+`origin/overdeck-state`, and `main` contains zero permanent-state paths. Apply
+these operational lessons to the remaining projects: mind-your-now, krux,
+lexerra, and tindra.
+
+1. Start from a porcelain-clean code checkout and a clean, correctly attached
+   state worktree. Dirty source or destination state is a pre-mutation failure,
+   not something the migrator cleans up.
+2. Run `pan admin state migrate <project> --dry-run` first. Inspect the manifest
+   and resolve every reported safety gate before the real invocation. The
+   migration is intentionally resumable; interruption checks may stop several
+   attempts as repository state changes.
+3. Do not push interim migration-fix commits to `main` while a real migration
+   attempt is between cleanup and its final marker commit. That creates a
+   transient remote state where `main` is clean but no authoritative marker
+   exists, so every reader correctly remains in legacy mode with no legacy
+   paths to read. Finish or safely resume the migration before publishing code
+   changes that expose that window.
+4. The ancestry guard introduced by `fa07e26a4e` rejects any code branch whose
+   history contains the orphan root of `overdeck-state`; path cleanliness alone
+   is insufficient because merging that ancestry would join the state and code
+   histories.
+5. Marker validation uses the semantics fixed by `2fde45421e`: the
+   `stateBranchSha` recorded in `migration-complete.json` must be an ancestor of
+   (or equal to) the current `origin/overdeck-state` tip. It must not be required
+   to equal the tip's immediate parent, because ordinary post-cutover state
+   commits advance the branch without invalidating migration.
+6. After cutover, rebuild the Beads database in the state worktree with
+   `bd init --prefix <project-prefix>` followed by `bd import`. This remains a
+   manual post-migration step until PAN-2551 automates it. Verify `bd` resolves
+   against `${OVERDECK_HOME}/state/<project>/.beads/`, not the code checkout.
+7. Confirm the remote marker, validate its recorded ancestry, verify `main`
+   carries zero state paths, and run Doctor. Only then treat the project as
+   migrated; a branch without a valid marker remains migration-in-progress and
+   all readers continue to resolve legacy state.

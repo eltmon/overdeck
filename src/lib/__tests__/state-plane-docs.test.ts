@@ -8,6 +8,12 @@ const files = [
   'docs/CONTEXT-LAYERS.md',
   'configuration/context-layers.mdx',
   'docs/VBRIEF.md',
+  'sync-sources/rules/prd-folder-placement.md',
+  'sync-sources/rules/prd-authoring.md',
+  'sync-sources/rules/rule-authoring.md',
+  'sync-sources/rules/context-nomenclature.md',
+  'sync-sources/rules/single-source-of-truth.md',
+  'sync-sources/rules/no-destructive-requests.md',
 ];
 
 describe('state-plane documentation', () => {

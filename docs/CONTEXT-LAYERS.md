@@ -174,8 +174,8 @@ The dashboard Context page edits the same layered files as the CLI. Use the
 layer selector to switch between Global, Project, and Workspace context; project
 and workspace selectors choose the registered project or workspace whose
 `.overdeck/context/project.md` or `.overdeck/context/workspace.md` file is loaded.
-Reads fall back to the corresponding legacy `.pan/context/` file when the
-canonical file is absent; when both exist, `.overdeck/` wins.
+The canonical context files are under `.overdeck/context/`; context is
+code-owned and is not stored in the permanent-state worktree.
 
 The editor shows per-harness previews for Claude Code and Pi. A separate **Full
 injected prompt** pane shows the complete Overdeck-controlled bundle that will

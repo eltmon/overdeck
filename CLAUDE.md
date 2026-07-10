@@ -65,8 +65,10 @@ The goal is autonomous correctness. Every manual intervention is a system bug.
 When working directly on `main` (not in a Overdeck workspace), commit completed changes and push to `origin` before ending the session. Agent PRs merge to `origin/main` through the pipeline — unpushed local commits cause divergence that requires manual merge resolution. Don't commit half-done work; finish the change, verify it builds, then commit and push.
 
 Permanent pipeline state is the exception to the code-branch destination: its
-domain writers commit to the dedicated `overdeck-state` worktree. Never stage
-state paths on `main` or a feature branch after a project is migrated.
+domain writers commit and push to the dedicated `overdeck-state` worktree at
+`${OVERDECK_HOME}/state/<project>/`. Run `bd` against that worktree; do not
+assume `.beads/` exists at the code-repository root. Never stage state paths on
+`main` or a feature branch after a project is migrated.
 
 ## CRITICAL: Releases Go Through `pan release stable` — Never Manual
 
@@ -616,10 +618,13 @@ bd close <id>         # Complete work
 4. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
    git pull --rebase
-   bd dolt push
    git push
    git status  # MUST show "up to date with origin"
    ```
+   For migrated projects, run `bd` from
+   `${OVERDECK_HOME}/state/<project>/`; the write door commits and pushes bead
+   state to `overdeck-state` automatically. Do not manually push the Beads
+   store from the code checkout or expect a root `.beads/` directory.
 5. **Clean up** - Clear stashes, prune remote branches
 6. **Verify** - All changes committed AND pushed
 7. **Hand off** - Provide context for next session
