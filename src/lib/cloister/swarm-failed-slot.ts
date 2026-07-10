@@ -7,7 +7,6 @@ import {
   type PanIssueSwarmSupersededAttempt,
 } from '../pan-dir/record.js';
 import { createMinimalIssueRecord } from './deacon-swarm-record.js';
-import type { ClassifiedSwarmSlot } from './deacon-swarm.js';
 import type { PersistedTaskOperation } from '../vbrief/dag.js';
 import type { VBriefDocument } from '../vbrief/types.js';
 import { recordRecoveryFailure } from './recovery-trip.js';
@@ -21,6 +20,7 @@ export interface FailedSlotArchiveDeps {
   runGitCommand: (command: string, cwd: string) => Promise<unknown>;
   clearSlotAssignment: (workspacePath: string, issueId: string, slotIndex: number, itemId?: string) => void;
 }
+interface ClassifiedSlot extends ReconciledSlotItem { lifecycle: string; reason?: string }
 
 export function nextSwarmSlotIndex(record: PanIssueRecord | undefined, reconciled: SlotReconcileResult): number {
   return Math.max(0,
@@ -77,7 +77,7 @@ export async function archiveFailedSwarmSlot(
 export async function requeueFailedSwarmSlots(
   issueId: string,
   workspacePath: string,
-  classified: ClassifiedSwarmSlot[],
+  classified: ClassifiedSlot[],
   doc: VBriefDocument,
   reconciled: SlotReconcileResult,
   deps: FailedSlotArchiveDeps & { applyTaskOperationToPlanFile: (path: string, operation: PersistedTaskOperation, workspace?: string) => Promise<unknown> },

@@ -44,6 +44,26 @@ Lifecycle events project status, while the Deacon keeps a thin patrol as a
 dropped-event safety net. A global Deacon pause gates every patrol and recovery
 path.
 
+## Resume classifier and intent policy
+
+`getAgentResumeGateBlockReason()` is the only classifier for `paused`, `troubled`,
+`stoppedByUser`, and failure backoff. `decideResumeGate(block, intent)` is the
+only policy function; autonomous recovery additionally passes through
+`decideAutonomousRedrive()`, which reads the cached memory verdict.
+
+| Gate | autonomous | operator-start | message-delivery |
+|---|---|---|---|
+| paused / scheduler-yielded | defer; explicit `pan unpause` required | block; start does not unpause | delivery allowed without resuming |
+| troubled | block; needs-you | block; explicit `pan untroubled` required | delivery allowed |
+| stopped-by-user, no completed handoff | block; one durable needs-you trip | clear the flag and start | delivery allowed |
+| stopped-by-user, completed handoff owing rework | clear the historical flag and re-drive | clear and start | delivery allowed |
+| failure backoff | defer | override with a logged warning | delivery allowed |
+
+Durable breaker identity is `{ issue, recoveryPath, obligationGeneration,
+tripCount }`. Restart cannot duplicate an open trip; acknowledgement or a
+successful explicit recovery resets it, and a later obligation generation may
+trip independently.
+
 ## Migration and recovery
 
 Run `pan admin state migrate <project> --dry-run` first. The real command uses

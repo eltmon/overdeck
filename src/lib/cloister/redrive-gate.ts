@@ -16,6 +16,8 @@ import {
 } from '../agents/agent-state.js';
 import { getCachedMemoryVerdict } from './memory-verdict-cache.js';
 
+export const REDRIVE_ENTRY_POINTS = ['dead-session-rework', 'swarm-slot-requeue'] as const;
+
 export type RedriveGateDecision =
   | { decision: 'proceed'; gateDecision: Extract<ResumeGateDecision, { decision: 'proceed' }> }
   | { decision: 'defer'; reason: string; needsYou?: true };

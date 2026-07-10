@@ -325,7 +325,8 @@ After 3 consecutive failures, verification is bypassed to prevent permanent bloc
 
 ## Agent Auto-Resume Gates
 
-Deacon auto-resume is intentionally suppressible through four gates:
+Deacon auto-resume is intentionally suppressible through the unified
+`getAgentResumeGateBlockReason` classifier and `decideResumeGate` intent policy:
 
 - **Boot no-resume:** `OVERDECK_NO_RESUME=1`, `pan dev --no-resume`, or
   `pan up --no-resume` disables orphan recovery and stopped-agent auto-resume for
@@ -338,6 +339,11 @@ Deacon auto-resume is intentionally suppressible through four gates:
   preserve failure counters/backoff state in `state.json`. `pan untroubled <id>`
   clears the troubled gate and failure fields after the underlying crash cause has
   been investigated. It does not spawn the agent.
+- **Operator-stop gate:** `stoppedByUser` blocks autonomous re-drive when no
+  completed handoff exists and emits one durable needs-you trip. A completed
+  handoff that owes review/test/verification rework may clear the historical
+  flag and re-drive. Explicit operator start clears only `stoppedByUser`; it does
+  not silently clear paused or troubled state.
 - **Memory gate (PAN-2500):** `assessMemoryPressure()` in `src/lib/cloister/memory-governor.ts`
   gates every autonomous resume/dispatch path — boot recovery, patrol auto-resume,
   reactive resume-on-stop, and review/test/ship dispatch — on live memory pressure,

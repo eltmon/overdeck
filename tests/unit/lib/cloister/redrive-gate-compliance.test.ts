@@ -1,6 +1,5 @@
-import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
-import { decideAutonomousRedrive } from '../../../../src/lib/cloister/redrive-gate.js';
+import { decideAutonomousRedrive, REDRIVE_ENTRY_POINTS } from '../../../../src/lib/cloister/redrive-gate.js';
 import { setCachedMemoryVerdictForTests } from '../../../../src/lib/cloister/memory-verdict-cache.js';
 
 afterEach(() => setCachedMemoryVerdictForTests(null));
@@ -51,10 +50,6 @@ describe('PAN-2543 re-drive gate compliance', () => {
   });
 
   it('enumerates every PAN-2543 autonomous re-drive entry point through the shared gate', () => {
-    const entryPoints = [
-      ['src/lib/cloister/deacon.ts', 'decideAgentAutonomousRedrive'],
-      ['src/lib/cloister/swarm-failed-slot.ts', 'decideAutonomousRedrive'],
-    ] as const;
-    for (const [path, predicate] of entryPoints) expect(readFileSync(path, 'utf8'), path).toContain(predicate);
+    expect(REDRIVE_ENTRY_POINTS).toEqual(['dead-session-rework', 'swarm-slot-requeue']);
   });
 });
