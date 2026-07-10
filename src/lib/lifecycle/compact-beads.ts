@@ -12,9 +12,7 @@ import { promisify } from 'util';
 import { Effect } from 'effect';
 import type { LifecycleContext, StepResult } from './types.js';
 import { stepOk, stepSkipped, stepFailed } from './types.js';
-import { findProjectByPathSync } from '../projects.js';
-import { resolveStateReadHomeSync } from '../state-home.js';
-import { flushAutoCommits, queueBeadsAutoCommit } from '../pan-dir/auto-commit.js';
+import { resolveStateReadHomeSync } from '../state-read-home.js';
 
 const execAsync = promisify(exec);
 
@@ -59,8 +57,7 @@ async function compactBeadsImpl(
   }
 
   // Check if .beads directory exists
-  const project = findProjectByPathSync(ctx.projectPath);
-  const stateHome = project ? resolveStateReadHomeSync(project) : { root: ctx.projectPath, migrated: false };
+  const stateHome = resolveStateReadHomeSync({ name: ctx.projectName ?? ctx.projectPath, path: ctx.projectPath });
   const operationRoot = stateHome.root;
   const beadsDir = join(operationRoot, '.beads');
   if (!existsSync(beadsDir)) {
@@ -85,6 +82,7 @@ async function compactBeadsImpl(
   });
 
   if (stateHome.migrated) {
+    const { flushAutoCommits, queueBeadsAutoCommit } = await import('../pan-dir/auto-commit.js');
     queueBeadsAutoCommit(ctx.projectPath);
     const result = await Effect.runPromise(flushAutoCommits(ctx.projectPath));
     return result.committed

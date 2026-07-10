@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../../../src/lib/projects.js', () => ({
   listProjectsSync: mocks.listProjectsSync,
+  findProjectByPathSync: (projectPath: string) =>
+    mocks.listProjectsSync().find(({ config }: { config: { path: string } }) => config.path === projectPath)?.config ?? null,
 }));
 
 let tempRoot: string;

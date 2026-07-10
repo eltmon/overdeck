@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { shouldCommitLegacyWorkspaceArtifacts } from '../state-home.js';
+import { shouldCommitLegacyWorkspaceArtifacts } from '../state-read-home.js';
 
 describe('migrated workspace commit gates', () => {
   it('permits legacy sync only before the completion marker is authoritative', () => {

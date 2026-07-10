@@ -19,7 +19,8 @@ import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle
 import { withBdMutex } from '../../../../lib/bd-mutex.js';
 import { validateProviderHealth } from '../../../../lib/provider-health.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../../../../lib/projects.js';
-import { isStateMigrated, shouldCommitLegacyWorkspaceArtifacts } from '../../../../lib/state-home.js';
+import { isStateMigrated } from '../../../../lib/state-home.js';
+import { shouldCommitLegacyWorkspaceArtifacts } from '../../../../lib/state-read-home.js';
 import { getWorkspaceStackHealth } from '../../../../lib/workspace/stack-health.js';
 import { writeAutoStartVBrief } from '../../../../lib/vbrief/auto-synthesize.js';
 import { findPlan, readPlan } from '../../../../lib/vbrief/io.js';

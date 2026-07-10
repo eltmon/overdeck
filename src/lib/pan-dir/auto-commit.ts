@@ -28,7 +28,7 @@ import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem';
 import * as NodePath from '@effect/platform-node/NodePath';
 import { GitError } from '../errors.js';
 import { findProjectByPathSync, listProjectsSync } from '../projects.js';
-import { resolveStateReadHomeSync, STATE_BRANCH } from '../state-home.js';
+import { resolveStateReadHomeSync, STATE_BRANCH } from '../state-read-home.js';
 import { isStateMigrationLocked } from '../state-migration-lock.js';
 import { isStatePlaneOnlyDiff } from '../state-plane.js';
 

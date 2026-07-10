@@ -67,7 +67,8 @@ import {
 import { getConcurrencyLimits } from '../cloister/concurrency.js';
 import { listAgentStates } from './queries.js';
 import { findProjectByPathSync } from '../projects.js';
-import { isStateMigrated, shouldCommitLegacyWorkspaceArtifacts } from '../state-home.js';
+import { isStateMigrated } from '../state-home.js';
+import { shouldCommitLegacyWorkspaceArtifacts } from '../state-read-home.js';
 import {
   decideChannelsForWorkAgent,
   dismissDevChannelsDialog,

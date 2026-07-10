@@ -3,7 +3,7 @@ import { Effect, FileSystem } from 'effect'
 import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem'
 import { FsError } from '../errors.js'
 import { findProjectByPathSync, type ProjectConfig } from '../projects.js'
-import { resolveStateReadHomeSync } from '../state-home.js'
+import { resolveStateReadHomeSync } from '../state-read-home.js'
 
 import { normalizeVBriefEnvelope, serializeVBriefDocument, VBriefMergeConflictError } from '../vbrief/io.js'
 import { generateVBriefFilename, parseVBriefFilename, slugify } from '../vbrief/lifecycle.js'

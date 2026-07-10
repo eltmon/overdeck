@@ -8,6 +8,7 @@ import {
   PAN_CONTEXT_FILENAME,
   PAN_CONTINUE_FILENAME,
   PAN_DIRNAME,
+  WORKSPACE_RUNTIME_DIRNAME,
   PAN_FEEDBACK_DIRNAME,
   PAN_SESSIONS_FILENAME,
   PAN_SPEC_FILENAME,
@@ -85,18 +86,18 @@ describe('ensureWorkspacePanDir / getWorkspacePanPaths', () => {
   it.effect('creates workspace .pan and feedback directory', () =>
     Effect.gen(function* () {
       const paths = yield* ensureWorkspacePanDir(TEST_DIR)
-      expect(paths.specPath).toBe(join(TEST_DIR, PAN_DIRNAME, PAN_SPEC_FILENAME))
-      expect(paths.continuePath).toBe(join(TEST_DIR, PAN_DIRNAME, PAN_CONTINUE_FILENAME))
-      expect(paths.sessionsPath).toBe(join(TEST_DIR, PAN_DIRNAME, PAN_SESSIONS_FILENAME))
-      expect(paths.feedbackDir).toBe(join(TEST_DIR, PAN_DIRNAME, PAN_FEEDBACK_DIRNAME))
-      expect(paths.contextPath).toBe(join(TEST_DIR, PAN_DIRNAME, PAN_CONTEXT_FILENAME))
+      expect(paths.specPath).toBe(join(TEST_DIR, WORKSPACE_RUNTIME_DIRNAME, PAN_SPEC_FILENAME))
+      expect(paths.continuePath).toBe(join(TEST_DIR, WORKSPACE_RUNTIME_DIRNAME, PAN_CONTINUE_FILENAME))
+      expect(paths.sessionsPath).toBe(join(TEST_DIR, WORKSPACE_RUNTIME_DIRNAME, PAN_SESSIONS_FILENAME))
+      expect(paths.feedbackDir).toBe(join(TEST_DIR, WORKSPACE_RUNTIME_DIRNAME, PAN_FEEDBACK_DIRNAME))
+      expect(paths.contextPath).toBe(join(TEST_DIR, WORKSPACE_RUNTIME_DIRNAME, PAN_CONTEXT_FILENAME))
       expect(existsSync(paths.feedbackDir)).toBe(true)
     }),
   )
 
   it('returns stable workspace paths', () => {
     const paths = getWorkspacePanPaths(TEST_DIR)
-    expect(paths.panDir).toBe(join(TEST_DIR, PAN_DIRNAME))
+    expect(paths.panDir).toBe(join(TEST_DIR, WORKSPACE_RUNTIME_DIRNAME))
   })
 })
 

@@ -33,7 +33,7 @@ import { migrateOverdeckToPanSync } from '../../lib/workspace-manager.js';
 import { runMultiToolSyncSync, resolveAlsoSyncToolsSync } from '../../lib/multi-tool-sync.js';
 import { ensurePlaywrightIsolationSync, ensureExcalidrawMcpSync } from '../../lib/claude-mcp.js';
 import { resolveProjectContextFile } from '../../lib/context-layers/layers.js';
-import { resolveStateReadHomeSync } from '../../lib/state-home.js';
+import { resolveStateReadHomeSync } from '../../lib/state-read-home.js';
 
 // Bundled git hooks distributed to registered projects (PAN-1201: sync-sources/).
 const BUNDLED_GIT_HOOKS_DIR = SYNC_SOURCES.gitHooks;

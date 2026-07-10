@@ -17,7 +17,7 @@ import { dirname, join } from 'node:path';
 import { hostname } from 'node:os';
 
 import { queueAutoCommit } from './auto-commit.js';
-import { resolveStateReadHomeSync } from '../state-home.js';
+import { resolveStateReadHomeSync } from '../state-read-home.js';
 import {
   getProjectSync,
   resolveProjectFromIssueSync,

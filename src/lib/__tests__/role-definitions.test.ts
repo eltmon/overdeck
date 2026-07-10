@@ -31,7 +31,7 @@ describe('role definitions', () => {
     expect(frontmatter.model).toBeUndefined();
     expect(frontmatter.description).toEqual(expect.any(String));
     expect(body).toContain('Read the issue and the PRD draft');
-    expect(body).toContain('.pan/drafts/');
+    expect(body).toContain('drafts/<ISSUE-ID>.md` on `overdeck-state`');
     expect(body).toContain('AskUserQuestion');
     expect(body).toContain('vBRIEF plan');
     expect(body).toContain('Beads');
@@ -40,8 +40,8 @@ describe('role definitions', () => {
     expect(body).toContain('Stop after `pan plan finalize` returns');
     // Status-as-field model — files do not move between directories
     expect(body).toContain('Files never move between directories');
-    // Output instructions must point at the canonical .pan/specs/ path, not legacy directories
-    expect(body).toMatch(/Promote.*\.pan\/specs\/|\.pan\/specs\/.*proposed/i);
+    // Output instructions must point at the canonical overdeck-state specs path.
+    expect(body).toMatch(/specs\/.*overdeck-state|overdeck-state.*specs\//i);
   });
 
   it('defines the work role with Jidoka inspection gates and no phase labels', () => {
@@ -146,7 +146,7 @@ describe('role definitions', () => {
     expect(body).toContain('There is no separate UAT role');
     expect(body).toContain('Playwright MCP tools');
     expect(body).toContain('isolated browser instance per session');
-    expect(body).toContain(".pan/continue.json");
+    expect(body).toContain('.overdeck/continue.json');
     expect(body).toContain('vBRIEF acceptance criteria');
     expect(body).toContain('TESTS PASSED');
     expect(body).toContain('TESTS FAILED');
