@@ -3,6 +3,8 @@ import {
   classifyInFlightSlots,
   dispatchNextWave,
   getFailedMergeBlock,
+  getFailedMergeBlocks,
+  recordFailedMergeBlock,
   recordStalledSlotRecovery,
   resetSwarmLoopSafetyForTests,
   type CoordinateSwarmSlotsDeps,
@@ -173,6 +175,44 @@ describe('deacon-swarm stalled-slot detection and duplicate-spawn guard', () => 
       slotIndex: 1,
       note: expect.stringContaining('stalled'),
     }));
+  });
+
+  it('PAN-2364: records a block for every stalled slot in one pass', () => {
+    const classified = [
+      { ...slot(), lifecycle: 'stalled' as const, reason: 'no-progress-timeout' as const, stalledForMs: STALL_THRESHOLD_MS + 1 },
+      { ...slot({ itemId: 'wi-b', slotIndex: 2, branch: 'feature/pan-2203-slot-2', agentId: 'agent-pan-2203-slot-2' }), lifecycle: 'stalled' as const, reason: 'no-progress-timeout' as const, stalledForMs: STALL_THRESHOLD_MS + 1 },
+    ];
+
+    expect(recordStalledSlotRecovery('PAN-2203', classified)).toEqual([
+      '[swarm] stalled slot 1 (item wi-a) for PAN-2203: recovery required',
+      '[swarm] stalled slot 2 (item wi-b) for PAN-2203: recovery required',
+    ]);
+    expect(getFailedMergeBlock('PAN-2203', 1)).toEqual(expect.objectContaining({ itemId: 'wi-a', slotIndex: 1 }));
+    expect(getFailedMergeBlock('PAN-2203', 2)).toEqual(expect.objectContaining({ itemId: 'wi-b', slotIndex: 2 }));
+  });
+
+  it('PAN-2364: only records blocks for newly stalled slots when others already hold blocks', () => {
+    recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-a', slotIndex: 1, note: 'Slot 1 stalled with no branch commit or pane output progress' });
+    const classified = [
+      { ...slot(), lifecycle: 'stalled' as const, reason: 'no-progress-timeout' as const, stalledForMs: STALL_THRESHOLD_MS + 1 },
+      { ...slot({ itemId: 'wi-b', slotIndex: 2, branch: 'feature/pan-2203-slot-2', agentId: 'agent-pan-2203-slot-2' }), lifecycle: 'stalled' as const, reason: 'no-progress-timeout' as const, stalledForMs: STALL_THRESHOLD_MS + 1 },
+    ];
+
+    expect(recordStalledSlotRecovery('PAN-2203', classified)).toEqual([
+      '[swarm] stalled slot 2 (item wi-b) for PAN-2203: recovery required',
+    ]);
+    expect(getFailedMergeBlock('PAN-2203', 1)).toEqual(expect.objectContaining({ itemId: 'wi-a', slotIndex: 1 }));
+    expect(getFailedMergeBlock('PAN-2203', 2)).toEqual(expect.objectContaining({ itemId: 'wi-b', slotIndex: 2 }));
+  });
+
+  it('PAN-2364: repeated passes over the same stalled slot are idempotent and do not rewrite the block', () => {
+    const classified = [{ ...slot(), lifecycle: 'stalled' as const, reason: 'no-progress-timeout' as const, stalledForMs: STALL_THRESHOLD_MS + 1 }];
+
+    expect(recordStalledSlotRecovery('PAN-2203', classified)).toEqual([
+      '[swarm] stalled slot 1 (item wi-a) for PAN-2203: recovery required',
+    ]);
+    expect(recordStalledSlotRecovery('PAN-2203', classified)).toEqual([]);
+    expect(getFailedMergeBlocks('PAN-2203')).toHaveLength(1);
   });
 
   it('keeps a fresh slot running within the threshold', async () => {

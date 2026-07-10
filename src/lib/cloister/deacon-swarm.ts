@@ -790,19 +790,19 @@ export function recordStalledSlotRecovery(issueId: string, slots: ClassifiedSwar
   const actions: string[] = [];
   const normalizedIssueId = issueId.toUpperCase();
 
-  const stalled = slots.find(slot => slot.lifecycle === 'stalled');
-  if (!stalled) return actions;
+  for (const slot of slots.filter(s => s.lifecycle === 'stalled')) {
+    if (getFailedMergeBlock(normalizedIssueId, slot.slotIndex, workspacePath)) continue;
 
-  if (getFailedMergeBlock(normalizedIssueId, stalled.slotIndex, workspacePath)) return actions;
+    recordFailedMergeBlock({
+      issueId: normalizedIssueId,
+      itemId: slot.itemId,
+      slotIndex: slot.slotIndex,
+      branch: slot.branch,
+      note: `Slot ${slot.slotIndex} stalled with no branch commit or pane output progress`,
+    }, workspacePath);
+    actions.push(`[swarm] stalled slot ${slot.slotIndex} (item ${slot.itemId}) for ${normalizedIssueId}: recovery required`);
+  }
 
-  recordFailedMergeBlock({
-    issueId: normalizedIssueId,
-    itemId: stalled.itemId,
-    slotIndex: stalled.slotIndex,
-    branch: stalled.branch,
-    note: `Slot ${stalled.slotIndex} stalled with no branch commit or pane output progress`,
-  }, workspacePath);
-  actions.push(`[swarm] stalled slot ${stalled.slotIndex} (item ${stalled.itemId}) for ${normalizedIssueId}: recovery required`);
   return actions;
 }
 
