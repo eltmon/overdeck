@@ -55,7 +55,7 @@ Two dispatchable items whose `files_scope` overlaps are serialized. Deacon may d
    `classifyInFlightSlots()` classifies slots as `running`, `ready-to-merge`, `failed`, or `stalled`. It checks a slot's durable completion marker first (see [Durable Slot Completion](#durable-slot-completion) below); a matching marker makes the slot `ready-to-merge` with signal `durable-completion` regardless of session state. Otherwise a pane exit code of 0 makes a slot ready to merge. A missing session, missing agent, non-zero pane exit, or unknown dead-pane exit makes it failed. A live pane with no branch-tip commit progress and no pane-output progress past the stall threshold becomes stalled.
 
 5. Verify and merge ready slots.
-   `mergeReadySlots()` calls `verifyAndMergeSlot()`. On success it writes the item `done` through `applyTaskOperationToPlanFile()`. On merge conflicts it records a failed-merge recovery block.
+   `mergeReadySlots()` calls `verifyAndMergeSlot()` for each slot that is not blocked. On success it writes the item `done` through `applyTaskOperationToPlanFile()`. On merge conflicts it records a per-slot failed-merge recovery block; the coordinator then skips that slot on subsequent passes while continuing to merge and dispatch the remaining slots.
 
 6. Garbage collect merged slots.
    `gcMergedSlots()` removes merged slot worktrees and branches after the slot has been incorporated into the parent feature branch.
@@ -64,7 +64,7 @@ Two dispatchable items whose `files_scope` overlaps are serialized. Deacon may d
    `dispatchNextWave()` calls `getDispatchableItems(doc, mergedItemIds)`, filters to slot-eligible items, applies file-overlap serialization, checks global capacity, allocates the lowest free slot index, claims the vBRIEF item through the write door, and spawns `agent-<issue>-slot-N`.
 
 8. Recover failed or stalled slots.
-   Failed merge and stalled-slot records pause automatic advancement for that issue until `pan swarm recover` applies an operator-selected action.
+   Failed merge and stalled-slot records are stored per slot. A block pauses automatic advancement for that specific slot only; the coordinator keeps working on the rest of the issue. `pan swarm status` lists all blocked slots and labels them `failed-merge-blocked` so they are not misreported as `ready-to-merge`. Recovery is applied slot-by-slot with `pan swarm recover <id> <slotIndex>`.
 
 ## CLI
 
@@ -94,11 +94,11 @@ pan swarm recover PAN-2203 1 --action drop
 pan swarm recover PAN-2203 1 --action handoff
 ```
 
-`pan swarm recover <id> <slotIndex> --action retry|drop|handoff` calls the same recovery path used by Deacon:
+`pan swarm recover <id> <slotIndex> --action retry|drop|handoff` targets a single blocked slot. Failed-merge and stalled-slot blocks are stored per-slot, so one blocked slot does not halt the rest of the swarm. The coordinator continues merging and dispatching other slots while any slot remains blocked.
 
 | Action | Effect |
 | --- | --- |
-| `retry` | Unblocks the item, clears the failed-slot block, and redispatches through `dispatchNextWave()`. |
+| `retry` | Archives the conflicted slot attempt (renames its branch and worktree to a superseded attempt record) so the old attempt cannot re-assert, unblocks the item, clears the per-slot block, and redispatches a fresh attempt through `dispatchNextWave()`. |
 | `drop` | Marks the item done through the vBRIEF write door and clears the block. Use only when the operator has verified the slot output is no longer needed. |
 | `handoff` | Keeps advancement paused and records an operator handoff note for manual resolution. |
 
@@ -132,7 +132,7 @@ Pane exit alone is not enough. A model can leave a pane alive while making no pr
 - the branch-tip commit time for the slot branch; and
 - the captured pane output digest.
 
-If neither changes before the stall threshold elapses, the slot becomes `stalled`. Deacon records a recovery block and stops advancing that issue until the operator chooses `retry`, `drop`, or `handoff`.
+If neither changes before the stall threshold elapses, the slot becomes `stalled`. Deacon records a per-slot recovery block and stops advancing that specific slot until the operator chooses `retry`, `drop`, or `handoff` for that slot. Other slots continue normally.
 
 The default stall threshold is 30 minutes. It can be overridden with `PAN_SWARM_STALL_THRESHOLD_MS` for test or operational tuning.
 
