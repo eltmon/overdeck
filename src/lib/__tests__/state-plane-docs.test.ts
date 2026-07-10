@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const files = [
@@ -23,5 +23,19 @@ describe('state-plane documentation', () => {
     const text = readFileSync('docs/VBRIEF.md', 'utf8');
     expect(text).toContain('PAN-967 replaced `.planning/plan.vbrief.json` with workspace-local `.pan/spec.vbrief.json`');
     expect(text).toContain('current canonical spec is `specs/<file>` on `overdeck-state`');
+  });
+
+  it('allows legacy permanent paths only in explicitly historical top-level docs', () => {
+    const matches = readdirSync('docs', { withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => `docs/${entry.name}`)
+      .filter((file) => /\.pan\/(records|specs|drafts)/.test(readFileSync(file, 'utf8')))
+      .sort();
+    expect(matches).toEqual([
+      'docs/FLYWHEEL-STATE.md',
+      'docs/STATE-PLANE-COMMIT-POLICY.md',
+    ]);
+    expect(readFileSync('docs/FLYWHEEL-STATE.md', 'utf8')).toContain('Historical-path note (PAN-2541)');
+    expect(readFileSync('docs/STATE-PLANE-COMMIT-POLICY.md', 'utf8')).toContain('old permanent locations');
   });
 });

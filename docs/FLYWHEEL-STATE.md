@@ -2,6 +2,11 @@
 
 Durable cumulative memory across Flywheel orchestrator runs. Status snapshots are ephemeral and live in `~/.overdeck/flywheel/`; this file is for facts that future runs should not have to rediscover.
 
+> Historical-path note (PAN-2541): entries below are an append-only incident log.
+> References to `.pan/records/`, `.pan/specs/`, and `.pan/drafts/` describe the
+> legacy layout that existed when each event occurred; current permanent state
+> lives in `records/`, `specs/`, and `drafts/` on `overdeck-state`.
+
 ## Substrate fixes
 
 ### Inspect bead→vBRIEF item resolution (commit b721b8b31d, 2026-07-09, RUN-60)
