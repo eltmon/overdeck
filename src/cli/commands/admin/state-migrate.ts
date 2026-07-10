@@ -59,7 +59,14 @@ async function createOrphanStateCommit(repo: string, sourceSha: string): Promise
 function workspacePaths(repo: string): string[] {
   const root = join(repo, 'workspaces');
   if (!existsSync(root)) return [];
-  return readdirSync(root, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => join(root, entry.name));
+  return readdirSync(root, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => join(root, entry.name))
+    // Only real git worktrees are workspaces. workspaces/ can contain stray
+    // non-worktree directories (e.g. a root-owned node_modules left by a
+    // container) that must not be touched — writing into them EACCES-aborts
+    // the migration mid-flight.
+    .filter((path) => existsSync(join(path, '.git')));
 }
 
 function rewriteGitignore(repo: string): void {
