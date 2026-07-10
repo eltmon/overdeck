@@ -37,6 +37,26 @@ if [[ "$branch" == "overdeck-state" ]]; then
   exit 0
 fi
 
+# Ancestry guard: a merge with --allow-unrelated-histories (e.g. strategy
+# "ours") can graft overdeck-state's history into a code branch WITHOUT adding
+# any state files, evading the content check below. If the state branch's
+# orphan root commit is an ancestor of the candidate tip, the histories were
+# connected — refuse regardless of file content.
+tip=${range##*..}
+state_ref=""
+for candidate in refs/remotes/origin/overdeck-state refs/heads/overdeck-state; do
+  git rev-parse --verify --quiet "$candidate" >/dev/null && { state_ref=$candidate; break; }
+done
+if [[ -n "$state_ref" ]]; then
+  state_root=$(git rev-list --max-parents=0 "$state_ref" | tail -1)
+  if [[ -n "$state_root" ]] && git merge-base --is-ancestor "$state_root" "$tip" 2>/dev/null; then
+    echo "✖ candidate history contains overdeck-state's orphan root ($state_root)." >&2
+    echo "  main and overdeck-state must never merge (PAN-2541 D8) — even an" >&2
+    echo "  'ours' merge that adds no files. Drop the merge commit and retry." >&2
+    exit 1
+  fi
+fi
+
 violations=""
 while IFS=$'\t' read -r status path rest; do
   [[ -z "$status" || "$status" == D* ]] && continue

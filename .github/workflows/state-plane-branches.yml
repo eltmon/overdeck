@@ -20,6 +20,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # The ancestry guard needs the state branch's root commit visible.
+          git fetch --quiet origin overdeck-state:refs/remotes/origin/overdeck-state || true
           if [[ "${{ github.event_name }}" == pull_request ]]; then
             branch=main
             range="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
