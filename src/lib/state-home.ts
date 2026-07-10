@@ -2,7 +2,7 @@
  * State-home resolver and dedicated overdeck-state worktree manager (PAN-2541).
  *
  * Migration is complete only when the tip of origin/overdeck-state contains a
- * valid migration-complete.json whose stateBranchSha names the marker's parent.
+ * valid migration-complete.json whose stateBranchSha is an ancestor of the tip.
  * An unmarked branch is an in-progress migration and continues using legacy
  * project-root state paths.
  */
@@ -120,8 +120,15 @@ async function markerAtRemoteTip(repoPath: string, tip: string): Promise<Migrati
   }
   if (!marker) return null;
 
-  const parent = await git(repoPath, ['rev-parse', `${tip}^`]).catch(() => '');
-  return marker.stateBranchSha === parent ? marker : null;
+  // The marker's stateBranchSha must be an ancestor of (or equal to) the tip —
+  // the state branch keeps growing after migration (records, specs, notes),
+  // so requiring the marker to be the LAST commit would un-migrate the project
+  // on its first post-migration state write. Ancestry still proves the marker
+  // belongs to this branch's history rather than a graft from elsewhere.
+  const anchored = await git(repoPath, ['merge-base', '--is-ancestor', marker.stateBranchSha, tip])
+    .then(() => true)
+    .catch(() => false);
+  return anchored ? marker : null;
 }
 
 export async function inspectStateMigration(project: ProjectConfig): Promise<{
