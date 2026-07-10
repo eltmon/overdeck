@@ -12,6 +12,9 @@ import { promisify } from 'util';
 import { Effect } from 'effect';
 import type { LifecycleContext, StepResult } from './types.js';
 import { stepOk, stepSkipped, stepFailed } from './types.js';
+import { findProjectByPathSync } from '../projects.js';
+import { resolveStateReadHomeSync } from '../state-home.js';
+import { flushAutoCommits, queueBeadsAutoCommit } from '../pan-dir/auto-commit.js';
 
 const execAsync = promisify(exec);
 
@@ -56,7 +59,10 @@ async function compactBeadsImpl(
   }
 
   // Check if .beads directory exists
-  const beadsDir = join(ctx.projectPath, '.beads');
+  const project = findProjectByPathSync(ctx.projectPath);
+  const stateHome = project ? resolveStateReadHomeSync(project) : { root: ctx.projectPath, migrated: false };
+  const operationRoot = stateHome.root;
+  const beadsDir = join(operationRoot, '.beads');
   if (!existsSync(beadsDir)) {
     return stepSkipped(step, ['No .beads directory in project']);
   }
@@ -64,7 +70,7 @@ async function compactBeadsImpl(
   // Count old closed beads
   const { stdout: countOutput } = await execAsync(
     `bd list --status closed --json 2>/dev/null | jq '[.[] | select(.closed_at != null) | select((now - (.closed_at | fromdateiso8601)) > (${days} * 24 * 60 * 60))] | length' 2>/dev/null || echo "0"`,
-    { cwd: ctx.projectPath, encoding: 'utf-8' },
+    { cwd: operationRoot, encoding: 'utf-8' },
   );
 
   const count = parseInt(countOutput.trim(), 10) || 0;
@@ -74,11 +80,19 @@ async function compactBeadsImpl(
 
   // Run compaction
   await execAsync(`bd admin compact --days ${days}`, {
-    cwd: ctx.projectPath,
+    cwd: operationRoot,
     encoding: 'utf-8',
   });
 
-  // Stage changes
+  if (stateHome.migrated) {
+    queueBeadsAutoCommit(ctx.projectPath);
+    const result = await Effect.runPromise(flushAutoCommits(ctx.projectPath));
+    return result.committed
+      ? stepOk(step, [`Compacted ${count} closed beads and committed through overdeck-state`])
+      : stepFailed(step, `Compacted beads but state write door refused commit: ${result.reason ?? 'unknown'}`);
+  }
+
+  // Legacy compatibility: pre-migration projects still commit on main.
   await execAsync('git add .beads/', { cwd: ctx.projectPath, encoding: 'utf-8' });
 
   // Check if there are changes to commit
