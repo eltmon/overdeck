@@ -30,6 +30,7 @@ const SIGTERM_GRACE_MS = 3_000;
 let serverProcess: ChildProcess.ChildProcess | null = null;
 let restartAttempt = 0;
 let restartTimer: ReturnType<typeof setTimeout> | null = null;
+let waitInterval: ReturnType<typeof setInterval> | null = null;
 let quitting = false;
 
 // Callbacks so main.ts can react to server-ready / URL changes
@@ -140,10 +141,15 @@ function spawnServer(): void {
 }
 
 function waitForServer(url: string, callback: (healthy: boolean) => void, maxMs = 30_000): void {
+  // Only one poller may be live: a crash-restart spawns a new child on a new
+  // port, and a stale poller's late callback would clobber serverUrl with the
+  // dead port (and, pre-PAN-2570, open another window).
+  if (waitInterval) clearInterval(waitInterval);
   const start = Date.now();
   const interval = setInterval(() => {
     if (Date.now() - start > maxMs) {
       clearInterval(interval);
+      if (waitInterval === interval) waitInterval = null;
       callback(false); // call anyway — server might still come up
       return;
     }
@@ -151,6 +157,7 @@ function waitForServer(url: string, callback: (healthy: boolean) => void, maxMs 
       .then((r) => {
         if (r.ok) {
           clearInterval(interval);
+          if (waitInterval === interval) waitInterval = null;
           callback(true);
         }
       })
@@ -158,6 +165,7 @@ function waitForServer(url: string, callback: (healthy: boolean) => void, maxMs 
         /* not ready yet */
       });
   }, 500);
+  waitInterval = interval;
 }
 
 function scheduleRestart(): void {
@@ -186,6 +194,11 @@ export function stopServer(): void {
   if (restartTimer) {
     clearTimeout(restartTimer);
     restartTimer = null;
+  }
+
+  if (waitInterval) {
+    clearInterval(waitInterval);
+    waitInterval = null;
   }
 
   const child = serverProcess;

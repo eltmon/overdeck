@@ -228,6 +228,7 @@ const SIGTERM_GRACE_MS = 3e3;
 let serverProcess = null;
 let restartAttempt = 0;
 let restartTimer = null;
+let waitInterval = null;
 let quitting = false;
 let onReadyCallback = null;
 function randomHex(bytes) {
@@ -299,20 +300,24 @@ function spawnServer() {
 	});
 }
 function waitForServer(url, callback, maxMs = 3e4) {
+	if (waitInterval) clearInterval(waitInterval);
 	const start = Date.now();
 	const interval = setInterval(() => {
 		if (Date.now() - start > maxMs) {
 			clearInterval(interval);
+			if (waitInterval === interval) waitInterval = null;
 			callback(false);
 			return;
 		}
 		fetch(url + "/api/health", { signal: AbortSignal.timeout(1e3) }).then((r) => {
 			if (r.ok) {
 				clearInterval(interval);
+				if (waitInterval === interval) waitInterval = null;
 				callback(true);
 			}
 		}).catch(() => {});
 	}, 500);
+	waitInterval = interval;
 }
 function scheduleRestart() {
 	if (quitting) return;
@@ -333,6 +338,10 @@ function stopServer() {
 	if (restartTimer) {
 		clearTimeout(restartTimer);
 		restartTimer = null;
+	}
+	if (waitInterval) {
+		clearInterval(waitInterval);
+		waitInterval = null;
 	}
 	const child = serverProcess;
 	if (!child) return;
@@ -1112,6 +1121,10 @@ electron.app.on("ready", () => {
 		serverPort = port;
 		serverUrl = `http://127.0.0.1:${port}`;
 		serverWsUrl = wsUrl;
+		if (mainWindow && !mainWindow.isDestroyed()) {
+			mainWindow.loadURL(resolveWindowUrl());
+			return;
+		}
 		mainWindow = createWindow();
 		handleAutoStartNag();
 	});

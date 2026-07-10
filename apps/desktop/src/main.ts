@@ -364,6 +364,13 @@ app.on("ready", () => {
     serverPort = port;
     serverUrl = `http://127.0.0.1:${port}`;
     serverWsUrl = wsUrl;
+    // The ready callback fires again after every server crash-restart. One
+    // window per callback multiplied windows under a crash loop (PAN-2570) —
+    // reuse the existing window and repoint it at the current server URL.
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      void mainWindow.loadURL(resolveWindowUrl());
+      return;
+    }
     mainWindow = createWindow();
     handleAutoStartNag();
   });
