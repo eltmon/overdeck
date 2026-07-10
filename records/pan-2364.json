@@ -1,0 +1,76 @@
+{
+  "issueId": "PAN-2364",
+  "schemaVersion": 2,
+  "feedback": [],
+  "created": "2026-07-10T20:57:17.176Z",
+  "updated": "2026-07-10T21:08:29.244Z",
+  "pipeline": {
+    "issueId": "PAN-2364",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "inspectStatus": "inspecting",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-10T21:08:29.211Z",
+    "inspectNotes": "Inspecting bead per-slot-block-storage"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 271,
+            "output": 200,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 18814,
+            "output": 43999,
+            "cacheRead": 6644060,
+            "cacheWrite": 180006
+          }
+        },
+        "work": {
+          "custom/kimi-k2.7-code": {
+            "input": 405733,
+            "output": 60827,
+            "cacheRead": 15360768,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-haiku-4-5": {
+          "input": 271,
+          "output": 200,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 18814,
+          "output": 43999,
+          "cacheRead": 6644060,
+          "cacheWrite": 180006
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 405733,
+          "output": 60827,
+          "cacheRead": 15360768,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 14.830811,
+        "pricingAsOf": "2026-07-10T21:08:29.240Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "claude-sonnet-5"
+}
