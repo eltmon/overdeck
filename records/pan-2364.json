@@ -47,16 +47,16 @@
     "recordedAt": "2026-07-10T22:47:42.876Z"
   },
   "created": "2026-07-10T20:57:17.176Z",
-  "updated": "2026-07-10T22:47:49.297Z",
+  "updated": "2026-07-10T23:24:41.061Z",
   "pipeline": {
     "issueId": "PAN-2364",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "verificationStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-10T22:47:49.245Z",
+    "updatedAt": "2026-07-10T23:24:41.061Z",
+    "testNotes": "Skipped: issue is already merged",
     "inspectNotes": "Inspecting bead per-slot-block-storage",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2571",
     "reviewRequestedAt": "2026-07-10T22:47:49.245Z",
@@ -91,11 +91,21 @@
         "tests/unit/lib/cloister/deacon-swarm-stall.test.ts"
       ],
       "recordedAt": "2026-07-10T22:47:42.876Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-10T23:24:41.061Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "codex": {
+          "openai/gpt-5.5": {
+            "input": 1040898,
+            "output": 5018,
+            "cacheRead": 947968,
+            "cacheWrite": 0
+          }
+        },
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
             "input": 271,
@@ -122,14 +132,20 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1021359,
-            "output": 186660,
-            "cacheRead": 66250752,
+            "input": 1502623,
+            "output": 244670,
+            "cacheRead": 102213632,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
+        "openai/gpt-5.5": {
+          "input": 1040898,
+          "output": 5018,
+          "cacheRead": 947968,
+          "cacheWrite": 0
+        },
         "anthropic/claude-haiku-4-5": {
           "input": 271,
           "output": 200,
@@ -149,15 +165,15 @@
           "cacheWrite": 100204
         },
         "custom/kimi-k2.7-code": {
-          "input": 1021359,
-          "output": 186660,
-          "cacheRead": 66250752,
+          "input": 1502623,
+          "output": 244670,
+          "cacheRead": 102213632,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 25.966086,
-        "pricingAsOf": "2026-07-10T22:47:49.296Z"
+        "usd": 34.577455,
+        "pricingAsOf": "2026-07-10T23:24:23.639Z"
       }
     },
     "merges": [
