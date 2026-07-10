@@ -2608,3 +2608,22 @@ stale (written 2026-07-08); re-verified all order-book items against live GitHub
 - NEXT: B8 finishes 3 beads → pan done → review→merge (full suite already green → TENET-10; PAN-2567
   manual-squash remedy if stuck-after-review recurs). B8 lands → A9 unfreezes → B9=PAN-2149
   (decompose cloister/service.ts) with MANDATORY PRD re-verify vs current main first.
+
+## RUN-62 tick 23 (2026-07-10 ~18:32 local) — RED MAIN was a FLAKE; B8 was STOPPED (resumed)
+
+- **RED MAIN = FLAKE, not a regression.** main test:failure on 80a385fada, but that commit is my
+  tick-22 DOC-ONLY commit and the prior commit (04eb5fdc8f, also doc-only) was test:success; only
+  commit between them is mine. Doc can't break tests → flake. Flake lane was green. **Re-ran the
+  failed test job** (gh run rerun 29127172562 --failed) to restore green; in_progress. NOT a
+  stop-the-line/strike situation. NOTE: flywheel per-tick doc commits × flaky suite = intermittent
+  red-main noise → REDUCING routine main commits (only commit materially-important ticks).
+- **B8 = PAN-2364 was STOPPED, now RESUMED.** state.json showed status=stopped, lastActivity 20:57
+  (~1.5hr stale) — the agent DIED mid-turn after committing 4 beads + running full gates (lint/
+  typecheck/test 971 files ✅) + pushing. **The frozen pane I read at ticks 21-22 was the last render
+  of a STOPPED agent — I misread it as active. LESSON: confirm liveness via state.json lastActivity,
+  NOT the pane.** `pan start PAN-2364` → now status=running, lastActivity 22:34. B8 continuing its 3
+  remaining beads (swarm-status display, recover-retry-archive, docs/SWARM.md).
+- **B7 = PAN-2372** done, verifying-on-main. **A9 = PAN-2229** held (waits on B8).
+- NEXT: confirm flake re-run → main green; B8 finishes 3 beads → pan done → review→merge (full suite
+  green → TENET-10; PAN-2567 manual-squash remedy if stuck-after-review). B8 lands → A9 unfreezes →
+  B9=PAN-2149 (re-verify PRD vs main first).
