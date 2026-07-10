@@ -2321,3 +2321,20 @@ stale (written 2026-07-08); re-verified all order-book items against live GitHub
   review-supervisor (Sonnet 5) idle-waiting for slots. Healthy.
 - NEXT: watch B7 progress bead-by-bead through compacts → pan done → review→test→merge (TENET-10
   full suite). Watch A9 slots complete + assemble PR. Hold B8=PAN-2364 until B7 lands+closed-out.
+
+## RUN-62 tick 5 (2026-07-10 ~13:11 local) — B7 2/7 beads; A9 swarm converging (1 merged, 1 ready, 1 finishing)
+
+- **Main CI green** (test/build(22)/lint/guard success; origin/main 0dde4fec53).
+- **B7 = PAN-2372** healthy — now 2 commits (`8771977` state-home + `f5e3818` atomic+verified
+  record writes WI-1), 1 bead closed, agent-pan-2372 (glm-5.2) at 62% ctx, +524/-13, actively
+  working the remaining beads. Multi-tick effort continuing. No action.
+- **A9 = PAN-2229 swarm converging** (`pan swarm status`): slot-2 (prompt-invariant-tests)
+  **MERGED** ✓; slot-1 (eval-prompt-harness) **ready-to-merge** (unmerged branch, awaiting deacon
+  merge); slot-3 (flywheel-launch-eval) **running**, idle ~22min (+582/-177). Deacon "Hold: none —
+  actively coordinating every patrol" and auto-nudging idle slots-1/3 ("run pan done if complete").
+  review-supervisor (Sonnet 5) idle-waiting for all slots. This is normal swarm completion, not a
+  wedge — deacon owns slot advance/merge. NOTE: idle-slot-not-calling-pan-done is exactly the class
+  B7/PAN-2372 fixes. Watch slot-3 — if still stuck next cycle after nudges, investigate (advance or
+  wedge). Slot-2 merged-but-session-alive will be reaped by deacon patrol.
+- NEXT: give deacon one cycle to advance slot-3 → merge slot-1 → review-supervisor assembles A9
+  issue PR. Keep B7 progressing bead-by-bead. Hold B8=PAN-2364 until B7 lands+closed-out+main-green.
