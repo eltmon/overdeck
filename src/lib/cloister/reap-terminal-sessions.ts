@@ -30,7 +30,7 @@
  * debugging only — set back to `false` once the review session-death + reset
  * loop work is done (see PAN-2007 re-enable checklist).
  */
-export const KEEP_SPECIALIST_SESSIONS_ALIVE = true;
+export const KEEP_SPECIALIST_SESSIONS_ALIVE = false;
 
 export type AdvancingRole = 'review' | 'test' | 'ship';
 
