@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { join } from 'node:path';
 import { getOverdeckHome } from './paths.js';
 import { resolveInfraRepo, type ProjectConfig } from './projects.js';
+import { projectKey as resolveProjectKey } from './state-home.js';
 
 export interface StateReadHome {
   root: string;
@@ -18,8 +19,8 @@ function validMarker(value: unknown): boolean {
     && Number.isInteger(marker.version) && Number(marker.version) >= 1;
 }
 
-export function resolveStateReadHomeSync(project: ProjectConfig, projectKey = basename(project.path)): StateReadHome {
-  const root = join(getOverdeckHome(), 'state', projectKey);
+export function resolveStateReadHomeSync(project: ProjectConfig, projectKey?: string): StateReadHome {
+  const root = join(getOverdeckHome(), 'state', resolveProjectKey(project, projectKey));
   try {
     if (validMarker(JSON.parse(readFileSync(join(root, 'migration-complete.json'), 'utf8')))) {
       return { root, migrated: true };

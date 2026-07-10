@@ -66,7 +66,15 @@ async function git(repoPath: string, args: string[]): Promise<string> {
   return stdout.trim();
 }
 
-function projectKey(project: ProjectConfig, explicit?: string): string {
+/**
+ * Resolve the state-worktree key for a project: an explicitly passed key wins,
+ * otherwise the registered projects.yaml key for this path, otherwise the path
+ * basename as a fallback for unregistered projects. The single source of truth
+ * for the registered-key lookup — reused by {@link resolveStateReadHomeSync}
+ * (state-read-home.ts) so the sync read door and the async home door cannot
+ * disagree on which state worktree a project lives in.
+ */
+export function projectKey(project: ProjectConfig, explicit?: string): string {
   if (explicit) return explicit;
   const projectPath = resolve(project.path);
   const match = listProjectsSync().find(({ config }) => resolve(config.path) === projectPath);
