@@ -163,7 +163,7 @@ Set the mode in `~/.overdeck/cloister.toml` under `[swarm] infer_completion`, or
 
 ### State-plane-clean worktree
 
-Both inference paths treat the slot worktree as clean when the only `git status` dirt is state-plane state — `.pan/continue.json`, `.pan/records/`, the workspace record door, and the other paths enumerated in `STATE_PLANE_PATHS`. The swarm writes durable state to those paths on the permanent plane, so their presence must not block a slot from being inferred complete. `defaultIsSlotWorktreeClean()` in `src/lib/cloister/deacon-swarm-completion.ts` delegates to `isStatePlaneOnlyStatus()`. A genuinely dirty worktree — uncommitted implementation edits — still blocks inference.
+Both inference paths treat the slot worktree as clean when the only `git status` dirt is state-plane state — `.pan/continue.json`, the workspace record door, and the other durable paths the swarm writes to the permanent plane (the full set is enumerated in `STATE_PLANE_PATHS`). Their presence must not block a slot from being inferred complete. `defaultIsSlotWorktreeClean()` in `src/lib/cloister/deacon-swarm-completion.ts` delegates to `isStatePlaneOnlyStatus()`. A genuinely dirty worktree — uncommitted implementation edits — still blocks inference.
 
 ## Synthesis Slots
 
