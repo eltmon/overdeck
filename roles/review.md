@@ -44,7 +44,7 @@ hooks:
 > files / synthesize" instruction in this file below — none of it applies right now.
 > You are the **sole reviewer**: read the diff yourself and review it across
 > **correctness, security, requirements/acceptance-criteria, and performance** in one
-> pass, write your findings to `.pan/review/<runId>/review.md`, then signal your verdict:
+> pass, write your findings to `.overdeck/review/<runId>/review.md`, then signal your verdict:
 >
 > ```
 > pan admin specialists done review <issueId> --status passed  --notes "<one-line summary>"
@@ -80,10 +80,10 @@ Never start, stop, kill, or restart the host-level Overdeck dashboard, superviso
 ## Inputs from your spawn prompt
 
 - Issue ID, branch, workspace
-- Context manifest path: `.pan/review/<runId>/context.json`
-- Review directory: `.pan/review/<runId>/`
+- Context manifest path: `.overdeck/review/<runId>/context.json`
+- Review directory: `.overdeck/review/<runId>/`
 - Convoy output files, one per reviewer. The exact paths are listed in the spawn prompt and repeated in `REVIEWER_READY` signals.
-- Synthesis output file: `.pan/review/<runId>/synthesis.md`
+- Synthesis output file: `.overdeck/review/<runId>/synthesis.md`
 - Expected signals, delivered as user messages via `pan tell`:
   - `REVIEWER_READY <subRole> <outputPath>`
   - `REVIEWER_FAILED <subRole> <reason>`
@@ -123,13 +123,13 @@ Before applying verdict logic, establish where this review sits in the issue's l
 
 ```bash
 # Cycle number = count of existing review directories for this issue (including the current one)
-ls -1dt .pan/review/agent-<issueId>-review-* 2>/dev/null | wc -l
+ls -1dt .overdeck/review/agent-<issueId>-review-* 2>/dev/null | wc -l
 ```
 
 Then compute two diffs and remember which one is which:
 
 - **PR diff** — `git merge-base origin/main HEAD` to `HEAD`. This is everything the PR has introduced.
-- **Cycle diff** — commits since the previous cycle's synthesis. Find the previous synthesis dir (second-newest under `.pan/review/agent-<issueId>-review-*`), read the commit SHA it reviewed (top of its `synthesis.md` or its `context.json`), and diff that SHA to `HEAD`. On cycle 1 there is no previous; the cycle diff equals the PR diff.
+- **Cycle diff** — commits since the previous cycle's synthesis. Find the previous synthesis dir (second-newest under `.overdeck/review/agent-<issueId>-review-*`), read the commit SHA it reviewed (top of its `synthesis.md` or its `context.json`), and diff that SHA to `HEAD`. On cycle 1 there is no previous; the cycle diff equals the PR diff.
 
 Code outside the PR diff is **pre-existing** and is out of scope for blockers regardless of which reviewer flagged it.
 
@@ -150,7 +150,7 @@ Approve when all four terminal signals arrived, all four reviewer reports are re
 
 ### 6. Write the synthesis report
 
-Write the full synthesis to `.pan/review/<runId>/synthesis.md` before signaling status. Record the HEAD SHA you reviewed so the next cycle can compute its cycle diff.
+Write the full synthesis to `.overdeck/review/<runId>/synthesis.md` before signaling status. Record the HEAD SHA you reviewed so the next cycle can compute its cycle diff.
 
 ```markdown
 # Review Synthesis — <issueId> — <timestamp>
