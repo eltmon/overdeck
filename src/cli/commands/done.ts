@@ -594,11 +594,8 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     const { workspacePath } = await resolveDoneWorkspace(issueId, agentId);
 
     if (workspacePath && existsSync(workspacePath)) {
-      const doneProject = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
-      const migratedState = await isStateMigrated(doneProject);
-      // Commit any stale workspace orchestration artifacts from a previous interrupted
-      // pan done run so the uncommitted-changes gate in runPreflightChecks doesn't
-      // reject them.
+      const migratedState = await isStateMigrated(resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath));
+      // Commit stale orchestration artifacts so preflight does not reject them.
       if (!migratedState) try {
         const { stdout: preDirty } = await execAsync(
           'git status --porcelain .pan/',

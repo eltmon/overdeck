@@ -161,7 +161,7 @@ import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync } from '../projects.js';
 import { queueBeadsAutoCommit } from '../pan-dir/auto-commit.js';
-import { findRecreatedLegacyStatePaths } from '../state-home.js';
+import { recreatedStateWarnings } from './state-recreation-patrol.js';
 import { withIssueRecordLock } from '../pan-dir/record-lock.js';
 import { recordMainDivergenceHealth, type ProjectMainDivergence } from './deacon-main-divergence.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
@@ -3186,19 +3186,11 @@ export async function runPatrol(): Promise<PatrolResult> {
     actions.push(...playwrightActions);
     for (const a of playwrightActions) addLog('action', a, state.patrolCycle);
   }
-
   const projectConfigs = listProjectsSync();
-  for (const { config: projectConfig } of projectConfigs) {
-    if (!projectConfig.path) continue;
-    queueBeadsAutoCommit(projectConfig.path);
-    const recreated = await findRecreatedLegacyStatePaths(projectConfig);
-    if (recreated.length > 0) {
-      addLog('error', `Migrated checkout has recreated state paths (stray writer): ${recreated.join(', ')}`, state.patrolCycle);
-    }
-  }
+  for (const { config: projectConfig } of projectConfigs) if (projectConfig.path) queueBeadsAutoCommit(projectConfig.path);
+  for (const warning of await recreatedStateWarnings(projectConfigs)) addLog('error', warning, state.patrolCycle);
   const divergenceWarnings = await recordMainDivergenceHealth(state, projectConfigs);
   for (const warning of divergenceWarnings) addLog('warn', warning, state.patrolCycle);
-
   // Periodic agent state cleanup (PAN-154)
   if (Math.random() < 0.003) {
     const cleanupActions = await cleanupStaleAgentState();
