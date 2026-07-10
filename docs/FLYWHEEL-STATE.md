@@ -2459,3 +2459,19 @@ stale (written 2026-07-08); re-verified all order-book items against live GitHub
   after B7 land+closeout+main-green.
 - NEXT: monitor B7 review verdict → test → merge. If review BLOCKS, relay/let work agent fix. On B7
   merge+closeout+main-green → dispatch B8=PAN-2364 (unfreezes A9).
+
+## RUN-62 tick 13 (2026-07-10 ~15:26 local) — B7 review PASSED → advancing to test phase
+
+- **B7 = PAN-2372 review PASSED** ✅ — agent-pan-2372-review (gpt-5.5) wrote
+  .pan/review/agent-pan-2372-review-1954bd48/review.md, signaled `specialists done review PAN-2372
+  --status passed`. Issue still labeled in-review (Merge: pending, Ready: No) — advancing to TEST
+  phase, no test agent spawned yet. Review's own check was FOCUSED (10 files, 56 tests) — NOT the
+  full suite.
+- **TENET-10 ENFORCEMENT PENDING:** B7 touches cloister-core (deacon/swarm) + state-home; the test
+  gate MUST run the FULL suite, not vitest --changed (memory: large changesets defeat --changed).
+  Verify agent-pan-2372-test command next tick; if it's --changed/--related only, ensure full
+  `npm test` green before allowing merge.
+- **Main green** (HEAD 94664ea5c3, advancing; guard/lint/build success, test building).
+- **A9 = PAN-2229** frozen by B8/PAN-2364 (expected). **B8 HELD** until B7 merges.
+- NEXT: catch test phase → verify FULL suite green (TENET-10) → merge → closeout. On B7
+  merge+closeout+main-green → dispatch B8=PAN-2364 (unfreezes A9).
