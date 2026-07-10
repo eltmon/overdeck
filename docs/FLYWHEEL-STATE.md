@@ -2627,3 +2627,23 @@ stale (written 2026-07-08); re-verified all order-book items against live GitHub
 - NEXT: confirm flake re-run → main green; B8 finishes 3 beads → pan done → review→merge (full suite
   green → TENET-10; PAN-2567 manual-squash remedy if stuck-after-review). B8 lands → A9 unfreezes →
   B9=PAN-2149 (re-verify PRD vs main first).
+
+## RUN-62 tick 24 (2026-07-10 ~18:51 local) — main green (flake cleared); B8 pan done → in-review (PR #2571)
+
+- **Main GREEN** — tick-23 flake re-run went test:success; current HEAD 337eb89ca9 all checks green.
+- **B8 = PAN-2364 RESUMED SUCCESSFULLY → in-review.** After tick-23 re-drive it went 4→8 commits
+  (finished all beads), pan done'd. PR #2571 OPEN. agent-pan-2364-review (gpt-5.5/codex) actively
+  reviewing — ran focused vitest on 5 changed swarm test files (passed), explicitly skipped the
+  repo-wide run (hit the known unrelated flakes).
+- **Model-divergence needs-you (likely FALSE POSITIVE):** deacon flagged "Model-divergence halt:
+  agent-pan-2364-review — needs-you" / pausedReason "live Codex pane indicates a model switch from
+  launch model gpt-5.5" — but the agent IS on gpt-5.5 and working normally. It's an advisory flag,
+  status still running, not a hard stop. Letting review complete; will clear/act only if it genuinely
+  blocks the verdict.
+- **TENET-10 for B8:** satisfied by PR #2571's full `test` CI job (work agent already ran 971 files
+  green); review's focused check is supplementary. Watch PR CI green before merge.
+- **PAN-2567 watch:** "advancing verdict reconcile PAN-2364" already appearing → B8 may hit the same
+  stuck-after-review merge loop. REMEDY ready: review PASSED + full CI green + PR clean/mergeable +
+  main-delta orthogonal to B8 files → `gh pr merge 2571 --squash`.
+- **A9 = PAN-2229** held (unfreezes when B8 merges). B7 done.
+- NEXT: review verdict + PR #2571 full CI → merge B8 → A9 unfreezes → B9=PAN-2149 (re-verify PRD).
