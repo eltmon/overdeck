@@ -2240,3 +2240,33 @@ Gate 2 open (operator-released). Census of live state on resume:
 - **conv 494 landing operator-authorized work on main (as brief warned):** `39e387968b feat: surface lost/unloadable conversation transcripts in the UI (PAN-2394)` (the predicted missing-transcript UI indicator) + `afc3c6f2 docs(design): standing crew cost panel + issue-tree mockup (PAN-2392/2393)`. Treat as operator-authorized, do not revert. Main HEAD advancing → verify green before any Lane B merge.
 - **Pre-existing stuck (noted, not this run's scope):** PAN-2253 verify-failed (`npx vitest run tests/unit/lib/systemd.test.ts`), PAN-2231 failed-merge (item lint-guard). PAN-399 correctly deacon-ignored (slots preserved per operator).
 - **NEXT tick:** confirm main-green (conv-494 commits) → re-verify PAN-2207 PRD (cheap) → dispatch B1. Check trio work-agent spawns as budget frees. Watch PAN-2383 for operator decision.
+
+## RUN-62 tick 1 (2026-07-10 ~16:03Z) — order book drained to B7; B7+A9 dispatched
+
+Fresh run (RUN-62), clean first Observe→Act. Brief `run-59-order-book.md` was 2 days
+stale (written 2026-07-08); re-verified all order-book items against live GitHub.
+
+- **Census.** Main CI **GREEN** at HEAD 024a324 (all checks success). Live tmux ground
+  truth (`-L overdeck`): only `agent-min-865` (MYN, cross-project — not order book) plus
+  conversation sessions + this flywheel. Overdeck pipeline was **empty** — no work/plan/
+  review/strike agents. The `pan status` rows showing 30000+ min "stopped, Boot --no-resume"
+  are STALE runtime state, not live agents.
+- **Order-book progress since brief (verified on GitHub):**
+  - Lane A: **A11 = PAN-2108 CLOSED** ✅ (context-exhausted recovery). Only **A9 = PAN-2229
+    OPEN** remains (prompt-regression evals).
+  - Lane B CI/CD batch **B3–B6 ALL CLOSED** ✅: PAN-2167 (B3), PAN-2359+PAN-2363 (B4),
+    PAN-2360+PAN-2300 (B5), PAN-2270 (B6). The whole small-fixes CI/CD reliability batch landed.
+  - Next serial Lane B = **B7 = PAN-2372** (atomic statusOverrides on slot done; PAN-2357
+    durable-completion cluster). Then B8 = PAN-2364 (per-slot failure isolation), then
+    decompositions B9–B13 (PAN-2149/2232/2233/2190/2189, all OPEN, all `needs-handoff`;
+    **re-verify PRDs before dispatch** — seams drifted, esp. after PAN-2507 + PAN-2543 work).
+- **Dispatched this tick (pipeline was empty; min target 2):**
+  - **B7 = PAN-2372** (Lane B serial, one-in-flight) → `planning-pan-2372` live. No draft
+    existed; auto-planning. TENET-10 applies (full suite green before merge, no --changed).
+  - **A9 = PAN-2229** (Lane A parallel-safe, no file collision with B7's cloister-completion
+    work) → `planning-pan-2229` live. Flagged "pre-epic, re-verify" — planning does the re-verify.
+- **NEXT tick:** watch both planning agents finalize → work agents spawn. Shepherd B7 to
+  review→test→merge (green-gated). When B7 lands + closed-out + main green → dispatch B8.
+  Hold decompositions until B7/B8 land AND their PRDs are re-verified against current main.
+  Release: no fixed target; when a coherent CI/CD batch is deployed+verified, SUGGEST a cut
+  (operator tags, never me).
