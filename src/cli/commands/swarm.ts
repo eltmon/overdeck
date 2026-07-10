@@ -29,6 +29,7 @@ import { listSlotAgents } from '../../lib/agents/slot-reconcile.js';
 import { stopAgentSync } from '../../lib/agents.js';
 import { listSessionNamesSync } from '../../lib/tmux.js';
 import { removeAgentSync } from '../../lib/overdeck/agents.js';
+import { acknowledgeRecoveryTrip } from '../../lib/cloister/recovery-trip.js';
 
 const execAsync = promisify(exec);
 
@@ -182,6 +183,8 @@ export async function swarmRecoverCommand(
       const actions = await deps.coordinateSwarmSlots({ issueId: issue });
       const retried = actions.some(line => line.includes(`archived failed slot ${slotIndex} `));
       if (retried) {
+        const itemId = actions.find(line => line.includes(`archived failed slot ${slotIndex} `))?.match(/\(item ([^)]+)\)/)?.[1];
+        if (itemId) acknowledgeRecoveryTrip(workspacePath, issue, 'swarm-slot-requeue', itemId);
         for (const line of actions) deps.console.log(line);
         return { ok: true, actions, workspacePath };
       }

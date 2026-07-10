@@ -10,6 +10,7 @@ import { createMinimalIssueRecord } from './deacon-swarm-record.js';
 import type { ClassifiedSwarmSlot } from './deacon-swarm.js';
 import type { PersistedTaskOperation } from '../vbrief/dag.js';
 import type { VBriefDocument } from '../vbrief/types.js';
+import { recordRecoveryFailure } from './recovery-trip.js';
 
 /** Patrol GC never removes forensic attempts; configured issue close-out owns teardown. */
 export const SWARM_SUPERSEDED_RETENTION = 'issue-close-out' as const;
@@ -90,6 +91,8 @@ export async function requeueFailedSwarmSlots(
     reconciled.superseded = [...(reconciled.superseded ?? []), attempt];
     nextDoc = { ...nextDoc, plan: { ...nextDoc.plan, items: nextDoc.plan.items.map(item => item.id === slot.itemId ? { ...item, status: 'pending' as const } : item) } };
     actions.push(`[swarm] archived failed slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}`);
+    const failure = recordRecoveryFailure(workspacePath, issueId, 'swarm-slot-requeue', slot.itemId);
+    if (failure.emitNeedsYou) actions.push(`[swarm] needs-you ${issueId}: slot item ${slot.itemId} failed ${failure.trip.tripCount} times`);
   }
   return { doc: nextDoc, actions };
 }

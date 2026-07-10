@@ -94,6 +94,15 @@ export interface PanIssueSwarmRecord {
   supersededAttempts?: PanIssueSwarmSupersededAttempt[];
 }
 
+export interface PanIssueRecoveryTrip {
+  issue: string;
+  recoveryPath: string;
+  obligationGeneration: string;
+  tripCount: number;
+  open: boolean;
+  needsYouEmittedAt?: string;
+}
+
 export interface PanIssuePipelineRecord {
   issueId: string;
   reviewStatus: string;
@@ -164,6 +173,7 @@ export interface PanIssueRecord {
   feedback?: ContinueFeedbackEntry[];
   scopeDrift?: ScopeDriftRecord;
   swarm?: PanIssueSwarmRecord;
+  recoveryTrips?: PanIssueRecoveryTrip[];
 
   pipeline: PanIssuePipelineRecord;
   closeOut: PanIssueCloseOutRecord;
