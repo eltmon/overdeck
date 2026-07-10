@@ -2338,3 +2338,20 @@ stale (written 2026-07-08); re-verified all order-book items against live GitHub
   wedge). Slot-2 merged-but-session-alive will be reaped by deacon patrol.
 - NEXT: give deacon one cycle to advance slot-3 → merge slot-1 → review-supervisor assembles A9
   issue PR. Keep B7 progressing bead-by-bead. Hold B8=PAN-2364 until B7 lands+closed-out+main-green.
+
+## RUN-62 tick 6 (2026-07-10 ~13:28 local) — B7 3/7 beads; A9 swarm slot state UNCHANGED 2 cycles (watch)
+
+- **Main green** (origin/main fd0736c8; test/build/lint/guard success).
+- **B7 = PAN-2372** advancing well — 3 commits now (`2e233fd` WI-2 re-home workspace record door
+  onto canonical resolution). ~3/7 beads. agent-pan-2372 (glm-5.2) alive. Priority, no action.
+- **A9 = PAN-2229 swarm — slot counts UNCHANGED across 2 cycles (~28min):** slot-2 merged, slot-1
+  ready-to-merge (STILL unmerged), slot-3 running. BUT slots are NOT wedged — slot-1 pane "Cogitated
+  10m14s" (actively thinking), slot-3 "Churned 1m52s" + fresh commit 9766d147. They're alive but
+  SLOW (glm/haiku multi-min think times). Two anomalies to watch: (a) deacon hasn't merged the
+  ready-to-merge slot-1 over 2 cycles; (b) the "stuck 20min" nudge appears to RE-ACTIVATE an
+  already-ready slot → it cogitates more = thrash. Both are the swarm-completion class B7/PAN-2372 +
+  B8/PAN-2364 + PAN-2498 already target — NOT filing a dup yet. **Decision: one more cycle.** If slot
+  state is identical at tick 7, treat as confirmed deacon swarm-coordination stall and investigate
+  (why ready-to-merge slot-1 isn't merged; whether nudging ready slots is the thrash bug). Not
+  hand-merging slot branches / not manual pan done — deacon owns swarm advance.
+- NEXT: tick 7 — re-check A9 slot state (advance vs confirmed stall); B7 bead progress; main green.
