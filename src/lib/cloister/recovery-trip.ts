@@ -14,6 +14,7 @@ export function recordRecoveryFailure(
   const trips = [...(record.recoveryTrips ?? [])];
   const index = trips.findIndex(trip => trip.issue === normalized && trip.recoveryPath === recoveryPath && trip.obligationGeneration === obligationGeneration);
   const prior = index >= 0 ? trips[index] : undefined;
+  if (prior?.open) return { trip: prior, emitNeedsYou: false };
   const tripCount = (prior?.tripCount ?? 0) + 1;
   const emitNeedsYou = tripCount >= threshold && !prior?.open;
   const trip: PanIssueRecoveryTrip = {

@@ -193,6 +193,7 @@ import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { reconcilePipelineLabelsPatrol } from './label-reconciler.js';
 import { pruneTerminalStoppedAgents } from './agent-gc.js';
 import { shouldRunRecoveryJanitor } from './patrol-cadence.js';
+import { recordDeadEndNeedsYou } from './dead-end-trip.js';
 import { reconcileOrphanProposedSpecs, spawnWorkAgentThroughAgentsEndpoint, triggerRebuildAndStart } from './orphan-proposed-reconciler.js';
 import { reconcileTestStatusFromGreenCiWithDeps } from './test-status-green-ci-reconciler.js';
 import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
@@ -1924,6 +1925,8 @@ export async function checkDeadEndAgents(): Promise<string[]> {
       const autoRequeueCount = status.autoRequeueCount || 0;
       if (autoRequeueCount >= 25) {
         console.log(`[deacon] Dead-end detected for ${key} but circuit breaker active (${autoRequeueCount}/25 requeues used)`);
+        const trip = recordDeadEndNeedsYou(key, 'dead-end-rebuild', status.updatedAt ?? 'rework', `Dead-end recovery needs-you: ${key} exhausted 25 requeues`);
+        if (trip) actions.push(trip);
         continue;
       }
 
@@ -1957,12 +1960,7 @@ export async function checkDeadEndAgents(): Promise<string[]> {
       }
 
       if (!sessionExistsSync(agentSessionName)) {
-        // PAN-2209: the work agent's session is gone (context-exhausted, crashed,
-        // or resume-failed after completion) but a review/test rework is needed.
-        // Nothing else respawns it, so the issue stalls indefinitely and an
-        // operator has to hand-recover. For the rework classes (review
-        // blocked/failed, verification failed, tests failed) respawn a fresh work
-        // agent — its kickoff prompt (work-agent-prompt.ts) drains the pending
+        // PAN-2209: respawn a dead work agent whose pending rework kickoff drains
         // `.pan/feedback` so it addresses the review. Merge-CI dead-ends need no
         // work session and keep their prior no-session behavior (they fall through
         // to `continue`; the merge-CI branch below requires a live session).
@@ -1971,6 +1969,8 @@ export async function checkDeadEndAgents(): Promise<string[]> {
           const gateDecision = decideAgentAutonomousRedrive(agentState ?? {}, getAgentDir(agentSessionName), true);
           if (gateDecision.decision === 'defer') {
             console.log(`[deacon] PAN-2209: ${issueId} (${statusType}) re-drive deferred — ${gateDecision.reason}`);
+            const trip = gateDecision.needsYou && recordDeadEndNeedsYou(issueId, 'operator-stopped-rework', status.updatedAt ?? statusType, `Dead-end recovery needs-you: ${issueId} was explicitly stopped before handoff`);
+            if (trip) actions.push(trip);
           } else {
             if (gateDecision.gateDecision.clearStoppedByUser && agentState) { delete agentState.stoppedByUser; saveAgentStateSync(agentState); }
             deadEndCooldowns.set(key, now); // Engage the shared circuit breaker so a chronically-dying agent
