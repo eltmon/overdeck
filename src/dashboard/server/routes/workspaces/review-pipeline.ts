@@ -5,6 +5,9 @@
  *   POST /api/review/:issueId/trigger
  *   POST /api/review/:issueId/request
  *
+ * Release read endpoint:
+ *   GET  /api/workspaces/:issueId/release
+ *
  * The cancel/control routes (reset, purge, abort, pending, unstick,
  * deacon-ignore, auto-merge) live in review-control.ts. Shared singletons
  * (review-status wrapper, pending-ops cluster, project path, readJsonBody,
@@ -23,6 +26,7 @@ import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { isStatePlaneOnlyStatus } from '../../../../lib/state-plane.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { getReviewStatusSync, type ReviewStatus } from '../../../../lib/review-status.js';
+import { getReleaseSetSync } from '../../../../lib/release-set.js';
 import { getCachedConflictGateMergeability } from '../../../../lib/cloister/conflict-gate.js';
 import { restoreTrackedBeadsExport } from '../../../../lib/beads-restore.js';
 import { transitionIssueToInReview, spawnRun } from '../../../../lib/agents.js';
@@ -797,9 +801,31 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
   }))
 );
 
+// ─── Route: GET /api/workspaces/:issueId/release ────────────────────────────
+
+const getReleaseSetRoute = HttpRouter.add(
+  'GET',
+  '/api/workspaces/:issueId/release',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    if (!parseIssueIdSync(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
+
+    const releaseSet = getReleaseSetSync(issueId);
+    if (!releaseSet) {
+      return jsonResponse({ error: 'Release set not found' }, { status: 404 });
+    }
+
+    return jsonResponse(releaseSet);
+  }))
+);
+
 export const reviewPipelineRouteLayer = Layer.mergeAll(
   postWorkspaceReviewRoute,
   postWorkspaceRequestReviewRoute,
+  getReleaseSetRoute,
 );
 
 export default reviewPipelineRouteLayer;
