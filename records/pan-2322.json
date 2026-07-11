@@ -25,7 +25,7 @@
     "recordedAt": "2026-07-11T09:47:42.604Z"
   },
   "created": "2026-07-11T09:43:27.964Z",
-  "updated": "2026-07-11T12:05:51.268Z",
+  "updated": "2026-07-11T13:16:11.522Z",
   "pipeline": {
     "issueId": "PAN-2322",
     "reviewStatus": "reviewing",
@@ -134,8 +134,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "config-test-identity-mock": "completed",
     "config-test-identity-mock.ac1": "completed",
@@ -151,5 +151,15 @@
     "gate-override-scrub-message.ac2": "completed",
     "gate-override-scrub-message.ac3": "completed",
     "gate-override-scrub-message.ac4": "completed"
-  }
+  },
+  "recoveryTrips": [
+    {
+      "issue": "PAN-2322",
+      "recoveryPath": "stuck-remediation",
+      "obligationGeneration": "2026-07-11T11:46:03.000Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-11T13:16:11.521Z"
+    }
+  ]
 }
