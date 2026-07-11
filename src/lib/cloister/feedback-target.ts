@@ -10,6 +10,7 @@ export type IssueFeedbackTarget =
 
 export interface ResolveIssueFeedbackTargetOptions {
   itemId?: string;
+  /** Test hook — replaces the default resurrection attempt for non-live targets. */
   revivePipelinePausedAgent?: (agentId: string, issueId: string) => Promise<boolean>;
 }
 
@@ -99,46 +100,88 @@ export async function resolveIssueFeedbackTarget(
     }
   }
 
-  // PAN-2461: the verification gate pauses the work agent with a "needs-you:" reason,
-  // and later specialists then find "no live feedback target" — a deadlock the gate
-  // itself created (11 issues in 24h). A pipeline-set needs-you pause is the
-  // pipeline's to clear when it has actionable feedback to deliver: unpause and
-  // resume the whole-issue agent so the feedback lands. Operator pauses (pan pause,
-  // any non-"needs-you:" reason) are never touched.
-  const revive = opts.revivePipelinePausedAgent ?? revivePipelinePausedAgent;
-  const revived = await revive(wholeIssueAgentId, normalizedIssue);
-  if (revived) return { agentId: wholeIssueAgentId };
+  // PAN-2209 + PAN-2461 — resurrection-first delivery (operator directive 2026-07-11):
+  // feedback with no live target is NOT an operator problem until resurrection has been
+  // tried. The verification gate pausing the only delivery target (PAN-2461), a
+  // governor/scheduler yield, a crash, or a plain stopped work agent after a BLOCKED
+  // verdict (PAN-2209) must all self-heal by bringing the agent back and delivering.
+  // Operator pauses are the one gate never overridden. Escalating to a human (or any
+  // mailbox-style deferred delivery, PAN-2255) is strictly the last resort after
+  // resurrection of every candidate has failed.
+  const revive = opts.revivePipelinePausedAgent ?? resurrectAgentForFeedback;
+  const candidates: string[] = [wholeIssueAgentId];
+  if (requestedItemId) {
+    const assigned = assignments.find(a => a.itemId === requestedItemId);
+    if (assigned) candidates.push(slotAgentId(normalizedIssue, assigned.slotIndex, assigned.agentId));
+  }
+  for (const assignment of assignments) {
+    candidates.push(slotAgentId(normalizedIssue, assignment.slotIndex, assignment.agentId));
+  }
+  const attempted = new Set<string>();
+  for (const candidate of candidates) {
+    if (attempted.has(candidate)) continue;
+    attempted.add(candidate);
+    if (await revive(candidate, normalizedIssue)) return { agentId: candidate };
+  }
 
   const suffix = requestedItemId ? ` for item ${requestedItemId}` : '';
   return {
     needsYou: true,
-    reason: `No live feedback target for ${normalizedIssue}${suffix}: ${wholeIssueAgentId} is not running and no assigned swarm slot has a live tmux session.`,
+    reason: `No live feedback target for ${normalizedIssue}${suffix}: ${wholeIssueAgentId} is not running, no assigned swarm slot has a live tmux session, and resurrection of ${attempted.size} candidate agent(s) failed.`,
   };
 }
 
 /**
- * PAN-2461: unpause + resume an agent that the PIPELINE paused (pausedReason
- * starts with "needs-you:") so feedback can be delivered to it. Returns true
- * when the agent is live again. Operator pauses are left untouched.
+ * PAN-2209 + PAN-2461: bring a non-running agent back to life so feedback can be
+ * delivered to it. Returns true when the agent is live again. Gate handling:
+ *
+ * - Pipeline pauses (`needs-you:*`, `[governor-slot]*`, scheduler yields) → unpause +
+ *   resume. A gate the pipeline set must never deadlock the pipeline's own delivery
+ *   (PAN-2461); the operator explicitly prefers briefly exceeding memory targets over
+ *   undelivered work↔review feedback.
+ * - Troubled / failure-backoff → clear the gate loudly and attempt ONE resume. The
+ *   failure-tracking machinery re-trips the gate if the agent crashes again, so this
+ *   cannot loop unboundedly.
+ * - Plain stopped/completed/crashed → resume.
+ * - OPERATOR pauses (pan pause, any non-pipeline pausedReason) are never overridden.
  */
-async function revivePipelinePausedAgent(agentId: string, issueId: string): Promise<boolean> {
+async function resurrectAgentForFeedback(agentId: string, issueId: string): Promise<boolean> {
   try {
-    const { getAgentStateSync, clearAgentPausedSync } = await import('../agents/agent-state.js');
+    const { getAgentStateSync, clearAgentPausedSync, clearAgentTroubledSync } = await import('../agents/agent-state.js');
     const state = getAgentStateSync(agentId);
     if (!state) return false;
-    if (state.paused !== true || !state.pausedReason?.startsWith('needs-you:')) return false;
 
-    console.log(`[feedback-target] ${agentId} is pipeline-paused (${state.pausedReason}) — unpausing to deliver feedback for ${issueId}`);
-    clearAgentPausedSync(agentId);
+    if (state.paused === true) {
+      const reason = state.pausedReason ?? '';
+      const pipelinePause = reason.startsWith('needs-you:')
+        || reason.startsWith('[governor-slot]')
+        || state.yieldedByScheduler === true;
+      if (!pipelinePause) {
+        console.log(`[feedback-target] ${agentId} is operator-paused (${reason || 'no reason'}) — not overriding to deliver ${issueId} feedback`);
+        return false;
+      }
+      console.log(`[feedback-target] ${agentId} is pipeline-paused (${reason || 'scheduler yield'}) — unpausing to deliver feedback for ${issueId}`);
+      clearAgentPausedSync(agentId);
+    }
+
+    if (state.troubled === true || (state.consecutiveFailures ?? 0) > 0) {
+      console.warn(
+        `[feedback-target] ${agentId} is gated (troubled=${state.troubled === true}, ` +
+        `failures=${state.consecutiveFailures ?? 0}) — clearing for one resurrection attempt to ` +
+        `deliver ${issueId} feedback; failure tracking re-trips the gate on another crash`,
+      );
+      clearAgentTroubledSync(agentId);
+    }
+
     const { resumeAgent } = await import('../agents/resume.js');
     const result = await resumeAgent(agentId);
     if (!result.success) {
-      console.warn(`[feedback-target] Failed to revive ${agentId}: ${result.error}`);
+      console.warn(`[feedback-target] Failed to resurrect ${agentId} for ${issueId} feedback: ${result.error}`);
       return false;
     }
     return isLiveSession(agentId);
   } catch (err) {
-    console.warn(`[feedback-target] revivePipelinePausedAgent(${agentId}) failed: ${err instanceof Error ? err.message : String(err)}`);
+    console.warn(`[feedback-target] resurrectAgentForFeedback(${agentId}) failed: ${err instanceof Error ? err.message : String(err)}`);
     return false;
   }
 }

@@ -7,7 +7,7 @@ Automatically syncs local development domains from WSL to Windows hosts file.
 1. Overdeck writes workspace DNS entries to `~/.wsl2hosts` in WSL when creating workspaces
 2. A Windows scheduled task reads this file every 5 minutes
 3. Entries are added to `C:\Windows\System32\drivers\etc\hosts` with the current WSL IP
-4. Your browser can now access `https://feature-pan-123.pan.localhost`
+4. Your browser can now access `https://feature-pan-123.overdeck.localhost`
 
 ## Installation
 

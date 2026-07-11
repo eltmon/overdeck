@@ -138,7 +138,7 @@ open http://localhost:3010
 docker ps | grep traefik
 
 # Traefik dashboard
-curl -k https://traefik.pan.localhost:8080/api/overview
+curl -k https://traefik.overdeck.localhost:8080/api/overview
 ```
 
 ### Agents

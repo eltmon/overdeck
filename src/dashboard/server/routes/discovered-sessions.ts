@@ -796,7 +796,7 @@ const getConvConfigRoute = HttpRouter.add(
   'GET',
   '/api/discovered-sessions/config',
   // Read-only, non-secret embedding settings. Public so the Settings panel loads even when
-  // the dashboard session cookie isn't minted (Traefik/pan.localhost). The PUT/test-connection
+  // the dashboard session cookie isn't minted (Traefik/overdeck.localhost). The PUT/test-connection
   // routes below stay auth-gated. Proper session-bootstrap fix tracked in PAN-1166.
   httpHandler(Effect.gen(function* () {
     const config = yield* getConversationsConfig();

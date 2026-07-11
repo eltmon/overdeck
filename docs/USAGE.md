@@ -25,7 +25,7 @@
 npx @overdeck/core
 ```
 
-**That's it!** Overdeck starts the browser/server experience and opens the dashboard at https://pan.localhost (or http://localhost:3010 if you skip HTTPS setup).
+**That's it!** Overdeck starts the browser/server experience and opens the dashboard at https://overdeck.localhost (or http://localhost:3010 if you skip HTTPS setup).
 
 For a full local install with reusable `overdeck` and `pan` commands:
 

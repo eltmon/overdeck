@@ -18,6 +18,8 @@ type DeaconReviewSynthesis = {
   verdict: 'passed' | 'blocked';
   topBlocker: string;
   body: string;
+  /** PAN-1862 (FR-6): per-sub-role outcome derived from each report's blocking findings. */
+  reviewerVerdicts: Record<string, { status: 'passed' | 'blocked'; findingsPath?: string }>;
 };
 
 function extractMarkdownSection(markdown: string, heading: string): string {
@@ -51,6 +53,14 @@ export function synthesizeReviewFromReports(opts: {
     })),
   );
   const verdict: 'passed' | 'blocked' = blockers.length > 0 ? 'blocked' : 'passed';
+  // PAN-1862 (FR-6): per-reviewer verdicts — a report with >=1 blocking finding blocks.
+  const reviewerVerdicts: Record<string, { status: 'passed' | 'blocked'; findingsPath?: string }> = {};
+  for (const report of opts.reports) {
+    reviewerVerdicts[report.subRole] = {
+      status: blockers.some(b => b.subRole === report.subRole) ? 'blocked' : 'passed',
+      findingsPath: report.path,
+    };
+  }
   const topBlocker = blockers[0] ? `[${blockers[0].subRole}] ${blockers[0].title}` : '';
   const blockerSection = blockers.length > 0
     ? blockers.map(blocker => `### [${blocker.subRole}] ${blocker.title}\nSource: ${blocker.path}`).join('\n\n')
@@ -89,7 +99,7 @@ export function synthesizeReviewFromReports(opts: {
     '',
   ].join('\n');
 
-  return { verdict, topBlocker, body };
+  return { verdict, topBlocker, body, reviewerVerdicts };
 }
 
 /**
@@ -216,9 +226,22 @@ async function nudgeSynthesisForCompleteReviewerReports(states: readonly AgentSt
         reports,
       });
       writeFileSync(join(reviewDir, 'synthesis.md'), synthesis.body);
+      // PAN-1862 (FR-6): anchor each reviewer verdict to the reviewed HEAD so the
+      // next cycle's reviewersToRerun can skip provably-clean reviewers.
+      let fallbackHead: string | undefined;
+      try {
+        const { execFile } = await import('node:child_process');
+        const { promisify } = await import('node:util');
+        const { stdout } = await promisify(execFile)('git', ['rev-parse', 'HEAD'], { cwd: state.workspace, encoding: 'utf-8', timeout: 10_000 });
+        fallbackHead = stdout.trim() || undefined;
+      } catch { /* non-fatal — verdicts without an anchor simply re-run next cycle */ }
+      const anchoredVerdicts = Object.fromEntries(
+        Object.entries(synthesis.reviewerVerdicts).map(([subRole, v]) => [subRole, { ...v, ...(fallbackHead ? { atCommit: fallbackHead } : {}) }]),
+      );
       setReviewStatusSync(state.issueId, {
         reviewStatus: synthesis.verdict,
         reviewNotes: synthesis.topBlocker || 'Review approved by Deacon fallback from completed reviewer reports',
+        reviewerVerdicts: anchoredVerdicts,
       });
       if (synthesis.verdict === 'blocked') {
         await Effect.runPromise(deliverReviewVerdictFeedback({
@@ -524,5 +547,106 @@ export async function cleanupOrphanedReviewSessions(): Promise<string[]> {
     logDeaconEventSync(`cleanupOrphanedReviewSessions completed: no orphaned sessions found`);
   }
 
+  return actions;
+}
+
+
+// ── PAN-1862 Phase A backstops ────────────────────────────────────────────────
+
+/** How long a discovery-mode parent may sit without signaling before the deacon forces the convoy. */
+export const REVIEW_DISCOVERY_TIMEOUT_MS = 8 * 60 * 1000;
+/** How long after the fork to wait before judging cache hits from cost events. */
+const FORK_CACHE_CHECK_DELAY_MS = 3 * 60 * 1000;
+
+/**
+ * PAN-1862 (NFR-5 backstop): a discovery-mode review parent that never signals
+ * discovery-ready (crashed, wedged, or just forgot) must not strand the review
+ * at reviewing-with-no-convoy. After REVIEW_DISCOVERY_TIMEOUT_MS — or as soon
+ * as the parent session is dead — force the discovery-ready handling: the fork
+ * may miss the 5-minute cache TTL (the miss detector below reports that), but
+ * the review itself always proceeds (NFR-2).
+ */
+export async function checkStalledReviewDiscovery(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    const { listAgentStates } = await import('../agents.js');
+    const states = listAgentStates();
+    const now = Date.now();
+    for (const state of states) {
+      if (state.role !== 'review' || state.reviewSubRole || !state.reviewDiscoveryPending || !state.issueId) continue;
+      const startedMs = Date.parse(state.lastResumeAt ?? state.startedAt);
+      const aged = Number.isFinite(startedMs) && now - startedMs > REVIEW_DISCOVERY_TIMEOUT_MS;
+      const alive = await Effect.runPromise(sessionExists(state.id)).catch(() => false);
+      const dead = !alive || await Effect.runPromise(isPaneDead(state.id)).catch(() => true);
+      if (!aged && !dead) continue;
+      const { handleReviewDiscoveryReady } = await import('./review-agent.js');
+      const result = await handleReviewDiscoveryReady(state.issueId, { source: dead ? 'deacon-backstop (parent dead)' : 'deacon-backstop (discovery timeout)' });
+      actions.push(result.message);
+      logDeaconEventSync(`checkStalledReviewDiscovery: ${result.message}`);
+    }
+  } catch (error: unknown) {
+    console.error('[deacon] Error checking stalled review discovery:', error instanceof Error ? error.message : String(error));
+  }
+  return actions;
+}
+
+/**
+ * PAN-1862 (FR-11/FR-12): detect a fork cache MISS — a forked reviewer's first
+ * request reporting cacheRead == 0 when a warm hit was expected (TTL expired,
+ * model mismatch, prefix drift). Purely observability: reviews are already
+ * running correctly either way (NFR-2); the operator just learns the savings
+ * didn't land, via a warn-level activity entry + a desktop notification.
+ * Checked once per fork (reviewForkCacheChecked).
+ */
+export async function checkReviewForkCacheMisses(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    const { listAgentStates, saveAgentState } = await import('../agents.js');
+    const { readEventsSync } = await import('../costs/events.js');
+    const { emitActivityEntrySync } = await import('../activity-logger.js');
+    const states = listAgentStates();
+    const now = Date.now();
+    for (const parent of states) {
+      if (parent.role !== 'review' || parent.reviewSubRole || !parent.reviewConvoyForkedAt || parent.reviewForkCacheChecked || !parent.issueId) continue;
+      const forkedMs = Date.parse(parent.reviewConvoyForkedAt);
+      if (!Number.isFinite(forkedMs) || now - forkedMs < FORK_CACHE_CHECK_DELAY_MS) continue;
+
+      const forkedReviewers = states.filter(s =>
+        s.issueId === parent.issueId && s.reviewSubRole && s.reviewForkedFromParent && s.reviewRunId === parent.reviewRunId,
+      );
+      if (forkedReviewers.length === 0) {
+        parent.reviewForkCacheChecked = true;
+        await Effect.runPromise(saveAgentState(parent));
+        continue;
+      }
+
+      // Scope to events at/after the fork — reviewer agent ids are reused across
+      // cycles, so an unscoped "first event" could be from an older run.
+      const firstEvents = forkedReviewers.map(r => ({
+        id: r.id,
+        event: readEventsSync({ agentId: r.id, startDate: parent.reviewConvoyForkedAt, limit: 1 })[0],
+      }));
+      if (firstEvents.some(fe => !fe.event) && now - forkedMs < 5 * FORK_CACHE_CHECK_DELAY_MS) continue; // not all reported yet — retry next patrol
+      const misses = firstEvents.filter(fe => fe.event && (fe.event.cacheRead ?? 0) === 0);
+
+      parent.reviewForkCacheChecked = true;
+      await Effect.runPromise(saveAgentState(parent));
+
+      // Proactive TTL heuristic: report the discovery→fork gap alongside a miss.
+      const readyMs = parent.reviewDiscoveryReadyAt ? Date.parse(parent.reviewDiscoveryReadyAt) : NaN;
+      const gapSeconds = Number.isFinite(readyMs) ? Math.round((forkedMs - readyMs) / 1000) : undefined;
+
+      if (misses.length > 0) {
+        const message = `Review cache miss for ${parent.issueId} — ${misses.length}/${forkedReviewers.length} forked reviewer(s) got zero cache reads on their first request${gapSeconds !== undefined ? ` (discovery→fork gap ${gapSeconds}s; cache TTL is 300s)` : ''}. Reviews proceed correctly at full input cost.`;
+        emitActivityEntrySync({ source: 'review', level: 'warn', message, issueId: parent.issueId, desktop: true });
+        actions.push(message);
+        logDeaconEventSync(`checkReviewForkCacheMisses: ${message}`);
+      } else {
+        actions.push(`Fork cache HIT confirmed for ${parent.issueId} (${forkedReviewers.length} reviewer(s))`);
+      }
+    }
+  } catch (error: unknown) {
+    console.error('[deacon] Error checking review fork cache misses:', error instanceof Error ? error.message : String(error));
+  }
   return actions;
 }

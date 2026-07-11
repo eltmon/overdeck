@@ -93,6 +93,29 @@ describe('concurrency governor — config + counting', () => {
     expect(countRunningAgents()).toEqual({ work: 1, advancing: 2, swarm: 0, total: 3 });
   });
 
+  it('excludes warm-idle advancing sessions (terminal verdict) from the ceiling (PAN-2579)', async () => {
+    vi.resetModules();
+    vi.doMock('../../../src/lib/agents.js', () => ({
+      listRunningAgentsSync: () => [
+        { id: 'agent-pan-1-review', role: 'review', issueId: 'PAN-1', status: 'running', tmuxActive: true },
+        { id: 'agent-pan-2-review', role: 'review', issueId: 'PAN-2', status: 'running', tmuxActive: true },
+        { id: 'agent-pan-3-test', role: 'test', issueId: 'PAN-3', status: 'running', tmuxActive: true },
+      ],
+    }));
+    vi.doMock('../../../src/lib/overdeck/agents.js', () => ({
+      countAgentsByStatus: (status: string) => (status === 'running' ? { work: 1, review: 2, test: 1 } : {}),
+    }));
+    const { registerReviewStatusMapReader } = await import('../../../src/lib/cloister/review-status-source.js');
+    registerReviewStatusMapReader(() => ({
+      'PAN-1': { reviewStatus: 'blocked' },   // warm-idle: verdict recorded, session kept for re-review
+      'PAN-2': { reviewStatus: 'reviewing' }, // actively reviewing — counts
+      'PAN-3': { testStatus: 'passed' },      // warm-idle test session
+    }));
+    const { countRunningAgents } = await import('../../../src/lib/cloister/concurrency.js');
+    // 3 advancing rows − 2 warm-idle = 1 counted; warm sessions are free capacity.
+    expect(countRunningAgents()).toEqual({ work: 1, advancing: 1, swarm: 0, total: 2 });
+  });
+
   it('reserves advancing slots up to the ceiling per patrol, then resets', () => {
     // PAN-2000: inject counts + limits directly instead of vi.doMock'ing config.js
     // and agents.js. The mock-based form flaked under the parallel run when the

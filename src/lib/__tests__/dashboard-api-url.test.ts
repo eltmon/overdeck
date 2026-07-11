@@ -3,8 +3,8 @@ import { getDashboardApiUrlSync } from '../config.js';
 
 // Regression lock for the DASHBOARD_URL → 404 bug: internal CLI/host → dashboard
 // calls must use the loopback (OVERDECK_DASHBOARD_URL), never a stale public
-// Traefik host (e.g. https://pan.localhost) inherited from the dashboard
-// process env. https://pan.localhost 404s the API and breaks on the
+// Traefik host (e.g. https://overdeck.localhost) inherited from the dashboard
+// process env. https://overdeck.localhost 404s the API and breaks on the
 // pan→overdeck host rename, so the internal var must win.
 describe('getDashboardApiUrlSync — env precedence', () => {
   const savedOverdeck = process.env.OVERDECK_DASHBOARD_URL;
@@ -24,7 +24,7 @@ describe('getDashboardApiUrlSync — env precedence', () => {
 
   it('prefers OVERDECK_DASHBOARD_URL over a stale public DASHBOARD_URL', () => {
     process.env.OVERDECK_DASHBOARD_URL = 'http://127.0.0.1:3011';
-    process.env.DASHBOARD_URL = 'https://pan.localhost';
+    process.env.DASHBOARD_URL = 'https://overdeck.localhost';
     expect(getDashboardApiUrlSync()).toBe('http://127.0.0.1:3011');
   });
 

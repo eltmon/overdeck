@@ -57,7 +57,7 @@ docker compose logs -f app
 | PostgreSQL | localhost:5432 | 5432 |
 | Redis | localhost:6379 | 6379 |
 
-With Traefik: https://app.pan.localhost
+With Traefik: https://app.overdeck.localhost
 
 ## Environment Variables
 
@@ -65,7 +65,7 @@ Create a `.env` file:
 
 ```bash
 APP_PORT=8000
-HOSTNAME=myapp.pan.localhost
+HOSTNAME=myapp.overdeck.localhost
 COMPOSE_PROJECT_NAME=myapp
 
 # Database

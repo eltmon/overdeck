@@ -140,6 +140,7 @@ vi.mock('../../src/lib/tmux.js', () => ({
   sendEscapeKeyAsync: vi.fn(() => Promise.resolve()),
   sendRawKeystroke: vi.fn(() => Effect.void),
   sessionExists: vi.fn(() => Effect.succeed(false)),
+  isPaneDead: vi.fn(() => Effect.succeed(false)),
   sessionExistsSync: vi.fn(() => Effect.succeed(false)),
   getAgentSessions: vi.fn(() => Effect.succeed([])),
   getAgentSessionsSync: vi.fn(() => Effect.succeed([])),

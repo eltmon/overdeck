@@ -43,7 +43,7 @@ import { markBlocked, markFailed, scheduleAutoMergeWithResult, transitionToMergi
 
 const uatTrainMocks = vi.hoisted(() => ({
   getUatCandidatePayload: vi.fn(async () => ({ branchName: 'uat/pan-otter-0610', bundled: ['PAN-1'], status: 'ready' as const })),
-  postUatGenerationStackPayload: vi.fn(async () => ({ ok: true as const, frontendUrl: 'https://uat-pan-otter-0610.pan.localhost', evicted: [] })),
+  postUatGenerationStackPayload: vi.fn(async () => ({ ok: true as const, frontendUrl: 'https://uat-pan-otter-0610.overdeck.localhost', evicted: [] })),
   postUatGenerationPromotePayload: vi.fn(async () => ({ success: true as const, generation: 'uat/pan-otter-0610', mergeSha: 'merge-sha', members: ['PAN-1'], postMergeStarted: ['PAN-1'], invalidated: [] })),
   runUatTrainReconcile: vi.fn(async () => ({ action: 'assembled' as const, invalidated: [] })),
 }));
@@ -981,7 +981,7 @@ describe('UAT mutation route auth', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', [INTERNAL_TOKEN_HEADER]: 'test-token' },
       body: '{}',
-    })).resolves.toEqual({ status: 200, body: { frontendUrl: 'https://uat-pan-otter-0610.pan.localhost', evicted: [] } });
+    })).resolves.toEqual({ status: 200, body: { frontendUrl: 'https://uat-pan-otter-0610.overdeck.localhost', evicted: [] } });
 
     expect(uatTrainMocks.postUatGenerationStackPayload).toHaveBeenCalledWith('uat/pan-otter-0610');
   });

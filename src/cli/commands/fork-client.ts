@@ -61,7 +61,7 @@ export function isForkResultInProgress(conv: ForkResultConv): boolean {
  * Loopback base URL for the dashboard API. Mirrors the resolution used by other
  * CLI→server callers (`src/lib/agent-runtime.ts`): prefer an explicit override,
  * otherwise hit the local API on 127.0.0.1 over plain HTTP. We deliberately do
- * NOT fall back to `DASHBOARD_URL` (which can be the Traefik `https://pan.localhost`
+ * NOT fall back to `DASHBOARD_URL` (which can be the Traefik `https://overdeck.localhost`
  * origin) — a self-signed TLS hop would just make a loopback call fail.
  */
 function dashboardBaseUrl(): string {

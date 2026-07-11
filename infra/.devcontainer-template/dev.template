@@ -24,8 +24,8 @@ case "${1:-help}" in
     echo "All services ready!"
     echo ""
     echo "URLs:"
-    echo "  Frontend: https://${FEATURE_FOLDER}.pan.localhost"
-    echo "  API:      https://api-${FEATURE_FOLDER}.pan.localhost"
+    echo "  Frontend: https://${FEATURE_FOLDER}.overdeck.localhost"
+    echo "  API:      https://api-${FEATURE_FOLDER}.overdeck.localhost"
     echo ""
     echo "Logs: ./dev logs"
     ;;
@@ -117,8 +117,8 @@ case "${1:-help}" in
     docker compose -f .devcontainer/docker-compose.devcontainer.yml ps
     echo ""
     echo "URLs:"
-    echo "  Frontend: https://${FEATURE_FOLDER}.pan.localhost"
-    echo "  API:      https://api-${FEATURE_FOLDER}.pan.localhost"
+    echo "  Frontend: https://${FEATURE_FOLDER}.overdeck.localhost"
+    echo "  API:      https://api-${FEATURE_FOLDER}.overdeck.localhost"
     ;;
   logs)
     docker compose -f .devcontainer/docker-compose.devcontainer.yml logs -f "${2:-}"
@@ -140,7 +140,7 @@ case "${1:-help}" in
     echo "  rebuild          Rebuild containers from scratch"
     echo ""
     echo "URLs for this workspace:"
-    echo "  Frontend: https://${FEATURE_FOLDER}.pan.localhost"
-    echo "  API:      https://api-${FEATURE_FOLDER}.pan.localhost"
+    echo "  Frontend: https://${FEATURE_FOLDER}.overdeck.localhost"
+    echo "  API:      https://api-${FEATURE_FOLDER}.overdeck.localhost"
     ;;
 esac

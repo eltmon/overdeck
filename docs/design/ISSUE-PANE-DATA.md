@@ -177,7 +177,7 @@ Each gate: `{ label, value, tone: Enum(ok\|bad\|run\|wait) }`.
 | container `cpuPercent` / `memoryUsage` | `Percent` / `String` | `0%` / `0KB` |
 | container `health` | `Enum(healthy\|unhealthy\|starting\|unknown)` | `healthy` |
 | `services[]` | `Array<{name,url}>` | `[{name:"frontend",url:"https://…"}]` |
-| `frontendUrl` / `apiUrl` / `mrUrl` | `URL?` | `https://feature-pan-1866.pan.localhost` |
+| `frontendUrl` / `apiUrl` / `mrUrl` | `URL?` | `https://feature-pan-1866.overdeck.localhost` |
 | `git` | `{ahead,behind,branch,dirty}` | `{ahead:2,behind:0,branch:"feature/pan-1866",dirty:false}` |
 | `location` / `isRemote` / `vmName` | `Enum(local\|remote)` / `Boolean` / `String?` | `local` / `false` / `null` |
 | `stackHealth` | `{healthy,reasons[],lastObserved}` | `{healthy:true,reasons:[],lastObserved:"…"}` |

@@ -105,14 +105,6 @@ vi.mock('../../../../lib/tmux.js', async (importOriginal) => {
   };
 });
 
-vi.mock('../../../../lib/cloister/reap-terminal-sessions.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../../lib/cloister/reap-terminal-sessions.js')>();
-  return {
-    ...actual,
-    KEEP_SPECIALIST_SESSIONS_ALIVE: true,
-  };
-});
-
 vi.mock('../../../../lib/cloister/specialists.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../lib/cloister/specialists.js')>();
   return {

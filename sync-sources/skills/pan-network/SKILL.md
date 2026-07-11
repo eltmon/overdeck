@@ -23,7 +23,7 @@ This skill guides you through setting up Traefik reverse proxy for local HTTPS, 
 ## When to Use
 
 - Setting up local HTTPS for development
-- Configuring *.pan.localhost domains
+- Configuring *.overdeck.localhost domains
 - Troubleshooting network connectivity between containers
 - Platform-specific DNS configuration
 
@@ -32,7 +32,7 @@ This skill guides you through setting up Traefik reverse proxy for local HTTPS, 
 ```
 Browser
    ↓
-https://myapp.pan.localhost
+https://myapp.overdeck.localhost
    ↓
 Traefik (port 443/80)
    ↓
@@ -52,17 +52,17 @@ docker compose up -d
 
 ```bash
 # Linux/macOS
-echo "127.0.0.1 pan.localhost" | sudo tee -a /etc/hosts
-echo "127.0.0.1 traefik.pan.localhost" | sudo tee -a /etc/hosts
-echo "127.0.0.1 myapp.pan.localhost" | sudo tee -a /etc/hosts
+echo "127.0.0.1 overdeck.localhost" | sudo tee -a /etc/hosts
+echo "127.0.0.1 traefik.overdeck.localhost" | sudo tee -a /etc/hosts
+echo "127.0.0.1 myapp.overdeck.localhost" | sudo tee -a /etc/hosts
 
 # Or use wildcard (requires dnsmasq)
 ```
 
 ### 3. Verify
 
-- Dashboard: https://pan.localhost
-- Traefik UI: https://traefik.pan.localhost:8080
+- Dashboard: https://overdeck.localhost
+- Traefik UI: https://traefik.overdeck.localhost:8080
 
 ## Platform-Specific Setup
 
@@ -72,8 +72,8 @@ echo "127.0.0.1 myapp.pan.localhost" | sudo tee -a /etc/hosts
 ```bash
 # Add to /etc/hosts
 sudo tee -a /etc/hosts << 'EOF'
-127.0.0.1 pan.localhost
-127.0.0.1 traefik.pan.localhost
+127.0.0.1 overdeck.localhost
+127.0.0.1 traefik.overdeck.localhost
 EOF
 ```
 
@@ -83,7 +83,7 @@ EOF
 sudo apt install dnsmasq
 
 # Configure
-echo "address=/pan.localhost/127.0.0.1" | sudo tee /etc/dnsmasq.d/pan.localhost.conf
+echo "address=/overdeck.localhost/127.0.0.1" | sudo tee /etc/dnsmasq.d/overdeck.localhost.conf
 
 # Restart
 sudo systemctl restart dnsmasq
@@ -95,8 +95,8 @@ sudo systemctl restart dnsmasq
 ```bash
 # Add to /etc/hosts
 sudo tee -a /etc/hosts << 'EOF'
-127.0.0.1 pan.localhost
-127.0.0.1 traefik.pan.localhost
+127.0.0.1 overdeck.localhost
+127.0.0.1 traefik.overdeck.localhost
 EOF
 ```
 
@@ -106,7 +106,7 @@ EOF
 brew install dnsmasq
 
 # Configure
-echo "address=/pan.localhost/127.0.0.1" >> $(brew --prefix)/etc/dnsmasq.conf
+echo "address=/overdeck.localhost/127.0.0.1" >> $(brew --prefix)/etc/dnsmasq.conf
 
 # Start
 sudo brew services start dnsmasq
@@ -133,8 +133,8 @@ netsh interface portproxy add v4tov4 listenport=443 listenaddress=0.0.0.0 connec
 
 Then add to Windows hosts file (`C:\Windows\System32\drivers\etc\hosts`):
 ```
-127.0.0.1 pan.localhost
-127.0.0.1 traefik.pan.localhost
+127.0.0.1 overdeck.localhost
+127.0.0.1 traefik.overdeck.localhost
 ```
 
 **Option B: Use WSL2 IP Directly**
@@ -144,7 +144,7 @@ Then add to Windows hosts file (`C:\Windows\System32\drivers\etc\hosts`):
 hostname -I
 
 # Add to Windows hosts (replace with actual IP)
-# 172.x.x.x pan.localhost
+# 172.x.x.x overdeck.localhost
 ```
 
 Note: WSL2 IP changes on restart.
@@ -169,8 +169,8 @@ templates/traefik/
 │   ├── overdeck.yml    # Overdeck dashboard routing
 │   └── workspace.yml.template  # Template for workspaces
 └── certs/
-    ├── _wildcard.pan.localhost.pem
-    └── _wildcard.pan.localhost-key.pem
+    ├── _wildcard.overdeck.localhost.pem
+    └── _wildcard.overdeck.localhost-key.pem
 ```
 
 ### Add a New Route
@@ -181,7 +181,7 @@ Create `dynamic/myapp.yml`:
 http:
   routers:
     myapp:
-      rule: "Host(`myapp.pan.localhost`)"
+      rule: "Host(`myapp.overdeck.localhost`)"
       service: myapp
       tls: {}
 
@@ -203,7 +203,7 @@ services:
   app:
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.myapp.rule=Host(`myapp.pan.localhost`)"
+      - "traefik.http.routers.myapp.rule=Host(`myapp.overdeck.localhost`)"
       - "traefik.http.routers.myapp.tls=true"
       - "traefik.http.services.myapp.loadbalancer.server.port=3000"
     networks:
@@ -219,7 +219,7 @@ networks:
 
 ### Using Provided Certs
 
-Overdeck includes pre-generated wildcard certs for `*.pan.localhost`:
+Overdeck includes pre-generated wildcard certs for `*.overdeck.localhost`:
 - Valid for development only
 - Auto-trusted by most browsers for localhost
 
@@ -236,7 +236,7 @@ mkcert -install
 
 # Generate wildcard cert
 cd templates/traefik/certs
-mkcert "*.pan.localhost" pan.localhost localhost 127.0.0.1 ::1
+mkcert "*.overdeck.localhost" overdeck.localhost localhost 127.0.0.1 ::1
 ```
 
 ## Troubleshooting
@@ -251,7 +251,7 @@ docker ps | grep traefik
 docker logs traefik
 
 # Verify DNS resolves
-ping pan.localhost
+ping overdeck.localhost
 ```
 
 ### "Certificate Error"
@@ -304,13 +304,13 @@ pan up
 pan down
 
 # View Traefik dashboard
-# https://traefik.pan.localhost:8080
+# https://traefik.overdeck.localhost:8080
 
 # List Traefik routes
 curl -s http://localhost:8080/api/http/routers | jq
 
 # Check service health
-curl -k https://pan.localhost/health
+curl -k https://overdeck.localhost/health
 ```
 
 ## Related Skills

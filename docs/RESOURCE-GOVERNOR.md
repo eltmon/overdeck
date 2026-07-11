@@ -144,6 +144,22 @@ verdict, the helper fails safe to the count cap rather than admitting blind.
 4. **Never** `docker pause` to reclaim RAM — a paused container keeps its memory resident; only
    `docker stop` actually frees it.
 
+Under the warm-by-default session lifecycle (PAN-2579, see
+[ROLES.md](./ROLES.md#session-lifecycle-warm-by-default-pan-2579)), this governor is the **only
+sanctioned evictor** of warm role sessions besides a reboot: role sessions — including review
+convoy sessions that have already recorded a verdict — persist for fast resume/re-review and are
+shed here when memory pressure demands it. Nothing else in the pipeline may kill a warm session as
+a side effect of recording a verdict (the PAN-1716 reap-on-verdict behavior was removed under
+PAN-2579).
+
+Concretely, `shed()` inserts a step between the stack teardown and the work-agent pauses: while
+the band is still `hard`, it kills **warm-idle advancing sessions** (review/test/ship whose phase
+verdict is terminal, selected by `selectNonMergedTerminalAdvancingSessions`) one at a time,
+re-checking pressure after each. This is the cheapest agent shed — the verdict is durable and the
+next dispatch resumes the saved session with its context, so a shed costs re-review latency, not
+state. Warm-idle sessions also do not count against the advancing ceiling
+(`countWarmIdleAdvancingAgents` in `concurrency.ts`), so keeping them warm never starves dispatch.
+
 ## Kernel safety net
 
 Even a correct governor can be too slow, or wrong about what's safe to shed. `src/lib/tmux.ts`'s

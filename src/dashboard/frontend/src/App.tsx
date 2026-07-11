@@ -50,6 +50,7 @@ import {
 import { AppRoutes, type PendingConversationTarget } from './App/AppRoutes';
 import { AppChrome } from './App/AppChrome';
 import { usePendingInputDialogs } from './App/hooks/usePendingInputDialogs';
+import { useDesktopActivityNotifications } from './App/hooks/useDesktopActivityNotifications';
 
 export {
   buildConversationUrl,
@@ -512,6 +513,7 @@ export default function App() {
     handleDeny,
     handleCloseConfirmation,
   } = usePendingInputDialogs({ agents, issues });
+  useDesktopActivityNotifications();
 
   // Global keyboard shortcuts: / for search, Cmd+K for command palette
   useEffect(() => {

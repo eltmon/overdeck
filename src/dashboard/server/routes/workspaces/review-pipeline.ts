@@ -347,8 +347,11 @@ const postWorkspaceReviewRoute = HttpRouter.add(
             }
 
             console.log(`[review] Parallel review dispatched for ${issueId}`);
-            // PAN-511: set 'reviewing' only after dispatch succeeds
-            setReviewStatus(issueId, { reviewStatus: 'reviewing' });
+            // PAN-511's "set 'reviewing' only after dispatch succeeds" invariant now lives
+            // inside spawnReviewRoleForIssue (it writes reviewing + reviewSpawnedAt right
+            // before spawning). PAN-2578: do NOT repeat a bare 'reviewing' write here — a
+            // fast review agent may have already recorded its verdict by the time this line
+            // runs, and the redundant write clobbered PAN-399's BLOCKED verdict.
             completePendingOperation(issueId, null);
             try {
               (await Effect.runPromise(eventStore.append({
@@ -556,16 +559,19 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
               'workspaces',
               `feature-${issueId.toLowerCase()}`
             );
-            setReviewStatus(issueId, { testStatus: 'testing' });
             // PAN-1048 R1: spawn the test role via the role primitive instead
             // of the legacy spawnEphemeralSpecialist machinery. Reactive
             // Cloister normally drives this on lifecycle transitions; this
             // path is a manual re-dispatch for already-approved reviews.
+            // PAN-2579: set 'testing' only AFTER the spawn succeeds — a pre-set
+            // non-terminal status would make spawnRun's warm-idle reaper treat a
+            // leftover warm test session as active and refuse the dispatch.
             const { spawnRun } = yield* Effect.promise(() => import('../../../../lib/agents.js'));
             try {
               const testRun = yield* Effect.promise(() => spawnRun(issueId, 'test', {
                 workspace: workspacePath,
               }));
+              setReviewStatus(issueId, { testStatus: 'testing' });
               console.log(
                 `[request-review] Test role spawned for ${issueId} as ${testRun.id}`
               );
@@ -725,11 +731,10 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
       if (result.success) {
         console.log(`[request-review] Review role spawned for ${issueId}`);
-        // PAN-511: set 'reviewing' only after spawn succeeds. spawnReviewRoleForIssue
-        // already flips reviewStatus internally, but we keep this redundant write
-        // to preserve the original ordering invariant for downstream readers.
-        // Increment autoRequeueCount only on a real dispatch.
-        setReviewStatus(issueId, { reviewStatus: 'reviewing', autoRequeueCount: newCount });
+        // spawnReviewRoleForIssue already flips reviewStatus to 'reviewing' (with
+        // reviewSpawnedAt) internally. PAN-2578: do not repeat a bare 'reviewing' write —
+        // it can clobber a fast agent's terminal verdict. Only record the requeue count.
+        setReviewStatus(issueId, { autoRequeueCount: newCount });
         yield* Effect.promise(() => Effect.runPromise(eventStore.append({
           type: 'pipeline.review-started',
           timestamp: new Date().toISOString(),

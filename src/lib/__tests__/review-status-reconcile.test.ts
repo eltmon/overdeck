@@ -335,3 +335,115 @@ describe('resetPipelineVerdictsForWorkStartSync', () => {
     expect(db.upsert).not.toHaveBeenCalled();
   });
 });
+
+describe('setReviewStatusSync — terminal-verdict clobber guard (PAN-2578)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    journal.readJournalStatusSync.mockReturnValue(null);
+    journal.enrichReviewNotesFromRecordSync.mockImplementation((_id: string, s: ReviewStatus) => s);
+  });
+
+  it('rejects a bare reviewing write over a blocked verdict (the PAN-399 race)', () => {
+    db.getFromDb.mockReturnValue(dbRow({ reviewStatus: 'blocked', reviewSpawnedAt: '2026-07-11T10:36:56.000Z' }));
+
+    const result = setReviewStatusSync('PAN-1866', { reviewStatus: 'reviewing' });
+
+    expect(result.reviewStatus).toBe('blocked');
+    expect(journal.updateIssueRecordForReviewStatusSync).not.toHaveBeenCalled();
+    expect(db.upsert).not.toHaveBeenCalled();
+  });
+
+  it('rejects a bare reviewing write over a failed verdict', () => {
+    db.getFromDb.mockReturnValue(dbRow({ reviewStatus: 'failed' }));
+
+    const result = setReviewStatusSync('PAN-1866', { reviewStatus: 'reviewing' });
+
+    expect(result.reviewStatus).toBe('failed');
+    expect(db.upsert).not.toHaveBeenCalled();
+  });
+
+  it('allows blocked → reviewing when the write starts a new cycle (carries reviewSpawnedAt)', () => {
+    db.getFromDb.mockReturnValue(dbRow({ reviewStatus: 'blocked', reviewSpawnedAt: '2026-07-11T10:36:56.000Z' }));
+
+    const result = setReviewStatusSync('PAN-1866', {
+      reviewStatus: 'reviewing',
+      reviewSpawnedAt: '2026-07-11T11:00:00.000Z',
+    });
+
+    expect(result.reviewStatus).toBe('reviewing');
+    expect(result.reviewSpawnedAt).toBe('2026-07-11T11:00:00.000Z');
+    expect(db.upsert).toHaveBeenCalled();
+  });
+
+  it('still allows a terminal verdict to be recorded over reviewing (the normal flow)', () => {
+    db.getFromDb.mockReturnValue(dbRow({ reviewStatus: 'reviewing' }));
+
+    const result = setReviewStatusSync('PAN-1866', { reviewStatus: 'blocked', reviewNotes: 'findings' });
+
+    expect(result.reviewStatus).toBe('blocked');
+    expect(db.upsert).toHaveBeenCalled();
+  });
+});
+
+
+describe("reviewStatus 'skipped' — review mode none (PAN-1862 FR-14/FR-16)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    journal.readJournalStatusSync.mockReturnValue(null);
+    journal.enrichReviewNotesFromRecordSync.mockImplementation((_id: string, s: ReviewStatus) => s);
+  });
+
+  it('a skipped review + skipped test passes the readyForMerge gate', () => {
+    db.getFromDb.mockReturnValue(dbRow({ reviewStatus: 'pending', testStatus: 'skipped' }));
+
+    const result = setReviewStatusSync('PAN-1866', { reviewStatus: 'skipped' });
+
+    expect(result.reviewStatus).toBe('skipped');
+    expect(result.readyForMerge).toBe(true);
+  });
+
+  it('recording skipped emits the same review.approved lifecycle event as passed', () => {
+    db.getFromDb.mockReturnValue(dbRow({ reviewStatus: 'pending', testStatus: 'pending' }));
+
+    setReviewStatusSync('PAN-1866', { reviewStatus: 'skipped', reviewSpawnedAt: '2026-07-11T12:00:00.000Z' });
+
+    expect(notifier.notify).toHaveBeenCalledWith(expect.objectContaining({ type: 'review.approved', issueId: 'PAN-1866' }));
+  });
+
+  it('a skipped review does NOT pass the gate while tests are still pending', () => {
+    db.getFromDb.mockReturnValue(dbRow({ reviewStatus: 'pending', testStatus: 'pending' }));
+
+    const result = setReviewStatusSync('PAN-1866', { reviewStatus: 'skipped' });
+
+    expect(result.readyForMerge).toBe(false);
+  });
+});
+
+describe('reviewerVerdicts map merge (PAN-1862 FR-6)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    journal.readJournalStatusSync.mockReturnValue(null);
+    journal.enrichReviewNotesFromRecordSync.mockImplementation((_id: string, s: ReviewStatus) => s);
+  });
+
+  it('a partial verdict update merges with carried-forward entries instead of replacing them', () => {
+    db.getFromDb.mockReturnValue(dbRow({
+      reviewStatus: 'blocked',
+      reviewerVerdicts: {
+        security: { status: 'passed', atCommit: 'aaaa1111' },
+        correctness: { status: 'blocked', atCommit: 'aaaa1111' },
+      },
+    }));
+
+    const result = setReviewStatusSync('PAN-1866', {
+      reviewStatus: 'passed',
+      reviewSpawnedAt: '2026-07-11T13:00:00.000Z',
+      reviewerVerdicts: { correctness: { status: 'passed', atCommit: 'bbbb2222' } },
+    });
+
+    expect(result.reviewerVerdicts).toEqual({
+      security: { status: 'passed', atCommit: 'aaaa1111' },     // carried forward, untouched
+      correctness: { status: 'passed', atCommit: 'bbbb2222' },  // updated by this cycle
+    });
+  });
+});

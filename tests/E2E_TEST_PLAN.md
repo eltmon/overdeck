@@ -22,7 +22,7 @@ pan install
 # ✓ Directories initialized
 # ✓ Docker network ready
 # ✓ mkcert CA installed
-# ✓ Wildcard certificates generated (*.pan.localhost, *.localhost)
+# ✓ Wildcard certificates generated (*.overdeck.localhost, *.localhost)
 # ✓ Traefik configuration created
 # ✓ Config created
 
@@ -36,7 +36,7 @@ ls ~/.overdeck/traefik/
 
 # Verify certificates
 ls ~/.overdeck/traefik/certs/
-# Expected: _wildcard.pan.localhost-key.pem  _wildcard.pan.localhost.pem
+# Expected: _wildcard.overdeck.localhost-key.pem  _wildcard.overdeck.localhost.pem
 
 # Verify config.toml contains traefik section
 cat ~/.overdeck/config.toml | grep -A 3 "\[traefik\]"
@@ -44,21 +44,21 @@ cat ~/.overdeck/config.toml | grep -A 3 "\[traefik\]"
 # [traefik]
 # enabled = true
 # dashboard_port = 8080
-# domain = "pan.localhost"
+# domain = "overdeck.localhost"
 ```
 
 ### 2. DNS Setup Test
 
 ```bash
 # Add to /etc/hosts (one-time setup)
-echo "127.0.0.1 pan.localhost traefik.pan.localhost" | sudo tee -a /etc/hosts
+echo "127.0.0.1 overdeck.localhost traefik.overdeck.localhost" | sudo tee -a /etc/hosts
 
 # Verify DNS resolution
-ping -c 1 pan.localhost
-# Expected: PING pan.localhost (127.0.0.1) 56(84) bytes of data.
+ping -c 1 overdeck.localhost
+# Expected: PING overdeck.localhost (127.0.0.1) 56(84) bytes of data.
 
 # Test with nslookup
-nslookup pan.localhost
+nslookup overdeck.localhost
 # Expected: Address: 127.0.0.1
 ```
 
@@ -74,12 +74,12 @@ pan up --detach
 # Starting Traefik...
 # ✓ Traefik started
 #   Dashboard: http://localhost:8080
-#   HTTPS:     https://pan.localhost
+#   HTTPS:     https://overdeck.localhost
 #
 # Starting dashboard...
 # ✓ Dashboard started in background
-#   Frontend:  https://pan.localhost
-#   API:       https://pan.localhost/api
+#   Frontend:  https://overdeck.localhost
+#   API:       https://overdeck.localhost/api
 #   (fallback: http://localhost:3001, http://localhost:3002)
 
 # Verify Traefik container is running
@@ -91,22 +91,22 @@ curl -I http://localhost:8080
 # Expected: HTTP/1.1 200 OK
 
 # Verify HTTPS frontend accessible
-curl -k -I https://pan.localhost
+curl -k -I https://overdeck.localhost
 # Expected: HTTP/2 200 (or 404 if dashboard not fully started)
 
 # Verify certificate is trusted (after mkcert -install)
-curl -I https://pan.localhost
+curl -I https://overdeck.localhost
 # Expected: No certificate errors
 
 # Wait for dashboard to start
 sleep 5
 
 # Check dashboard frontend
-curl -I https://pan.localhost
+curl -I https://overdeck.localhost
 # Expected: HTTP/2 200
 
 # Check dashboard API
-curl -I https://pan.localhost/api/health
+curl -I https://overdeck.localhost/api/health
 # Expected: HTTP/2 200 (if health endpoint exists)
 ```
 
@@ -127,10 +127,10 @@ curl -I http://localhost:3002
 # Test Traefik is proxying correctly
 
 # Frontend should route to :3001
-curl -v https://pan.localhost 2>&1 | grep -E "(< HTTP|< location)"
+curl -v https://overdeck.localhost 2>&1 | grep -E "(< HTTP|< location)"
 
 # API should route to :3002 and strip /api prefix
-curl -v https://pan.localhost/api/health 2>&1 | grep -E "(< HTTP|< location)"
+curl -v https://overdeck.localhost/api/health 2>&1 | grep -E "(< HTTP|< location)"
 ```
 
 ### 6. Shutdown Test (pan down)
@@ -161,7 +161,7 @@ lsof -ti:3001
 lsof -ti:3002
 # Expected: No output (empty)
 
-curl -I https://pan.localhost
+curl -I https://overdeck.localhost
 # Expected: Connection refused
 ```
 
@@ -189,7 +189,7 @@ pan up --detach
 curl -I http://localhost:3001
 # Expected: HTTP/1.1 200 OK
 
-curl -I https://pan.localhost
+curl -I https://overdeck.localhost
 # Expected: Connection refused
 
 # Clean up
@@ -204,10 +204,10 @@ pan down
 | pan install generates certificates | Wildcard certs in traefik/certs/ | ⏳ |
 | pan install creates traefik config | docker-compose.yml, traefik.yml, dynamic/ | ⏳ |
 | pan install sets traefik.enabled=true | Config has [traefik] section | ⏳ |
-| DNS resolution works | ping pan.localhost succeeds | ⏳ |
+| DNS resolution works | ping overdeck.localhost succeeds | ⏳ |
 | pan up starts Traefik | Docker container running | ⏳ |
 | pan up starts dashboard | Ports 3001/3002 in use | ⏳ |
-| HTTPS access works | curl https://pan.localhost succeeds | ⏳ |
+| HTTPS access works | curl https://overdeck.localhost succeeds | ⏳ |
 | Traefik dashboard accessible | curl http://localhost:8080 succeeds | ⏳ |
 | pan down stops everything | No containers, ports free | ⏳ |
 | Minimal mode skips Traefik | traefik.enabled=false in config | ⏳ |
@@ -274,7 +274,7 @@ lsof -ti:3002 | xargs kill -9
 rm -rf ~/.overdeck
 
 # Remove hosts entry
-sudo sed -i.bak '/pan.localhost/d' /etc/hosts
+sudo sed -i.bak '/overdeck.localhost/d' /etc/hosts
 
 # Remove Docker resources
 docker rm -f overdeck-traefik

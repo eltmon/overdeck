@@ -193,7 +193,7 @@ function isRfc1918(ip: number): boolean {
 /**
  * True when `addr` is the IP of a container on one of THIS host's Docker bridge
  * interfaces (docker0 / br-*). Such a peer can only be a process running on this
- * machine — our own host-local Traefik fronting pan.localhost, or another
+ * machine — our own host-local Traefik fronting overdeck.localhost, or another
  * Overdeck container — never a LAN client (a direct LAN hit to the 0.0.0.0
  * API port arrives with a LAN peer that is not inside any Docker bridge subnet).
  *
@@ -260,13 +260,13 @@ const runningInContainer = existsSync('/.dockerenv');
 /**
  * A request we trust to mint a session because it originated from this machine —
  * the local browser hitting the dashboard directly (127.0.0.1), or the
- * host-local Traefik that fronts pan.localhost. In Docker, that Traefik reaches
+ * host-local Traefik that fronts overdeck.localhost. In Docker, that Traefik reaches
  * the host server from a Docker-bridge IP (e.g. 172.18.0.2), NOT 127.0.0.1, so
  * a literal-loopback check alone silently breaks the zero-step bootstrap for
- * every pan.localhost user — their session mint 401s and no cookie is ever set.
+ * every overdeck.localhost user — their session mint 401s and no cookie is ever set.
  *
  * This is the auto-bootstrap that removes the manual one-time #overdeck_token
- * step: any browser on pan.localhost gets a session with no user action. It is
+ * step: any browser on overdeck.localhost gets a session with no user action. It is
  * NOT a security downgrade for the LAN — the raw API ports bind 0.0.0.0, but a
  * direct LAN hit has a non-loopback, non-Docker-bridge peer and is rejected. We
  * read ONLY the real TCP peer (request.remoteAddress), never X-Forwarded-For,

@@ -237,6 +237,24 @@ describe('review mode resolution', () => {
     expect(isExtendedReviewEnabled('PAN-1982')).toBe(true);
     expect(mockLoadConfigSync).not.toHaveBeenCalled();
   });
+
+  it("resolves mode 'none' from merged config (PAN-1862 FR-13)", () => {
+    mockLoadConfigSync.mockReturnValue({
+      config: { roles: { review: { model: 'workhorse:expensive', mode: 'none' } } },
+    });
+
+    expect(resolveReviewMode('PAN-1982')).toBe('none');
+    expect(isExtendedReviewEnabled('PAN-1982')).toBe(false);
+  });
+
+  it("resolves per-issue reviewMode 'none' over config", () => {
+    mockLoadConfigSync.mockReturnValue({
+      config: { roles: { review: { model: 'workhorse:expensive', mode: 'full' } } },
+    });
+    mockReadIssueRecordSync.mockReturnValue({ reviewMode: 'none' });
+
+    expect(resolveReviewMode('PAN-1982')).toBe('none');
+  });
 });
 
 // ── killAllReviewSessions ─────────────────────────────────────────────────────
@@ -507,11 +525,16 @@ describe('spawnReviewRoleForIssue review mode fan-out', () => {
 
     expect(block).toContain('buildReviewRolePrompt');
     expect(block).toContain('buildSelfReviewPrompt');
-    expect(block).toContain('REVIEW_SUB_ROLES.map');
-    expect(block).toContain('spawnReviewSubRoleForIssue');
+    // PAN-1862: the fan-out itself lives in review-convoy.ts — the dispatch block
+    // delegates to launchConvoyReviewersPromise over the selective in-scope set
+    // (all four on a first cycle; a subset when carried verdicts prove skips safe).
+    expect(block).toContain('launchConvoyReviewersPromise');
     expect(block).toContain('...(opts.model ? { model: opts.model } : {})');
     expect(block).toContain('...(opts.harness ? { harness: opts.harness } : {})');
     expect(block).toContain('message: `Convoy review spawned: ${run.id}`');
+    // The fan-out itself (params.inScope.map -> spawnReviewSubRoleForIssue) lives in
+    // review-convoy.ts and is exercised behaviorally by the review-rerun-scope and
+    // convoy tests — no extra source introspection here (lint:source-introspection).
   });
 
   it('full mode re-review resumes the parent before reusing the convoy fan-out path', async () => {

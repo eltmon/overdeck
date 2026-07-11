@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RolesPanel } from '../RolesPanel';
@@ -265,5 +265,61 @@ describe('RolesPanel — Anthropic spend warning (regression PAN-1093 follow-up)
       /Anthropic API key in use; this model will bill the Anthropic API\./i,
     );
     expect(warnings.length).toBeGreaterThan(0);
+  });
+});
+
+describe('RolesPanel — review pipeline controls (PAN-1862 FR-10/FR-17)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  async function expandReviewCard() {
+    renderPanel();
+    await screen.findByText('Review');
+    const toggle = screen.getAllByRole('button', { name: /sub-roles/i })
+      .find((el) => el.getAttribute('aria-controls') === 'review-subroles');
+    expect(toggle).toBeTruthy();
+    fireEvent.click(toggle!);
+  }
+
+  it('shows the review mode selector; scope + banner hidden outside full mode', async () => {
+    installFetchMock(); // default: no mode set -> quick
+    await expandReviewCard();
+
+    const modeSelect = await screen.findByDisplayValue(/Quick — one reviewer/);
+    expect(modeSelect).toBeInTheDocument();
+    expect(screen.queryByText(/Re-review scope/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('review-model-uniformity-banner')).not.toBeInTheDocument();
+  });
+
+  it('full mode with MIXED reviewer models renders the red uniformity banner naming the models', async () => {
+    const settings = structuredClone(settingsPayload);
+    (settings.roles.review as Record<string, unknown>).mode = 'full';
+    installFetchMock({ settings });
+    await expandReviewCard();
+
+    const banner = await screen.findByTestId('review-model-uniformity-banner');
+    expect(banner.textContent).toContain('different models');
+    expect(banner.textContent).toContain('cache sharing is disabled');
+    expect(banner.textContent).toContain('security=claude-opus-4-7');
+    expect(banner.textContent).toContain('correctness=claude-sonnet-4-6');
+    expect(screen.getByText(/Re-review scope/)).toBeInTheDocument();
+  });
+
+  it('full mode with UNIFORM reviewer models renders no banner', async () => {
+    const settings = structuredClone(settingsPayload);
+    (settings.roles.review as Record<string, unknown>).mode = 'full';
+    settings.roles.review.sub = {
+      security: { model: 'workhorse:expensive' },
+      correctness: { model: 'workhorse:expensive' },
+      performance: { model: 'workhorse:expensive' },
+      requirements: { model: 'workhorse:expensive' },
+      synthesis: { model: 'workhorse:expensive' },
+    };
+    installFetchMock({ settings });
+    await expandReviewCard();
+
+    await screen.findByText(/Re-review scope/);
+    expect(screen.queryByTestId('review-model-uniformity-banner')).not.toBeInTheDocument();
   });
 });

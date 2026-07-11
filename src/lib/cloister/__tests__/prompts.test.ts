@@ -254,8 +254,8 @@ optional:
           vars: {
             ISSUE_ID: 'PAN-611',
             WORKSPACE: '/workspace',
-            FRONTEND_URL: 'https://pan.localhost',
-            API_URL: 'https://pan.localhost/api',
+            FRONTEND_URL: 'https://overdeck.localhost',
+            API_URL: 'https://overdeck.localhost/api',
             TEST_TOKEN_API: 'test-key',
           },
         });

@@ -216,6 +216,75 @@ describe('deriveMessagesTimelineRows', () => {
 
     expect(rows.some((r) => r.kind === 'working')).toBe(false);
   });
+
+  // ─── Compact boundary interleaving (PAN-2576) ──────────────────────────────
+
+  it('splits a work group at a compact boundary and places the divider between the halves', () => {
+    const workLog = [
+      work({ id: 'w1', createdAt: '2024-01-01T00:00:00Z' }),
+      work({ id: 'w2', createdAt: '2024-01-01T00:00:01Z' }),
+      work({ id: 'w3', createdAt: '2024-01-01T00:10:00Z' }),
+      work({ id: 'w4', createdAt: '2024-01-01T00:10:01Z' }),
+    ];
+    const entries = deriveTimelineEntries([], workLog);
+    const rows = deriveMessagesTimelineRows(entries, false, [
+      { id: 'b1', timestamp: '2024-01-01T00:05:00Z' },
+    ]);
+
+    expect(rows.map((r) => r.kind)).toEqual(['work', 'compact-boundary', 'work']);
+    expect((rows[0] as { groupedEntries: WorkLogEntry[] }).groupedEntries.map((e) => e.id)).toEqual(['w1', 'w2']);
+    expect((rows[2] as { groupedEntries: WorkLogEntry[] }).groupedEntries.map((e) => e.id)).toEqual(['w3', 'w4']);
+  });
+
+  it('places a boundary newer than every entry at the end, before the working indicator', () => {
+    const entries = deriveTimelineEntries([], [work({ id: 'w1', createdAt: '2024-01-01T00:00:00Z' })]);
+    const rows = deriveMessagesTimelineRows(entries, true, [
+      { id: 'b1', timestamp: '2024-01-01T01:00:00Z' },
+    ]);
+
+    expect(rows.map((r) => r.kind)).toEqual(['work', 'compact-boundary', 'working']);
+  });
+
+  it('places a boundary older than every entry at the start', () => {
+    const entries = deriveTimelineEntries([], [work({ id: 'w1', createdAt: '2024-01-01T01:00:00Z' })]);
+    const rows = deriveMessagesTimelineRows(entries, false, [
+      { id: 'b1', timestamp: '2024-01-01T00:00:00Z' },
+    ]);
+
+    expect(rows.map((r) => r.kind)).toEqual(['compact-boundary', 'work']);
+  });
+
+  it('interleaves multiple boundaries in timestamp order', () => {
+    const workLog = [
+      work({ id: 'w1', createdAt: '2024-01-01T00:00:00Z' }),
+      work({ id: 'w2', createdAt: '2024-01-01T00:10:00Z' }),
+      work({ id: 'w3', createdAt: '2024-01-01T00:20:00Z' }),
+    ];
+    const entries = deriveTimelineEntries([], workLog);
+    // Deliberately unsorted input — derivation must sort by timestamp.
+    const rows = deriveMessagesTimelineRows(entries, false, [
+      { id: 'b2', timestamp: '2024-01-01T00:15:00Z' },
+      { id: 'b1', timestamp: '2024-01-01T00:05:00Z' },
+    ]);
+
+    expect(rows.map((r) => (r.kind === 'compact-boundary' ? r.boundary.id : r.kind))).toEqual([
+      'work', 'b1', 'work', 'b2', 'work',
+    ]);
+  });
+
+  it('keeps an entry stamped exactly at the boundary timestamp before the divider', () => {
+    const workLog = [
+      work({ id: 'w1', createdAt: '2024-01-01T00:05:00Z' }),
+      work({ id: 'w2', createdAt: '2024-01-01T00:05:01Z' }),
+    ];
+    const entries = deriveTimelineEntries([], workLog);
+    const rows = deriveMessagesTimelineRows(entries, false, [
+      { id: 'b1', timestamp: '2024-01-01T00:05:00Z' },
+    ]);
+
+    expect(rows.map((r) => r.kind)).toEqual(['work', 'compact-boundary', 'work']);
+    expect((rows[0] as { groupedEntries: WorkLogEntry[] }).groupedEntries.map((e) => e.id)).toEqual(['w1']);
+  });
 });
 
 // ─── estimateMessagesTimelineRowHeight ────────────────────────────────────────

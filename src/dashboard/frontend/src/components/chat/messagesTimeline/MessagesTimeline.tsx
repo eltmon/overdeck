@@ -92,29 +92,15 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   const handledTargetKeyRef = useRef<string | null>(null);
 
   const timelineEntries = useMemo(() => deriveTimelineEntries(messages, workLog), [messages, workLog]);
-  const baseRows = useMemo(() => deriveMessagesTimelineRows(timelineEntries, streaming), [timelineEntries, streaming]);
+  // Compact boundaries are interleaved (and split work groups) inside
+  // deriveMessagesTimelineRows — injecting them here against grouped rows
+  // pushed mid-group boundaries to the end of the timeline (PAN-2576).
+  const baseRows = useMemo(
+    () => deriveMessagesTimelineRows(timelineEntries, streaming, compactBoundaries),
+    [timelineEntries, streaming, compactBoundaries],
+  );
   const rows = useMemo(() => {
     let result = baseRows;
-
-    // Inject compact boundary dividers by timestamp
-    if (compactBoundaries && compactBoundaries.length > 0) {
-      const copy = [...result];
-      for (const boundary of compactBoundaries) {
-        const boundaryRow: MessagesTimelineRow = {
-          kind: 'compact-boundary',
-          id: `compact-${boundary.id}`,
-          createdAt: boundary.timestamp,
-          boundary,
-        };
-        const idx = copy.findIndex(r => r.createdAt && r.createdAt > boundary.timestamp);
-        if (idx >= 0) {
-          copy.splice(idx, 0, boundaryRow);
-        } else {
-          copy.push(boundaryRow);
-        }
-      }
-      result = copy;
-    }
 
     // Inject proposed plan
     if (proposedPlan) {
@@ -155,7 +141,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     }
 
     return result;
-  }, [baseRows, proposedPlan, compactBoundaries, compacting]);
+  }, [baseRows, proposedPlan, compacting]);
 
   // Index round markers by the row they should follow. A single row can have
   // multiple markers (e.g. two consecutive rounds without any new messages

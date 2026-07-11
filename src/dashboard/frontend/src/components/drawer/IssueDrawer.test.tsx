@@ -213,8 +213,8 @@ describe('IssueDrawer', () => {
       status: 'pending_changes',
       pendingChanges: true,
       urls: {
-        wrapperUrl: 'https://pan.localhost/s/slugone1',
-        rawUrl: 'https://artifacts.pan.localhost/a/slugone1',
+        wrapperUrl: 'https://overdeck.localhost/s/slugone1',
+        rawUrl: 'https://artifacts.overdeck.localhost/a/slugone1',
       },
       thumbnailUrl: '/api/artifacts/slugone1/thumbnail',
     };
@@ -233,8 +233,8 @@ describe('IssueDrawer', () => {
       status: 'unshared',
       pendingChanges: false,
       urls: {
-        wrapperUrl: 'https://pan.localhost/s/slugtwo2',
-        rawUrl: 'https://artifacts.pan.localhost/a/slugtwo2',
+        wrapperUrl: 'https://overdeck.localhost/s/slugtwo2',
+        rawUrl: 'https://artifacts.overdeck.localhost/a/slugtwo2',
       },
     };
 
@@ -272,11 +272,11 @@ describe('IssueDrawer', () => {
 
     expect(within(firstCard).getByRole('link', { name: 'Open Wrapper' })).toHaveAttribute(
       'href',
-      'https://pan.localhost/s/slugone1',
+      'https://overdeck.localhost/s/slugone1',
     );
 
     fireEvent.click(within(firstCard).getByRole('button', { name: 'Copy Link' }));
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith('https://pan.localhost/s/slugone1'));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('https://overdeck.localhost/s/slugone1'));
     expect(within(firstCard).getByRole('button', { name: 'Copied' })).toBeInTheDocument();
 
     fireEvent.click(within(firstCard).getByRole('button', { name: 'Unshare' }));

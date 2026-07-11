@@ -43,6 +43,6 @@ export async function currentAction(opts: { json?: boolean }): Promise<void> {
   field('Harness', conv.harness ?? 'claude-code');
   field('CWD', conv.cwd);
   field('tmux', conv.tmuxSession);
-  field('Dashboard', `https://pan.localhost/conv/${conv.id}`);
+  field('Dashboard', `https://overdeck.localhost/conv/${conv.id}`);
   console.log();
 }

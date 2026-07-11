@@ -24,7 +24,23 @@ and the human Merge button performs the final GitHub squash. The `ship` token
 survives only as the merge-specialist identity for model routing, historical
 activity attribution, and old session records.
 
-A **Run** is a process playing a role: `(role, model, harness)`. Runs are ephemeral — they spawn, do one role's worth of work, update the tracker, and exit. There is no long-lived agent holding state.
+A **Run** is a process playing a role: `(role, model, harness)`. A run's *work* is scoped — it does one role's worth of work and records its verdict — but its *session* is not disposable. See the session-lifecycle policy below.
+
+## Session lifecycle: warm by default (PAN-2579)
+
+Role sessions are **warm by default**: they persist after recording their verdict, until issue close-out. A session for an issue's role should be absent only for two reasons:
+
+1. **Reboot** — the machine or dashboard restarted and the session did not survive.
+2. **Resource relief** — the memory governor (PAN-2500) or preemptive scheduler (PAN-2507) evicted or yielded it to free capacity for a blocked part of the pipeline. See [RESOURCE-GOVERNOR.md](./RESOURCE-GOVERNOR.md).
+
+Consequences:
+
+- **Dispatch resumes before it spawns.** Every dispatch path (review request, re-review, test run, rework handoff) first looks for a live warm session for that role + issue and messages/resumes it; cold-spawning is the fallback for the absent case.
+- **Review agents (and convoy sub-reviewers) stay warm after a verdict** so a re-review after a BLOCKED → fix cycle resumes reviewers that already hold context from the previous pass, cutting re-review latency (PAN-1862 is the convoy-warm-reuse design).
+- **BLOCKED feedback goes agent-to-agent.** The review agent's `pan admin specialists done review --status blocked` delivers feedback directly to the live work agent (`deliverReviewVerdictFeedback` → `messageAgent`); the deacon is a recovery backstop, not the primary path.
+- **Idle-warm sessions are free capacity**, not load: they must not count against the advancing-role concurrency ceiling, and they are the first thing the governor sheds under memory pressure.
+
+> **Implementation status (2026-07-11, landed):** reap-on-verdict is gone — `pan specialists done` (CLI and HTTP route) records the verdict and leaves the session alive; the deacon's terminal/idle-terminal advancing reapers are removed (only MERGED-issue sessions still reap). `countRunningAgents()` excludes warm-idle advancing sessions from the ceiling, the memory governor sheds them first under HARD pressure, and the review dispatch guard distinguishes finished-idle (warm-reuse for a newer request) from actively-reviewing (PAN-1131). Convoy-wide warm re-review landed with PAN-1862: selective re-review resumes only the in-scope sub-reviewers (carried verdicts become stub reports), and first-cycle reviewers fork the parent's discovery session for warm-cache sharing — see [REVIEW-AGENT-ARCHITECTURE.md](./REVIEW-AGENT-ARCHITECTURE.md).
 
 ---
 

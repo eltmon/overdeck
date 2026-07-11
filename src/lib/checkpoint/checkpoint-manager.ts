@@ -282,6 +282,15 @@ async function resolveCheckpointCommit(cwd: string, agentId: string, turnId: str
     await Effect.runPromise(deleteCheckpoint(cwd, agentId, turnId))
   }
 }async function pruneCheckpointRefsForAgentsPromise(cwd: string, agentIds: string[]): Promise<number> {
+  // Multi-repo projects (e.g. MYN) have a projectPath that is a plain folder of
+  // repos, not a git repo itself. Checkpoint refs can only live in a git repo,
+  // so a non-git cwd means there is nothing to prune.
+  try {
+    await execFileAsync('git', ['rev-parse', '--git-dir'], { cwd, encoding: 'utf-8' })
+  } catch {
+    console.log(`[checkpoint] ${cwd} is not a git repository — no checkpoint refs to prune`)
+    return 0
+  }
   let totalRefs = 0
   for (const agentId of agentIds) {
     assertSafeAgentId(agentId)

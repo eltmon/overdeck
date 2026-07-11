@@ -169,12 +169,12 @@ describe('role model configuration', () => {
     expect(config.roles?.review?.mode).toBe('full');
   });
 
-  it('rejects review mode values outside quick or full', () => {
+  it('rejects review mode values outside quick, full, or none', () => {
     expect(() => mergeConfigs({
       roles: {
         review: { model: 'workhorse:expensive', mode: 'extended' as never },
       },
-    })).toThrow('config.yaml: roles.review.mode must be quick or full');
+    })).toThrow('config.yaml: roles.review.mode must be quick, full, or none');
   });
 
   it('seeds missing roles while preserving partial user role config', () => {

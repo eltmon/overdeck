@@ -3,7 +3,7 @@ import type { Agent, Issue } from '../types';
 export type PipelineIssuePhase = 'ship' | 'review' | 'work' | 'plan' | 'ready' | 'todo' | 'verifying';
 
 type PipelineStateLike = {
-  reviewStatus?: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
+  reviewStatus?: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked' | 'skipped';
   testStatus?: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
   mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
   inspectStatus?: 'pending' | 'inspecting' | 'passed' | 'failed' | 'error';
@@ -157,6 +157,8 @@ export function getPipelineIssuePhase(
   if (
     reviewStatus?.reviewStatus === 'reviewing' ||
     reviewStatus?.reviewStatus === 'passed' ||
+    reviewStatus?.reviewStatus === 'skipped' || // PAN-1862: mode none — review phase complete
+
     reviewStatus?.reviewStatus === 'failed' ||
     reviewStatus?.reviewStatus === 'blocked' ||
     reviewStatus?.testStatus === 'testing' ||
