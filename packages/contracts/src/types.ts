@@ -343,6 +343,7 @@ export const ReviewStatusSnapshot = Schema.Struct({
   uatNotes: Schema.optional(Schema.String),
   mergeStatus: Schema.optional(MergeStatusValue),
   releaseStatus: Schema.optional(ReleaseStatusValue),
+  releaseNotes: Schema.optional(Schema.String),
   verificationStatus: Schema.optional(VerificationStatusValue),
   verificationNotes: Schema.optional(Schema.String),
   verificationCycleCount: Schema.optional(Schema.Number),
