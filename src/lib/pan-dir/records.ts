@@ -268,16 +268,21 @@ export {
  * PAN-1908 / PAN-1919: rebuild and queue the per-issue permanent record for a
  * given issue. Fire-and-forget: failures are logged, never thrown, so
  * review-status writes stay synchronous and fast.
+ *
+ * PAN-2583: returns whether the durable write actually landed, so the caller
+ * can fall back to a sandbox-writable verdict drop when it did not (a sandboxed
+ * reviewer cannot write ${OVERDECK_HOME}/state, and swallowing that here was
+ * how blocked review verdicts silently vanished).
  */
 export async function updateIssueRecordForIssue(
   issueId: string,
   reviewStatus?: ReviewStatus | null,
-): Promise<void> {
+): Promise<boolean> {
   try {
     const resolved = resolveProjectFromIssueSync(issueId);
-    if (!resolved) return;
+    if (!resolved) return false;
     const project = getProjectSync(resolved.projectKey);
-    if (!project) return;
+    if (!project) return false;
 
     await withIssueRecordLock(issueId, async () => {
       const record = await buildIssueRecord(project, issueId, { reviewStatus });
@@ -296,7 +301,9 @@ export async function updateIssueRecordForIssue(
       const recordPath = writeIssueRecordSync(project, issueId, record);
       queueIssueRecordCommit(project, issueId, recordPath);
     });
+    return true;
   } catch (err) {
     console.warn(`[pan-dir/records] Failed to update record for ${issueId}: ${(err as Error).message}`);
+    return false;
   }
 }

@@ -542,7 +542,13 @@ async function spawnReviewRoleForIssuePromise(
     // model mismatches are handled at fork time, not here — a mismatched reviewer
     // simply spawns fresh while the rest fork.
     const cfgReviewHarness = loadYamlConfig().config.roles?.review?.harness;
-    const discoveryForkMode = fullReview && (opts.harness ?? cfgReviewHarness ?? 'claude-code') === 'claude-code';
+    // PAN-2585: decide from the harness that will ACTUALLY run — the saved review
+    // agent is the resume target, and model routing (not config) usually picks the
+    // harness. Falling through to the 'claude-code' literal put codex parents into
+    // discovery mode, where they stand by forever for a fork that can never happen.
+    const savedReviewHarness = getAgentStateSync(`agent-${opts.issueId.toLowerCase()}-review`)?.harness;
+    const discoveryForkMode = fullReview
+      && (opts.harness ?? savedReviewHarness ?? cfgReviewHarness ?? 'claude-code') === 'claude-code';
 
     const prompt = fullReview
       ? buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary, inScopeSubRoles, carriedSubRoles, discovery: discoveryForkMode })

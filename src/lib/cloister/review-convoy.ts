@@ -494,17 +494,18 @@ export async function handleReviewDiscoveryReady(
   if (!parent) {
     return { success: false, message: `No review parent state for ${normalized} — nothing to fork` };
   }
-  if (!parent.reviewDiscoveryPending) {
-    return { success: true, message: `Discovery already handled for ${normalized} (or parent not in discovery mode) — no-op` };
-  }
   const workspace = parent.workspace;
   const runId = parent.reviewRunId;
   if (!workspace || !runId) {
     return { success: false, message: `Review parent for ${normalized} is missing workspace/runId state — cannot launch the convoy` };
   }
 
-  // Idempotency under racing signals: any live reviewer session for this issue
-  // means a launch already happened (or is in flight) — clear the flag and stop.
+  // PAN-2585: the signal is AUTHORITATIVE. `reviewDiscoveryPending` is persisted only
+  // in state.json and is invisible through the DB-backed agent reader, so it must not
+  // gate the launch — gating on it left parents standing by forever for reviewers that
+  // were never forked. Idempotency comes from evidence instead: a live reviewer
+  // session, or a reviewer output already written for the CURRENT run, means the
+  // convoy launched — no-op. No evidence means launch, flag or no flag.
   try {
     const sessions = await Effect.runPromise(listSessionNames());
     const reviewerPrefix = `agent-${normalized.toLowerCase()}-review-`;
@@ -514,6 +515,17 @@ export async function handleReviewDiscoveryReady(
       return { success: true, message: `Convoy already launched for ${normalized} — no-op` };
     }
   } catch { /* liveness probe failure — proceed; spawnRun's own guards hold */ }
+  try {
+    const { existsSync } = await import('node:fs');
+    const hasRunOutput = REVIEW_SUB_ROLES.some(subRole =>
+      existsSync(reviewerAgentOutputPath(workspace, runId, subRole)),
+    );
+    if (hasRunOutput) {
+      parent.reviewDiscoveryPending = false;
+      await Effect.runPromise(saveAgentState(parent));
+      return { success: true, message: `Convoy for ${normalized} run ${runId} already produced reviewer output — no-op` };
+    }
+  } catch { /* output probe failure — proceed */ }
 
   // Clear the pending flag BEFORE launching so a concurrent duplicate signal
   // short-circuits on the check above / the flag here.
