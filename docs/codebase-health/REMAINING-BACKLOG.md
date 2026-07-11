@@ -13,6 +13,7 @@
 | `config-yaml.ts` | 3,012 | **7** (barrel) | ✅ done |
 | `routes/workspaces.ts` | 6,638 | 1,736 | ~74% off, still >1k |
 | `cloister/deacon.ts` | 7,180 | 3,381 | ~53% off, still large |
+| `cloister/service.ts` | 2,057 | **959** | ✅ below 1k after PAN-2149 seam split |
 | `SettingsPage.tsx` | 4,200 | 2,043 | ~51% off, still >1k |
 | `KanbanBoard.tsx` | 3,017 | ~1k-ish | reduced |
 | `lib/agents.ts` | (large) | **4,572** | only 4 modules pulled — **bulk remains; highest-priority finish** |
@@ -26,7 +27,7 @@ These were not named A–E targets and are largely untouched (a few only had har
 
 - `routes/conversations.ts` **4,898** (only harness branches migrated, not decomposed)
 - `routes/agents.ts` 4,071 · `routes/issues.ts` 4,065
-- `cloister/service.ts` 2,039 · `routes/misc.ts` 1,835 · `cli/commands/workspace.ts` 1,791
+- `routes/misc.ts` 1,835 · `cli/commands/workspace.ts` 1,791
 - `routes/specialists.ts` 1,753 · `cloister/specialists.ts` 1,749 · `workspace-manager.ts` 1,736
 - `database/schema.ts` 1,650 · `chat/MessagesTimeline.tsx` 1,620 · `services/conversation-service.ts` 1,609
 - `CommandDeck/index.tsx` 1,540 · `overdeck/conversations.ts` 1,522 · `settings-api.ts` 1,488

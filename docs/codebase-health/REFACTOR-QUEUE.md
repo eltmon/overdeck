@@ -87,7 +87,7 @@ time, full suite before merge, verify against origin HEAD.
 
 | # | Issue | Target | Notes |
 |---|---|---|---|
-| 12 | PAN-2149 | `cloister/service.ts` (2,057, regrowing — reddened main 07-02) | **PRD written — on main** |
+| 12 | PAN-2149 | `cloister/service.ts` (2,057, regrowing — reddened main 07-02) | **DONE — landed 2026-07-11**: `service.ts` is now a 959-line entry point delegating to `service-reactive.ts`, `service-health.ts`, `service-crash.ts`, `service-completion.ts`, and `service-status.ts`. |
 | 13 | PAN-2232 | `cloister/specialists.ts` (1,749) | **PRD written — on main** |
 | 14 | PAN-2233 | `cloister/merge-agent.ts` (1,414) — in-flight-guard test must stay green | **PRD written — on main** |
 | 15 | PAN-2190 | `routes/workspaces/merge-ops.ts` (1,925 — created by the workspaces split) | **PRD written — on main** |
