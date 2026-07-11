@@ -230,11 +230,30 @@ jobs:
       - name: Build
         run: bun run build
 
+      # macOS only: decode the App Store Connect API key (.p8) from a base64
+      # secret to a file on the runner. @electron/notarize (invoked by the
+      # afterSign hook in apps/desktop/scripts/notarize.cjs) needs a file path,
+      # not the key material inline.
+      - name: Prepare Apple API key (macOS)
+        if: matrix.target == 'mac'
+        shell: bash
+        run: |
+          KEY_PATH="$RUNNER_TEMP/AuthKey.p8"
+          echo "${{ secrets.APPLE_API_KEY }}" | base64 --decode > "$KEY_PATH"
+          echo "APPLE_API_KEY=$KEY_PATH" >> "$GITHUB_ENV"
+
       - name: Build desktop app (${{ matrix.target }})
         run: bun run ${{ matrix.script }}
         env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          # Code signing (Developer ID Application). electron-builder reads a
+          # base64-encoded .p12 directly from CSC_LINK; empty on linux/win, so
+          # the build just skips signing there.
+          CSC_LINK: ${{ secrets.MACOS_CERTIFICATE }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          # Notarization (App Store Connect API key). APPLE_API_KEY (the .p8
+          # file path) is exported by the "Prepare Apple API key" step above.
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER_ID }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

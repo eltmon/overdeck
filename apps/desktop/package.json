@@ -43,6 +43,7 @@
     "electron-updater": "^6.8.3"
   },
   "devDependencies": {
+    "@electron/notarize": "^2.5.0",
     "@overdeck/contracts": "workspace:*",
     "@types/node": "^22.0.0",
     "electron": "40.6.0",
@@ -101,7 +102,12 @@
         }
       ],
       "icon": "resources/icon.png",
-      "category": "public.app-category.developer-tools"
+      "category": "public.app-category.developer-tools",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "notarize": false
     },
     "dmg": {
       "title": "Overdeck",
@@ -122,6 +128,7 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     },
-    "afterPack": "scripts/afterPack.cjs"
+    "afterPack": "scripts/afterPack.cjs",
+    "afterSign": "scripts/notarize.cjs"
   }
 }
