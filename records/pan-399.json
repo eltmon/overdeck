@@ -76,6 +76,16 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-11T17:39:24.032Z"
+    },
+    {
+      "timestamp": "2026-07-11T17:42:38.734Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-11T17:42:41.608Z"
     }
   ],
   "feedback": [],
@@ -97,6 +107,7 @@
       "sync-sources/hooks/record-cost-event.js",
       "sync-sources/skills/pan-rollout/SKILL.md",
       "tests/fixtures/synced-skills.txt",
+      "tests/unit/dashboard/routes/resources-stacks.test.ts",
       "tests/unit/lib/cloister/postmerge-auto-retro.test.ts",
       "tests/unit/lib/cloister/postmerge-release-isolation.test.ts",
       "tests/unit/lib/database/release-set-schema.test.ts",
@@ -181,6 +192,7 @@
       "sync-sources/hooks/record-cost-event.js",
       "sync-sources/skills/pan-rollout/SKILL.md",
       "tests/fixtures/synced-skills.txt",
+      "tests/unit/dashboard/routes/resources-stacks.test.ts",
       "tests/unit/lib/cloister/postmerge-auto-retro.test.ts",
       "tests/unit/lib/cloister/postmerge-release-isolation.test.ts",
       "tests/unit/lib/database/release-set-schema.test.ts",
@@ -190,24 +202,23 @@
       "tests/unit/lib/projects-release-config.test.ts",
       "tests/unit/lib/review-status-release.test.ts"
     ],
-    "recordedAt": "2026-07-11T17:30:43.650Z"
+    "recordedAt": "2026-07-11T17:42:30.203Z"
   },
   "created": "2026-07-11T09:28:34.266Z",
-  "updated": "2026-07-11T17:39:24.035Z",
+  "updated": "2026-07-11T17:46:43.746Z",
   "pipeline": {
     "issueId": "PAN-399",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-11T17:39:22.637Z",
+    "updatedAt": "2026-07-11T17:46:43.670Z",
     "reviewNotes": "Verification failed at test",
-    "verificationNotes": "Verification FAILED at test (145195ms):\n\nrepare src/lib/database/driver.ts:205:50\n ❯ getReviewStatusFromDbSync src/lib/overdeck/review-status-sync.ts:287:6\n ❯ getReviewStatusSync src/lib/review-status.ts:806:20\n ❯ reviewStatusReader src/dashboard/server/routes/resources/stacks.ts:31:81\n ❯ reviewStatusesFor src/dashboard/server/routes/resources/stacks.ts:90:25\n ❯ getResourceStacks src/dashboard/server/routes/resources/stacks.ts:34:42\n ❯ Array.<anonymous> src/dashboard/server/routes/resources/snapshot.ts:49:20\n ❯ next node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/effect.ts:1275:25\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯\n\n FAIL  |root| tests/unit/dashboard/routes/resources-stacks.test.ts > resources stack payload > groups compose-project containers into an issue stack with summed CPU and RAM\n FAIL  |root| tests/unit/dashboard/routes/resources-stacks.test.ts > resources stack payload > does not spawn docker commands while serving GET /api/resources\n FAIL  |root| tests/unit/dashboard/routes/resources-stacks.test.ts > resources stack payload > does not spawn docker commands while serving GET /api/resources\nError: no such table: review_status\n ❯ rawPrepare src/lib/database/driver.ts:181:15\n    179| function rawPrepare(db: RawDatabase, sql: string): RawStatement {\n    180|   if (db.prepare) {\n    181|     return db.prepare(sql);\n       |               ^\n    182|   }\n    183|   if (db.query) {\n ❯ Object.prepare src/lib/database/driver.ts:205:50\n ❯ getReviewStatusFromDbSync src/lib/overdeck/review-status-sync.ts:287:6\n ❯ getReviewStatusSync src/lib/review-status.ts:806:20\n ❯ reviewStatusReader src/dashboard/server/routes/resources/stacks.ts:73:37\n ❯ reviewStatusesFor src/dashboard/server/routes/resources/stacks.ts:90:25\n ❯ getResourceStacks src/dashboard/server/routes/resources/stacks.ts:34:42\n ❯ Array.<anonymous> src/dashboard/server/routes/resources/snapshot.ts:49:20\n ❯ next node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/effect.ts:1275:25\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2577",
-    "lastVerifiedCommit": "e79ec9962580d1f4171a7c40f66dc23f147dd15d",
-    "reviewRequestedAt": "2026-07-11T17:34:50.917Z",
+    "lastVerifiedCommit": "2e1ce576e19b515c3f8fed02237e1947736e1c33",
+    "reviewRequestedAt": "2026-07-11T17:42:38.735Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "drizzle/overdeck/0000_overdeck_init.sql",
@@ -226,6 +237,7 @@
         "sync-sources/hooks/record-cost-event.js",
         "sync-sources/skills/pan-rollout/SKILL.md",
         "tests/fixtures/synced-skills.txt",
+        "tests/unit/dashboard/routes/resources-stacks.test.ts",
         "tests/unit/lib/cloister/postmerge-auto-retro.test.ts",
         "tests/unit/lib/cloister/postmerge-release-isolation.test.ts",
         "tests/unit/lib/database/release-set-schema.test.ts",
@@ -310,6 +322,7 @@
         "sync-sources/hooks/record-cost-event.js",
         "sync-sources/skills/pan-rollout/SKILL.md",
         "tests/fixtures/synced-skills.txt",
+        "tests/unit/dashboard/routes/resources-stacks.test.ts",
         "tests/unit/lib/cloister/postmerge-auto-retro.test.ts",
         "tests/unit/lib/cloister/postmerge-release-isolation.test.ts",
         "tests/unit/lib/database/release-set-schema.test.ts",
@@ -319,7 +332,7 @@
         "tests/unit/lib/projects-release-config.test.ts",
         "tests/unit/lib/review-status-release.test.ts"
       ],
-      "recordedAt": "2026-07-11T17:30:43.650Z"
+      "recordedAt": "2026-07-11T17:42:30.203Z"
     }
   },
   "closeOut": {
@@ -333,9 +346,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 54096526,
-            "output": 138821,
-            "cacheRead": 51191552,
+            "input": 54947937,
+            "output": 140146,
+            "cacheRead": 51885568,
             "cacheWrite": 0
           },
           "unknown": {
@@ -393,9 +406,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 4055710,
-            "output": 260868,
-            "cacheRead": 142297856,
+            "input": 4074194,
+            "output": 265136,
+            "cacheRead": 145025792,
             "cacheWrite": 0
           }
         }
@@ -408,9 +421,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 54796886,
-          "output": 167850,
-          "cacheRead": 56883456,
+          "input": 55648297,
+          "output": 169175,
+          "cacheRead": 57577472,
           "cacheWrite": 0
         },
         "unknown": {
@@ -438,15 +451,15 @@
           "cacheWrite": 77989
         },
         "custom/kimi-k2.7-code": {
-          "input": 4055710,
-          "output": 260868,
-          "cacheRead": 142297856,
+          "input": 4074194,
+          "output": 265136,
+          "cacheRead": 145025792,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 126.07719900000001,
-        "pricingAsOf": "2026-07-11T17:39:22.693Z"
+        "usd": 127.80387,
+        "pricingAsOf": "2026-07-11T17:46:43.734Z"
       }
     },
     "merges": [
@@ -454,8 +467,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "release-engine-tests": "completed",
     "release-engine-tests.ac1": "completed",
