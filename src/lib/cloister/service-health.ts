@@ -5,7 +5,14 @@ import { getRuntimeForAgent } from '../runtimes/index.js';
 import type { HealthState } from '../runtimes/types.js';
 import { writeHealthEvent } from '../overdeck/health-events.js';
 import type { CloisterConfig } from './config.js';
-import { clearOldViolationsSync } from './fpp-violations.js';
+import {
+  checkAgentForViolations,
+  clearOldViolationsSync,
+  hasExceededMaxNudges,
+  sendNudge,
+  type FPPViolation,
+} from './fpp-violations.js';
+import { checkCostLimits, type CostAlert } from './cost-monitor.js';
 import { performHandoff } from './handoff.js';
 import { createHandoffEvent, logHandoffEventSync } from './handoff-logger.js';
 import { getAgentHealth, getAgentsNeedingAttention, type AgentHealth } from './health.js';
@@ -22,6 +29,10 @@ export type HealthEvent =
   | { type: 'session_rotated'; specialistName: string; result: SessionRotationResult }
   | { type: 'handoff_triggered'; agentId: string; trigger: TriggerDetection }
   | { type: 'handoff_completed'; agentId: string; result: HandoffResult }
+  | { type: 'fpp_violation_detected'; agentId: string; violation: FPPViolation }
+  | { type: 'fpp_nudge_sent'; agentId: string; nudgeCount: number }
+  | { type: 'fpp_max_nudges_exceeded'; agentId: string; violation: FPPViolation }
+  | { type: 'cost_alert'; alert: CostAlert }
   | { type: 'error'; error: Error };
 
 export interface HealthHost {
@@ -163,7 +174,7 @@ export async function performHealthCheck(host: HealthHost): Promise<void> {
       console.error('Cloister health check failed:', error);
       host.emit({ type: 'error', error: error as Error });
     }
-  
+
 }
 
 /**
@@ -185,7 +196,7 @@ export async function checkSpecialistRotations(host: HealthHost): Promise<void> 
     }
 
     // Could check other specialists here if needed
-  
+
 }
 
 /**
@@ -226,7 +237,7 @@ export function recordHealthEvent(host: HealthHost, health: AgentHealth): void {
     } catch (error) {
       console.error(`Failed to record health event for ${health.agentId}:`, error);
     }
-  
+
 }
 
 /**
@@ -302,6 +313,80 @@ export async function checkHandoffTriggers(host: HealthHost, agentHealths: Agent
         }
       } catch (error) {
         console.error(`Failed to check handoff triggers for ${health.agentId}:`, error);
+      }
+    }
+
+}
+
+/**
+ * Check for FPP violations and send nudges
+ */
+export function checkFPPViolations(host: HealthHost, agentIds: string[]): void {
+    for (const agentId of agentIds) {
+      const violation = checkAgentForViolations(agentId);
+      if (!violation) continue;
+
+      // New violation detected
+      if (violation.nudgeCount === 0) {
+        host.emit({ type: 'fpp_violation_detected', agentId, violation });
+      }
+
+      // Check if we should send a nudge
+      const timeSinceLastNudge = violation.lastNudgeAt
+        ? Date.now() - new Date(violation.lastNudgeAt).getTime()
+        : Infinity;
+
+      // Send nudge every 5 minutes until max nudges
+      const NUDGE_INTERVAL_MS = 5 * 60 * 1000;
+      if (timeSinceLastNudge >= NUDGE_INTERVAL_MS || violation.nudgeCount === 0) {
+        if (hasExceededMaxNudges(violation)) {
+          // Max nudges exceeded - alert user
+          host.emit({ type: 'fpp_max_nudges_exceeded', agentId, violation });
+          console.error(
+            `🔔 Agent ${agentId} exceeded max nudges for ${violation.type} - manual intervention required`
+          );
+        } else {
+          // Send nudge
+          const sent = sendNudge(violation);
+          if (sent) {
+            host.emit({ type: 'fpp_nudge_sent', agentId, nudgeCount: violation.nudgeCount });
+          }
+        }
+      }
+    }
+
+}
+
+/**
+ * Check for cost limit alerts
+ */
+export function checkCostAlerts(host: HealthHost, agentIds: string[]): void {
+    const config = host.config.cost_limits;
+    if (!config) return;
+
+    for (const agentId of agentIds) {
+      // Extract issue ID from agent ID (format: agent-issue-123 or issue-123)
+      const issueId = agentId.startsWith('agent-')
+        ? agentId.replace(/^agent-/, '')
+        : agentId;
+
+      const alerts = checkCostLimits(agentId, issueId, config);
+      for (const alert of alerts) {
+        host.emit({ type: 'cost_alert', alert });
+
+        // Resolve the entity label: for daily_total, use explicit "(unattributed)" bucket
+        const entityLabel = alert.agentId || alert.issueId || '(unattributed)';
+
+        // Log the alert
+        if (alert.level === 'limit_reached') {
+          console.error(
+            `🔔 COST LIMIT REACHED: ${alert.type} for ${entityLabel} - $${alert.currentCost.toFixed(2)} / $${alert.limit.toFixed(2)}`
+          );
+        } else {
+          console.warn(
+            `🔔 Cost warning: ${alert.type} for ${entityLabel} at ${alert.percentUsed.toFixed(0)}% ($${alert.currentCost.toFixed(2)} / $${alert.limit.toFixed(2)})`
+          );
+        }
       }
     }
   

@@ -24,14 +24,8 @@ import {
 } from '../overdeck/control-settings.js';
 import type { TriggerDetection } from './triggers.js';
 import type { HandoffResult } from './handoff.js';
-import {
-  checkAgentForViolations,
-  sendNudge,
-  resolveViolationSync,
-  hasExceededMaxNudges,
-  type FPPViolation,
-} from './fpp-violations.js';
-import { checkCostLimits, getCostSummary, type CostAlert } from './cost-monitor.js';
+import type { FPPViolation } from './fpp-violations.js';
+import { getCostSummary, type CostAlert } from './cost-monitor.js';
 import type { SessionRotationResult } from './session-rotation.js';
 import {
   startDeacon,
@@ -57,6 +51,8 @@ import { emitActivityEntrySync } from '../activity-logger.js';
 import { handleCloisterDomainEvent, identifyOrphanedReviewingIssues, parseSpecialistAgentSession } from './service-reactive.js';
 import {
   checkHandoffTriggers,
+  checkCostAlerts,
+  checkFPPViolations,
   checkSpecialistRotations,
   mapHeartbeatSource,
   performHealthCheck,
@@ -765,72 +761,14 @@ export class CloisterService {
    * Check for FPP violations and send nudges
    */
   private checkFPPViolations(agentIds: string[]): void {
-    for (const agentId of agentIds) {
-      const violation = checkAgentForViolations(agentId);
-      if (!violation) continue;
-
-      // New violation detected
-      if (violation.nudgeCount === 0) {
-        this.emit({ type: 'fpp_violation_detected', agentId, violation });
-      }
-
-      // Check if we should send a nudge
-      const timeSinceLastNudge = violation.lastNudgeAt
-        ? Date.now() - new Date(violation.lastNudgeAt).getTime()
-        : Infinity;
-
-      // Send nudge every 5 minutes until max nudges
-      const NUDGE_INTERVAL_MS = 5 * 60 * 1000;
-      if (timeSinceLastNudge >= NUDGE_INTERVAL_MS || violation.nudgeCount === 0) {
-        if (hasExceededMaxNudges(violation)) {
-          // Max nudges exceeded - alert user
-          this.emit({ type: 'fpp_max_nudges_exceeded', agentId, violation });
-          console.error(
-            `🔔 Agent ${agentId} exceeded max nudges for ${violation.type} - manual intervention required`
-          );
-        } else {
-          // Send nudge
-          const sent = sendNudge(violation);
-          if (sent) {
-            this.emit({ type: 'fpp_nudge_sent', agentId, nudgeCount: violation.nudgeCount });
-          }
-        }
-      }
-    }
+    return checkFPPViolations(this.healthHost(), agentIds);
   }
 
   /**
    * Check for cost limit alerts
    */
   private checkCostAlerts(agentIds: string[]): void {
-    const config = this.config.cost_limits;
-    if (!config) return;
-
-    for (const agentId of agentIds) {
-      // Extract issue ID from agent ID (format: agent-issue-123 or issue-123)
-      const issueId = agentId.startsWith('agent-')
-        ? agentId.replace(/^agent-/, '')
-        : agentId;
-
-      const alerts = checkCostLimits(agentId, issueId, config);
-      for (const alert of alerts) {
-        this.emit({ type: 'cost_alert', alert });
-
-        // Resolve the entity label: for daily_total, use explicit "(unattributed)" bucket
-        const entityLabel = alert.agentId || alert.issueId || '(unattributed)';
-
-        // Log the alert
-        if (alert.level === 'limit_reached') {
-          console.error(
-            `🔔 COST LIMIT REACHED: ${alert.type} for ${entityLabel} - $${alert.currentCost.toFixed(2)} / $${alert.limit.toFixed(2)}`
-          );
-        } else {
-          console.warn(
-            `🔔 Cost warning: ${alert.type} for ${entityLabel} at ${alert.percentUsed.toFixed(0)}% ($${alert.currentCost.toFixed(2)} / $${alert.limit.toFixed(2)})`
-          );
-        }
-      }
-    }
+    return checkCostAlerts(this.healthHost(), agentIds);
   }
 
   /**
