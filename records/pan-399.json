@@ -156,9 +156,32 @@
       "timestamp": "2026-07-11T22:50:56.271Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-11T23:35Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-11T23:35:18.882Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-11T23:35:20.415Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-11T23:35Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-11T23:35:47.184Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-11T23:35:47Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-399\n\nrelease lookup/retry accepts lowercase IDs but queries case-sensitive release/merge keys\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-399 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -277,17 +300,17 @@
     "recordedAt": "2026-07-11T22:50:49.101Z"
   },
   "created": "2026-07-11T09:28:34.266Z",
-  "updated": "2026-07-11T22:58:55.872Z",
+  "updated": "2026-07-11T23:35:47.184Z",
   "pipeline": {
     "issueId": "PAN-399",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-11T22:58:55.846Z",
-    "reviewNotes": "Verification failed at typecheck",
+    "updatedAt": "2026-07-11T23:35:19.032Z",
+    "reviewNotes": "CHANGES REQUESTED: release lookup/retry paths are case-sensitive after accepting lowercase issue IDs — GET /api/workspaces/:issueId/release and pan rollout status/retry pass the raw param to getReleaseSetSync/runRelease while storage queries are case-sensitive, so lowercase pan-399 misses sets stored as PAN-399. Canonicalize once after parsing + add lowercase coverage. Full findings: .pan/review/agent-pan-399-review-3d1876c4/review.md",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2577",
     "lastVerifiedCommit": "3d1876c48fabb8c4c98c848b867698e27f998428",
     "reviewRequestedAt": "2026-07-11T22:58:53.603Z",
@@ -407,8 +430,7 @@
         "tests/unit/lib/review-status-release.test.ts"
       ],
       "recordedAt": "2026-07-11T22:50:49.101Z"
-    },
-    "panDoneRecoveredAt": "2026-07-11T22:58:53.603Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -546,7 +568,7 @@
       },
       "costAtCloseOut": {
         "usd": 140.790487,
-        "pricingAsOf": "2026-07-11T22:58:55.870Z"
+        "pricingAsOf": "2026-07-11T23:35:19.072Z"
       }
     },
     "merges": [
@@ -554,8 +576,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "release-engine-tests": "completed",
     "release-engine-tests.ac1": "completed",
