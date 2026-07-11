@@ -3,17 +3,17 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-11T09:48:27.729Z",
-  "updated": "2026-07-11T09:53:34.210Z",
+  "updated": "2026-07-11T10:03:12.395Z",
   "pipeline": {
     "issueId": "PAN-1491",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "failed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-11T09:53:34.076Z",
-    "inspectNotes": "Bead b2-parse-criteria BLOCKED: commit d813b8b4 does not implement parseAffectedCriteria(body, labels) at all. The diff only adds optional weight/weightReason fields to FlywheelSuggestion in packages/contracts/src/flywheel.ts:180-190 — no trailer parsing, no label parsing, no range validation, no union/sort logic exists anywhere in this commit. None of AC1-AC4 can be evaluated because the function under test is absent. This commit appears to belong to a different bead (weight/weightReason schema extension) and was delivered against the wrong review request. Required fix: land a commit that actually adds parseAffectedCriteria(body, labels) implementing trailer regex parsing (Flywheel-Affects-Criterion / Affects-Criterion, case-insensitive, comma/space separated, dedup), label parsing (affects-criterion-N pattern), range filtering (1-7 or whatever the valid criterion range is, excluding 0 and 8 per AC3), sorted union of both sources, and empty-array fallback for null/empty body with no labels or only unrelated Flywheel-* trailers."
+    "updatedAt": "2026-07-11T10:03:12.355Z",
+    "inspectNotes": "Inspecting bead b3-weight-fn"
   },
   "closeOut": {
     "usage": {
@@ -88,17 +88,17 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 8794,
-            "output": 6395,
-            "cacheRead": 648892,
-            "cacheWrite": 169604
+            "input": 22811,
+            "output": 7385,
+            "cacheRead": 773901,
+            "cacheWrite": 254877
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1070026,
-            "output": 137740,
-            "cacheRead": 62109184,
+            "input": 1080006,
+            "output": 141898,
+            "cacheRead": 63369984,
             "cacheWrite": 0
           }
         }
@@ -159,21 +159,21 @@
           "cacheWrite": 243872
         },
         "anthropic/claude-sonnet-5": {
-          "input": 8794,
-          "output": 6395,
-          "cacheRead": 648892,
-          "cacheWrite": 169604
+          "input": 22811,
+          "output": 7385,
+          "cacheRead": 773901,
+          "cacheWrite": 254877
         },
         "custom/kimi-k2.7-code": {
-          "input": 1070026,
-          "output": 137740,
-          "cacheRead": 62109184,
+          "input": 1080006,
+          "output": 141898,
+          "cacheRead": 63369984,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 62.921257,
-        "pricingAsOf": "2026-07-11T09:53:34.192Z"
+        "usd": 63.463037,
+        "pricingAsOf": "2026-07-11T10:03:12.394Z"
       }
     },
     "merges": [],
