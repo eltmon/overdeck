@@ -144,7 +144,18 @@ async function deliverReviewVerdictFeedbackPromise(
           await messageAgent(target.agentId, message);
           agentMessageSent = true;
         } catch (err) {
-          console.log(`[review-verdict-feedback] Could not message ${target.agentId}; feedback file remains available: ${err instanceof Error ? err.message : String(err)}`);
+          // PAN-2228: a resolved-but-unreachable target is a real delivery failure,
+          // not a shrug. Surface it as needs-you so the stall is visible instead of
+          // the issue silently parking with an unread feedback file.
+          const reason = err instanceof Error ? err.message : String(err);
+          console.warn(`[review-verdict-feedback] Could not message ${target.agentId}; feedback file remains available: ${reason}`);
+          try {
+            await surfaceIssueFeedbackNeedsYou(issueId, `Feedback delivery to ${target.agentId} failed: ${reason}`, {
+              specialist: 'review-agent',
+              feedbackPath: fileResult.filePath,
+              slotItemId: opts.slotItemId,
+            });
+          } catch { /* best-effort — the warn above still records the failure */ }
         }
       } else {
         try {
