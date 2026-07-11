@@ -11,9 +11,22 @@
       "reason": "resume",
       "agentModel": "kimi-k2.7-code",
       "timestamp": "2026-07-11T20:05:45.289Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-11T23:42Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-11T23:42:28.253Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-11T23:42:28Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1491\n\n# Review Synthesis — PAN-1491 — 2026-07-11T19:41:55-04:00\n\n## Verdict: CHANGES REQUESTED — production weighting cannot read affected-criterion declarations\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-58e625ce/context.json\n- Branch: feature/pan-1491\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1491\n- HEAD reviewed: 58e625cedb0c122275073cf5f0b7547800025d0f\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-58e625ce/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-58e625ce/correctness.md | 2 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-58e625ce/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-58e625ce/requirements.md | 2 |\n\n## Blocking Findings\n\n### [correctness, requirements] Production weighting never sees affected-criterion declarations — `src/lib/overdeck/substrate-bug-weights-service.ts:58`\nThe production default source for `listSubstrateBugWeights()` is `listInWindow`, cast to `SubstrateBugInput[]`, but the real `FlywheelSubstrateBug` projection does not include issue `body` or `labels`. The service then calls `parseAffectedCriteria(bug.body, bug.labels)`, so real rows reach the parser with both inputs missing and collapse to `affectedCriteria: []`, `weight: 0`, and `\"no affected criteria declared\"`.\n\nThis blocks FR-4 because the route and CLI return weighted rows, but the live production path cannot observe the `Flywheel-Affects-Criterion` trailer or `affects-criterion-N` labels required to compute metric-aware weights. Fix by making the production data source supply supported body/label or parsed-criteria data before parsing, and remove the unsafe cast so TypeScript enforces the required shape.\n\n### [correctness] Criterion 6 weights read a nonexistent top-level ratio — `src/lib/overdeck/substrate-bug-weight.ts:24`\n`CRITERION_META` maps criterion 6 to `valueField: 'ratio'`, but criterion 6 telemetry is compound: `value` contains `simple`, `medium`, and `complex` bucket objects with ratios, while `target` contains `maxRatio`. `numericSubfield()` only reads a top-level field, so criterion 6 gets the status floor but never the normalized distance from the worst bucket ratio to the target.\n\nThis makes red time-consistency bugs with very different ratios rank the same. Fix by normalizing criterion 6 explicitly, using the highest finite bucket ratio and comparing it to `target.maxRatio`, with a focused regression test.\n\n### [performance] New weights route returns an unbounded result set — `src/dashboard/server/routes/flywheel-substrate-bug-weights.ts:16`\n`GET /api/flywheel/substrate-bug-weights` accepts a caller-provided `window`, loads all matching substrate bugs, maps and sorts the full result, and serializes every row without a maximum window, limit, cursor, or pagination.\n\nThe route is a new HTTP request path, so its memory, sorting cost, and response size are unbounded by request. Fix by adding a bounded response contract, such as clamping windows and adding capped `limit`/pagination, while keeping any full historical batch behavior on the CLI side if needed.\n\n### [requirements] Weight badge does not use required semantic token badge styling — `src/dashboard/frontend/src/components/flywheel/FlywheelStatusDetails.tsx:103`\nFR-9 requires the weight badge to follow the existing semantic badge idiom from `statusPrimitives.tsx`, using semantic token classes such as `border-info/30`, `bg-info/15`, `text-info-foreground`, and `font-mono`. The current `WeightBadge` uses hardcoded amber classes, no border, and no `font-mono`.\n\nThis violates an explicit acceptance criterion for the UI surface. Fix by restyling the badge with the existing semantic-token badge pattern and extending the component test to assert those classes.\n\n## Non-blocking Findings\n\n### [requirements] Service tie-break diverges from vBRIEF action text\n~ The b4-service action text says weighted rows should sort by weight descending, then `filed_at` ascending. The implementation sorts equal weights by `issueId`, and the tests document that behavior. The requirements reviewer treated this as advisory because it was not a separate acceptance criterion.\n\n## Clean Sub-roles\n- security\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-58e625ce/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1491 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/server/routes/flywheel-substrate-bug-weights.ts",
@@ -63,7 +76,7 @@
     "recordedAt": "2026-07-11T10:51:47.612Z"
   },
   "created": "2026-07-11T09:48:27.729Z",
-  "updated": "2026-07-11T20:06:13.528Z",
+  "updated": "2026-07-11T23:42:28.254Z",
   "pipeline": {
     "issueId": "PAN-1491",
     "reviewStatus": "reviewing",
@@ -72,7 +85,7 @@
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-11T10:54:58.234Z",
+    "updatedAt": "2026-07-11T23:36:19.561Z",
     "inspectNotes": "Bead b3-weight-fn BLOCKED: commit d813b8b4 does not implement computeSubstrateBugWeight(criteria, stats) at all. The diff only adds optional weight/weightReason fields to the FlywheelSuggestion interface/schema in packages/contracts/src/flywheel.ts:180-190 — no status-multiplier logic, no normalizedDistance calculation, no compound-value field reading (medianMs/p95Ms), no insufficient_data short-circuit, and no reason-string generation exist anywhere in this commit. None of AC1-AC5 can be evaluated because the function under review is absent. This is the same d813b8b4 diff already submitted (and blocked) against bead b2-parse-criteria moments ago — it looks like the wrong commit is being routed to review requests, or the actual b3-weight-fn implementation commit has not landed yet. Required fix: identify and deliver the commit that actually adds computeSubstrateBugWeight, implementing per-criterion status multiplier (red=1.6x per AC1 example: 3*(1+0.6)), a status floor that dominates over raw normalized drift for red vs green (AC2), safe reading of a configured valueField from compound values with graceful fallback to normalizedDistance 0 + floor when the field is absent (AC3), a weight-0 + insufficient-telemetry-reason short circuit when all criteria are insufficient_data (AC4), and a reason string naming the highest-contributing criterion by label/status/value-vs-target (AC5).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1636",
     "lastVerifiedCommit": "58e625cedb0c122275073cf5f0b7547800025d0f",
@@ -207,9 +220,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1627192,
-            "output": 254491,
-            "cacheRead": 127346176,
+            "input": 1832336,
+            "output": 254831,
+            "cacheRead": 127889408,
             "cacheWrite": 0
           }
         }
@@ -276,15 +289,15 @@
           "cacheWrite": 256982
         },
         "custom/kimi-k2.7-code": {
-          "input": 1627192,
-          "output": 254491,
-          "cacheRead": 127346176,
+          "input": 1832336,
+          "output": 254831,
+          "cacheRead": 127889408,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 77.584125,
-        "pricingAsOf": "2026-07-11T10:54:58.263Z"
+        "usd": 77.883585,
+        "pricingAsOf": "2026-07-11T23:36:19.757Z"
       }
     },
     "merges": [
