@@ -171,6 +171,21 @@
       "reason": "feedback",
       "note": "[2026-07-11T23:35Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-11T23:35:47.184Z"
+    },
+    {
+      "timestamp": "2026-07-11T23:47:39.859Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-11T23:47:43.073Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-11T23:49Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-11T23:49:03.470Z"
     }
   ],
   "feedback": [
@@ -178,8 +193,8 @@
       "seq": 2,
       "specialist": "review-agent",
       "outcome": "changes-requested",
-      "timestamp": "2026-07-11T23:35:47Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-399\n\nrelease lookup/retry accepts lowercase IDs but queries case-sensitive release/merge keys\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-399 -m \"Fixed review issues\"`"
+      "timestamp": "2026-07-11T23:49:03Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-399\n\nrelease engine starts dependents even when dependencies are blocked\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-399 -m \"Fixed review issues\"`"
     }
   ],
   "scopeDrift": {
@@ -192,6 +207,7 @@
       "src/dashboard/server/read-model.ts",
       "src/lib/database/__tests__/pending-auto-merges-schema.test.ts",
       "src/lib/database/review-status-db.ts",
+      "src/lib/merge-set.ts",
       "src/lib/overdeck/infra.ts",
       "src/lib/overdeck/paths.ts",
       "src/lib/overdeck/release-sync.ts",
@@ -205,10 +221,12 @@
       "tests/unit/lib/cloister/postmerge-auto-retro.test.ts",
       "tests/unit/lib/cloister/postmerge-release-isolation.test.ts",
       "tests/unit/lib/database/release-set-schema.test.ts",
+      "tests/unit/lib/merge-set.test.ts",
       "tests/unit/lib/pan-1908-no-loss-audit.test.ts",
       "tests/unit/lib/pan-444-post-merge-step0.test.ts",
       "tests/unit/lib/pan-dir/verdict-restore.test.ts",
       "tests/unit/lib/projects-release-config.test.ts",
+      "tests/unit/lib/release-set.test.ts",
       "tests/unit/lib/review-status-release.test.ts"
     ],
     "declaredScopeUntouched": [
@@ -267,6 +285,7 @@
       "src/lib/database/release-set-db.ts",
       "src/lib/database/review-status-db.ts",
       "src/lib/database/schema.ts",
+      "src/lib/merge-set.ts",
       "src/lib/overdeck/infra.ts",
       "src/lib/overdeck/paths.ts",
       "src/lib/overdeck/release-sync.ts",
@@ -291,29 +310,31 @@
       "tests/unit/lib/cloister/postmerge-auto-retro.test.ts",
       "tests/unit/lib/cloister/postmerge-release-isolation.test.ts",
       "tests/unit/lib/database/release-set-schema.test.ts",
+      "tests/unit/lib/merge-set.test.ts",
       "tests/unit/lib/pan-1908-no-loss-audit.test.ts",
       "tests/unit/lib/pan-444-post-merge-step0.test.ts",
       "tests/unit/lib/pan-dir/verdict-restore.test.ts",
       "tests/unit/lib/projects-release-config.test.ts",
+      "tests/unit/lib/release-set.test.ts",
       "tests/unit/lib/review-status-release.test.ts"
     ],
-    "recordedAt": "2026-07-11T22:50:49.101Z"
+    "recordedAt": "2026-07-11T23:47:28.889Z"
   },
   "created": "2026-07-11T09:28:34.266Z",
-  "updated": "2026-07-11T23:35:47.184Z",
+  "updated": "2026-07-11T23:51:36.711Z",
   "pipeline": {
     "issueId": "PAN-399",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-11T23:35:19.032Z",
+    "updatedAt": "2026-07-11T23:51:36.626Z",
     "reviewNotes": "CHANGES REQUESTED: release lookup/retry paths are case-sensitive after accepting lowercase issue IDs — GET /api/workspaces/:issueId/release and pan rollout status/retry pass the raw param to getReleaseSetSync/runRelease while storage queries are case-sensitive, so lowercase pan-399 misses sets stored as PAN-399. Canonicalize once after parsing + add lowercase coverage. Full findings: .pan/review/agent-pan-399-review-3d1876c4/review.md",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2577",
-    "lastVerifiedCommit": "3d1876c48fabb8c4c98c848b867698e27f998428",
-    "reviewRequestedAt": "2026-07-11T22:58:53.603Z",
+    "lastVerifiedCommit": "50e6261801c2e934d4ed221f2186ea5e6ae69c5d",
+    "reviewRequestedAt": "2026-07-11T23:47:39.863Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "drizzle/overdeck/0000_overdeck_init.sql",
@@ -324,6 +345,7 @@
         "src/dashboard/server/read-model.ts",
         "src/lib/database/__tests__/pending-auto-merges-schema.test.ts",
         "src/lib/database/review-status-db.ts",
+        "src/lib/merge-set.ts",
         "src/lib/overdeck/infra.ts",
         "src/lib/overdeck/paths.ts",
         "src/lib/overdeck/release-sync.ts",
@@ -337,10 +359,12 @@
         "tests/unit/lib/cloister/postmerge-auto-retro.test.ts",
         "tests/unit/lib/cloister/postmerge-release-isolation.test.ts",
         "tests/unit/lib/database/release-set-schema.test.ts",
+        "tests/unit/lib/merge-set.test.ts",
         "tests/unit/lib/pan-1908-no-loss-audit.test.ts",
         "tests/unit/lib/pan-444-post-merge-step0.test.ts",
         "tests/unit/lib/pan-dir/verdict-restore.test.ts",
         "tests/unit/lib/projects-release-config.test.ts",
+        "tests/unit/lib/release-set.test.ts",
         "tests/unit/lib/review-status-release.test.ts"
       ],
       "declaredScopeUntouched": [
@@ -399,6 +423,7 @@
         "src/lib/database/release-set-db.ts",
         "src/lib/database/review-status-db.ts",
         "src/lib/database/schema.ts",
+        "src/lib/merge-set.ts",
         "src/lib/overdeck/infra.ts",
         "src/lib/overdeck/paths.ts",
         "src/lib/overdeck/release-sync.ts",
@@ -423,13 +448,15 @@
         "tests/unit/lib/cloister/postmerge-auto-retro.test.ts",
         "tests/unit/lib/cloister/postmerge-release-isolation.test.ts",
         "tests/unit/lib/database/release-set-schema.test.ts",
+        "tests/unit/lib/merge-set.test.ts",
         "tests/unit/lib/pan-1908-no-loss-audit.test.ts",
         "tests/unit/lib/pan-444-post-merge-step0.test.ts",
         "tests/unit/lib/pan-dir/verdict-restore.test.ts",
         "tests/unit/lib/projects-release-config.test.ts",
+        "tests/unit/lib/release-set.test.ts",
         "tests/unit/lib/review-status-release.test.ts"
       ],
-      "recordedAt": "2026-07-11T22:50:49.101Z"
+      "recordedAt": "2026-07-11T23:47:28.889Z"
     }
   },
   "closeOut": {
@@ -443,9 +470,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 59804884,
-            "output": 152231,
-            "cacheRead": 56265984,
+            "input": 61696665,
+            "output": 156556,
+            "cacheRead": 57971968,
             "cacheWrite": 0
           },
           "unknown": {
@@ -509,9 +536,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 4981464,
-            "output": 289574,
-            "cacheRead": 170617600,
+            "input": 5156288,
+            "output": 323825,
+            "cacheRead": 183202560,
             "cacheWrite": 0
           }
         }
@@ -524,9 +551,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 60505244,
-          "output": 181260,
-          "cacheRead": 61957888,
+          "input": 62397025,
+          "output": 185585,
+          "cacheRead": 63663872,
           "cacheWrite": 0
         },
         "unknown": {
@@ -560,15 +587,15 @@
           "cacheWrite": 77989
         },
         "custom/kimi-k2.7-code": {
-          "input": 4981464,
-          "output": 289574,
-          "cacheRead": 170617600,
+          "input": 5156288,
+          "output": 323825,
+          "cacheRead": 183202560,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 140.790487,
-        "pricingAsOf": "2026-07-11T23:35:19.072Z"
+        "usd": 145.396445,
+        "pricingAsOf": "2026-07-11T23:51:36.702Z"
       }
     },
     "merges": [
