@@ -139,6 +139,7 @@ export interface PanIssuePipelineRecord {
   verificationStatus?: string;
   inspectStatus?: string;
   mergeStatus?: string;
+  releaseStatus?: string;
   readyForMerge: boolean;
   reviewNotes?: string;
   testNotes?: string;

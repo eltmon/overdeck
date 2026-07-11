@@ -96,6 +96,7 @@ function projectPipeline(
     verificationStatus: status?.verificationStatus,
     inspectStatus: status?.inspectStatus,
     mergeStatus: status?.mergeStatus,
+    releaseStatus: status?.releaseStatus ?? 'pending',
     readyForMerge: status?.readyForMerge ?? false,
     closedOut: existing?.closedOut,
     closedOutAt: existing?.closedOutAt,
