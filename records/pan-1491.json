@@ -3,17 +3,17 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-11T09:48:27.729Z",
-  "updated": "2026-07-11T10:03:12.395Z",
+  "updated": "2026-07-11T10:03:22.480Z",
   "pipeline": {
     "issueId": "PAN-1491",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-11T10:03:12.355Z",
-    "inspectNotes": "Inspecting bead b3-weight-fn"
+    "updatedAt": "2026-07-11T10:03:22.389Z",
+    "inspectNotes": "Bead b3-weight-fn BLOCKED: commit d813b8b4 does not implement computeSubstrateBugWeight(criteria, stats) at all. The diff only adds optional weight/weightReason fields to the FlywheelSuggestion interface/schema in packages/contracts/src/flywheel.ts:180-190 — no status-multiplier logic, no normalizedDistance calculation, no compound-value field reading (medianMs/p95Ms), no insufficient_data short-circuit, and no reason-string generation exist anywhere in this commit. None of AC1-AC5 can be evaluated because the function under review is absent. This is the same d813b8b4 diff already submitted (and blocked) against bead b2-parse-criteria moments ago — it looks like the wrong commit is being routed to review requests, or the actual b3-weight-fn implementation commit has not landed yet. Required fix: identify and deliver the commit that actually adds computeSubstrateBugWeight, implementing per-criterion status multiplier (red=1.6x per AC1 example: 3*(1+0.6)), a status floor that dominates over raw normalized drift for red vs green (AC2), safe reading of a configured valueField from compound values with graceful fallback to normalizedDistance 0 + floor when the field is absent (AC3), a weight-0 + insufficient-telemetry-reason short circuit when all criteria are insufficient_data (AC4), and a reason string naming the highest-contributing criterion by label/status/value-vs-target (AC5)."
   },
   "closeOut": {
     "usage": {
@@ -173,7 +173,7 @@
       },
       "costAtCloseOut": {
         "usd": 63.463037,
-        "pricingAsOf": "2026-07-11T10:03:12.394Z"
+        "pricingAsOf": "2026-07-11T10:03:22.465Z"
       }
     },
     "merges": [],
