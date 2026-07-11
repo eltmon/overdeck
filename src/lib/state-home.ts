@@ -156,7 +156,15 @@ export function shouldCommitLegacyWorkspaceArtifacts(migrated: boolean): boolean
 
 export async function findRecreatedLegacyStatePaths(project: ProjectConfig): Promise<string[]> {
   if (!(await isStateMigrated(project))) return [];
-  const legacyStateRoot = resolveInfraRepo(project).repoPath;
+  // The recreation tripwire scans the LEGACY SOURCE (project.path) — the
+  // location the migration reads and deletes legacy state from
+  // (state-migrate.ts `legacyStateSource`). This is deliberately NOT the state
+  // HOST (resolveInfraRepo, used above to gate `isStateMigrated` and to locate
+  // where migrated state now lives): for a polyrepo the source is the non-git
+  // root while the host is a sub-repo, so a stray writer recreates state at the
+  // root, not the host. Rooting this scan at the host would blind the tripwire
+  // in exactly the polyrepo case.
+  const legacyStateRoot = project.path;
   return STATE_BRANCH_PATHS
     .map((statePath) => statePath === '.beads/'
       ? join(legacyStateRoot, '.beads')

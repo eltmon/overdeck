@@ -180,14 +180,19 @@ describe('state home', () => {
   it('trips when a migrated checkout recreates a legacy state directory', async () => {
     const parent = pushUnmarkedStateBranch();
     pushCompletionMarker(parent);
+    // Polyrepo whose state HOST (infra -> repo, which carries the migration
+    // marker so isStateMigrated resolves true) is a DIFFERENT directory from its
+    // legacy SOURCE root (project.path = root). A stray writer recreates state at
+    // the source root, so the tripwire must scan project.path — scanning the host
+    // (repo) would miss the stray write at root.
     const polyrepo: ProjectConfig = {
       name: 'Polyrepo fixture',
       path: root,
       workspace: { type: 'polyrepo', repos: [{ name: 'infra', path: 'repo' }] },
       pan_records: { repo: 'infra' },
     };
-    mkdirSync(join(repo, '.pan', 'records'), { recursive: true });
-    await expect(findRecreatedLegacyStatePaths(polyrepo)).resolves.toEqual([join(repo, '.pan', 'records')]);
+    mkdirSync(join(root, '.pan', 'records'), { recursive: true });
+    await expect(findRecreatedLegacyStatePaths(polyrepo)).resolves.toEqual([join(root, '.pan', 'records')]);
   });
 
   it('recreates a clean wrong-branch state worktree on overdeck-state', async () => {
