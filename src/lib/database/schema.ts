@@ -11,7 +11,7 @@ import { encodeClaudeProjectDir, getOverdeckHome } from '../paths.js';
 import { backfillAgentsFromStateJsonSync } from './agent-backfill.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 59;
+export const SCHEMA_VERSION = 60;
 
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
@@ -599,6 +599,43 @@ export function initSchema(db: SqliteDatabase): void {
 
     CREATE INDEX IF NOT EXISTS idx_merge_set_repos_issue_order
       ON merge_set_repos(issue_id, merge_order, repo_key);
+
+    -- ===== Release Sets (PAN-399: coordinated post-merge release state) =====
+    CREATE TABLE IF NOT EXISTS release_sets (
+      issue_id       TEXT PRIMARY KEY,
+      project_key    TEXT NOT NULL,
+      project_path   TEXT NOT NULL,
+      workspace_type TEXT NOT NULL,
+      status         TEXT NOT NULL DEFAULT 'pending',
+      created_at     TEXT NOT NULL,
+      updated_at     TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_release_sets_project
+      ON release_sets(project_key, updated_at);
+
+    CREATE TABLE IF NOT EXISTS release_set_components (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      issue_id        TEXT NOT NULL,
+      component_key   TEXT NOT NULL,
+      provider        TEXT,
+      trigger         TEXT NOT NULL,
+      release_order   INTEGER NOT NULL DEFAULT 0,
+      required        INTEGER NOT NULL DEFAULT 1,
+      status          TEXT NOT NULL DEFAULT 'pending',
+      health_status   TEXT,
+      version_status  TEXT,
+      smoke_status    TEXT,
+      rollback_status TEXT,
+      notes           TEXT,
+      FOREIGN KEY (issue_id) REFERENCES release_sets(issue_id) ON DELETE CASCADE
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_release_set_components_issue_component
+      ON release_set_components(issue_id, component_key);
+
+    CREATE INDEX IF NOT EXISTS idx_release_set_components_issue_order
+      ON release_set_components(issue_id, release_order, component_key);
 
     -- ===== Git Operations (PAN-653: persistent git event log) =====
     CREATE TABLE IF NOT EXISTS git_operations (
@@ -1653,6 +1690,43 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
     try { db.exec(`ALTER TABLE agents ADD COLUMN yielded_by_scheduler INTEGER`); } catch { /* already exists */ }
     try { db.exec(`ALTER TABLE agents ADD COLUMN yielded_at TEXT`); } catch { /* already exists */ }
     try { db.exec(`ALTER TABLE agents ADD COLUMN last_yield_resume_at TEXT`); } catch { /* already exists */ }
+  }
+
+  // v59 -> v60: add release set tables for coordinated post-merge release state (PAN-399).
+  if (currentVersion < 60) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS release_sets (
+        issue_id       TEXT PRIMARY KEY,
+        project_key    TEXT NOT NULL,
+        project_path   TEXT NOT NULL,
+        workspace_type TEXT NOT NULL,
+        status         TEXT NOT NULL DEFAULT 'pending',
+        created_at     TEXT NOT NULL,
+        updated_at     TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_release_sets_project
+        ON release_sets(project_key, updated_at);
+      CREATE TABLE IF NOT EXISTS release_set_components (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        issue_id        TEXT NOT NULL,
+        component_key   TEXT NOT NULL,
+        provider        TEXT,
+        trigger         TEXT NOT NULL,
+        release_order   INTEGER NOT NULL DEFAULT 0,
+        required        INTEGER NOT NULL DEFAULT 1,
+        status          TEXT NOT NULL DEFAULT 'pending',
+        health_status   TEXT,
+        version_status  TEXT,
+        smoke_status    TEXT,
+        rollback_status TEXT,
+        notes           TEXT,
+        FOREIGN KEY (issue_id) REFERENCES release_sets(issue_id) ON DELETE CASCADE
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_release_set_components_issue_component
+        ON release_set_components(issue_id, component_key);
+      CREATE INDEX IF NOT EXISTS idx_release_set_components_issue_order
+        ON release_set_components(issue_id, release_order, component_key);
+    `);
   }
 
   // After all migrations, set the version
