@@ -24,7 +24,23 @@ and the human Merge button performs the final GitHub squash. The `ship` token
 survives only as the merge-specialist identity for model routing, historical
 activity attribution, and old session records.
 
-A **Run** is a process playing a role: `(role, model, harness)`. Runs are ephemeral — they spawn, do one role's worth of work, update the tracker, and exit. There is no long-lived agent holding state.
+A **Run** is a process playing a role: `(role, model, harness)`. A run's *work* is scoped — it does one role's worth of work and records its verdict — but its *session* is not disposable. See the session-lifecycle policy below.
+
+## Session lifecycle: warm by default (PAN-2579)
+
+Role sessions are **warm by default**: they persist after recording their verdict, until issue close-out. A session for an issue's role should be absent only for two reasons:
+
+1. **Reboot** — the machine or dashboard restarted and the session did not survive.
+2. **Resource relief** — the memory governor (PAN-2500) or preemptive scheduler (PAN-2507) evicted or yielded it to free capacity for a blocked part of the pipeline. See [RESOURCE-GOVERNOR.md](./RESOURCE-GOVERNOR.md).
+
+Consequences:
+
+- **Dispatch resumes before it spawns.** Every dispatch path (review request, re-review, test run, rework handoff) first looks for a live warm session for that role + issue and messages/resumes it; cold-spawning is the fallback for the absent case.
+- **Review agents (and convoy sub-reviewers) stay warm after a verdict** so a re-review after a BLOCKED → fix cycle resumes reviewers that already hold context from the previous pass, cutting re-review latency (PAN-1862 is the convoy-warm-reuse design).
+- **BLOCKED feedback goes agent-to-agent.** The review agent's `pan admin specialists done review --status blocked` delivers feedback directly to the live work agent (`deliverReviewVerdictFeedback` → `messageAgent`); the deacon is a recovery backstop, not the primary path.
+- **Idle-warm sessions are free capacity**, not load: they must not count against the advancing-role concurrency ceiling, and they are the first thing the governor sheds under memory pressure.
+
+> **Implementation status (2026-07-11):** the code still reaps review/test/ship sessions immediately after their verdict (PAN-1716, `src/lib/cloister/reap-terminal-sessions.ts`) because idle sessions used to count against the advancing ceiling and livelock dispatch. PAN-2579 tracks moving eviction to the resource governor and fixing the ceiling accounting; PAN-1131 tracks making re-dispatch able to distinguish a warm-idle reviewer from an actively-reviewing one.
 
 ---
 

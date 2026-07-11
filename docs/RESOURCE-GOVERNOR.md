@@ -144,6 +144,14 @@ verdict, the helper fails safe to the count cap rather than admitting blind.
 4. **Never** `docker pause` to reclaim RAM — a paused container keeps its memory resident; only
    `docker stop` actually frees it.
 
+Under the warm-by-default session lifecycle (PAN-2579, see
+[ROLES.md](./ROLES.md#session-lifecycle-warm-by-default-pan-2579)), this governor is the **only
+sanctioned evictor** of warm role sessions besides a reboot: role sessions — including review
+convoy sessions that have already recorded a verdict — persist for fast resume/re-review and are
+shed here, cheapest-value-first, when memory pressure demands it. Nothing else in the pipeline may
+kill a warm session as a side effect of recording a verdict (the PAN-1716 reap-on-verdict behavior
+is slated for removal under PAN-2579).
+
 ## Kernel safety net
 
 Even a correct governor can be too slow, or wrong about what's safe to shed. `src/lib/tmux.ts`'s
