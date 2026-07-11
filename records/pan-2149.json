@@ -26,6 +26,11 @@
       "id": "D-test-waived",
       "summary": "Test gate waived: Refactor-only seam extraction; no behavior change required new tests. Existing coverage was exercised by scoped Cloister suites and the full Vitest suite.",
       "recordedAt": "2026-07-11T15:37:09.915Z"
+    },
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: Refactor-only seam extraction; no behavior change required new tests. Existing coverage was exercised by scoped Cloister suites and the full Vitest suite.",
+      "recordedAt": "2026-07-11T17:03:44.340Z"
     }
   ],
   "sessionHistory": [
@@ -81,6 +86,16 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-11T15:38:17.919Z"
+    },
+    {
+      "timestamp": "2026-07-11T17:03:54.012Z",
+      "reason": "end",
+      "note": "Test gate waived: Refactor-only seam extraction; no behavior change required new tests. Existing coverage was exercised by scoped Cloister suites and the full Vitest suite."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-11T17:03:58.677Z"
     }
   ],
   "feedback": [],
@@ -118,10 +133,10 @@
       "src/lib/cloister/service-status.ts",
       "src/lib/cloister/service.ts"
     ],
-    "recordedAt": "2026-07-11T15:37:16.042Z"
+    "recordedAt": "2026-07-11T17:03:50.585Z"
   },
   "created": "2026-07-10T23:44:51.626Z",
-  "updated": "2026-07-11T15:39:29.797Z",
+  "updated": "2026-07-11T17:07:22.164Z",
   "pipeline": {
     "issueId": "PAN-2149",
     "reviewStatus": "reviewing",
@@ -130,11 +145,11 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-11T15:39:29.757Z",
+    "updatedAt": "2026-07-11T17:07:21.903Z",
     "inspectNotes": "Bead health-seam ack: duplicate delivery of already-reviewed commit 74dc13c0, re-confirmed - all 5 functions verbatim (this.->host. only), delegates <=5 lines with no visibility change, file-size baseline lowered 1684->1476, typecheck/lint/vitest all exit 0 (9237 passed, 0 failed).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2573",
-    "lastVerifiedCommit": "b2702a03dbaff591b5e7aca312fad94d8c14c565",
-    "reviewRequestedAt": "2026-07-11T15:38:12.677Z",
+    "lastVerifiedCommit": "6bf20f9406587c4becd8707f7a0b485bb875d2bf",
+    "reviewRequestedAt": "2026-07-11T17:03:54.020Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [
@@ -169,7 +184,7 @@
         "src/lib/cloister/service-status.ts",
         "src/lib/cloister/service.ts"
       ],
-      "recordedAt": "2026-07-11T13:51:53.348Z"
+      "recordedAt": "2026-07-11T17:03:50.585Z"
     }
   },
   "closeOut": {
@@ -177,21 +192,21 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 8538469,
-            "output": 6364,
-            "cacheRead": 8111616,
+            "input": 8578047,
+            "output": 6760,
+            "cacheRead": 8133632,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 30777119,
-            "output": 82376,
-            "cacheRead": 29785600,
+            "input": 32784992,
+            "output": 88909,
+            "cacheRead": 31612544,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 1507411,
-            "output": 3656,
-            "cacheRead": 1377280,
+            "input": 1842233,
+            "output": 4367,
+            "cacheRead": 1705984,
             "cacheWrite": 0
           }
         },
@@ -214,21 +229,21 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 8538469,
-          "output": 6364,
-          "cacheRead": 8111616,
+          "input": 8578047,
+          "output": 6760,
+          "cacheRead": 8133632,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 30777119,
-          "output": 82376,
-          "cacheRead": 29785600,
+          "input": 32784992,
+          "output": 88909,
+          "cacheRead": 31612544,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 1507411,
-          "output": 3656,
-          "cacheRead": 1377280,
+          "input": 1842233,
+          "output": 4367,
+          "cacheRead": 1705984,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -245,8 +260,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 33.048587,
-        "pricingAsOf": "2026-07-11T15:39:29.796Z"
+        "usd": 35.278966000000004,
+        "pricingAsOf": "2026-07-11T17:07:22.122Z"
       }
     },
     "merges": [
