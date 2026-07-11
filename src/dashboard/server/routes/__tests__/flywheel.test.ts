@@ -51,6 +51,12 @@ const uatTrainMocks = vi.hoisted(() => ({
 vi.mock('../../services/uat-train.js', () => uatTrainMocks);
 vi.mock('../specialists.js', () => ({ firePostMergeLifecycle: vi.fn(() => true) }));
 
+const substrateBugWeightsMocks = vi.hoisted(() => ({
+  listSubstrateBugWeights: vi.fn(async () => []),
+}));
+
+vi.mock('../../../../lib/overdeck/substrate-bug-weights-service.js', () => substrateBugWeightsMocks);
+
 interface RouteResult {
   status: number;
   body: unknown;
@@ -281,6 +287,65 @@ describe('flywheel stats payload helper', () => {
       delete process.env.OVERDECK_HOME;
       rmSync(overdeckHome, { recursive: true, force: true });
     }
+  });
+});
+
+describe('GET /api/flywheel/substrate-bug-weights', () => {
+  afterEach(() => {
+    substrateBugWeightsMocks.listSubstrateBugWeights.mockReset();
+  });
+
+  it('returns weighted substrate bugs from the service', async () => {
+    substrateBugWeightsMocks.listSubstrateBugWeights.mockResolvedValue([
+      {
+        issueId: 'PAN-HEAVY',
+        severity: 'P0',
+        filedBy: 'agent',
+        affectedCriteria: [1],
+        weight: 4.8,
+        weightReason: 'Criterion 1 is red',
+      },
+      {
+        issueId: 'PAN-LIGHT',
+        severity: 'P2',
+        filedBy: 'operator',
+        affectedCriteria: [3],
+        weight: 1.2,
+        weightReason: 'Criterion 3 is green',
+      },
+    ]);
+
+    const result = await requestFlywheelRoute('/api/flywheel/substrate-bug-weights');
+
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual([
+      {
+        issueId: 'PAN-HEAVY',
+        severity: 'P0',
+        filedBy: 'agent',
+        affectedCriteria: [1],
+        weight: 4.8,
+        weightReason: 'Criterion 1 is red',
+      },
+      {
+        issueId: 'PAN-LIGHT',
+        severity: 'P2',
+        filedBy: 'operator',
+        affectedCriteria: [3],
+        weight: 1.2,
+        weightReason: 'Criterion 3 is green',
+      },
+    ]);
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenCalledWith('30d');
+  });
+
+  it('passes an explicit window query param to the service', async () => {
+    substrateBugWeightsMocks.listSubstrateBugWeights.mockResolvedValue([]);
+
+    const result = await requestFlywheelRoute('/api/flywheel/substrate-bug-weights?window=7d');
+
+    expect(result.status).toBe(200);
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenCalledWith('7d');
   });
 });
 
