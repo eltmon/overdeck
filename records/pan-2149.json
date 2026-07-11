@@ -28,7 +28,7 @@
   ],
   "feedback": [],
   "created": "2026-07-10T23:44:51.626Z",
-  "updated": "2026-07-11T05:42:27.972Z",
+  "updated": "2026-07-11T06:16:50.365Z",
   "pipeline": {
     "issueId": "PAN-2149",
     "reviewStatus": "pending",
@@ -37,8 +37,8 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-11T05:42:27.901Z",
-    "inspectNotes": "Bead health-seam ack: all 5 functions verbatim (this.->host. only, verified programmatically), delegates <=5 lines with no visibility change (shared healthHost() factory instead of inline literal per call site — non-blocking, avoids 5x duplication), file-size baseline lowered 1684->1476, no any moved, typecheck/lint/vitest all exit 0 (9237 passed, 0 failed)."
+    "updatedAt": "2026-07-11T06:16:50.285Z",
+    "inspectNotes": "Bead health-seam ack: duplicate delivery of already-reviewed commit 74dc13c0, re-confirmed - all 5 functions verbatim (this.->host. only), delegates <=5 lines with no visibility change, file-size baseline lowered 1684->1476, typecheck/lint/vitest all exit 0 (9237 passed, 0 failed)."
   },
   "closeOut": {
     "usage": {
@@ -55,6 +55,12 @@
             "output": 25716,
             "cacheRead": 9695744,
             "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 33732,
+            "output": 121,
+            "cacheRead": 9984,
+            "cacheWrite": 0
           }
         },
         "plan": {
@@ -67,10 +73,10 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 26353,
-            "output": 5183,
-            "cacheRead": 720583,
-            "cacheWrite": 99792
+            "input": 28156,
+            "output": 10516,
+            "cacheRead": 1372677,
+            "cacheWrite": 119420
           }
         }
       },
@@ -87,6 +93,12 @@
           "cacheRead": 9695744,
           "cacheWrite": 0
         },
+        "openai/gpt-5.6-sol": {
+          "input": 33732,
+          "output": 121,
+          "cacheRead": 9984,
+          "cacheWrite": 0
+        },
         "anthropic/claude-fable-5": {
           "input": 19415,
           "output": 40360,
@@ -94,15 +106,15 @@
           "cacheWrite": 165191
         },
         "anthropic/claude-sonnet-5": {
-          "input": 26353,
-          "output": 5183,
-          "cacheRead": 720583,
-          "cacheWrite": 99792
+          "input": 28156,
+          "output": 10516,
+          "cacheRead": 1372677,
+          "cacheWrite": 119420
         }
       },
       "costAtCloseOut": {
-        "usd": 16.616338,
-        "pricingAsOf": "2026-07-11T05:42:27.971Z"
+        "usd": 16.980124,
+        "pricingAsOf": "2026-07-11T06:16:50.364Z"
       }
     },
     "merges": [],
