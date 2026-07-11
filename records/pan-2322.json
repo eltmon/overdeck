@@ -25,7 +25,7 @@
     "recordedAt": "2026-07-11T09:47:42.604Z"
   },
   "created": "2026-07-11T09:43:27.964Z",
-  "updated": "2026-07-11T09:50:39.342Z",
+  "updated": "2026-07-11T12:05:51.268Z",
   "pipeline": {
     "issueId": "PAN-2322",
     "reviewStatus": "reviewing",
@@ -134,8 +134,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "config-test-identity-mock": "completed",
     "config-test-identity-mock.ac1": "completed",
