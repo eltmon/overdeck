@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { canDispatchAdvancing } from '../concurrency.js';
 import {
-  KEEP_SPECIALIST_SESSIONS_ALIVE,
   selectMergedAdvancingSessions,
   type ReapableStatus,
 } from '../reap-terminal-sessions.js';
@@ -48,8 +47,7 @@ describe('PAN-2341 merged advancing reaper', () => {
     expect(second).toEqual([]);
   });
 
-  it('selects merged advancing sessions after specialist keep-alive is disabled', () => {
-    expect(KEEP_SPECIALIST_SESSIONS_ALIVE).toBe(false);
+  it('selects merged advancing sessions under the warm lifecycle (merged = past close-out)', () => {
     expect(selectMergedAdvancingSessions({
       'PAN-3001': mergedStatus(),
     }, ['agent-pan-3001-test'])).toEqual(['agent-pan-3001-test']);

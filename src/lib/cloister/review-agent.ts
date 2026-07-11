@@ -44,7 +44,7 @@ import { Effect } from 'effect';
 import { killSession, listSessionNames, isPaneDead } from '../tmux.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { removeAgentSync, listAgentIdsByPrefixSync } from '../overdeck/agents.js';
-import { setReviewStatusSync } from '../review-status.js';
+import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
 import { loadConfigSync as loadYamlConfig, resolveModel, type ReviewMode } from '../config-yaml.js';
 import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } from './review-context.js';
 import { buildRealConflictGateDeps, getCachedConflictGateMergeability, resolveConflictGate } from './conflict-gate.js';
@@ -473,12 +473,53 @@ function buildSelfReviewPrompt(opts: {
         }
       }
 
+      // PAN-1131 residual + PAN-2579: a runId-matching live pane is only "actively
+      // reviewing" while this cycle's verdict is UNRECORDED. Once the verdict is
+      // terminal, the session is warm-idle (kept alive by the warm-by-default
+      // lifecycle) — a re-dispatch request must NOT be swallowed by the guard, or
+      // the issue jams at a stale verdict with a live-but-finished reviewer. Fall
+      // through to the respawn path below: it kills the convoy tmux and the spawn
+      // machinery resumes the saved session with its context intact (warm reuse).
+      let finishedIdle = false;
       if (!paneDead && !opts.force && !staleRunId) {
+        try {
+          const status = getReviewStatusSync(opts.issueId);
+          const terminal = status?.reviewStatus === 'passed'
+            || status?.reviewStatus === 'blocked'
+            || status?.reviewStatus === 'failed';
+          // Warm-reuse ONLY for a genuinely un-serviced newer request (same
+          // ISO-string comparison as needsReviewDispatch). A terminal verdict
+          // with NO newer request means this call is a stale duplicate dispatch
+          // racing the verdict (the PAN-399 shape) — skip below and leave the
+          // verdict alone rather than re-entering 'reviewing'.
+          const newerRequest = !!status?.reviewRequestedAt
+            && (!status.reviewSpawnedAt || status.reviewRequestedAt > status.reviewSpawnedAt);
+          finishedIdle = terminal && newerRequest;
+          if (finishedIdle) {
+            console.log(
+              `[review-agent] ${reviewSessionName} is finished-idle (verdict ${status?.reviewStatus}, newer request pending) — warm-reusing for the new review cycle`,
+            );
+          } else if (terminal) {
+            console.log(
+              `[review-agent] ${reviewSessionName} has a terminal verdict (${status?.reviewStatus}) and no newer request — treating this dispatch as a stale duplicate; leaving the verdict intact`,
+            );
+          }
+        } catch (statusErr) {
+          console.warn(`[review-agent] Could not probe review status for finished-idle check on ${opts.issueId}:`, statusErr);
+        }
+      }
+
+      if (!paneDead && !opts.force && !staleRunId && !finishedIdle) {
         console.log(`[review-agent] Idempotency guard: ${reviewSessionName} already running for ${opts.issueId} — skipping spawn`);
         return { success: true, message: `Review already in progress: ${reviewSessionName}` };
       }
-      // Session pane is dead, force mode, or stale runId — kill the whole convoy and respawn.
-      const reason = opts.force ? 'force-killed for re-review' : paneDead ? 'pane is dead' : 'stale runId';
+      // Session pane is dead, force mode, stale runId, or finished-idle — kill the
+      // convoy tmux and respawn (the spawn path resumes the saved session, so a
+      // warm reviewer keeps its context).
+      const reason = opts.force ? 'force-killed for re-review'
+        : paneDead ? 'pane is dead'
+        : staleRunId ? 'stale runId'
+        : 'finished-idle (warm reuse for new cycle)';
       console.log(`[review-agent] ${reviewSessionName} ${reason} — respawning convoy`);
       await Effect.runPromise(
         killAllReviewerSessions(undefined, opts.issueId).pipe(
