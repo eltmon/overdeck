@@ -310,6 +310,26 @@ export function setReviewStatusSync(
     return status as ReviewStatus;
   }
 
+  // PAN-2578: a bare 'reviewing' write must never clobber a terminal blocked/failed verdict.
+  // A review agent can finish FASTER than the dispatch path that spawned it (PAN-399: the
+  // verification gate completed 2 minutes after the agent recorded BLOCKED, and the dispatch
+  // route's redundant `{ reviewStatus: 'reviewing' }` write destroyed the verdict in both the
+  // DB and the journal). Blocked/failed → reviewing is legal ONLY when the caller explicitly
+  // starts a NEW review cycle by carrying reviewSpawnedAt (spawnReviewRoleForIssue does).
+  if (
+    update.reviewStatus === 'reviewing' &&
+    (status.reviewStatus === 'blocked' || status.reviewStatus === 'failed') &&
+    update.reviewSpawnedAt === undefined
+  ) {
+    console.warn(
+      `[review-status] Rejecting stale 'reviewing' write for ${issueId} — a terminal ` +
+      `'${status.reviewStatus}' verdict is already recorded for this review cycle. Only a ` +
+      `new dispatch (carrying reviewSpawnedAt) may re-enter 'reviewing'.`
+    );
+    notifyPipelineSync({ type: 'status_changed', issueId, status: status as ReviewStatus });
+    return status as ReviewStatus;
+  }
+
   // PAN-424: Reject testStatus regression from 'passed' to 'dispatch_failed' or 'failed'.
   // Once tests pass, duplicate dispatch failures must not overwrite the result.
   if (

@@ -356,7 +356,8 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
             }));
 
             if (result.success) {
-              setReviewStatus(issueId, { reviewStatus: 'reviewing' });
+              // spawnReviewRoleForIssue already set 'reviewing' + reviewSpawnedAt.
+              // PAN-2578: no bare 'reviewing' repeat — it can clobber a fast verdict.
               console.log(`[reset-review] Re-dispatched review for ${issueId}`);
             } else {
               console.warn(

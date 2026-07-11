@@ -335,3 +335,52 @@ describe('resetPipelineVerdictsForWorkStartSync', () => {
     expect(db.upsert).not.toHaveBeenCalled();
   });
 });
+
+describe('setReviewStatusSync — terminal-verdict clobber guard (PAN-2578)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    journal.readJournalStatusSync.mockReturnValue(null);
+    journal.enrichReviewNotesFromRecordSync.mockImplementation((_id: string, s: ReviewStatus) => s);
+  });
+
+  it('rejects a bare reviewing write over a blocked verdict (the PAN-399 race)', () => {
+    db.getFromDb.mockReturnValue(dbRow({ reviewStatus: 'blocked', reviewSpawnedAt: '2026-07-11T10:36:56.000Z' }));
+
+    const result = setReviewStatusSync('PAN-1866', { reviewStatus: 'reviewing' });
+
+    expect(result.reviewStatus).toBe('blocked');
+    expect(journal.updateIssueRecordForReviewStatusSync).not.toHaveBeenCalled();
+    expect(db.upsert).not.toHaveBeenCalled();
+  });
+
+  it('rejects a bare reviewing write over a failed verdict', () => {
+    db.getFromDb.mockReturnValue(dbRow({ reviewStatus: 'failed' }));
+
+    const result = setReviewStatusSync('PAN-1866', { reviewStatus: 'reviewing' });
+
+    expect(result.reviewStatus).toBe('failed');
+    expect(db.upsert).not.toHaveBeenCalled();
+  });
+
+  it('allows blocked → reviewing when the write starts a new cycle (carries reviewSpawnedAt)', () => {
+    db.getFromDb.mockReturnValue(dbRow({ reviewStatus: 'blocked', reviewSpawnedAt: '2026-07-11T10:36:56.000Z' }));
+
+    const result = setReviewStatusSync('PAN-1866', {
+      reviewStatus: 'reviewing',
+      reviewSpawnedAt: '2026-07-11T11:00:00.000Z',
+    });
+
+    expect(result.reviewStatus).toBe('reviewing');
+    expect(result.reviewSpawnedAt).toBe('2026-07-11T11:00:00.000Z');
+    expect(db.upsert).toHaveBeenCalled();
+  });
+
+  it('still allows a terminal verdict to be recorded over reviewing (the normal flow)', () => {
+    db.getFromDb.mockReturnValue(dbRow({ reviewStatus: 'reviewing' }));
+
+    const result = setReviewStatusSync('PAN-1866', { reviewStatus: 'blocked', reviewNotes: 'findings' });
+
+    expect(result.reviewStatus).toBe('blocked');
+    expect(db.upsert).toHaveBeenCalled();
+  });
+});
