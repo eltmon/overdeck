@@ -24,6 +24,7 @@ import { formatTier1Summary, type ReviewContextManifest } from './review-context
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
 import { reviewersToRerun, type ReviewerVerdictsMap, type ReReviewScope } from './review-rerun-scope.js';
+import { readIssueRecordSync, resolveProjectForIssue } from '../pan-dir/record.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { AGENTS_DIR, packageRoot, sessionFilePath } from '../paths.js';
 import type { RuntimeName } from '../runtimes/types.js';
@@ -275,7 +276,7 @@ export async function computeConvoyScope(issueId: string, workspace: string): Pr
     // Dynamic import: review-status.ts reaches back into cloister via review-agent,
     // so a static edge here would close a module cycle (lint:circular).
     const { getReviewStatusSync } = await import('../review-status.js');
-    scope = resolveReReviewScope();
+    scope = resolveReReviewScope(issueId);
     const priorVerdicts = getReviewStatusSync(issueId)?.reviewerVerdicts as ReviewerVerdictsMap | undefined;
     let changedFiles: string[] | undefined;
     const anchors = new Set(
@@ -550,7 +551,16 @@ export async function handleReviewDiscoveryReady(
 
 
 /** PAN-1862 (FR-7): resolved re-review scope — merged config, default 'changed'. */
-export function resolveReReviewScope(): ReReviewScope {
+export function resolveReReviewScope(issueId?: string): ReReviewScope {
+  // PAN-1874: per-issue record override beats merged project/global config
+  // (same resolution shape as resolveReviewMode in review-agent.ts).
+  if (issueId) {
+    try {
+      const project = resolveProjectForIssue(issueId);
+      const issueScope = project ? readIssueRecordSync(project, issueId)?.reReviewScope : undefined;
+      if (issueScope === 'all' || issueScope === 'changed' || issueScope === 'blockers') return issueScope;
+    } catch { /* fall through to config */ }
+  }
   const scope = loadYamlConfig().config.roles?.review?.reReviewScope;
   return scope === 'all' || scope === 'blockers' ? scope : 'changed';
 }
