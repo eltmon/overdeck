@@ -2,7 +2,7 @@
   "issueId": "PAN-2229",
   "schemaVersion": 2,
   "created": "2026-07-10T21:05:49.847Z",
-  "updated": "2026-07-11T13:14:11.604Z",
+  "updated": "2026-07-11T14:02:22.266Z",
   "feedback": [],
   "pipeline": {
     "issueId": "PAN-2229",
@@ -25,7 +25,7 @@
       "2": {
         "slotIndex": 2,
         "agentId": "agent-pan-2229-slot-2",
-        "completedAt": "2026-07-11T11:54:06.094Z"
+        "completedAt": "2026-07-11T14:02:22.249Z"
       },
       "3": {
         "slotIndex": 3,
@@ -35,7 +35,7 @@
     }
   },
   "harness": "claude-code",
-  "model": "glm-5.2",
+  "model": "kimi-k2.7-code",
   "recoveryTrips": [
     {
       "issue": "PAN-2229",
