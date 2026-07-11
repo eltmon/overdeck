@@ -15,22 +15,36 @@
   ],
   "feedback": [],
   "created": "2026-07-06T16:22:45.954Z",
-  "updated": "2026-07-06T20:48:52.506Z",
+  "updated": "2026-07-08T03:14:05.732Z",
   "pipeline": {
     "issueId": "PAN-1491",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T20:48:51.876Z",
-    "deaconIgnored": true,
-    "deaconIgnoredAt": "2026-07-06T20:48:51.876Z",
-    "deaconIgnoredReason": "swarm stop via pan swarm stop"
+    "updatedAt": "2026-07-08T01:00:24.041Z",
+    "inspectNotes": "Bead b3-weight-fn ack: computeSubstrateBugWeight (src/lib/overdeck/substrate-bug-weight.ts) implements status-multiplier*floor+normalizedDistance formula correctly for scalar and compound (medianMs/ratio) criteria, zero-weights insufficient_data with the right reason string, and names the highest-contributing criterion by label/status/value-vs-target; all 7 unit tests pass, function is pure with no I/O.",
+    "deaconIgnored": false
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 990232,
+            "output": 2533,
+            "cacheRead": 554752,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.5": {
+            "input": 6520700,
+            "output": 22121,
+            "cacheRead": 5589376,
+            "cacheWrite": 0
+          }
+        },
         "implementation": {
           "anthropic/claude-haiku-4-5-20251001": {
             "input": 126,
@@ -79,6 +93,14 @@
             "cacheWrite": 243872
           }
         },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 8794,
+            "output": 6395,
+            "cacheRead": 648892,
+            "cacheWrite": 169604
+          }
+        },
         "work": {
           "custom/kimi-k2.7-code": {
             "input": 832195,
@@ -89,6 +111,18 @@
         }
       },
       "totals": {
+        "openai/codex-auto-review": {
+          "input": 990232,
+          "output": 2533,
+          "cacheRead": 554752,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.5": {
+          "input": 9699838,
+          "output": 62766,
+          "cacheRead": 7153024,
+          "cacheWrite": 0
+        },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 126,
           "output": 9951,
@@ -113,12 +147,6 @@
           "cacheRead": 0,
           "cacheWrite": 0
         },
-        "openai/gpt-5.5": {
-          "input": 3179138,
-          "output": 40645,
-          "cacheRead": 1563648,
-          "cacheWrite": 0
-        },
         "cliproxy/gpt-5.4-mini": {
           "input": 34740,
           "output": 9470,
@@ -131,6 +159,12 @@
           "cacheRead": 21358853,
           "cacheWrite": 243872
         },
+        "anthropic/claude-sonnet-5": {
+          "input": 8794,
+          "output": 6395,
+          "cacheRead": 648892,
+          "cacheWrite": 169604
+        },
         "custom/kimi-k2.7-code": {
           "input": 832195,
           "output": 119068,
@@ -139,27 +173,30 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 52.526233,
-        "pricingAsOf": "2026-07-06T20:48:52.505Z"
+        "usd": 61.706578,
+        "pricingAsOf": "2026-07-08T01:00:24.763Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "model": "claude-sonnet-5",
   "statusOverrides": {
-    "b1-contract": "running"
+    "b1-contract": "running",
+    "b2-parse-criteria": "completed",
+    "b2-parse-criteria.b2-parse-criteria.ac1": "completed",
+    "b2-parse-criteria.b2-parse-criteria.ac2": "completed",
+    "b2-parse-criteria.b2-parse-criteria.ac3": "completed",
+    "b2-parse-criteria.b2-parse-criteria.ac4": "completed",
+    "b3-weight-fn": "completed",
+    "b3-weight-fn.b3-weight-fn.ac1": "completed",
+    "b3-weight-fn.b3-weight-fn.ac2": "completed",
+    "b3-weight-fn.b3-weight-fn.ac3": "completed",
+    "b3-weight-fn.b3-weight-fn.ac4": "completed",
+    "b3-weight-fn.b3-weight-fn.ac5": "completed"
   },
   "swarm": {
-    "slotAssignments": [
-      {
-        "slotIndex": 1,
-        "itemId": "b1-contract",
-        "agentId": "agent-pan-1491-slot-1",
-        "branch": "feature/pan-1491-slot-1",
-        "assignedAt": "2026-07-06T17:25:35.080Z"
-      }
-    ]
+    "slotAssignments": []
   }
 }
