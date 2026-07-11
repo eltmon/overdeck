@@ -137,7 +137,7 @@ describe('supervisor systemd unit helpers', () => {
 
       [Service]
       Type=simple
-      WorkingDirectory="/opt/overdeck"
+      WorkingDirectory=/opt/overdeck
       ExecStart="/usr/bin/node" "/opt/overdeck/dist/supervisor/server.js"
       Environment="OVERDECK_SUPERVISOR_PORT=3012" "OVERDECK_HOME=/home/dev/.overdeck"
       Restart=on-failure

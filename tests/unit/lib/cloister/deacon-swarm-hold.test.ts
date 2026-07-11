@@ -15,6 +15,12 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../../../src/lib/projects.js', () => ({
   listProjectsSync: mocks.listProjectsSync,
+  findProjectByPathSync: (projectPath: string) =>
+    mocks.listProjectsSync().find(({ config }: { config: { path: string } }) => config.path === projectPath)?.config ?? null,
+  // PAN-2372 WI-2: workspace-door record path now resolves the owning project;
+  // these tests fixture records at the workspace .pan/records/ path, so treat
+  // issues as unregistered and use the workspace-door fallback.
+  resolveProjectFromIssueSync: () => null,
 }));
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
@@ -172,6 +178,7 @@ type DispatchDeps = Pick<
   | 'spawnRun'
   | 'getMaxSlotIndex'
   | 'listSlotAssignments'
+  | 'runGitCommand'
 >;
 
 function dispatchDeps(overrides: Partial<DispatchDeps> = {}): DispatchDeps {
@@ -185,6 +192,7 @@ function dispatchDeps(overrides: Partial<DispatchDeps> = {}): DispatchDeps {
     spawnRun: vi.fn(async () => undefined),
     getMaxSlotIndex: vi.fn(() => 5),
     listSlotAssignments: vi.fn(() => []),
+    runGitCommand: vi.fn(async () => undefined),
     ...overrides,
   };
 }
@@ -267,9 +275,127 @@ describe('per-spawn freeze/hold re-check (PAN-2214 slot-20 regression)', () => {
     const doc = makeDoc('PAN-107', 1);
     const deps = dispatchDeps();
 
-    const actions = await recoverFailedMergeSlot('PAN-107', workspacePath, doc, 'retry', deps);
+    const actions = await recoverFailedMergeSlot('PAN-107', workspacePath, 1, doc, 'retry', deps);
 
     expect(deps.spawnRun).not.toHaveBeenCalled();
     expect(actions).toContain('[swarm] dispatch-halted wi-1: freeze/hold active');
+  });
+});
+
+type CoordinateDeps = CoordinateSwarmSlotsDeps;
+
+function makeCoordinateDeps(
+  issueId: string,
+  projectPath: string,
+  workspacePath: string,
+  overrides: Partial<CoordinateDeps> = {},
+): CoordinateDeps {
+  return {
+    listFeatureWorkspaces: () => [{ issueId, projectPath, workspacePath }],
+    reconcileSlotState: vi.fn(async (reconcileIssueId: string) => ({
+      issueId: reconcileIssueId,
+      merged: [],
+      inFlight: [],
+      pending: [],
+      branches: [],
+      agents: [],
+    })),
+    listSessionNames: vi.fn(async () => []),
+    isPaneDead: vi.fn(async () => false),
+    getPaneExitStatus: vi.fn(async () => null),
+    getAgentRuntimeState: vi.fn(async () => ({ resolution: 'done' })),
+    getPaneOutputDigest: vi.fn(async () => ''),
+    getBranchTipCommitTime: vi.fn(async () => null),
+    getSlotBranchAheadCount: vi.fn(async () => 0),
+    isSlotWorktreeClean: vi.fn(async () => true),
+    sendCompletionNudge: vi.fn(async () => {}),
+    slotWorktreeExists: vi.fn(() => false),
+    verifyAndMergeSlot: vi.fn(async () => ({
+      verified: true,
+      merged: true,
+      conflicts: false,
+      evidence: { verifyCommands: [], expectedOutputs: [], commandOutputs: [] },
+    })),
+    applyTaskOperationToPlanFile: vi.fn(async () => null),
+    fireTieredCommitHooks: vi.fn(async () => []),
+    recordSlotAssignment: vi.fn(),
+    clearSlotAssignment: vi.fn(),
+    runGitCommand: vi.fn(async () => null),
+    registeredSlotCapacityAvailable: vi.fn(() => true),
+    tryReserveSwarmSlot: vi.fn(() => true),
+    releaseSwarmSlot: vi.fn(),
+    spawnRun: vi.fn(async () => null),
+    getIssueHold: vi.fn(() => null),
+    readStatusOverrides: vi.fn(() => undefined),
+    readSlotCompletion: vi.fn(() => undefined),
+    getFinalizedAt: vi.fn(() => undefined),
+    setFinalizedAt: vi.fn(),
+    shouldDispatch: vi.fn(() => true),
+    getMaxSlotIndex: vi.fn(() => 4),
+    listSlotAssignments: vi.fn(() => []),
+    requestIssueReview: vi.fn(async () => ({ success: true, message: 'dispatched' })),
+    ...overrides,
+  };
+}
+
+describe('PAN-2364 coordinator continues around blocked slots', () => {
+  it('emits a per-issue blocked-slots line listing every blocked slot', async () => {
+    const { coordinateSwarmSlots, recordFailedMergeBlock } = await import('../../../../src/lib/cloister/deacon-swarm.js');
+    const projectPath = setupWorkspace('pan-200', 'PAN-200');
+    const workspacePath = join(projectPath, 'workspaces', 'feature-pan-200');
+    recordFailedMergeBlock({ issueId: 'PAN-200', itemId: 'wi-1', slotIndex: 1, note: 'slot 1 conflict' }, workspacePath);
+    recordFailedMergeBlock({ issueId: 'PAN-200', itemId: 'wi-3', slotIndex: 3, note: 'slot 3 conflict' }, workspacePath);
+    mocks.getReviewStatusSync.mockReturnValue(null);
+    const deps = makeCoordinateDeps('PAN-200', projectPath, workspacePath);
+
+    const actions = await coordinateSwarmSlots({}, deps);
+
+    expect(actions).toContain('[swarm] blocked slots for PAN-200: slot 1 (item wi-1), slot 3 (item wi-3) — other slots continue; run `pan swarm recover PAN-200 <slot>`');
+  });
+
+  it('merges a ready-to-merge slot while another slot is blocked', async () => {
+    const { coordinateSwarmSlots, recordFailedMergeBlock } = await import('../../../../src/lib/cloister/deacon-swarm.js');
+    const projectPath = setupWorkspace('pan-201', 'PAN-201');
+    const workspacePath = join(projectPath, 'workspaces', 'feature-pan-201');
+    recordFailedMergeBlock({ issueId: 'PAN-201', itemId: 'wi-1', slotIndex: 1, note: 'slot 1 conflict' }, workspacePath);
+    mocks.getReviewStatusSync.mockReturnValue(null);
+    const deps = makeCoordinateDeps('PAN-201', projectPath, workspacePath, {
+      reconcileSlotState: vi.fn(async () => ({
+        issueId: 'PAN-201',
+        merged: [],
+        inFlight: [
+          { itemId: 'wi-1', slotIndex: 1, status: 'in_flight', branch: 'feature/pan-201-slot-1', agentId: 'agent-pan-201-slot-1' },
+          { itemId: 'wi-2', slotIndex: 2, status: 'in_flight', branch: 'feature/pan-201-slot-2', agentId: 'agent-pan-201-slot-2' },
+        ],
+        pending: [],
+        branches: [],
+        agents: [],
+      })),
+    });
+
+    const actions = await coordinateSwarmSlots({}, deps);
+
+    expect(actions).toContain('[swarm] skipped merge slot 1 (item wi-1) for PAN-201: failed-merge block — awaiting `pan swarm recover`');
+    expect(actions).toContain('[swarm] merged slot 2 (item wi-2) for PAN-201');
+    expect(deps.verifyAndMergeSlot).toHaveBeenCalledTimes(1);
+    expect(deps.verifyAndMergeSlot).toHaveBeenCalledWith(
+      { issueId: 'PAN-201', featureWorkspace: workspacePath },
+      2,
+      expect.objectContaining({ id: 'wi-2' }),
+    );
+  });
+
+  it('dispatches a new item to a non-blocked slot index', async () => {
+    const { coordinateSwarmSlots, recordFailedMergeBlock } = await import('../../../../src/lib/cloister/deacon-swarm.js');
+    const projectPath = setupWorkspace('pan-202', 'PAN-202');
+    const workspacePath = join(projectPath, 'workspaces', 'feature-pan-202');
+    recordFailedMergeBlock({ issueId: 'PAN-202', itemId: 'wi-1', slotIndex: 1, note: 'slot 1 conflict' }, workspacePath);
+    mocks.getReviewStatusSync.mockReturnValue(null);
+    const deps = makeCoordinateDeps('PAN-202', projectPath, workspacePath);
+
+    const actions = await coordinateSwarmSlots({}, deps);
+
+    expect(actions).toContain('[swarm] dispatched implementation slot 2 (item wi-2) for PAN-202');
+    expect(deps.spawnRun).toHaveBeenCalledWith('PAN-202', 'work', expect.objectContaining({ slotIndex: 2, slotItemId: 'wi-2' }));
   });
 });

@@ -12,7 +12,7 @@ Read this with:
 
 - [`FLYWHEEL.md`](./FLYWHEEL.md) — the orchestrator that drives the ready-set the trains assemble from.
 - [`MERGE-WORKFLOW.md`](./MERGE-WORKFLOW.md) — the per-issue merge state machine, which remains the escape hatch.
-- [`../.pan/drafts/PAN-1737.md`](../.pan/drafts/PAN-1737.md) — the originating PRD (full design rationale).
+- [`drafts/PAN-1737.md` on `overdeck-state`](https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/PAN-1737.md) — the originating PRD (full design rationale; on disk: `${OVERDECK_HOME}/state/overdeck/drafts/PAN-1737.md`).
 - [`../docs/design/pan-1737-uat-batch-trains.html`](./design/pan-1737-uat-batch-trains.html) — the approved 3-state mockup.
 
 ## The problem it solves

@@ -22,6 +22,7 @@ import {
   type StuckRemediationState,
 } from './stuck-remediation-state.js';
 import { queryReadyBeadsByIssueLabels, resolveBeadsQueryRoot, type ReadyBeadsByIssue } from '../beads-query.js';
+import { recordRecoveryFailure } from './recovery-trip.js';
 
 export interface StuckRemediationOptions {
   now?: number;
@@ -36,6 +37,84 @@ function shouldSkipReviewStatus(status: ReviewStatus | null): boolean {
   if (status.stuck || status.deaconIgnored || status.mergeStatus === 'merged' || status.readyForMerge) return true;
   if (status.reviewStatus === 'blocked' || status.reviewStatus === 'failed') return true;
   return status.verificationStatus === 'failed' || status.testStatus === 'failed';
+}
+
+// PAN-2519: the rework subset of shouldSkipReviewStatus — a work agent that OWES
+// a fix (review blocked/failed, verification failed, tests failed) and is NOT
+// already done/ignored (merged, readyForMerge, stuck, deaconIgnored). These are
+// exactly the agents the idle-escalation path skips (via shouldSkipReviewStatus)
+// AND the PAN-2209 dead-end respawn skips (session still exists) — so a
+// wedged-but-alive rework agent falls through both and stalls invisibly.
+function hasPendingRework(status: ReviewStatus | null): boolean {
+  if (!status) return false;
+  if (status.stuck || status.deaconIgnored || status.mergeStatus === 'merged' || status.readyForMerge) return false;
+  return (
+    status.reviewStatus === 'blocked' ||
+    status.reviewStatus === 'failed' ||
+    status.verificationStatus === 'failed' ||
+    status.testStatus === 'failed'
+  );
+}
+
+// Mirror of the deacon dead-end circuit breaker (deacon.ts: autoRequeueCount >= 25
+// halts respawn). Below the ceiling we kill a wedged rework agent so PAN-2209
+// respawns it fresh; at/above it, respawn would be refused, so we park it as
+// troubled instead — leaving a live operator signal rather than a dead session.
+const STUCK_KILL_REQUEUE_CEILING = 25;
+
+// A wedged-but-alive work agent holding pending rework: kill its session so the
+// deacon's PAN-2209 dead-end path respawns a fresh agent whose kickoff prompt
+// drains .pan/feedback. Returns true when it handled the agent (caller returns).
+async function evaluateWedgedReworkAgent(
+  agent: AgentState,
+  config: StuckRemediationConfig,
+  now: number,
+  actions: string[],
+): Promise<boolean> {
+  const agentId = agent.id;
+  if (agent.role !== 'work' || !agent.workspace) return false;
+
+  const issueId = issueIdForAgent(agent);
+  const status = getReviewStatusSync(issueId);
+  if (!hasPendingRework(status)) return false;
+
+  const lastActivityMs = getAgentEffectiveLastActivityMs(agentId);
+  if (lastActivityMs === null || !Number.isFinite(lastActivityMs)) return false;
+
+  const stuckState = readStuckRemediationState(agentId);
+  if (stuckState) {
+    const firstStuckMs = new Date(stuckState.firstStuckAt).getTime();
+    if (Number.isFinite(firstStuckMs) && lastActivityMs > firstStuckMs) {
+      // The agent resumed activity since we flagged it — clear and let the
+      // normal path re-evaluate on a future tick.
+      clearStuckRemediationState(agentId);
+      return false;
+    }
+  }
+
+  const idleMinutes = Math.floor((now - lastActivityMs) / 60_000);
+  const lastStage = stuckState?.lastStage ?? 0;
+  // One action per stuck episode (lastStage < 3). A successful respawn advances
+  // activity and clears state above, so the next wedge is a fresh episode.
+  if (idleMinutes < config.stage3_minutes || lastStage >= 3) return false;
+
+  const firstStuck = firstStuckAt(new Date(lastActivityMs).toISOString(), stuckState);
+  const requeues = status?.autoRequeueCount ?? 0;
+
+  if (requeues >= STUCK_KILL_REQUEUE_CEILING) {
+    // Chronic re-death: the deacon breaker would refuse another respawn, so
+    // parking as troubled surfaces it for an operator instead of a dead session.
+    markAgentTroubled(agentId);
+    writeStuckRemediationState(agentId, stageState(3, now, firstStuck));
+    logAction(actions, transitionAction(3, issueId, idleMinutes, 'rework-wedge-troubled'));
+    surfaceStuckNeedsYou(agent, issueId, firstStuck, actions);
+    return true;
+  }
+
+  killSessionSync(agentId);
+  writeStuckRemediationState(agentId, stageState(3, now, firstStuck));
+  logAction(actions, transitionAction(3, issueId, idleMinutes, 'killed-for-respawn'));
+  return true;
 }
 
 function hasReadyBeads(readyByQueryRoot: Map<string, ReadyBeadsByIssue>, agent: AgentState, issueLabel: string): boolean {
@@ -87,6 +166,12 @@ function logAction(actions: string[], action: string): void {
   logDeaconEventSync(action);
 }
 
+function surfaceStuckNeedsYou(agent: AgentState, issueId: string, generation: string, actions: string[]): void {
+  if (!agent.workspace) return;
+  const failure = recordRecoveryFailure(agent.workspace, issueId, 'stuck-remediation', generation, 1);
+  if (failure.emitNeedsYou) logAction(actions, `[deacon] needs-you ${issueId}: stuck remediation exhausted`);
+}
+
 async function evaluateAgent(
   agent: AgentState,
   config: StuckRemediationConfig,
@@ -113,6 +198,11 @@ async function evaluateAgent(
     await evaluateAutoPlanningAgent(agent, config, now, actions);
     return;
   }
+  // PAN-2519: catch wedged-but-alive work agents that OWE a rework fix before the
+  // ready-beads gate skips them (shouldSkipReviewStatus is true for rework state).
+  // These are invisible to both idle-escalation (skipped here) and PAN-2209
+  // respawn (session still exists); killing the session bridges them to respawn.
+  if (await evaluateWedgedReworkAgent(agent, config, now, actions)) return;
   if (!shouldCheckReadyBeadsForAgent(agent, now)) return;
   if (!agent.workspace) return;
 
@@ -141,6 +231,7 @@ async function evaluateAgent(
     markAgentTroubled(agentId);
     writeStuckRemediationState(agentId, stageState(3, now, firstStuck));
     logAction(actions, transitionAction(3, issueId, idleMinutes, 'marked-troubled'));
+    surfaceStuckNeedsYou(agent, issueId, firstStuck, actions);
     return;
   }
 

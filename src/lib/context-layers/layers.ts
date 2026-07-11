@@ -5,18 +5,18 @@
  *
  *   global    — ~/.overdeck/context/global.md  (+ global/{skills,agents}/)
  *               Applies to every harness invocation, everywhere.
- *   project   — <projectRoot>/.pan/context/project.md
+ *   project   — <projectRoot>/.overdeck/context/project.md
  *               Applies when CWD is under a registered project. Committed.
- *   workspace — <workspace>/.pan/context/workspace.md
+ *   workspace — <workspace>/.overdeck/context/workspace.md
  *               Auto-assembled by Overdeck at spawn time. Gitignored.
  *
  * The global layer lives under ~/.overdeck (per-machine). Project and
- * workspace layers live under the repo's `.pan/` dir — the convention
- * PAN-967 unified everything else under — not the legacy `.overdeck/`.
+ * Project and workspace context live outside the permanent state plane under
+ * `.overdeck/`. Reads retain a `.pan/context/` compatibility fallback.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { dirname, join } from 'path';
 import { getOverdeckHome } from '../paths.js';
 
 /** The three context layers, outermost to innermost. */
@@ -56,24 +56,42 @@ export function globalAgentsDir(): string {
   return join(globalContextDir(), 'global', 'agents');
 }
 
-/** `<projectRoot>/.pan/context` — a registered project's layer directory. */
+/** `<projectRoot>/.overdeck/context` — a registered project's layer directory. */
 export function projectContextDir(projectRoot: string): string {
-  return join(projectRoot, '.pan', 'context');
+  return join(projectRoot, '.overdeck', 'context');
 }
 
-/** `<projectRoot>/.pan/context/project.md` — a project's canonical source. */
+/** `<projectRoot>/.overdeck/context/project.md` — a project's canonical source. */
 export function projectContextFile(projectRoot: string): string {
   return join(projectContextDir(projectRoot), 'project.md');
 }
 
-/** `<workspace>/.pan/context` — a workspace's layer directory. */
+export function legacyProjectContextFile(projectRoot: string): string {
+  return join(projectRoot, '.pan', 'context', 'project.md');
+}
+
+export function resolveProjectContextFile(projectRoot: string): string {
+  const canonical = projectContextFile(projectRoot);
+  return existsSync(canonical) ? canonical : legacyProjectContextFile(projectRoot);
+}
+
+/** `<workspace>/.overdeck/context` — a workspace's layer directory. */
 export function workspaceContextDir(workspacePath: string): string {
-  return join(workspacePath, '.pan', 'context');
+  return join(workspacePath, '.overdeck', 'context');
 }
 
 /** `<workspace>/.pan/context/workspace.md` — the auto-assembled bundle. */
 export function workspaceContextFile(workspacePath: string): string {
   return join(workspaceContextDir(workspacePath), 'workspace.md');
+}
+
+export function legacyWorkspaceContextFile(workspacePath: string): string {
+  return join(workspacePath, '.pan', 'context', 'workspace.md');
+}
+
+export function resolveWorkspaceContextFile(workspacePath: string): string {
+  const canonical = workspaceContextFile(workspacePath);
+  return existsSync(canonical) ? canonical : legacyWorkspaceContextFile(workspacePath);
 }
 
 /** `~/.overdeck/context/pi-global.md` — the rendered global layer for Pi. */
@@ -135,17 +153,17 @@ export function globalLayer(): ContextLayer {
 
 /** Describe a project layer's on-disk state. */
 export function projectLayer(projectRoot: string): ContextLayer {
-  const file = projectContextFile(projectRoot);
-  return { kind: 'project', file, dir: projectContextDir(projectRoot), exists: existsSync(file) };
+  const file = resolveProjectContextFile(projectRoot);
+  return { kind: 'project', file, dir: dirname(file), exists: existsSync(file) };
 }
 
 /** Describe a workspace layer's on-disk state. */
 export function workspaceLayer(workspacePath: string): ContextLayer {
-  const file = workspaceContextFile(workspacePath);
+  const file = resolveWorkspaceContextFile(workspacePath);
   return {
     kind: 'workspace',
     file,
-    dir: workspaceContextDir(workspacePath),
+    dir: dirname(file),
     exists: existsSync(file),
   };
 }

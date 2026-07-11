@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { gcMergedSlots, gcOrphanedSlots, type CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
 import type { ReconciledSlotItem, SlotReconcileResult } from '../../../../src/lib/agents/slot-reconcile.js';
 
@@ -23,6 +23,7 @@ function deps(sessionNames: string[] = [], options: { worktreeExists?: boolean }
 }
 
 describe('deacon-swarm merged slot GC', () => {
+  afterEach(() => vi.useRealTimers());
   it('removes a merged slot worktree and slot branch', async () => {
     const fakeDeps = deps();
 
@@ -77,6 +78,25 @@ describe('deacon-swarm merged slot GC', () => {
 
     expect(fakeDeps.runGitCommand).not.toHaveBeenCalled();
     expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
+  });
+
+  it('reaps a merged live slot after the idle threshold and frees its occupancy', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-10T12:00:00.000Z'));
+    const fakeDeps = {
+      ...deps(['agent-pan-2203-slot-1']),
+      getAgentLastActivity: vi.fn(() => '2026-07-10T11:20:00.000Z'),
+      stopSlotAgent: vi.fn(async () => undefined),
+    };
+
+    const actions = await gcMergedSlots('PAN-2203', '/repo/workspaces/feature-pan-2203', [slot()], fakeDeps);
+
+    expect(actions).toEqual([
+      '[swarm] gc reaped idle merged agent agent-pan-2203-slot-1',
+      '[swarm] gc slot 1 (item wi-1) for PAN-2203',
+    ]);
+    expect(fakeDeps.stopSlotAgent).toHaveBeenCalledWith('agent-pan-2203-slot-1');
+    expect(fakeDeps.clearSlotAssignment).toHaveBeenCalled();
   });
 
   it('guards by conventional agent id when reconcile lost the agentId', async () => {

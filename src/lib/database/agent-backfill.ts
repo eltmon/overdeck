@@ -32,6 +32,7 @@ const VALID_ROLES = new Set<AgentState['role']>([
   'ship',
   'flywheel',
   'strike',
+  'knowledge',
 ]);
 
 const COLUMN_MAP: Record<keyof DbAgent, string> = {
@@ -58,6 +59,9 @@ const COLUMN_MAP: Record<keyof DbAgent, string> = {
   paused: 'paused',
   pausedReason: 'paused_reason',
   pausedAt: 'paused_at',
+  yieldedByScheduler: 'yielded_by_scheduler',
+  yieldedAt: 'yielded_at',
+  lastYieldResumeAt: 'last_yield_resume_at',
   troubled: 'troubled',
   troubledAt: 'troubled_at',
   consecutiveFailures: 'consecutive_failures',

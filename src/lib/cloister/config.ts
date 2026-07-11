@@ -110,6 +110,26 @@ export interface ConcurrencyConfig {
    * `resources.governorFootprintDefaultWorkGb`.
    */
   work_footprint_gb?: number;
+  /**
+   * PAN-2507: preemptive pipeline scheduler. When true, a blocked advancing
+   * (review/test/ship) dispatch may YIELD an idle work agent — pause it
+   * (resumable, session preserved) to free the slot/memory, dispatch the
+   * advancing role, and auto-resume the yielded agent oldest-first once
+   * capacity returns. Defaults to false (opt-in): unset installs keep the
+   * static defer-until-attrition behavior at every dispatch site.
+   */
+  preemption?: boolean;
+  /**
+   * PAN-2507: anti-thrash cap on how many work agents may be in the yielded
+   * (scheduler-paused) state at once. Default 3.
+   */
+  max_yielded?: number;
+  /**
+   * PAN-2507: anti-thrash cooldown (seconds) — an agent resumed from a yield
+   * may not be re-yielded until this many seconds have elapsed since its
+   * resume. Default 600.
+   */
+  yield_cooldown_secs?: number;
 }
 
 export type SwarmInferCompletionMode = 'off' | 'nudge' | 'auto';
@@ -363,9 +383,12 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
     memory_driven: false,
     memory_driven_max_work_agents: 24,
     work_footprint_gb: 2,
+    preemption: false,
+    max_yielded: 3,
+    yield_cooldown_secs: 600,
   },
   swarm: {
-    infer_completion: 'nudge',
+    infer_completion: 'auto',
   },
   notifications: {
     slack_webhook: undefined,

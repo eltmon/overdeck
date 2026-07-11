@@ -20,6 +20,8 @@ import { homedir } from 'os';
 import { getManagedTmuxSocketName } from '../tmux.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getClaudePermissionFlagsSync, getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
+import { resolveProjectForIssue } from '../pan-dir/record.js';
+import { isStateMigrated } from '../state-home.js';
 
 const AGENTS_DIR = join(homedir(), '.overdeck', 'agents');
 const REMOTE_PAN_DIR = '/workspace/.pan';
@@ -495,6 +497,14 @@ export interface SpawnRemoteAgentOptions {
   tier?: 'ephemeral' | 'durable';
 }
 
+export function assertFlyRemoteStateSupported(issueId: string, migrated: boolean): void {
+  if (migrated) {
+    throw new Error(
+      `Fly remote spawn blocked for ${issueId.toUpperCase()}: PAN-2541 D14 forbids remote work on migrated projects until PAN-2549 implements overdeck-state synchronization.`,
+    );
+  }
+}
+
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
@@ -564,6 +574,8 @@ export async function writeRemoteFile(
  */
 export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promise<RemoteAgentState> {
   const { issueId, workspace, model = 'claude-sonnet-4-6', prompt } = options;
+  const project = resolveProjectForIssue(issueId);
+  if (project) assertFlyRemoteStateSupported(issueId, await isStateMigrated(project));
   const tier = options.tier ?? 'ephemeral';
 
   const agentId = `agent-${issueId.toLowerCase()}`;

@@ -1,4 +1,5 @@
 import { join } from 'path'
+import { existsSync } from 'node:fs'
 import { Effect, FileSystem } from 'effect'
 import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem'
 import { FsError } from '../errors.js'
@@ -6,15 +7,16 @@ import { FsError } from '../errors.js'
 import type { WorkspacePanPaths } from './types.js'
 import {
   PAN_CONTINUE_FILENAME,
-  PAN_DIRNAME,
+  WORKSPACE_RUNTIME_DIRNAME,
   PAN_FEEDBACK_DIRNAME,
   PAN_SESSIONS_FILENAME,
   PAN_SPEC_FILENAME,
   PAN_CONTEXT_FILENAME,
+  LEGACY_WORKSPACE_RUNTIME_DIRNAME,
 } from './types.js'
 
 function workspacePanPaths(workspacePath: string): WorkspacePanPaths {
-  const panDir = join(workspacePath, PAN_DIRNAME)
+  const panDir = join(workspacePath, WORKSPACE_RUNTIME_DIRNAME)
   return {
     panDir,
     specPath: join(panDir, PAN_SPEC_FILENAME),
@@ -27,6 +29,24 @@ function workspacePanPaths(workspacePath: string): WorkspacePanPaths {
 
 export function getWorkspacePanPaths(workspacePath: string): WorkspacePanPaths {
   return workspacePanPaths(workspacePath)
+}
+
+export function getLegacyWorkspacePanPaths(workspacePath: string): WorkspacePanPaths {
+  const panDir = join(workspacePath, LEGACY_WORKSPACE_RUNTIME_DIRNAME)
+  return {
+    panDir,
+    specPath: join(panDir, PAN_SPEC_FILENAME),
+    continuePath: join(panDir, PAN_CONTINUE_FILENAME),
+    sessionsPath: join(panDir, PAN_SESSIONS_FILENAME),
+    feedbackDir: join(panDir, PAN_FEEDBACK_DIRNAME),
+    contextPath: join(panDir, PAN_CONTEXT_FILENAME),
+  }
+}
+
+/** Resolve workspace runtime reads to `.overdeck/`, then legacy `.pan/`. */
+export function getReadableWorkspacePanPaths(workspacePath: string): WorkspacePanPaths {
+  const canonical = getWorkspacePanPaths(workspacePath)
+  return existsSync(canonical.panDir) ? canonical : getLegacyWorkspacePanPaths(workspacePath)
 }
 
 export function ensureWorkspacePanDir(

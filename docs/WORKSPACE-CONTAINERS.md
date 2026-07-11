@@ -107,3 +107,27 @@ Use `pan workspace rebuild <issue-id>` to reset one workspace stack:
 Use `pan workspace reap` for bulk cleanup of orphaned broken stacks. It is dry-run by default and lists candidate workspace stacks without modifying Docker state. `pan workspace reap --apply` performs teardown for candidates, and active-agent stacks are skipped so in-progress work is not destroyed accidentally.
 
 Use rebuild for the workspace you are actively repairing. Use reap for stale, orphaned stacks after reviewing the dry-run output.
+
+## Terminal-state stack teardown
+
+Terminal issues (closed/merged) must not leave Docker stacks running. Overdeck has three layers of protection:
+
+1. **Close-out is the durable owner.** `pan close <issue-id>` and dashboard Close Out run a verified teardown of the workspace Docker stack and its `overdeck-feature-<issue>_devnet` network. Teardown is name-based (`docker compose -p overdeck-feature-<issue> down -v --remove-orphans` followed by `docker network rm overdeck-feature-<issue>_devnet`), so it works even if the workspace directory has already been removed. Close-out records a warning, not a failure, if the network cannot be verified as removed.
+
+2. **Reaper backstop.** The deacon's closed-issue reaper (`reconcileClosedIssueAgents` → `reapIssueResidue`) runs on boot and during periodic patrols. For any closed/merged issue whose feature branch is gone, it invokes the same name-based teardown primitive and removes the stack/network. This catches stacks that leaked before close-out ran.
+
+3. **Rebuild guard.** `pan workspace rebuild` and all autonomous stack-rebuild paths go through `rebuildWorkspaceStack`, which no-ops with an error for closed/merged issues. Verifying-on-main issues are not blocked and can still be rebuilt.
+
+### Widen the default address pool
+
+Docker's default bridge pool supports only ~31 networks. To make a transient leak non-fatal, configure a wider pool in `/etc/docker/daemon.json` and restart Docker:
+
+```json
+{
+  "default-address-pools": [
+    { "base": "10.200.0.0/16", "size": 24 }
+  ]
+}
+```
+
+`pan doctor` warns when the devnet count is within ~5 of the default limit or when `default-address-pools` is missing. Overdeck never edits `daemon.json` automatically.

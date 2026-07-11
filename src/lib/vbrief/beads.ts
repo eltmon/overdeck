@@ -635,6 +635,7 @@ async function createBeadsFromVBriefPromise(
     const phase = item.metadata?.phase;
     const beadMetadata = {
       ...(item.metadata ?? {}),
+      vbriefItemId: itemId,
       ...resolveInspectionMetadata(inspectionPolicy, item),
     };
 

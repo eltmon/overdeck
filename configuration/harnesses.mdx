@@ -48,8 +48,9 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
 
 ### OpenAI Codex CLI (alternative)
 
-- First-party OpenAI agent loop for the GPT model family (GPT-5.5, GPT-5.4,
-  GPT-5.3-Codex, …) with ChatGPT-subscription or API-key auth.
+- First-party OpenAI agent loop for the GPT model family (GPT-5.6 Sol/Terra/Luna,
+  GPT-5.5, GPT-5.4, GPT-5.3-Codex, …) with ChatGPT-subscription or API-key auth.
+- `gpt-5.6-sol` is the default OpenAI model surfaced by this harness.
 - Work agents run as live, attachable TUI sessions (`codexMode: work-tui`)
   under the PTY supervisor — never one-shot `codex exec`.
 - Runtime adapter at `src/lib/runtimes/codex.ts`; per-agent thread-id pinning

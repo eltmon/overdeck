@@ -275,11 +275,12 @@ export async function fetchActivityDataWithContext(
 
   const agentId = `agent-${issueLower}`;
   const planningAgentId = `planning-${issueLower}`;
+  const knowledgeAgentId = `agent-${issueLower}-knowledge`;
   const agentsDir = join(homedir(), '.overdeck', 'agents');
 
   let hasPlanningSection = false;
 
-  for (const checkId of [planningAgentId, agentId]) {
+  for (const checkId of [planningAgentId, agentId, knowledgeAgentId]) {
     const agentDir = join(agentsDir, checkId);
     if (!await pathExists(agentDir)) continue;
 
@@ -288,7 +289,7 @@ export async function fetchActivityDataWithContext(
 
     try {
       const isPlanning = checkId.startsWith('planning-');
-      const sectionType = isPlanning ? 'planning' : 'work';
+      const sectionType = isPlanning ? 'planning' : checkId.endsWith('-knowledge') ? 'knowledge' : 'work';
       if (isPlanning) hasPlanningSection = true;
 
       let transcript = '';
@@ -521,7 +522,7 @@ export async function fetchActivityDataWithContext(
         const orchestratorJsonlPath = await resolveJsonlPath(orchestratorSessionName, workspacePath);
         // PAN-1832: surface the ACTUAL review agent's model/harness (e.g. after a
         // restart onto pi/glm-5.2) instead of a hardcoded 'specialist' label that
-        // the frontend then back-fills with the role-default model (gpt-5.5).
+        // the frontend then back-fills with the role-default model (gpt-5.6-sol).
         const orchestratorState = getAgentStateSync(orchestratorSessionName);
         sections.push({
           type: 'review',

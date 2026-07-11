@@ -1,0 +1,10 @@
+src/lib/pan-dir/auto-commit.ts
+src/lib/pan-dir/context.ts
+src/lib/pan-dir/drafts.ts
+src/lib/pan-dir/feedback.ts
+src/lib/pan-dir/record.ts
+src/lib/pan-dir/records.ts
+src/lib/pan-dir/sessions.ts
+src/lib/pan-dir/specs.ts
+src/lib/state-home.ts
+src/lib/vbrief/beads.ts

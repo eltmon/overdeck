@@ -240,7 +240,7 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
   if (tier >= 2 && config.embeddings && config.embeddingAutoOnDeep
       && isBackgroundFeatureEnabled('sessionEmbeddings')) {
     if (enrichedIds.length > 0) {
-      const embedded = await embedSessions({ sessionIds: enrichedIds, config });
+      const embedded = await embedSessions({ sessionIds: enrichedIds, config, autoInstall: true });
       result.embedded = embedded.embedded;
     }
   }

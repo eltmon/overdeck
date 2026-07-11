@@ -310,6 +310,42 @@ export async function spawnWorkAgentThroughAgentsEndpoint(issueId: string, dashb
   };
 }
 
+export interface RebuildAndStartResult {
+  triggered: boolean;
+  error?: string;
+}
+
+/**
+ * PAN-2520: trigger the `rebuild-and-start` recovery for a workspace whose Docker
+ * stack is unhealthy — the same path the dashboard "Rebuild & start" button uses
+ * (`POST /api/workspaces/:issueId/rebuild-and-start`, workspaces.ts). It rebuilds
+ * the stack, then `pan start`s the work agent once the stack is healthy. Used by
+ * the deacon dead-end recovery when a PAN-2209 respawn defers on `stack-unhealthy`
+ * (which would otherwise loop forever, since nothing else rebuilds the stack).
+ */
+export async function triggerRebuildAndStart(
+  issueId: string,
+  dashboardOrigin = internalDashboardOrigin(),
+): Promise<RebuildAndStartResult> {
+  const response = await fetch(
+    new URL(`/api/workspaces/${encodeURIComponent(issueId)}/rebuild-and-start`, dashboardOrigin),
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: dashboardOrigin },
+    },
+  );
+  const body = await response.json().catch(() => ({})) as Record<string, unknown>;
+  if (response.ok && body['success'] !== false) {
+    return { triggered: true };
+  }
+  return {
+    triggered: false,
+    error: typeof body['error'] === 'string'
+      ? body['error']
+      : `rebuild-and-start returned HTTP ${response.status}`,
+  };
+}
+
 /**
  * Surface a real, actioned reconciler outcome in the dashboard activity feed.
  * Use this ONLY when something actually happened that a human should see — a

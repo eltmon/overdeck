@@ -8,7 +8,7 @@ import { Command } from 'commander';
 import { listCommand } from './list.js';
 import { wakeCommand } from './wake.js';
 import { resetCommand } from './reset.js';
-import { doneCommand } from './done.js';
+import { doneAndExitCommand } from './done.js';
 import { logsCommand, cleanupLogsCommand } from './logs.js';
 
 export function registerSpecialistsCommands(program: Command): void {
@@ -44,7 +44,7 @@ export function registerSpecialistsCommands(program: Command): void {
     .description('Signal specialist completion (deterministic status update)')
     .requiredOption('--status <status>', 'Result status: passed, failed, or review-only blocked')
     .option('--notes <notes>', 'Optional notes about the result')
-    .action(doneCommand);
+    .action(doneAndExitCommand);
 
   // pan specialists logs <project> <type> [runId]
   specialists

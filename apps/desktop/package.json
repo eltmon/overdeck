@@ -1,6 +1,6 @@
 {
   "name": "@overdeck/desktop",
-  "version": "0.44.0",
+  "version": "0.45.7",
   "description": "Overdeck Command Deck — AI agent monitoring desktop app",
   "publishConfig": {
     "access": "public"
@@ -18,7 +18,8 @@
     "bin",
     "dist-electron",
     "server",
-    "resources"
+    "resources",
+    "drizzle"
   ],
   "engines": {
     "node": ">=22.0.0"
@@ -33,9 +34,9 @@
     "start": "bun run scripts/start-electron.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --configLoader runner --passWithNoTests",
-    "dist:linux": "electron-builder --linux AppImage --publish never",
-    "dist:mac": "electron-builder --mac dmg --universal --publish never",
-    "dist:win": "electron-builder --win nsis --publish never",
+    "dist:linux": "node scripts/prepare-server-resources.mjs && electron-builder --linux AppImage --publish never",
+    "dist:mac": "node scripts/prepare-server-resources.mjs && electron-builder --mac dmg --arm64 --publish never",
+    "dist:win": "node scripts/prepare-server-resources.mjs && electron-builder --win nsis --publish never",
     "postinstall": "electron-rebuild -f -w node-pty 2>/dev/null; exit 0"
   },
   "dependencies": {
@@ -48,10 +49,10 @@
     "@types/node": "^22.0.0",
     "electron": "40.6.0",
     "electron-builder": "^25.1.8",
-    "electron-rebuild": "^3.2.9",
     "tsdown": "^0.21.7",
     "typescript": "^5.7.3",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "@electron/rebuild": "^4.2.0"
   },
   "build": {
     "appId": "com.overdeck.app",
@@ -67,12 +68,16 @@
     ],
     "extraResources": [
       {
-        "from": "../../dist/dashboard/server.js",
-        "to": "server/server.js"
+        "from": "drizzle",
+        "to": "drizzle"
       },
       {
-        "from": "../../dist/dashboard/public",
-        "to": "server/public"
+        "from": "server",
+        "to": "server",
+        "filter": [
+          "**/*",
+          "!**/*.map"
+        ]
       },
       {
         "from": "resources",
@@ -96,8 +101,7 @@
         {
           "target": "dmg",
           "arch": [
-            "arm64",
-            "x64"
+            "arm64"
           ]
         }
       ],

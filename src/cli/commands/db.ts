@@ -20,6 +20,7 @@ import {
   type DatabaseProvisionerLogger,
 } from '../../lib/db-provisioners/index.js';
 import type { DatabaseConfig, ProjectConfig as FullProjectConfig } from '../../lib/workspace-config.js';
+import { readIssueRecordForWorkspaceSync } from '../../lib/pan-dir/record.js';
 
 const execAsync = promisify(exec);
 
@@ -133,7 +134,7 @@ export function registerDbCommands(program: Command): void {
     .option('--issue-id <id>', 'Restore only this issue')
     .option('--dry-run', 'Show what would be restored without writing')
     .option('--verbose', 'Log each processed issue')
-    .action(restoreVerdictsCommand);
+    .action(restoreVerdictsAndExitCommand);
 
   db.command('reconcile-merges')
     .description('Backfill fulfilled merge state from tracked PR and branch ancestry evidence (PAN-2311)')
@@ -146,11 +147,9 @@ export function registerDbCommands(program: Command): void {
 async function gcAgentsCommand(options: { dryRun?: boolean }): Promise<void> {
   const candidates = listAllAgentsSync()
     .filter((agent) =>
-      agent.role === 'work'
-      && agent.status === 'stopped'
-      && agent.paused !== true
-      && agent.troubled !== true
-      && isTerminalIssueStage(getIssueStageSync(agent.issueId)),
+      agent.status === 'stopped'
+      && ((agent.workspace && readIssueRecordForWorkspaceSync(agent.workspace, agent.issueId)?.pipeline?.closedOut === true)
+        || isTerminalIssueStage(getIssueStageSync(agent.issueId))),
     );
   const ids = candidates.map((agent) => agent.id);
 
@@ -578,6 +577,15 @@ async function restoreVerdictsCommand(options: {
     spinner.fail(`Verdict restore failed: ${error.message}`);
     process.exitCode = 1;
   }
+}
+
+export async function restoreVerdictsAndExitCommand(options: {
+  issueId?: string;
+  dryRun?: boolean;
+  verbose?: boolean;
+}): Promise<never> {
+  await restoreVerdictsCommand(options);
+  process.exit(process.exitCode && process.exitCode !== 0 ? process.exitCode : 0);
 }
 
 async function reconcileMergesCommand(options: {

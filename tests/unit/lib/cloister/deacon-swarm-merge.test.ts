@@ -144,3 +144,36 @@ describe('verify-failed surfacing', () => {
     ]);
   });
 });
+
+describe('PAN-2372 WI-4 merge clears the durable slot-completion marker (FR-6, AC4)', () => {
+  let workspacePath: string;
+
+  beforeEach(() => {
+    resetSwarmLoopSafetyForTests();
+    workspacePath = mkdtempSync(join(tmpdir(), 'pan-2372-swarm-merge-clear-'));
+  });
+
+  afterEach(() => {
+    rmSync(workspacePath, { recursive: true, force: true });
+  });
+
+  it('removes swarm.slotCompletions[slotIndex] for the merged slot and preserves siblings', async () => {
+    const { writeSwarmSlotCompletion } = await import('../../../../src/lib/cloister/deacon-swarm-record.js');
+    const { readIssueRecordForWorkspaceSync } = await import('../../../../src/lib/pan-dir/record.js');
+    const fakeDeps = deps({ merged: true, conflicts: false });
+    // Seed a durable marker for the slot about to merge, plus a sibling marker
+    // that must survive (only the merged slot's marker is cleared).
+    writeSwarmSlotCompletion(workspacePath, 'PAN-2203', {
+      slotIndex: 1, itemId: 'wi-1', agentId: 'agent-pan-2203-slot-1', completedAt: '2026-07-01T00:00:00.000Z',
+    });
+    writeSwarmSlotCompletion(workspacePath, 'PAN-2203', {
+      slotIndex: 2, itemId: 'wi-2', agentId: 'agent-pan-2203-slot-2', completedAt: '2026-07-01T00:00:00.000Z',
+    });
+
+    await mergeReadySlots('PAN-2203', workspacePath, doc(), [readySlot()], fakeDeps);
+
+    const record = readIssueRecordForWorkspaceSync(workspacePath, 'PAN-2203');
+    expect(record?.swarm?.slotCompletions?.['1']).toBeUndefined();   // merged slot cleared
+    expect(record?.swarm?.slotCompletions?.['2']).toBeDefined();     // sibling preserved
+  });
+});

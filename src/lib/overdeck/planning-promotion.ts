@@ -18,7 +18,8 @@ import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.j
 import { createInFlightGuard } from '../cloister/in-flight-guard.js';
 import { checkPrdGateSync, asPanSpecDocument, findSpecByIssue, writeSpec, writeSpecForIssue } from '../pan-dir/index.js';
 import { resolveAutoSpawnOnFinalize } from '../planning/spawn-planning-session.js';
-import { extractTeamPrefix, findProjectByTeamSync, resolveProjectFromIssueSync } from '../projects.js';
+import { extractTeamPrefix, findProjectByPathSync, findProjectByTeamSync, resolveProjectFromIssueSync } from '../projects.js';
+import { isStateMigrated } from '../state-home.js';
 import { loadRemoteAgentState } from '../remote/remote-agents.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { killSession, sessionExists } from '../tmux.js';
@@ -98,15 +99,27 @@ type CompletePlanningPhase = 'prdGate' | 'beadsMaterialize' | 'specWrite' | 'aut
 type CompletePlanningPhaseStatus = 'start' | 'success' | 'failure' | 'skipped';
 
 const completePlanningGuard = createInFlightGuard();
+const completePlanningAutoSpawnIntent = new Set<string>();
 
-export function beginCompletePlanningLease(issueId: string): { started: boolean; release: () => void } {
+export function beginCompletePlanningLease(
+  issueId: string,
+  autoSpawnRequested = false,
+): { started: boolean; autoSpawnRequested: () => boolean; release: () => void } {
   const key = issueId.toLowerCase();
+  if (autoSpawnRequested) completePlanningAutoSpawnIntent.add(key);
   let release!: () => void;
   const lease = new Promise<void>((resolve) => {
     release = resolve;
   });
   const started = completePlanningGuard.run(key, () => lease);
-  return { started, release: started ? release : () => undefined };
+  return {
+    started,
+    autoSpawnRequested: () => completePlanningAutoSpawnIntent.has(key),
+    release: started ? () => {
+      completePlanningAutoSpawnIntent.delete(key);
+      release();
+    } : () => undefined,
+  };
 }
 
 function emitCompletePlanningPhase(
@@ -210,20 +223,22 @@ export async function completePlanningArtifacts(options: {
   return { proposed, beadCount: created.length, beadsWarning: null };
 }
 
-export function completePlanningFilesToStage(projectPath: string, proposedFilename: string): string[] {
-  const filesToStage = [`.pan/specs/${proposedFilename}`];
-  if (existsSync(join(projectPath, '.pan', 'context', 'codebase'))) {
+export function completePlanningFilesToStage(projectPath: string, proposedFilename: string, migrated = false): string[] {
+  const filesToStage = migrated ? [] : [`.pan/specs/${proposedFilename}`];
+  if (existsSync(join(projectPath, '.overdeck', 'context', 'codebase'))) {
+    filesToStage.push('.overdeck/context/codebase/');
+  } else if (!migrated && existsSync(join(projectPath, '.pan', 'context', 'codebase'))) {
     filesToStage.push('.pan/context/codebase/');
   }
   return filesToStage;
 }
 
-export function completePlanningWorkspaceGitAddCommands(gitRoot: string): string[][] {
+export function completePlanningWorkspaceGitAddCommands(gitRoot: string, migrated = false): string[][] {
   const commands: string[][] = [];
-  if (existsSync(join(gitRoot, '.pan'))) {
+  if (!migrated && existsSync(join(gitRoot, '.pan'))) {
     commands.push(['add', '.pan/']);
   }
-  if (existsSync(join(gitRoot, '.beads'))) {
+  if (!migrated && existsSync(join(gitRoot, '.beads'))) {
     commands.push(['add', '.beads/']);
   }
   // PAN-2386: the polyrepo scaffold .gitignore is created during workspace setup
@@ -244,6 +259,11 @@ export function completePlanningWorkspaceGitAddCommands(gitRoot: string): string
  * tree handed to auto-start is clean.
  */
 export async function commitWorkspaceRecordBeforeAutoSpawn(gitRoot: string, issueId: string): Promise<void> {
+  const project = findProjectByPathSync(gitRoot);
+  if (project && await isStateMigrated(project)) {
+    await Effect.runPromise(flushAutoCommits(project.path));
+    return;
+  }
   if (!existsSync(join(gitRoot, '.git'))) return;
   const issueLower = issueId.toLowerCase();
 
@@ -430,7 +450,7 @@ export async function completePlanningForIssue(options: {
   }
   const sessionName = `planning-${id.toLowerCase()}`;
   const issueLower = id.toLowerCase();
-  const completePlanningLease = beginCompletePlanningLease(id);
+  const completePlanningLease = beginCompletePlanningLease(id, autoSpawn);
   if (!completePlanningLease.started) {
     console.log(`[complete-planning] ${id} already has an in-flight finalize; returning in-flight status`);
     return jsonResponse({
@@ -545,12 +565,16 @@ export async function completePlanningForIssue(options: {
       console.log(`[complete-planning] Wrote pan spec to ${proposed.path}`);
       console.log(`[complete-planning] Materialized ${beadCount} beads for ${upperIssueId}`);
 
-      const filesToStage = completePlanningFilesToStage(projectPath, proposed.filename);
+      const project = findProjectByPathSync(projectPath);
+      const migrated = project ? await isStateMigrated(project) : false;
+      const filesToStage = completePlanningFilesToStage(projectPath, proposed.filename, migrated);
       // Polyrepo project roots (e.g. myn) have no .git at projectPath — the
       // sub-worktrees are the repos. Spec promotion still lands on disk; only
       // the convenience commit on main is skipped.
       const projectIsGitRepo = existsSync(join(projectPath, '.git'));
-      if (!projectIsGitRepo) {
+      if (migrated) {
+        await Effect.runPromise(flushAutoCommits(projectPath));
+      } else if (!projectIsGitRepo) {
         console.log(`[complete-planning] Project root ${projectPath} is not a git repository (polyrepo) — pan spec updated on disk but not committed`);
       } else {
         const { stdout: branchStdout } = await execFileAsync(
@@ -588,7 +612,7 @@ export async function completePlanningForIssue(options: {
         await execFileAsync('git', ['init'], { cwd: gitRoot, encoding: 'utf-8' });
       }
 
-      for (const args of completePlanningWorkspaceGitAddCommands(gitRoot)) {
+      for (const args of completePlanningWorkspaceGitAddCommands(gitRoot, migrated)) {
         await execFileAsync('git', args, { cwd: gitRoot, encoding: 'utf-8' });
       }
 
@@ -693,18 +717,19 @@ export async function completePlanningForIssue(options: {
     // PAN-2386: if auto-start is requested, make sure the workspace tree is clean
     // before we ask start-agent to spawn. The per-issue record may have been
     // modified by debounced auto-commit writes during finalize.
-    if (autoSpawn && workspacePath) {
+    const effectiveAutoSpawn = autoSpawn || completePlanningLease.autoSpawnRequested();
+    if (effectiveAutoSpawn && workspacePath) {
       await commitWorkspaceRecordBeforeAutoSpawn(workspacePath, id);
     }
 
     const autoSpawnResult = await completePlanningAutoSpawnAndKill({
       issueId: id,
-      autoSpawn,
+      autoSpawn: effectiveAutoSpawn,
       skipKill,
       sessionName,
     });
     emitCompletePlanningPhase(id, 'terminal', 'success', autoSpawnResult?.workAgentSpawned ? 'planning complete and work agent spawn requested' : autoSpawnResult?.workAgentSkipReason ?? 'planning complete', {
-      autoSpawn,
+      autoSpawn: effectiveAutoSpawn,
       workAgentSpawned: autoSpawnResult?.workAgentSpawned ?? false,
       workAgentSkipReason: autoSpawnResult?.workAgentSkipReason,
     });

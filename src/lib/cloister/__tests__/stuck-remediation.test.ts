@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   isFlywheelGloballyPaused: vi.fn(),
   describeAgentDeath: vi.fn(),
   countPendingAskUserQuestionsForAgent: vi.fn(),
+  recordRecoveryFailure: vi.fn(),
 }));
 
 vi.mock('../../agents.js', () => ({
@@ -115,6 +116,7 @@ vi.mock('../../beads-query.js', () => ({
     }),
   ),
 }));
+vi.mock('../recovery-trip.js', () => ({ recordRecoveryFailure: mocks.recordRecoveryFailure }));
 
 import { checkStuckAgentRemediation } from '../stuck-remediation.js';
 import { queryReadyBeadsByIssueLabels } from '../../beads-query.js';
@@ -205,6 +207,7 @@ describe('checkStuckAgentRemediation', () => {
     mocks.resumeFlywheel.mockResolvedValue({ activeRunId: 'RUN-8' });
     mocks.describeAgentDeath.mockReturnValue('exit=1 at 2026-05-23T11:59:00Z');
     mocks.countPendingAskUserQuestionsForAgent.mockReturnValue(Effect.succeed(0));
+    mocks.recordRecoveryFailure.mockReturnValue({ trip: { tripCount: 1 }, emitNeedsYou: true });
     mockReadyBeads();
   });
 
@@ -290,7 +293,7 @@ describe('checkStuckAgentRemediation', () => {
     const actions = await checkStuckAgentRemediation({ now: NOW });
 
     const expectedAction = '[deacon] stuck-remediation stage=3 issue=PAN-1415 idleMin=100 action=marked-troubled';
-    expect(actions).toEqual([expectedAction]);
+    expect(actions).toEqual([expectedAction, '[deacon] needs-you PAN-1415: stuck remediation exhausted']);
     expect(mocks.markAgentTroubled).toHaveBeenCalledWith('agent-pan-1415');
     expect(mocks.messageAgent).not.toHaveBeenCalled();
     expect(mocks.resumeAgent).not.toHaveBeenCalled();
@@ -328,10 +331,14 @@ describe('checkStuckAgentRemediation', () => {
     expectNoStage();
   });
 
+  // PAN-2519: operator-owned / already-done review states are never auto-acted.
+  // (Rework states — blocked/failed/verification-failed — are handled below by
+  // the wedged-rework kill-for-respawn branch, NOT skipped.)
   it.each([
     ['stuck review status', { stuck: true }],
     ['deacon ignored review status', { deaconIgnored: true }],
-    ['blocked review status', { reviewStatus: 'blocked' }],
+    ['merged review status', { mergeStatus: 'merged' }],
+    ['ready-for-merge review status', { readyForMerge: true }],
   ])('skips agents with %s', async (_name, reviewStatus) => {
     mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(100));
     mocks.getReviewStatusSync.mockReturnValue(reviewStatus);
@@ -340,7 +347,59 @@ describe('checkStuckAgentRemediation', () => {
 
     expect(actions).toEqual([]);
     expectNoStage();
+    expect(mocks.killSessionSync).not.toHaveBeenCalled();
     expect(mockQueryReadyBeadsByIssueLabels).not.toHaveBeenCalled();
+  });
+
+  // PAN-2519: a wedged-but-alive work agent that OWES a rework fix is invisible to
+  // both idle-escalation (skipped via shouldSkipReviewStatus) and PAN-2209 respawn
+  // (its session still exists), so it stalls. Kill the session so the deacon's
+  // dead-end path respawns a fresh agent that drains .pan/feedback.
+  it.each([
+    ['blocked review status', { reviewStatus: 'blocked' }],
+    ['failed review status', { reviewStatus: 'failed' }],
+    ['failed verification status', { verificationStatus: 'failed' }],
+    ['failed test status', { testStatus: 'failed' }],
+  ])('kills a wedged rework agent for respawn with %s', async (_name, reviewStatus) => {
+    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(100));
+    mocks.getReviewStatusSync.mockReturnValue(reviewStatus);
+
+    const actions = await checkStuckAgentRemediation({ now: NOW });
+
+    const expectedAction = '[deacon] stuck-remediation stage=3 issue=PAN-1415 idleMin=100 action=killed-for-respawn';
+    expect(actions).toEqual([expectedAction]);
+    expect(mocks.killSessionSync).toHaveBeenCalledWith('agent-pan-1415');
+    expect(mocks.markAgentTroubled).not.toHaveBeenCalled();
+    expect(mocks.writeStuckRemediationState).toHaveBeenCalledWith('agent-pan-1415', {
+      lastStage: 3,
+      lastStageAt: new Date(NOW).toISOString(),
+      firstStuckAt: lastActivity(100),
+    });
+    expect(mocks.logDeaconEventSync).toHaveBeenCalledWith(expectedAction);
+  });
+
+  it('does not kill a wedged rework agent below the stage-3 idle threshold', async () => {
+    // 50 min idle (< stage3_minutes=90) — still within the poke/resume ladder.
+    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(50));
+    mocks.getReviewStatusSync.mockReturnValue({ reviewStatus: 'blocked' });
+
+    await checkStuckAgentRemediation({ now: NOW });
+
+    expect(mocks.killSessionSync).not.toHaveBeenCalled();
+  });
+
+  it('parks a chronically re-dying rework agent as troubled once the requeue ceiling is hit', async () => {
+    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(100));
+    // autoRequeueCount >= 25 mirrors the deacon dead-end breaker: respawn would be
+    // refused, so park as troubled to leave a live operator signal, not a dead session.
+    mocks.getReviewStatusSync.mockReturnValue({ reviewStatus: 'blocked', autoRequeueCount: 25 });
+
+    const actions = await checkStuckAgentRemediation({ now: NOW });
+
+    const expectedAction = '[deacon] stuck-remediation stage=3 issue=PAN-1415 idleMin=100 action=rework-wedge-troubled';
+    expect(actions).toEqual([expectedAction, '[deacon] needs-you PAN-1415: stuck remediation exhausted']);
+    expect(mocks.killSessionSync).not.toHaveBeenCalled();
+    expect(mocks.markAgentTroubled).toHaveBeenCalledWith('agent-pan-1415');
   });
 
   it('skips agents with open ready beads', async () => {

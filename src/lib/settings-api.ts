@@ -282,7 +282,7 @@ export function getDefaultConversationModelApi(): ModelId {
   throw new Error('No default model configured — set models.default_conversation_model');
 }
 
-const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer'];
+const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer', 'knowledge'];
 type AvailableModel = { id: ModelId; name: string; costPer1MTokens: number };
 type AvailableModelsApi = Record<'anthropic' | 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter' | 'nous' | 'dashscope', AvailableModel[]>;
 const WORKHORSE_SLOTS: readonly WorkhorseSlot[] = ['expensive', 'mid', 'cheap'];
@@ -1301,14 +1301,15 @@ export function getAvailableModelsApi(): AvailableModelsApi {
     }
   }
 
-  // Order OpenAI models with latest family first: 5.5 (current default) → 5.4 → 5.3-codex → 5.2 → o-series → gpt-4o legacy.
+  // Order OpenAI models with latest family first: 5.6-sol (current default) → 5.6-terra → 5.6-luna → 5.5 → 5.4 → 5.3-codex → 5.2 → o-series → gpt-4o legacy.
   const openaiOrder: Record<string, number> = {
-    'gpt-5.5': 0, 'gpt-5.5-pro': 1,
-    'gpt-5.4': 10, 'gpt-5.4-pro': 11, 'gpt-5.4-mini': 12,
-    'gpt-5.3-codex': 20,
-    'gpt-5.2': 30,
-    'o3': 40, 'o4-mini': 41,
-    'gpt-4o': 50, 'gpt-4o-mini': 51,
+    'gpt-5.6-sol': 0, 'gpt-5.6-terra': 1, 'gpt-5.6-luna': 2,
+    'gpt-5.5': 10, 'gpt-5.5-pro': 11,
+    'gpt-5.4': 20, 'gpt-5.4-pro': 21, 'gpt-5.4-mini': 22,
+    'gpt-5.3-codex': 30,
+    'gpt-5.2': 40,
+    'o3': 50, 'o4-mini': 51,
+    'gpt-4o': 60, 'gpt-4o-mini': 61,
   };
   result.openai.sort((a, b) => (openaiOrder[a.id] ?? 99) - (openaiOrder[b.id] ?? 99));
 

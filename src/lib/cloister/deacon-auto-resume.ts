@@ -7,6 +7,7 @@ import { resumedBootReconciliationOutcome, skippedBootReconciliationOutcome, ski
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { getConcurrencyLimits, countRunningAgents, workResumeSlotsAvailable } from './concurrency.js';
 import { assessMemoryPressure } from './memory-governor.js';
+import { resumeYieldedAgents } from './preemption.js';
 import {
   getBootReconciliationHeldResumeSet,
   getBootReconciliationPendingHoldSet,
@@ -840,6 +841,15 @@ export async function autoResumeStoppedWorkAgents(deps: AutoResumeNotifierDeps):
   const workSlots = workResumeSlotsAvailable(runningBefore, concurrencyLimits);
   const cores = cpus().length || 1;
   const loadCeiling = cores * RESUME_LOAD_FACTOR;
+
+  // PAN-2507: resume scheduler-yielded work agents oldest-first BEFORE any other
+  // stopped candidate, drawing from the same slot budget and honoring the same
+  // per-iteration memory gate. Each resumed agent consumes one work slot.
+  const resumedYielded = await resumeYieldedAgents(workSlots);
+  if (resumedYielded.length > 0) {
+    resumed.push(...resumedYielded);
+    resumeAttempts += resumedYielded.length;
+  }
 
   // PAN-1908: authoritative registry is the agents table; no directory scan.
   const bootReconciliationHoldSet = getBootReconciliationPendingHoldSet();

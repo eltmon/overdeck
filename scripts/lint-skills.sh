@@ -260,3 +260,10 @@ def main() -> int:
 
 raise SystemExit(main())
 PY
+
+role_state_commit=$(git grep -nEi '(git[[:space:]]+(add|commit)|commit[^.]{0,40})(\.pan/|\.beads/)' -- 'roles/*.md' || true)
+if [[ -n "$role_state_commit" ]]; then
+  echo "role state-commit lint failed: role prompts must never instruct committing .pan/ or .beads/:" >&2
+  echo "$role_state_commit" >&2
+  exit 1
+fi

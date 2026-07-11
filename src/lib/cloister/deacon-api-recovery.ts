@@ -3,12 +3,13 @@ import { join } from 'path';
 import { Effect } from 'effect';
 import { isContextOverflowTail } from '../context-overflow.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
-import { getAgentDir, getAgentRuntimeStateSync, getAgentStateSync, saveAgentRuntimeState } from '../agents.js';
+import { getAgentDir, getAgentRuntimeStateSync, getAgentStateSync, saveAgentRuntimeState, setAgentPausedSync } from '../agents.js';
 import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
 import { sessionFilePath } from '../paths.js';
 import { getReviewStatusSync } from '../review-status.js';
 import { capturePane, listSessionNames, sendKeys } from '../tmux.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
+import { handleKnownAgentModal, paneShowsModelSwitch } from './modal-detector.js';
 
 // ============================================================================
 // API Error Recovery
@@ -207,6 +208,28 @@ export async function checkApiErrorAgents(): Promise<string[]> {
     }
 
     if (!tmuxOutput.trim()) continue;
+
+    const agentState = getAgentStateSync(sessionName);
+    if (agentState?.harness === 'codex') {
+      if (paneShowsModelSwitch(tmuxOutput, agentState.model)) {
+        const reason = `needs-you: live Codex pane indicates a model switch from launch model ${agentState.model}`;
+        setAgentPausedSync(sessionName, reason, true);
+        markWorkspaceStuck(agentState.issueId, 'model_divergence', { reason });
+        actions.push(`Model-divergence halt: ${sessionName} — needs-you`);
+        continue;
+      }
+      const modal = await handleKnownAgentModal(sessionName, undefined, tmuxOutput);
+      if (modal !== 'none') {
+        const issueId = agentState.issueId;
+        const reason = modal === 'handled'
+          ? 'usage limit: Codex rate-limit reminder dismissed without changing model'
+          : 'needs-you: Codex rate-limit dialog remained after Keep current model selection';
+        setAgentPausedSync(sessionName, reason, true);
+        if (issueId) markWorkspaceStuck(issueId, 'usage_limit', { reason });
+        actions.push(`Usage-limit halt: ${sessionName} kept its configured model${modal === 'needs-you' ? ' — needs-you' : ''}`);
+        continue;
+      }
+    }
 
     const hasPrompt = tmuxOutput.includes('❯');
     if (!hasPrompt) continue;
@@ -478,4 +501,3 @@ export async function checkApiErrorAgents(): Promise<string[]> {
 
   return actions;
 }
-

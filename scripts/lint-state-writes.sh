@@ -126,8 +126,27 @@ if [[ -n "$cont_violations" ]]; then
   exit 1
 fi
 
-echo "✓ state-write lint passed (single write surface intact)"
 if [[ -n "${legacy_violations:-}" ]]; then
   echo "⚠ legacy pan-dir writers still present — route to record.ts when possible:"
   echo "$legacy_violations"
 fi
+
+# ── Rule 4: migrated checkout state-path recreation guard (PAN-2541 FR-12a) ──
+# This deliberately scans path construction adjacent to a raw write primitive;
+# the allowlist is the reviewed read/write-door boundary.
+STATE_ALLOWLIST='scripts/state-write-allowlist.txt'
+mapfile -t state_excludes < <(sed '/^[[:space:]]*$/d; s#^#:!#' "$STATE_ALLOWLIST")
+state_candidates=$(
+  { git grep -nE \
+      "(writeFileSync|writeFileString|writeFile\\(|mkdirSync|makeDirectory|renameSync|\\.rename\\().*(\\.pan[/\\\"']|\\.beads[/\\\"'])" \
+      -- 'src/**' 'scripts/**' "${state_excludes[@]}" ':!src/**/__tests__/**' ':!scripts/lint-state-writes.sh'; } || true
+)
+state_violations=$(printf '%s\n' "$state_candidates" | comment_filter)
+if [[ -n "$state_violations" ]]; then
+  echo "✗ direct state-plane write construction outside the approved doors:" >&2
+  echo "$state_violations" >&2
+  echo "Route the mutation through a domain writer or review scripts/state-write-allowlist.txt." >&2
+  exit 1
+fi
+
+echo "✓ state-write lint passed (single write surface intact)"

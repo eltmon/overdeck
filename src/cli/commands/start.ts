@@ -18,7 +18,7 @@ import { hasPRDDraft, getPRDDraftPathSync } from '../../lib/prd-draft.js';
 import { isGitHubIssueSync, resolveGitHubIssueSync } from '../../lib/tracker-utils.js';
 import { Effect } from 'effect';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
-import { getWorkspacePanPaths } from '../../lib/pan-dir/index.js';
+import { getReadableWorkspacePanPaths } from '../../lib/pan-dir/index.js';
 import type { RuntimeName } from '../../lib/runtimes/types.js';
 import { findPlanSync } from '../../lib/vbrief/io.js';
 import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
@@ -765,7 +765,7 @@ async function validateBeadsMatchPlanWithRetry(
  */
 function validateAndCleanStateFile(workspacePath: string, issueId: string): { valid: boolean; removed: boolean; wrongIssue?: string } {
   const upperId = issueId.toUpperCase();
-  const { continuePath } = getWorkspacePanPaths(workspacePath);
+  const { continuePath } = getReadableWorkspacePanPaths(workspacePath);
 
   if (!existsSync(continuePath)) {
     return { valid: true, removed: false };

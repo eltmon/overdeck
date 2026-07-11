@@ -483,6 +483,35 @@ describe('auto-commit', () => {
     }),
   );
 
+  it.effect('commits migrated state only on overdeck-state and asserts the branch', () =>
+    Effect.gen(function* () {
+      const stateTmp = mkdtempSync(join(tmpdir(), 'pan-autocommit-state-'));
+      try {
+        execSync('git init -q', { cwd: stateTmp });
+        configureGit(stateTmp);
+        writeFileSync(join(stateTmp, 'migration-complete.json'), '{}\n');
+        execSync('git add migration-complete.json', { cwd: stateTmp });
+        execSync('git commit -q -m "state marker"', { cwd: stateTmp });
+        execSync('git branch -M overdeck-state', { cwd: stateTmp });
+        execSync('git remote add origin .', { cwd: stateTmp });
+        mkdirSync(join(stateTmp, 'records'));
+        const path = join(stateTmp, 'records', 'pan-2541.json');
+        writeFileSync(path, '{}\n');
+
+        queueAutoCommit({ projectRoot: tmp, repoRoot: stateTmp, paths: [path], subject: 'chore(state): state branch' });
+        expect(yield* flushAutoCommits(tmp)).toEqual({ committed: true });
+        expect(exec(stateTmp, 'git branch --show-current')).toBe('overdeck-state');
+
+        execSync('git branch -M wrong-state', { cwd: stateTmp });
+        writeFileSync(path, '{"changed":true}\n');
+        queueAutoCommit({ projectRoot: tmp, repoRoot: stateTmp, paths: [path], subject: 'chore(state): reject wrong branch' });
+        expect((yield* flushAutoCommits(tmp)).reason).toContain('expected overdeck-state');
+      } finally {
+        rmSync(stateTmp, { recursive: true, force: true });
+      }
+    }),
+  );
+
   it.effect('is a no-op outside a git repo', () =>
     Effect.gen(function* () {
       const noGitTmp = mkdtempSync(join(tmpdir(), 'pan-autocommit-nogit-'));

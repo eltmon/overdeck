@@ -21,7 +21,7 @@ with no convergence guarantee. This queue makes the delivery spine boring.
 4. Deploys build from origin/main, always.
 
 **Execution model:** same as the refactor sprint — PRD-first (drafts in
-`.pan/drafts/PAN-<n>.md`, `Verified-Against` header, grep anchors, re-verify sections),
+`drafts/PAN-<n>.md` on `overdeck-state`, `Verified-Against` header, grep anchors, re-verify sections),
 one work agent at a time within a phase; Phase 0/3/4 items are peripheral and safe for
 normal pipeline flow; Phase 1/2 touch pipeline machinery (TENET-10: red main stalls the
 pipeline that ships the fix) — one at a time, full suite before merge, verify against
@@ -54,7 +54,7 @@ predecessor lands.
 |---|---|---|---|
 | 4 | [PAN-2207](https://github.com/eltmon/overdeck/issues/2207) | `pan done` idempotent per step + deacon patrol for "PR open + beads closed + review never requested" | **PRD written — on main** |
 | 5 | [PAN-2341](https://github.com/eltmon/overdeck/issues/2341) | Boot-time convoy reconcile + zombie review/test agent reap (advancing-ceiling jam) | **PRD written — on main** |
-| 6 | [PAN-2167](https://github.com/eltmon/overdeck/issues/2167) | Clean-tree gate exempts pipeline-owned paths (`.pan/records`, `.pan/test/result.json`) | **PRD written — on main** |
+| 6 | [PAN-2167](https://github.com/eltmon/overdeck/issues/2167) | Clean-tree gate exempts pipeline-owned state paths (the pre-migration record/test layout) | **PRD written** |
 
 ## Phase 2 — strike + swarm merge-path hardening (TENET-10; one at a time)
 

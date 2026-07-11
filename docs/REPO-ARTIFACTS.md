@@ -129,21 +129,20 @@ developer configured globally.
 
 ---
 
-## vBRIEF Lifecycle — `.pan/specs/`
+## vBRIEF Lifecycle — `specs/` on `overdeck-state`
 
-Scope vBRIEFs are durable, first-class source-of-truth artifacts. They live in `.pan/specs/`
-on main and **do not move between directories** — status is tracked via the `plan.status`
+Scope vBRIEFs are durable, first-class source-of-truth artifacts. They live in `specs/`
+on `overdeck-state` (on disk: `${OVERDECK_HOME}/state/<project>/specs/`) and **do not move between directories** — status is tracked via the `plan.status`
 field inside each JSON file. See [VBRIEF.md](./VBRIEF.md) for the full format and lifecycle
 reference.
 
 ```
-project-repo/  (main branch)
-└── .pan/
-    ├── specs/
+state-worktree/  (overdeck-state branch)
+├── specs/
     │   ├── 2026-05-01-PAN-960-foo.vbrief.json     (status: "proposed")
     │   ├── 2026-04-28-PAN-714-bar.vbrief.json     (status: "active")
     │   └── 2026-04-20-MIN-846-baz.vbrief.json     (status: "completed")
-    └── drafts/
+└── drafts/
         └── PAN-970-next-thing.md                   PRD being refined
 ```
 
@@ -151,7 +150,7 @@ project-repo/  (main branch)
 - Filenames are issue-keyed: `YYYY-MM-DD-<ISSUE-ID>-<slug>.vbrief.json`
 - The date prefix is the immutable creation date (UTC)
 - Files never move — `plan.status` field transitions: `draft → proposed → active → completed` (or `cancelled`)
-- Continue state lives in the workspace at `.pan/continue.json`, not alongside the spec on main
+- Continue state lives in the workspace at `.overdeck/continue.json`, not alongside the canonical spec
 
 ### PRDs vs vBRIEFs
 
@@ -159,16 +158,15 @@ These are complementary, not competing artifacts:
 
 | Artifact | Author | Format | Location | Purpose |
 |----------|--------|--------|----------|---------|
-| **PRD** | Human | Markdown | `docs/prds/` | Requirements, intent, context — input to planning |
-| **vBRIEF** | Agent (Opus) | JSON | `.pan/specs/` | Structured operational plan — output of planning |
+| **PRD** | Human | Markdown | `drafts/` on `overdeck-state` | Requirements, intent, context — input to planning |
+| **vBRIEF** | Agent (Opus) | JSON | `specs/` on `overdeck-state` | Structured operational plan — output of planning |
 
 PRDs are human-authored Product Requirement Definitions that describe *what* to build and
-*why*. They live in `docs/prds/{planned,active,completed}/` and are not touched by the
-lifecycle system.
+*why*. Canonical drafts live in `drafts/` on `overdeck-state`.
 
 vBRIEFs are machine-readable operational artifacts that describe *how* to build it — with
-acceptance criteria, dependency DAGs, and status tracking. They live in `.pan/specs/` on
-main with field-based status transitions (files never move between directories).
+acceptance criteria, dependency DAGs, and status tracking. They live in `specs/` on
+`overdeck-state` with field-based status transitions (files never move between directories).
 
 The planning agent reads the PRD (if one exists) as input and produces a vBRIEF plan as output.
 
@@ -192,9 +190,9 @@ This means the entire planning/orchestration context travels with the branch and
 
 Beads (task tracking) live at `.beads/` — a separate dot-directory, not inside `.pan/`.
 
-During planning, the vBRIEF spec is created in `.pan/specs/` on main with
+During planning, the vBRIEF spec is created in `specs/` on `overdeck-state` with
 `plan.status: "proposed"`. When work starts, it is copied to the workspace as
-`.pan/spec.vbrief.json`.
+`.overdeck/spec.vbrief.json`.
 
 ### Continue State (replaces STATE.md)
 
@@ -202,7 +200,7 @@ The structured continuation state file (`continue.json`) replaces the
 free-form `STATE.md`. It contains git state, decisions, hazards, resume points, beads
 mapping, agent model, and session history — all machine-parseable.
 
-**During work**: Written to `.pan/continue.json` in the workspace.
+**During work**: Written to `.overdeck/continue.json` in the workspace.
 **After merge**: Archived with the completed spec on main.
 
 See [VBRIEF.md § Continue State](./VBRIEF.md#continue-state--structured-session-history) for the full schema.
@@ -217,7 +215,7 @@ runs. These live under `.pan/` to keep the project root clean:
 | Path | Written by | Contents |
 |------|-----------|----------|
 | `.pan/events/` | Cost WAL | Per-issue cost event logs (`<issue-id>.jsonl`) |
-| `.pan/review/` | Review agents | Parallel review output |
+| `.overdeck/review/` | Review agents | Parallel review output |
 | `.pan/prompts/` | Remote agents | VM-side agent prompt files |
 
 These directories are **gitignored** — they are runtime state, not repo artifacts.
@@ -225,7 +223,7 @@ Add to `.gitignore`:
 
 ```
 .pan/events/
-.pan/review/
+.overdeck/review/
 .pan/prompts/
 ```
 
@@ -240,13 +238,13 @@ project-repo/
 │   ├── agents/<name>/AGENT.md     Project-specific agent overrides
 │   └── rules/<name>.md            Project-specific rules
 ├── .pan.yaml                      Per-project config (committed)
-├── .pan/specs/                    vBRIEF specs (committed to main, field-based status)
+├── specs/                    vBRIEF specs on overdeck-state (field-based status)
 │   └── YYYY-MM-DD-ID-slug.vbrief.json
-├── .pan/drafts/                   PRDs being refined (committed to main)
-├── .pan/spec.vbrief.json          Workspace scope plan (on feature branch)
-├── .pan/continue.json             Workspace session state (on feature branch)
+├── drafts/                   PRDs being refined on overdeck-state
+├── .overdeck/spec.vbrief.json          Workspace scope plan (on feature branch)
+├── .overdeck/continue.json             Workspace session state (on feature branch)
 ├── .pan/prd.md                    Workspace PRD copy (on feature branch)
-├── .pan/review/                   Specialist feedback (on feature branch)
+├── .overdeck/review/                   Specialist feedback (on feature branch)
 ├── .beads/                        Task tracking beads (on feature branch)
 ├── .claude/                       Claude Code tool directories (committed)
 │   ├── skills/                    ← .pan/skills/ synced here; user-owned skills NOT overwritten
@@ -263,7 +261,7 @@ project-repo/
 │       ├── active/                Human-authored PRDs for active work
 │       ├── planned/               Pre-work PRDs
 │       └── completed/             Archived PRDs
-└── .gitignore                     Must include .pan/events/, .pan/review/, .pan/prompts/
+└── .gitignore                     Must include .pan/events/, .overdeck/review/, .pan/prompts/
 ```
 
 ---
@@ -309,7 +307,7 @@ If yes → root. If no → find or create the appropriate `docs/` subdirectory.
 | Global skills cache | `~/.overdeck/skills/` | Machine-local, refreshed by `pan sync` |
 | Agent state dirs | `~/.overdeck/agents/<id>/` | Runtime state, not portable. Includes `state.json`, `health.json`, `lifecycle.log`, `spawn.log`, `output.log`, launcher scripts, and saved Claude session metadata. |
 | Specialist sessions | `~/.overdeck/specialists/` | Runtime state |
-| Issue archives (runtime) | `~/.overdeck/archives/<issue>/` | Closed-issue runtime state backup (agent dirs, logs). Scope vBRIEFs remain in `.pan/specs/` with `status: "completed"`. |
+| Issue archives (runtime) | `~/.overdeck/archives/<issue>/` | Closed-issue runtime state backup (agent dirs, logs). Scope vBRIEFs remain in `specs/` with `status: "completed"`. |
 | Traefik config | `~/.overdeck/traefik/` | Infrastructure, not project content |
 | Cost database | `~/.overdeck/panopticon.db` | Aggregated across all projects |
 | Shadow state | `~/.overdeck/shadow-state/` | Derived from tracker, not authoritative |

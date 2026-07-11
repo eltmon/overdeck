@@ -229,6 +229,54 @@ function isHookConfigured(
   );
 }
 
+/**
+ * PAN-2530: Remove stale pre-rebrand hook entries that point at the old
+ * `~/.panopticon/bin/<scriptName>` path.
+ *
+ * Before the PAN-1952 rebrand, hooks were installed under `panopticon/bin/`.
+ * `isHookConfigured()` only recognizes the current `overdeck/bin/` path, so a
+ * re-sync after the rename added the new hook *alongside* the legacy one,
+ * leaving both registered and both firing (e.g. ask-user-question-hook fired
+ * twice, one copy still branded "Panopticon"). Prune any legacy entry for this
+ * script so exactly one hook survives after install.
+ *
+ * Mutates `settings` in place. Returns true if anything was removed.
+ */
+export function pruneLegacyPanopticonHook(
+  settings: ClaudeSettings,
+  hookType: keyof NonNullable<ClaudeSettings['hooks']>,
+  scriptName: string,
+): boolean {
+  const list = settings?.hooks?.[hookType];
+  if (!list) return false;
+
+  const isLegacy = (command: string | undefined): boolean =>
+    command?.includes(`panopticon/bin/${scriptName}`) ?? false;
+
+  let removed = false;
+  const next: HookConfig[] = [];
+  for (const hookConfig of list) {
+    const originalHooks = hookConfig.hooks ?? [];
+    const keptHooks = originalHooks.filter((hook) => {
+      if (isLegacy(hook.command)) {
+        removed = true;
+        return false;
+      }
+      return true;
+    });
+    // Drop a config only if it *had* hooks and they were all legacy; otherwise
+    // preserve it (including genuinely-empty configs) unchanged.
+    if (keptHooks.length > 0 || originalHooks.length === 0) {
+      next.push(keptHooks.length === originalHooks.length ? hookConfig : { ...hookConfig, hooks: keptHooks });
+    }
+  }
+
+  if (removed) {
+    settings.hooks![hookType] = next;
+  }
+  return removed;
+}
+
 export function addOverdeckHookIfMissing(
   settings: ClaudeSettings,
   hookType: keyof NonNullable<ClaudeSettings['hooks']>,
@@ -239,6 +287,9 @@ export function addOverdeckHookIfMissing(
   if (!settings.hooks) {
     settings.hooks = {};
   }
+  // PAN-2530: drop any stale panopticon/bin/<scriptName> twin so the rebrand
+  // never leaves two copies of this hook registered and firing together.
+  pruneLegacyPanopticonHook(settings, hookType, scriptName);
   if (isHookConfigured(settings, hookType, binDir, scriptName)) return false;
   const list = (settings.hooks[hookType] ??= []);
   list.push({
@@ -471,11 +522,16 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
   }
 
   const added: string[] = [];
+  const removed: string[] = [];
   const addHookIfMissing = (
     hookType: keyof NonNullable<ClaudeSettings['hooks']>,
     scriptName: string,
     matcher: string = '.*',
   ): void => {
+    // PAN-2530: remove any stale panopticon/bin twin before (re)installing.
+    if (pruneLegacyPanopticonHook(settings, hookType, scriptName)) {
+      removed.push(`${hookType}:${scriptName}`);
+    }
     if (addOverdeckHookIfMissing(settings, hookType, binDir, scriptName, matcher)) {
       added.push(`${hookType}:${scriptName}`);
     }
@@ -518,6 +574,10 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
     addHookIfMissing('PostToolUse', 'tldr-post-edit', 'Edit|Write');
   }
 
+  if (removed.length > 0) {
+    console.log(chalk.yellow(`\n✓ Removed ${removed.length} stale panopticon/bin hook(s):`));
+    for (const entry of removed) console.log(chalk.dim(`  • ${entry}`));
+  }
   if (added.length === 0) {
     console.log(chalk.cyan('\n✓ All Overdeck hooks already registered'));
   } else {

@@ -80,6 +80,11 @@ vi.mock('../../../../src/lib/projects.js', () => ({
   })),
   hasProjectsSync: vi.fn(() => true),
   listProjectsSync: vi.fn(() => [{ key: 'overdeck', config: { name: 'Overdeck', path: projectRoot } }]),
+  findProjectByPathSync: vi.fn(() => ({
+    name: 'Overdeck',
+    path: projectRoot,
+    issue_prefix: 'PAN',
+  })),
 }));
 
 vi.mock('../../../../src/lib/prd-draft.js', () => ({

@@ -74,6 +74,15 @@ function buildReviewFeedbackBody(opts: {
   return `# Review ${verdictLabel} for ${opts.issueId}\n\n${synthesis}${sourceLine}\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n\`pan review request ${opts.issueId} -m "Fixed review issues"\``;
 }
 
+// PAN-2518: the PR-comment POST is advisory — the review verdict is already
+// durable (setReviewStatusSync + writeFeedbackFile) before we get here. A `gh
+// api` call that STALLS (not rejects) on a network hiccup must never block the
+// caller: `pan admin specialists done` is shelled out from the review agent's
+// own session, so a hung POST leaves that agent waiting on a never-returning
+// command and the issue stalls in-review. A bounded timeout turns a stall into
+// a rejection the caller already swallows.
+const PR_COMMENT_TIMEOUT_MS = 15_000;
+
 export async function postPrComment(prUrl: string | undefined, body: string): Promise<boolean> {
   const parsed = parseGitHubPrUrl(prUrl);
   if (!parsed) return false;
@@ -81,7 +90,7 @@ export async function postPrComment(prUrl: string | undefined, body: string): Pr
   await execFileAsync(
     'gh',
     ['api', `repos/${parsed.owner}/${parsed.repo}/issues/${parsed.number}/comments`, '--field', `body=${body}`],
-    { encoding: 'utf-8' },
+    { encoding: 'utf-8', timeout: PR_COMMENT_TIMEOUT_MS, killSignal: 'SIGKILL' },
   );
   return true;
 }

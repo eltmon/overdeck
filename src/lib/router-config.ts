@@ -67,7 +67,7 @@ export function generateRouterConfig(settings: SettingsConfig): RouterConfig {
       apiKey: settings.api_keys.openai.startsWith('$')
         ? settings.api_keys.openai
         : settings.api_keys.openai,
-      models: ['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.2'],
+      models: ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.2'],
     });
   }
 
@@ -134,7 +134,7 @@ export function generateRouterConfigFromWorkTypes(): RouterConfig {
       name: 'openai',
       baseURL: 'https://api.openai.com/v1',
       apiKey: apiKeys.openai.startsWith('$') ? apiKeys.openai : apiKeys.openai,
-      models: ['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.2'],
+      models: ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.2'],
     });
   }
 
@@ -148,7 +148,7 @@ export function generateRouterConfigFromWorkTypes(): RouterConfig {
     });
   }
 
-  for (const role of ['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer'] as const) {
+  for (const role of ['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer', 'knowledge'] as const) {
     router[`role:${role}`] = { model: resolveModel(role, undefined, config) };
   }
   for (const subRole of ['inspect', 'inspect-deep'] as const) {

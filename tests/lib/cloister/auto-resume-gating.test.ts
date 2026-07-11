@@ -13,6 +13,8 @@ describe('auto-resume gates', () => {
   let originalNoResume: string | undefined;
   let originalCwd: string;
   let resumeAgentMock: ReturnType<typeof vi.fn>;
+  // PAN-2507: spy for the resume-yielded-first insertion in autoResumeStoppedWorkAgents.
+  let resumeYieldedMock: ReturnType<typeof vi.fn>;
   let bootReconciliationState: {
     decision: 'pending' | 'resume_all' | 'hold_all' | 'per_agent' | null;
     perAgent: Record<string, 'resume' | 'hold'>;
@@ -40,6 +42,7 @@ describe('auto-resume gates', () => {
     process.env.OVERDECK_HOME = tempHome;
     delete process.env.OVERDECK_NO_RESUME;
     resumeAgentMock = vi.fn();
+    resumeYieldedMock = vi.fn(async () => []);
     resumeSlotsMock = 999;
     bootReconciliationState = {
       decision: null,
@@ -76,6 +79,7 @@ describe('auto-resume gates', () => {
     vi.doUnmock('../../../src/lib/operator-interventions.js');
     vi.doUnmock('../../../src/lib/tmux.js');
     vi.doUnmock('../../../src/lib/cloister/concurrency.js');
+    vi.doUnmock('../../../src/lib/cloister/preemption.js');
     vi.doUnmock('os');
     vi.doUnmock('child_process');
     vi.doUnmock('ora');
@@ -164,6 +168,12 @@ describe('auto-resume gates', () => {
       tryReserveSwarmSlot: () => true,
       releaseSwarmSlot: vi.fn(),
       canDispatchAdvancing: () => true,
+    }));
+    // PAN-2507: mock the preemption module so the resume-yielded-first insertion
+    // and the dispatch-site yield helper are deterministic spies.
+    vi.doMock('../../../src/lib/cloister/preemption.js', () => ({
+      resumeYieldedAgents: (...args: unknown[]) => resumeYieldedMock(...args),
+      tryYieldForAdvancingDispatch: vi.fn(async () => false),
     }));
     vi.doMock('../../../src/lib/review-status.js', () => ({
       getReviewStatus: vi.fn().mockReturnValue({
@@ -317,6 +327,7 @@ describe('auto-resume gates', () => {
       hasProjectsSync: vi.fn().mockReturnValue(true),
       listProjects: vi.fn().mockReturnValue(projects),
       listProjectsSync: vi.fn().mockReturnValue(projects),
+      findProjectByPathSync: vi.fn(() => projects[0].config),
     }));
     vi.doMock('../../../src/lib/work-agent-lifecycle.js', () => ({
       assertCanStartFresh: vi.fn(),
@@ -389,6 +400,20 @@ describe('auto-resume gates', () => {
 
     expect(resumed).toEqual([]);
     expect(resumeAgentMock).not.toHaveBeenCalled();
+  }, 20_000);
+
+  // PAN-2507 (AC-5): scheduler-yielded agents resume first, drawing from the
+  // work-slot budget, before any other stopped candidate is considered.
+  it('resumes scheduler-yielded agents first, within the slot budget', async () => {
+    resumeSlotsMock = 5;
+    resumeYieldedMock.mockResolvedValue(['agent-pan-2001-yielded']);
+    const { autoResumeStoppedWorkAgents } = await loadDeaconWithResumeMock();
+
+    const resumed = await autoResumeStoppedWorkAgents();
+
+    // Called with the free work-slot budget (5), and its result is prepended.
+    expect(resumeYieldedMock).toHaveBeenCalledWith(5);
+    expect(resumed).toContain('agent-pan-2001-yielded');
   }, 20_000);
 
   it('logs verify-paused instead of manually-paused for merged paused agents', async () => {

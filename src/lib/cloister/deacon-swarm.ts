@@ -17,7 +17,10 @@ import {
 import {
   readIssueRecordForWorkspaceSync,
   writeIssueRecordForWorkspaceSync,
+  getIssueRecordPathForWorkspace,
   type PanIssueRecord,
+  type PanIssueSwarmFailedMergeBlock,
+  type PanIssueSwarmSlotCompletion,
 } from '../pan-dir/record.js';
 import { findSpecByIssue } from '../pan-dir/specs.js';
 import { capturePane, isPaneDead, listPaneValues, listSessionNames as listTmuxSessionNames } from '../tmux.js';
@@ -59,8 +62,9 @@ import {
   type RequestIssueReviewResult,
 } from './deacon-swarm-finalization.js';
 import { gcMergedSlots } from './deacon-swarm-gc.js';
-import { createMinimalIssueRecord, writeSwarmFinalizedAt } from './deacon-swarm-record.js';
+import { createMinimalIssueRecord, writeSwarmFinalizedAt, clearSwarmSlotCompletion } from './deacon-swarm-record.js';
 import { fireTieredCommitHooks } from './swarm-tiered-hooks.js';
+import { applySupersededSlotHighWater, archiveFailedSwarmSlot, requeueFailedSwarmSlots } from './swarm-failed-slot.js';
 
 export { gcOrphanedSlots } from './deacon-swarm-orphan-gc.js';
 export { gcMergedSlots } from './deacon-swarm-gc.js';
@@ -132,6 +136,13 @@ export interface CoordinateSwarmSlotsDeps {
   getIssueHold?: (issueId: string) => Pick<ReviewStatus, 'stuck' | 'deaconIgnored' | 'stuckReason'> | null;
   /** Per-issue record statusOverrides — the durable item done-ness the merged plan view applies. */
   readStatusOverrides?: (workspacePath: string, issueId: string) => Record<string, string> | undefined;
+  /**
+   * PAN-2372 WI-4 / FR-6: durable per-slot completion marker (written by slot
+   * `pan done`). When present for a slot, it beats every other classification —
+   * even a vanished session or missing agent — because it is the durable record
+   * that the slot finished; the runtime plane is rebuildable and may be absent.
+   */
+  readSlotCompletion?: (workspacePath: string, issueId: string, slotIndex: number) => PanIssueSwarmSlotCompletion | undefined;
   getFinalizedAt: (issueId: string, workspacePath: string) => string | undefined;
   setFinalizedAt: (issueId: string, workspacePath: string, finalizedAt: string) => void;
   /**
@@ -195,6 +206,7 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   getMaxSlotIndex: defaultGetMaxSlotIndex,
   listSlotAssignments: listDurableSlotAssignments,
   readStatusOverrides: defaultReadStatusOverrides,
+  readSlotCompletion: defaultReadSlotCompletion,
   getFinalizedAt: getSwarmFinalizedAt,
   setFinalizedAt: recordSwarmFinalizedAt,
   requestIssueReview: defaultRequestIssueReview,
@@ -213,8 +225,34 @@ function defaultGetIssueHold(issueId: string): Pick<ReviewStatus, 'stuck' | 'dea
 }
 
 function defaultReadStatusOverrides(workspacePath: string, issueId: string): Record<string, string> | undefined {
+  // PAN-2372 WI-4 / FR-7: distinguish an absent record (silent undefined — a
+  // brand-new issue that simply has no overrides yet) from an UNREADABLE record
+  // (the file exists but won't parse). readIssueRecordForWorkspaceSync returns
+  // null for both, so the existsSync check is what separates them. A corrupt
+  // record is preserved as a .corrupt-<ts> sidecar by the atomic writer (WI-1);
+  // warn so a broken sidecar never silently masks a slot's done-ness.
+  const normalized = issueId.toUpperCase();
+  const record = readIssueRecordForWorkspaceSync(workspacePath, normalized);
+  if (record === null && existsSync(getIssueRecordPathForWorkspace(workspacePath, normalized))) {
+    console.warn(`[swarm] record unreadable for ${normalized} — treating as no overrides; see .corrupt sidecar`);
+    return undefined;
+  }
+  return record?.statusOverrides;
+}
+
+/**
+ * PAN-2372 WI-4 / FR-6: read a slot's durable completion marker from the record
+ * door. Returns undefined when no record or no marker exists. Used by
+ * classifyInFlightSlots to recognize a slot whose `pan done` durably recorded
+ * completion even when the runtime plane (agent state, tmux session) is gone.
+ */
+function defaultReadSlotCompletion(
+  workspacePath: string,
+  issueId: string,
+  slotIndex: number,
+): PanIssueSwarmSlotCompletion | undefined {
   try {
-    return readIssueRecordForWorkspaceSync(workspacePath, issueId.toUpperCase())?.statusOverrides;
+    return readIssueRecordForWorkspaceSync(workspacePath, issueId.toUpperCase())?.swarm?.slotCompletions?.[String(slotIndex)];
   } catch {
     return undefined;
   }
@@ -226,7 +264,7 @@ function defaultShouldDispatch(issueId: string): boolean {
   return !(hold?.stuck || hold?.deaconIgnored);
 }
 
-export type SwarmSlotLifecycle = 'running' | 'ready-to-merge' | 'failed' | 'stalled' | 'awaiting-completion-signal';
+export type SwarmSlotLifecycle = 'running' | 'ready-to-merge' | 'failed' | 'stalled' | 'awaiting-completion-signal' | 'failed-merge-blocked';
 
 export interface ClassifyInFlightSlotsOptions {
   workspacePath?: string;
@@ -241,7 +279,7 @@ export interface ClassifiedSwarmSlot extends ReconciledSlotItem {
   exitStatus?: number | null;
   reason?: 'missing-agent' | 'vanished-session' | 'pane-exit-nonzero' | 'pane-exit-unknown' | 'no-progress-timeout';
   stalledForMs?: number;
-  signal?: 'inferred' | 'completion-nudge';
+  signal?: 'inferred' | 'completion-nudge' | 'durable-completion';
   actions?: string[];
 }
 
@@ -288,10 +326,14 @@ export async function coordinateSwarmSlots(
       actions.push(`[swarm] deferred ${issueId}: advance backoff active`);
       continue;
     }
-    const failedMergeBlock = getFailedMergeBlock(issueId, workspace.workspacePath);
-    if (failedMergeBlock) {
-      actions.push(`[swarm] blocked ${issueId}: failed-merge slot ${failedMergeBlock.slotIndex} (item ${failedMergeBlock.itemId})`);
-      continue;
+    const failedMergeBlocks = getFailedMergeBlocks(issueId, workspace.workspacePath);
+    const blockedSlotIndexes = new Set(failedMergeBlocks.map(block => block.slotIndex));
+    const blockedItemIds = new Set(failedMergeBlocks.map(block => block.itemId));
+    if (failedMergeBlocks.length > 0) {
+      const slots = failedMergeBlocks
+        .map(block => `slot ${block.slotIndex} (item ${block.itemId})`)
+        .join(', ');
+      actions.push(`[swarm] blocked slots for ${issueId}: ${slots} — other slots continue; run \`pan swarm recover ${issueId} <slot>\``);
     }
 
     try {
@@ -326,7 +368,6 @@ export async function coordinateSwarmSlots(
         }
         actions.push(`[swarm] considered ${issueId}: endgame (merge/cleanup only)`);
       }
-
       const classified = await classifyInFlightSlots(reconciled.inFlight, deps, {
         workspacePath: workspace.workspacePath,
         issueId,
@@ -336,13 +377,15 @@ export async function coordinateSwarmSlots(
         actions.push(`[swarm] ${issueId} slot ${slot.slotIndex} ${slot.lifecycle}${slot.signal ? ` signal: ${slot.signal}` : ''}`);
         if (slot.actions) actions.push(...slot.actions);
       }
-      actions.push(...recordStalledSlotRecovery(issueId, classified, workspace.workspacePath));
-      actions.push(...await mergeReadySlots(issueId, workspace.workspacePath, doc, classified, deps));
+      const requeue = await requeueFailedSwarmSlots(issueId, workspace.workspacePath, classified, doc, reconciled, deps, blockedSlotIndexes);
+      actions.push(...requeue.actions);
+      actions.push(...recordStalledSlotRecovery(issueId, classified, workspace.workspacePath)); // stalled slots remain operator-recoverable
+      actions.push(...await mergeReadySlots(issueId, workspace.workspacePath, doc, classified, deps, blockedSlotIndexes));
       actions.push(...await gcMergedSlots(issueId, workspace.workspacePath, reconciled.merged, deps));
       actions.push(...await gcOrphanedSlots(issueId, workspace.workspacePath, reconciled, deps));
       actions.push(...await finalizeSwarmIssueIfComplete(issueId, workspace.workspacePath, spec.document, deps));
       if (dispatchEligible) {
-        actions.push(...await dispatchNextWave(issueId, workspace.workspacePath, doc, reconciled, readiness, deps));
+        actions.push(...await dispatchNextWave(issueId, workspace.workspacePath, requeue.doc, reconciled, analyzeSwarmReadiness(requeue.doc), deps, blockedSlotIndexes, blockedItemIds));
       }
       recordSwarmAdvanceSuccess(issueId);
     } catch (err) {
@@ -365,6 +408,7 @@ export async function classifyInFlightSlots(
       | 'getSlotBranchAheadCount'
       | 'isSlotWorktreeClean'
       | 'sendCompletionNudge'
+      | 'readSlotCompletion'
     >> = defaultDeps,
   options: ClassifyInFlightSlotsOptions = {},
 ): Promise<ClassifiedSwarmSlot[]> {
@@ -374,6 +418,24 @@ export async function classifyInFlightSlots(
   const stallThresholdMs = options.stallThresholdMs ?? swarmStallThresholdMs();
 
   for (const slot of slots) {
+    // PAN-2372 WI-4 / FR-6: a durable completion marker (written by slot
+    // `pan done`) is the STRONGEST completion signal — it is the durable record
+    // that the slot finished, so it beats a vanished session, a missing agent,
+    // and the rebuildable runtime plane. Check it before everything else. The
+    // itemId guard (AC2) ignores a stale marker left for a slot now bound to a
+    // different item (e.g. after a re-plan rotated slot→item).
+    if (options.workspacePath && options.issueId) {
+      const completion = await (deps.readSlotCompletion ?? defaultReadSlotCompletion)(
+        options.workspacePath,
+        options.issueId,
+        slot.slotIndex,
+      );
+      if (completion && (!completion.itemId || completion.itemId === slot.itemId)) {
+        classified.push({ ...slot, lifecycle: 'ready-to-merge', exitStatus: 0, signal: 'durable-completion' });
+        continue;
+      }
+    }
+
     const durableReady = await classifyDurableReadySlot(slot, deps, options);
     if (!slot.agentId) {
       if (durableReady) {
@@ -480,6 +542,7 @@ export async function mergeReadySlots(
   doc: VBriefDocument,
   slots: ClassifiedSwarmSlot[],
   deps: Pick<CoordinateSwarmSlotsDeps, 'verifyAndMergeSlot' | 'applyTaskOperationToPlanFile' | 'fireTieredCommitHooks'> = defaultDeps,
+  blockedSlotIndexes: Set<number> = new Set(),
 ): Promise<string[]> {
   const actions: string[] = [];
   const itemsById = new Map(doc.plan.items.map(item => [item.id, item]));
@@ -487,6 +550,11 @@ export async function mergeReadySlots(
 
   for (const slot of slots) {
     if (slot.lifecycle !== 'ready-to-merge') continue;
+
+    if (blockedSlotIndexes.has(slot.slotIndex)) {
+      actions.push(`[swarm] skipped merge slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: failed-merge block — awaiting \`pan swarm recover\``);
+      continue;
+    }
 
     const item = itemsById.get(slot.itemId);
     if (!item) {
@@ -511,6 +579,10 @@ export async function mergeReadySlots(
         itemId: item.id,
         writerId: 'deacon-swarm',
       }, workspacePath);
+      // PAN-2372 WI-4 / FR-6: the durable marker has done its job — the slot is
+      // merged. Clear it so the same slotIndex can be re-dispatched later without
+      // a stale "completed" marker falsely surfacing as ready-to-merge.
+      clearSwarmSlotCompletion(workspacePath, issueId, slot.slotIndex);
       actions.push(`[swarm] merged slot ${slot.slotIndex} (item ${item.id}) for ${issueId}`);
       // PAN-2385: commits just landed — fire the tiered feed + supervisor review (best-effort).
       try {
@@ -572,13 +644,48 @@ export function isSwarmAdvanceCoolingDown(issueId: string, now = Date.now()): bo
   return record !== undefined && record.cooldownUntil > now;
 }
 
-export function getFailedMergeBlock(issueId: string, workspacePath?: string): FailedMergeBlock | undefined {
+export function getFailedMergeBlock(
+  issueId: string,
+  slotIndex: number,
+  workspacePath?: string,
+): FailedMergeBlock | undefined {
   const normalized = issueId.toUpperCase();
   if (workspacePath) {
-    const durable = readIssueRecordForWorkspaceSync(workspacePath, normalized)?.swarm?.failedMergeBlock;
-    if (durable) return { ...durable, issueId: durable.issueId.toUpperCase() };
+    const swarm = readIssueRecordForWorkspaceSync(workspacePath, normalized)?.swarm;
+    const keyed = swarm?.failedMergeBlocks?.[String(slotIndex)];
+    if (keyed) return { ...keyed, issueId: keyed.issueId.toUpperCase() };
+    const legacy = swarm?.failedMergeBlock;
+    if (legacy && legacy.slotIndex === slotIndex) {
+      return { ...legacy, issueId: legacy.issueId.toUpperCase() };
+    }
   }
-  return failedMergeBlocks.get(normalized);
+  return failedMergeBlocks.get(`${normalized}:${slotIndex}`);
+}
+
+export function getFailedMergeBlocks(issueId: string, workspacePath?: string): FailedMergeBlock[] {
+  const normalized = issueId.toUpperCase();
+  const bySlot = new Map<number, FailedMergeBlock>();
+
+  if (workspacePath) {
+    const swarm = readIssueRecordForWorkspaceSync(workspacePath, normalized)?.swarm;
+    if (swarm?.failedMergeBlock) {
+      const legacy = swarm.failedMergeBlock;
+      bySlot.set(legacy.slotIndex, { ...legacy, issueId: legacy.issueId.toUpperCase() });
+    }
+    if (swarm?.failedMergeBlocks) {
+      for (const [key, block] of Object.entries(swarm.failedMergeBlocks)) {
+        bySlot.set(Number(key), { ...block, issueId: block.issueId.toUpperCase() });
+      }
+    }
+  }
+
+  for (const [key, block] of failedMergeBlocks.entries()) {
+    if (key.startsWith(`${normalized}:`) && !bySlot.has(block.slotIndex)) {
+      bySlot.set(block.slotIndex, { ...block });
+    }
+  }
+
+  return [...bySlot.values()].sort((a, b) => a.slotIndex - b.slotIndex);
 }
 
 export function getSwarmFinalizedAt(issueId: string, workspacePath?: string): string | undefined {
@@ -591,19 +698,24 @@ export function recordSwarmFinalizedAt(issueId: string, workspacePath: string, f
 
 export function recordFailedMergeBlock(block: FailedMergeBlock, workspacePath?: string): void {
   const normalizedBlock = { ...block, issueId: block.issueId.toUpperCase() };
-  failedMergeBlocks.set(normalizedBlock.issueId, normalizedBlock);
-  if (workspacePath) writeSwarmFailedMergeBlock(workspacePath, normalizedBlock.issueId, normalizedBlock);
+  failedMergeBlocks.set(`${normalizedBlock.issueId}:${normalizedBlock.slotIndex}`, normalizedBlock);
+  if (workspacePath) {
+    writeSwarmFailedMergeBlock(workspacePath, normalizedBlock.issueId, normalizedBlock.slotIndex, normalizedBlock);
+  }
 }
 
-export function clearFailedMergeBlock(issueId: string, workspacePath?: string): void {
+export function clearFailedMergeBlock(issueId: string, slotIndex: number, workspacePath?: string): void {
   const normalizedIssueId = issueId.toUpperCase();
-  failedMergeBlocks.delete(normalizedIssueId);
-  if (workspacePath) writeSwarmFailedMergeBlock(workspacePath, normalizedIssueId, undefined);
+  failedMergeBlocks.delete(`${normalizedIssueId}:${slotIndex}`);
+  if (workspacePath) {
+    writeSwarmFailedMergeBlock(workspacePath, normalizedIssueId, slotIndex, undefined);
+  }
 }
 
 export async function recoverFailedMergeSlot(
   issueId: string,
   workspacePath: string,
+  slotIndex: number,
   doc: VBriefDocument,
   action: SwarmRecoveryAction,
   deps: Pick<
@@ -618,11 +730,23 @@ export async function recoverFailedMergeSlot(
     | 'shouldDispatch'
     | 'getMaxSlotIndex'
     | 'listSlotAssignments'
+    | 'runGitCommand'
   > = defaultDeps,
 ): Promise<string[]> {
   const normalizedIssueId = issueId.toUpperCase();
-  const block = getFailedMergeBlock(normalizedIssueId, workspacePath);
-  if (!block) return [`[swarm] no failed-merge slot for ${normalizedIssueId}`];
+  const block = getFailedMergeBlock(normalizedIssueId, slotIndex, workspacePath);
+  if (!block) {
+    const otherBlocks = getFailedMergeBlocks(normalizedIssueId, workspacePath);
+    if (otherBlocks.length === 0) {
+      return [`[swarm] no failed-merge slot for ${normalizedIssueId}`];
+    }
+    const lines = otherBlocks
+      .map(b => `  slot ${b.slotIndex} (item ${b.itemId}): ${b.note}`)
+      .join('\n');
+    return [
+      `[swarm] no failed-merge block for ${normalizedIssueId} slot ${slotIndex}. Currently blocked slots:\n${lines}`,
+    ];
+  }
 
   const planPath = join(workspacePath, '.pan', 'spec.vbrief.json');
   if (action === 'handoff') {
@@ -638,18 +762,35 @@ export async function recoverFailedMergeSlot(
       writerId: 'deacon-swarm',
       reason: 'Dropped failed swarm slot after operator recovery',
     }, workspacePath);
-    clearFailedMergeBlock(normalizedIssueId, workspacePath);
+    clearFailedMergeBlock(normalizedIssueId, block.slotIndex, workspacePath);
     deps.clearSlotAssignment(workspacePath, normalizedIssueId, block.slotIndex, block.itemId);
     return [`[swarm] dropped failed-merge slot ${block.slotIndex} (item ${block.itemId}) for ${normalizedIssueId}`];
   }
 
+  // retry: archive the conflicted attempt so it cannot re-assert, then unblock
+  // and dispatch a fresh attempt.
+  await archiveFailedSwarmSlot(
+    normalizedIssueId,
+    workspacePath,
+    {
+      itemId: block.itemId,
+      slotIndex: block.slotIndex,
+      status: 'in_flight',
+      branch: block.branch,
+      agentId: block.branch ? `agent-${normalizedIssueId.toLowerCase()}-slot-${block.slotIndex}` : undefined,
+    },
+    { runGitCommand: deps.runGitCommand, clearSlotAssignment: deps.clearSlotAssignment },
+  );
   await deps.applyTaskOperationToPlanFile(planPath, {
     type: 'unblock',
     itemId: block.itemId,
     writerId: 'deacon-swarm',
     reason: 'Retrying failed swarm slot after merge conflict',
   }, workspacePath);
-  clearFailedMergeBlock(normalizedIssueId, workspacePath);
+  clearFailedMergeBlock(normalizedIssueId, block.slotIndex, workspacePath);
+  const remainingBlocks = getFailedMergeBlocks(normalizedIssueId, workspacePath);
+  const blockedSlotIndexes = new Set(remainingBlocks.map(b => b.slotIndex));
+  const blockedItemIds = new Set(remainingBlocks.map(b => b.itemId));
   const retryDoc = {
     ...doc,
     plan: {
@@ -668,42 +809,62 @@ export async function recoverFailedMergeSlot(
       pending: [],
       branches: [],
       agents: [],
-    }, analyzeSwarmReadiness(retryDoc), deps),
+    }, analyzeSwarmReadiness(retryDoc), deps, blockedSlotIndexes, blockedItemIds),
   ];
 }
 
 export function recordStalledSlotRecovery(issueId: string, slots: ClassifiedSwarmSlot[], workspacePath?: string): string[] {
   const actions: string[] = [];
   const normalizedIssueId = issueId.toUpperCase();
-  if (getFailedMergeBlock(normalizedIssueId, workspacePath)) return actions;
 
-  const stalled = slots.find(slot => slot.lifecycle === 'stalled');
-  if (!stalled) return actions;
+  for (const slot of slots.filter(s => s.lifecycle === 'stalled')) {
+    if (getFailedMergeBlock(normalizedIssueId, slot.slotIndex, workspacePath)) continue;
 
-  recordFailedMergeBlock({
-    issueId: normalizedIssueId,
-    itemId: stalled.itemId,
-    slotIndex: stalled.slotIndex,
-    branch: stalled.branch,
-    note: `Slot ${stalled.slotIndex} stalled with no branch commit or pane output progress`,
-  }, workspacePath);
-  actions.push(`[swarm] stalled slot ${stalled.slotIndex} (item ${stalled.itemId}) for ${normalizedIssueId}: recovery required`);
+    recordFailedMergeBlock({
+      issueId: normalizedIssueId,
+      itemId: slot.itemId,
+      slotIndex: slot.slotIndex,
+      branch: slot.branch,
+      note: `Slot ${slot.slotIndex} stalled with no branch commit or pane output progress`,
+    }, workspacePath);
+    actions.push(`[swarm] stalled slot ${slot.slotIndex} (item ${slot.itemId}) for ${normalizedIssueId}: recovery required`);
+  }
+
   return actions;
 }
 
 function writeSwarmFailedMergeBlock(
   workspacePath: string,
   issueId: string,
+  slotIndex: number,
   block: FailedMergeBlock | undefined,
 ): void {
   const normalizedIssueId = issueId.toUpperCase();
   const existing = readIssueRecordForWorkspaceSync(workspacePath, normalizedIssueId);
   const record = existing ?? createMinimalIssueRecord(normalizedIssueId);
+  const existingSwarm = record.swarm ?? {};
+  const existingBlocks = existingSwarm.failedMergeBlocks ?? {};
+
+  // PAN-2364: fold a legacy singular block into the per-slot map and clear the
+  // singular field on first write to the new keyed storage.
+  const foldedBlocks: Record<string, PanIssueSwarmFailedMergeBlock> = { ...existingBlocks };
+  if (existingSwarm.failedMergeBlock) {
+    foldedBlocks[String(existingSwarm.failedMergeBlock.slotIndex)] = existingSwarm.failedMergeBlock;
+  }
+
+  const nextBlocks = { ...foldedBlocks };
+  if (block) {
+    nextBlocks[String(slotIndex)] = block;
+  } else {
+    delete nextBlocks[String(slotIndex)];
+  }
+
   writeIssueRecordForWorkspaceSync(workspacePath, normalizedIssueId, {
     ...record,
     swarm: {
-      ...(record.swarm ?? {}),
-      failedMergeBlock: block,
+      ...existingSwarm,
+      failedMergeBlocks: nextBlocks,
+      failedMergeBlock: undefined,
     },
   });
 }
@@ -739,23 +900,24 @@ export async function dispatchNextWave(
     | 'getMaxSlotIndex'
     | 'listSlotAssignments'
   > & Partial<Pick<CoordinateSwarmSlotsDeps, 'listSessionNames' | 'slotWorktreeExists'>> = defaultDeps,
+  blockedSlotIndexes: Set<number> = new Set(),
+  blockedItemIds: Set<string> = new Set(),
 ): Promise<string[]> {
   const actions: string[] = [];
   const mergedItemIds = new Set(reconciled.merged.map(slot => slot.itemId));
   const slotEligibleIds = new Set(readiness.items.filter(item => item.slotEligible).map(item => item.id));
-  const maxSlotIndex = Math.max(1, Math.floor((deps.getMaxSlotIndex ?? defaultGetMaxSlotIndex)()));
+  const configuredMaxSlotIndex = Math.max(1, Math.floor((deps.getMaxSlotIndex ?? defaultGetMaxSlotIndex)()));
   const occupiedSlotIndexes = new Set([
+    ...blockedSlotIndexes, // PAN-2364: blocked slots count as occupied so other slots cannot collide with them
     ...reconciled.inFlight.map(slot => slot.slotIndex),
-    // ALL local slot branches — merged or not — hold their index until gc
-    // deletes the branch; reusing a merged-branch index would respawn onto a
-    // stale branch (PAN-2214).
+    // Local branches hold their index until GC; archived indexes are added below.
     ...reconciled.branches.map(branch => branch.slotIndex),
     ...reconciled.agents.map(agent => agent.slotIndex),
-    // Durable slot assignments from the issue record survive registry resets.
     ...(deps.listSlotAssignments ?? listDurableSlotAssignments)(issueId, workspacePath).map(assignment => assignment.slotIndex),
+    ...(reconciled.superseded ?? []).map(attempt => attempt.slotIndex),
   ]);
-  // Orphaned on-disk slot worktrees — no assignment, agent, or branch entry —
-  // still occupy their index (PAN-2213).
+  const maxSlotIndex = applySupersededSlotHighWater(occupiedSlotIndexes, reconciled, configuredMaxSlotIndex);
+  // Orphaned on-disk worktrees still occupy their index (PAN-2213).
   if (deps.slotWorktreeExists) {
     for (let index = 1; index <= maxSlotIndex; index++) {
       if (!occupiedSlotIndexes.has(index) && deps.slotWorktreeExists(`${workspacePath}-slot-${index}`)) {
@@ -769,6 +931,7 @@ export async function dispatchNextWave(
   const planPath = join(workspacePath, '.pan', 'spec.vbrief.json');
 
   for (const item of getDispatchableItems(doc, mergedItemIds)) {
+    if (blockedItemIds.has(item.id)) continue;
     if (!slotEligibleIds.has(item.id)) continue;
     if (inFlightItemIds.has(item.id)) continue;
 

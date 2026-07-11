@@ -479,6 +479,27 @@ describe('spawnAgent PTY supervisor wiring', () => {
     expect(sessionOptions.env.OVERDECK_FLYWHEEL_AGENT_ROLE).toBeUndefined();
   });
 
+  it('spawns a knowledge role as a specialist live session and skips work beads/verification gates', async () => {
+    writeSupervisorArtifact();
+    const { spawnRun } = await import('../agents.js');
+    const { assertIssueHasBeads } = await import('../beads-query.js');
+
+    const state = await spawnRun('PAN-2468', 'knowledge', {
+      workspace,
+      model: 'claude-sonnet-4-6',
+    });
+
+    expect(state.id).toBe('agent-pan-2468-knowledge');
+    expect(state.role).toBe('knowledge');
+    expect(createSessionMock).toHaveBeenCalledWith(
+      'agent-pan-2468-knowledge',
+      workspace,
+      expect.stringContaining('launcher.sh'),
+      expect.any(Object),
+    );
+    expect(assertIssueHasBeads).not.toHaveBeenCalled();
+  });
+
   it('writes Channels MCP config and bridge token when the MCP override is enabled', async () => {
     vi.useFakeTimers();
     try {

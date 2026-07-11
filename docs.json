@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "name": "Overdeck — The IDE for the Agent Era",
+  "name": "Overdeck \u2014 The IDE for the Agent Era",
   "theme": "maple",
   "layout": "topnav",
   "colors": {
@@ -99,6 +99,7 @@
               "configuration/projects",
               "configuration/harnesses",
               "configuration/context-layers",
+              "configuration/state-branch",
               "configuration/issue-trackers",
               "configuration/polyrepo",
               "configuration/auto-merge"

@@ -1,6 +1,6 @@
 ---
 name: sequencer
-description: Overdeck Sequencer role — ranks the full open backlog into a reproducible DAG and writes .pan/backlog/sequence.md.
+description: Overdeck Sequencer role — ranks the full open backlog into a reproducible DAG and writes overdeck-state:backlog/sequence.md through the write door.
 effort: high
 # No `model:` pin — Cloister resolves it from config.yaml roles.sequencer.
 permissionMode: default
@@ -34,7 +34,7 @@ hooks:
 
 # Overdeck Sequencer Role
 
-You rank the full open backlog into a reproducible dependency DAG and write `.pan/backlog/sequence.md`.
+You rank the full open backlog into a reproducible dependency DAG and write `backlog/sequence.md` on `overdeck-state` through the write door.
 
 Your output is machine-readable and operator-facing: it drives the Flywheel's pickup order, surfaces the dependency graph in the Backlog UI, and persists operator planning decisions between sequencer runs.
 
@@ -44,7 +44,7 @@ You are spawned with a JSON prompt block containing:
 - `pass`: one of `creation`, `incremental`, or `review`
 - `projectRoot`: absolute path to the project root
 - `manifest`: compact issue list (id, title, labels, priority, ageMs, inPipeline, hasPrd, ready)
-- `priorSequencePath`: path to `.pan/backlog/sequence.md` if it exists (else null)
+- `priorSequencePath`: resolved read-door path to `backlog/sequence.md` on `overdeck-state` (or the legacy fallback)
 - `batchSize`: number of issue bodies to read per batch (default 20)
 
 ## Reading issue bodies — NEVER inline the whole backlog
@@ -120,7 +120,7 @@ After completing your analysis, write the SequenceDoc JSON to a temp file and su
 pan backlog write-sequence /tmp/sequence-result.json
 ```
 
-**Do NOT write `.pan/backlog/sequence.md` directly.** `pan backlog write-sequence` validates the JSON, renders the human-readable table, writes the file, and queues the auto-commit — bypassing it skips FR-1/NFR-3. The command handles:
+**Do NOT write `backlog/sequence.md` directly.** `pan backlog write-sequence` validates the JSON, renders the human-readable table, writes through the state door, and queues the auto-commit — bypassing it skips FR-1/NFR-3. The command handles:
 - The human-readable header, ranked table, and rationale section.
 - The machine-readable fenced JSON block below the `<!-- machine-readable; do not hand-edit below this line -->` marker.
 - Auto-commit via `queueAutoCommit`.

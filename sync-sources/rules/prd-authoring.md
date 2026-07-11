@@ -3,9 +3,11 @@ scope: universal
 ---
 ### PRD / spec authoring — write for the cheapest model that will execute it
 
-PRDs, specs, and plans (e.g. `.pan/drafts/<issue>.md`, vBRIEF items) are executed
-by implementation agents that may run on cheaper or smaller models than the one
-that wrote the plan. Ambiguity in the spec becomes wrong guesses in the diff.
+PRDs, specs, and plans (for example, `drafts/<issue>.md` on `overdeck-state`,
+on disk at `${OVERDECK_HOME}/state/<project>/drafts/<issue>.md`) are executed by
+implementation agents that may run on cheaper or smaller models than the one
+that wrote the plan. Unmigrated projects alone still resolve the legacy
+`<projectRoot>/.pan/drafts/<issue>.md` fallback. Ambiguity in the spec becomes wrong guesses in the diff.
 Author every plan so it can be executed without re-research or judgment calls:
 
 - **Implementation detail belongs in the PRD — this is deliberate.** Conventional

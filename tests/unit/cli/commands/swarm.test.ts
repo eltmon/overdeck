@@ -74,6 +74,7 @@ function makeDeps(doc: VBriefDocument): SwarmCommandDeps {
       '[swarm] dispatched implementation slot 1 (item wi-1) for PAN-2203',
     ]),
     getFailedMergeBlock: vi.fn(() => ({ issueId: 'PAN-2203', itemId: 'wi-1', slotIndex: 1, note: 'conflict' })),
+    getFailedMergeBlocks: vi.fn(() => []),
     recoverFailedMergeSlot: vi.fn(async () => ['[swarm] retrying failed-merge slot 1 (item wi-1) for PAN-2203']),
     console: {
       log: vi.fn(),
@@ -225,13 +226,52 @@ describe('pan swarm command', () => {
     const result = await swarmRecoverCommand('PAN-2203', '1', { action: 'retry' }, deps);
 
     expect(result.ok).toBe(true);
-    expect(deps.getFailedMergeBlock).toHaveBeenCalledWith('PAN-2203', '/repo/workspaces/feature-pan-2203');
+    expect(deps.getFailedMergeBlock).toHaveBeenCalledWith('PAN-2203', 1, '/repo/workspaces/feature-pan-2203');
     expect(deps.recoverFailedMergeSlot).toHaveBeenCalledWith(
       'PAN-2203',
       '/repo/workspaces/feature-pan-2203',
+      1,
       doc,
       'retry',
     );
+  });
+
+  it('recover retry routes a non-merge slot failure through coordinator archival', async () => {
+    const deps = makeDeps(makeDoc([makeEligibleItem('wi-1', 'src/a.ts')]));
+    deps.getFailedMergeBlock = vi.fn(() => undefined);
+    deps.coordinateSwarmSlots = vi.fn(async () => [
+      '[swarm] archived failed slot 3 (item wi-1) for PAN-2203',
+      '[swarm] dispatched implementation slot 4 (item wi-1) for PAN-2203',
+    ]);
+
+    const result = await swarmRecoverCommand('PAN-2203', '3', { action: 'retry' }, deps);
+
+    expect(result.ok).toBe(true);
+    expect(deps.coordinateSwarmSlots).toHaveBeenCalledWith({ issueId: 'PAN-2203' });
+    expect(deps.recoverFailedMergeSlot).not.toHaveBeenCalled();
+  });
+
+  it('recover against a slot with no block lists the currently blocked slots and exits nonzero', async () => {
+    const deps = makeDeps(makeDoc([makeEligibleItem('wi-1', 'src/a.ts')]));
+    deps.getFailedMergeBlock = vi.fn(() => undefined);
+    deps.getFailedMergeBlocks = vi.fn(() => [
+      { issueId: 'PAN-2203', itemId: 'wi-1', slotIndex: 1, note: 'slot 1 conflict' },
+      { issueId: 'PAN-2203', itemId: 'wi-3', slotIndex: 3, note: 'slot 3 conflict' },
+    ]);
+    deps.coordinateSwarmSlots = vi.fn(async () => []);
+
+    const result = await swarmRecoverCommand('PAN-2203', '2', { action: 'retry' }, deps);
+
+    expect(result.ok).toBe(false);
+    expect(deps.recoverFailedMergeSlot).not.toHaveBeenCalled();
+    expect(deps.console.error).toHaveBeenCalledWith(
+      expect.stringContaining('No failed-merge block for PAN-2203 slot 2'),
+    );
+    const errorCall = vi.mocked(deps.console.error).mock.calls.find(call =>
+      String(call[0]).includes('No failed-merge block for PAN-2203 slot 2'),
+    )?.[0];
+    expect(String(errorCall)).toContain('slot 1 (item wi-1): slot 1 conflict');
+    expect(String(errorCall)).toContain('slot 3 (item wi-3): slot 3 conflict');
   });
 
   it('recover reads a failed slot persisted by Deacon instead of a CLI-local map', async () => {
@@ -278,7 +318,7 @@ describe('pan swarm command', () => {
       const result = await swarmRecoverCommand('PAN-2203', '1', { action: 'retry' }, deps);
 
       expect(result.ok).toBe(true);
-      expect(deps.recoverFailedMergeSlot).toHaveBeenCalledWith('PAN-2203', workspace, doc, 'retry');
+      expect(deps.recoverFailedMergeSlot).toHaveBeenCalledWith('PAN-2203', workspace, 1, doc, 'retry');
     } finally {
       rmSync(workspace, { recursive: true, force: true });
       resetSwarmLoopSafetyForTests();
@@ -458,6 +498,7 @@ describe('pan swarm status (PAN-2214)', () => {
     hold?: { deaconIgnored?: boolean; deaconIgnoredReason?: string; stuck?: boolean; stuckReason?: string } | null;
     reconciled?: Record<string, unknown>;
     classified?: Array<Record<string, unknown>>;
+    getFailedMergeBlocks?: () => Array<Record<string, unknown>>;
     sessionNames?: string[];
     liveSlotCount?: number;
   } = {}): SwarmStatusCommandDeps {
@@ -484,6 +525,7 @@ describe('pan swarm status (PAN-2214)', () => {
         ...options.reconciled,
       })) as unknown as SwarmStatusCommandDeps['reconcileSlotState'],
       classifyInFlightSlots: vi.fn(async () => (options.classified ?? []) as never),
+      getFailedMergeBlocks: vi.fn(() => (options.getFailedMergeBlocks ? options.getFailedMergeBlocks() : [])),
       getReviewStatusSync: vi.fn(() => options.hold ?? null) as unknown as SwarmStatusCommandDeps['getReviewStatusSync'],
       listSessionNamesSync: vi.fn(() => options.sessionNames ?? []),
       getConcurrencyLimits: vi.fn(() => ({
@@ -547,6 +589,40 @@ describe('pan swarm status (PAN-2214)', () => {
     expect(loggedText(deps)).toContain('Hold: none — the Deacon is actively coordinating this issue on every patrol.');
   });
 
+  it('PAN-2364: lists blocked slots separately and overrides ready-to-merge mislabel', async () => {
+    const deps = makeStatusDeps({
+      reconciled: {
+        inFlight: [
+          { itemId: 'wi-1', slotIndex: 1, status: 'in_flight', branch: 'feature/pan-2203-slot-1', agentId: 'agent-pan-2203-slot-1' },
+          { itemId: 'wi-2', slotIndex: 2, status: 'in_flight', branch: 'feature/pan-2203-slot-2', agentId: 'agent-pan-2203-slot-2' },
+        ],
+        branches: [
+          { slotIndex: 1, branch: 'feature/pan-2203-slot-1', merged: false },
+          { slotIndex: 2, branch: 'feature/pan-2203-slot-2', merged: false },
+        ],
+      },
+      classified: [
+        { itemId: 'wi-1', slotIndex: 1, lifecycle: 'ready-to-merge' },
+        { itemId: 'wi-2', slotIndex: 2, lifecycle: 'running' },
+      ],
+      getFailedMergeBlocks: () => [
+        { issueId: 'PAN-2203', itemId: 'wi-1', slotIndex: 1, note: 'merge conflict' },
+        { issueId: 'PAN-2203', itemId: 'wi-3', slotIndex: 3, note: 'another conflict' },
+      ],
+    });
+
+    const result = await swarmStatusCommand('PAN-2203', deps);
+
+    expect(result.ok).toBe(true);
+    const output = loggedText(deps);
+    expect(output).toContain('slot 1 · item wi-1 · failed-merge (blocked)');
+    expect(output).not.toContain('slot 1 · item wi-1 · ready-to-merge');
+    expect(output).toContain('slot 2 · item wi-2 · running');
+    expect(output).toContain('Blocked slots:');
+    expect(output).toContain('slot 1 (item wi-1): merge conflict. Recover with `pan swarm recover PAN-2203 1 --action retry|drop|handoff`.');
+    expect(output).toContain('slot 3 (item wi-3): another conflict. Recover with `pan swarm recover PAN-2203 3 --action retry|drop|handoff`.');
+  });
+
   it('is read-only: no record writes, git mutations, or spawns are possible through its deps', async () => {
     const deps = makeStatusDeps({
       reconciled: {
@@ -568,6 +644,7 @@ describe('pan swarm status (PAN-2214)', () => {
       'countRunningSwarmSlotsForIssue',
       'findSpecByIssue',
       'getConcurrencyLimits',
+      'getFailedMergeBlocks',
       'getReviewStatusSync',
       'listSessionNamesSync',
       'reconcileSlotState',
@@ -598,6 +675,7 @@ describe('pan swarm reset (PAN-2214)', () => {
       resolveProjectFromIssueSync: vi.fn(() => ({ projectName: 'overdeck', projectPath: '/repo' })),
       clearAllSlotAssignments: vi.fn(),
       clearFailedMergeBlock: vi.fn(),
+      getFailedMergeBlocks: vi.fn(() => [{ issueId: 'PAN-2203', itemId: 'wi-1', slotIndex: 1, note: 'conflict' }]),
       runGitCommand: vi.fn(async (command: string) => {
         gitCalls.push(command);
         if (command.startsWith('git for-each-ref')) {
@@ -693,7 +771,7 @@ describe('pan swarm reset (PAN-2214)', () => {
 
     expect(result.ok).toBe(true);
     expect(deps.clearAllSlotAssignments).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203');
-    expect(deps.clearFailedMergeBlock).toHaveBeenCalledWith('PAN-2203', '/repo/workspaces/feature-pan-2203');
+    expect(deps.clearFailedMergeBlock).toHaveBeenCalledWith('PAN-2203', 1, '/repo/workspaces/feature-pan-2203');
     // The running row is stopped twice at most (once via stop's enumeration, once via the
     // final sweep) — the essential guarantee is it is stopped and the stopped row is not touched.
     expect(deps.stopAgentSync).toHaveBeenCalledWith('agent-pan-2203-slot-1');
