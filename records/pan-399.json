@@ -136,6 +136,21 @@
       "timestamp": "2026-07-11T21:41:55.232Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-07-11T22:12:54.067Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-11T22:15:01.233Z"
+    },
+    {
+      "timestamp": "2026-07-11T22:19:05.177Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
@@ -254,23 +269,23 @@
       "tests/unit/lib/projects-release-config.test.ts",
       "tests/unit/lib/review-status-release.test.ts"
     ],
-    "recordedAt": "2026-07-11T21:41:48.518Z"
+    "recordedAt": "2026-07-11T22:18:47.079Z"
   },
   "created": "2026-07-11T09:28:34.266Z",
-  "updated": "2026-07-11T21:48:28.805Z",
+  "updated": "2026-07-11T22:22:24.992Z",
   "pipeline": {
     "issueId": "PAN-399",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-11T21:48:28.773Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed verification error",
+    "updatedAt": "2026-07-11T22:22:24.375Z",
+    "reviewNotes": "Verification failed at typecheck",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2577",
     "lastVerifiedCommit": "3d1876c48fabb8c4c98c848b867698e27f998428",
-    "reviewRequestedAt": "2026-07-11T21:48:23.041Z",
+    "reviewRequestedAt": "2026-07-11T22:20:21.644Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "drizzle/overdeck/0000_overdeck_init.sql",
@@ -386,9 +401,8 @@
         "tests/unit/lib/projects-release-config.test.ts",
         "tests/unit/lib/review-status-release.test.ts"
       ],
-      "recordedAt": "2026-07-11T21:41:48.518Z"
-    },
-    "panDoneRecoveredAt": "2026-07-11T21:48:23.041Z"
+      "recordedAt": "2026-07-11T22:18:47.079Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -401,9 +415,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 59267610,
-            "output": 151297,
-            "cacheRead": 55831296,
+            "input": 59804884,
+            "output": 152231,
+            "cacheRead": 56265984,
             "cacheWrite": 0
           },
           "unknown": {
@@ -467,9 +481,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 4878178,
-            "output": 286464,
-            "cacheRead": 166146816,
+            "input": 4940352,
+            "output": 289102,
+            "cacheRead": 169002752,
             "cacheWrite": 0
           }
         }
@@ -482,9 +496,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 59967970,
-          "output": 180326,
-          "cacheRead": 61523200,
+          "input": 60505244,
+          "output": 181260,
+          "cacheRead": 61957888,
           "cacheWrite": 0
         },
         "unknown": {
@@ -518,15 +532,15 @@
           "cacheWrite": 77989
         },
         "custom/kimi-k2.7-code": {
-          "input": 4878178,
-          "output": 286464,
-          "cacheRead": 166146816,
+          "input": 4940352,
+          "output": 289102,
+          "cacheRead": 169002752,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 139.072185,
-        "pricingAsOf": "2026-07-11T21:48:28.803Z"
+        "usd": 140.442725,
+        "pricingAsOf": "2026-07-11T22:22:24.948Z"
       }
     },
     "merges": [
