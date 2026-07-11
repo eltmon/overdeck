@@ -252,17 +252,17 @@
     "recordedAt": "2026-07-11T20:48:18.808Z"
   },
   "created": "2026-07-11T09:28:34.266Z",
-  "updated": "2026-07-11T20:51:37.560Z",
+  "updated": "2026-07-11T21:20:46.903Z",
   "pipeline": {
     "issueId": "PAN-399",
-    "reviewStatus": "failed",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-11T20:51:37.427Z",
-    "reviewNotes": "Review role spawn failed: Role run agent-pan-399-review already running. Use 'pan tell' to message it.",
+    "updatedAt": "2026-07-11T21:20:46.813Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed verification error",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2577",
     "lastVerifiedCommit": "3d1876c48fabb8c4c98c848b867698e27f998428",
     "reviewRequestedAt": "2026-07-11T20:48:23.984Z",
@@ -461,9 +461,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 4790014,
-            "output": 275690,
-            "cacheRead": 156378368,
+            "input": 4819856,
+            "output": 285862,
+            "cacheRead": 164926720,
             "cacheWrite": 0
           }
         }
@@ -512,15 +512,15 @@
           "cacheWrite": 77989
         },
         "custom/kimi-k2.7-code": {
-          "input": 4790014,
-          "output": 275690,
-          "cacheRead": 156378368,
+          "input": 4819856,
+          "output": 285862,
+          "cacheRead": 164926720,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 135.794241,
-        "pricingAsOf": "2026-07-11T20:51:37.518Z"
+        "usd": 137.48746500000001,
+        "pricingAsOf": "2026-07-11T21:20:46.870Z"
       }
     },
     "merges": [
@@ -528,8 +528,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "release-engine-tests": "completed",
     "release-engine-tests.ac1": "completed",
