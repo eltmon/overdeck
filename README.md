@@ -36,7 +36,7 @@ No install step required. `npx @overdeck/core` starts Command Deck and opens the
 
 **Requires Node.js 22.16+** (or 24+) — the floor for the bundled `node:sqlite` driver. If your shell's default Node is older, Overdeck automatically relaunches under an installed compatible Node (Homebrew `node@22`, nvm, fnm, volta, or asdf) — no manual switching needed. If none is found, it prints the exact install command for your setup.
 
-Dashboard runs at https://pan.localhost (or http://localhost:3011 if you skip HTTPS setup).
+Dashboard runs at https://overdeck.localhost (or http://localhost:3011 if you skip HTTPS setup).
 
 See the [full documentation](https://docs.overdeck.ai) for detailed setup, configuration, and usage guides.
 

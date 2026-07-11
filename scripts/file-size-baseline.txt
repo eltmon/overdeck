@@ -1,7 +1,7 @@
 1013 src/cli/commands/doctor.ts
 1060 src/cli/commands/done.ts
 1575 src/cli/commands/start.ts
-1454 src/cli/index.ts
+1459 src/cli/index.ts
 1012 src/dashboard/frontend/src/components/AwaitingMergePage.tsx
 1374 src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx
 1540 src/dashboard/frontend/src/components/CommandDeck/index.tsx
@@ -17,7 +17,7 @@
 1321 src/dashboard/server/ws-rpc.ts
 1035 src/lib/cloister/deacon-auto-resume.ts
 1179 src/lib/cloister/deacon-swarm.ts
-3622 src/lib/cloister/deacon.ts
+3627 src/lib/cloister/deacon.ts
 1409 src/lib/cloister/merge-agent.ts
 2135 src/lib/cloister/service.ts
 1749 src/lib/cloister/specialists.ts
@@ -27,9 +27,9 @@
 1104 src/lib/overdeck/agents.ts
 1539 src/lib/overdeck/conversations.ts
 1050 src/lib/overdeck/memory.ts
-1001 src/lib/overdeck/merge.ts
-1110 src/lib/review-status.ts
-1476 src/lib/settings-api.ts
+1002 src/lib/overdeck/merge.ts
+1153 src/lib/review-status.ts
+1486 src/lib/settings-api.ts
 1205 src/lib/sync.ts
 1268 src/lib/tmux.ts
 1092 src/lib/vbrief/dag.ts

@@ -30,4 +30,4 @@ api_port = 3002
 [traefik]
 enabled = true
 dashboard_port = 8080
-domain = "pan.localhost"
+domain = "overdeck.localhost"

@@ -872,7 +872,7 @@ describe('FeatureItem', () => {
           json: async () => ({
             exists: true,
             issueId: 'PAN-821',
-            frontendUrl: 'https://feature-pan-821.pan.localhost',
+            frontendUrl: 'https://feature-pan-821.overdeck.localhost',
             stackHealth: {
               healthy: false,
               reasons: ['api unhealthy: connection refused'],
@@ -993,7 +993,7 @@ describe('FeatureItem', () => {
     stubWorkspace({
       exists: true,
       issueId: 'PAN-821',
-      frontendUrl: 'https://feature-pan-821.pan.localhost',
+      frontendUrl: 'https://feature-pan-821.overdeck.localhost',
       stackHealth: {
         healthy: false,
         reasons: ['api unhealthy: connection refused'],

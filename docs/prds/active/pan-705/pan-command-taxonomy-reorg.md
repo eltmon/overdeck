@@ -122,7 +122,7 @@ The dashboard is the other user-facing surface and must stay in lockstep with th
 
 14g. Add a one-time upgrade announcement banner on first dashboard launch after upgrade. Renders the migration table from QUICK-REFERENCE.md inline, dismissible, persisted to localStorage. Implemented as a component under `src/dashboard/frontend/src/components/upgrade-announcement/`.
 
-**Exit criteria:** All `/api/work/*` routes removed. No frontend grep hits for legacy command strings. Dashboard integration tests green. First-launch announcement renders and dismisses correctly. `pan up && open https://pan.localhost` shows the announcement on first visit after upgrade.
+**Exit criteria:** All `/api/work/*` routes removed. No frontend grep hits for legacy command strings. Dashboard integration tests green. First-launch announcement renders and dismisses correctly. `pan up && open https://overdeck.localhost` shows the announcement on first visit after upgrade.
 
 ### Phase 5 — Docs and tests
 

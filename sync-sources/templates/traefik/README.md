@@ -11,8 +11,8 @@ Traefik reverse proxy for local development with HTTPS.
 ├── dynamic/                # Dynamic routing configs
 │   └── overdeck.yml      # Dashboard routing
 ├── certs/                  # mkcert SSL certificates
-│   ├── _wildcard.pan.localhost.pem
-│   └── _wildcard.pan.localhost-key.pem
+│   ├── _wildcard.overdeck.localhost.pem
+│   └── _wildcard.overdeck.localhost-key.pem
 └── README.md               # This file
 ```
 
@@ -20,8 +20,8 @@ Traefik reverse proxy for local development with HTTPS.
 
 | URL | Service |
 |-----|---------|
-| `https://pan.localhost` | Overdeck Dashboard (Frontend) |
-| `https://pan.localhost/api/*` | Overdeck Dashboard (API) |
+| `https://overdeck.localhost` | Overdeck Dashboard (Frontend) |
+| `https://overdeck.localhost/api/*` | Overdeck Dashboard (API) |
 | `http://localhost:8080` | Traefik Dashboard |
 
 ## How It Works
@@ -33,8 +33,8 @@ Traefik reverse proxy for local development with HTTPS.
 - Sets up TLS with wildcard certificates
 
 ### Dynamic Configuration (`dynamic/overdeck.yml`)
-- Routes `https://pan.localhost` to dashboard frontend (port 3001)
-- Routes `https://pan.localhost/api/*` to dashboard API (port 3002)
+- Routes `https://overdeck.localhost` to dashboard frontend (port 3001)
+- Routes `https://overdeck.localhost/api/*` to dashboard API (port 3002)
 - Uses `host.docker.internal` to access host-based services
 
 ### Docker Compose
@@ -47,12 +47,12 @@ Traefik reverse proxy for local development with HTTPS.
 
 1. **mkcert certificates** must be generated first:
    ```bash
-   mkcert "*.pan.localhost" "*.localhost" localhost 127.0.0.1 ::1
+   mkcert "*.overdeck.localhost" "*.localhost" localhost 127.0.0.1 ::1
    ```
    Certificates should be in `~/.overdeck/traefik/certs/`
 
 2. **DNS/Hosts configuration**:
-   - Add to `/etc/hosts`: `127.0.0.1 pan.localhost`
+   - Add to `/etc/hosts`: `127.0.0.1 overdeck.localhost`
    - Wildcard `*.localhost` resolves automatically on most systems
 
 ## Usage

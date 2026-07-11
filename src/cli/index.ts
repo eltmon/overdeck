@@ -79,7 +79,7 @@ import { pendingCommand } from './commands/pending.js';
 import { requestReviewCommand } from './commands/request-review.js';
 import { resetReviewCommand } from './commands/reset-review.js';
 import { abortReviewCommand } from './commands/abort-review.js';
-import { reviewModeCommand } from './commands/review-mode.js';
+import { reviewModeCommand, reviewScopeCommand } from './commands/review-mode.js';
 // PAN-1048 R5: `pan review run` removed. Review now runs as the role primitive
 // via spawnRun(issueId, 'review', …) → roles/review.md, with convoy reviewers
 // spawned by the review role through `pan review spawn-reviewer`.
@@ -358,8 +358,13 @@ review
 
 review
   .command('mode <id> <mode>')
-  .description('Set per-issue review mode (quick or full)')
+  .description('Set per-issue review mode (quick, full, or none)')
   .action(reviewModeCommand);
+
+review
+  .command('scope <id> <scope>')
+  .description('Set per-issue re-review scope (all, changed, or blockers) — which convoy reviewers re-run (PAN-1874)')
+  .action(reviewScopeCommand);
 
 review
   .command('restart <id>')
@@ -673,7 +678,7 @@ program
     // Check if Traefik is enabled
     const configFile = join(process.env.HOME || '', '.overdeck', 'config.toml');
     let traefikEnabled = false;
-    let traefikDomain = 'pan.localhost';
+    let traefikDomain = 'overdeck.localhost';
     let dashboardPort = 3010;
     let dashboardApiPort = 3011;
 
@@ -682,7 +687,7 @@ program
         const configContent = readFileSync(configFile, 'utf-8');
         const config = parse(configContent) as any;
         traefikEnabled = config.traefik?.enabled === true;
-        traefikDomain = config.traefik?.domain || 'pan.localhost';
+        traefikDomain = config.traefik?.domain || 'overdeck.localhost';
         dashboardPort = config.dashboard?.port || 3010;
         dashboardApiPort = config.dashboard?.api_port || 3011;
       } catch (error) {

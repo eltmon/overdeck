@@ -104,7 +104,7 @@ history (`git log --follow docs/FLYWHEEL-STATE.md`).
   line is NOT a green CI result. Use `gh run list --branch main --workflow CI --limit 1`.
   Red main silently empties the merge gate (every PR inherits the failing `test` check).
   (RUN-32 t7, RUN-34 t1)
-- **`pan flywheel emit-status` 404s in the standard host env** when `DASHBOARD_URL=https://pan.localhost`
+- **`pan flywheel emit-status` 404s in the standard host env** when `DASHBOARD_URL=https://overdeck.localhost`
   is set — `dashboardBaseUrl()` (`src/cli/commands/flywheel.ts:103`) POSTs through the Traefik proxy,
   which 404s POST mutations even though the route is healthy on the local server (`GET localhost:3011/api/flywheel/status` → 200).
   **Every tick, emit with the loopback override:** `OVERDECK_DASHBOARD_URL=http://localhost:3011 pan flywheel emit-status --file <path>`

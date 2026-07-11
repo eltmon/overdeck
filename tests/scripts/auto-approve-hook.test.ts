@@ -49,6 +49,7 @@ describe('auto-approve-hook', () => {
     'flywheel-orchestrator',
     'strike-pan-1616',
     'inspect-pan-1616-workspace-kb8b7',
+    'conv-pan-1616',
   ])('auto-allows read-only tool calls for %s', async (agentId) => {
     const stdin = JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'git diff --stat' } })
 
@@ -68,7 +69,6 @@ describe('auto-approve-hook', () => {
   })
 
   it.each([
-    ['conversation agents', 'conv-pan-1616'],
     ['unset agent ID', undefined],
   ] as const)('stays silent for %s', async (_label, agentId) => {
     const stdin = JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'git diff --stat' } })

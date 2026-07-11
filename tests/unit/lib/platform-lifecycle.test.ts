@@ -23,7 +23,7 @@ const baseConfig = {
   dashboardPort: 43990,
   dashboardApiPort: 43991,
   traefikEnabled: false,
-  traefikDomain: 'pan.localhost',
+  traefikDomain: 'overdeck.localhost',
   traefikDir: '/tmp/does-not-exist/traefik',
 };
 

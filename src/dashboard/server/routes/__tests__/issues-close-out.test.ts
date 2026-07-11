@@ -264,7 +264,7 @@ describe('POST /api/issues/:id/close-out', () => {
     const result = await postCloseOut('PAN-1190', {
       [INTERNAL_TOKEN_HEADER]: '',
       cookie: `${DASHBOARD_SESSION_COOKIE}=test-browser-session-token`,
-      origin: 'http://api-feature-pan-1190.pan.localhost:3011',
+      origin: 'http://api-feature-pan-1190.overdeck.localhost:3011',
       [DASHBOARD_CSRF_HEADER]: dashboardCsrfToken(),
     });
 
@@ -310,7 +310,7 @@ describe('POST /api/issues/bulk-close-out', () => {
   it('rejects cookie-authenticated bulk close-out from untrusted same-site origins', async () => {
     const result = await postBulkCloseOut({
       cookie: `${DASHBOARD_SESSION_COOKIE}=test-browser-session-token`,
-      origin: 'http://feature-pan-1190.pan.localhost:3011',
+      origin: 'http://feature-pan-1190.overdeck.localhost:3011',
       [DASHBOARD_CSRF_HEADER]: dashboardCsrfToken(),
     });
 

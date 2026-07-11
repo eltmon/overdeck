@@ -26,6 +26,8 @@ import {
 } from '../agents.js';
 import { countAgentsByStatus } from '../overdeck/agents.js';
 import { getCachedMemoryVerdict } from './memory-verdict-cache.js';
+import { isRoleTerminal, type AdvancingRole } from './reap-terminal-sessions.js';
+import { readReviewStatusMap } from './review-status-source.js';
 
 const DEFAULT_MAX_WORK_AGENTS = 6;
 const DEFAULT_RESERVED_ADVANCING_SLOTS = 3;
@@ -95,8 +97,9 @@ export function describeRunningAgents(): string {
   const swarm = alive.filter(a => a.role === 'work' && SWARM_SLOT_ID.test(a.id)).map(a => a.id);
   const work = alive.filter(a => a.role === 'work' && !SWARM_SLOT_ID.test(a.id)).map(a => a.id);
   const advancing = alive.filter(a => a.role && ADVANCING_ROLES.has(a.role)).map(a => a.id);
+  const warmIdle = countWarmIdleAdvancingAgents(alive);
   const { totalCeiling } = getConcurrencyLimits();
-  return `counts: work=${work.length} advancing=${advancing.length} swarm=${swarm.length} total=${work.length + advancing.length}/${totalCeiling}`
+  return `counts: work=${work.length} advancing=${advancing.length} (warm-idle=${warmIdle}, excluded) swarm=${swarm.length} total=${work.length + Math.max(0, advancing.length - warmIdle)}/${totalCeiling}`
     + ` | advancing=[${advancing.join(', ')}] work=[${work.join(', ')}] swarm=[${swarm.join(', ')}]`;
 }
 
@@ -128,18 +131,47 @@ export function countRunningSwarmSlotsForIssue(
   ).length;
 }
 
+/**
+ * PAN-2579: count running advancing-role agents whose issue's phase verdict is
+ * already terminal — "warm-idle" sessions kept alive for fast re-review under
+ * the warm-by-default lifecycle. They are free capacity, not load: excluding
+ * them from the ceiling is what lets warm sessions persist without recreating
+ * the PAN-1716 livelock (completed reviewers starving every new dispatch).
+ * Best-effort: if the review-status source is unregistered or unreadable,
+ * count nothing as warm-idle (the ceiling stays conservative). The status map
+ * is read through the cycle-free review-status-source leaf, registered by
+ * review-status.ts at module load.
+ */
+export function countWarmIdleAdvancingAgents(
+  agents: ReturnType<typeof listRunningAgentsSync> = listRunningAgentsSync(),
+): number {
+  const advancingRows = agents.filter(a => a.role && ADVANCING_ROLES.has(a.role) && a.issueId);
+  if (advancingRows.length === 0) return 0;
+  const statuses = readReviewStatusMap();
+  if (!statuses) return 0;
+  let warmIdle = 0;
+  for (const row of advancingRows) {
+    const status = statuses[row.issueId!.toUpperCase()];
+    if (status && isRoleTerminal(row.role as AdvancingRole, status)) warmIdle++;
+  }
+  return warmIdle;
+}
+
 export function countRunningAgents(): RunningCounts {
   const counts = countAgentsByStatus('running');
   const workTotal = counts['work'] ?? 0;
-  let advancing = 0;
+  let advancingTotal = 0;
   for (const role of ADVANCING_ROLES) {
-    advancing += counts[role] ?? 0;
+    advancingTotal += counts[role] ?? 0;
   }
   // Swarm slots are work-role sessions but draw from the dedicated swarm reserve,
   // so subtract them from `work` (PAN-2212): the swarm neither starves nor is
   // starved by the work/advancing ceiling.
   const swarm = countRunningSwarmSlots();
   const work = Math.max(0, workTotal - swarm);
+  // PAN-2579: warm-idle advancing sessions (verdict terminal, kept alive for the
+  // next cycle) do not occupy the ceiling.
+  const advancing = Math.max(0, advancingTotal - countWarmIdleAdvancingAgents());
   return { work, advancing, swarm, total: work + advancing };
 }
 

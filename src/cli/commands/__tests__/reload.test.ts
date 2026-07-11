@@ -125,7 +125,7 @@ describe('reloadCommand', () => {
       dashboardPort: 3010,
       dashboardApiPort: 3011,
       traefikEnabled: false,
-      traefikDomain: 'pan.localhost',
+      traefikDomain: 'overdeck.localhost',
       traefikDir: '/tmp/traefik',
     });
     mocks.restartDashboard.mockReturnValue(Effect.succeed(undefined));

@@ -302,10 +302,10 @@ docker ps | grep traefik
 docker logs traefik
 
 # Verify DNS resolution
-ping myapp.pan.localhost
+ping myapp.overdeck.localhost
 
 # Check /etc/hosts
-grep pan.localhost /etc/hosts
+grep overdeck.localhost /etc/hosts
 ```
 
 ### WSL2 networking

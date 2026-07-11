@@ -1,36 +1,22 @@
 /**
- * Reap terminal-status advancing-role sessions (PAN-1716).
+ * Warm-idle advancing-session classification (PAN-2579; formerly the PAN-1716
+ * reap-on-verdict selection).
  *
  * Advancing roles (review/test/ship) run one tmux session per role per issue.
- * Once a session records its terminal phase verdict the Claude process sits idle
- * at its prompt forever — nothing kills it. `countRunningAgents()` keeps counting
- * those zombies against the PAN-1665 advancing ceiling, so a handful of completed
- * review/test sessions can starve every new dispatch and livelock the pipeline.
+ * Under the warm-by-default lifecycle a session that has recorded its terminal
+ * phase verdict stays ALIVE — "warm-idle" — so the next cycle can resume it with
+ * its context intact (fast re-review). This module holds the pure classification
+ * logic shared by:
  *
- * This module holds the pure selection logic shared by the completion path
- * (`pan specialists done`) and the deacon defense-in-depth janitor: given the
- * review-status map and the set of tmux-alive sessions, decide which advancing
- * sessions are safe to reap.
+ *   - `countRunningAgents()` (concurrency.ts), which EXCLUDES warm-idle sessions
+ *     from the PAN-1665 advancing ceiling — they are free capacity, not load
+ *     (this fixes the accounting bug that reap-on-verdict used to work around);
+ *   - the memory governor's shed ladder, which kills warm-idle sessions FIRST
+ *     under HARD memory pressure (they resume with context via the saved
+ *     session, so a shed costs latency, not state);
+ *   - the deacon's merged-issue reapers (sessions of MERGED issues are past
+ *     close-out and are still reaped).
  */
-
-/**
- * PAN-2007 (operator request, 2026-06-21): temporarily keep specialist
- * (review/test/ship) tmux sessions ALIVE through the whole pipeline so the
- * operator can watch them and confirm verdict signaling. While `true`:
- *   - the PAN-1716 terminal-advancing reaper (`checkTerminalAdvancingSessions`)
- *     is a no-op, and
- *   - the `pan specialists done` completion path records the verdict but does
- *     NOT kill the tmux session.
- *
- * The verdict is recorded BEFORE either kill would fire and the deacon advances
- * the pipeline independently, so disabling the kills loses no state.
- *
- * Tradeoff: idle specialist sessions linger and count against the PAN-1665
- * advancing-role ceiling until close-out. Acceptable for low-volume supervised
- * debugging only — set back to `false` once the review session-death + reset
- * loop work is done (see PAN-2007 re-enable checklist).
- */
-export const KEEP_SPECIALIST_SESSIONS_ALIVE = false;
 
 export type AdvancingRole = 'review' | 'test' | 'ship';
 

@@ -194,12 +194,12 @@ else
 fi
 
 # Test 8: HTTPS endpoint responds (if DNS configured)
-test_start "HTTPS endpoint https://pan.localhost responds"
-if curl -k -sf https://pan.localhost > /dev/null 2>&1; then
+test_start "HTTPS endpoint https://overdeck.localhost responds"
+if curl -k -sf https://overdeck.localhost > /dev/null 2>&1; then
     test_pass
 else
     log_warn "HTTPS endpoint not accessible (DNS may not be configured)"
-    log_warn "Add to /etc/hosts: 127.0.0.1 pan.localhost"
+    log_warn "Add to /etc/hosts: 127.0.0.1 overdeck.localhost"
 fi
 
 # Test 9: Port-based access still works

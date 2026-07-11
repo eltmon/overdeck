@@ -37,115 +37,36 @@
  */
 
 import { exec } from 'child_process';
-import { mkdir, readFile, rm } from 'fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { killSession, listSessionNames, isPaneDead } from '../tmux.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { removeAgentSync, listAgentIdsByPrefixSync } from '../overdeck/agents.js';
-import { setReviewStatusSync } from '../review-status.js';
+import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
 import { loadConfigSync as loadYamlConfig, resolveModel, type ReviewMode } from '../config-yaml.js';
 import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } from './review-context.js';
 import { buildRealConflictGateDeps, getCachedConflictGateMergeability, resolveConflictGate } from './conflict-gate.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
+import { type ReReviewScope } from './review-rerun-scope.js';
+import {
+  computeConvoyScope,
+  launchConvoyReviewersPromise,
+} from './review-convoy.js';
 import { shouldSkipDispatchAsMerged } from './merge-verification.js';
 import { readIssueRecordSync, resolveProjectForIssue } from '../pan-dir/record.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
-import { AGENTS_DIR, packageRoot } from '../paths.js';
+import { AGENTS_DIR, packageRoot, sessionFilePath } from '../paths.js';
 import { getAgentStateSync } from '../agents.js';
 import type { RuntimeName } from '../runtimes/types.js';
 
-/**
- * Read a convoy sub-role prompt template from the overdeck install.
- *
- * Sub-role prompts are harness-agnostic templates owned by Overdeck. The
- * orchestrator reads them from its own install (packageRoot/roles/) and
- * inlines the body into the spawn message — they never live in the agent's
- * workspace, and they are never loaded via the Claude-specific `--agent` flag.
- * That keeps the same prompt content driving Claude Code, Pi, Codex, or any
- * future harness, and prevents a work agent from ambiently discovering its
- * own reviewer prompts in the workspace tree.
- */
-async function readConvoySubRoleTemplate(subRole: string): Promise<string> {
-  const path = join(packageRoot, 'roles', `review-${subRole}.md`);
-  return readFile(path, 'utf-8');
-}
-
 const execAsync = promisify(exec);
-const REVIEWER_TIMEOUT_MS = 20 * 60 * 1000;
-
-function reviewerAgentId(issueId: string, subRole: ReviewSubRole): string {
-  return `agent-${issueId.toLowerCase()}-review-${subRole}`;
-}
-
-function reviewerAgentOutputPath(workspace: string, runId: string, subRole: ReviewSubRole): string {
-  return join(workspace, PAN_DIRNAME, 'review', runId, `${subRole}.md`);
-}
-
 // PAN-1531: review-temp stash helpers removed.
 // Review now runs against the committed diff only. The dirty-worktree gate
 // at pan done time (and the same gate added to /api/review/:id/request)
 // guarantees the worktree is clean before specialists see the diff.
-
-async function buildConvoyPromptPromise(opts: {
-  issueId: string;
-  subRole: string;
-  outputPath: string;
-  synthesisAgentId: string;
-  contextManifestPath?: string;
-  tier1Summary?: string;
-}): Promise<string> {
-  const template = await readConvoySubRoleTemplate(opts.subRole);
-  const prompt = [
-    `REVIEW TASK for ${opts.issueId} — ${opts.subRole.toUpperCase()} REVIEW:`,
-    '',
-    `Issue: ${opts.issueId}`,
-    `Sub-role: ${opts.subRole}`,
-    '',
-    'Output file — write your full findings here when done:',
-    `  ${opts.outputPath}`,
-    '',
-    opts.tier1Summary
-      ? [
-          'Shared review context (read this first; do not run git diff yourself):',
-          '─────────────────────────────────────────────────────────────',
-          opts.tier1Summary,
-          '─────────────────────────────────────────────────────────────',
-          '',
-          opts.contextManifestPath
-            ? `Full manifest (read on demand for additional detail): ${opts.contextManifestPath}`
-            : '',
-        ].join('\n')
-      : opts.contextManifestPath
-        ? [
-            'Context manifest (read this first; do not run git diff yourself):',
-            `  ${opts.contextManifestPath}`,
-            'The manifest contains per-file risk ranking and acceptance criteria.',
-          ].join('\n')
-        : 'No context manifest available. Write a blocked reviewer report explaining that the shared review context is missing.',
-    '',
-    '─────────────────────────────────────────────────────────────',
-    'REVIEW METHODOLOGY (inlined from roles/review-' + opts.subRole + '.md):',
-    '─────────────────────────────────────────────────────────────',
-    '',
-    template.trim(),
-    '',
-    '─────────────────────────────────────────────────────────────',
-    '',
-    'Write exactly one final report to the output file shown above, then stop',
-    'and wait. You do NOT need to signal synthesis or run any pan command —',
-    'when you finish your turn with the report written, Overdeck detects it',
-    'and signals the synthesis agent REVIEWER_READY automatically. Your only',
-    'job is to write the report file, then stop.',
-    'Only the output file is consumed by synthesis; your chat response is not the review report.',
-  ].filter(Boolean).join('\n');
-
-  const sizeBytes = Buffer.byteLength(prompt, 'utf-8');
-  console.log(`[review-agent] Convoy prompt for ${opts.issueId}/${opts.subRole}: ${sizeBytes} bytes`);
-  return prompt;
-}
 
 function buildReviewRolePrompt(opts: {
   issueId: string;
@@ -156,30 +77,85 @@ function buildReviewRolePrompt(opts: {
   reviewDir: string;
   contextManifestPath?: string;
   tier1Summary?: string;
+  /** PAN-1862 (FR-9): sub-roles actually running this cycle (default: all four). */
+  inScopeSubRoles?: ReviewSubRole[];
+  /** PAN-1862 (FR-9): sub-roles whose passed verdicts are carried forward this cycle. */
+  carriedSubRoles?: Array<{ subRole: ReviewSubRole; atCommit?: string }>;
+  /**
+   * PAN-1862 Phase A: when true, the parent performs SHARED DISCOVERY first and
+   * signals `pan admin specialists discovery-ready review <id>`; the server then
+   * forks this session into the convoy so the reviewers inherit the warm cache.
+   */
+  discovery?: boolean;
 }): string {
+  const inScope = opts.inScopeSubRoles && opts.inScopeSubRoles.length > 0 ? opts.inScopeSubRoles : [...REVIEW_SUB_ROLES];
+  const carried = opts.carriedSubRoles ?? [];
   const subRoleFiles = REVIEW_SUB_ROLES.map(r => `  ${join(opts.reviewDir, `${r}.md`)}`).join('\n');
-  const expectedSignals = REVIEW_SUB_ROLES.map(r => `  REVIEWER_READY ${r} <outputPath> or REVIEWER_FAILED ${r} <reason> or REVIEWER_TIMEOUT ${r} <reason>`).join('\n');
+  const expectedSignals = inScope.map(r => `  REVIEWER_READY ${r} <outputPath> or REVIEWER_FAILED ${r} <reason> or REVIEWER_TIMEOUT ${r} <reason>`).join('\n');
   const synthesisPath = join(opts.reviewDir, 'synthesis.md');
+  const runningDesc = inScope.length === REVIEW_SUB_ROLES.length
+    ? 'the four convoy reviewers (security, correctness, performance, requirements)'
+    : `${inScope.length} convoy reviewer(s) this cycle (${inScope.join(', ')})`;
+  const carriedSection = carried.length > 0
+    ? [
+        '',
+        `CARRIED-FORWARD VERDICTS (PAN-1862 selective re-review): ${carried.map(c => c.subRole).join(', ')}.`,
+        'These reviewers PASSED the prior cycle and none of their domain files changed',
+        'since, so they were NOT re-run. Their stub reports are already written in the',
+        'review directory — treat each as a passed verdict. Do NOT wait for signals',
+        'from them; they will never arrive.',
+      ].join('\n')
+    : '';
+  const discoverySection = opts.discovery
+    ? [
+        `DISCOVERY + SYNTHESIS — REVIEW for ${opts.issueId}`,
+        '',
+        'PHASE 1 — SHARED DISCOVERY (do this FIRST):',
+        'Read the code the whole review convoy will need so it lives in THIS',
+        "session's history. WHY: after you signal readiness the server FORKS this",
+        'session into the convoy reviewers, and because the prompt cache is',
+        'content-addressed, everything you read here becomes a ~90%-discounted',
+        'cache read for every forked reviewer instead of four independent',
+        'full-price re-reads. Reviewers also review better when they all see the',
+        'same curated context and understand the change as a whole.',
+        '',
+        '1. Read the context manifest (path below): risk ranking + acceptance criteria.',
+        '2. Read the committed diff for the branch (git diff against the merge base).',
+        '3. Read the FULL contents of the HIGH-risk changed files and the immediately',
+        '   surrounding code they depend on. Stay within the manifest scope — this is',
+        '   curation for the convoy, not an open-ended crawl.',
+        '',
+        'Then signal readiness EXACTLY ONCE (repeat signals are a server-side no-op):',
+        `  pan admin specialists discovery-ready review ${opts.issueId}`,
+        '',
+        'PHASE 2 — STANDBY (after the signal):',
+        `The server forks this session into ${runningDesc}.`,
+        'Your work resumes only once they finish.',
+        '',
+      ]
+    : [
+        `STANDBY — REVIEW SYNTHESIS for ${opts.issueId}`,
+        '',
+        `Do NOT do anything yet. The Overdeck server has already spawned ${runningDesc}`,
+        'and they are running in parallel right now. Your work begins only once they finish.',
+        '',
+      ];
   const prompt = [
-    `STANDBY — REVIEW SYNTHESIS for ${opts.issueId}`,
-    '',
-    'Do NOT do anything yet. The Overdeck server has already spawned the four',
-    'convoy reviewers (security, correctness, performance, requirements) and they',
-    'are running in parallel right now. Your work begins only once they finish.',
-    '',
-    'You will receive exactly one `pan tell` signal per sub-role as each reviewer',
-    'finishes — these are delivered to you as user messages:',
+    ...discoverySection,
+    `You will receive exactly one \`pan tell\` signal per RUNNING sub-role as each`,
+    'reviewer finishes — these are delivered to you as user messages:',
     expectedSignals,
+    carriedSection,
     '',
-    'Until all four terminal signals have arrived: do nothing. Do not read the',
+    `Until all ${inScope.length} terminal signal(s) have arrived: do nothing. Do not read the`,
     'reviewer output files, do not run git, do not inspect tmux sessions, do not',
     'poll anything. Just wait — the reviewers notify you when they finish, and',
     'Deacon is the failsafe if one never starts or never completes. Acting early',
     'wastes tokens reviewing nothing.',
     '',
-    'Once you have all four terminal signals, follow roles/review.md exactly to',
-    'read the reports, synthesize the verdict, write the synthesis report, and',
-    'signal the status.',
+    `Once you have all ${inScope.length} terminal signal(s), follow roles/review.md exactly to`,
+    'read the reports (including any carried-forward stubs), synthesize the verdict,',
+    'write the synthesis report, and signal the status.',
     '',
     '── Review context ──',
     `Issue: ${opts.issueId}`,
@@ -206,9 +182,12 @@ function buildReviewRolePrompt(opts: {
     'Convoy reviewer output files (read each one ONLY after its REVIEWER_READY signal):',
     subRoleFiles,
     '',
-    'After writing the synthesis report, signal the verdict with Overdeck CLI:',
-    `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>"`,
-    `  pan admin specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>"`,
+    'After writing the synthesis report, signal the verdict with Overdeck CLI,',
+    'including a per-reviewer verdict for each sub-role that RAN this cycle',
+    '(PAN-1862 — this is what lets the next re-review skip provably-clean reviewers;',
+    'do NOT list carried-forward sub-roles, their verdicts are already recorded):',
+    `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>" --reviewers "${inScope.map(r => `${r}=passed`).join(',')}"`,
+    `  pan admin specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>" --reviewers "<subRole>=passed|blocked for each of: ${inScope.join(', ')}>"`,
     '',
     // PAN-2007: do NOT tell the agent to `exit`. The session is kept alive through
     // the pipeline (KEEP_SPECIALIST_SESSIONS_ALIVE) so it can be reused for the next
@@ -296,118 +275,8 @@ function buildSelfReviewPrompt(opts: {
   const sizeBytes = Buffer.byteLength(prompt, 'utf-8');
   console.log(`[review-agent] Self-review prompt for ${opts.issueId}: ${sizeBytes} bytes`);
   return prompt;
-}async function spawnReviewSubRoleForIssuePromise(opts: {
-  issueId: string;
-  workspace: string;
-  subRole: ReviewSubRole;
-  runId: string;
-  outputPath?: string;
-  contextManifestPath?: string;
-  synthesisAgentId?: string;
-  model?: string;
-  harness?: RuntimeName;
-  allowHost?: boolean;
-}): Promise<{ success: boolean; message: string; error?: string; sessionId?: string }> {
-  try {
-    const { saveAgentState, spawnRun, getAgentStateSync, getLatestSessionIdSync, resumeAgent } = await import('../agents.js');
-    const cfg = loadYamlConfig().config;
-    const outputPath = opts.outputPath ?? reviewerAgentOutputPath(opts.workspace, opts.runId, opts.subRole);
-    const synthesisAgentId = opts.synthesisAgentId ?? `agent-${opts.issueId.toLowerCase()}-review`;
-    const model = opts.model ?? resolveModel('review', opts.subRole, cfg, opts.subRole ? undefined : `review:${opts.issueId}`);
-    const reviewerDir = join(AGENTS_DIR, reviewerAgentId(opts.issueId, opts.subRole));
-
-    await mkdir(dirname(outputPath), { recursive: true });
-    await rm(outputPath, { force: true });
-    await rm(join(reviewerDir, 'reviewer-signaled'), { force: true });
-    await rm(join(reviewerDir, 'reviewer-launcher.pid'), { force: true });
-
-    // Build Tier-1 inline summary from manifest when available (PAN-1125)
-    let tier1Summary: string | undefined;
-    if (opts.contextManifestPath) {
-      try {
-        const manifestRaw = await readFile(opts.contextManifestPath, 'utf-8');
-        const manifest = JSON.parse(manifestRaw) as ReviewContextManifest;
-        tier1Summary = formatTier1Summary(manifest);
-      } catch (manifestErr) {
-        console.warn(`[review-agent] Failed to read manifest for Tier-1 summary (${opts.issueId}/${opts.subRole}):`, manifestErr);
-      }
-    }
-
-    const prompt = await Effect.runPromise(buildConvoyPrompt({
-      issueId: opts.issueId,
-      subRole: opts.subRole,
-      outputPath,
-      synthesisAgentId,
-      contextManifestPath: opts.contextManifestPath,
-      tier1Summary,
-    }));
-
-    // PAN-1862: convoy sub-reviewers RESUME by default too — same rule as quick review. Each
-    // lane keeps its prior round's context so a re-review checks the fix instead of re-reading
-    // the whole diff. Fresh-spawn only on a harness/model change or when no session exists.
-    const reviewerAgent = reviewerAgentId(opts.issueId, opts.subRole);
-    const savedReviewer = getAgentStateSync(reviewerAgent);
-    const canResumeReviewer = reviewResumeDecision({
-      requestedModel: opts.model ?? model,
-      requestedHarness: opts.harness,
-      savedModel: savedReviewer?.model,
-      savedHarness: savedReviewer?.harness,
-      hasSavedState: !!savedReviewer,
-      hasSavedSession: !!getLatestSessionIdSync(reviewerAgent),
-    });
-    if (canResumeReviewer) {
-      console.log(`[review-agent] Resuming convoy sub-reviewer ${opts.subRole} for ${opts.issueId} — preserving context (PAN-1862)`);
-      const resumeResult = await resumeAgent(reviewerAgent, prompt);
-      if (resumeResult.success) {
-        try {
-          const resumed = getAgentStateSync(reviewerAgent);
-          if (resumed) {
-            resumed.reviewSubRole = opts.subRole;
-            resumed.reviewRunId = opts.runId;
-            resumed.reviewOutputPath = outputPath;
-            resumed.reviewSynthesisAgentId = synthesisAgentId;
-            resumed.reviewDeadlineAt = new Date(Date.now() + REVIEWER_TIMEOUT_MS).toISOString();
-            await Effect.runPromise(saveAgentState(resumed));
-          }
-        } catch { /* non-fatal */ }
-        return { success: true, message: `Review ${opts.subRole} resumed (session preserved): ${reviewerAgent}`, sessionId: reviewerAgent };
-      }
-      console.warn(`[review-agent] Convoy sub-reviewer ${opts.subRole} resume failed; falling back to a fresh session: ${resumeResult.error}`);
-    }
-
-    const run = await spawnRun(opts.issueId, 'review', {
-      workspace: opts.workspace,
-      subRole: opts.subRole,
-      prompt,
-      model,
-      harness: opts.harness,
-      // PAN-977: thread the synthesis wiring up front so the generated launcher
-      // owns the REVIEWER_READY/FAILED/TIMEOUT signal deterministically.
-      reviewSynthesisAgentId: synthesisAgentId,
-      reviewOutputPath: outputPath,
-      allowHost: opts.allowHost ?? false,
-    });
-    run.reviewSubRole = opts.subRole;
-    run.reviewRunId = opts.runId;
-    run.reviewOutputPath = outputPath;
-    run.reviewSynthesisAgentId = synthesisAgentId;
-    run.reviewDeadlineAt = new Date(Date.now() + REVIEWER_TIMEOUT_MS).toISOString();
-    await Effect.runPromise(saveAgentState(run));
-    try {
-      const { notifyPipelineSync } = await import('../pipeline-notifier.js');
-      notifyPipelineSync({ type: 'reviewer_started', issueId: opts.issueId, role: opts.subRole, sessionName: run.id });
-    } catch {
-      // Non-fatal
-    }
-    return { success: true, message: `Review ${opts.subRole} spawned: ${run.id}`, sessionId: run.id };
-  } catch (err) {
-    return {
-      success: false,
-      message: `Failed to spawn review ${opts.subRole}`,
-      error: err instanceof Error ? err.message : String(err),
-    };
-  }
-}async function spawnReviewRoleForIssuePromise(
+}
+async function spawnReviewRoleForIssuePromise(
   opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean },
 ): Promise<{ success: boolean; message: string; error?: string; gated?: boolean }> {
   const reviewSessionName = `agent-${opts.issueId.toLowerCase()}-review`;
@@ -420,6 +289,27 @@ function buildSelfReviewPrompt(opts: {
     console.log(message);
     emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: opts.issueId });
     return { success: false, message };
+  }
+
+  // PAN-1862 (FR-14): review mode 'none' — skip the AI review entirely. This sits at
+  // the single review entry point so the trigger route, host auto-dispatch, and every
+  // Deacon re-dispatch site all honor it without per-call-site logic. The pre-review
+  // verification gate (typecheck/lint/test floor) has already run by the time any
+  // caller reaches here — 'none' skips only the AI review, never the quality floor.
+  // reviewSpawnedAt is stamped so the durable reviewRequestedAt intent counts as
+  // serviced (otherwise needsReviewDispatch would re-fire this skip every read).
+  // Setting reviewStatus 'skipped' advances the lifecycle exactly like an approved
+  // review (the setReviewStatusSync write path emits review.approved for it).
+  if (resolveReviewMode(opts.issueId) === 'none') {
+    setReviewStatusSync(opts.issueId, {
+      reviewStatus: 'skipped',
+      reviewNotes: 'Review mode: none — AI review skipped by configuration; verification gate still enforced',
+      reviewSpawnedAt: new Date().toISOString(),
+    });
+    const message = `Review skipped for ${opts.issueId} (mode=none) — advancing to test`;
+    console.log(`[review-agent] ${message}`);
+    emitActivityEntrySync({ source: 'review', level: 'info', message, issueId: opts.issueId });
+    return { success: true, message };
   }
 
   // Idempotency: if a review role agent for this issue already has an alive
@@ -473,12 +363,53 @@ function buildSelfReviewPrompt(opts: {
         }
       }
 
+      // PAN-1131 residual + PAN-2579: a runId-matching live pane is only "actively
+      // reviewing" while this cycle's verdict is UNRECORDED. Once the verdict is
+      // terminal, the session is warm-idle (kept alive by the warm-by-default
+      // lifecycle) — a re-dispatch request must NOT be swallowed by the guard, or
+      // the issue jams at a stale verdict with a live-but-finished reviewer. Fall
+      // through to the respawn path below: it kills the convoy tmux and the spawn
+      // machinery resumes the saved session with its context intact (warm reuse).
+      let finishedIdle = false;
       if (!paneDead && !opts.force && !staleRunId) {
+        try {
+          const status = getReviewStatusSync(opts.issueId);
+          const terminal = status?.reviewStatus === 'passed'
+            || status?.reviewStatus === 'blocked'
+            || status?.reviewStatus === 'failed';
+          // Warm-reuse ONLY for a genuinely un-serviced newer request (same
+          // ISO-string comparison as needsReviewDispatch). A terminal verdict
+          // with NO newer request means this call is a stale duplicate dispatch
+          // racing the verdict (the PAN-399 shape) — skip below and leave the
+          // verdict alone rather than re-entering 'reviewing'.
+          const newerRequest = !!status?.reviewRequestedAt
+            && (!status.reviewSpawnedAt || status.reviewRequestedAt > status.reviewSpawnedAt);
+          finishedIdle = terminal && newerRequest;
+          if (finishedIdle) {
+            console.log(
+              `[review-agent] ${reviewSessionName} is finished-idle (verdict ${status?.reviewStatus}, newer request pending) — warm-reusing for the new review cycle`,
+            );
+          } else if (terminal) {
+            console.log(
+              `[review-agent] ${reviewSessionName} has a terminal verdict (${status?.reviewStatus}) and no newer request — treating this dispatch as a stale duplicate; leaving the verdict intact`,
+            );
+          }
+        } catch (statusErr) {
+          console.warn(`[review-agent] Could not probe review status for finished-idle check on ${opts.issueId}:`, statusErr);
+        }
+      }
+
+      if (!paneDead && !opts.force && !staleRunId && !finishedIdle) {
         console.log(`[review-agent] Idempotency guard: ${reviewSessionName} already running for ${opts.issueId} — skipping spawn`);
         return { success: true, message: `Review already in progress: ${reviewSessionName}` };
       }
-      // Session pane is dead, force mode, or stale runId — kill the whole convoy and respawn.
-      const reason = opts.force ? 'force-killed for re-review' : paneDead ? 'pane is dead' : 'stale runId';
+      // Session pane is dead, force mode, stale runId, or finished-idle — kill the
+      // convoy tmux and respawn (the spawn path resumes the saved session, so a
+      // warm reviewer keeps its context).
+      const reason = opts.force ? 'force-killed for re-review'
+        : paneDead ? 'pane is dead'
+        : staleRunId ? 'stale runId'
+        : 'finished-idle (warm reuse for new cycle)';
       console.log(`[review-agent] ${reviewSessionName} ${reason} — respawning convoy`);
       await Effect.runPromise(
         killAllReviewerSessions(undefined, opts.issueId).pipe(
@@ -594,41 +525,68 @@ function buildSelfReviewPrompt(opts: {
     }
 
     const fullReview = isExtendedReviewEnabled(opts.issueId);
+
+    // PAN-1862 (FR-7/FR-8/NFR-1): selective re-review — which convoy reviewers run
+    // this cycle vs carry their prior passed verdict forward (computeConvoyScope).
+    const { inScope: inScopeSubRoles, carried: carriedSubRoles, scope: reReviewScope } = fullReview
+      ? await computeConvoyScope(opts.issueId, opts.workspace)
+      : { inScope: [...REVIEW_SUB_ROLES], carried: [], scope: 'changed' as ReReviewScope };
+
+    // PAN-1862 Phase A: discovery-then-fork mode. When the full-convoy review will
+    // run on claude-code, the parent does the shared discovery reads FIRST, signals
+    // `pan admin specialists discovery-ready review <id>`, and the server forks its
+    // session into the convoy — the reviewers replay the discovery prefix as warm
+    // cache reads instead of four independent full-price re-reads. Any other
+    // harness keeps the inline convoy spawn (the fork machinery is Claude Code's
+    // --resume; NFR-2 explicitly degrades to independent reads there). Per-reviewer
+    // model mismatches are handled at fork time, not here — a mismatched reviewer
+    // simply spawns fresh while the rest fork.
+    const cfgReviewHarness = loadYamlConfig().config.roles?.review?.harness;
+    const discoveryForkMode = fullReview && (opts.harness ?? cfgReviewHarness ?? 'claude-code') === 'claude-code';
+
     const prompt = fullReview
-      ? buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary })
+      ? buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary, inScopeSubRoles, carriedSubRoles, discovery: discoveryForkMode })
       : buildSelfReviewPrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary });
 
-    const spawnConvoyReviewers = async (synthesisAgentId: string) => {
-      const reviewerResults = await Promise.all(REVIEW_SUB_ROLES.map(async (subRole) => {
-        const outputPath = reviewerAgentOutputPath(opts.workspace, runId, subRole);
-        const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
-          issueId: opts.issueId,
-          workspace: opts.workspace,
-          subRole,
-          runId,
-          outputPath,
-          contextManifestPath,
-          synthesisAgentId,
-          ...(opts.model ? { model: opts.model } : {}),
-          ...(opts.harness ? { harness: opts.harness } : {}),
-          allowHost,
-        }));
-        if (!result.success) {
-          try {
-            const { messageAgent } = await import('../agents.js');
-            await messageAgent(synthesisAgentId, `REVIEWER_FAILED ${subRole} ${result.error ?? result.message}`);
-          } catch (signalErr) {
-            console.warn(`[review-agent] Failed to signal ${subRole} spawn failure to ${synthesisAgentId}:`, signalErr);
-          }
+    // PAN-1862: in discovery-fork mode the convoy is NOT spawned here — the parent
+    // signals discovery-ready and handleReviewDiscoveryReady launches (and forks)
+    // the convoy. markDiscoveryPending records what the handler needs on the
+    // parent's state; the deacon's stalled-discovery backstop covers a parent that
+    // never signals.
+    const markDiscoveryPending = async (synthesisAgentId: string) => {
+      try {
+        const parent = getAgentStateSync(synthesisAgentId);
+        if (parent) {
+          parent.reviewDiscoveryPending = true;
+          parent.reviewContextManifestPath = contextManifestPath;
+          parent.reviewDiscoveryReadyAt = undefined;
+          parent.reviewConvoyForkedAt = undefined;
+          parent.reviewForkCacheChecked = undefined;
+          await Effect.runPromise(saveAgentState(parent));
         }
-        return result;
-      }));
-
-      const failedReviewers = reviewerResults.filter(r => !r.success);
-      if (failedReviewers.length > 0) {
-        console.warn(`[review-agent] Review role spawned for ${opts.issueId}, but ${failedReviewers.length} reviewer(s) failed to spawn`);
+      } catch (stateErr) {
+        console.warn(`[review-agent] Could not mark discovery pending on ${synthesisAgentId}:`, stateErr);
       }
-      return reviewerResults;
+    };
+    const spawnConvoyReviewers = async (synthesisAgentId: string) => {
+      if (discoveryForkMode) {
+        await markDiscoveryPending(synthesisAgentId);
+        console.log(`[review-agent] ${opts.issueId}: parent spawned in discovery mode — convoy defers to the discovery-ready signal (PAN-1862)`);
+        return [];
+      }
+      return launchConvoyReviewersPromise({
+        issueId: opts.issueId,
+        workspace: opts.workspace,
+        runId,
+        synthesisAgentId,
+        inScope: inScopeSubRoles,
+        carried: carriedSubRoles,
+        scope: reReviewScope,
+        contextManifestPath,
+        ...(opts.model ? { model: opts.model } : {}),
+        ...(opts.harness ? { harness: opts.harness } : {}),
+        allowHost,
+      });
     };
 
     // PAN-1862: RESUME the saved review session by default. The review agent keeps the prior
@@ -824,39 +782,6 @@ export function isReviewSessionForIssue(sessionName: string, projectKey: string 
  * fallible step; any failure here is fatal and propagates via Effect's defect
  * channel through `Effect.promise`.
  */
-export const buildConvoyPrompt = (opts: {
-  issueId: string;
-  subRole: string;
-  outputPath: string;
-  synthesisAgentId: string;
-  contextManifestPath?: string;
-  tier1Summary?: string;
-}): Effect.Effect<string> => Effect.promise(() => buildConvoyPromptPromise(opts));
-
-/**
- * Effect variant of {@link spawnReviewSubRoleForIssue}. The Promise version
- * already aggregates errors into the structured result shape, so the Effect
- * form lifts via `Effect.promise`.
- */
-export const spawnReviewSubRoleForIssue = (opts: {
-  issueId: string;
-  workspace: string;
-  subRole: ReviewSubRole;
-  runId: string;
-  outputPath?: string;
-  contextManifestPath?: string;
-  synthesisAgentId?: string;
-  model?: string;
-  harness?: RuntimeName;
-  allowHost?: boolean;
-}): Effect.Effect<{ success: boolean; message: string; error?: string; sessionId?: string }> =>
-  Effect.promise(() => spawnReviewSubRoleForIssuePromise(opts));
-
-/**
- * Effect variant of {@link spawnReviewRoleForIssue}. The Promise version
- * returns a structured result instead of throwing, so the Effect form lifts
- * via `Effect.promise`.
- */
 export const spawnReviewRoleForIssue = (
   opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean },
 ): Effect.Effect<{ success: boolean; message: string; error?: string; gated?: boolean }> =>
@@ -883,6 +808,14 @@ export const killAllReviewSessions = (): Effect.Effect<{ killed: string[]; faile
 // PAN-1862 resume-vs-fresh decision lives in its own pure module (review-resume-decision.ts) so
 // it is unit-testable without importing this heavy file. Re-exported for external callers.
 export { reviewResumeDecision } from './review-resume-decision.js';
+// PAN-1862: convoy machinery lives in review-convoy.ts; re-exported here so the
+// deacon modules, tests, and the CLI keep one stable import surface.
+export {
+  buildConvoyPrompt,
+  spawnReviewSubRoleForIssue,
+  handleReviewDiscoveryReady,
+  resolveReReviewScope,
+} from './review-convoy.js';
 
 /**
  * Is the issue carrying leftover EXTENDED-review (convoy) sub-reviewer agents from a
@@ -901,13 +834,13 @@ export function resolveReviewMode(issueId?: string): ReviewMode {
   if (issueId) {
     const project = resolveProjectForIssue(issueId);
     const issueMode = project ? readIssueRecordSync(project, issueId)?.reviewMode : undefined;
-    if (issueMode === 'quick' || issueMode === 'full') {
+    if (issueMode === 'quick' || issueMode === 'full' || issueMode === 'none') {
       return issueMode;
     }
   }
 
   const configMode = loadYamlConfig().config.roles?.review?.mode;
-  return configMode === 'full' ? 'full' : 'quick';
+  return configMode === 'full' || configMode === 'none' ? configMode : 'quick';
 }
 
 /**

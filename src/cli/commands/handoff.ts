@@ -109,11 +109,11 @@ export async function handoffCommand(
 
   if (newConv.forkStatus === 'failed') {
     console.log(chalk.red(`Handoff failed: ${newConv.forkError ?? 'unknown error'}`));
-    console.log(chalk.gray(`  Conv ID: ${newConv.id} (Dashboard: https://pan.localhost/conv/${newConv.id})`));
+    console.log(chalk.gray(`  Conv ID: ${newConv.id} (Dashboard: https://overdeck.localhost/conv/${newConv.id})`));
     process.exit(1);
   }
   if (isForkResultInProgress(newConv)) {
-    console.log(chalk.yellow(`Handoff is still in progress — watch https://pan.localhost/conv/${newConv.id}`));
+    console.log(chalk.yellow(`Handoff is still in progress — watch https://overdeck.localhost/conv/${newConv.id}`));
     console.log(chalk.gray(`  Conv ID: ${newConv.id}`));
     console.log(chalk.gray(`  Session: ${newConv.tmuxSession}${newConv.sessionAlive ? ' (live)' : ''}`));
     process.exit(1);
@@ -130,5 +130,5 @@ export async function handoffCommand(
   if (newConv.handoffDocPath) {
     console.log(chalk.gray(`  Handoff doc: ${newConv.handoffDocPath}`));
   }
-  console.log(chalk.gray(`  Dashboard: https://pan.localhost/conv/${newConv.id}`));
+  console.log(chalk.gray(`  Dashboard: https://overdeck.localhost/conv/${newConv.id}`));
 }

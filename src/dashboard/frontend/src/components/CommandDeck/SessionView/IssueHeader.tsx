@@ -15,6 +15,7 @@ import {
 import styles from '../styles/command-deck.module.css';
 import { useDashboardStore } from '../../../lib/store';
 import { AutoMergeToggle } from '../../AutoMergeToggle';
+import { ReviewPolicyControl } from '../../ReviewPolicyControl';
 
 type PlanningStageData = Pick<PlanningSummaryResponse, 'hasPrd' | 'hasState'>;
 
@@ -320,6 +321,7 @@ export function IssueHeader({ issueId, title, url }: IssueHeaderProps) {
           {resolvedTotalCost !== null && (
             <span className={styles.issueHeaderCost} data-testid="zone-a-cost">{formatCost(resolvedTotalCost)}</span>
           )}
+          <ReviewPolicyControl issueId={issueId} />
           <AutoMergeToggle issueId={issueId} autoMerge={autoMergeSnap?.autoMerge} compact />
         </div>
       </div>

@@ -8,27 +8,24 @@ function deps(overrides: Partial<BootAdvancingSelfHealDeps> = {}): BootAdvancing
   return {
     reconcileInFlightJournals: vi.fn(async () => []),
     checkMergedAdvancingSessions: vi.fn(async () => []),
-    checkIdleTerminalAdvancingSessions: vi.fn(async () => []),
     log: vi.fn(),
     ...overrides,
   };
 }
 
 describe('PAN-2341 boot advancing self-heal', () => {
-  it('runs journal reconcile, merged reaper, and idle-terminal reaper in order', async () => {
+  it('runs journal reconcile then the merged reaper in order (PAN-2579: no idle-terminal reap — warm sessions persist)', async () => {
     const order: string[] = [];
     const d = deps({
       reconcileInFlightJournals: vi.fn(async () => { order.push('reconcile'); return ['reconciled PAN-3001']; }),
       checkMergedAdvancingSessions: vi.fn(async () => { order.push('merged'); return ['reaped merged']; }),
-      checkIdleTerminalAdvancingSessions: vi.fn(async () => { order.push('idle'); return ['reaped idle']; }),
     });
 
     await expect(runBootAdvancingSelfHeal(d)).resolves.toEqual([
       'reconciled PAN-3001',
       'reaped merged',
-      'reaped idle',
     ]);
-    expect(order).toEqual(['reconcile', 'merged', 'idle']);
+    expect(order).toEqual(['reconcile', 'merged']);
   });
 
   it('continues later boot self-heal steps when one guarded step fails', async () => {
@@ -41,17 +38,13 @@ describe('PAN-2341 boot advancing self-heal', () => {
     expect(d.log).toHaveBeenCalledWith('startDeacon: reconcileInFlightJournals boot self-heal failed: readonly db');
   });
 
-  it('frees the slot via the ordered reconcile then idle reaper actions', async () => {
+  it('frees the slot via the journal reconcile action alone (warm sessions are excluded from the ceiling, not reaped)', async () => {
     const d = deps({
       reconcileInFlightJournals: vi.fn(async () => ['Reconciled journaled advancing verdict for PAN-3001']),
-      checkIdleTerminalAdvancingSessions: vi.fn(async () => [
-        'Reaped idle terminal advancing session agent-pan-3001-review (verdict recorded, idle >=10m, row stopped)',
-      ]),
     });
 
     await expect(runBootAdvancingSelfHeal(d)).resolves.toEqual([
       'Reconciled journaled advancing verdict for PAN-3001',
-      'Reaped idle terminal advancing session agent-pan-3001-review (verdict recorded, idle >=10m, row stopped)',
     ]);
   });
 

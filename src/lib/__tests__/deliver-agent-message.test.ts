@@ -21,6 +21,7 @@ vi.mock('../tmux.js', () => ({
   sessionExists: vi.fn(),
   sessionExistsSync: vi.fn(),
   sessionExists: vi.fn(() => Effect.succeed(false)),
+  isPaneDead: vi.fn(() => Effect.succeed(false)),
   getAgentSessions: vi.fn(),
   getAgentSessionsSync: vi.fn(),
   getAgentSessions: vi.fn(() => Effect.succeed([])),

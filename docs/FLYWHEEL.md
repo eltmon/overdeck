@@ -130,7 +130,7 @@ reconciler assembles them into rolling **UAT batch trains** — throwaway `uat/*
 branches off main that bundle as many ready features as possible, resolving
 cross-feature conflicts inside the batch, so a human can UAT the combined result
 and **promote the batch** (merge exactly what they tested) in one action. Each
-generation can serve a live stack at `uat-<codename>.pan.localhost`.
+generation can serve a live stack at `uat-<codename>.overdeck.localhost`.
 
 This is the primary merge path for a flywheel run; the per-issue merge (see
 [`MERGE-WORKFLOW.md`](./MERGE-WORKFLOW.md)) remains the escape hatch. The full

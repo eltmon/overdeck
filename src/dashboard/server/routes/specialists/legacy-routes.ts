@@ -237,22 +237,14 @@ const postSpecialistsDoneRoute = HttpRouter.add(
         });
         console.log(`[specialists/done] Set ${tmuxSession} to idle`);
 
-        // PAN-846: Kill the specialist tmux session so it doesn't leak RAM.
-        // The session has completed its work; next dispatch spawns fresh.
-        // PAN-2007: operator-requested temporary keep-alive — record the verdict
-        // (already done above via setReviewStatusBase) but leave the session
-        // running so the operator can inspect it. Re-enable by flipping the flag.
-        const { KEEP_SPECIALIST_SESSIONS_ALIVE } = await import('../../../../lib/cloister/reap-terminal-sessions.js');
-        if (KEEP_SPECIALIST_SESSIONS_ALIVE) {
-          console.log(`[specialists/done] PAN-2007 keep-alive: verdict recorded, leaving ${tmuxSession} running`);
-        } else {
-          try {
-            await Effect.runPromise(killSession(tmuxSession));
-            console.log(`[specialists/done] Killed specialist session ${tmuxSession}`);
-          } catch (err) {
-            console.log(`[specialists/done] Session ${tmuxSession} already gone or failed to kill: ${err instanceof Error ? err.message : String(err)}`);
-          }
-        }
+        // PAN-2579 (warm-by-default lifecycle): the verdict is recorded; the session
+        // stays ALIVE so the next review/test cycle resumes it with context intact.
+        // Warm-idle sessions no longer count against the advancing ceiling
+        // (countRunningAgents excludes them) and the memory governor sheds them
+        // first under HARD pressure — eviction is the governor's job, never a
+        // side effect of recording a verdict. (Supersedes the PAN-846 kill and
+        // the PAN-2007 keep-alive flag.)
+        console.log(`[specialists/done] Warm lifecycle: verdict recorded, leaving ${tmuxSession} running (PAN-2579)`);
 
         // Clear write-scope lock so the next specialist can claim the workspace
         if (projectKey) {

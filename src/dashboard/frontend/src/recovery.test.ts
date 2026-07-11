@@ -10,7 +10,7 @@ afterEach(() => {
 describe('isModuleLoadError', () => {
   it('matches the common dynamic-import failure messages', () => {
     const messages = [
-      'Failed to fetch dynamically imported module: https://pan.localhost/assets/Foo-abc.js',
+      'Failed to fetch dynamically imported module: https://overdeck.localhost/assets/Foo-abc.js',
       'error loading dynamically imported module',
       'Importing a module script failed.',
       'module script failed',

@@ -42,7 +42,7 @@ describe('reviewModeCommand', () => {
     expect(() => reviewModeCommand('PAN-1982', 'bogus')).toThrow('process.exit');
 
     expect(exitSpy).toHaveBeenCalledWith(1);
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('review mode must be quick or full'));
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('review mode must be quick, full, or none'));
     expect(existsSync(join(workspacePath, '.pan', 'records', 'pan-1982.json'))).toBe(false);
   });
 });

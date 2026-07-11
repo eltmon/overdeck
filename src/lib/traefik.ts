@@ -62,7 +62,7 @@ export function generateOverdeckTraefikConfigSync(mode?: TraefikRenderMode): boo
     : config.dashboard.api_port;
 
   const placeholders: Record<string, string> = {
-    TRAEFIK_DOMAIN: config.traefik?.domain || 'pan.localhost',
+    TRAEFIK_DOMAIN: config.traefik?.domain || 'overdeck.localhost',
     DASHBOARD_PORT: String(config.dashboard.port),
     DASHBOARD_API_PORT: String(config.dashboard.api_port),
     DASHBOARD_FRONTEND_PORT: String(frontendPort),
@@ -97,7 +97,7 @@ export function cleanupTemplateFilesSync(): void {
  * file as `http:` routers/services. This function creates a dedicated tls.yml file
  * that Traefik's file provider will pick up separately.
  *
- * The first cert found (pan.localhost) is used as the default certificate.
+ * The first cert found (overdeck.localhost) is used as the default certificate.
  * All certs are listed in the certificates array for SNI matching.
  *
  * Safe to call multiple times (idempotent).
@@ -134,7 +134,7 @@ export function generateTlsConfigSync(): boolean {
 
   // Use the configured domain cert as default, fall back to first cert
   const config = loadConfigSync();
-  const domain = config.traefik?.domain || 'pan.localhost';
+  const domain = config.traefik?.domain || 'overdeck.localhost';
   const defaultCert = certPairs.find(p => p.certFile.includes(domain)) || certPairs[0];
 
   // Build YAML content
