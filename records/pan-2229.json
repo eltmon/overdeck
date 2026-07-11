@@ -2,7 +2,7 @@
   "issueId": "PAN-2229",
   "schemaVersion": 2,
   "created": "2026-07-10T21:05:49.847Z",
-  "updated": "2026-07-11T08:20:02.632Z",
+  "updated": "2026-07-11T09:14:03.080Z",
   "feedback": [],
   "pipeline": {
     "issueId": "PAN-2229",
@@ -25,7 +25,7 @@
       "2": {
         "slotIndex": 2,
         "agentId": "agent-pan-2229-slot-2",
-        "completedAt": "2026-07-11T08:20:02.620Z"
+        "completedAt": "2026-07-11T09:14:03.067Z"
       },
       "3": {
         "slotIndex": 3,
