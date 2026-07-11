@@ -7,6 +7,7 @@ import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { buildCompactRecoverySeedMessage } from '../context-overflow.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { normalizeModelOverrideSync, requireModelOverrideSync } from '../model-validation.js';
+import { getOverdeckDatabaseSync } from '../overdeck/infra.js';
 import { sessionFilePath } from '../paths.js';
 import { logAgentLifecycleSync } from '../persistent-logger.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
@@ -16,6 +17,7 @@ import { sessionRotationRefused } from '../session-rotation.js';
 import { appendContinueSessionEntryForIssue } from '../vbrief/lifecycle-io.js';
 import { createSession, isPaneDead, killSession, listPaneValues, sessionExists } from '../tmux.js';
 import {
+  decideResumeGate,
   getAgentDir,
   getAgentResumeGateBlockReason,
   getAgentStateSync,
@@ -123,15 +125,19 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
   // Check runtime state — allow both suspended (auto-suspend) and stopped/idle (manual stop, crash)
   const runtimeState = getAgentRuntimeStateSync(normalizedId);
   const agentState = getAgentStateSync(normalizedId);
-  const gateBlockReason = agentState ? getAgentResumeGateBlockReason(agentState) : undefined;
+  const gateBlock = agentState ? getAgentResumeGateBlockReason(agentState) : undefined;
+  const gateDecision = decideResumeGate(gateBlock, 'operator-start');
   const bypassTroubledGate = opts?.compact === true && opts.recoverGated === true && agentState?.troubled === true && agentState.paused !== true;
-  if (gateBlockReason && !bypassTroubledGate) {
-    const reason = `Cannot resume ${normalizedId}: ${gateBlockReason}. Clear the gate before resuming.`;
+  if (gateDecision.decision === 'block' && !bypassTroubledGate) {
+    const reason = `Cannot resume ${normalizedId}: ${gateDecision.reason}. Clear the gate before resuming.`;
     logAgentLifecycleSync(normalizedId, `resumeAgent BLOCKED: ${reason}`);
     return { success: false, error: reason };
   }
+  if (gateDecision.decision === 'proceed' && gateDecision.warning) {
+    logAgentLifecycleSync(normalizedId, `resumeAgent: ${gateDecision.warning}`);
+  }
   if (bypassTroubledGate) {
-    logAgentLifecycleSync(normalizedId, `resumeAgent: bypassing troubled gate for explicit compact recovery (${gateBlockReason})`);
+    logAgentLifecycleSync(normalizedId, `resumeAgent: bypassing troubled gate for explicit compact recovery (${gateBlock?.reason})`);
   }
   const hasWorkspace = !!agentState?.workspace && existsSync(agentState.workspace);
   const isPlaceholder = !!agentState && agentState.status === 'starting' && typeof agentState.model === 'string' && agentState.model.startsWith('pending-');
@@ -514,11 +520,15 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     // context_overflow (don't clobber an unrelated stuck state).
     if (opts?.compact && agentState?.issueId) {
       try {
-        const { getReviewStatusSync } = await import('../review-status.js');
-        const rs = getReviewStatusSync(agentState.issueId);
-        if (rs?.stuck && rs.stuckReason === 'context_overflow') {
-          const { clearWorkspaceStuck } = await import('../review-status.js');
-          clearWorkspaceStuck(agentState.issueId);
+        const db = getOverdeckDatabaseSync();
+        const row = db.prepare('SELECT stuck, stuck_reason FROM review_status WHERE issue_id = ?')
+          .get(agentState.issueId.toUpperCase()) as { stuck?: number; stuck_reason?: string | null } | undefined;
+        if (row?.stuck === 1 && row.stuck_reason === 'context_overflow') {
+          db.prepare(`
+            UPDATE review_status
+            SET stuck = 0, stuck_reason = NULL, stuck_at = NULL, stuck_details = NULL, updated_at = ?
+            WHERE issue_id = ?
+          `).run(Date.now(), agentState.issueId.toUpperCase());
           logAgentLifecycleSync(normalizedId, `cleared context_overflow stuck flag after compaction-resume for ${agentState.issueId}`);
         }
       } catch (clearErr) {

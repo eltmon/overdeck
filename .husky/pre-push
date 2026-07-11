@@ -19,6 +19,12 @@ read_version() {
 while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
   zero=0000000000000000000000000000000000000000
   if [ "$local_sha" = "$zero" ]; then
+    # Refuse deleting the state branch — it holds the canonical pipeline
+    # state plane (PAN-2541) and shares no history with any code branch.
+    if [ "$remote_ref" = "refs/heads/overdeck-state" ]; then
+      echo "✖ refusing to delete overdeck-state — it is the canonical pipeline state plane (PAN-2541)." >&2
+      exit 1
+    fi
     continue  # ref deletion — nothing to audit
   fi
 
@@ -33,6 +39,8 @@ while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
         base=$(git merge-base origin/main "$local_sha" 2>/dev/null || true)
       fi
       if [ -n "$base" ]; then
+        branch_name="${remote_ref#refs/heads/}"
+        bash scripts/guard-state-plane-branches.sh --branch "$branch_name" --range "$base..$local_sha" </dev/null
         if [ "$remote_ref" = "refs/heads/main" ]; then
           bash scripts/guard-agent-main-push.sh --range "$base..$local_sha" </dev/null
         fi

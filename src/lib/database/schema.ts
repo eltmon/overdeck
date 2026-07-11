@@ -11,7 +11,7 @@ import { encodeClaudeProjectDir, getOverdeckHome } from '../paths.js';
 import { backfillAgentsFromStateJsonSync } from './agent-backfill.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 58;
+export const SCHEMA_VERSION = 59;
 
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
@@ -428,6 +428,9 @@ export function initSchema(db: SqliteDatabase): void {
       paused        INTEGER,
       paused_reason TEXT,
       paused_at     TEXT,
+      yielded_by_scheduler INTEGER,
+      yielded_at    TEXT,
+      last_yield_resume_at TEXT,
       troubled      INTEGER,
       troubled_at   TEXT,
       consecutive_failures INTEGER,
@@ -1643,6 +1646,13 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   if (currentVersion < 58 && db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'discovered_sessions'`).get()) {
     try { db.exec(`ALTER TABLE discovered_sessions ADD COLUMN harness TEXT`); } catch { /* already exists */ }
     db.exec(`UPDATE discovered_sessions SET harness = 'claude-code' WHERE harness IS NULL`);
+  }
+
+  // v58 -> v59: PAN-2507 preemptive scheduler yield attribution on agents.
+  if (currentVersion < 59) {
+    try { db.exec(`ALTER TABLE agents ADD COLUMN yielded_by_scheduler INTEGER`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE agents ADD COLUMN yielded_at TEXT`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE agents ADD COLUMN last_yield_resume_at TEXT`); } catch { /* already exists */ }
   }
 
   // After all migrations, set the version

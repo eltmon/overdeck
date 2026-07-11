@@ -1,5 +1,5 @@
 /**
- * Strike workspace reaper (PAN-1882).
+ * Strike workspace reaper (PAN-1882, PAN-2359).
  *
  * Strikes bypass the normal pipeline — and its close-out workspace teardown —
  * so their `feature-<id>-strike` git worktrees + `strike/<id>` branches pile up
@@ -10,9 +10,11 @@
  * `origin/main` AND no live `strike-<id>` session exists.
  *
  * Safety: only `strike/*` worktrees are eligible (never `feature/*`, the active
- * pipeline); a worktree is reaped only when its branch is an ancestor of
- * origin/main (0 commits ahead — nothing unmerged is ever lost) and no live
- * strike session is using it.
+ * pipeline); a worktree is reaped only when its branch AUTHORED commits that are
+ * now all in origin/main (walk-reflogs > 1 AND 0 commits ahead) and no live
+ * strike session is using it. A freshly-created strike branch sits at
+ * origin/main's HEAD with a single reflog entry, so the extra reflog guard
+ * prevents reaping a workspace before the agent has committed any work.
  */
 
 import { exec } from 'child_process';
@@ -77,6 +79,22 @@ export async function reapMergedStrikeWorkspaces(projectRoot: string = process.c
       continue; // can't determine merge state — leave it for a future patrol
     }
     if (ahead !== '0') continue; // has unmerged commits — never reap
+
+    // A fresh strike branch is created at origin/main's HEAD and is also
+    // 0 commits ahead, but it has not authored any commits yet. Only reap
+    // branches that actually authored commits and are now fully merged.
+    let reflogCount: number;
+    try {
+      const { stdout } = await execAsync(
+        `git rev-list --walk-reflogs --count ${JSON.stringify(branch)}`,
+        { cwd: projectRoot, encoding: 'utf-8' },
+      );
+      reflogCount = Number(stdout.trim());
+      if (Number.isNaN(reflogCount)) continue;
+    } catch {
+      continue; // can't determine authorship — leave it for a future patrol
+    }
+    if (reflogCount <= 1) continue; // never-committed branch (fresh strike) — don't reap
 
     try {
       await execAsync(`git worktree remove ${JSON.stringify(path)} --force`, { cwd: projectRoot });

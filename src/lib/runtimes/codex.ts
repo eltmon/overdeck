@@ -204,6 +204,14 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
     if (existsSync(notifyHookPath)) {
       lines.push(`notify = ["node", "${notifyHookPath}"]`)
     }
+    // PAN-2521: suppress Codex's blocking "Approaching rate limits — switch to
+    // <cheaper model>?" TUI nudge. It renders a modal select prompt that freezes
+    // the pane: an unattended pipeline agent can't answer it, stops emitting tool
+    // calls, and the issue stalls (observed wedging a review pane). Pipeline agents
+    // must run on their configured model, so the nudge is pure downside here.
+    // `[notice] hide_rate_limit_model_nudge` is the Codex config knob that hides it
+    // (equivalent to the prompt's "never show again" option).
+    lines.push('', '[notice]', 'hide_rate_limit_model_nudge = true')
     if (opts.trustedDir) {
       // Pre-seed folder trust so the TUI skips its first-run autonomy wizard.
       // TOML basic-string key: escape backslashes and double-quotes in the path.

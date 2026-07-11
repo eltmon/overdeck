@@ -209,7 +209,9 @@ describe('agent failure tracking and auto-resume backoff', () => {
       startedAt: BASE_TIME.toISOString(),
     });
 
-    const resumed = await autoResumeStoppedWorkAgents();
+    const resumePromise = autoResumeStoppedWorkAgents();
+    await vi.runAllTimersAsync();
+    const resumed = await resumePromise;
     const state = agents.getAgentStateSync(agentId);
 
     expect(resumed).toEqual([]);

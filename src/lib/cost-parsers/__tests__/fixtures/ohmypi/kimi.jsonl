@@ -1,0 +1,7 @@
+# Synthetic fixture for kimi provider.
+# No real on-disk omp session for this provider was found, so this follows the omp v3
+# format with representative assistant message.usage fields.
+{"type":"session","version":3,"id":"sess-synthetic-kimi-001","timestamp":"2026-07-06T00:00:00.000Z","cwd":"[synthetic cwd]","title":"Synthetic kimi session","titleSource":"synthetic"}
+{"type":"model_change","id":"mc-kimi-001","parentId":null,"timestamp":"2026-07-06T00:00:00.100Z","model":"kimi-k2"}
+{"type":"message","id":"msg-kimi-user-001","parentId":"mc-kimi-001","timestamp":"2026-07-06T00:00:01.000Z","message":{"role":"user","content":[{"type":"text","text":"[sanitized]"}],"attribution":"user"}}
+{"type":"message","id":"msg-kimi-assistant-001","parentId":"msg-kimi-user-001","timestamp":"2026-07-06T00:00:02.000Z","message":{"role":"assistant","content":[{"type":"text","text":"[sanitized]"}],"api":"kimi-messages","provider":"kimi","model":"kimi-k2","usage":{"input":1000,"output":200,"cacheRead":50,"cacheWrite":25,"totalTokens":1275,"cost":{"input":0.0005,"output":0.0002,"cacheRead":0.000005,"cacheWrite":0.0000125,"total":0.0007175}},"stopReason":"stop"}}

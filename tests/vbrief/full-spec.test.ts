@@ -296,10 +296,10 @@ describe('updateSubItemStatus: writes to per-issue record statusOverrides', () =
   });
 });
 
-// ─── Planning prompt v0.5 fields ──────────────────────────────────────────────
+// ─── Planning prompt xBRIEF fields ────────────────────────────────────────────
 
-describe('Planning prompt includes v0.5 field placeholders', () => {
-  it('includes vBRIEFInfo.author in prompt template', async () => {
+describe('Planning prompt includes xBRIEF field placeholders', () => {
+  it('includes xBRIEFInfo.author in prompt template', async () => {
     const { buildPlanningPrompt } = await import('../../src/lib/planning/spawn-planning-session.js') as any;
 
     const prompt = await buildPlanningPrompt(
@@ -314,7 +314,7 @@ describe('Planning prompt includes v0.5 field placeholders', () => {
       'claude-opus-4-6'
     );
 
-    expect(prompt).toContain('vBRIEFInfo');
+    expect(prompt).toContain('xBRIEFInfo');
     expect(prompt).toContain('author');
     expect(prompt).toContain('uid');
     expect(prompt).toContain('sequence');

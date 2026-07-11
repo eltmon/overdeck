@@ -129,8 +129,8 @@ export function armBootReconciliationGraceTimer(
   graceTimer = setTimeout(() => {
     graceTimer = null;
     if (getBootReconciliationState().decision !== 'pending') return;
-    setBootReconciliationDecision('resume_all');
-    logDeaconEventSync('boot reconciliation grace expired — decision set to resume_all');
+    setBootReconciliationDecision('hold_all');
+    logDeaconEventSync('boot reconciliation grace expired — decision set to hold_all');
     void Promise.resolve(onGraceExpired()).catch((err) => {
       const message = err instanceof Error ? err.message : String(err);
       logDeaconEventSync(`boot reconciliation grace expiry apply hook failed: ${message}`);
@@ -186,15 +186,29 @@ export function startBootReconciliation(
     return { bootId, graceDeadline, candidateIds, decision: 'hold_all', timerArmed: false };
   }
 
-  if (candidateIds.length === 0) {
-    clearBootReconciliationGraceTimer();
-    setBootReconciliationDecision('resume_all');
-    logDeaconEventSync(`boot reconciliation stamped ${bootId}: no candidates`);
-    return { bootId, graceDeadline, candidateIds, decision: 'resume_all', timerArmed: false };
-  }
-
+  // PAN-2510: an empty candidate list at stamp time does NOT mean "genuinely
+  // nothing to reconcile". startBootReconciliation() runs in the dashboard
+  // process, but agent liveness is reconciled asynchronously in the separately
+  // spawned deacon child (reconcileAgentLiveness marks crashed agents `stopped`
+  // ~1s later). On a full box reboot (OOM crash, power cycle) the agents are
+  // still marked `healthy`/`running` in the table when the dashboard stamps, so
+  // listBootReconciliationCandidateIds() returns 0 — then the crashed agents
+  // materialize as candidates a second later. Terminally committing `resume_all`
+  // here (the pre-PAN-2510 fast path) permanently skipped the operator dialog
+  // AND left the held-resume set empty, so those late-arriving candidates
+  // auto-resumed ungated — the exact post-reboot flood we must avoid.
+  //
+  // Instead we always open the grace window in `pending`. The candidate set is
+  // recomputed live (frontend poll + held-resume/pending-hold sets), so late
+  // arrivals from the deacon-child reconciliation are discovered and held, and
+  // the dialog renders. If the window expires with still-zero candidates
+  // (genuinely clean boot / dashboard-only restart with nothing stopped), the
+  // grace timer resolves `pending` → `hold_all`, the safe timeout default.
   setBootReconciliationDecision('pending');
   const timerArmed = armBootReconciliationGraceTimer(graceDeadline, options.onGraceExpired);
-  logDeaconEventSync(`boot reconciliation stamped ${bootId}: holding ${candidateIds.length} candidate(s) until ${graceDeadline}`);
+  const heldSummary = candidateIds.length === 0
+    ? 'awaiting agent-table reconciliation (0 candidates at stamp time)'
+    : `holding ${candidateIds.length} candidate(s)`;
+  logDeaconEventSync(`boot reconciliation stamped ${bootId}: ${heldSummary} until ${graceDeadline}`);
   return { bootId, graceDeadline, candidateIds, decision: 'pending', timerArmed };
 }

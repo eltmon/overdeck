@@ -27,7 +27,9 @@ import { renderForHarness, validateTemplate } from '../../../lib/context-layers/
 import {
   globalContextFile as defaultGlobalContextFile,
   projectContextFile,
+  resolveProjectContextFile,
   workspaceContextFile,
+  resolveWorkspaceContextFile,
   codexGlobalContextFile,
 } from '../../../lib/context-layers/layers.js';
 import { hasManagedRegion, userContentOutsideRegion } from '../../../lib/context-layers/render.js';
@@ -265,7 +267,7 @@ async function buildSyncTargets(projects: ProjectEntry[]): Promise<ContextSyncTa
   ];
 
   for (const { key, config } of projects) {
-    const projectMd = await readOptionalFile(projectContextFile(config.path));
+    const projectMd = await readOptionalFile(resolveProjectContextFile(config.path));
     if (!projectMd.exists) continue; // no project.md → sync leaves this project's files alone
     targets.push(
       await describeSyncTarget('claude-code', 'project', key, `${config.name} · CLAUDE.md`, join(config.path, 'CLAUDE.md')),
@@ -288,14 +290,14 @@ export async function buildContextLayerState(
   ];
 
   for (const project of catalog.projects) {
-    resolvedLayers.push(await layerRecord(projectContextFile(project.config.path), {
+    resolvedLayers.push(await layerRecord(resolveProjectContextFile(project.config.path), {
       kind: 'project',
       projectKey: project.key,
     }));
   }
 
   for (const workspace of catalog.workspaces) {
-    resolvedLayers.push(await layerRecord(workspaceContextFile(workspace.path), {
+    resolvedLayers.push(await layerRecord(resolveWorkspaceContextFile(workspace.path), {
       kind: 'workspace',
       projectKey: workspace.projectKey,
       workspacePath: workspace.path,

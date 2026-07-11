@@ -67,6 +67,13 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
 3. **Drive every action to done.** Each dispatched action ends EITHER merged to `main` OR
    with a follow-up dispatched **in the same tick**. Sub-agent push-back is input to your
    next decision, never a terminal state. "I asked, it pushed back, so I stopped" is unacceptable.
+   **Every tick, sweep the WHOLE merge-eligible set — not just your own dispatches.** Work
+   reaches readyForMerge from outside your run too (operator revivals, strikes, externally
+   requested reviews). Emit a `merge` verb in `activePipeline` for every issue in your project
+   that is review+test passed and ready, whether or not you started it — the UAT merge train
+   assembles only from those verbs (the server also runs an eligibility sweep as a backstop,
+   PAN-2484, but verb coverage keeps ordering and conflict planning yours). Respect per-project
+   `auto_merge_default: hold` — never emit merge verbs for held projects (e.g. MIN issues).
 4. **Fix at the root, every revolution.** When a Overdeck command, route, gate, or role is
    broken, file the substrate bug as a record (the provenance trailer attaches automatically),
    then **drive a root-cause fix to `main`** — `pan strike` for a precision fix, `pan plan
@@ -212,7 +219,7 @@ Each revolution is a tick; run a full one at least every 20 minutes even with no
    agent/review/test/slot pane (`-S -22`) and **read its last real action** — is it advancing its
    bead, done, or stalled/errored? **Root-cause every stalled/errored one, never nudge it:** dead
    pane / `token_revoked` (a lone stale agent, not fleet-wide — verify the codex fleet with `codex
-   login status`; gpt-5.5 uses the **codex** harness auth `~/.codex/auth.json`, NOT ohmypi);
+   login status`; gpt-5.5 and the gpt-5.6 family use the **codex** harness auth `~/.codex/auth.json`, NOT ohmypi);
    `OVERDECK_SPECIALIST_RESULT: review-agent failed` that still produced a verdict (a FALSE signal —
    confirm in `overdeck.db` `review_status`, NOT the deprecated `panopticon.db`); POST errors like
    `Effect.catchAll is not a function` / `Project not found for PAN-x` (broken status endpoint /
@@ -313,7 +320,7 @@ prior context — and then propose a default, never an open question. Record dec
   assemble/ship from the dashboard (UAT + merge are operator-gated regardless). Operator-named
   merges use `gh pr merge --admin --squash --delete-branch` — never admin-merge while `main` is red.
 - **Strike harness routing.** Do not pass `--harness`/`--model` unless the operator asked —
-  provider defaults route correctly (kimi→ohmypi, gpt-5.5→codex, claude-*→claude-code). Never
+  provider defaults route correctly (kimi→ohmypi, gpt-5.5/gpt-5.6→codex, claude-*→claude-code). Never
   force `--harness claude-code` on a kimi/gpt model: the 200k-window illusion deadlocks it (PAN-1865).
 - **Never (one-way doors).** `pan tell`, `pan approve`, `pan resume`, `pan wake`, `pan kill`,
   `pan wipe`; **creating, editing, or committing ANY file** (code, PRD, vBRIEF/spec, draft, doc)

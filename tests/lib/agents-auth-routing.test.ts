@@ -1,4 +1,7 @@
 import { Effect } from 'effect';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -52,7 +55,7 @@ vi.mock('../../src/lib/cliproxy.js', () => ({
 }));
 
 import { generateLauncherScriptSync } from '../../src/lib/launcher-generator.js';
-import { getProviderEnvForModel, getAgentRuntimeBaseCommand, getProviderExportsForModel } from '../../src/lib/agents.js';
+import { getProviderEnvForModel, getAgentRuntimeBaseCommand, getProviderExportsForModel, roleAgentDefinitionPath } from '../../src/lib/agents.js';
 
 describe('agents auth routing', () => {
   beforeEach(() => {
@@ -213,6 +216,24 @@ describe('agents auth routing', () => {
     expect(command).toContain('--effort high');
     expect(command).toContain("--model 'kimi-k2.6'");
     expect(command).toContain('--name agent-pan-964');
+  });
+
+  it('resolves role definition files from the package root when launched outside the overdeck repo', async () => {
+    const originalCwd = process.cwd();
+    const otherProject = mkdtempSync(join(tmpdir(), 'pan-other-project-'));
+    try {
+      process.chdir(otherProject);
+
+      const command = await getAgentRuntimeBaseCommand('kimi-k2.6', 'agent-pan-2479', roleAgentDefinitionPath('work'));
+
+      expect(command).not.toContain('--agent roles/work.md');
+      expect(command).toMatch(/--append-system-prompt-file '[^']*role-prompts\/work\.md'/);
+      expect(command).toContain('--effort high');
+      expect(command).toContain('--name agent-pan-2479');
+    } finally {
+      process.chdir(originalCwd);
+      rmSync(otherProject, { recursive: true, force: true });
+    }
   });
 
   it('clears stale provider env before exporting Anthropic settings', async () => {

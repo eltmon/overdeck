@@ -13,7 +13,7 @@ import { logAgentLifecycleSync } from '../persistent-logger.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
 import { normalizeAgentId } from './identity.js';
 
-export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer';
+export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer' | 'knowledge';
 
 export const SESSION_EXITED_BEFORE_KICKOFF = 'session-exited-before-kickoff';
 
@@ -53,6 +53,23 @@ export interface AgentState {
   paused?: boolean;
   pausedReason?: string;
   pausedAt?: string;
+  /**
+   * PAN-2507: true when this work agent was paused by the preemptive scheduler
+   * (yielded to free capacity for an advancing dispatch), as distinct from an
+   * operator pause. Reuses `paused: true` so every existing no-resume gate
+   * protects the yielded agent; this flag lets the deacon resume yielded agents
+   * oldest-first and lets `pan unpause` self-clear the yield attribution.
+   */
+  yieldedByScheduler?: boolean;
+  /** PAN-2507: ISO timestamp of the yield (oldest-first resume ordering). */
+  yieldedAt?: string;
+  /**
+   * PAN-2507: ISO timestamp of the most recent resume-from-yield. Enforces the
+   * re-yield cooldown (an agent just resumed from a yield may not be re-yielded
+   * until `yield_cooldown_secs` elapse). Survives unpause (it is a cooldown
+   * tracker, not a pause field).
+   */
+  lastYieldResumeAt?: string;
   troubled?: boolean;
   troubledAt?: string;
   consecutiveFailures?: number;
@@ -182,7 +199,7 @@ export async function wipeAgentStateDirs(
 }
 
 export function isRole(value: unknown): value is Role {
-  return value === 'plan' || value === 'work' || value === 'review' || value === 'test' || value === 'ship' || value === 'flywheel' || value === 'strike' || value === 'sequencer';
+  return value === 'plan' || value === 'work' || value === 'review' || value === 'test' || value === 'ship' || value === 'flywheel' || value === 'strike' || value === 'sequencer' || value === 'knowledge';
 }
 
 function cleanAgentState(raw: AgentState): AgentState {
@@ -204,6 +221,9 @@ function cleanAgentState(raw: AgentState): AgentState {
     paused: raw.paused,
     pausedReason: raw.pausedReason,
     pausedAt: raw.pausedAt,
+    yieldedByScheduler: raw.yieldedByScheduler,
+    yieldedAt: raw.yieldedAt,
+    lastYieldResumeAt: raw.lastYieldResumeAt,
     troubled: raw.troubled,
     troubledAt: raw.troubledAt,
     consecutiveFailures: raw.consecutiveFailures,
@@ -434,6 +454,40 @@ export const setAgentPaused = (
     return state;
   });
 
+/**
+ * PAN-2507: pause an agent as a scheduler YIELD (distinct from an operator
+ * pause). Reuses the pause write path so every no-resume gate protects the
+ * yielded agent, and stamps the yield attribution used for oldest-first resume.
+ */
+function applyAgentYielded(state: AgentState, reason: string): void {
+  applyAgentPaused(state, reason, true);
+  state.yieldedByScheduler = true;
+  state.yieldedAt = new Date().toISOString();
+}
+
+/** PAN-2507: set the yield gate (pause + scheduler attribution) in one write. */
+export function setAgentYieldedSync(agentId: string, reason: string): boolean {
+  const state = getAgentStateSync(agentId);
+  if (!state) return false;
+  applyAgentYielded(state, reason);
+  saveAgentStateSync(state);
+  return true;
+}
+
+/**
+ * PAN-2507: clear a scheduler yield ahead of a resume — drops the pause + yield
+ * attribution (so `resumeAgent`'s pause gate passes) and stamps
+ * `lastYieldResumeAt` to arm the re-yield cooldown, in a single write.
+ */
+export function clearYieldForResumeSync(agentId: string): boolean {
+  const state = getAgentStateSync(agentId);
+  if (!state) return false;
+  applyAgentUnpaused(state);
+  state.lastYieldResumeAt = new Date().toISOString();
+  saveAgentStateSync(state);
+  return true;
+}
+
 function applyAgentUnpaused(state: AgentState): void {
   if (state.stoppedByPause === true) {
     delete state.stoppedByUser;
@@ -442,10 +496,17 @@ function applyAgentUnpaused(state: AgentState): void {
   delete state.paused;
   delete state.pausedReason;
   delete state.pausedAt;
+  // PAN-2507 (FR-5): clearing a pause also clears the scheduler-yield
+  // attribution, so an operator `pan unpause` on a yielded agent self-clears
+  // the yield. `lastYieldResumeAt` is deliberately preserved — it is a
+  // re-yield cooldown tracker, not a pause field.
+  delete state.yieldedByScheduler;
+  delete state.yieldedAt;
 }
 
 function isAgentPauseClear(state: AgentState): boolean {
-  return !state.paused && state.pausedReason === undefined && state.pausedAt === undefined;
+  return !state.paused && state.pausedReason === undefined && state.pausedAt === undefined
+    && state.yieldedByScheduler === undefined && state.yieldedAt === undefined;
 }
 
 /** Clears the persistent manual pause gate without spawning the agent. */
@@ -615,23 +676,87 @@ export async function recordStartupSessionExit(state: AgentState, issueId: strin
   throw new Error(`Agent ${state.id} exited before kickoff could be delivered`);
 }
 
-export function getAgentResumeGateBlockReason(state: Pick<AgentState, 'paused' | 'pausedReason' | 'troubled' | 'consecutiveFailures'>): string | undefined {
+export type ResumeGateBlock =
+  | { gate: 'paused'; reason: string; pausedReason?: string; yieldedByScheduler?: boolean }
+  | { gate: 'troubled'; reason: string; troubledAt?: string }
+  | { gate: 'stopped-by-user'; reason: string }
+  | { gate: 'failure-backoff'; reason: string; consecutiveFailures: number };
+
+export type ResumeIntent = 'autonomous' | 'operator-start' | 'message-delivery';
+
+export interface ResumeGateContext {
+  hasCompletedHandoff?: boolean;
+  owesRework?: boolean;
+}
+
+export type ResumeGateDecision =
+  | { decision: 'proceed'; clearStoppedByUser?: true; overrideFailureBackoff?: true; warning?: string }
+  | { decision: 'block'; reason: string; needsYou?: true }
+  | { decision: 'queue-message'; reason: string };
+
+/** Pure classification only. Call decideResumeGate before acting on the classified gate. */
+export function getAgentResumeGateBlockReason(
+  state: Pick<AgentState, 'paused' | 'pausedReason' | 'yieldedByScheduler' | 'troubled' | 'troubledAt' | 'stoppedByUser' | 'consecutiveFailures'>,
+): ResumeGateBlock | undefined {
   if (state.paused === true) {
-    return state.pausedReason
-      ? `agent is paused (${state.pausedReason})`
-      : 'agent is paused';
+    return {
+      gate: 'paused',
+      reason: state.pausedReason ? `agent is paused (${state.pausedReason})` : 'agent is paused',
+      pausedReason: state.pausedReason,
+      yieldedByScheduler: state.yieldedByScheduler,
+    };
   }
   if (state.troubled === true) {
     const failures = state.consecutiveFailures ?? 0;
-    return `agent is troubled (${failures} failure${failures === 1 ? '' : 's'})`;
+    return {
+      gate: 'troubled',
+      reason: `agent is troubled (${failures} failure${failures === 1 ? '' : 's'})`,
+      troubledAt: state.troubledAt,
+    };
   }
+  if (state.stoppedByUser === true) return { gate: 'stopped-by-user', reason: 'agent was stopped by the operator' };
+  const failures = state.consecutiveFailures ?? 0;
+  if (failures > 0) return {
+    gate: 'failure-backoff',
+    reason: `agent is in failure backoff (${failures} failure${failures === 1 ? '' : 's'})`,
+    consecutiveFailures: failures,
+  };
   return undefined;
 }
 
+/** Intent-aware policy over a classified gate. This function never mutates agent state. */
+export function decideResumeGate(
+  block: ResumeGateBlock | undefined,
+  intent: ResumeIntent,
+  context: ResumeGateContext = {},
+): ResumeGateDecision {
+  if (!block) return { decision: 'proceed' };
+  if (intent === 'message-delivery') return { decision: 'queue-message', reason: block.reason };
+
+  if (intent === 'operator-start') {
+    if (block.gate === 'paused') return { decision: 'block', reason: `${block.reason}; run pan unpause first` };
+    if (block.gate === 'troubled') return { decision: 'block', reason: `${block.reason}; run pan untroubled first` };
+    if (block.gate === 'stopped-by-user') return { decision: 'proceed', clearStoppedByUser: true };
+    return {
+      decision: 'proceed',
+      overrideFailureBackoff: true,
+      warning: `Operator start overrides ${block.reason}`,
+    };
+  }
+
+  if (block.gate === 'stopped-by-user') {
+    if (context.hasCompletedHandoff === true && context.owesRework === true) {
+      return { decision: 'proceed', clearStoppedByUser: true };
+    }
+    return { decision: 'block', reason: block.reason, needsYou: true };
+  }
+  return { decision: 'block', reason: block.reason };
+}
+
 function assertAgentCanTransitionToRunning(state: AgentState): void {
-  const reason = getAgentResumeGateBlockReason(state);
-  if (reason) {
-    throw new Error(`Cannot run ${state.id}: ${reason}. Clear the gate before resuming.`);
+  const decision = decideResumeGate(getAgentResumeGateBlockReason(state), 'operator-start');
+  if (decision.decision === 'block') {
+    throw new Error(`Cannot run ${state.id}: ${decision.reason}. Clear the gate before resuming.`);
   }
 }
 

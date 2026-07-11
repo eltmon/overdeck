@@ -8,7 +8,7 @@ import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, rmSync, existsSync
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { readFeatureContext, writeStoryFeatureContext } from '../work-agent-prompt.js';
-import { PAN_DIRNAME, PAN_CONTEXT_FILENAME } from '../../pan-dir/index.js';
+import { PAN_DIRNAME, WORKSPACE_RUNTIME_DIRNAME, PAN_CONTEXT_FILENAME } from '../../pan-dir/index.js';
 
 // Mock tracker factory
 const mockGetIssue = vi.hoisted(() => vi.fn());
@@ -137,7 +137,7 @@ describe('writeStoryFeatureContext', () => {
 
     await writeStoryFeatureContext(storyWorkspace, 'US-123');
 
-    const written = readFileSync(join(storyWorkspace, PAN_DIRNAME, PAN_CONTEXT_FILENAME), 'utf-8');
+    const written = readFileSync(join(storyWorkspace, WORKSPACE_RUNTIME_DIRNAME, PAN_CONTEXT_FILENAME), 'utf-8');
     expect(written).toContain('Feature Context for US-123');
     expect(written).toContain('Parent Feature:** The Big Feature (F-456)');
     expect(written).toContain('Problem');
@@ -155,7 +155,7 @@ describe('writeStoryFeatureContext', () => {
 
     await writeStoryFeatureContext(storyWorkspace, 'US-123');
 
-    const written = readFileSync(join(storyWorkspace, PAN_DIRNAME, PAN_CONTEXT_FILENAME), 'utf-8');
+    const written = readFileSync(join(storyWorkspace, WORKSPACE_RUNTIME_DIRNAME, PAN_CONTEXT_FILENAME), 'utf-8');
     expect(written).toBe('# Parent Context\nFallback');
   });
 

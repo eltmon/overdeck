@@ -16,12 +16,13 @@ import * as ChildProcess from "node:child_process";
 import * as Crypto from "node:crypto";
 import * as FS from "node:fs";
 
-import { resolveServerEntry } from "./main.js";
+import { resolveServerEntry, resolveServerStaticDir } from "./main.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const BASE_PORT = 7825;
 const MAX_RESTART_DELAY_MS = 30_000;
+const MAX_RESTART_ATTEMPTS = 8;
 const SIGTERM_GRACE_MS = 3_000;
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -29,6 +30,7 @@ const SIGTERM_GRACE_MS = 3_000;
 let serverProcess: ChildProcess.ChildProcess | null = null;
 let restartAttempt = 0;
 let restartTimer: ReturnType<typeof setTimeout> | null = null;
+let waitInterval: ReturnType<typeof setInterval> | null = null;
 let quitting = false;
 
 // Callbacks so main.ts can react to server-ready / URL changes
@@ -52,6 +54,8 @@ export function startServer(onReady: (port: number, wsUrl: string) => void): voi
   // The app-quit path sets isQuitting in main.ts before stopServer, so this
   // only un-latches the flag when the caller intends a real restart.
   quitting = false;
+  // A deliberate (re)start gets a fresh crash budget.
+  restartAttempt = 0;
   onReadyCallback = onReady;
   spawnServer();
 }
@@ -75,7 +79,13 @@ function spawnServer(): void {
     {
       env: {
         ...process.env,
+        // The server's config reads API_PORT || PORT (src/dashboard/server/config.ts)
+        API_PORT: String(port),
         OVERDECK_PORT: String(port),
+        // Packaged layout puts the frontend at resources/server/public, which
+        // the server cannot derive from its own bundle path (it assumes a
+        // repo-root dist/dashboard/public layout).
+        OVERDECK_FRONTEND_DIR: resolveServerStaticDir() ?? undefined,
         OVERDECK_AUTH_TOKEN: authToken,
         OVERDECK_MODE: "desktop",
         OVERDECK_NO_BROWSER: "1",
@@ -83,8 +93,10 @@ function spawnServer(): void {
         TERM: process.env.TERM || "xterm-256color",
         COLORTERM: process.env.COLORTERM || "truecolor",
         LANG: process.env.LANG || "en_US.UTF-8",
-        // Strip env vars that would confuse the child
-        ELECTRON_RUN_AS_NODE: undefined,
+        // process.execPath is the Electron binary; without this flag a
+        // packaged app ignores [entry] and boots the full desktop app again,
+        // fork-bombing the machine (PAN-2559).
+        ELECTRON_RUN_AS_NODE: "1",
       } as NodeJS.ProcessEnv,
       stdio: ["ignore", "pipe", "pipe"],
     },
@@ -102,8 +114,13 @@ function spawnServer(): void {
   child.on("spawn", () => {
     console.log(`[desktop/server] spawned pid=${child.pid} port=${port}`);
     // Wait for server to be listening before signalling ready
-    waitForServer(`http://127.0.0.1:${port}`, () => {
-      console.log(`[desktop/server] ready on port ${port}`);
+    waitForServer(`http://127.0.0.1:${port}`, (healthy) => {
+      console.log(`[desktop/server] ready on port ${port} (healthy=${String(healthy)})`);
+      if (healthy) {
+        // A confirmed-healthy boot resets the crash budget so the cap only
+        // counts consecutive failures.
+        restartAttempt = 0;
+      }
       onReadyCallback?.(port, `ws://127.0.0.1:${port}`);
     });
   });
@@ -123,30 +140,44 @@ function spawnServer(): void {
   });
 }
 
-function waitForServer(url: string, callback: () => void, maxMs = 30_000): void {
+function waitForServer(url: string, callback: (healthy: boolean) => void, maxMs = 30_000): void {
+  // Only one poller may be live: a crash-restart spawns a new child on a new
+  // port, and a stale poller's late callback would clobber serverUrl with the
+  // dead port (and, pre-PAN-2570, open another window).
+  if (waitInterval) clearInterval(waitInterval);
   const start = Date.now();
   const interval = setInterval(() => {
     if (Date.now() - start > maxMs) {
       clearInterval(interval);
-      callback(); // call anyway — server might still come up
+      if (waitInterval === interval) waitInterval = null;
+      callback(false); // call anyway — server might still come up
       return;
     }
     fetch(url + "/api/health", { signal: AbortSignal.timeout(1_000) })
       .then((r) => {
         if (r.ok) {
           clearInterval(interval);
-          callback();
+          if (waitInterval === interval) waitInterval = null;
+          callback(true);
         }
       })
       .catch(() => {
         /* not ready yet */
       });
   }, 500);
+  waitInterval = interval;
 }
 
 function scheduleRestart(): void {
   if (quitting) return;
   restartAttempt++;
+  if (restartAttempt > MAX_RESTART_ATTEMPTS) {
+    console.error(
+      `[desktop/server] server failed ${MAX_RESTART_ATTEMPTS} consecutive times — giving up. ` +
+        "Use the app menu's dashboard restart to retry.",
+    );
+    return;
+  }
   const delay = Math.min(1_000 * Math.pow(2, restartAttempt - 1), MAX_RESTART_DELAY_MS);
   console.log(`[desktop/server] restarting in ${delay}ms (attempt ${restartAttempt})`);
   restartTimer = setTimeout(() => {
@@ -163,6 +194,11 @@ export function stopServer(): void {
   if (restartTimer) {
     clearTimeout(restartTimer);
     restartTimer = null;
+  }
+
+  if (waitInterval) {
+    clearInterval(waitInterval);
+    waitInterval = null;
   }
 
   const child = serverProcess;

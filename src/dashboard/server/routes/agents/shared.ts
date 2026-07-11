@@ -34,6 +34,7 @@ import {
 import type { WorkAgentLifecycleState, WorkAgentRecommendedAction } from '../../../../lib/work-agent-lifecycle.js';
 import { emitActivityEntrySync } from '../../../../lib/activity-logger.js';
 import { getResourceConfig, type HealthLeakedSpecialist, type SystemHealthSnapshot } from '../../services/system-health-service.js';
+import { classifyMemoryPressure } from '../../../../lib/cloister/memory-governor.js';
 import { capturePane } from '../../../../lib/tmux.js';
 import type { RuntimeName } from '../../../../lib/runtimes/types.js';
 
@@ -554,13 +555,17 @@ export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuar
   const hardWorkAgentLimit = resolveAgentCountEnv('PAN_AGENT_BLOCK_COUNT', resourceConfig.agentBlockCount);
   const warnWorkAgentLimit = resolveAgentCountEnv('PAN_AGENT_WARN_COUNT', resourceConfig.agentWarnCount);
 
-  if (health.summary.availableMemoryBytes < health.thresholds.memoryAvailableCriticalBytes) {
+  const memoryBand = classifyMemoryPressure(health.summary.availableMemoryBytes, {
+    warningBytes: health.thresholds.memoryAvailableWarningBytes,
+    criticalBytes: health.thresholds.memoryAvailableCriticalBytes,
+  });
+  if (memoryBand === 'hard') {
     warnings.push({
       severity: 'critical',
       code: 'memory_pressure',
       message: `Available RAM is critically low (${availableGb} GB).`,
     });
-  } else if (health.summary.availableMemoryBytes < health.thresholds.memoryAvailableWarningBytes) {
+  } else if (memoryBand === 'soft') {
     warnings.push({
       severity: 'warning',
       code: 'memory_pressure',

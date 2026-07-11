@@ -23,7 +23,7 @@
 import { existsSync, readFileSync } from 'fs';
 import { Effect } from 'effect';
 import type { SessionUsage } from './jsonl-parser.js';
-import type { TokenUsage } from '../cost.js';
+import { getPricingSync, type AIProvider, type TokenUsage } from '../cost.js';
 import { FsError } from '../errors.js';
 
 // Minimal entry shape we care about. Anything else is ignored.
@@ -76,6 +76,7 @@ export interface OhmypiCostEventUsage {
   cacheRead: number;
   cacheWrite: number;
   cost: number;
+  warnings?: Array<{ type: 'unpriced-model'; provider: string | null; model: string; reason: string }>;
 }
 
 interface PiGenericEntry {
@@ -97,17 +98,59 @@ function isAssistantMessage(entry: PiEntry): entry is PiMessageEntry {
   return isMessage(entry) && entry.message?.role === 'assistant';
 }
 
+function pricingProviderFor(provider: string | null, model: string): AIProvider | null {
+  const lowerProvider = provider?.toLowerCase() ?? '';
+  const lowerModel = model.toLowerCase();
+  if (lowerProvider === 'openai' || lowerProvider === 'openai-codex' || lowerModel.includes('gpt')) return 'openai';
+  if (lowerProvider === 'google' || lowerModel.includes('gemini')) return 'google';
+  if (lowerProvider === 'anthropic' || lowerModel.includes('claude')) return 'anthropic';
+  if (
+    lowerProvider === 'kimi'
+    || lowerProvider === 'minimax'
+    || lowerProvider === 'zai'
+    || lowerProvider === 'zhipu'
+    || lowerProvider === 'custom'
+    || lowerModel.includes('kimi')
+    || lowerModel.includes('minimax')
+    || lowerModel.includes('glm')
+  ) {
+    return 'custom';
+  }
+  return null;
+}
+
+function computeCostFromPricing(
+  provider: string | null,
+  model: string,
+  usage: TokenUsage,
+): { cost: number; reason?: string } {
+  const pricingProvider = pricingProviderFor(provider, model);
+  if (!pricingProvider) return { cost: 0, reason: 'unknown-provider' };
+
+  const pricing = getPricingSync(pricingProvider, model);
+  if (!pricing) return { cost: 0, reason: 'unpriced-model' };
+
+  return {
+    cost:
+      (usage.inputTokens / 1000) * pricing.inputPer1k
+      + (usage.outputTokens / 1000) * pricing.outputPer1k
+      + ((usage.cacheReadTokens ?? 0) / 1000) * (pricing.cacheReadPer1k ?? 0)
+      + ((usage.cacheWriteTokens ?? 0) / 1000) * (pricing.cacheWrite5mPer1k ?? 0),
+  };
+}
+
 function tsMs(timestamp: string | undefined): number {
   if (!timestamp) return 0;
   const t = Date.parse(timestamp);
   return Number.isFinite(t) ? t : 0;
 }
 
-interface ParseResult {
+export interface ParseResult {
   ok: boolean;
   reason?: string;
   usage?: SessionUsage;
   usageEvents?: OhmypiCostEventUsage[];
+  unpricedModels?: Array<{ provider: string | null; model: string; reason: string }>;
 }
 
 // Known top-level entry types. Anything else is logged once per session.
@@ -141,6 +184,15 @@ export function parseOhmypiSessionCostEventsSync(filePath: string): OhmypiCostEv
   if (!existsSync(filePath)) return [];
   const result = parseOhmypiSessionContent(readFileSync(filePath, 'utf8'), filePath);
   return result.ok ? result.usageEvents ?? [] : [];
+}
+
+export function parseOhmypiSessionCostResultSync(filePath: string): ParseResult {
+  if (!existsSync(filePath)) return { ok: false, reason: 'unreadable' };
+  try {
+    return parseOhmypiSessionContent(readFileSync(filePath, 'utf8'), filePath);
+  } catch {
+    return { ok: false, reason: 'unreadable' };
+  }
 }
 
 /**
@@ -250,6 +302,7 @@ export function parseOhmypiSessionContent(content: string, filePath = '<inline>'
     { cost: number; inputTokens: number; outputTokens: number; messageCount: number; cacheReadTokens?: number; cacheWriteTokens?: number }
   > = {};
   const usageEvents: OhmypiCostEventUsage[] = [];
+  const unpricedModels: Array<{ provider: string | null; model: string; reason: string }> = [];
   const modelsInOrder: string[] = [];
   let compactionCount = 0;
 
@@ -272,12 +325,29 @@ export function parseOhmypiSessionContent(content: string, filePath = '<inline>'
     const output = usage.output ?? 0;
     const cacheRead = usage.cacheRead ?? 0;
     const cacheWrite = usage.cacheWrite ?? 0;
-    const cost = usage.cost?.total ?? 0;
-    const localComputed =
-      (usage.cost?.input ?? 0) +
-      (usage.cost?.output ?? 0) +
-      (usage.cost?.cacheRead ?? 0) +
-      (usage.cost?.cacheWrite ?? 0);
+    const tokenUsage: TokenUsage = {
+      inputTokens: input,
+      outputTokens: output,
+      cacheReadTokens: cacheRead,
+      cacheWriteTokens: cacheWrite,
+    };
+    const hasInlineCost = usage.cost?.total !== undefined;
+    let cost = usage.cost?.total ?? 0;
+    let warning: OhmypiCostEventUsage['warnings'] | undefined;
+    if (!hasInlineCost && input + output + cacheRead + cacheWrite > 0) {
+      const computed = computeCostFromPricing(provider, model, tokenUsage);
+      cost = computed.cost;
+      if (computed.reason) {
+        unpricedModels.push({ provider, model, reason: computed.reason });
+        warning = [{ type: 'unpriced-model', provider, model, reason: computed.reason }];
+      }
+    }
+    const localComputed = hasInlineCost
+      ? (usage.cost?.input ?? 0) +
+        (usage.cost?.output ?? 0) +
+        (usage.cost?.cacheRead ?? 0) +
+        (usage.cost?.cacheWrite ?? 0)
+      : cost;
 
     totals.inputTokens += input;
     totals.outputTokens += output;
@@ -311,6 +381,7 @@ export function parseOhmypiSessionContent(content: string, filePath = '<inline>'
       cacheRead,
       cacheWrite,
       cost,
+      ...(warning ? { warnings: warning } : {}),
     });
   }
 
@@ -352,6 +423,7 @@ export function parseOhmypiSessionContent(content: string, filePath = '<inline>'
       modelBreakdown,
     },
     usageEvents,
+    unpricedModels,
   };
 }
 

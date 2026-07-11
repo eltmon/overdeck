@@ -3,6 +3,27 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
+/**
+ * Canonical paths allowed at the root of `overdeck-state` (PAN-2541 D2).
+ * This list describes branch content only. Workspace-local runtime paths such
+ * as `.pan/continue.json` remain in STATE_PLANE_PATHS for legacy diff
+ * classification and must never be added here.
+ */
+export const STATE_BRANCH_PATHS = [
+  'records/',
+  'continues/',
+  'specs/',
+  'drafts/',
+  'review/',
+  'test/',
+  'feedback/',
+  'backlog/',
+  'notes/',
+  '.beads/',
+] as const;
+
+export type StateBranchPath = typeof STATE_BRANCH_PATHS[number];
+
 export const STATE_PLANE_PATHS = [
   '.pan/records/',
   '.pan/continues/',
@@ -25,6 +46,26 @@ export function isStatePlanePath(relativePath: string): boolean {
     }
     return normalized === statePath;
   });
+}
+
+export function parsePorcelainStatusPaths(porcelain: string): string[] {
+  return porcelain
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .filter(Boolean)
+    .flatMap((line) => {
+      const status = line.slice(0, 2);
+      const pathPart = line.length > 3 ? line.slice(3).trim() : '';
+      const paths = status.includes('R') || status.includes('C')
+        ? pathPart.split(' -> ')
+        : [pathPart];
+      return paths.map(unquoteGitPath);
+    })
+    .filter(Boolean);
+}
+
+export function isStatePlaneOnlyStatus(porcelain: string): boolean {
+  return parsePorcelainStatusPaths(porcelain).every(isStatePlanePath);
 }
 
 export async function isStatePlaneOnlyDiff(
@@ -71,4 +112,73 @@ async function countRevisionRange(range: string, repoPath: string): Promise<numb
   );
   const count = Number.parseInt(stdout.trim(), 10);
   return Number.isFinite(count) ? count : 0;
+}
+
+function unquoteGitPath(path: string): string {
+  const trimmed = path.trim();
+  if (!trimmed.startsWith('"') || !trimmed.endsWith('"')) {
+    return trimmed;
+  }
+
+  const inner = trimmed.slice(1, -1);
+  const bytes: number[] = [];
+  let decoded = '';
+
+  const flushBytes = () => {
+    if (bytes.length === 0) return;
+    decoded += new TextDecoder().decode(Uint8Array.from(bytes));
+    bytes.length = 0;
+  };
+
+  for (let index = 0; index < inner.length; index += 1) {
+    const char = inner[index];
+    if (char !== '\\') {
+      flushBytes();
+      decoded += char;
+      continue;
+    }
+
+    const next = inner[index + 1];
+    if (next === undefined) {
+      flushBytes();
+      decoded += '\\';
+      continue;
+    }
+
+    const octal = inner.slice(index + 1).match(/^[0-7]{1,3}/)?.[0];
+    if (octal) {
+      bytes.push(Number.parseInt(octal, 8));
+      index += octal.length;
+      continue;
+    }
+
+    flushBytes();
+    index += 1;
+    switch (next) {
+      case 'n':
+        decoded += '\n';
+        break;
+      case 'r':
+        decoded += '\r';
+        break;
+      case 't':
+        decoded += '\t';
+        break;
+      case 'b':
+        decoded += '\b';
+        break;
+      case 'f':
+        decoded += '\f';
+        break;
+      case 'v':
+        decoded += '\v';
+        break;
+      default:
+        decoded += next;
+        break;
+    }
+  }
+
+  flushBytes();
+  return decoded;
 }

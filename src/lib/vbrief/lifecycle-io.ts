@@ -24,7 +24,7 @@ import {
   slugify,
   type VBriefLifecycleDir,
 } from './lifecycle.js';
-import { readPlanSync } from './io.js';
+import { normalizeVBriefEnvelope, readPlanSync, serializeVBriefDocument } from './io.js';
 import { invalidateVBriefIndex } from './vbrief-index.js';
 import type { VBriefDocument } from './types.js';
 import { getProjectPanPaths, updateSpecStatus } from '../pan-dir/specs.js';
@@ -55,7 +55,7 @@ function readSpecFileSync(path: string): PanSpecDocument | null {
   }
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    parsed = normalizeVBriefEnvelope(JSON.parse(raw));
   } catch {
     return null;
   }
@@ -73,7 +73,7 @@ function updateSpecStatusSync(
   if (existing.status === newStatus) return existing;
   const nextDocument: PanSpecDocument = { ...existing.document, status: newStatus };
   const tmp = `${existing.path}.tmp`;
-  writeFileSync(tmp, JSON.stringify(nextDocument, null, 2), 'utf-8');
+  writeFileSync(tmp, serializeVBriefDocument(nextDocument), 'utf-8');
   renameSync(tmp, existing.path);
   invalidateVBriefIndex(projectRoot);
   return { ...existing, status: newStatus, document: nextDocument };
@@ -93,7 +93,7 @@ function writeSpecForIssueSync(
   const nextFilename = filename ?? generateVBriefFilename(doc.plan.id, doc.plan.title);
   const path = join(specsDir, nextFilename);
   const tmp = `${path}.tmp`;
-  writeFileSync(tmp, JSON.stringify(specDocument, null, 2), 'utf-8');
+  writeFileSync(tmp, serializeVBriefDocument(specDocument), 'utf-8');
   renameSync(tmp, path);
   invalidateVBriefIndex(projectRoot);
   const parts = parseVBriefFilename(nextFilename);
@@ -235,7 +235,7 @@ export function updatePlanStatus(filePath: string, newStatus: string): void {
   doc.plan.updated = now;
   doc.vBRIEFInfo.updated = now;
   const tmp = filePath + '.tmp';
-  writeFileSync(tmp, JSON.stringify(doc, null, 2), 'utf-8');
+  writeFileSync(tmp, serializeVBriefDocument(doc), 'utf-8');
   renameSync(tmp, filePath);
 }async function moveVBriefPromise(
   projectRoot: string,

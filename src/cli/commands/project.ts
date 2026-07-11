@@ -73,7 +73,7 @@ export async function projectAddCommand(
   console.log(chalk.dim(`  Key: ${key}`));
   console.log(chalk.dim(`  Path: ${fullPath}`));
   if (regResult.seededContextLayer) {
-    console.log(chalk.dim('  Context layer: .pan/context/project.md (commit this)'));
+    console.log(chalk.dim('  Context layer: .overdeck/context/project.md (commit this)'));
   }
   if (linearTeam) {
     console.log(chalk.dim(`  Linear team: ${linearTeam}`));

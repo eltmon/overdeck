@@ -25,6 +25,7 @@ vi.mock('../config-yaml.js', () => ({
     flywheel: 'claude-opus-4-7',
     strike: 'workhorse:expensive',
     sequencer: 'workhorse:expensive',
+    knowledge: 'workhorse:expensive',
   },
   DEFAULT_WORKHORSES: {
     expensive: 'claude-opus-4-7',
@@ -39,6 +40,7 @@ vi.mock('../config-yaml.js', () => ({
     ship: { model: 'workhorse:mid' },
     strike: { model: 'workhorse:expensive' },
     sequencer: { model: 'workhorse:expensive' },
+    knowledge: { model: 'workhorse:expensive' },
     flywheel: { model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
   },
   ROLE_EFFORTS: ['low', 'medium', 'high', 'xhigh', 'max'],
@@ -249,6 +251,7 @@ describe('loadSettingsApi', () => {
       },
       test: { model: 'workhorse:mid' },
       ship: { model: 'workhorse:mid' },
+      knowledge: { model: 'workhorse:expensive' },
       flywheel: { model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
     });
     expect(settings.models).not.toHaveProperty('overrides');

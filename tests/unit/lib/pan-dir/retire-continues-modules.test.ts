@@ -6,7 +6,7 @@
  * AC: pan-dir/continue.ts deletes readWorkspaceContinue/writeWorkspaceContinue
  * AC: promoteContinueToProject deleted; planning-promotion flow intact
  * AC: no production write to .pan/continues/ or .pan/continue.json (beyond legacy exceptions)
- * AC: .pan/records/<issue>.json is not gitignored
+ * AC (post PAN-2541): .pan/records/ is gitignored on main — records live on overdeck-state
  */
 
 import { describe, it, expect } from 'vitest';
@@ -79,14 +79,18 @@ describe('PAN-1919: retire dead continue modules', () => {
     expect(result.trim()).toBe('');
   });
 
-  it('AC4: .pan/records/pan-1919.json is not gitignored', () => {
+  it('AC4 (post PAN-2541): .pan/records/ is gitignored on main — records live on overdeck-state', () => {
+    // PAN-2541 moved per-issue records to the overdeck-state branch; on main
+    // .pan/records/ is intentionally gitignored so state cannot leak back into
+    // code history. The no-loss guard that records stay TRACKED on
+    // overdeck-state lives in tests/integration/state-branch-no-loss.test.ts.
     const result = execSync(
       `git check-ignore -v .pan/records/pan-1919.json; echo $?`,
       { cwd: ROOT, encoding: 'utf-8' },
     );
-    // exit code 1 means NOT ignored; git check-ignore outputs nothing and exits 1
+    // exit code 0 means ignored — the intended post-migration state.
     const exitCode = result.trim().split('\n').pop();
-    expect(exitCode).toBe('1');
+    expect(exitCode).toBe('0');
   });
 
   it('AC: lint-state-writes exits 0 after module retirement', () => {

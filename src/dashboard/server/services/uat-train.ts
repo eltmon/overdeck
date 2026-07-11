@@ -91,7 +91,7 @@ async function getReadySet(): Promise<ReadyFeature[] | null> {
       Effect.provide(nodeServicesLayer),
     ),
   );
-  return queue.map((item) => ({
+  const fromVerbs: ReadyFeature[] = queue.map((item) => ({
     issueId: item.issueId,
     title: item.title,
     branch: item.branchName,
@@ -99,7 +99,51 @@ async function getReadySet(): Promise<ReadyFeature[] | null> {
     ...(item.prUrl !== undefined ? { prUrl: item.prUrl } : {}),
     conflictsWith: item.conflictsWith,
   }));
+  const swept = await sweepEligibleFeatures(new Set(fromVerbs.map((f) => f.issueId)));
+  return [...fromVerbs, ...swept];
 }
+
+/**
+ * PAN-2484: the verb-based ready set misses merge-eligible issues that entered
+ * the pipeline outside the active flywheel run (operator revivals, strikes,
+ * externally-requested reviews) — those sat at readyForMerge with no train ever
+ * assembling around them. Sweep review status for THIS project's merge-eligible
+ * issues whose feature branch exists and append any the verb set missed. The
+ * flywheel's ordering still leads; swept extras ride at the tail (the assembly
+ * engine's conflict hook owns any cross-feature conflicts).
+ */
+async function sweepEligibleFeatures(alreadyIncluded: ReadySet): Promise<ReadyFeature[]> {
+  try {
+    const { loadReviewStatuses, mergeGateEligibility } = await import('../../../lib/review-status.js');
+    const { resolveProjectFromIssueSync } = await import('../../../lib/projects.js');
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const execFileAsync = promisify(execFile);
+    const root = projectRoot();
+    const extras: ReadyFeature[] = [];
+    for (const [issueId, rs] of Object.entries(loadReviewStatuses())) {
+      if (alreadyIncluded.has(issueId)) continue;
+      if (rs.readyForMerge !== true) continue;
+      if (!mergeGateEligibility(rs).eligible) continue;
+      const project = resolveProjectFromIssueSync(issueId);
+      if (!project || resolve(project.projectPath) !== root) continue;
+      const branch = `feature/${issueId.toLowerCase()}`;
+      try {
+        await execFileAsync('git', ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`], { cwd: root, timeout: 10_000 });
+      } catch {
+        continue; // no local branch — nothing to assemble
+      }
+      console.log(`[uat-train] ${issueId} is merge-eligible without a flywheel merge verb — swept into the ready set (PAN-2484)`);
+      extras.push({ issueId, title: issueId, branch, conflictsWith: [] });
+    }
+    return extras;
+  } catch (err) {
+    console.warn(`[uat-train] eligibility sweep failed: ${err instanceof Error ? err.message : String(err)}`);
+    return [];
+  }
+}
+
+type ReadySet = Set<string>;
 
 function codenameLabel(features: readonly ReadyFeature[]): string {
   const prefix = features[0]?.issueId.split('-')[0];

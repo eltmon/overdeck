@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from '@effect/vitest'
 import { Effect } from 'effect'
-import { existsSync, mkdtempSync, rmSync } from 'fs'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 
@@ -8,6 +8,7 @@ import {
   PAN_CONTEXT_FILENAME,
   PAN_CONTINUE_FILENAME,
   PAN_DIRNAME,
+  WORKSPACE_RUNTIME_DIRNAME,
   PAN_FEEDBACK_DIRNAME,
   PAN_SESSIONS_FILENAME,
   PAN_SPEC_FILENAME,
@@ -85,18 +86,18 @@ describe('ensureWorkspacePanDir / getWorkspacePanPaths', () => {
   it.effect('creates workspace .pan and feedback directory', () =>
     Effect.gen(function* () {
       const paths = yield* ensureWorkspacePanDir(TEST_DIR)
-      expect(paths.specPath).toBe(join(TEST_DIR, PAN_DIRNAME, PAN_SPEC_FILENAME))
-      expect(paths.continuePath).toBe(join(TEST_DIR, PAN_DIRNAME, PAN_CONTINUE_FILENAME))
-      expect(paths.sessionsPath).toBe(join(TEST_DIR, PAN_DIRNAME, PAN_SESSIONS_FILENAME))
-      expect(paths.feedbackDir).toBe(join(TEST_DIR, PAN_DIRNAME, PAN_FEEDBACK_DIRNAME))
-      expect(paths.contextPath).toBe(join(TEST_DIR, PAN_DIRNAME, PAN_CONTEXT_FILENAME))
+      expect(paths.specPath).toBe(join(TEST_DIR, WORKSPACE_RUNTIME_DIRNAME, PAN_SPEC_FILENAME))
+      expect(paths.continuePath).toBe(join(TEST_DIR, WORKSPACE_RUNTIME_DIRNAME, PAN_CONTINUE_FILENAME))
+      expect(paths.sessionsPath).toBe(join(TEST_DIR, WORKSPACE_RUNTIME_DIRNAME, PAN_SESSIONS_FILENAME))
+      expect(paths.feedbackDir).toBe(join(TEST_DIR, WORKSPACE_RUNTIME_DIRNAME, PAN_FEEDBACK_DIRNAME))
+      expect(paths.contextPath).toBe(join(TEST_DIR, WORKSPACE_RUNTIME_DIRNAME, PAN_CONTEXT_FILENAME))
       expect(existsSync(paths.feedbackDir)).toBe(true)
     }),
   )
 
   it('returns stable workspace paths', () => {
     const paths = getWorkspacePanPaths(TEST_DIR)
-    expect(paths.panDir).toBe(join(TEST_DIR, PAN_DIRNAME))
+    expect(paths.panDir).toBe(join(TEST_DIR, WORKSPACE_RUNTIME_DIRNAME))
   })
 })
 
@@ -110,6 +111,41 @@ describe('spec helpers', () => {
       const read = yield* readSpec(path)
       expect(read.status).toBe('proposed')
       expect(read.plan.id).toBe('PAN-967')
+    }),
+  )
+
+  it.effect('reads a v0.8 xBRIEFInfo pan spec document with top-level status', () =>
+    Effect.gen(function* () {
+      const paths = yield* ensurePanDirs(TEST_DIR)
+      const path = join(paths.specsDir, '2026-06-30-PAN-2426-xbrief-v08.vbrief.json')
+      writeFileSync(
+        path,
+        JSON.stringify(
+          {
+            xBRIEFInfo: {
+              version: '0.8',
+              created: '2026-06-30T00:00:00Z',
+              updated: '2026-06-30T00:00:00Z',
+            },
+            status: 'active',
+            plan: {
+              id: 'PAN-2426',
+              title: 'xBRIEF v0.8',
+              status: 'active',
+              items: [],
+              edges: [],
+            },
+          },
+          null,
+          2,
+        ),
+        'utf-8',
+      )
+
+      const read = yield* readSpec(path)
+      expect(read.status).toBe('active')
+      expect(read.vBRIEFInfo.version).toBe('0.8')
+      expect(read.plan.id).toBe('PAN-2426')
     }),
   )
 

@@ -40,9 +40,9 @@ export function PermissionsSection({
             {
               value: 'auto' as const,
               title: 'Auto (recommended)',
-              flag: '--permission-mode auto',
+              flag: '--permission-mode default',
               description:
-                "Claude Code's built-in classifier auto-approves safe tool calls and blocks destructive ones (force pushes, exfiltration, rm -rf, writes outside workspace). Requires skipAutoPermissionPrompt: true in ~/.claude/settings.json.",
+                "Launches with --permission-mode default; Overdeck's PermissionRequest/PreToolUse auto-approve hooks approve safe tool calls and block destructive ones (force pushes, exfiltration, rm -rf, writes outside workspace) without full bypass.",
             },
             {
               value: 'bypass' as const,

@@ -747,7 +747,7 @@ async function deliverTestFailureToWorkAgentHostSide(issueId: string, status: Re
       await messageAgent(target.agentId, message);
       console.log(`[review-status] delivered test failure to ${target.agentId} for ${issueId} (host-side)`);
     } else {
-      surfaceIssueFeedbackNeedsYou(issueId, target.reason, { specialist: 'test-agent', feedbackPath });
+      await surfaceIssueFeedbackNeedsYou(issueId, target.reason, { specialist: 'test-agent', feedbackPath });
     }
   } catch (err) {
     console.warn(`[review-status] host-side test-failure delivery for ${issueId} did not complete (non-fatal): ${err instanceof Error ? err.message : String(err)}`);

@@ -68,6 +68,7 @@ const ENV_KEYS = [
   'DASHBOARD_URL',
   'OVERDECK_HOME',
   'OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY',
+  'OVERDECK_AGENT_ID',
 ];
 
 let envSnapshot: EnvSnapshot;
@@ -180,6 +181,29 @@ describe('ServerConfig', () => {
       const cfg = await getConfig();
       expect(cfg.host).toBe('127.0.0.1');
     });
+  });
+
+  describe('workspace primary override identity gate', () => {
+    it.each(['agent-pan-2545', 'planning-pan-2545', 'flywheel-orchestrator', 'strike-pan-2485', 'future-role-pan-1'])(
+      'refuses the primary-port escape hatch for pipeline identity %s',
+      async (agentId) => {
+        process.env['OVERDECK_AGENT_ID'] = agentId;
+
+        await expect(getConfig()).rejects.toThrow(
+          `Refusing OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY=1 for pipeline-role identity`,
+        );
+      },
+    );
+
+    it.each([undefined, 'conv-20260709-6371'])(
+      'allows the primary-port escape hatch for operator identity %s',
+      async (agentId) => {
+        if (agentId === undefined) delete process.env['OVERDECK_AGENT_ID'];
+        else process.env['OVERDECK_AGENT_ID'] = agentId;
+
+        await expect(getConfig()).resolves.toMatchObject({ port: 3011 });
+      },
+    );
   });
 
   describe('optional API keys', () => {

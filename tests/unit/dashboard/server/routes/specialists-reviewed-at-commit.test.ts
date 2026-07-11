@@ -54,7 +54,28 @@ vi.mock('child_process', async (importActual) => {
       return {} as ReturnType<typeof actual.exec>;
     },
     execFile: (...args: unknown[]) => {
-      const callback = args[args.length - 1] as (err: null, result: { stdout: string; stderr: string }) => void;
+      const gitArgs = args[1] as string[];
+      const callback = args[args.length - 1] as (err: Error | null, result: { stdout: string; stderr: string }) => void;
+      if (gitArgs[0] === 'rev-parse') {
+        const ref = gitArgs[1]!;
+        if (ref.endsWith('^')) {
+          const commit = ref.slice(0, -1);
+          const parent = mockParentShaByCommit.get(commit);
+          if (!parent) {
+            callback(new Error(`unknown parent for ${commit}`), { stdout: '', stderr: '' });
+            return {} as ReturnType<typeof actual.execFile>;
+          }
+          callback(null, { stdout: `${parent}\n`, stderr: '' });
+          return {} as ReturnType<typeof actual.execFile>;
+        }
+        callback(null, { stdout: `${ref}\n`, stderr: '' });
+        return {} as ReturnType<typeof actual.execFile>;
+      }
+      if (gitArgs[0] === 'diff' && gitArgs[1] === '--name-only') {
+        const rangeKey = `${gitArgs[2]}..${gitArgs[3]}`;
+        callback(null, { stdout: mockDiffNameOnlyByRange.get(rangeKey) ?? mockDiffNameOnlyStdout, stderr: '' });
+        return {} as ReturnType<typeof actual.execFile>;
+      }
       callback(null, { stdout: mockDiffNameOnlyStdout, stderr: '' });
       return {} as ReturnType<typeof actual.execFile>;
     },
@@ -63,6 +84,8 @@ vi.mock('child_process', async (importActual) => {
 
 let mockExecHeadSha = 'defaultsha';
 const mockTreeShaByCommit = new Map<string, string>();
+const mockParentShaByCommit = new Map<string, string>();
+const mockDiffNameOnlyByRange = new Map<string, string>();
 let mockDiffNameOnlyStdout = '';
 
 // ─── Stub modules that deacon imports ────────────────────────────────────────
@@ -177,6 +200,8 @@ beforeEach(async () => {
   });
   mockExecHeadSha = 'defaultsha';
   mockTreeShaByCommit.clear();
+  mockParentShaByCommit.clear();
+  mockDiffNameOnlyByRange.clear();
   mockDiffNameOnlyStdout = '';
   mockResolveProject.mockReturnValue({ projectPath: '/fake/project' });
 }, 30_000);
@@ -290,6 +315,7 @@ describe('checkPostReviewCommits — deacon detects new commits via reviewedAtCo
     mockExecHeadSha = 'newsha99';
     mockTreeShaByCommit.set('oldsha1', 'oldtree');
     mockTreeShaByCommit.set('newsha99', 'newtree');
+    mockParentShaByCommit.set('newsha99', 'oldsha1');
     mockDiffNameOnlyStdout = '.pan/records/pan-905.json\n.pan/test/result.json\n.beads/issues.jsonl\n';
 
     const actions = await checkPostReviewCommits();
@@ -301,6 +327,34 @@ describe('checkPostReviewCommits — deacon detects new commits via reviewedAtCo
     expect(after?.testStatus).toBe('passed');
     expect(after?.readyForMerge).toBe(true);
     expect(after?.reviewedAtCommit).toBe('newsha99');
+  });
+
+  it('preserves review and test verdicts when HEAD is state-only commits after the reviewed code commit', async () => {
+    setReviewStatusSync('PAN-906', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      readyForMerge: true,
+      reviewedAtCommit: 'codesha1',
+    });
+
+    mockExecHeadSha = 'stateonly2';
+    mockTreeShaByCommit.set('codesha1', 'codetree');
+    mockTreeShaByCommit.set('stateonly2', 'state-tree');
+    mockParentShaByCommit.set('stateonly2', 'stateonly1');
+    mockParentShaByCommit.set('stateonly1', 'codesha1');
+    mockDiffNameOnlyByRange.set('stateonly1..stateonly2', '.pan/records/pan-906.json\n');
+    mockDiffNameOnlyByRange.set('codesha1..stateonly1', '.beads/issues.jsonl\n');
+    mockDiffNameOnlyByRange.set('codesha1..stateonly2', 'src/lib/cloister/deacon.ts\n');
+
+    const actions = await checkPostReviewCommits();
+
+    expect(actions.filter((a) => a.includes('PAN-906'))).toHaveLength(0);
+
+    const after = getReviewStatusSync('PAN-906');
+    expect(after?.reviewStatus).toBe('passed');
+    expect(after?.testStatus).toBe('passed');
+    expect(after?.readyForMerge).toBe(true);
+    expect(after?.reviewedAtCommit).toBe('stateonly2');
   });
 
   it('does not reset review when HEAD matches reviewedAtCommit', async () => {

@@ -53,7 +53,7 @@ function makePlan(issueId: string, slug: string, status: string = 'proposed'): V
 
 function writePlan(dir: string, filename: string, doc: VBriefDocument): string {
   const p = join(dir, filename);
-  writeFileSync(p, JSON.stringify(doc, null, 2), 'utf-8');
+  writeFileSync(p, JSON.stringify(doc, undefined, 2), 'utf-8');
   return p;
 }
 

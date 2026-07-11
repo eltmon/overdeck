@@ -1,6 +1,6 @@
 {
   "name": "@overdeck/core",
-  "version": "0.43.0",
+  "version": "0.45.7",
   "description": "Multi-agent orchestration for AI coding assistants (Claude Code, Codex, Cursor, Gemini CLI)",
   "publishConfig": {
     "access": "public"
@@ -69,7 +69,8 @@
     "node": ">=22.5.0"
   },
   "overrides": {
-    "@effect/platform-node-shared": "4.0.0-beta.73"
+    "@effect/platform-node-shared": "4.0.0-beta.73",
+    "unrun": "0.2.39"
   },
   "scripts": {
     "dev": "tsx watch src/cli/index.ts",
@@ -134,13 +135,13 @@
     "@effect/vitest": "4.0.0-beta.73",
     "@google-cloud/speech": "^7.3.1",
     "@homebridge/node-pty-prebuilt-multiarch": "^0.13.1",
+    "@huggingface/transformers": "^4.2.0",
     "@iarna/toml": "^2.2.5",
     "@linear/sdk": "^70.0.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@octokit/rest": "^22.0.1",
     "@types/mustache": "^4.2.6",
     "@types/ws": "^8.18.1",
-    "@xenova/transformers": "^2.17.2",
     "ai": "^6.0.180",
     "chalk": "^5.6.2",
     "chokidar": "^5.0.0",
@@ -173,6 +174,7 @@
     "@typescript-eslint/parser": "6.21.0",
     "@vitest/coverage-v8": "^4.1.6",
     "autoevals": "^0.3.0",
+    "cross-env": "^10.1.0",
     "eslint": "^8.55.0",
     "evalite": "^0.19.0",
     "husky": "^9.1.7",

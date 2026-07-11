@@ -31,7 +31,7 @@ describe('role definitions', () => {
     expect(frontmatter.model).toBeUndefined();
     expect(frontmatter.description).toEqual(expect.any(String));
     expect(body).toContain('Read the issue and the PRD draft');
-    expect(body).toContain('.pan/drafts/');
+    expect(body).toContain('drafts/<ISSUE-ID>.md` on `overdeck-state`');
     expect(body).toContain('AskUserQuestion');
     expect(body).toContain('vBRIEF plan');
     expect(body).toContain('Beads');
@@ -40,8 +40,8 @@ describe('role definitions', () => {
     expect(body).toContain('Stop after `pan plan finalize` returns');
     // Status-as-field model — files do not move between directories
     expect(body).toContain('Files never move between directories');
-    // Output instructions must point at the canonical .pan/specs/ path, not legacy directories
-    expect(body).toMatch(/Promote.*\.pan\/specs\/|\.pan\/specs\/.*proposed/i);
+    // Output instructions must point at the canonical overdeck-state specs path.
+    expect(body).toMatch(/specs\/.*overdeck-state|overdeck-state.*specs\//i);
   });
 
   it('defines the work role with Jidoka inspection gates and no phase labels', () => {
@@ -146,10 +146,36 @@ describe('role definitions', () => {
     expect(body).toContain('There is no separate UAT role');
     expect(body).toContain('Playwright MCP tools');
     expect(body).toContain('isolated browser instance per session');
-    expect(body).toContain(".pan/continue.json");
+    expect(body).toContain('.overdeck/continue.json');
     expect(body).toContain('vBRIEF acceptance criteria');
     expect(body).toContain('TESTS PASSED');
     expect(body).toContain('TESTS FAILED');
+  });
+
+  it('prohibits work, review, and test roles from controlling host dashboard processes', () => {
+    for (const role of ['work', 'review', 'test']) {
+      const { body } = splitFrontmatter(readRepoFile(`roles/${role}.md`));
+      expect(body).toContain('Never start, stop, kill, or restart the host-level Overdeck dashboard');
+      expect(body).toContain('https://api-feature-<issue>.pan.localhost');
+    }
+  });
+
+  it('defines the knowledge role as OKF maintenance with no merge or pan done authority', () => {
+    const { frontmatter, body } = splitFrontmatter(readRepoFile('roles/knowledge.md'));
+
+    expect(frontmatter).toMatchObject({
+      name: 'knowledge',
+      permissionMode: 'default',
+      effort: 'high',
+    });
+    expect(frontmatter.model).toBeUndefined();
+    expect(body).toContain('/okf study');
+    expect(body).toContain('/okf retro');
+    expect(body).toContain('/okf sync');
+    expect(body).toContain('Open PRs to the knowledge repository only');
+    expect(body).toContain('Never run `pan done`');
+    expect(body).toContain('Never merge code or knowledge PRs yourself');
+    expect(body).toContain('Cite concept IDs');
   });
 
   // PAN-1531: ship role removed. Rebase is performed server-side by

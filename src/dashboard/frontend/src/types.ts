@@ -110,9 +110,9 @@ export interface Agent {
   type?: 'agent';
   /**
    * PAN-1048 role primitive. Replaces the legacy agentPhase string.
-   * 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel'.
+   * 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'knowledge'.
    */
-  role?: 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer';
+  role?: 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer' | 'knowledge';
   /**
    * @deprecated PAN-1048 — server stopped emitting this; kept on the type
    * temporarily so older test fixtures still compile while their references
@@ -144,6 +144,23 @@ export interface Agent {
   runtimeState?: string;         // 'completed' when agent finished normally (not session lost)
   hasSession?: boolean;          // Whether a resumable Claude session exists
   lifecycle?: WorkAgentLifecycle;
+  resourceStats?: AgentResourceStats | null;
+}
+
+export interface AgentResourceStats {
+  id: string;
+  issueId: string;
+  role: string;
+  model: string;
+  status: string;
+  statusChip: { state: 'working' | 'idle'; idleMinutes: number; fanOut: boolean };
+  rootPid: number | null;
+  processCount: number;
+  cpuPercent: number;
+  memoryBytes: number;
+  burnUsdPerHour: number;
+  hypotheticalUsdPerHour?: number;
+  totalUsd: number;
 }
 
 export interface AgentHealth {
@@ -273,7 +290,11 @@ export interface ContainerStats {
   memoryPercent: number;
   networkIn: number;      // bytes
   networkOut: number;     // bytes
-  status: 'running' | 'stopped' | 'unhealthy' | 'restarting';
+  status: 'running' | 'stopped' | 'paused' | 'unhealthy' | 'restarting';
+  memLimitBytes?: number | null;
+  memPercentOfLimit?: number;
+  oomKills24h?: number;
+  composeFile?: string;
 }
 
 export interface ContainerHistory {
@@ -284,10 +305,158 @@ export interface ContainerHistory {
 
 export type ResourceGroupBy = 'issue' | 'type' | 'status';
 
+export interface HostVitalsSnapshot {
+  stale: boolean;
+  cpu: {
+    percent: number;
+    load: [number, number, number];
+    spark: number[];
+  };
+  mem: {
+    usedBytes: number;
+    availableBytes: number;
+    swapUsedBytes: number;
+    swapTotalBytes: number;
+  };
+  disk: {
+    usedBytes: number;
+    freeBytes: number;
+    reclaimableBytes: number;
+  };
+  docker: {
+    containers: number;
+    running: number;
+    stacks: number;
+    networks: number;
+    networkPool: { used: number; total: number };
+    stale: boolean;
+  };
+  agents: {
+    sessions: number;
+    active: number;
+    idleOver15m: number;
+    burnUsdPerHour: number;
+    hypotheticalUsdPerHour: number;
+    totalUsd: number;
+  };
+}
+
+export interface SpawnGateSnapshot {
+  state: 'OPEN' | 'SOFT' | 'BLOCKED';
+  reason: string;
+  pressure: number;
+  stale?: boolean;
+  warnings: Array<{
+    severity?: 'warning' | 'critical';
+    code?: string;
+    message: string;
+  }>;
+}
+
+export type ResourceStackPhase = 'merged' | 'ship' | 'review' | 'work' | 'plan' | 'ready' | 'todo' | 'verifying';
+
+export interface ResourceStack {
+  id: string;
+  issueId: string | null;
+  issueTitle: string;
+  composeProject: string;
+  serviceCount: number;
+  services: ContainerStats[];
+  aggregates: {
+    cpuPercent: number;
+    memoryBytes: number;
+    diskBytes: number;
+  };
+  phase: ResourceStackPhase;
+  idleMinutes?: number;
+  uatUrl?: string;
+}
+
+export interface CapacityForecastSnapshot {
+  stacks: Array<{
+    stackId: string;
+    issueId: string | null;
+    composeProject: string;
+    predictedRamBytes: number;
+    predictedLoad: number;
+    approximate: true;
+    source: 'last-run-peak' | 'fleet-median';
+  }>;
+  headroom: {
+    freeRamBytes: number;
+    loadHeadroom: number;
+  };
+}
+
+export interface ResourceHistoryPoint {
+  ts: string;
+  value: number;
+}
+
+export interface ResourceHistoryAnnotation {
+  ts: string;
+  label: string;
+  targetKind: string;
+  targetId: string;
+}
+
+export interface ResourceHistorySnapshot {
+  startedAt: string;
+  cpu: ResourceHistoryPoint[];
+  mem: ResourceHistoryPoint[];
+  annotations: ResourceHistoryAnnotation[];
+}
+
+export interface ReclaimCandidate {
+  kind: 'stack' | 'venv' | 'docker-prune' | 'exited-container';
+  label: string;
+  why: string;
+  ramBytes: number;
+  diskBytes: number;
+  action: string;
+  issueId?: string;
+}
+
 export interface ResourcesSnapshot {
   containers: ContainerStats[];
   agents: Agent[];
   updatedAt: string;
+  hostVitals?: HostVitalsSnapshot;
+  spawnGate?: SpawnGateSnapshot;
+  forecast?: CapacityForecastSnapshot;
+  reclaimCandidates?: ReclaimCandidate[];
+  reclaimTotals?: { ramBytes: number; diskBytes: number };
+  reclaimThresholdBytes?: number;
+  stale?: boolean;
+  stacks?: ResourceStack[];
+  coreServices?: CoreServiceResource[];
+  hostProcesses?: HostProcessResource[];
+}
+
+export interface CoreServiceResource {
+  id: 'dashboard' | 'deacon' | 'support-fleet';
+  label: string;
+  status: string;
+  cpuPercent: number;
+  memoryBytes: number;
+  memberCount: number;
+  eventLoopP99Ms?: number;
+  lastTickAgeSeconds?: number | null;
+  members?: string[];
+}
+
+export interface HostProcessResource {
+  id: string;
+  family: string;
+  label: string;
+  owner: { label: string; agentId?: string; issueId?: string };
+  pidCount: number;
+  cpuPercent: number;
+  memoryBytes: number;
+  peakCpuPercent: number;
+  peakMemoryBytes: number;
+  note?: string;
+  retainedUntil?: string;
 }
 
 export interface SystemHealthAgentProcess {

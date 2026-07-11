@@ -5,6 +5,7 @@ import {
   CircleCheck,
   CircleX,
   Code2,
+  BookOpenCheck,
   Compass,
   Eye,
   FlaskConical,
@@ -137,6 +138,19 @@ const PHASE_COLOR: Record<WorkingPhase, string> = {
 function PhaseIcon({ runtime, dotStatus }: { runtime: AgentRuntimeSnapshot | undefined; dotStatus: StatusDotStatus }) {
   const phase = runtime?.currentTool ? toolNameToPhase(runtime.currentTool) : undefined;
   if (!phase) {
+    // PAN-2487 follow-up (operator ask): a running session must visibly MOVE even
+    // when no per-tool telemetry is flowing — a static dot on an active/thinking
+    // row reads as "not doing anything". Spin a generic loader; the richer
+    // per-phase icon below still wins whenever currentTool is known.
+    if (dotStatus === 'active' || dotStatus === 'thinking') {
+      return (
+        <Loader2
+          size={12}
+          className="animate-spin"
+          style={{ color: 'var(--primary)', flexShrink: 0 }}
+        />
+      );
+    }
     return <StatusDot status={dotStatus} size="sm" />;
   }
   const Icon = PHASE_ICON[phase];
@@ -190,6 +204,7 @@ interface SessionNodeProps {
 
 const TYPE_ICON: Record<string, LucideIcon> = {
   work: Code2,
+  knowledge: BookOpenCheck,
   strike: Zap,
   planning: Compass,
   review: Eye,
@@ -257,6 +272,7 @@ function deriveSessionLabel(session: SessionNodeType, _resolvedModel?: string | 
     case 'review': return 'Review';
     case 'reviewer': return session.role ? capitalize(session.role) : 'Reviewer';
     case 'work': return 'Work';
+    case 'knowledge': return 'Knowledge';
     case 'strike': return 'Strike';
     case 'planning': return 'Planning';
     case 'legacy': return 'Planning state';
@@ -273,6 +289,8 @@ function describeSessionPurpose(session: SessionNodeType): string {
   switch (session.type) {
     case 'work':
       return 'Implementation agent for this issue.';
+    case 'knowledge':
+      return 'Knowledge agent maintaining the OKF bundle for this issue.';
     case 'strike':
       return 'Drop-in implement-and-merge agent for this issue.';
     case 'planning':

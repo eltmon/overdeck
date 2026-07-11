@@ -1,0 +1,176 @@
+---
+title: The State Branch
+description: Where Overdeck keeps pipeline state — the overdeck-state branch, the state worktree, and what it means for your repository
+---
+
+# The State Branch
+
+Overdeck records everything durable about your pipeline — plans, per-issue
+records, review verdicts, PRD drafts, the beads task database — in git, so it
+survives reinstalls and travels between machines. That state lives on a
+dedicated branch called **`overdeck-state`**, not on `main`.
+
+Your code history and your pipeline history share one repository but never
+share a branch, a commit, or a merge.
+
+## Why a separate branch
+
+Overdeck writes state constantly — every plan, verdict, and task update lands
+a commit. When that state lived on `main`, those commits made up most of the
+branch's history. The churn buried real code changes in `git log`, triggered
+CI on every state write, and forced feature branches to rebase over commits
+that never touched code. Moving state to its own branch removes all three
+problems at once: `main` shows only code, CI runs only on code, and feature
+branches rebase only when code actually changes.
+
+## What you see on GitHub
+
+The default view of your repository shows `main`: source code, docs, and one
+Overdeck-owned directory, `.overdeck/context/`, which holds your hand-written
+project guidance (see [Context Layers](/configuration/context-layers)). No
+plans, no records, no task database.
+
+Switch the branch dropdown to `overdeck-state` and the file listing changes
+completely:
+
+| Directory | Contents |
+| --- | --- |
+| `records/` | One JSON file per issue: decisions, verdicts, cost history |
+| `specs/` | Machine-readable work plans (vBRIEFs) |
+| `drafts/` | PRD drafts, one markdown file per issue |
+| `continues/` | Session resume state per issue |
+| `backlog/` | The prioritized issue sequence |
+| `notes/` | Operator notes and briefs |
+| `review/`, `test/`, `feedback/` | Pipeline artifacts |
+| `.beads/` | The beads task database (JSONL export) |
+| `migration-complete.json` | The marker that tells Overdeck this project uses the state branch |
+
+A PRD is browsable at
+`github.com/<owner>/<repo>/blob/overdeck-state/drafts/<issue>.md` — useful for
+linking plans in issues and chat.
+
+## Where the files live on your machine
+
+Overdeck checks the state branch out to a **state worktree** at
+`~/.overdeck/state/<project>/`. A worktree is a second checkout of the same
+repository: the same file is `drafts/pan-123.md` on the branch and
+`~/.overdeck/state/<project>/drafts/pan-123.md` on disk. Every state commit
+Overdeck makes happens there — never in your project checkout.
+
+You never create this worktree yourself. `pan install`, `pan doctor`, and the
+migration all create or repair it automatically, on any machine.
+
+Two directories share the `.overdeck` name; they are different things:
+
+| Path | What it is |
+| --- | --- |
+| `~/.overdeck/` | Overdeck's machine home: config, agents, and now `state/<project>/` worktrees |
+| `<your repo>/.overdeck/` | One tracked directory on `main`, holding only your context layer |
+
+This mirrors the convention tools like Cargo use: `~/.cargo/` for the machine,
+`./.cargo/` for the project.
+
+## What happens when you clone
+
+**A plain `git clone` checks out code only.** Your working directory contains
+`main`'s files — no `records/`, no `.beads/`. Git does download the state
+branch's history into `.git/` (that is how the state reaches new machines),
+but none of it appears on disk unless you check the branch out.
+
+Want a lighter clone? `git clone --single-branch` fetches `main` alone.
+
+**Cloning the state branch directly** (`git clone -b overdeck-state <url>`)
+gives you a working directory that starts at `records/`, `specs/`, and so on
+— occasionally useful for inspecting pipeline state without Overdeck, in the
+same way people clone a `gh-pages` branch.
+
+## The branches never merge
+
+`main` and `overdeck-state` have no common ancestor — `overdeck-state` is an
+orphan branch, like `gh-pages`. GitHub cannot even open a pull request between
+them; the compare page reports "nothing to compare." You may still see
+GitHub's "recent pushes — Compare & pull request" banner after state activity.
+Ignore it: it appears for any recently pushed branch and leads nowhere here.
+
+Overdeck also enforces the separation mechanically:
+
+- A CI guard fails any code-branch change that adds state paths, and any
+  state-branch change that adds code.
+- The same guard rejects a branch whose *history* contains the state branch's
+  root commit, so even a file-less `git merge --allow-unrelated-histories`
+  is refused at push time.
+- If something forced past all of that ever lands, it is one
+  `git revert` from undone — a merge commit destroys nothing.
+
+## How a project starts using the state branch
+
+Projects opt in one at a time with a single command:
+
+```bash
+pan admin state migrate <project> --dry-run   # print the plan, change nothing
+pan admin state migrate <project>             # perform the cutover
+```
+
+The migration copies all existing state onto a new `overdeck-state` branch,
+removes it from `main` in one ordinary commit, and publishes both branches in
+a single atomic push. The final commit on the state branch adds
+`migration-complete.json` — the **marker**. Overdeck treats a project as
+migrated only when a valid marker is present at the branch tip's history, so a
+half-finished or interrupted migration leaves every reader safely on the old
+layout. The command is resumable: run it again after a failure and it
+continues where it stopped.
+
+Until you migrate a project, nothing changes for it — Overdeck keeps reading
+and writing the legacy `.pan/` layout on `main`, and `pan doctor` reports
+"Legacy state layout" for it.
+
+<Info>
+Migration is per project and per repository. Migrating one project never
+affects another, and the mechanism is plain git — GitHub and GitLab remotes
+behave identically.
+</Info>
+
+## What changes day to day
+
+Almost nothing, by design. Plans finalize, records update, and beads tasks
+flow exactly as before — Overdeck resolves every read and write to the state
+worktree automatically. The visible differences:
+
+- `git log main` shows code changes only. State activity appears on
+  `overdeck-state` instead.
+- State pushes no longer trigger your CI.
+- PRD links in issues point at `blob/overdeck-state/drafts/...` instead of
+  in-repo `.pan/` paths.
+- Running `bd` against the project's task database means running it in the
+  state worktree (Overdeck does this for you; for manual inspection, `cd
+  ~/.overdeck/state/<project>` first).
+
+## Frequently asked questions
+
+**Does deleting my project checkout lose pipeline state?**
+No. State lives on the `overdeck-state` branch on your remote and in the
+state worktree under `~/.overdeck/`. Re-cloning the repo and running
+`pan doctor` restores everything.
+
+**Can I edit state files by hand?**
+Read them freely. For edits, prefer `pan` commands — Overdeck assumes it is
+the only writer, and hand edits can race it. Operator notes in `notes/` are
+the exception; they are yours.
+
+**Why does my repository's total clone size include state history?**
+Both branches share one git object store. The weight is the same as before
+the migration — it used to live on `main` — but if it ever grows
+uncomfortable, `git clone --single-branch` or `--filter=blob:none` skips it.
+
+**What if I accidentally merge `overdeck-state` into `main`?**
+You almost can't: GitHub refuses the pull request, and the CI guard plus the
+local pre-push hook reject the merge commit. If one is ever forced through,
+`git revert -m 1 <merge-commit>` restores `main` completely.
+
+**Can the `overdeck-state` branch be deleted?**
+Protect it like `main` — it is the only home of your pipeline state, and no
+code branch can restore it. Add a rule on your remote that blocks deletion
+and force pushes of `overdeck-state` (GitHub: a repository ruleset targeting
+the branch; GitLab: a protected-branch entry). Locally, git already refuses
+to delete the branch while the state worktree has it checked out, and
+Overdeck's bundled agent rules forbid agents from deleting it in any form.

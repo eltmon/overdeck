@@ -40,13 +40,13 @@ Research-only agent that produces an executable plan for an issue. Never writes 
 
 ## Outputs
 
-1. **PRD draft** in `<projectRoot>/.pan/drafts/<ISSUE-ID>.md` — **created FIRST, before the vBRIEF and beads, whenever one does not already exist.** The vBRIEF is *lowered from* the PRD, never invented alongside it. Write the PRD to the standard in `.claude/rules/prd-authoring.md`: executable by a cheaper model with no re-research — glossary first, verified file/line references with grep-anchor quotes, before/after snippets, numbered work items, numbered FR-/NFR- requirements, decisions made in the doc, intersecting repo rules restated, mechanically checkable acceptance criteria. If a PRD already exists, verify it is still accurate against the current code before lowering it; correct drifted references in place.
-2. **vBRIEF plan** in `.pan/spec.vbrief.json` with items, acceptance criteria, and dependency edges (workspace working copy)
-3. **Continue context** in `.pan/continue.json` with decisions, hazards, and a clear `resumePoint` for the implementation agent
+1. **PRD draft** at `drafts/<ISSUE-ID>.md` on `overdeck-state`, resolved through the draft write door — **created FIRST, before the vBRIEF and beads, whenever one does not already exist.** The vBRIEF is *lowered from* the PRD, never invented alongside it. Write the PRD to the standard in `.claude/rules/prd-authoring.md`: executable by a cheaper model with no re-research — glossary first, verified file/line references with grep-anchor quotes, before/after snippets, numbered work items, numbered FR-/NFR- requirements, decisions made in the doc, intersecting repo rules restated, mechanically checkable acceptance criteria. If a PRD already exists, verify it is still accurate against the current code before lowering it; correct drifted references in place.
+2. **vBRIEF plan** in `.overdeck/spec.vbrief.json` with items, acceptance criteria, and dependency edges (workspace working copy)
+3. **Continue context** in `.overdeck/continue.json` with decisions, hazards, and a clear `resumePoint` for the implementation agent
 4. **Beads** created with `bd create` and labelled with the issue id, one per `items[]` entry, with edges that mirror the plan's `edges`
-5. **Codebase map** under `<projectRoot>/.pan/context/codebase/` — bootstrapped if missing, corrected if stale.
+5. **Codebase map** under `<projectRoot>/.overdeck/context/codebase/` — bootstrapped if missing, corrected if stale.
 
-`pan plan finalize` does the full handoff in one shot: it materializes beads, marks the workspace vBRIEF `plan.status: "proposed"`, then calls the dashboard's complete-planning endpoint to promote the canonical spec into `<projectRoot>/.pan/specs/<YYYY-MM-DD>-<ISSUE>-<slug>.vbrief.json`, commit it on main, push, transition the issue to Planned, and terminate this planning session. You do not write to `.pan/specs/` directly. Whether a work agent starts afterward is decided by deterministic state, not by you: human-initiated planning waits in Planned for `pan start` / Start Agent; flywheel-initiated planning (launched with `--auto-start`) auto-spawns. The dashboard Done button is the manual handoff path for `--no-promote` runs. See docs/VBRIEF.md for the four-artifact model.
+`pan plan finalize` does the full handoff in one shot: it materializes beads, marks the workspace vBRIEF `plan.status: "proposed"`, then calls the dashboard's complete-planning endpoint to promote the canonical spec into `specs/<YYYY-MM-DD>-<ISSUE>-<slug>.vbrief.json` on `overdeck-state` through the write door, transition the issue to Planned, and terminate this planning session. You do not write to `specs/` directly. Whether a work agent starts afterward is decided by deterministic state, not by you: human-initiated planning waits in Planned for `pan start` / Start Agent; flywheel-initiated planning (launched with `--auto-start`) auto-spawns. The dashboard Done button is the manual handoff path for `--no-promote` runs. See docs/VBRIEF.md for the four-artifact model.
 
 ## Edge semantics for the executor
 
@@ -68,13 +68,13 @@ If two items are independent, leave them unconnected. The work agent reads the D
 
 ## Process
 
-1. Read the issue and the PRD draft at `<projectRoot>/.pan/drafts/<ISSUE-ID>.md` if it exists. For cross-issue context, look up existing specs by issue ID via the read-only lifecycle index — never write or move files in `.pan/specs/`.
+1. Read the issue and the PRD draft at `drafts/<ISSUE-ID>.md` on `overdeck-state` through the read door if it exists. For cross-issue context, look up existing specs by issue ID via the read-only lifecycle index — never write or move files in `specs/` directly.
 2. Explore the codebase. **Prefer TLDR MCP tools over full `Read` whenever possible** — see TLDR section below. Use Read/Grep/Glob for everything else, but never edit
 3. Empirically test risky assumptions (use `claude --print` to probe CLI behavior, run the dev server briefly to check shape)
 4. Surface ambiguities to the user via AskUserQuestion before committing to an approach
-5. **Write the PRD draft** at `<projectRoot>/.pan/drafts/<ISSUE-ID>.md` if it does not exist (see Outputs #1 for the standard). Do not proceed to the vBRIEF until the PRD is on disk.
-6. Materialize the plan: write `.pan/spec.vbrief.json`, `.pan/continue.json`, beads (workspace-local)
-7. Run `pan plan finalize` — that materializes beads, marks the workspace vBRIEF `plan.status: "proposed"`, and (unless invoked with `--no-promote`) promotes the canonical spec to `<projectRoot>/.pan/specs/`, commits on main, transitions the issue, and terminates this planning session. Your final action is this single command; no separate "Done" click is required. Do not start, request, or wait for the work agent — the handoff gate (human approval or the auto-spawn stamp) lives outside your session.
+5. **Write the PRD draft** through the draft write door to `drafts/<ISSUE-ID>.md` on `overdeck-state` if it does not exist (see Outputs #1 for the standard). Do not proceed to the vBRIEF until the PRD is on disk.
+6. Materialize the plan: write `.overdeck/spec.vbrief.json`, `.overdeck/continue.json`, beads (workspace-local)
+7. Run `pan plan finalize` — that materializes beads, marks the workspace vBRIEF `plan.status: "proposed"`, and (unless invoked with `--no-promote`) promotes the canonical spec to `specs/` on `overdeck-state`, transitions the issue, and terminates this planning session. Your final action is this single command; no separate "Done" click is required. Do not start, request, or wait for the work agent — the handoff gate (human approval or the auto-spawn stamp) lives outside your session.
 8. Stop after `pan plan finalize` returns; do not start implementation work. Stop after planning is complete. The session may be killed mid-shutdown — that is the expected end-of-planning signal.
 
 ## TLDR: prefer code summaries over full reads

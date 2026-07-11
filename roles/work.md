@@ -50,6 +50,8 @@ Autonomous coding role for a single Overdeck issue. Runs in a tmux session bound
 
 Work is one undifferentiated mode. Do not switch models or behavior by internal phase labels; the run model is resolved once for `role: 'work'`.
 
+Never start, stop, kill, or restart the host-level Overdeck dashboard, supervisor, or Deacon. Development and verification target only the feature workspace's own containers and endpoint (`https://api-feature-<issue>.pan.localhost`).
+
 ## Per-Bead Workflow
 
 For every bead:
@@ -58,7 +60,7 @@ For every bead:
 2. `bd update <bead-id> --claim` — claim it.
 3. Implement only that bead.
 4. `git add` specific files and `git commit` — one bead = one commit.
-5. `bd close <bead-id> --reason="…"`. (`bd close` writes bead status to the per-issue record automatically — do **not** write to the record or `.pan/continue.json` directly.)
+5. `bd close <bead-id> --reason="…"`. (`bd close` writes bead status to the per-issue record automatically — do **not** write to the record or `.overdeck/continue.json` directly.)
 6. Re-read this bead's plan-item metadata (merged view via the spec on main) after the commit.
 7. If `metadata.requiresInspection === true`, run `pan inspect <ISSUE-ID> --bead <bead-id>` for `inspectionDepth: "fast"` or omitted, or add `--deep` for `inspectionDepth: "deep"`, then wait for the verdict via `pan tell`.
 8. If `metadata.requiresInspection === false`, skip inspection and continue.
@@ -75,7 +77,7 @@ You remain the durable work agent for the issue. The foreman path is not a reviv
 
 ### Wave loop
 
-1. Read `.pan/spec.vbrief.json` and compute dependency waves with `groupItemsByWave(doc)` from `src/lib/vbrief/dag.ts`.
+1. Read `.overdeck/spec.vbrief.json` and compute dependency waves with `groupItemsByWave(doc)` from `src/lib/vbrief/dag.ts`.
 2. Run `analyzeSwarmReadiness(doc)` from `src/lib/vbrief/swarm-readiness.ts`. Use its overlap matrix and conflict groups to serialize items inside a wave when scopes overlap. Overlap orders work; it never refuses the issue.
 3. On every start or restart, run the reconcile helper from `src/lib/agents/slot-reconcile.ts` before dispatching new work. Existing `feature/<issue>-slot-*` branches, `agent-<issue>-slot-<n>` agents, and status overrides determine which items are already merged, in flight, or still pending.
 4. For each pending item in the current wave, call `chooseDispatchTier(item)` from `src/lib/agents/dispatch-tier.ts`.

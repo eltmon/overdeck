@@ -66,6 +66,9 @@ import {
 } from './spawn-prep.js';
 import { getConcurrencyLimits } from '../cloister/concurrency.js';
 import { listAgentStates } from './queries.js';
+import { findProjectByPathSync } from '../projects.js';
+import { isStateMigrated } from '../state-home.js';
+import { shouldCommitLegacyWorkspaceArtifacts } from '../state-read-home.js';
 import {
   decideChannelsForWorkAgent,
   dismissDevChannelsDialog,
@@ -171,7 +174,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   // so we never block the Node event loop.
   await Effect.runPromise(saveAgentState(state));
 
-  const isSpecialistRole = role === 'review' || role === 'test' || role === 'ship';
+  const isSpecialistRole = role === 'review' || role === 'test' || role === 'ship' || role === 'knowledge';
   const shouldRegisterConversation = isSpecialistRole || options.registerConversation === true;
   // PAN-1557: convoy sub-reviewers are now interactive specialists — deliver
   // their prompt via tmux after Claude boots (same as the orchestrator/test/
@@ -288,6 +291,11 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   if (options.reviewSynthesisAgentId) state.reviewSynthesisAgentId = options.reviewSynthesisAgentId;
   if (options.reviewOutputPath) state.reviewOutputPath = options.reviewOutputPath;
 
+  const extraEnvExports = [...flywheelEnvExports(flywheelEnv), ...(options.extraEnvExports ?? [])];
+  if (role === 'knowledge' && !extraEnvExports.includes('export PATH="$HOME/.overdeck/bin:$PATH"')) {
+    extraEnvExports.push('export PATH="$HOME/.overdeck/bin:$PATH"');
+  }
+
   const launcherContent = generateLauncherScriptSync({
     role,
     workingDir: workspace,
@@ -297,7 +305,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     promptFile: shouldDeliverPromptViaTmux ? undefined : promptFile,
     promptFileMode: undefined,
     overdeckEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
-    extraEnvExports: flywheelEnvExports(flywheelEnv),
+    extraEnvExports,
     baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole, options.effort),
     appendSystemPromptFiles: await claudeSystemPromptFiles(workspace, resolvedHarness),
     sessionId,
@@ -414,7 +422,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
 }
 
 export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
-  const role: 'work' | 'strike' = options.role ?? 'work';
+  const role: 'work' | 'strike' | 'knowledge' = options.role ?? 'work';
   const sessionPrefix = role === 'strike' ? 'strike' : 'agent';
   const agentId = options.agentId ?? `${sessionPrefix}-${options.issueId.toLowerCase()}`;
 
@@ -431,7 +439,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Strike agents bypass the normal pipeline (no plan/beads/review/test) —
   // see roles/strike.md. The beads gate is the only thing we skip; everything
   // else (workspace health, supervisor wiring, launcher) is identical.
-  if (role !== 'strike' && options.slotItemId === undefined) {
+  if (role !== 'strike' && role !== 'knowledge' && options.slotItemId === undefined) {
     // Use a short lock timeout when spawning from HTTP handlers so dashboard
     // requests fail fast to the JSONL fallback instead of blocking behind CLI
     // processes that hold the cross-process bd lock. The CLI `pan start` path
@@ -542,6 +550,10 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   if (role === 'work') {
     try {
       const workspace = options.workspace;
+      const project = findProjectByPathSync(workspace);
+      if (project && !shouldCommitLegacyWorkspaceArtifacts(await isStateMigrated(project))) {
+        console.warn(`[agents] Deferred legacy .pan/ index cleanup for ${options.issueId} — migrated projects use gitignored .overdeck/ runtime files; historical entries retire with the branch`);
+      } else {
       const { stdout: trackedFiles } = await execAsync(
         'git ls-files .pan/continue.json .pan/spec.vbrief.json',
         { cwd: workspace },
@@ -564,6 +576,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
         } else {
           console.warn(`[agents] Skipping .pan/ untrack for ${options.issueId} — .pan/ paths have uncommitted changes`);
         }
+      }
       }
     } catch (err: any) {
       console.warn(`[agents] .pan/ untrack cleanup failed for ${options.issueId}: ${err.message}`);

@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { OVERDECK_HOME, SYNC_SOURCES, isDevMode } from './paths.js';
 import { listProjectsSync } from './projects.js';
+import { resolveProjectContextFile } from './context-layers/layers.js';
 
 /** Persisted manifest for the startup sync skip-when-unchanged gate. */
 export interface SyncManifest {
@@ -42,7 +43,7 @@ function computeSyncInputHash(): string {
   updateHashFromFile(hash, globalMd);
 
   for (const { config } of listProjectsSync()) {
-    const projectMd = join(config.path, '.pan', 'context', 'project.md');
+    const projectMd = resolveProjectContextFile(config.path);
     if (existsSync(projectMd)) {
       updateHashFromFile(hash, projectMd);
     }

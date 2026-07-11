@@ -83,7 +83,7 @@ This is just background information.
 });
 
 describe('synthesizeMinimalVBrief', () => {
-  it('creates a proposed no-inspection v0.6 vBRIEF with acceptance-criterion items', () => {
+  it('creates a proposed no-inspection v0.8 xBRIEF with acceptance-criterion items', () => {
     const doc = synthesizeMinimalVBrief({
       issueId: 'pan-1071',
       title: 'Auto start work agents',
@@ -91,7 +91,7 @@ describe('synthesizeMinimalVBrief', () => {
       url: 'https://example.test/PAN-1071',
     });
 
-    expect(doc.vBRIEFInfo.version).toBe('0.6');
+    expect(doc.vBRIEFInfo.version).toBe('0.8');
     expect(doc.vBRIEFInfo.inspectionPolicy).toBe('never');
     expect(doc.plan.id).toBe('pan-1071');
     expect(doc.plan.status).toBe('proposed');
@@ -126,7 +126,11 @@ describe('writeAutoStartVBrief', () => {
       const projectDoc = JSON.parse(await readFile(result.projectSpecPath, 'utf-8'));
 
       expect(result.canonicalFilename).toMatch(/PAN-1071/);
+      expect(workspaceDoc.xBRIEFInfo.version).toBe('0.8');
+      expect(workspaceDoc.vBRIEFInfo).toBeUndefined();
       expect(workspaceDoc.plan.status).toBe('proposed');
+      expect(projectDoc.xBRIEFInfo.version).toBe('0.8');
+      expect(projectDoc.vBRIEFInfo).toBeUndefined();
       expect(projectDoc.plan.status).toBe('proposed');
       expect(projectDoc.plan.metadata.canonicalFilename).toBe(result.canonicalFilename);
     });

@@ -46,6 +46,7 @@ export interface SlotReconcileResult {
   pending: ReconciledSlotItem[];
   branches: ReconciledSlotBranch[];
   agents: ReconciledSlotAgent[];
+  superseded?: NonNullable<NonNullable<ReturnType<typeof readIssueRecordForWorkspaceSync>>['swarm']>['supersededAttempts'];
 }
 
 export interface SlotReconcileDeps {
@@ -89,6 +90,7 @@ export async function reconcileSlotState(
     pending: [],
     branches,
     agents,
+    superseded: readIssueRecordForWorkspaceSync(workspace, issueId.toUpperCase())?.swarm?.supersededAttempts ?? [],
   };
 
   for (const slotItem of slotItems) {

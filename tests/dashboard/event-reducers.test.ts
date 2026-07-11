@@ -508,6 +508,20 @@ describe('applyEvent — activity.updated', () => {
   })
 })
 
+// ─── applyEvent — conversation.title_changed ─────────────────────────────────
+
+describe('applyEvent — conversation.title_changed', () => {
+  it('increments conversationsListRevision', () => {
+    const state = applyEvent(makeState({ conversationsListRevision: 7 }), {
+      type: 'conversation.title_changed',
+      sequence: 32,
+      timestamp: ts(),
+      payload: { conversationName: 'conv-1', title: 'New title', titleSource: 'auto' },
+    })
+    expect(state.conversationsListRevision).toBe(8)
+  })
+})
+
 // ─── applyEvent — shadow inference ──────────────────────────────────────────
 
 describe('applyEvent — shadow.inference_update', () => {

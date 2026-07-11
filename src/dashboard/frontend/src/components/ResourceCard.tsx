@@ -29,6 +29,7 @@ interface AgentCardProps {
 const STATUS_DOT: Record<ContainerStats['status'], string> = {
   running: 'bg-success',
   stopped: 'bg-destructive',
+  paused: 'bg-muted-foreground',
   unhealthy: 'bg-warning',
   restarting: 'bg-warning',
 };
@@ -36,6 +37,7 @@ const STATUS_DOT: Record<ContainerStats['status'], string> = {
 const STATUS_LABEL: Record<ContainerStats['status'], string> = {
   running: 'running',
   stopped: 'stopped',
+  paused: 'paused',
   unhealthy: 'unhealthy',
   restarting: 'restarting',
 };

@@ -29,6 +29,17 @@ const mockWriteFeedbackFile = vi.fn();
 const mockResolveProjectFromIssue = vi.fn();
 const mockGetAgentRuntimeState = vi.fn().mockReturnValue(null);
 const mockIsIssueClosed = vi.fn();
+// PAN-2209 dead-end respawn
+const mockGetAgentStateSync = vi.fn().mockReturnValue(null);
+const mockGetAgentDir = vi.fn().mockReturnValue('/tmp/nonexistent-agent-dir');
+const mockSaveAgentStateSync = vi.fn();
+const mockClearAgentTroubledSync = vi.fn();
+const mockSpawnWorkAgentThroughAgentsEndpoint = vi.fn();
+const mockRecordDeadEndNeedsYou = vi.fn();
+
+vi.mock('../../../src/lib/cloister/dead-end-trip.js', () => ({
+  recordDeadEndNeedsYou: (...args: unknown[]) => mockRecordDeadEndNeedsYou(...args),
+}));
 
 vi.mock('../../../src/lib/cloister/issue-closed.js', () => ({
   isIssueClosed: (...args: unknown[]) => mockIsIssueClosed(...args),
@@ -83,11 +94,17 @@ vi.mock('../../../src/lib/agents.js', () => ({
   saveSessionId: vi.fn(),
   listRunningAgents: vi.fn(() => []),
   listRunningAgentsSync: vi.fn(() => []),
-  getAgentDir: vi.fn().mockReturnValue('/tmp'),
+  getAgentDir: (...args: unknown[]) => mockGetAgentDir(...args),
   getAgentState: vi.fn().mockReturnValue(null),
-  getAgentStateSync: vi.fn().mockReturnValue(null),
+  getAgentStateSync: (...args: unknown[]) => mockGetAgentStateSync(...args),
   saveAgentState: vi.fn(),
-  saveAgentStateSync: vi.fn(),
+  saveAgentStateSync: (...args: unknown[]) => mockSaveAgentStateSync(...args),
+  clearAgentTroubledSync: (...args: unknown[]) => mockClearAgentTroubledSync(...args),
+}));
+
+vi.mock('../../../src/lib/cloister/orphan-proposed-reconciler.js', () => ({
+  reconcileOrphanProposedSpecs: vi.fn().mockResolvedValue([]),
+  spawnWorkAgentThroughAgentsEndpoint: (...args: unknown[]) => mockSpawnWorkAgentThroughAgentsEndpoint(...args),
 }));
 
 const mockSpawnReviewRoleForIssue = vi.fn();
@@ -580,5 +597,130 @@ describe('checkDeadEndAgents — dead-end CI recovery path', () => {
     expect(retryActions[0]).toMatch(/CI failure notification/);
     expect(retryActions[0]).toMatch(/attempt 1\/5/);
     expect(ciRetryMap.get(deadEndIssueId)?.count).toBe(1);
+  });
+});
+
+describe('checkDeadEndAgents — PAN-2209 dead work-agent respawn on review-blocked', () => {
+  let originalContent: string | null = null;
+  let checkDeadEndAgents: () => Promise<string[]>;
+  let deadEndIssueId: string;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    deadEndIssueId = `PAN-2209-RESPAWN-${process.pid}-${Date.now()}`;
+    mockSetReviewStatus.mockReset();
+    // Dead work agent: no live tmux session.
+    mockSessionExists.mockReset().mockReturnValue(false);
+    mockSendKeysAsync.mockReset().mockResolvedValue(undefined);
+    mockResolveProjectFromIssue.mockReset().mockReturnValue(null);
+    mockGetAgentStateSync.mockReset().mockReturnValue({ paused: false });
+    mockGetAgentDir.mockReset().mockReturnValue('/tmp/nonexistent-agent-dir');
+    mockSaveAgentStateSync.mockReset();
+    mockClearAgentTroubledSync.mockReset();
+    mockSpawnWorkAgentThroughAgentsEndpoint.mockReset().mockResolvedValue({ spawned: true, agentId: `agent-${deadEndIssueId.toLowerCase()}` });
+    mockRecordDeadEndNeedsYou.mockReset();
+    mockLoadReviewStatuses.mockReset().mockImplementation(() => {
+      try { return JSON.parse(readFileSync(REVIEW_STATUS_FILE, 'utf-8')); } catch { return {}; }
+    });
+
+    originalContent = existsSync(REVIEW_STATUS_FILE) ? readFileSync(REVIEW_STATUS_FILE, 'utf-8') : null;
+
+    const mod = await import('../../../src/lib/cloister/deacon.js');
+    checkDeadEndAgents = mod.checkDeadEndAgents;
+    mod.ciRetryMap.clear();
+  });
+
+  afterEach(() => {
+    if (originalContent !== null) writeFileSync(REVIEW_STATUS_FILE, originalContent, 'utf-8');
+    else if (existsSync(REVIEW_STATUS_FILE)) unlinkSync(REVIEW_STATUS_FILE);
+  });
+
+  const blockedStatus = (overrides: Record<string, unknown> = {}) => ({
+    issueId: deadEndIssueId,
+    reviewStatus: 'blocked',
+    testStatus: 'passed',
+    readyForMerge: false,
+    autoRequeueCount: 0,
+    updatedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(), // > 5 min stale
+    ...overrides,
+  });
+
+  it('respawns a fresh work agent (and clears the troubled gate) when review is blocked and the session is dead', async () => {
+    writeStatusFile({ [deadEndIssueId]: blockedStatus() });
+
+    const actions = await checkDeadEndAgents();
+
+    // A fresh work agent must be spawned for the blocked issue.
+    expect(mockSpawnWorkAgentThroughAgentsEndpoint).toHaveBeenCalledTimes(1);
+    expect(mockSpawnWorkAgentThroughAgentsEndpoint).toHaveBeenCalledWith(deadEndIssueId);
+    // The system-set troubled gate is cleared so the spawn is not refused.
+    expect(mockClearAgentTroubledSync).toHaveBeenCalledWith(`agent-${deadEndIssueId.toLowerCase()}`);
+    // The circuit breaker is engaged (autoRequeueCount incremented).
+    const requeueCall = mockSetReviewStatus.mock.calls.find(c => (c[1] as any)?.autoRequeueCount !== undefined);
+    expect(requeueCall?.[1].autoRequeueCount).toBe(1);
+    expect(actions.some(a => /PAN-2209.*respawned/.test(a))).toBe(true);
+  });
+
+  it('respects a deliberate pause (burn-guard/operator) and does NOT respawn', async () => {
+    mockGetAgentStateSync.mockReturnValue({ paused: true, pausedReason: 'burn-guard: fable/opus must not resume' });
+    writeStatusFile({ [deadEndIssueId]: blockedStatus() });
+
+    const actions = await checkDeadEndAgents();
+
+    expect(mockSpawnWorkAgentThroughAgentsEndpoint).not.toHaveBeenCalled();
+    expect(mockClearAgentTroubledSync).not.toHaveBeenCalled();
+    expect(actions.some(a => /respawned/.test(a))).toBe(false);
+  });
+
+  it('keeps an explicit mid-work operator stop without a completed handoff', async () => {
+    mockGetAgentStateSync.mockReturnValue({ stoppedByUser: true });
+    mockRecordDeadEndNeedsYou.mockReturnValue(`Dead-end recovery needs-you: ${deadEndIssueId} was explicitly stopped before handoff`);
+    writeStatusFile({ [deadEndIssueId]: blockedStatus() });
+
+    const actions = await checkDeadEndAgents();
+
+    expect(mockSpawnWorkAgentThroughAgentsEndpoint).not.toHaveBeenCalled();
+    expect(mockSaveAgentStateSync).not.toHaveBeenCalled();
+    expect(actions.some(a => /respawned/.test(a))).toBe(false);
+    expect(actions.some(a => a.includes('needs-you'))).toBe(true);
+  });
+
+  it('persists one needs-you trip when the 25-requeue breaker is exhausted', async () => {
+    mockRecordDeadEndNeedsYou.mockReturnValue(`Dead-end recovery needs-you: ${deadEndIssueId} exhausted 25 requeues`);
+    writeStatusFile({ [deadEndIssueId]: blockedStatus({ autoRequeueCount: 25 }) });
+
+    const actions = await checkDeadEndAgents();
+
+    expect(mockSpawnWorkAgentThroughAgentsEndpoint).not.toHaveBeenCalled();
+    expect(mockRecordDeadEndNeedsYou).toHaveBeenCalledWith(deadEndIssueId, 'dead-end-rebuild', expect.any(String), expect.stringContaining('exhausted 25'));
+    expect(actions).toContain(`Dead-end recovery needs-you: ${deadEndIssueId} exhausted 25 requeues`);
+  });
+
+  it('clears historical stoppedByUser for completed-handoff rework before respawn', async () => {
+    const agentDir = mkdtempSync(join(tmpdir(), 'pan-2536-completed-'));
+    writeFileSync(join(agentDir, 'completed.processed'), '');
+    const state = { stoppedByUser: true };
+    mockGetAgentDir.mockReturnValue(agentDir);
+    mockGetAgentStateSync.mockReturnValue(state);
+    writeStatusFile({ [deadEndIssueId]: blockedStatus() });
+
+    await checkDeadEndAgents();
+
+    expect(state.stoppedByUser).toBeUndefined();
+    expect(mockSaveAgentStateSync).toHaveBeenCalledWith(state);
+    expect(mockSpawnWorkAgentThroughAgentsEndpoint).toHaveBeenCalledTimes(1);
+    rmSync(agentDir, { recursive: true, force: true });
+  });
+
+  it('does not respawn a merge-CI dead-end with a dead session (no work rework needed)', async () => {
+    writeStatusFile({ [deadEndIssueId]: blockedStatus({
+      reviewStatus: 'passed',
+      mergeStatus: 'failed',
+      mergeNotes: 'Merge failed: failing required checks',
+    }) });
+
+    await checkDeadEndAgents();
+
+    expect(mockSpawnWorkAgentThroughAgentsEndpoint).not.toHaveBeenCalled();
   });
 });

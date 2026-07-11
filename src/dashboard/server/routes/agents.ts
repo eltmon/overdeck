@@ -54,6 +54,8 @@ import {
   postAgentRestartFreshRoute,
   postAgentsRestartAllRoute,
   postAgentResetSessionRoute,
+  getAgentsRestartConfigRoute,
+  postAgentsRestartWithConfigRoute,
 } from './agents/lifecycle-restart.js';
 import {
   getAgentCloisterHealthRoute,
@@ -131,6 +133,8 @@ export const agentsRouteLayer = Layer.mergeAll(
   postAgentSwitchModelRoute,
   postAgentRestartFreshRoute,
   postAgentDeliveryMethodRoute,
+  getAgentsRestartConfigRoute,
+  postAgentsRestartWithConfigRoute,
 );
 
 export default agentsRouteLayer;

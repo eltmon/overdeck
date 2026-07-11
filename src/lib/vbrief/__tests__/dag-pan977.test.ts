@@ -397,7 +397,7 @@ describe('persisted task authority', () => {
     const specsDir = join(projectRoot, '.pan', 'specs');
     mkdirSync(specsDir, { recursive: true });
     const planPath = join(specsDir, '2026-01-01-PAN-977-test.vbrief.json');
-    writeFileSync(planPath, JSON.stringify(doc, null, 2), 'utf-8');
+    writeFileSync(planPath, JSON.stringify(doc, undefined, 2), 'utf-8');
     return planPath;
   }
 

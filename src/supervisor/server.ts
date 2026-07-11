@@ -22,11 +22,13 @@ import * as path from 'node:path';
 import { appendFile } from 'node:fs/promises';
 import { readPlatformConfigSync } from '../lib/platform-lifecycle.js';
 import { readWatchdogConfig, SupervisorWatchdog } from './watchdog.js';
-import { createSupervisorRestartSpawner } from './restart-spawn.js';
+import { createSupervisorRestartSpawner, resolveBundledPanInvocation } from './restart-spawn.js';
 import { readTtsWatchdogConfig, TtsWatchdog } from './tts-watchdog.js';
 
 const SUPERVISOR_PORT = Number(process.env.OVERDECK_SUPERVISOR_PORT || 3012);
-const PAN_BINARY = process.env.OVERDECK_PAN_BINARY || 'pan';
+const PAN_INVOCATION = process.env.OVERDECK_PAN_BINARY
+  ? { panBinary: process.env.OVERDECK_PAN_BINARY, panArgsPrefix: [] }
+  : resolveBundledPanInvocation();
 const LOG_FILE = path.join(os.homedir(), '.overdeck', 'logs', 'supervisor.log');
 const platformConfig = readPlatformConfigSync();
 const watchdogConfig = readWatchdogConfig(process.env, platformConfig.dashboardApiPort);
@@ -70,7 +72,7 @@ function sendJson(req: http.IncomingMessage, res: http.ServerResponse, status: n
   res.end(JSON.stringify(body));
 }
 
-const spawnRestart = createSupervisorRestartSpawner({ panBinary: PAN_BINARY, log });
+const spawnRestart = createSupervisorRestartSpawner({ ...PAN_INVOCATION, log });
 
 const watchdog = new SupervisorWatchdog({
   config: watchdogConfig,

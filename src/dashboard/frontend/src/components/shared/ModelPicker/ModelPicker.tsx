@@ -413,7 +413,7 @@ function pickModelForHarness(
   const allowed = (modelId: string) => canUsePickerHarness(newHarness, modelId, policy).allowed;
 
   // Hardcoded preferences match HARNESS_DEFAULT_MODEL in the chat picker.
-  const preferred = newHarness === 'ohmypi' ? 'gpt-5.5' : newHarness === 'codex' ? 'codex-4o' : 'claude-sonnet-5';
+  const preferred = newHarness === 'ohmypi' ? 'gpt-5.6-sol' : newHarness === 'codex' ? 'codex-4o' : 'claude-sonnet-5';
   if (allModels.some((m) => m.id === preferred) && allowed(preferred)) return preferred;
 
   const currentProvider = allModels.find((m) => m.id === currentModel)?.provider;

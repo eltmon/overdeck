@@ -1,5 +1,7 @@
 import { Effect } from 'effect';
 import { spawn, type ChildProcess } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 import { acquireRestartLock, readRestartLockHolder, type RestartLockHandle } from '../lib/restart-lock.js';
 import type { SpawnRestartResult } from './watchdog.js';
 
@@ -10,6 +12,7 @@ type LogFn = (msg: string) => void | Promise<void>;
 
 interface SupervisorRestartSpawnerOptions {
   panBinary: string;
+  panArgsPrefix?: string[];
   log: LogFn;
   env?: NodeJS.ProcessEnv;
   acquireRestartLockFn?: typeof acquireRestartLock;
@@ -29,6 +32,13 @@ export function buildSupervisorRestartArgs(): string[] {
     '--health-timeout',
     String(WATCHDOG_RESTART_HEALTH_TIMEOUT_MS),
   ];
+}
+
+export function resolveBundledPanInvocation(moduleUrl = import.meta.url): { panBinary: string; panArgsPrefix: string[] } {
+  return {
+    panBinary: process.execPath,
+    panArgsPrefix: [resolve(dirname(fileURLToPath(moduleUrl)), '../cli/index.js')],
+  };
 }
 
 function appendCapped(current: string, chunk: Buffer | string): string {
@@ -76,7 +86,7 @@ export function createSupervisorRestartSpawner(options: SupervisorRestartSpawner
     try {
       let stdout = '';
       let stderr = '';
-      const child = spawnImpl(options.panBinary, buildSupervisorRestartArgs(), {
+      const child = spawnImpl(options.panBinary, [...(options.panArgsPrefix ?? []), ...buildSupervisorRestartArgs()], {
         detached: true,
         stdio: ['ignore', 'pipe', 'pipe'],
         env: {

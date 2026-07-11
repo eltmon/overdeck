@@ -127,7 +127,7 @@ describe('swarm verdict feedback routing', () => {
     }));
 
     expect(result.agentMessageSent).toBe(true);
-    expect(mockResolveIssueFeedbackTarget).toHaveBeenCalledWith('PAN-2203', { itemId: 'wi-b' });
+    expect(mockResolveIssueFeedbackTarget).toHaveBeenCalledWith('PAN-2203', expect.objectContaining({ itemId: 'wi-b' }));
     expect(mockMessageAgent).toHaveBeenCalledWith(
       'agent-pan-2203-slot-2',
       expect.stringContaining('MUST READ: /tmp/workspace/.pan/feedback/001-review-agent-changes-requested.md'),
@@ -183,7 +183,7 @@ describe('swarm verdict feedback routing', () => {
     }));
 
     expect(result.agentMessageSent).toBe(true);
-    expect(mockResolveIssueFeedbackTarget).toHaveBeenCalledWith('PAN-2203', { itemId: 'wi-c' });
+    expect(mockResolveIssueFeedbackTarget).toHaveBeenCalledWith('PAN-2203', expect.objectContaining({ itemId: 'wi-c' }));
     expect(mockMessageAgent).toHaveBeenCalledWith(
       'agent-pan-2203-slot-1',
       expect.stringContaining('MUST READ: /tmp/workspace/.pan/feedback/001-review-agent-changes-requested.md'),

@@ -12,6 +12,7 @@ import { Effect } from 'effect';
 
 const mockListAgentStates = vi.hoisted(() => vi.fn());
 const mockListSessions = vi.hoisted(() => vi.fn());
+const mockListPaneValues = vi.hoisted(() => vi.fn());
 const mockGetStats = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../../lib/agents.js', () => ({
@@ -20,6 +21,7 @@ vi.mock('../../../../lib/agents.js', () => ({
 
 vi.mock('../../../../lib/tmux.js', () => ({
   listSessions: () => Effect.succeed(mockListSessions()),
+  listPaneValues: (...args: unknown[]) => Effect.succeed(mockListPaneValues(...args)),
 }));
 
 vi.mock('../../../../lib/docker-stats.js', () => ({
@@ -52,6 +54,7 @@ describe('GET /api/resources (agents table)', () => {
   beforeEach(() => {
     mockListAgentStates.mockReturnValue([]);
     mockListSessions.mockReturnValue([]);
+    mockListPaneValues.mockReturnValue([]);
     mockGetStats.mockReturnValue([]);
   });
 
@@ -126,7 +129,14 @@ describe('GET /api/resources (agents table)', () => {
     const { body } = await runResourcesEffect();
 
     expect(body.containers).toEqual([
-      { name: 'container-1', cpu: '10%', mem: '100MiB', status: 'running' },
+      {
+        name: 'container-1',
+        cpu: '10%',
+        mem: '100MiB',
+        status: 'running',
+        memLimitBytes: null,
+        oomKills24h: 0,
+      },
     ]);
   });
 });

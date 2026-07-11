@@ -6,10 +6,11 @@ import { promisify } from 'node:util';
 
 import { Effect } from 'effect';
 
-import { messageAgent } from '../agents.js';
+import { clearAgentPausedSync, getAgentStateSync, messageAgent, resumeAgent } from '../agents.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { getReviewStatusSync } from '../review-status.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
+import { sessionExists } from '../tmux.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
 
@@ -73,6 +74,15 @@ function buildReviewFeedbackBody(opts: {
   return `# Review ${verdictLabel} for ${opts.issueId}\n\n${synthesis}${sourceLine}\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n\`pan review request ${opts.issueId} -m "Fixed review issues"\``;
 }
 
+// PAN-2518: the PR-comment POST is advisory — the review verdict is already
+// durable (setReviewStatusSync + writeFeedbackFile) before we get here. A `gh
+// api` call that STALLS (not rejects) on a network hiccup must never block the
+// caller: `pan admin specialists done` is shelled out from the review agent's
+// own session, so a hung POST leaves that agent waiting on a never-returning
+// command and the issue stalls in-review. A bounded timeout turns a stall into
+// a rejection the caller already swallows.
+const PR_COMMENT_TIMEOUT_MS = 15_000;
+
 export async function postPrComment(prUrl: string | undefined, body: string): Promise<boolean> {
   const parsed = parseGitHubPrUrl(prUrl);
   if (!parsed) return false;
@@ -80,7 +90,7 @@ export async function postPrComment(prUrl: string | undefined, body: string): Pr
   await execFileAsync(
     'gh',
     ['api', `repos/${parsed.owner}/${parsed.repo}/issues/${parsed.number}/comments`, '--field', `body=${body}`],
-    { encoding: 'utf-8' },
+    { encoding: 'utf-8', timeout: PR_COMMENT_TIMEOUT_MS, killSignal: 'SIGKILL' },
   );
   return true;
 }
@@ -124,7 +134,10 @@ async function deliverReviewVerdictFeedbackPromise(
   if (fileResult.success && fileResult.filePath) {
     const message = `SPECIALIST FEEDBACK: review-agent reported ${opts.verdict.toUpperCase()} for ${issueId}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, then fix ALL review findings. Do NOT stop at the prompt.`;
     try {
-      const target = await resolveIssueFeedbackTarget(issueId, { itemId: opts.slotItemId });
+      const target = await resolveIssueFeedbackTarget(issueId, {
+        itemId: opts.slotItemId,
+        revivePipelinePausedAgent,
+      });
       if ('agentId' in target) {
         try {
           await messageAgent(target.agentId, message);
@@ -134,7 +147,7 @@ async function deliverReviewVerdictFeedbackPromise(
         }
       } else {
         try {
-          surfaceIssueFeedbackNeedsYou(issueId, target.reason, {
+          await surfaceIssueFeedbackNeedsYou(issueId, target.reason, {
             specialist: 'review-agent',
             feedbackPath: fileResult.filePath,
             slotItemId: opts.slotItemId,
@@ -156,6 +169,31 @@ async function deliverReviewVerdictFeedbackPromise(
     prCommentPosted,
     agentMessageSent,
   };
+}
+
+/**
+ * PAN-2461: unpause + resume an agent that the PIPELINE paused (pausedReason
+ * starts with "needs-you:") so feedback can be delivered to it. Operator pauses
+ * are left untouched.
+ */
+async function revivePipelinePausedAgent(agentId: string, issueId: string): Promise<boolean> {
+  try {
+    const state = getAgentStateSync(agentId);
+    if (!state) return false;
+    if (state.paused !== true || !state.pausedReason?.startsWith('needs-you:')) return false;
+
+    console.log(`[review-verdict-feedback] ${agentId} is pipeline-paused (${state.pausedReason}) — unpausing to deliver feedback for ${issueId}`);
+    clearAgentPausedSync(agentId);
+    const result = await resumeAgent(agentId);
+    if (!result.success) {
+      console.warn(`[review-verdict-feedback] Failed to revive ${agentId}: ${result.error}`);
+      return false;
+    }
+    return Effect.runPromise(sessionExists(agentId));
+  } catch (err) {
+    console.warn(`[review-verdict-feedback] revivePipelinePausedAgent(${agentId}) failed: ${err instanceof Error ? err.message : String(err)}`);
+    return false;
+  }
 }
 
 // ─── Effect variant (PAN-1249) ───────────────────────────────────────────────

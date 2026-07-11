@@ -90,7 +90,7 @@ function writePlan(projectRoot: string, issueId: string, doc: VBriefDocument): v
 function writeWorkspaceDraft(workspacePath: string, doc: VBriefDocument): void {
   const panDir = join(workspacePath, '.pan');
   mkdirSync(panDir, { recursive: true });
-  writeFileSync(join(panDir, 'spec.vbrief.json'), JSON.stringify(doc, null, 2));
+  writeFileSync(join(panDir, 'spec.vbrief.json'), JSON.stringify(doc, undefined, 2));
 }
 
 function makeDoc(planId: string, items: Array<{ id: string; title: string }>): VBriefDocument {

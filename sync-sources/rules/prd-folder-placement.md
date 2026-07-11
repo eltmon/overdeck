@@ -1,12 +1,14 @@
 ---
 scope: dev
 ---
-### Place draft PRDs in `.pan/drafts/<issue>.md`
+### Place draft PRDs on the state branch
 
-Write draft PRDs to `.pan/drafts/<issue>.md` where `<issue>` is the issue ID
-(lowercase). Do not place PRDs in ad-hoc locations outside the `.pan/`
-folder structure.
+Write draft PRDs to `drafts/<issue>.md` on `overdeck-state`, where `<issue>` is
+the lowercase issue ID. On disk, that is
+`${OVERDECK_HOME}/state/<project>/drafts/<issue>.md`. Do not place PRDs in
+ad-hoc locations in the code checkout.
 
-`.pan/` is the canonical location for Overdeck planning artifacts (drafts,
-specs, continue state). Keeping PRDs in the canonical structure makes them
-discoverable for agents and tooling.
+The state worktree is the canonical home for permanent planning artifacts
+(drafts, specs, and continue state). For an unmigrated project only, the legacy
+fallback remains `<projectRoot>/.pan/drafts/<issue>.md` until its migration
+marker lands on `origin/overdeck-state`.

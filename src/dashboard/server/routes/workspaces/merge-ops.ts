@@ -13,16 +13,13 @@
  * Shared singletons (pending operations, project path, workspace info, readJsonBody)
  * stay owned by ../workspaces.js and are imported here.
  */
-
 import { exec, execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { promisify } from 'node:util';
-
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-
 import { messageAgent, getAgentState, spawnAgent } from '../../../../lib/agents.js';
 import { queryBeadsForIssue, type BeadEntry } from '../../../../lib/beads-query.js';
 import { syncMainIntoWorkspace } from '../../../../lib/cloister/merge-agent.js';
@@ -32,6 +29,7 @@ import { extractNumberSync, extractPrefixSync, parseIssueIdSync } from '../../..
 import { enqueueMerge, getCurrentMerge, markMergeProcessing, dequeueMerge, getAllActiveQueues } from '../../../../lib/overdeck/merge.js';
 import { findProjectByTeamSync } from '../../../../lib/projects.js';
 import { getReviewStatusSync, markWorkspaceStuck, setReviewStatusSync as setReviewStatusBase, type ReviewStatus } from '../../../../lib/review-status.js';
+import { isStatePlaneOnlyStatus } from '../../../../lib/state-plane.js';
 import { getWorkAgentLifecycleStateSync } from '../../../../lib/work-agent-lifecycle.js';
 import { findPlan } from '../../../../lib/vbrief/io.js';
 import { isIntegrationPermissionError, verifyAppCanMerge } from '../../../../lib/github-app.js';
@@ -44,9 +42,10 @@ import { httpHandler } from '../http-handler.js';
 import { _serverManagedMerges } from '../specialists.js';
 import { completePendingOperation, getPendingOperation, getProjectPath, getWorkspaceInfoForIssue, readJsonBody, setPendingOperation, setReviewStatus } from '../workspaces.js';
 import { buildLocalMainRecoveryError } from './git-recovery-advice.js';
-
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
+export const shouldBlockApproveForDirtyStatus = (status: string): boolean =>
+  status.trim() !== '' && !isStatePlaneOnlyStatus(status);
 
 async function ensureWorkAgentReadyForMerge(
   issueId: string,
@@ -1002,6 +1001,11 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
 
     setReviewStatus(issueId, { mergeStep: 'rebasing' });
     console.log(`[merge] Rebasing ${branchName} onto ${targetBranch} for ${issueId} (agent=${await Effect.runPromise(sessionExists(agentId)) ? 'running' : 'stopped'})...`);
+    {
+      const { beginShipLog, appendShipLog } = await import('../../../../lib/cloister/ship-log.js');
+      beginShipLog(issueId);
+      appendShipLog(issueId, `Ship started: rebasing ${branchName} onto ${targetBranch}…`, 'rebasing');
+    }
 
     let rebaseResult: { success: boolean; reason?: string; conflictFiles?: string[]; newHead?: string };
 
@@ -1122,18 +1126,56 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
     // Step 3: Post-rebase verification gate (typecheck, lint, test)
     // Ensures the rebase didn't introduce issues before merging.
     setReviewStatus(issueId, { mergeStatus: 'verifying', mergeStep: 'verifying', mergeNotes: undefined });
-    console.log(`[merge] Running post-rebase verification for ${issueId}...`);
 
-    const { runVerificationForIssue } = await import(
-      '../../../../lib/cloister/verification-runner.js'
-    );
-    const verifyResult = await Effect.runPromise(runVerificationForIssue(
-      issueId,
-      workspacePath,
-      { isRemote: false },
-      'merge-verify',
-      { syncTargetBranch: false },
-    ));
+    // PAN-2487: when the tip SHA being merged already has GREEN CI on GitHub,
+    // the local gate suite re-proves what CI already proved on the identical
+    // tree — 10-20 min of redundant wall-clock per merge. Skip local gates in
+    // that case; any rebase above produced a NEW SHA, whose CI can't be green
+    // yet, so post-rebase combinations still verify locally.
+    let skipLocalVerification = false;
+    if (primaryForge === 'github' && artifactUrl) {
+      try {
+        const { parsePullRequestRef, getCiCheckRunsStatePromise, isGitHubAppConfigured } = await import('../../../../lib/github-app.js');
+        if (isGitHubAppConfigured()) {
+          const ref = parsePullRequestRef({ url: artifactUrl });
+          if (ref) {
+            const { stdout: tipShaRaw } = await execAsync('git rev-parse HEAD', { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 });
+            const tipSha = tipShaRaw.trim();
+            const ci = await getCiCheckRunsStatePromise(ref.owner, ref.repo, tipSha);
+            if (ci.green && ci.total > 0) {
+              skipLocalVerification = true;
+              console.log(`[merge] CI is green on ${tipSha.slice(0, 8)} (${ci.successCount}/${ci.total} checks) — skipping redundant local verification for ${issueId} (PAN-2487)`);
+              setReviewStatus(issueId, { mergeNotes: `Local verification skipped: CI green on ${tipSha.slice(0, 8)} (${ci.successCount}/${ci.total} checks)` });
+            } else {
+              console.log(`[merge] CI on tip not green (verdict=${ci.verdict}, total=${ci.total}) — running local verification for ${issueId}`);
+            }
+          }
+        }
+      } catch (ciErr: any) {
+        console.warn(`[merge] CI-state check failed (${ciErr.message?.slice(0, 120)}) — falling back to local verification for ${issueId}`);
+      }
+    }
+
+    const { appendShipLog } = await import('../../../../lib/cloister/ship-log.js');
+    if (skipLocalVerification) {
+      appendShipLog(issueId, '✓ Local verification skipped — CI already green on this exact commit', 'verifying');
+    }
+    const verifyResult = skipLocalVerification
+      ? { outcome: 'passed' as const }
+      : await (async () => {
+        console.log(`[merge] Running post-rebase verification for ${issueId}...`);
+        appendShipLog(issueId, 'Running post-rebase verification (full quality-gate suite)…', 'verifying');
+        const { runVerificationForIssue } = await import(
+          '../../../../lib/cloister/verification-runner.js'
+        );
+        return Effect.runPromise(runVerificationForIssue(
+          issueId,
+          workspacePath,
+          { isRemote: false },
+          'merge-verify',
+          { syncTargetBranch: false, onGateLog: (line) => appendShipLog(issueId, line, 'verifying') },
+        ));
+      })();
 
     if (verifyResult.outcome === 'failed') {
       const error = `Post-rebase verification failed at ${verifyResult.failedCheck}`;
@@ -1178,6 +1220,7 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
 
     // Step 4b: Merge the review artifact via the configured forge.
     setReviewStatus(issueId, { mergeStep: 'squash-merging' });
+    appendShipLog(issueId, `Verification passed — squash-merging the ${primaryForge} PR…`, 'squash-merging');
     let artifactMerged = false;
     try {
       console.log(`[merge] Merging ${primaryForge} review artifact for ${issueId}...`);
@@ -1251,6 +1294,7 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
     // Step 5: Mark merged and dequeue next BEFORE post-merge lifecycle.
     // postMergeLifecycle spawns a deploy script that may kill this server process,
     // so queue processing must happen before that point.
+    appendShipLog(issueId, `✓ MERGED — running post-merge cleanup (labels, docker teardown, verify-on-main)`, 'post-merge-cleanup');
     setReviewStatus(issueId, { mergeStatus: 'merged', mergeStep: 'post-merge-cleanup', mergeNotes: undefined, readyForMerge: false });
     completePendingOperation(issueId, null);
 
@@ -1594,7 +1638,8 @@ const postWorkspaceApproveRoute = HttpRouter.add(
             'git status --porcelain -uno',
             { cwd: workspacePath, encoding: 'utf-8' }
           );
-          if (status.trim()) {
+          // STATE-PLANE-COMMIT-POLICY rules 3/6: state-plane-only dirt is not agent work.
+          if (shouldBlockApproveForDirtyStatus(status)) {
             const error = `Workspace has uncommitted changes. Please commit the changes, explicitly discard them, or surface them to the operator first:\ncd ${workspacePath}\ngit status`;
             completePendingOperation(issueId, error);
             return jsonResponse({ error }, { status: 400 });

@@ -1,6 +1,7 @@
 import {
   Brain,
   Hammer,
+  BookOpenCheck,
   ShieldCheck,
   GitMerge,
   CheckCircle2,
@@ -54,6 +55,7 @@ interface RoleStyle {
 const SESSION_STYLE: Record<SessionNodeType, RoleStyle> = {
   planning: { Icon: Brain, ring: 'var(--info)', fg: 'var(--info)' },
   work: { Icon: Hammer, ring: 'var(--primary)', fg: 'var(--primary)' },
+  knowledge: { Icon: BookOpenCheck, ring: 'var(--info)', fg: 'var(--info)' },
   strike: { Icon: Zap, ring: 'var(--warning)', fg: 'var(--warning)' },
   review: { Icon: ShieldCheck, ring: 'var(--signal-review)', fg: 'var(--signal-review)' },
   reviewer: { Icon: ShieldCheck, ring: 'var(--signal-review)', fg: 'var(--signal-review)' },

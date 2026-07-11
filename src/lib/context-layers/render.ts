@@ -10,7 +10,7 @@
 import type { Harness } from '@overdeck/contracts';
 import { renderForHarness } from './harness.js';
 import { renderBundledRules } from './rules.js';
-import { globalContextFile, projectContextFile, readLayerContent } from './layers.js';
+import { globalContextFile, resolveProjectContextFile, readLayerContent } from './layers.js';
 
 /** Opening marker of the Overdeck-managed region in a target CLAUDE.md. */
 export const REGION_BEGIN =
@@ -93,7 +93,7 @@ export function renderGlobalLayer(harness: Harness, includeDevRules: boolean): s
  * `project.md` — sync then leaves that project's CLAUDE.md alone.
  */
 export function renderProjectLayer(projectRoot: string, harness: Harness): string {
-  const raw = readLayerContent(projectContextFile(projectRoot));
+  const raw = readLayerContent(resolveProjectContextFile(projectRoot));
   if (raw.trim().length === 0) return '';
   return renderForHarness(raw, harness).trim();
 }

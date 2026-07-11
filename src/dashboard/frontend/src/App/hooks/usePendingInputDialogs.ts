@@ -58,12 +58,23 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
     // resolved here; conversation subjects are tracked via a separate poll, so
     // never claim those are "no longer waiting".
     const knownAgent = agentEntry != null;
-    const stillPending = agentEntry?.pendingAskUserQuestion != null;
+    // PAN-2487 follow-up: "still pending" must consider EVERY pending-input kind,
+    // not only AskUserQuestion payloads. A pane-detected wait (rateLimit,
+    // sessionResume) has no AUQ payload, so the old check told the operator
+    // "no longer waiting" while the agent was still modal-blocked — and the
+    // needs-you entry (correctly) refused to clear.
+    const stillPending =
+      agentEntry?.pendingAskUserQuestion != null ||
+      (agentEntry?.pendingInputKinds?.length ?? 0) > 0;
     undismissAskUserQuestion(askUserQuestionReopenId);
     setFocusedAskUserQuestionId(askUserQuestionReopenId);
     if (knownAgent && !stillPending) {
       toast.info('That question is no longer waiting', {
         description: 'The agent stopped or already received an answer.',
+      });
+    } else if (knownAgent && agentEntry?.pendingAskUserQuestion == null && (agentEntry?.pendingInputKinds?.length ?? 0) > 0) {
+      toast.info('This agent is blocked on a terminal dialog', {
+        description: 'Open its terminal to answer (e.g. a harness rate-limit or session-resume prompt) — it cannot be answered from here yet.',
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

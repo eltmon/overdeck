@@ -9,7 +9,7 @@ function decodeJsonResponse(response: { status: number; body: unknown }) {
 }
 
 async function postAgentSwitchModel(agentId: string, body: Record<string, unknown>) {
-  const { agentsRouteLayer } = await import('../agents.js');
+  const { postAgentSwitchModelRoute } = await import('../agents/control.js');
   const request = HttpServerRequest.fromWeb(new Request(`http://localhost/api/agents/${agentId}/switch-model`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:3011' },
@@ -18,7 +18,7 @@ async function postAgentSwitchModel(agentId: string, body: Record<string, unknow
 
   return Effect.runPromise(
     Effect.scoped(
-      Effect.flatMap(HttpRouter.toHttpEffect(agentsRouteLayer), (app) =>
+      Effect.flatMap(HttpRouter.toHttpEffect(postAgentSwitchModelRoute), (app) =>
         Effect.provideService(app, HttpServerRequest.HttpServerRequest, request)
       ),
     ),

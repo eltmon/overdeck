@@ -86,6 +86,50 @@ export interface ConcurrencyConfig {
    * not trimmed to satisfy the cap. Defaults to true (PAN-1812).
    */
   exempt_operator_started?: boolean;
+  /**
+   * PAN-2504: memory-DRIVEN work-agent admission. When true, the work-agent
+   * ceiling is derived from live free memory — admit until the next agent's
+   * estimated footprint would breach the governor's SOFT reserve — instead of
+   * the fixed `max_work_agents` count. This lets a big box fill toward its
+   * memory budget rather than idling at a hardcoded 6. Defaults to false
+   * (opt-in): unset installs keep the count-based cap. Requires the memory
+   * governor to have published a cached verdict; falls back to the count cap
+   * until then.
+   */
+  memory_driven?: boolean;
+  /**
+   * Safety upper bound on concurrent work agents when `memory_driven` is on —
+   * caps the memory-derived ceiling so a mis-estimated footprint can't march the
+   * box to hundreds of agents. Default 24.
+   */
+  memory_driven_max_work_agents?: number;
+  /**
+   * Per-work-agent RSS estimate (GB) used for the memory-driven budget:
+   * additional slots = floor((availableBytes - softReserve) / work_footprint_gb).
+   * Conservative by design (over-estimating admits fewer). Default 2, matching
+   * `resources.governorFootprintDefaultWorkGb`.
+   */
+  work_footprint_gb?: number;
+  /**
+   * PAN-2507: preemptive pipeline scheduler. When true, a blocked advancing
+   * (review/test/ship) dispatch may YIELD an idle work agent — pause it
+   * (resumable, session preserved) to free the slot/memory, dispatch the
+   * advancing role, and auto-resume the yielded agent oldest-first once
+   * capacity returns. Defaults to false (opt-in): unset installs keep the
+   * static defer-until-attrition behavior at every dispatch site.
+   */
+  preemption?: boolean;
+  /**
+   * PAN-2507: anti-thrash cap on how many work agents may be in the yielded
+   * (scheduler-paused) state at once. Default 3.
+   */
+  max_yielded?: number;
+  /**
+   * PAN-2507: anti-thrash cooldown (seconds) — an agent resumed from a yield
+   * may not be re-yielded until this many seconds have elapsed since its
+   * resume. Default 600.
+   */
+  yield_cooldown_secs?: number;
 }
 
 export type SwarmInferCompletionMode = 'off' | 'nudge' | 'auto';
@@ -336,9 +380,15 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
     reserved_advancing_slots: 3,
     reserved_swarm_slots: 3,
     exempt_operator_started: true,
+    memory_driven: false,
+    memory_driven_max_work_agents: 24,
+    work_footprint_gb: 2,
+    preemption: false,
+    max_yielded: 3,
+    yield_cooldown_secs: 600,
   },
   swarm: {
-    infer_completion: 'nudge',
+    infer_completion: 'auto',
   },
   notifications: {
     slack_webhook: undefined,

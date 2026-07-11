@@ -46,6 +46,19 @@ interface TtsHealthStatus {
   error?: string;
 }
 
+interface RestartConfigChangeItem {
+  agentId: string;
+  issueId: string;
+  currentModel: string;
+  currentHarness: string;
+  newModel: string;
+  newHarness: string;
+  changed: boolean;
+  paused: boolean;
+  troubled: boolean;
+  status: string;
+}
+
 async function fetchCloisterStatus(): Promise<CloisterStatus> {
   const res = await fetch('/api/cloister/status');
   if (!res.ok) throw new Error('Failed to fetch Cloister status');
@@ -86,6 +99,13 @@ async function fetchTtsHealth(): Promise<TtsHealthStatus> {
   return res.json();
 }
 
+async function fetchRestartConfigList(): Promise<{ items: RestartConfigChangeItem[]; changedAgents: number }> {
+  const res = await fetch('/api/agents/restart-with-current-config');
+  if (!res.ok) throw new Error('Failed to fetch restart config list');
+  const data = await res.json();
+  return { items: data.items || [], changedAgents: data.changedAgents || 0 };
+}
+
 function formatTtsHealthTitle(health: TtsHealthStatus | undefined, failed: boolean): string {
   if (failed) return 'TTS: Health check failed';
   if (!health) return 'TTS: Checking daemon';
@@ -106,6 +126,8 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
   const [restartConversations, setRestartConversations] = useState(true);
   const [restartAgents, setRestartAgents] = useState(true);
   const [isToggling, setIsToggling] = useState(false);
+  const [showRestartConfigModal, setShowRestartConfigModal] = useState(false);
+  const [selectedForRestart, setSelectedForRestart] = useState<Set<string>>(new Set());
   const popoverRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [popoverPos, setPopoverPos] = useState<{ left: number; bottom: number } | null>(null);
@@ -146,6 +168,13 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
     enabled: ttsEnabled,
     refetchInterval: 10000,
     retry: false,
+  });
+
+  const { data: restartConfigData } = useQuery({
+    queryKey: ['restart-config-list'],
+    queryFn: fetchRestartConfigList,
+    enabled: showRestartConfigModal,
+    refetchInterval: 5000,
   });
 
   const agents = useDashboardStore(selectAgents);
@@ -192,6 +221,24 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       refetch();
       setShowRestartPopover(false);
+    },
+  });
+
+  const restartWithConfigMutation = useMutation({
+    mutationFn: async (agentIds: string[]) => {
+      const res = await fetch('/api/agents/restart-with-current-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentIds }),
+      });
+      if (!res.ok) throw new Error(`Restart failed: ${res.statusText}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+      refetch();
+      setShowRestartConfigModal(false);
+      setSelectedForRestart(new Set());
     },
   });
 
@@ -319,6 +366,15 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
             : (status.running ? 'Stop Cloister' : 'Start Cloister')}
         </button>
 
+        {/* Restart with Current Config */}
+        <button
+          onClick={() => setShowRestartConfigModal(true)}
+          className="p-1 rounded text-xs bg-popover text-foreground border border-border hover:bg-card transition-colors"
+          title="Restart agents with current config"
+        >
+          <Zap className={`w-3.5 h-3.5 ${restartWithConfigMutation.isPending ? 'animate-spin' : ''}`} />
+        </button>
+
         {/* Restart Sessions */}
         <button
           ref={buttonRef}
@@ -378,6 +434,93 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
                   {(restartMutation.error as Error).message}
                 </div>
               )}
+          </div>,
+          document.body,
+        )}
+
+        {/* Restart with Current Config Modal */}
+        {showRestartConfigModal && createPortal(
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+            <div className="bg-card border border-border rounded-lg shadow-lg max-w-2xl max-h-96 overflow-auto w-96">
+              <div className="px-4 py-3 border-b border-border flex justify-between items-center">
+                <h3 className="text-sm font-semibold text-foreground">
+                  Restart Agents with Current Config
+                </h3>
+                <button
+                  onClick={() => setShowRestartConfigModal(false)}
+                  className="text-muted-foreground hover:text-foreground text-lg leading-none"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="p-4 space-y-3 max-h-64 overflow-y-auto">
+                {restartConfigData?.items.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No eligible agents to restart.</p>
+                ) : (
+                  restartConfigData?.items.map(item => (
+                    <label
+                      key={item.agentId}
+                      className="flex items-start gap-2 p-2 rounded text-xs text-foreground hover:bg-muted cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedForRestart.has(item.agentId)}
+                        onChange={e => {
+                          const newSelected = new Set(selectedForRestart);
+                          if (e.target.checked) {
+                            newSelected.add(item.agentId);
+                          } else {
+                            newSelected.delete(item.agentId);
+                          }
+                          setSelectedForRestart(newSelected);
+                        }}
+                        disabled={item.paused || item.troubled}
+                        className="accent-primary mt-0.5"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium text-foreground">
+                          {item.issueId}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground space-y-0.5">
+                          <div>Current: {item.currentModel} / {item.currentHarness}</div>
+                          {item.changed && (
+                            <div className="text-warning">→ New: {item.newModel} / {item.newHarness}</div>
+                          )}
+                          {!item.changed && (
+                            <div className="text-muted-foreground">No change needed</div>
+                          )}
+                          {(item.paused || item.troubled) && (
+                            <div className="text-destructive">
+                              {item.paused ? 'Paused' : 'Troubled'} — cannot restart
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </label>
+                  ))
+                )}
+              </div>
+              <div className="flex justify-end gap-1.5 px-4 py-3 border-t border-border">
+                <button
+                  onClick={() => setShowRestartConfigModal(false)}
+                  className="px-2 py-1 rounded text-xs text-foreground bg-muted hover:bg-accent"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => restartWithConfigMutation.mutate(Array.from(selectedForRestart))}
+                  disabled={restartWithConfigMutation.isPending || selectedForRestart.size === 0}
+                  className="px-2 py-1 rounded text-xs text-primary-foreground bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {restartWithConfigMutation.isPending ? 'Restarting...' : `Restart (${selectedForRestart.size})`}
+                </button>
+              </div>
+              {restartWithConfigMutation.isError && (
+                <div className="px-4 py-2 text-xs text-destructive border-t border-border">
+                  {(restartWithConfigMutation.error as Error).message}
+                </div>
+              )}
+            </div>
           </div>,
           document.body,
         )}

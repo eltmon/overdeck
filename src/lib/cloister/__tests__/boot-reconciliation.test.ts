@@ -274,7 +274,14 @@ describe('boot reconciliation', () => {
     expect(listBootReconciliationCandidateIds()).toEqual(['agent-live']);
   });
 
-  it('marks a boot with only phantom stopped work agents as resume_all without holding a modal', () => {
+  it('PAN-2510: opens the grace window in pending on an empty candidate list, then safely holds at expiry', async () => {
+    // An empty candidate list at stamp time is ambiguous: it can mean "genuinely
+    // nothing to resume" (only phantoms) OR "the deacon child has not marked the
+    // crashed agents `stopped` yet" (the cross-process boot race). We can't tell
+    // the two apart synchronously, so we must open the grace window in `pending`
+    // rather than terminally committing resume_all — otherwise the operator
+    // dialog is skipped and late-arriving candidates auto-resume ungated.
+    const onGraceExpired = vi.fn();
     const completedAgentDir = join(testHome, 'agents', 'agent-completed');
     mkdirSync(completedAgentDir, { recursive: true });
     writeFileSync(join(completedAgentDir, 'completed.processed'), '');
@@ -291,24 +298,58 @@ describe('boot reconciliation', () => {
     const result = startBootReconciliation({
       bootId: 'boot-phantoms',
       now: BASE_TIME,
+      onGraceExpired,
     });
 
     expect(result).toEqual({
       bootId: 'boot-phantoms',
       graceDeadline: '2026-06-29T15:00:30.000Z',
       candidateIds: [],
-      decision: 'resume_all',
-      timerArmed: false,
+      decision: 'pending',
+      timerArmed: true,
     });
     expect(getBootReconciliationState()).toMatchObject({
-      decision: 'resume_all',
+      decision: 'pending',
       bootId: 'boot-phantoms',
       bootStartedAt: '2026-06-29T15:00:00.000Z',
       graceDeadline: '2026-06-29T15:00:30.000Z',
     });
+
+    // Still nothing genuine to resume by the deadline → safe hold default.
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(getBootReconciliationState().decision).toBe('hold_all');
+    expect(onGraceExpired).toHaveBeenCalledTimes(1);
   });
 
-  it('stamps pending state and flips to resume_all when the grace timer expires', async () => {
+  it('PAN-2510: holds late-materializing candidates that reconcile in during the grace window (full-reboot race)', () => {
+    // Simulates the OOM / power-cycle race: at stamp time the crashed agents are
+    // still marked `running` in the table (0 candidates), then the deacon child's
+    // reconcileAgentLiveness marks them `stopped` ~1s later. The decision must
+    // remain `pending` so the live-computed held set picks them up and the
+    // operator dialog renders — it must NOT have been locked to resume_all.
+    mocks.agents = [
+      stoppedWorkAgent(testHome, 'agent-crashed', {
+        status: 'running',
+        workspace: workspacePath(testHome, 'crashed'),
+      }),
+    ];
+
+    const result = startBootReconciliation({ bootId: 'boot-reboot', now: BASE_TIME });
+    expect(result.candidateIds).toEqual([]);
+    expect(result.decision).toBe('pending');
+    expect(result.timerArmed).toBe(true);
+
+    // Deacon child reconciliation lands: the agent flips to `stopped`.
+    mocks.agents[0].status = 'stopped';
+    mocks.agents[0].stoppedAt = '2026-06-29T15:00:01.000Z';
+
+    // The candidate is now discoverable, and the boot decision is still pending
+    // (not terminally resume_all), so it will be held and surfaced in the dialog.
+    expect(listBootReconciliationCandidateIds()).toEqual(['agent-crashed']);
+    expect(getBootReconciliationState().decision).toBe('pending');
+  });
+
+  it('stamps pending state and flips to hold_all when the grace timer expires', async () => {
     const onGraceExpired = vi.fn();
     mocks.agents = [
       stoppedWorkAgent(testHome, 'agent-pan-2076', { workspace: workspacePath(testHome, 'workspace') }),
@@ -337,7 +378,7 @@ describe('boot reconciliation', () => {
 
     await vi.advanceTimersByTimeAsync(30_000);
 
-    expect(getBootReconciliationState().decision).toBe('resume_all');
+    expect(getBootReconciliationState().decision).toBe('hold_all');
     expect(onGraceExpired).toHaveBeenCalledTimes(1);
   });
 

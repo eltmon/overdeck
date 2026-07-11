@@ -3,6 +3,12 @@ import { Effect } from 'effect';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { ensureCompatibleNode } from './node-preflight.js';
+
+// Relaunch under a compatible Node (>=22) before anything else runs. If the
+// current runtime is already Node 22+ this is a no-op; otherwise it re-execs the
+// CLI under an installed Node 22+, or exits with a specific fix command.
+ensureCompatibleNode();
 
 // Load ~/.overdeck.env before any other imports
 // This makes API keys and other env vars available to all commands
@@ -103,6 +109,7 @@ import { createRegistryCommand } from './commands/registry.js';
 import { createDocsCommand } from './commands/docs.js';
 import { planCommand } from './commands/plan.js';
 import { strikeCommand } from './commands/strike.js';
+import { configureKnowledgeCommand } from './commands/knowledge.js';
 import { planFinalizeCommand } from './commands/plan-finalize.js';
 import { planDoneCommand } from './commands/plan-done.js';
 import { registerCavemanCommands } from './commands/caveman.js';
@@ -578,10 +585,8 @@ program
   .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex (defaults to role/provider settings)')
   .option('--effort <level>', 'Strike effort: low | medium | high | xhigh | max (default medium)')
   .option('--dry-run', 'Print what would happen without spawning')
-  .action((ids: string[], options: { model?: string; harness?: RuntimeName; effort?: RoleEffort; dryRun?: boolean }) =>
-    strikeCommand(ids, options),
-  );
-
+  .action((ids: string[], options: { model?: string; harness?: RuntimeName; effort?: RoleEffort; dryRun?: boolean }) => strikeCommand(ids, options));
+configureKnowledgeCommand(program);
 registerSwarmCommands(program);
 registerWorkspaceCommands(program);
 registerTestCommands(program);
@@ -1391,19 +1396,9 @@ program
     const { fileURLToPath } = await import('url');
     const { existsSync } = await import('fs');
 
-    // Check Node.js version — dashboard requires Node 22+ (node-pty, Effect.js)
+    // Node 22+ is guaranteed here: ensureCompatibleNode() at CLI startup
+    // relaunches under a compatible Node (or exits) before any command runs.
     const nodeVersion = process.versions.node;
-    const major = parseInt(nodeVersion.split('.')[0]!, 10);
-    if (major < 22) {
-      console.error(chalk.red(`Error: Overdeck dashboard requires Node.js 22 or later.`));
-      console.error(chalk.dim(`You are running Node.js ${nodeVersion}.`));
-      console.error('');
-      console.error('Install Node 22:');
-      console.error(chalk.dim('  nvm install 22 && nvm use 22'));
-      console.error(chalk.dim('  # or: brew install node@22'));
-      console.error(chalk.dim('  # or: https://nodejs.org/en/download'));
-      process.exit(1);
-    }
 
     const __dirname = dirname(fileURLToPath(import.meta.url));
     const bundledServer = join(__dirname, '..', 'dashboard', 'server.js');

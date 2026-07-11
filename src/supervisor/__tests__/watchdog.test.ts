@@ -35,6 +35,7 @@ function makeWatchdog(overrides: Partial<{
   deaconStatus: unknown;
   spawnOptions: Array<Parameters<SpawnRestart>[0]>;
   config: SupervisorWatchdogConfig;
+  evictPortHoldersFn: (port: number) => Promise<{ pids: number[]; error: string | null }>;
 }> = {}): SupervisorWatchdog {
   const spawns = overrides.spawns ?? { count: 0 };
   const logs = overrides.logs ?? [];
@@ -55,6 +56,7 @@ function makeWatchdog(overrides: Partial<{
       spawns.count += 1;
       return { pid: 1000 + spawns.count, error: null };
     },
+    evictPortHoldersFn: overrides.evictPortHoldersFn,
     fetchFn: async (input) => {
       if (input.endsWith('/api/deacon/status')) {
         return {
@@ -291,6 +293,7 @@ describe('SupervisorWatchdog', () => {
         expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
       },
       healthBody: { status: 'ok', repoRoot: '/repo', mode: 'peer' },
+      evictPortHoldersFn: async () => ({ pids: [4242], error: null }),
     });
 
     await watchdog.checkOnce();
@@ -314,6 +317,7 @@ describe('SupervisorWatchdog', () => {
         expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
       },
       healthBody: { status: 'ok', repoRoot: '/other-repo', mode: 'primary' },
+      evictPortHoldersFn: async () => ({ pids: [4242], error: null }),
     });
 
     await watchdog.checkOnce();
@@ -325,6 +329,45 @@ describe('SupervisorWatchdog', () => {
       consecutiveHardFailures: 1,
     });
     expect(watchdog.status().lastError).toContain('/other-repo');
+  });
+
+  it('evicts a health-verified foreign dashboard before restarting the primary', async () => {
+    const spawns = { count: 0 };
+    const logs: string[] = [];
+    const evict = vi.fn(async () => ({ pids: [15589], error: null }));
+    const watchdog = makeWatchdog({
+      spawns,
+      logs,
+      fetchOk: true,
+      config: { ...config, failThreshold: 3, expectedIdentity: { repoRoot: '/repo', mode: 'primary' } },
+      healthBody: { status: 'ok', repoRoot: '/repo/workspaces/feature-pan-2542', mode: 'primary' },
+      evictPortHoldersFn: evict,
+    });
+
+    await watchdog.checkOnce();
+
+    expect(evict).toHaveBeenCalledWith(3011);
+    expect(logs).toContain('watchdog evicted foreign dashboard PID(s) 15589 from port 3011 with SIGTERM');
+    expect(spawns.count).toBe(1);
+  });
+
+  it('emits a needs-you escalation when foreign-dashboard eviction fails', async () => {
+    const spawns = { count: 0 };
+    const logs: string[] = [];
+    const watchdog = makeWatchdog({
+      spawns,
+      logs,
+      fetchOk: true,
+      config: { ...config, expectedIdentity: { repoRoot: '/repo', mode: 'primary' } },
+      healthBody: { status: 'ok', repoRoot: '/other-repo', mode: 'primary' },
+      evictPortHoldersFn: async () => ({ pids: [], error: 'no holder PID found for port 3011' }),
+    });
+
+    await watchdog.checkOnce();
+
+    expect(spawns.count).toBe(0);
+    expect(watchdog.status().gaveUp).toBe(true);
+    expect(logs.some((message) => message.startsWith('NEEDS YOU:'))).toBe(true);
   });
 
   it('marks a matching primary dashboard health response healthy', async () => {

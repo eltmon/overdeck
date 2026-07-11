@@ -22,6 +22,7 @@ import {
   sessionExistsSync,
 } from '../tmux.js';
 import {
+  decideResumeGate,
   getAgentDir,
   getAgentResumeGateBlockReason,
   getAgentStateSync,
@@ -67,9 +68,9 @@ export async function restartAgent(
   if (!agentState) {
     return { success: false, error: `Agent ${normalizedId} not found` };
   }
-  const gateBlockReason = getAgentResumeGateBlockReason(agentState);
-  if (gateBlockReason) {
-    const reason = `Cannot restart ${normalizedId}: ${gateBlockReason}. Clear the gate before restarting.`;
+  const gateDecision = decideResumeGate(getAgentResumeGateBlockReason(agentState), 'operator-start');
+  if (gateDecision.decision === 'block') {
+    const reason = `Cannot restart ${normalizedId}: ${gateDecision.reason}. Clear the gate before restarting.`;
     logAgentLifecycleSync(normalizedId, `restartAgent BLOCKED: ${reason}`);
     return { success: false, error: reason };
   }
@@ -228,9 +229,9 @@ export async function recoverAgent(
 
   // Runtime state files may lack required fields (PAN-150)
   if (!state.id) state.id = normalizedId;
-  const gateBlockReason = getAgentResumeGateBlockReason(state);
-  if (gateBlockReason) {
-    logAgentLifecycleSync(normalizedId, `recoverAgent BLOCKED: Cannot recover ${normalizedId}: ${gateBlockReason}. Clear the gate before recovering.`);
+  const gateDecision = decideResumeGate(getAgentResumeGateBlockReason(state), 'operator-start');
+  if (gateDecision.decision === 'block') {
+    logAgentLifecycleSync(normalizedId, `recoverAgent BLOCKED: Cannot recover ${normalizedId}: ${gateDecision.reason}. Clear the gate before recovering.`);
     return null;
   }
   const modelOverride = normalizeModelOverrideSync(opts.modelOverride);

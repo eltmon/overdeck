@@ -1,0 +1,7 @@
+# Synthetic fixture for Gemini provider.
+# No real on-disk omp session for this provider was found, so this follows the omp v3
+# format with representative assistant message.usage fields.
+{"type":"session","version":3,"id":"sess-synthetic-gemini-001","timestamp":"2026-07-06T00:00:00.000Z","cwd":"[synthetic cwd]","title":"Synthetic Gemini session","titleSource":"synthetic"}
+{"type":"model_change","id":"mc-gemini-001","parentId":null,"timestamp":"2026-07-06T00:00:00.100Z","model":"gemini-2.5"}
+{"type":"message","id":"msg-gemini-user-001","parentId":"mc-gemini-001","timestamp":"2026-07-06T00:00:01.000Z","message":{"role":"user","content":[{"type":"text","text":"[sanitized]"}],"attribution":"user"}}
+{"type":"message","id":"msg-gemini-assistant-001","parentId":"msg-gemini-user-001","timestamp":"2026-07-06T00:00:02.000Z","message":{"role":"assistant","content":[{"type":"text","text":"[sanitized]"}],"api":"gemini-messages","provider":"google","model":"gemini-2.5","usage":{"input":3000,"output":400,"cacheRead":150,"cacheWrite":100,"totalTokens":3650,"cost":{"input":0.0015,"output":0.0004,"cacheRead":0.000015,"cacheWrite":0.00005,"total":0.001965}},"stopReason":"stop"}}

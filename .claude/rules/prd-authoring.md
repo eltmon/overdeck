@@ -24,6 +24,14 @@ Author every plan so it can be executed without re-research or judgment calls:
 - **Restate intersecting repo rules** (fake timers for delay tests, async-only
   primitives, style guides) inside the doc. Do not assume the executor recalls
   them.
+- **Documentation is a required work item.** Every PRD MUST include a numbered
+  work item that adds or updates the docs the change touches — user-facing pages
+  (Mintlify `configuration/…`, `reference/…`), developer docs (`docs/…`), the
+  relevant `CLAUDE.md`/rule sections, and inline module headers. New or changed
+  behavior that ships without a docs update is incomplete work, not a follow-up.
+  Name the exact doc files in the work item and give it a matching acceptance
+  criterion. If the change genuinely alters no documented surface, say so
+  explicitly in the doc rather than omitting the item.
 - **Acceptance criteria** that map 1:1 to work items and are mechanically
   checkable.
 

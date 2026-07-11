@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import type { DockerCleanupResult } from './types.js';
+import type { DockerCleanupResult, WorkspaceDockerTeardownResult } from './types.js';
 import { DEVCONTAINER_DIRNAME } from '../workspace/devcontainer-renderer.js';
 
 const execAsync = promisify(exec);
@@ -142,6 +142,102 @@ export async function stopWorkspaceDockerPromise(
     result.steps.push('Cleaned up Docker-created files');
   } catch {
     // Alpine container might not be available
+  }
+
+  return result;
+}
+
+/**
+ * Tear down a workspace Docker stack by project/network name, independent of
+ * whether the workspace directory still exists. This is the durable close-out
+ * primitive: it removes containers AND the `_devnet` network and verifies the
+ * network is gone.
+ */
+export async function teardownWorkspaceDockerByNamePromise(
+  issueIdLower: string,
+): Promise<WorkspaceDockerTeardownResult> {
+  const featureFolder = `feature-${issueIdLower}`;
+  const composeProjectName = `overdeck-${featureFolder}`;
+  const networkName = `${composeProjectName}_devnet`;
+  const result: WorkspaceDockerTeardownResult = {
+    networkRemoved: false,
+    steps: [],
+  };
+
+  // 1. Stop and remove containers/volumes for the named compose project.
+  try {
+    await execAsync(
+      `docker compose -p "${composeProjectName}" down -v --remove-orphans`,
+      { timeout: 60000 },
+    );
+    result.steps.push(`Stopped Docker stack for project ${composeProjectName}`);
+  } catch (error: any) {
+    result.steps.push(
+      `Docker stack down attempted (${error.message?.split('\n')[0] || 'stack may not exist'})`,
+    );
+  }
+
+  // 2. If containers are still attached to the network (compose files missing,
+  //    project label mismatch, etc.), remove them by force so the network can
+  //    be freed. This is the durable close-out fallback.
+  try {
+    const { stdout: containerStdout } = await execAsync(
+      `docker ps -a --filter network="${networkName}" --format '{{.ID}}'`,
+      { encoding: 'utf-8', timeout: 30000 },
+    );
+    const containerIds = containerStdout.trim().split('\n').filter(Boolean);
+    if (containerIds.length > 0) {
+      try {
+        await execAsync(`docker rm -f ${containerIds.map((id) => `"${id}"`).join(' ')}`, {
+          timeout: 30000,
+        });
+        result.steps.push(
+          `Removed ${containerIds.length} container(s) attached to ${networkName}`,
+        );
+      } catch (rmError: any) {
+        result.steps.push(
+          `Container removal attempted (${rmError.message?.split('\n')[0] || 'containers may be in use'})`,
+        );
+      }
+    }
+  } catch (error: any) {
+    result.steps.push(
+      `Container discovery attempted (${error.message?.split('\n')[0] || 'could not list containers'})`,
+    );
+  }
+
+  // 3. Remove the bridge network; treat already-absent as success.
+  try {
+    await execAsync(`docker network rm "${networkName}"`, { timeout: 30000 });
+    result.steps.push(`Removed Docker network ${networkName}`);
+  } catch (error: any) {
+    const message = (error.message || '').toLowerCase();
+    if (message.includes('not found') || message.includes('no such network')) {
+      result.steps.push(`Docker network ${networkName} already absent`);
+    } else {
+      result.steps.push(
+        `Docker network rm attempted (${error.message?.split('\n')[0] || 'network may be in use'})`,
+      );
+    }
+  }
+
+  // 3. Verify the network is actually gone.
+  try {
+    const { stdout } = await execAsync(
+      `docker network ls --format '{{.Name}}'`,
+      { encoding: 'utf-8', timeout: 30000 },
+    );
+    const networks = stdout.trim().split('\n').filter(Boolean);
+    result.networkRemoved = !networks.includes(networkName);
+    result.steps.push(
+      result.networkRemoved
+        ? `Verified network ${networkName} is absent`
+        : `Network ${networkName} still present after teardown`,
+    );
+  } catch (error: any) {
+    result.steps.push(
+      `Network verification attempted (${error.message?.split('\n')[0] || 'could not list networks'})`,
+    );
   }
 
   return result;

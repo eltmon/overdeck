@@ -85,9 +85,21 @@ export const ServerConfigLayer = Layer.effect(
     // The refusal message deliberately does not name the env var — agents read it.
     const identity = getDashboardIdentity();
     const hostDashboardApiPort = readHostDashboardApiPort();
-    const overrideAllowed =
-      process.env['OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY'] === '1' &&
-      !isWorkspaceRepoRoot(identity.repoRoot);
+    const overrideRequested = process.env['OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY'] === '1';
+    const agentId = process.env['OVERDECK_AGENT_ID'];
+    const nonConversationUsingOverride =
+      overrideRequested && agentId !== undefined && !agentId.startsWith('conv-');
+    if (nonConversationUsingOverride) {
+      const msg = (
+        `Refusing OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY=1 for pipeline-role identity ` +
+        `OVERDECK_AGENT_ID=${agentId}. Work, planning, review, and flywheel agents must never bind ` +
+        `the host dashboard port; use the workspace container endpoint instead. Only an operator-supervised ` +
+        `conversation (conv-*) or a process with no agent identity may use this emergency override.`
+      );
+      console.error(`[overdeck] ${msg}`);
+      throw new ServerConfigError('OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY', msg);
+    }
+    const overrideAllowed = overrideRequested && !isWorkspaceRepoRoot(identity.repoRoot);
     if (
       shouldRefuseHostDashboardPort({
         repoRoot: identity.repoRoot,

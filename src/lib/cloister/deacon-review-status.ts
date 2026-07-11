@@ -16,7 +16,8 @@ import { REVIEW_SUB_ROLES } from './review-monitor.js';
 import { getAllProjectSpecialistStatuses, getTmuxSessionName } from './specialists.js';
 import { isPaneDead, sessionExistsSync } from '../tmux.js';
 import { describeRunningAgents, releaseAdvancingSlot, tryReserveAdvancingSlot } from './concurrency.js';
-import { findWorkspacePath } from '../lifecycle/archive-planning.js';
+import { tryYieldForAdvancingDispatch } from './preemption.js';
+import { findWorkspacePath, inferBranchFromWorkspace } from '../lifecycle/archive-planning.js';
 import { isIssueClosed } from './issue-closed.js';
 import { shouldSkipDispatchAsMerged } from './merge-verification.js';
 import { getAutoCloseOutCanonicalState } from './deacon-canonical-state.js';
@@ -369,7 +370,7 @@ export async function handleReviewCoordinatorDied(
     return actions;
   }
 
-  if (!tryReserveAdvancingSlot()) {
+  if (!tryReserveAdvancingSlot() && !(await tryYieldForAdvancingDispatch('review', issueId))) {
     actions.push(`Deferred review re-dispatch for ${issueId} — advancing-role concurrency ceiling reached`);
     return actions;
   }
@@ -377,7 +378,7 @@ export async function handleReviewCoordinatorDied(
   try {
     const { spawnReviewRoleForIssue } = await import('./review-agent.js');
     const dispatchResult = await Effect.runPromise(
-      spawnReviewRoleForIssue({ issueId, workspace, branch: `feature/${issueLower}` }),
+      spawnReviewRoleForIssue({ issueId, workspace, branch: inferBranchFromWorkspace(workspace, issueLower) }),
     );
     if (dispatchResult.gated) {
       releaseAdvancingSlot();
@@ -530,13 +531,13 @@ async function reconcileReviewStatusOrphan(issueId: string, rawStatus: ReviewSta
     const issueLower = issueId.toLowerCase();
     const workspace = agentState?.workspace || (resolved ? findWorkspacePath(resolved.projectPath, issueLower) : null);
 
-    if (workspace && resolved && !tryReserveAdvancingSlot()) {
+    if (workspace && resolved && !tryReserveAdvancingSlot() && !(await tryYieldForAdvancingDispatch('review', issueId))) {
       actions.push(`Deferred review re-dispatch for ${issueId} — advancing-role concurrency ceiling reached`);
     } else if (workspace && resolved) {
       try {
         const { spawnReviewRoleForIssue } = await import('./review-agent.js');
         const dispatchResult = await Effect.runPromise(
-          spawnReviewRoleForIssue({ issueId, workspace, branch: `feature/${issueLower}` }),
+          spawnReviewRoleForIssue({ issueId, workspace, branch: inferBranchFromWorkspace(workspace, issueLower) }),
         );
         if (dispatchResult.gated) {
           releaseAdvancingSlot();
@@ -583,7 +584,7 @@ async function reconcileReviewStatusOrphan(issueId: string, rawStatus: ReviewSta
             ? `Orphaned test for ${issueId}: workspace docker stack unhealthy, rebuild cap reached — escalated to human`
             : `Orphaned test for ${issueId}: workspace docker stack rebuilding — deferring re-dispatch`,
         );
-      } else if (!tryReserveAdvancingSlot()) {
+      } else if (!tryReserveAdvancingSlot() && !(await tryYieldForAdvancingDispatch('test', issueId))) {
         actions.push(`Deferred test re-dispatch for ${issueId} — advancing-role concurrency ceiling reached`);
       } else {
         const mergedGuard = await shouldSkipDispatchAsMerged(issueId);
@@ -737,7 +738,7 @@ export async function recoverStalledReviewConvoys(
       }
 
       // PAN-1665: honor advancing-role concurrency budget before dispatch.
-      if (!tryReserveAdvancingSlot()) {
+      if (!tryReserveAdvancingSlot() && !(await tryYieldForAdvancingDispatch('review', issueId))) {
         actions.push(
           `Stalled review convoy for ${issueId}: deferring — advancing-role concurrency ceiling reached`,
         );
@@ -753,7 +754,7 @@ export async function recoverStalledReviewConvoys(
         const result = await Effect.runPromise(spawnReviewRoleForIssue({
           issueId,
           workspace,
-          branch: `feature/${issueLower}`,
+          branch: inferBranchFromWorkspace(workspace, issueLower),
           force: true,
         }));
         if (!result.success) {
@@ -832,7 +833,7 @@ export async function checkMissingReviewStatuses(): Promise<string[]> {
         continue;
       }
 
-      if (!tryReserveAdvancingSlot()) {
+      if (!tryReserveAdvancingSlot() && !(await tryYieldForAdvancingDispatch('review', issueId))) {
         actions.push(`Deferred missing-status review for ${issueId} — advancing-role concurrency ceiling reached`);
         continue;
       }
@@ -842,7 +843,7 @@ export async function checkMissingReviewStatuses(): Promise<string[]> {
         await Effect.runPromise(spawnReviewRoleForIssue({
           issueId,
           workspace,
-          branch: `feature/${issueLower}`,
+          branch: inferBranchFromWorkspace(workspace, issueLower),
         }));
         recordDeaconNudge({
           patrol: 'checkMissingReviewStatuses',

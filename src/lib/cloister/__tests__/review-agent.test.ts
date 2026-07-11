@@ -120,6 +120,8 @@ describe('spawnReviewRoleForIssue', () => {
     mocks.resumeAgent.mockResolvedValue({ success: false, reason: 'no session' });
     mocks.wipeAgentStateDirs.mockResolvedValue(undefined);
     mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
+    mocks.isPaneDead.mockReturnValue(Effect.succeed(false));
+    mocks.killSession.mockReturnValue(Effect.void);
     mocks.getReviewStatus.mockReturnValue(undefined);
     mocks.buildReviewContext.mockResolvedValue({ manifestPath: undefined, changedFiles: [] });
     mocks.formatTier1Summary.mockReturnValue('shared review context');
@@ -157,5 +159,38 @@ describe('spawnReviewRoleForIssue', () => {
       'review',
       expect.objectContaining({ model: 'gpt-5.5', harness: 'ohmypi', workspace: '/tmp/pan-review-harness' }),
     );
+  });
+
+  it('PAN-2534: replaces a lingering review session whose run identity is missing', async () => {
+    mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-1194-review']));
+    mocks.getAgentStateSync.mockReturnValue(undefined);
+
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({
+      issueId: 'PAN-1194',
+      workspace: '/tmp/pan-review-stale',
+      branch: 'feature/pan-1194',
+    }));
+
+    expect(result.success).toBe(true);
+    expect(mocks.killSession).toHaveBeenCalledWith('agent-pan-1194-review');
+    expect(mocks.spawnRun).toHaveBeenCalled();
+  });
+
+  it('keeps a live review session whose run identity matches current HEAD', async () => {
+    mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-1194-review']));
+    mocks.getAgentStateSync.mockReturnValue({ reviewRunId: 'agent-pan-1194-review-abc12345' });
+
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({
+      issueId: 'PAN-1194',
+      workspace: '/tmp/pan-review-current',
+      branch: 'feature/pan-1194',
+    }));
+
+    expect(result).toEqual({
+      success: true,
+      message: 'Review already in progress: agent-pan-1194-review',
+    });
+    expect(mocks.killSession).not.toHaveBeenCalled();
+    expect(mocks.spawnRun).not.toHaveBeenCalled();
   });
 });

@@ -123,6 +123,10 @@ vi.mock('../../../lib/cloister/inspect-checkpoints.js', () => ({
   getDiffStats: inspectMocks.getDiffStats,
 }));
 
+vi.mock('../../../lib/vbrief/io.js', () => ({
+  readWorkspacePlanSync: vi.fn(() => null),
+}));
+
 vi.mock('../../../lib/tracker-utils.js', () => ({
   resolveTrackerTypeSync: trackerMocks.resolveTrackerTypeSync,
   isGitHubIssueSync: trackerMocks.isGitHubIssueSync,

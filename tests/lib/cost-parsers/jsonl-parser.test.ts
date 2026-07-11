@@ -9,27 +9,36 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { tmpdir, homedir } from 'os';
+import { tmpdir } from 'os';
+import { fileURLToPath } from 'url';
 import { getActiveSessionModelSync, parseClaudeSessionSync } from '../../../src/lib/cost-parsers/jsonl-parser.js';
+
+const CLAUDE_FIXTURE_DIR = join(__dirname, '../../../src/lib/cost-parsers/__tests__/fixtures/claude');
 
 describe('getActiveSessionModel', () => {
   let tempHome: string;
-  let originalHome: string;
+  let originalClaudeProjectsDir: string | undefined;
 
   beforeEach(() => {
     // Create temp directory for test
     tempHome = mkdtempSync(join(tmpdir(), 'pan-test-jsonl-'));
-    originalHome = process.env.HOME!;
-
-    // Note: We cannot override the CLAUDE_PROJECTS_DIR at runtime since it's
-    // defined at module load time. These tests work with the real ~/.claude/projects
-    // directory but use unique workspace names to avoid conflicts.
+    originalClaudeProjectsDir = process.env.CLAUDE_PROJECTS_DIR;
+    process.env.CLAUDE_PROJECTS_DIR = join(tempHome, '.claude', 'projects');
   });
 
   afterEach(() => {
+    if (originalClaudeProjectsDir === undefined) {
+      delete process.env.CLAUDE_PROJECTS_DIR;
+    } else {
+      process.env.CLAUDE_PROJECTS_DIR = originalClaudeProjectsDir;
+    }
     // Clean up temp directory
     rmSync(tempHome, { recursive: true, force: true });
   });
+
+  function claudeProjectDirFor(testWorkspacePath: string): string {
+    return join(process.env.CLAUDE_PROJECTS_DIR!, testWorkspacePath.replace(/\//g, '-'));
+  }
 
   it('should return null for workspace with no session files', () => {
     // Use a workspace path that definitely doesn't exist
@@ -50,8 +59,7 @@ describe('getActiveSessionModel', () => {
 
     // Convert to Claude project dir name format (keeps leading dash)
     // e.g., /tmp/pan-test/test-workspace -> -tmp-pan-test-test-workspace
-    const projectDirName = testWorkspacePath.replace(/\//g, '-');
-    const claudeProjectDir = join(homedir(), '.claude', 'projects', projectDirName);
+    const claudeProjectDir = claudeProjectDirFor(testWorkspacePath);
 
     // Create the directory
     mkdirSync(claudeProjectDir, { recursive: true });
@@ -85,8 +93,7 @@ describe('getActiveSessionModel', () => {
   it('should return model ID from top-level model field', () => {
     // Test case where model is at top level, not in message object
     const testWorkspacePath = join(tempHome, 'test-workspace-2');
-    const projectDirName = testWorkspacePath.replace(/\//g, '-');
-    const claudeProjectDir = join(homedir(), '.claude', 'projects', projectDirName);
+    const claudeProjectDir = claudeProjectDirFor(testWorkspacePath);
 
     mkdirSync(claudeProjectDir, { recursive: true });
 
@@ -112,8 +119,7 @@ describe('getActiveSessionModel', () => {
 
   it('should return null when session file has no model field', () => {
     const testWorkspacePath = join(tempHome, 'test-workspace-3');
-    const projectDirName = testWorkspacePath.replace(/\//g, '-');
-    const claudeProjectDir = join(homedir(), '.claude', 'projects', projectDirName);
+    const claudeProjectDir = claudeProjectDirFor(testWorkspacePath);
 
     mkdirSync(claudeProjectDir, { recursive: true });
 
@@ -139,8 +145,7 @@ describe('getActiveSessionModel', () => {
 
   it('should handle invalid JSON in session file gracefully', () => {
     const testWorkspacePath = join(tempHome, 'test-workspace-4');
-    const projectDirName = testWorkspacePath.replace(/\//g, '-');
-    const claudeProjectDir = join(homedir(), '.claude', 'projects', projectDirName);
+    const claudeProjectDir = claudeProjectDirFor(testWorkspacePath);
 
     mkdirSync(claudeProjectDir, { recursive: true });
 
@@ -158,8 +163,7 @@ describe('getActiveSessionModel', () => {
 
   it('should use most recently modified session file', () => {
     const testWorkspacePath = join(tempHome, 'test-workspace-5');
-    const projectDirName = testWorkspacePath.replace(/\//g, '-');
-    const claudeProjectDir = join(homedir(), '.claude', 'projects', projectDirName);
+    const claudeProjectDir = claudeProjectDirFor(testWorkspacePath);
 
     mkdirSync(claudeProjectDir, { recursive: true });
 
@@ -195,8 +199,7 @@ describe('getActiveSessionModel', () => {
 
   it('should search first 10 lines for model field', () => {
     const testWorkspacePath = join(tempHome, 'test-workspace-6');
-    const projectDirName = testWorkspacePath.replace(/\//g, '-');
-    const claudeProjectDir = join(homedir(), '.claude', 'projects', projectDirName);
+    const claudeProjectDir = claudeProjectDirFor(testWorkspacePath);
 
     mkdirSync(claudeProjectDir, { recursive: true });
 
@@ -226,8 +229,7 @@ describe('getActiveSessionModel', () => {
   it('should handle special characters in workspace path', () => {
     // Test with path containing special characters that need escaping
     const testWorkspacePath = join(tempHome, 'test-workspace-special');
-    const projectDirName = testWorkspacePath.replace(/\//g, '-');
-    const claudeProjectDir = join(homedir(), '.claude', 'projects', projectDirName);
+    const claudeProjectDir = claudeProjectDirFor(testWorkspacePath);
 
     mkdirSync(claudeProjectDir, { recursive: true });
 
@@ -442,6 +444,29 @@ describe('parseClaudeSession', () => {
     expect(result!.cost_v2!).toBeGreaterThan(0);
   });
 
+  it('parses a sanitized real Claude session fixture with exact cache tokens and cost', () => {
+    // Derived from /home/eltmon/.claude/projects/-home-eltmon-Projects-overdeck/0452b49d-8d7f-4d2b-8f22-38ed04f260c4.jsonl
+    // (2026-06-17). Conversation content, prompt text, and attachments are redacted in the committed fixture.
+    const sessionFile = join(CLAUDE_FIXTURE_DIR, 'real-cache-session.jsonl');
+
+    const result = parseClaudeSessionSync(sessionFile);
+
+    expect(result).not.toBeNull();
+    expect(result!.model).toBe('claude-sonnet-4-6');
+    expect(result!.usage.inputTokens).toBe(3);
+    expect(result!.usage.outputTokens).toBe(8);
+    expect(result!.usage.cacheReadTokens).toBe(17213);
+    expect(result!.usage.cacheWriteTokens).toBe(39899);
+    expect(result!.cost_v2).toBe(0.244687);
+
+    const breakdown = result!.modelBreakdown!['claude-sonnet-4-6'];
+    expect(breakdown.inputTokens).toBe(3);
+    expect(breakdown.outputTokens).toBe(8);
+    expect(breakdown.cacheReadTokens).toBe(17213);
+    expect(breakdown.cacheWriteTokens).toBe(39899);
+    expect(breakdown.cost).toBe(0.244687);
+  });
+
   it('should handle top-level usage field', () => {
     const sessionFile = join(tempDir, 'top-level-usage.jsonl');
     const content = JSON.stringify({
@@ -526,5 +551,40 @@ describe('parseClaudeSession', () => {
     expect(result!.model).toBe('claude-sonnet-4');
     // Should not have modelBreakdown since no model IDs found
     expect(result!.modelBreakdown).toBeUndefined();
+  });
+
+  it('should parse a sanitized real Claude Code session fixture', () => {
+    const fixturePath = fileURLToPath(
+      new URL('../../../src/lib/cost-parsers/__tests__/fixtures/claude/real-session.jsonl', import.meta.url),
+    );
+
+    const result = parseClaudeSessionSync(fixturePath);
+
+    expect(result).not.toBeNull();
+    expect(result!.model).toBe('claude-sonnet-4-6');
+    expect(result!.sessionId).toBe('dce5e02f-4dd7-421d-952e-e6aca624d284');
+    expect(result!.messageCount).toBe(1);
+
+    // Usage fields preserved verbatim from the real session
+    expect(result!.usage.inputTokens).toBe(3);
+    expect(result!.usage.outputTokens).toBe(1);
+    expect(result!.usage.cacheReadTokens).toBe(0);
+    expect(result!.usage.cacheWriteTokens).toBe(31249);
+
+    // Per-message cost_v2 uses the exact model's pricing
+    const expectedCost =
+      (3 * 0.003 / 1000) +   // input
+      (1 * 0.015 / 1000) +   // output
+      (31249 * 0.00375 / 1000); // cache write (5m TTL)
+    expect(result!.cost_v2).toBeCloseTo(expectedCost, 5);
+
+    // Model breakdown keyed by exact model ID
+    expect(result!.modelBreakdown).toBeDefined();
+    expect(result!.modelBreakdown!['claude-sonnet-4-5-20250929']).toBeDefined();
+    const breakdown = result!.modelBreakdown!['claude-sonnet-4-5-20250929'];
+    expect(breakdown.messageCount).toBe(1);
+    expect(breakdown.inputTokens).toBe(3);
+    expect(breakdown.outputTokens).toBe(1);
+    expect(breakdown.cost).toBeCloseTo(expectedCost, 5);
   });
 });

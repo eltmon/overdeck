@@ -414,7 +414,7 @@ async function getLocalEmbeddingPipeline(modelId: string): Promise<FeatureExtrac
   const cached = localEmbeddingPipelines.get(modelId);
   if (cached) return cached;
 
-  const pipelinePromise = import('@xenova/transformers')
+  const pipelinePromise = import('@huggingface/transformers')
     .then(({ pipeline }) => pipeline('feature-extraction', modelId))
     .then((pipeline) => pipeline as FeatureExtractionPipeline);
   localEmbeddingPipelines.set(modelId, pipelinePromise);

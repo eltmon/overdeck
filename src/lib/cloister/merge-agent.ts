@@ -11,6 +11,7 @@ import { promisify } from 'util';
 import { Effect } from 'effect';
 import { capturePane, killSession, listSessionNames, sendKeys, sessionExists } from '../tmux.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
+import { loadConfigSync } from '../config-yaml.js';
 
 const execAsync = promisify(exec);
 
@@ -543,6 +544,7 @@ export async function postMergeLifecycle(
     }
 
     await notifyTldrDaemon(projectPath, sourceBranch ?? '');
+    await maybeSpawnPostMergeKnowledgeRetro(issueId, projectPath);
 
     // Mark completed BEFORE logging — prevents re-entry even if the log line triggers something
     _completedPostMerge.add(issueId);
@@ -631,6 +633,39 @@ async function killPostMergeRoleSessions(issueId: string): Promise<void> {
     }
   } catch (err) {
     console.warn(`[merge-agent] Could not kill role sessions for ${issueId}: ${err}`);
+  }
+}
+
+function isPostMergeKnowledgeRetroEnabled(): boolean {
+  try {
+    return loadConfigSync().config.knowledge?.postMergeAutoRetro === true;
+  } catch (err) {
+    console.warn(`[merge-agent] Could not read knowledge post-merge retro config: ${err}`);
+    return false;
+  }
+}
+
+async function maybeSpawnPostMergeKnowledgeRetro(issueId: string, projectPath: string): Promise<void> {
+  if (!isPostMergeKnowledgeRetroEnabled()) return;
+
+  try {
+    const child = spawn('pan', ['knowledge', issueId, '--retro'], {
+      cwd: projectPath,
+      detached: true,
+      stdio: 'ignore',
+    });
+    child.once?.('error', (err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[merge-agent] Post-merge knowledge retro spawn failed for ${issueId}: ${message}`);
+      logActivity('knowledge_retro_error', `Post-merge knowledge retro spawn failed for ${issueId}: ${message}`, issueId);
+    });
+    child.unref();
+    console.log(`[merge-agent] Spawned post-merge knowledge retro for ${issueId} (pid ${child.pid})`);
+    logActivity('knowledge_retro_spawned', `Spawned post-merge knowledge retro for ${issueId}`, issueId);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`[merge-agent] Post-merge knowledge retro spawn failed for ${issueId}: ${message}`);
+    logActivity('knowledge_retro_error', `Post-merge knowledge retro spawn failed for ${issueId}: ${message}`, issueId);
   }
 }
 

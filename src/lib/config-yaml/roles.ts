@@ -26,6 +26,7 @@ export const DEFAULT_MODEL_REFS: Record<Role, ModelRef> = {
   // expensive workhorse slot (same as plan/review).
   strike: 'workhorse:expensive',
   sequencer: 'workhorse:expensive',
+  knowledge: 'workhorse:expensive',
 };
 
 export const DEFAULT_WORKHORSES: Required<WorkhorsesConfig> = {
@@ -60,6 +61,7 @@ export const DEFAULT_ROLES: Record<Role, RoleConfig> = {
   // slot because strike skips the normal review pipeline and lands directly.
   strike: { model: 'workhorse:expensive' },
   sequencer: { model: 'workhorse:expensive' },
+  knowledge: { model: 'workhorse:expensive' },
   flywheel: {
     model: 'claude-opus-4-8',
     effort: 'high',

@@ -1,13 +1,21 @@
 import { existsSync } from 'node:fs';
+import { Effect } from 'effect';
 import type { ReconciledSlotItem } from '../agents/slot-reconcile.js';
+import { getAgentStateSync } from '../agents/agent-state.js';
+import { stopAgent } from '../agents/termination.js';
 import type { CoordinateSwarmSlotsDeps } from './deacon-swarm.js';
+
+const MERGED_LIVE_SLOT_IDLE_MS = 30 * 60 * 1000;
 
 export async function gcMergedSlots(
   issueId: string,
   workspacePath: string,
   slots: ReconciledSlotItem[],
-  deps: Pick<CoordinateSwarmSlotsDeps, 'runGitCommand' | 'clearSlotAssignment' | 'listSessionNames'>
-    & Partial<Pick<CoordinateSwarmSlotsDeps, 'slotWorktreeExists'>>,
+  deps: Pick<CoordinateSwarmSlotsDeps, 'runGitCommand' | 'clearSlotAssignment' | 'listSessionNames'> & {
+    slotWorktreeExists?: (path: string) => boolean;
+    getAgentLastActivity?: (agentId: string) => string | undefined;
+    stopSlotAgent?: (agentId: string) => Promise<void>;
+  },
 ): Promise<string[]> {
   const actions: string[] = [];
   // A freshly dispatched slot branch points at the feature branch HEAD, so
@@ -22,8 +30,14 @@ export async function gcMergedSlots(
 
     const agentId = slot.agentId ?? `agent-${issueId.toLowerCase()}-slot-${slot.slotIndex}`;
     if (sessionNames.has(agentId)) {
-      actions.push(`[swarm] gc skipped slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: agent session alive`);
-      continue;
+      const lastActivity = (deps.getAgentLastActivity ?? (id => getAgentStateSync(id)?.lastActivity))(agentId);
+      const idleFor = lastActivity ? Date.now() - Date.parse(lastActivity) : 0;
+      if (!Number.isFinite(idleFor) || idleFor < MERGED_LIVE_SLOT_IDLE_MS) {
+        actions.push(`[swarm] gc skipped slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: agent session alive`);
+        continue;
+      }
+      await (deps.stopSlotAgent ?? (id => Effect.runPromise(stopAgent(id))))(agentId);
+      actions.push(`[swarm] gc reaped idle merged agent ${agentId}`);
     }
 
     const slotWorkspace = `${workspacePath}-slot-${slot.slotIndex}`;

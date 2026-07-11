@@ -124,6 +124,32 @@ describe('guard-agent-main-push.sh', () => {
     expect(result.ok).toBe(true);
   });
 
+  it('allows conversation-context (conv-*) ranges touching src without the operator escape hatch', () => {
+    const { root, base } = setupRepo();
+    mkdirSync(join(root, 'src'), { recursive: true });
+    writeFileSync(join(root, 'src', 'code.ts'), 'export const code = true;\n');
+    const head = commitAll(root, 'code change');
+
+    const result = runGuard(root, ['--range', `${base}..${head}`], {
+      OVERDECK_AGENT_ID: 'conv-20260708-3490',
+    });
+
+    expect(result.ok).toBe(true);
+  });
+
+  it('still blocks a non-conversation agent id that merely contains "conv" mid-string', () => {
+    const { root, base } = setupRepo();
+    mkdirSync(join(root, 'src'), { recursive: true });
+    writeFileSync(join(root, 'src', 'code.ts'), 'export const code = true;\n');
+    const head = commitAll(root, 'code change');
+
+    const result = runGuard(root, ['--range', `${base}..${head}`], {
+      OVERDECK_AGENT_ID: 'agent-reconvene-2227',
+    });
+
+    expect(result.ok).toBe(false);
+  });
+
   it('allows operator escape-hatch ranges even when code paths changed', () => {
     const { root, base } = setupRepo();
     mkdirSync(join(root, 'scripts'), { recursive: true });

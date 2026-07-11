@@ -491,6 +491,10 @@ async function deleteBranchesImpl(
   const step = 'teardown:branches';
   const branchName = `feature/${issueLower}`;
   const details: string[] = [];
+  const localSlots = await execAsync(`git for-each-ref --format="%(refname:short)" "refs/heads/feature/${issueLower}-slot-*"`, { cwd: projectPath, encoding: 'utf-8' })
+    .then(({ stdout }) => stdout.trim().split('\n').filter(Boolean)).catch(() => [] as string[]);
+  const remoteSlots = await execAsync(`git ls-remote --heads origin "feature/${issueLower}-slot-*"`, { cwd: projectPath, encoding: 'utf-8' })
+    .then(({ stdout }) => stdout.trim().split('\n').map(line => line.split('refs/heads/')[1]).filter((name): name is string => Boolean(name))).catch(() => [] as string[]);
 
   // Delete local branch
   try {
@@ -500,12 +504,26 @@ async function deleteBranchesImpl(
     details.push(`Local branch ${branchName} not found (already deleted)`);
   }
 
+  for (const slotBranch of localSlots) {
+    try {
+      await execAsync(`git branch -D ${JSON.stringify(slotBranch)}`, { cwd: projectPath, encoding: 'utf-8' });
+      details.push(`Deleted local branch ${slotBranch}`);
+    } catch { details.push(`Failed to delete local branch ${slotBranch}`); }
+  }
+
   // Delete remote branch
   try {
     await execAsync(`git push origin --delete "${branchName}"`, { cwd: projectPath, encoding: 'utf-8' });
     details.push(`Deleted remote branch ${branchName}`);
   } catch {
     details.push(`Remote branch ${branchName} not found (already deleted)`);
+  }
+
+  for (const slotBranch of remoteSlots) {
+    try {
+      await execAsync(`git push origin --delete ${JSON.stringify(slotBranch)}`, { cwd: projectPath, encoding: 'utf-8' });
+      details.push(`Deleted remote branch ${slotBranch}`);
+    } catch { details.push(`Failed to delete remote branch ${slotBranch}`); }
   }
 
   return stepOk(step, details);

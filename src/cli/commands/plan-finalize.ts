@@ -4,7 +4,7 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { dirname, join, resolve } from 'path';
 import { createBeadsFromVBrief } from '../../lib/vbrief/beads.js';
-import { findPlanSync, findWorkspaceDraftPlanSync, readPlanSync } from '../../lib/vbrief/io.js';
+import { findPlanSync, findWorkspaceDraftPlanSync, readPlanSync, serializeVBriefDocument } from '../../lib/vbrief/io.js';
 import { generateVBriefFilename, slugify } from '../../lib/vbrief/lifecycle.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
@@ -500,7 +500,7 @@ export function stampPlanForFinalization(planPath: string, issueId: string): str
   doc.vBRIEFInfo.updated = now;
 
   const tmp = planPath + '.tmp';
-  writeFileSync(tmp, JSON.stringify(doc, null, 2), 'utf-8');
+  writeFileSync(tmp, serializeVBriefDocument(doc), 'utf-8');
   renameSync(tmp, planPath);
 
   return canonicalFilename;

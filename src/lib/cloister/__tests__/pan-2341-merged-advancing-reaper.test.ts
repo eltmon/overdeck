@@ -48,8 +48,8 @@ describe('PAN-2341 merged advancing reaper', () => {
     expect(second).toEqual([]);
   });
 
-  it('selects merged advancing sessions even while specialist keep-alive is enabled', () => {
-    expect(KEEP_SPECIALIST_SESSIONS_ALIVE).toBe(true);
+  it('selects merged advancing sessions after specialist keep-alive is disabled', () => {
+    expect(KEEP_SPECIALIST_SESSIONS_ALIVE).toBe(false);
     expect(selectMergedAdvancingSessions({
       'PAN-3001': mergedStatus(),
     }, ['agent-pan-3001-test'])).toEqual(['agent-pan-3001-test']);

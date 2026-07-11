@@ -36,6 +36,7 @@ function roleConfig(): Pick<NormalizedConfig, 'workhorses' | 'roles'> {
       },
       test: { model: 'gemini-3.1-pro-preview' },
       ship: { model: 'workhorse:mid', harness: 'ohmypi' },
+      knowledge: { model: 'workhorse:expensive' },
       flywheel: { harness: 'claude-code', model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
     },
   };
@@ -43,7 +44,7 @@ function roleConfig(): Pick<NormalizedConfig, 'workhorses' | 'roles'> {
 
 describe('role model configuration', () => {
   it('exports default model refs for every role', () => {
-    expect(Object.keys(DEFAULT_MODEL_REFS).sort()).toEqual(['flywheel', 'plan', 'review', 'sequencer', 'ship', 'strike', 'test', 'work']);
+    expect(Object.keys(DEFAULT_MODEL_REFS).sort()).toEqual(['flywheel', 'knowledge', 'plan', 'review', 'sequencer', 'ship', 'strike', 'test', 'work']);
   });
 
   it('dereferences workhorse refs and passes literal model ids through', () => {
@@ -61,6 +62,7 @@ describe('role model configuration', () => {
       review: 'claude-opus-4-7',
       test: 'gemini-3.1-pro-preview',
       ship: 'claude-sonnet-4-6',
+      knowledge: 'claude-opus-4-7',
       flywheel: 'claude-opus-4-7',
     };
 
@@ -192,7 +194,15 @@ describe('role model configuration', () => {
     expect(config.roles?.work?.sub?.['inspect-deep']?.model).toBe('workhorse:mid');
     expect(config.roles?.plan).toEqual(DEFAULT_ROLES.plan);
     expect(config.roles?.ship).toEqual(DEFAULT_ROLES.ship);
+    expect(config.roles?.knowledge).toEqual(DEFAULT_ROLES.knowledge);
     expect(config.roles?.flywheel).toEqual(DEFAULT_ROLES.flywheel);
+  });
+
+  it('errors loudly when the default knowledge workhorse ref cannot resolve', () => {
+    expect(() => resolveModel('knowledge', undefined, {
+      roles: { knowledge: {} },
+      workhorses: { mid: 'claude-sonnet-4-6', cheap: 'claude-haiku-4-5' },
+    })).toThrow('defaults.knowledge.model references workhorse:expensive but workhorses.expensive is not defined');
   });
 
   it('accepts and validates flywheel role fields', () => {

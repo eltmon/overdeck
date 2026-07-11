@@ -47,8 +47,9 @@ const SPAWN_GRACE_PERIOD_MS = 30_000;
 // (PAN-1972): a `pan start`-spawned work agent does NOT pass
 // `registerConversation` (only the flywheel does), so without backfill it has
 // no row and the work tab renders "No conversation data available for this
-// session." review/test/ship get rows at spawn; this is the self-healing net.
-const BACKFILL_ROLES = new Set(['work', 'review', 'test', 'ship']);
+// session." Knowledge agents follow the same live-session path. review/test/ship
+// get rows at spawn; this is the self-healing net.
+const BACKFILL_ROLES = new Set(['work', 'review', 'test', 'ship', 'knowledge']);
 
 // Tmux session prefixes that are NOT specialist agents and must be left alone
 // by the backfill pass even if they happen to be missing a row.

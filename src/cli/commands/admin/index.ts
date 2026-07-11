@@ -17,13 +17,19 @@ import { registerConfigCommand } from '../config.js';
 import { hooksStatusCommand, parseHookHarness, setupHooksCommand } from '../setup/hooks.js';
 import { tldrCommand } from './tldr-handler.js';
 import { hookCommand } from './fpp-handler.js';
+import { backfillTitlesCommand } from './conversations-handler.js';
 import { listStatesCommand, cleanupStatesCommand } from './tracker-handler.js';
 import { migrateConfigCommand } from '../migrate-config.js';
+import { registerStateMigrationCommand } from './state-migrate.js';
+import { registerReconcileLabelsCommand } from './reconcile-labels.js';
 
 export function registerAdminCommands(program: Command): void {
   const admin = program
     .command('admin')
     .description('Plumbing commands: watchdog, specialists, infra, db, config, and more');
+
+  registerStateMigrationCommand(admin);
+  registerReconcileLabelsCommand(admin);
 
   // pan admin cloister — lifecycle watchdog
   registerCloisterCommands(admin);
@@ -79,6 +85,19 @@ export function registerAdminCommands(program: Command): void {
     .option('--json', 'Output as JSON')
     .action((action, idOrMessage, options) => {
       hookCommand(action || 'help', idOrMessage?.join(' '), options);
+    });
+
+  // pan admin conversations — conversation maintenance
+  const conversations = admin
+    .command('conversations')
+    .description('Conversation maintenance utilities');
+
+  conversations
+    .command('backfill-titles')
+    .description('Backfill titles for conversations stuck on "New conversation"')
+    .option('--dry-run', 'Preview changes without writing to the database')
+    .action(async (options: { dryRun?: boolean }) => {
+      await backfillTitlesCommand(options);
     });
 
   // pan admin tracker — tracker-specific operations

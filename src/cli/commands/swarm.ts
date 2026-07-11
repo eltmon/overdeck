@@ -16,6 +16,7 @@ import {
   clearFailedMergeBlock,
   coordinateSwarmSlots,
   getFailedMergeBlock,
+  getFailedMergeBlocks,
   recoverFailedMergeSlot,
   type ClassifiedSwarmSlot,
   type SwarmRecoveryAction,
@@ -29,6 +30,7 @@ import { listSlotAgents } from '../../lib/agents/slot-reconcile.js';
 import { stopAgentSync } from '../../lib/agents.js';
 import { listSessionNamesSync } from '../../lib/tmux.js';
 import { removeAgentSync } from '../../lib/overdeck/agents.js';
+import { acknowledgeRecoveryTrip } from '../../lib/cloister/recovery-trip.js';
 
 const execAsync = promisify(exec);
 
@@ -46,6 +48,7 @@ export interface SwarmCommandDeps {
   ensureWorkspace: (issueId: string, project: ResolvedProjectLike) => Promise<string>;
   coordinateSwarmSlots: typeof coordinateSwarmSlots;
   getFailedMergeBlock: typeof getFailedMergeBlock;
+  getFailedMergeBlocks: typeof getFailedMergeBlocks;
   recoverFailedMergeSlot: typeof recoverFailedMergeSlot;
   console: ConsoleLike;
 }
@@ -98,6 +101,7 @@ const defaultDeps: SwarmCommandDeps = {
   ensureWorkspace: ensureFeatureWorkspace,
   coordinateSwarmSlots,
   getFailedMergeBlock,
+  getFailedMergeBlocks,
   recoverFailedMergeSlot,
   console,
 };
@@ -176,17 +180,33 @@ export async function swarmRecoverCommand(
   }
 
   const workspacePath = await deps.ensureWorkspace(issue, loaded.project);
-  const block = deps.getFailedMergeBlock(issue, workspacePath);
+  const block = deps.getFailedMergeBlock(issue, slotIndex, workspacePath);
   if (!block) {
-    deps.console.error(chalk.red(`No failed-merge slot is recorded for ${issue}.`));
-    return { ok: false, actions: [] };
-  }
-  if (block.slotIndex !== slotIndex) {
-    deps.console.error(chalk.red(`Recorded failed-merge slot for ${issue} is slot ${block.slotIndex}, not slot ${slotIndex}.`));
+    if (action === 'retry') {
+      const actions = await deps.coordinateSwarmSlots({ issueId: issue });
+      const retried = actions.some(line => line.includes(`archived failed slot ${slotIndex} `));
+      if (retried) {
+        const itemId = actions.find(line => line.includes(`archived failed slot ${slotIndex} `))?.match(/\(item ([^)]+)\)/)?.[1];
+        if (itemId) acknowledgeRecoveryTrip(workspacePath, issue, 'swarm-slot-requeue', itemId);
+        for (const line of actions) deps.console.log(line);
+        return { ok: true, actions, workspacePath };
+      }
+    }
+    const otherBlocks = deps.getFailedMergeBlocks(issue, workspacePath);
+    if (otherBlocks.length > 0) {
+      const lines = otherBlocks
+        .map(b => `  slot ${b.slotIndex} (item ${b.itemId}): ${b.note}`)
+        .join('\n');
+      deps.console.error(
+        chalk.red(`No failed-merge block for ${issue} slot ${slotIndex}. Currently blocked slots:\n${lines}`),
+      );
+    } else {
+      deps.console.error(chalk.red(`No failed-merge slot is recorded for ${issue}.`));
+    }
     return { ok: false, actions: [] };
   }
 
-  const actions = await deps.recoverFailedMergeSlot(issue, workspacePath, loaded.doc, action);
+  const actions = await deps.recoverFailedMergeSlot(issue, workspacePath, slotIndex, loaded.doc, action);
   for (const line of actions) deps.console.log(line);
 
   return { ok: true, actions, workspacePath };
@@ -314,6 +334,7 @@ export interface SwarmResetCommandDeps extends SwarmStopCommandDeps {
   runGitCommand: (command: string, cwd: string) => Promise<unknown>;
   clearAllSlotAssignments: typeof clearAllSlotAssignments;
   clearFailedMergeBlock: typeof clearFailedMergeBlock;
+  getFailedMergeBlocks: typeof getFailedMergeBlocks;
   removeAgentSync: (agentId: string) => void;
 }
 
@@ -323,6 +344,7 @@ const defaultResetDeps: SwarmResetCommandDeps = {
   runGitCommand: (command, cwd) => execAsync(command, { cwd }),
   clearAllSlotAssignments,
   clearFailedMergeBlock,
+  getFailedMergeBlocks,
   removeAgentSync,
 };
 
@@ -399,7 +421,9 @@ export async function swarmResetCommand(
   }
 
   deps.clearAllSlotAssignments(workspacePath, issue);
-  deps.clearFailedMergeBlock(issue, workspacePath);
+  for (const block of deps.getFailedMergeBlocks(issue, workspacePath)) {
+    deps.clearFailedMergeBlock(issue, block.slotIndex, workspacePath);
+  }
 
   // No stale running registration may survive: mark live-status rows stopped.
   let stoppedRows = 0;
@@ -517,6 +541,7 @@ export interface SwarmStatusCommandDeps {
     slots: Parameters<typeof classifyInFlightSlots>[0],
     workspacePath: string,
   ) => Promise<ClassifiedSwarmSlot[]>;
+  getFailedMergeBlocks: typeof getFailedMergeBlocks;
   getReviewStatusSync: typeof getReviewStatusSync;
   listSessionNamesSync: () => string[];
   getConcurrencyLimits: typeof getConcurrencyLimits;
@@ -529,6 +554,7 @@ const defaultStatusDeps: SwarmStatusCommandDeps = {
   findSpecByIssue,
   reconcileSlotState,
   classifyInFlightSlots: (slots, workspacePath) => classifyInFlightSlots(slots, undefined, { workspacePath }),
+  getFailedMergeBlocks,
   getReviewStatusSync,
   listSessionNamesSync,
   getConcurrencyLimits,
@@ -559,6 +585,8 @@ export async function swarmStatusCommand(
   const lifecycleBySlot = new Map(classified.map(slot => [slot.slotIndex, slot.lifecycle]));
   const branchMergedBySlot = new Map(reconciled.branches.map(branch => [branch.slotIndex, branch.merged]));
   const liveSessions = new Set(safeListSessionNames(deps));
+  const blockedSlots = deps.getFailedMergeBlocks(issue, workspacePath);
+  const blockedSlotIndexes = new Set(blockedSlots.map(block => block.slotIndex));
 
   deps.console.log(chalk.bold(`Swarm status for ${issue}`));
 
@@ -587,9 +615,29 @@ export async function swarmStatusCommand(
   );
 
   const rows = [
-    ...reconciled.merged.map(slot => ({ ...slot, lifecycle: 'merged' })),
-    ...reconciled.inFlight.map(slot => ({ ...slot, lifecycle: lifecycleBySlot.get(slot.slotIndex) ?? 'running' })),
-  ].sort((a, b) => a.slotIndex - b.slotIndex);
+    ...reconciled.merged.map(slot => ({ ...slot, lifecycle: 'merged' as const })),
+    ...reconciled.inFlight.map(slot => ({
+      ...slot,
+      lifecycle: blockedSlotIndexes.has(slot.slotIndex)
+        ? 'failed-merge-blocked'
+        : (lifecycleBySlot.get(slot.slotIndex) ?? 'running'),
+    })),
+  ];
+
+  for (const block of blockedSlots) {
+    if (!rows.some(row => row.slotIndex === block.slotIndex)) {
+      rows.push({
+        itemId: block.itemId,
+        slotIndex: block.slotIndex,
+        status: 'in_flight',
+        branch: block.branch,
+        agentId: undefined,
+        lifecycle: 'failed-merge-blocked',
+      });
+    }
+  }
+
+  rows.sort((a, b) => a.slotIndex - b.slotIndex);
 
   if (rows.length === 0) {
     deps.console.log('Slots: none — nothing is dispatched right now, and no merged slot state remains.');
@@ -604,10 +652,24 @@ export async function swarmStatusCommand(
       : branchMergedBySlot.get(row.slotIndex) ? 'merged' : 'unmerged';
     const sessionName = row.agentId ?? `agent-${issueLower}-slot-${row.slotIndex}`;
     const sessionState = liveSessions.has(sessionName) ? 'session alive' : 'session dead';
+    const lifecycle = row.lifecycle === 'failed-merge-blocked'
+      ? 'failed-merge (blocked)'
+      : row.lifecycle;
     deps.console.log(
-      `  slot ${row.slotIndex} · item ${row.itemId} · ${row.lifecycle} · branch ${branch} (${branchState}) · ${sessionState}`,
+      `  slot ${row.slotIndex} · item ${row.itemId} · ${lifecycle} · branch ${branch} (${branchState}) · ${sessionState}`,
     );
   }
+
+  if (blockedSlots.length > 0) {
+    deps.console.log('Blocked slots:');
+    for (const block of blockedSlots) {
+      deps.console.log(
+        `  slot ${block.slotIndex} (item ${block.itemId}): ${block.note}. `
+        + `Recover with \`pan swarm recover ${issue} ${block.slotIndex} --action retry|drop|handoff\`.`,
+      );
+    }
+  }
+
   return { ok: true };
 }
 

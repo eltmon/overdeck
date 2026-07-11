@@ -551,7 +551,7 @@ export function roleAgentDefinitionPath(role: Role, subRole?: string): string | 
   if (role === 'review' && subRole) {
     return null;
   }
-  return `roles/${role}.md`;
+  return join(packageRoot, 'roles', `${role}.md`);
 }
 
 /**

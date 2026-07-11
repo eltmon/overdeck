@@ -41,7 +41,7 @@ interface SystemHealthThresholds {
   overcommitCriticalPercent: number;
 }
 
-interface ProcMemorySnapshot {
+export interface ProcMemorySnapshot {
   memTotal: number;
   memAvailable: number;
   memFree: number;
@@ -329,7 +329,7 @@ async function readProcMemoryDarwin(): Promise<ProcMemorySnapshot> {
   };
 }
 
-async function readProcMemory(): Promise<ProcMemorySnapshot> {
+export async function readProcMemory(): Promise<ProcMemorySnapshot> {
   return platform() === 'darwin' ? readProcMemoryDarwin() : readProcMemoryLinux();
 }
 

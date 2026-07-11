@@ -58,6 +58,7 @@ export interface MemoryConfig {
   features?: {
     observations?: boolean;
     prompt_time_injection?: boolean;
+    knowledge_index?: boolean;
   };
   rollup_pending_threshold?: number;
   sidebar_refresh_interval_ms?: number;
@@ -135,6 +136,15 @@ export interface NormalizedFeatureRegistryConfig {
     model: string;
     perDayCostCapUsd: number;
   };
+}
+
+export interface KnowledgeConfig {
+  /** Spawn `pan knowledge <issue> --retro` after a successful merge lifecycle. Default: false. */
+  post_merge_auto_retro?: boolean;
+}
+
+export interface NormalizedKnowledgeConfig {
+  postMergeAutoRetro: boolean;
 }
 
 export type ManualCompactMode = 'claude-code' | 'overdeck-native';
@@ -383,6 +393,18 @@ export interface ResourcesConfig {
   agent_warn_count?: number;
   /** Work-agent count threshold that blocks new spawns */
   agent_block_count?: number;
+  /** PAN-2500: deacon memory governor — stop admitting new resumes (GiB reserve) */
+  governor_soft_reserve_gb?: number;
+  /** PAN-2500: deacon memory governor — start shedding (GiB reserve) */
+  governor_hard_reserve_gb?: number;
+  /** PAN-2500: deacon memory governor — re-admit only past this reserve; must exceed governor_soft_reserve_gb */
+  governor_recovery_reserve_gb?: number;
+  /** PAN-2500: cold-start footprint estimate (GiB) for a work agent with no live per-project docker-stack data yet */
+  governor_footprint_default_work_gb?: number;
+  /** PAN-2500: cold-start footprint estimate (GiB) for a review agent */
+  governor_footprint_default_review_gb?: number;
+  /** PAN-2500: cold-start footprint estimate (GiB) for a test agent */
+  governor_footprint_default_test_gb?: number;
 }
 
 export interface IssuesConfig {
@@ -477,6 +499,9 @@ export interface YamlConfig {
 
   /** Knowledge registry population configuration */
   registry?: FeatureRegistryConfig;
+
+  /** OKF/knowledge-agent behavior */
+  knowledge?: KnowledgeConfig;
 
   /** Multi-tool sync configuration */
   tools?: {
@@ -765,6 +790,7 @@ export interface NormalizedConfig {
     };
     observationsEnabled: boolean;
     promptTimeInjectionEnabled: boolean;
+    knowledgeIndexEnabled: boolean;
     rollupPendingThreshold: number;
     sidebarRefreshIntervalMs: number;
     workerConcurrency: number;
@@ -783,6 +809,9 @@ export interface NormalizedConfig {
 
   /** Knowledge registry population configuration */
   registry: NormalizedFeatureRegistryConfig;
+
+  /** OKF/knowledge-agent behavior */
+  knowledge: NormalizedKnowledgeConfig;
 
   /** Shadow mode configuration */
   shadow: NormalizedShadowConfig;
@@ -812,6 +841,14 @@ export interface NormalizedConfig {
     memoryBlockGb: number;
     agentWarnCount: number;
     agentBlockCount: number;
+    /** PAN-2500: deacon memory governor reserves, GiB. recoveryReserveGb > softReserveGb always. */
+    governorSoftReserveGb: number;
+    governorHardReserveGb: number;
+    governorRecoveryReserveGb: number;
+    /** PAN-2500: cold-start per-role footprint defaults, GiB (used when no live per-project stack data exists). */
+    governorFootprintDefaultWorkGb: number;
+    governorFootprintDefaultReviewGb: number;
+    governorFootprintDefaultTestGb: number;
   };
 
   /** Dashboard issue-fetch behavior, normalised (always defined). */

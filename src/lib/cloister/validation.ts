@@ -325,6 +325,9 @@ export interface QualityGateRunOptions {
   vmName?: string;
   /** Template placeholders for resolving container names (e.g., {{FEATURE_FOLDER}}) */
   placeholders?: TemplatePlaceholders;
+  /** PAN-2487: mirror of the human-readable gate progress lines (start/pass/fail
+   *  per gate), e.g. into the per-issue ship log so the UI can show live progress. */
+  onLog?: (line: string) => void;
 }
 
 /**
@@ -368,6 +371,7 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
     const cwd = gate.path ? join(projectPath, gate.path) : projectPath;
 
     console.log(`[quality-gate] Running "${name}" (${required ? 'required' : 'optional'}) in ${cwd}`);
+    opts.onLog?.(`Running gate "${name}"${required ? '' : ' (optional)'}…`);
     const startTime = Date.now();
 
     if (gate.type === 'http_health') {
@@ -495,6 +499,7 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
         lastError = error;
         if (attempt < maxAttempts) {
           console.log(`[quality-gate] ✗ "${name}" failed attempt ${attempt}/${maxAttempts} — retrying (gate declares retry: ${gate.retry})`);
+          opts.onLog?.(`↻ ${name} failed attempt ${attempt}/${maxAttempts} — retrying`);
         }
       }
     }
@@ -502,6 +507,7 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
     if (passedGate) {
       const durationMs = Date.now() - startTime;
       console.log(`[quality-gate] ✓ "${name}" passed (${durationMs}ms)`);
+      opts.onLog?.(`✓ ${name} passed (${Math.round(durationMs/1000)}s)`);
       results.push({
         name,
         passed: true,
@@ -514,6 +520,7 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
       const durationMs = Date.now() - startTime;
       const output = ((error.stdout || '') + (error.stderr || '')).slice(-2000);
       console.log(`[quality-gate] ✗ "${name}" failed (${durationMs}ms): ${error.message?.slice(0, 200)}`);
+      opts.onLog?.(`✗ ${name} FAILED (${Math.round(durationMs/1000)}s): ${error.message?.slice(0, 160)}`);
       results.push({
         name,
         passed: false,

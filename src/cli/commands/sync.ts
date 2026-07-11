@@ -32,6 +32,8 @@ import { cleanupAgentDirectories } from '../../lib/agent-directory-cleanup.js';
 import { migrateOverdeckToPanSync } from '../../lib/workspace-manager.js';
 import { runMultiToolSyncSync, resolveAlsoSyncToolsSync } from '../../lib/multi-tool-sync.js';
 import { ensurePlaywrightIsolationSync, ensureExcalidrawMcpSync } from '../../lib/claude-mcp.js';
+import { resolveProjectContextFile } from '../../lib/context-layers/layers.js';
+import { resolveStateReadHomeSync } from '../../lib/state-read-home.js';
 
 // Bundled git hooks distributed to registered projects (PAN-1201: sync-sources/).
 const BUNDLED_GIT_HOOKS_DIR = SYNC_SOURCES.gitHooks;
@@ -137,7 +139,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     console.log(chalk.cyan('context layers → CLAUDE.md:'));
     console.log(`  ${chalk.blue('↻')} global → ~/.claude/CLAUDE.md ${chalk.dim('(managed region)')}`);
     for (const { config } of listProjectsSync()) {
-      if (existsSync(join(config.path, '.pan', 'context', 'project.md'))) {
+      if (existsSync(resolveProjectContextFile(config.path))) {
         console.log(
           `  ${chalk.blue('↻')} ${config.name} → ${join(config.path, 'CLAUDE.md')} ${chalk.dim('(managed region)')}`,
         );
@@ -369,16 +371,17 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       if (!existsSync(config.path)) continue;
       const mainBeadsDir = join(config.path, '.beads');
       if (!existsSync(mainBeadsDir)) continue; // Project hasn't used beads yet — skip
+      const bdRoot = resolveStateReadHomeSync(config).root;
       // Test connectivity. If the database is missing, auto-init.
       try {
-        execSync('bd list --json --limit 0 2>&1', { cwd: config.path, stdio: 'pipe', timeout: 8000 });
+        execSync(`bd -C ${JSON.stringify(bdRoot)} list --json --limit 0 2>&1`, { cwd: config.path, stdio: 'pipe', timeout: 8000 });
       } catch (e: any) {
         const msg = String(e?.stdout ?? e?.stderr ?? e?.message ?? '');
         if (msg.includes('database') && (msg.includes('not found') || msg.includes('not exist') || msg.includes('defaulting'))) {
           const beadsSpinner = ora(`Initializing beads database for ${config.name}...`).start();
           try {
             const prefix = (key || config.name).toLowerCase().replace(/[^a-z0-9-]/g, '-');
-            execSync(`bd init --prefix ${prefix}`, { cwd: config.path, stdio: 'pipe', timeout: 20000 });
+            execSync(`bd -C ${JSON.stringify(bdRoot)} init --prefix ${prefix}`, { cwd: config.path, stdio: 'pipe', timeout: 20000 });
             try { execSync('git config beads.role contributor', { cwd: config.path, stdio: 'pipe' }); } catch { /* non-fatal */ }
             beadsSpinner.succeed(`Beads database initialized for ${config.name} (prefix: ${prefix})`);
           } catch {
@@ -566,16 +569,17 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       if (!existsSync(config.path)) continue;
       const mainBeadsDir = join(config.path, '.beads');
       if (!existsSync(mainBeadsDir)) continue; // Project hasn't used beads yet — skip
+      const bdRoot = resolveStateReadHomeSync(config).root;
       // Test connectivity. If the database is missing, auto-init.
       try {
-        execSync('bd list --json --limit 0 2>&1', { cwd: config.path, stdio: 'pipe', timeout: 8000 });
+        execSync(`bd -C ${JSON.stringify(bdRoot)} list --json --limit 0 2>&1`, { cwd: config.path, stdio: 'pipe', timeout: 8000 });
       } catch (e: any) {
         const msg = String(e?.stdout ?? e?.stderr ?? e?.message ?? '');
         if (msg.includes('database') && (msg.includes('not found') || msg.includes('not exist') || msg.includes('defaulting'))) {
           const beadsSpinner = ora(`Initializing beads database for ${config.name}...`).start();
           try {
             const prefix = (key || config.name).toLowerCase().replace(/[^a-z0-9-]/g, '-');
-            execSync(`bd init --prefix ${prefix}`, { cwd: config.path, stdio: 'pipe', timeout: 20000 });
+            execSync(`bd -C ${JSON.stringify(bdRoot)} init --prefix ${prefix}`, { cwd: config.path, stdio: 'pipe', timeout: 20000 });
             beadsSpinner.succeed(`Beads database initialized for ${config.name} (prefix: ${prefix})`);
           } catch {
             beadsSpinner.warn(`Could not auto-initialize beads for ${config.name} — run: cd ${config.path} && bd init`);

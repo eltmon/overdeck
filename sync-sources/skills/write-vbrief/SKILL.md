@@ -5,7 +5,7 @@ description: >
   launching the interactive planning agent. Use when the work is well-understood
   and the agent can author the plan from the issue body and codebase alone.
   Also use when you ARE the work agent and need to self-plan before implementing.
-  Covers the full vBRIEF v0.6 schema, continue.json format, bead sizing rules,
+  Covers the full xBRIEF v0.8 schema, continue.json format, bead sizing rules,
   inspection gates, and the `pan plan finalize` handoff command.
 triggers:
   - write vbrief
@@ -51,14 +51,14 @@ Minimum exploration:
 
 ## Step 2 — Write `.pan/spec.vbrief.json`
 
-The file goes at `.pan/spec.vbrief.json` in the workspace root. It MUST conform to vBRIEF v0.6.
+The file goes at `.pan/spec.vbrief.json` in the workspace root. It MUST conform to xBRIEF v0.8.
 
 ### Full schema
 
 ```json
 {
-  "vBRIEFInfo": {
-    "version": "0.6",
+  "xBRIEFInfo": {
+    "version": "0.8",
     "created": "<ISO 8601 timestamp>",
     "author": "overdeck/<VERSION>",
     "description": "Plan for <ISSUE-ID>: <issue title>"
@@ -272,7 +272,7 @@ Most plans have 0–2 inspection beads. More than 3 suggests the beads are too l
 
 Before running `pan plan finalize`:
 
-- [ ] `.pan/spec.vbrief.json` has exactly two top-level keys: `vBRIEFInfo` and `plan`
+- [ ] `.pan/spec.vbrief.json` has exactly two top-level keys: `xBRIEFInfo` and `plan`
 - [ ] `plan.id` is lowercase issue ID
 - [ ] `plan.uid` is a fresh UUID v4
 - [ ] `plan.status` is `"approved"`
