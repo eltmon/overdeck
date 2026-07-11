@@ -237,6 +237,24 @@ describe('review mode resolution', () => {
     expect(isExtendedReviewEnabled('PAN-1982')).toBe(true);
     expect(mockLoadConfigSync).not.toHaveBeenCalled();
   });
+
+  it("resolves mode 'none' from merged config (PAN-1862 FR-13)", () => {
+    mockLoadConfigSync.mockReturnValue({
+      config: { roles: { review: { model: 'workhorse:expensive', mode: 'none' } } },
+    });
+
+    expect(resolveReviewMode('PAN-1982')).toBe('none');
+    expect(isExtendedReviewEnabled('PAN-1982')).toBe(false);
+  });
+
+  it("resolves per-issue reviewMode 'none' over config", () => {
+    mockLoadConfigSync.mockReturnValue({
+      config: { roles: { review: { model: 'workhorse:expensive', mode: 'full' } } },
+    });
+    mockReadIssueRecordSync.mockReturnValue({ reviewMode: 'none' });
+
+    expect(resolveReviewMode('PAN-1982')).toBe('none');
+  });
 });
 
 // ── killAllReviewSessions ─────────────────────────────────────────────────────

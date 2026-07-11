@@ -422,6 +422,27 @@ function buildSelfReviewPrompt(opts: {
     return { success: false, message };
   }
 
+  // PAN-1862 (FR-14): review mode 'none' — skip the AI review entirely. This sits at
+  // the single review entry point so the trigger route, host auto-dispatch, and every
+  // Deacon re-dispatch site all honor it without per-call-site logic. The pre-review
+  // verification gate (typecheck/lint/test floor) has already run by the time any
+  // caller reaches here — 'none' skips only the AI review, never the quality floor.
+  // reviewSpawnedAt is stamped so the durable reviewRequestedAt intent counts as
+  // serviced (otherwise needsReviewDispatch would re-fire this skip every read).
+  // Setting reviewStatus 'skipped' advances the lifecycle exactly like an approved
+  // review (the setReviewStatusSync write path emits review.approved for it).
+  if (resolveReviewMode(opts.issueId) === 'none') {
+    setReviewStatusSync(opts.issueId, {
+      reviewStatus: 'skipped',
+      reviewNotes: 'Review mode: none — AI review skipped by configuration; verification gate still enforced',
+      reviewSpawnedAt: new Date().toISOString(),
+    });
+    const message = `Review skipped for ${opts.issueId} (mode=none) — advancing to test`;
+    console.log(`[review-agent] ${message}`);
+    emitActivityEntrySync({ source: 'review', level: 'info', message, issueId: opts.issueId });
+    return { success: true, message };
+  }
+
   // Idempotency: if a review role agent for this issue already has an alive
   // tmux pane, treat the current dispatch as a no-op. spawnRun has its own
   // session-exists check but it throws — we want soft "already running"
@@ -942,13 +963,13 @@ export function resolveReviewMode(issueId?: string): ReviewMode {
   if (issueId) {
     const project = resolveProjectForIssue(issueId);
     const issueMode = project ? readIssueRecordSync(project, issueId)?.reviewMode : undefined;
-    if (issueMode === 'quick' || issueMode === 'full') {
+    if (issueMode === 'quick' || issueMode === 'full' || issueMode === 'none') {
       return issueMode;
     }
   }
 
   const configMode = loadYamlConfig().config.roles?.review?.mode;
-  return configMode === 'full' ? 'full' : 'quick';
+  return configMode === 'full' || configMode === 'none' ? configMode : 'quick';
 }
 
 /**

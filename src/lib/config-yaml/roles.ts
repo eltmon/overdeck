@@ -288,8 +288,8 @@ function validateRoleFields(role: Role, roleConfig: RoleConfig): void {
   if (roleConfig.effort !== undefined && !ROLE_EFFORTS.includes(roleConfig.effort)) {
     throw new Error(`config.yaml: roles.${role}.effort must be one of ${ROLE_EFFORTS.join(', ')}`);
   }
-  if (roleConfig.mode !== undefined && roleConfig.mode !== 'quick' && roleConfig.mode !== 'full') {
-    throw new Error(`config.yaml: roles.${role}.mode must be quick or full`);
+  if (roleConfig.mode !== undefined && roleConfig.mode !== 'quick' && roleConfig.mode !== 'full' && roleConfig.mode !== 'none') {
+    throw new Error(`config.yaml: roles.${role}.mode must be quick, full, or none`);
   }
   if (roleConfig.maxAgents !== undefined && (!Number.isInteger(roleConfig.maxAgents) || roleConfig.maxAgents < 1)) {
     throw new Error(`config.yaml: roles.${role}.maxAgents must be a positive integer`);

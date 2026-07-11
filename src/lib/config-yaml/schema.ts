@@ -358,7 +358,7 @@ export interface RoleSubConfig {
 
 export type RoleEffort = EffortLevel;
 export const ROLE_EFFORTS: readonly RoleEffort[] = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
-export type ReviewMode = 'quick' | 'full';
+export type ReviewMode = 'quick' | 'full' | 'none';
 export type FlywheelScope = 'pan-only' | 'all-tracked-projects';
 
 export interface RoleConfig {

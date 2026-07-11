@@ -10,14 +10,14 @@ import {
 } from '../../lib/pan-dir/record.js';
 
 function isReviewMode(value: string): value is ReviewMode {
-  return value === 'quick' || value === 'full';
+  return value === 'quick' || value === 'full' || value === 'none';
 }
 
 export function reviewModeCommand(id: string, mode: string): void {
   const issueId = id.toUpperCase();
   if (!isReviewMode(mode)) {
-    console.error(chalk.red(`Error: review mode must be quick or full, got '${mode}'`));
-    console.error(chalk.dim(`Usage: pan review mode ${issueId} <quick|full>`));
+    console.error(chalk.red(`Error: review mode must be quick, full, or none, got '${mode}'`));
+    console.error(chalk.dim(`Usage: pan review mode ${issueId} <quick|full|none>`));
     process.exit(1);
   }
 

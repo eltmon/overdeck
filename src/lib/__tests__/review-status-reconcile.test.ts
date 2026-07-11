@@ -384,3 +384,37 @@ describe('setReviewStatusSync — terminal-verdict clobber guard (PAN-2578)', ()
     expect(db.upsert).toHaveBeenCalled();
   });
 });
+
+
+describe("reviewStatus 'skipped' — review mode none (PAN-1862 FR-14/FR-16)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    journal.readJournalStatusSync.mockReturnValue(null);
+    journal.enrichReviewNotesFromRecordSync.mockImplementation((_id: string, s: ReviewStatus) => s);
+  });
+
+  it('a skipped review + skipped test passes the readyForMerge gate', () => {
+    db.getFromDb.mockReturnValue(dbRow({ reviewStatus: 'pending', testStatus: 'skipped' }));
+
+    const result = setReviewStatusSync('PAN-1866', { reviewStatus: 'skipped' });
+
+    expect(result.reviewStatus).toBe('skipped');
+    expect(result.readyForMerge).toBe(true);
+  });
+
+  it('recording skipped emits the same review.approved lifecycle event as passed', () => {
+    db.getFromDb.mockReturnValue(dbRow({ reviewStatus: 'pending', testStatus: 'pending' }));
+
+    setReviewStatusSync('PAN-1866', { reviewStatus: 'skipped', reviewSpawnedAt: '2026-07-11T12:00:00.000Z' });
+
+    expect(notifier.notify).toHaveBeenCalledWith(expect.objectContaining({ type: 'review.approved', issueId: 'PAN-1866' }));
+  });
+
+  it('a skipped review does NOT pass the gate while tests are still pending', () => {
+    db.getFromDb.mockReturnValue(dbRow({ reviewStatus: 'pending', testStatus: 'pending' }));
+
+    const result = setReviewStatusSync('PAN-1866', { reviewStatus: 'skipped' });
+
+    expect(result.readyForMerge).toBe(false);
+  });
+});

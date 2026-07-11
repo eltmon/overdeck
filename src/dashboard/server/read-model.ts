@@ -225,7 +225,7 @@ type SpecialistLifecycleState = 'active' | 'sleeping' | 'uninitialized';
 
 const VALID_SPECIALIST_NAMES = new Set<SpecialistAgentName>(["review-agent", "test-agent", "merge-agent", "inspect-agent", "uat-agent"]);
 const VALID_SPECIALIST_LIFECYCLE_STATES = new Set<SpecialistLifecycleState>(["active", "sleeping", "uninitialized"]);
-const VALID_REVIEW_STATUSES = new Set<ReviewStatusValue>(["pending", "reviewing", "passed", "failed", "blocked"]);
+const VALID_REVIEW_STATUSES = new Set<ReviewStatusValue>(["pending", "reviewing", "passed", "failed", "blocked", "skipped"]);
 const VALID_TEST_STATUSES = new Set<TestStatusValue>(["pending", "testing", "passed", "failed", "skipped", "dispatch_failed"]);
 const VALID_UAT_STATUSES = new Set<UatStatusValue>(["pending", "testing", "passed", "failed"]);
 const VALID_MERGE_STATUSES = new Set<MergeStatusValue>(["pending", "queued", "merging", "verifying", "merged", "failed"]);

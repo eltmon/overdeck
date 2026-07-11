@@ -42,7 +42,7 @@ export interface BlockerReason {
 
 export interface ReviewStatus {
   issueId: string;
-  reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
+  reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked' | 'skipped';
   testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
   mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
   inspectStatus?: 'pending' | 'inspecting' | 'passed' | 'failed' | 'error';
@@ -141,7 +141,7 @@ export function reviewGatesPassedSync(
   s: Pick<ReviewStatus, 'reviewStatus' | 'testStatus' | 'verificationStatus' | 'uatStatus' | 'mergeStatus'>,
 ): boolean {
   return (
-    s.reviewStatus === 'passed' &&
+    (s.reviewStatus === 'passed' || s.reviewStatus === 'skipped') &&
     (s.testStatus === 'passed' || s.testStatus === 'skipped') &&
     verificationSatisfied(s) &&
     (s.uatStatus === undefined || s.uatStatus === 'passed') &&
@@ -170,7 +170,9 @@ export function mergeGateEligibility(
   status: Pick<ReviewStatus, 'reviewStatus' | 'testStatus' | 'verificationStatus' | 'mergeStatus'> | null,
 ): MergeGateEligibility {
   if (!status) return { eligible: false, reason: 'no review record' };
-  if (status.reviewStatus !== 'passed') return { eligible: false, reason: `review is ${status.reviewStatus}` };
+  if (status.reviewStatus !== 'passed' && status.reviewStatus !== 'skipped') {
+    return { eligible: false, reason: `review is ${status.reviewStatus}` };
+  }
   if (status.testStatus !== 'passed' && status.testStatus !== 'skipped') {
     return { eligible: false, reason: `test is ${status.testStatus}` };
   }
@@ -538,9 +540,11 @@ export function setReviewStatusSync(
 
   // Reactive Cloister owns review→test and test→ship scheduling. setReviewStatus
   // emits the lifecycle event here so API and direct-import callers share one path.
+  // PAN-1862 (FR-14): reviewStatus 'skipped' (review mode none) advances the
+  // lifecycle exactly like an approved review — same event, same downstream.
   if (
-    update.reviewStatus === 'passed' &&
-    status.reviewStatus !== 'passed' &&
+    (update.reviewStatus === 'passed' || update.reviewStatus === 'skipped') &&
+    status.reviewStatus !== 'passed' && status.reviewStatus !== 'skipped' &&
     updated.testStatus === 'pending'
   ) {
     const canSkipTests =
