@@ -136,7 +136,7 @@ import { runQualityGates } from './validation.js';
 import { loadProjectsConfigSync } from '../projects.js';
 import { cleanupStaleLocks } from '../git-utils.js';
 import { gitPush, MainDivergedError } from '../git/operations.js';
-import { markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
+import { getReviewStatusSync, markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
 import { appendGitOperationSync, type GitOperationType } from '../git-activity.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
 import { verifyMergedBeforeLifecycle, type PostMergeLifecycleOptions } from './merge-verification.js';
@@ -411,6 +411,7 @@ export async function postMergeLifecycle(
     try {
       await transitionIssueToVerifyingOnMain(issueId, projectPath);
       void recordFeatureRegistryLifecycle({ issueId, status: 'merged' });
+      await triggerPostMergeReleaseIfConfigured(issueId, projectPath);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.warn(`[merge-agent] Could not transition issue to verifying_on_main: ${message}`);
@@ -557,6 +558,30 @@ export async function postMergeLifecycle(
   });
   _postMergeInFlight.set(issueId, run);
   return run;
+}
+
+export async function triggerPostMergeReleaseIfConfigured(issueId: string, projectPath: string): Promise<void> {
+  const currentStatus = getReviewStatusSync(issueId)?.releaseStatus;
+  if (currentStatus && currentStatus !== 'pending') {
+    console.log(`[merge-agent] Release already started or completed for ${issueId} (${currentStatus}), skipping`);
+    return;
+  }
+
+  const { resolveProjectFromIssueSync, getProjectSync } = await import('../projects.js');
+  const resolved = resolveProjectFromIssueSync(issueId);
+  const project = resolved ? getProjectSync(resolved.projectKey) : null;
+
+  if (!project?.release) {
+    setReviewStatusSync(issueId, {
+      releaseStatus: 'skipped',
+      releaseNotes: 'No release config found for project.',
+    });
+    console.log(`[merge-agent] No release config for ${issueId}; marked release skipped`);
+    return;
+  }
+
+  const { runRelease } = await import('../release/release-engine.js');
+  await runRelease(issueId, projectPath);
 }
 
 async function transitionIssueToVerifyingOnMain(issueId: string, projectPath: string): Promise<void> {
