@@ -70,7 +70,7 @@
     "recordedAt": "2026-07-11T09:59:17.529Z"
   },
   "created": "2026-07-11T09:50:24.420Z",
-  "updated": "2026-07-11T20:14:28.146Z",
+  "updated": "2026-07-11T23:35:52.376Z",
   "pipeline": {
     "issueId": "PAN-2528",
     "reviewStatus": "reviewing",
@@ -79,7 +79,7 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-11T20:14:27.606Z",
+    "updatedAt": "2026-07-11T23:35:52.193Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues: shared HarnessSelect now disables blocked ohmypi with inline ToS reason; PI_TOS_BLOCK_REASON now names the Claude Code subscription Terms of Service restriction; configuration/harnesses.mdx ## ToS rules section now states that dashboard pickers render ohmypi disabled with inline Terms of Service reason. tests: ModelPicker.render 5/5, chat ModelPicker 8/8, frontend-typecheck clean.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2575",
     "lastVerifiedCommit": "942917cdcc7c40ec843e24bb427ca41525673c96",
@@ -125,9 +125,9 @@
       "byStage": {
         "codex": {
           "openai/gpt-5.5": {
-            "input": 2372550,
-            "output": 12241,
-            "cacheRead": 2121600,
+            "input": 2497202,
+            "output": 12780,
+            "cacheRead": 2205184,
             "cacheWrite": 0
           }
         },
@@ -157,9 +157,9 @@
         },
         "work": {
           "custom/MiniMax-M3": {
-            "input": 9266446,
-            "output": 171251,
-            "cacheRead": 64559928,
+            "input": 9268288,
+            "output": 171695,
+            "cacheRead": 65156618,
             "cacheWrite": 0
           },
           "custom/kimi-k2.7-code": {
@@ -172,9 +172,9 @@
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 2372550,
-          "output": 12241,
-          "cacheRead": 2121600,
+          "input": 2497202,
+          "output": 12780,
+          "cacheRead": 2205184,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -196,9 +196,9 @@
           "cacheWrite": 102609
         },
         "custom/MiniMax-M3": {
-          "input": 9266446,
-          "output": 171251,
-          "cacheRead": 64559928,
+          "input": 9268288,
+          "output": 171695,
+          "cacheRead": 65156618,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
@@ -209,8 +209,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 25.75278,
-        "pricingAsOf": "2026-07-11T20:14:28.071Z"
+        "usd": 26.017166,
+        "pricingAsOf": "2026-07-11T23:35:52.308Z"
       }
     },
     "merges": [
