@@ -1,0 +1,24 @@
+{
+  "issueId": "PAN-2383",
+  "schemaVersion": 2,
+  "created": "2026-07-11T09:24:27.211Z",
+  "updated": "2026-07-11T09:24:27.212Z",
+  "pipeline": {
+    "issueId": "PAN-2383",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-11T09:24:27.211Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-11T09:24:27.211Z",
+    "mergeStatus": "merged"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {}
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  }
+}

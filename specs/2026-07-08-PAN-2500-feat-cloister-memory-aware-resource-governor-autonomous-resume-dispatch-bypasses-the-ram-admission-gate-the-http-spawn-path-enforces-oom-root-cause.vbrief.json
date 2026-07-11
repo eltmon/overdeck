@@ -4,17 +4,17 @@
     "created": "2026-07-08T07:27:22.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2500: memory-aware resource governor — autonomous resume/dispatch bypasses the RAM admission gate the HTTP spawn path enforces (OOM root cause)",
-    "updated": "2026-07-08T07:38:33.130Z"
+    "updated": "2026-07-11T09:24:28.776Z"
   },
   "plan": {
     "id": "pan-2500",
     "title": "feat(cloister): memory-aware resource governor — autonomous resume/dispatch bypasses the RAM admission gate the HTTP spawn path enforces (OOM root cause)",
-    "status": "proposed",
+    "status": "completed",
     "uid": "a1d5a16d-af91-4686-8a6d-62a668bc875a",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-08T07:27:22.000Z",
-    "updated": "2026-07-08T07:38:33.130Z",
+    "updated": "2026-07-11T09:24:28.776Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2500",
@@ -716,5 +716,5 @@
       "canonicalFilename": "2026-07-08-PAN-2500-feat-cloister-memory-aware-resource-governor-autonomous-resume-dispatch-bypasses-the-ram-admission-gate-the-http-spawn-path-enforces-oom-root-cause.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

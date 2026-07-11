@@ -4,17 +4,17 @@
     "created": "2026-07-05T17:59:46.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2383: editable per-issue Standing Crew toggle on the issue view — upgrade PAN-2378's read-only chip",
-    "updated": "2026-07-05T18:07:10.830Z"
+    "updated": "2026-07-11T09:23:18.208Z"
   },
   "plan": {
     "id": "pan-2383",
     "title": "feat(dashboard): editable per-issue Standing Crew toggle on the issue view — upgrade PAN-2378's read-only chip",
-    "status": "proposed",
+    "status": "completed",
     "uid": "e18b3e29-6d92-4543-9f2f-d405902d5f2d",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-05T17:59:46.000Z",
-    "updated": "2026-07-05T18:07:10.830Z",
+    "updated": "2026-07-11T09:23:18.208Z",
     "metadata": {
       "tiered_execution": "on",
       "canonicalFilename": "2026-07-05-PAN-2383-feat-dashboard-editable-per-issue-standing-crew-toggle-on-the-issue-view-upgrade-pan-2378-s-read-only-chip.vbrief.json"
@@ -576,5 +576,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "completed"
 }

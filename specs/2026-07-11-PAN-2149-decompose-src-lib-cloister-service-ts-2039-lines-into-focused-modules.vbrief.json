@@ -1,0 +1,639 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-11T05:08:42.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2149: Decompose src/lib/cloister/service.ts (2039 lines) into focused modules",
+    "updated": "2026-07-11T05:13:46.578Z"
+  },
+  "plan": {
+    "id": "pan-2149",
+    "title": "Decompose src/lib/cloister/service.ts (2039 lines) into focused modules",
+    "status": "running",
+    "uid": "f88ea2c5-8b82-4cc6-8302-c4227fc8a2ee",
+    "author": "agent:claude-fable-5",
+    "sequence": 6,
+    "created": "2026-07-11T05:08:42.000Z",
+    "updated": "2026-07-11T05:13:46.578Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2149",
+        "label": "PAN-2149",
+        "type": "issue"
+      },
+      {
+        "uri": "overdeck-state:drafts/PAN-2149.md",
+        "label": "PRD (verified against main @ bc95c5956c; anchors re-verified at f4a43ee4a6)",
+        "type": "spec"
+      },
+      {
+        "uri": "docs/codebase-health/REFACTOR-QUEUE.md",
+        "label": "Refactor queue item 12",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "refactor",
+      "codebase-health",
+      "cloister",
+      "tenet-10",
+      "needs-handoff"
+    ],
+    "narratives": {
+      "Problem": "src/lib/cloister/service.ts is 2,135 lines (baseline 2,135, regrowing — it reddened main on 2026-07-02 by growing past its baseline). It mixes ~580 lines of module-level reactive dispatch (domain-event → role spawn) with the ~1,425-line CloisterService class covering lifecycle, health monitoring, crash/restart/poke, completion markers (the PAN-174 verification-gate entry), alerts, and the status surface. Nothing about its structure resists growth, and it is pipeline-runtime machinery: a defect here stalls the pipeline that ships the fix (TENET-10).",
+      "Proposal": "Barrel decomposition per the PRD (drafts/PAN-2149.md): service.ts keeps every export resolving via re-exports so zero importers change. Module-level reactive dispatch moves verbatim to service-reactive.ts; class-method bodies extract to service-health.ts, service-crash.ts, service-completion.ts via host-object delegation (enumerated host interfaces built as object literals at the call site — no private→public widening, no raw `this`). One seam per commit; full suite + typecheck + lint (with file-size baseline --update) per seam. The event-store provider trio stays in service.ts (only the class reads it). Final audit enforces every file <1,000 lines with an explicit fallback extraction (service-status.ts) if service.ts lands ≥1,000.",
+      "NonGoals": "- No changes to cloister/specialists.ts (PAN-2232), cloister/merge-agent.ts (PAN-2233), routes/workspaces/merge-ops.ts (PAN-2190), or cloister/deacon.ts (PAN-2189 — deliberately deferred)\n- No behavior change to patrol cadence, crash policy, poke escalation, or the verification gate; no reordering of check sequences inside start()/startMonitoringLoop()/performHealthCheck()\n- No conversion of CloisterService to Effect services and no dissolution of the class\n- No importer/call-site edits anywhere outside src/lib/cloister/ (barrel preserves the import surface) except the sanctioned test repoints named in the plan\n- No renamed exports, no logic edits, no new explicit `any`, no execSync, no file-size baseline raises"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Adopted the existing PRD drafts/PAN-2149.md as the plan source instead of re-deriving a design.",
+        "rationale": "The PRD is marked 'PRD written — on main' in docs/codebase-health/REFACTOR-QUEUE.md and carries locked design decisions D1–D6; planning re-verified every grep anchor at HEAD f4a43ee4a6 rather than trusting line numbers."
+      },
+      {
+        "summary": "coordinateSwarmSlots fast-path (PAN-2203) moves with the reactive seam.",
+        "rationale": "PRD §8.1 pre-decided this contingency; the fast-path has landed at service.ts:454 inside handleCloisterDomainEventPromise."
+      },
+      {
+        "summary": "progressFingerprint and pokeAgentWithEscalation (post-PRD, commit b9515bf356) are assigned to the crash seam.",
+        "rationale": "PRD §8.3 requires assigning new methods to a seam; both are poke/escalation machinery cohesive with pokeAgent/killAgent/handleAgentCrash."
+      },
+      {
+        "summary": "The event-store provider trio (CloisterEventStore, cloisterEventStoreProvider, setCloisterEventStoreProvider) stays in service.ts rather than moving with the reactive region.",
+        "rationale": "Verified the module-level provider is read only by the class (service.ts:924); keeping it avoids a runtime back-import from the seam and any new export surface."
+      },
+      {
+        "summary": "No repoint of the review-agent introspection test is planned; it is verified green at final-audit instead.",
+        "rationale": "Verified the regex-matched startup-recovery block (Re-dispatched recovery review, ~line 884) lives inside CloisterService.start(), which stays in service.ts under this plan; PRD FR-4 requires repointing only in the commit whose seam moves the block."
+      },
+      {
+        "summary": "PRD WI-5 split into two beads (alerts-extract, final-audit) with an explicit fallback rule: if service.ts ≥1,000 lines after alerts-extract, extract getStatus/getAgentHealth/getAllAgentHealth bodies into service-status.ts.",
+        "rationale": "Post-extraction size estimate is ~950–1,000 lines — too thin a margin to leave the contingency implicit; the fallback is a decision made in the plan, not a judgment call for the executor."
+      },
+      {
+        "summary": "Every seam commit runs `bash scripts/lint-file-size.sh --update` and commits the lowered baseline.",
+        "rationale": "Verified npm run lint includes lint:file-size, which fails on stale (shrunken) baseline entries; --update only lowers or drops entries, never raises."
+      },
+      {
+        "summary": "requiresInspection is set only on the health seam (first host-delegation extraction).",
+        "rationale": "It establishes the host-object delegation pattern the crash, completion, and alerts seams copy; a wrong pattern there would cascade (foundation criterion). The reactive seam is a verbatim move whose defects surface at typecheck/full suite."
+      }
+    ],
+    "items": [
+      {
+        "id": "reactive-extract",
+        "title": "Extract module-level reactive dispatch to service-reactive.ts (pure move + barrel re-export)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-11T05:08:42.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-2149",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/service.ts",
+            "src/lib/cloister/service-reactive.ts",
+            "scripts/file-size-baseline.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner",
+            "wc -l src/lib/cloister/service.ts src/lib/cloister/service-reactive.ts"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0 with zero importer edits",
+            "lint exits 0 (baseline lowered in-commit)",
+            "full vitest run reports 0 failed",
+            "service-reactive.ts under 1000 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-5"
+          ],
+          "readinessReason": "First seam of a strictly serialized chain; it is the only dispatchable item at wave 0, so ready means \"start here\", not parallel-safe with siblings."
+        },
+        "narrative": {
+          "Action": "Move the module-level reactive-dispatch region of src/lib/cloister/service.ts verbatim into new src/lib/cloister/service-reactive.ts: identifyOrphanedReviewingIssues, parseSpecialistAgentSession, ReactiveIssueState, CloisterDomainEventLike, ROLE_RUN_STATES, stateToRole, the helper functions between them (normalizeIssueId, roleFromAgentId, STARTING_WITHOUT_SESSION_GRACE_MS, isFreshStarting, activeRoleRunExists, buildReactiveRolePrompt, resolveWorkspaceForIssue, payloadRecord), issueStateChangeFromDomainEvent, handleCloisterDomainEventPromise (including the PAN-2203 coordinateSwarmSlots fast-path at ~line 454), and the EOF Effect wrappers onIssueStateChange and handleCloisterDomainEvent. Re-export every previously exported symbol from service.ts (barrel). LEAVE in service.ts: the CloisterEventStore interface, cloisterEventStoreProvider, setCloisterEventStoreProvider (only the class reads the provider at ~line 924), writeStateFile/readCloisterStateFile, nonRestartableReason, cleanupLegacySpecialistsDirectory, and everything from the CloisterStatus interface onward. Move imports the region needs; keep `import type` for any types pulled back from service.ts. Run `bash scripts/lint-file-size.sh --update` and commit the lowered baseline in the same commit. Commit message: refactor(cloister): extract service reactive dispatch (pan-2149)."
+        },
+        "items": [
+          {
+            "id": "reactive-extract.ac1",
+            "title": "src/lib/cloister/service-reactive.ts exists, contains the named reactive functions moved verbatim (including handleCloisterDomainEventPromise with the coordinateSwarmSlots fast-path and the onIssueStateChange/handleCloisterDomainEvent wrappers), and wc -l reports under 1,000 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reactive-extract.ac2",
+            "title": "service.ts re-exports every previously exported reactive symbol so all existing importers resolve unchanged — npm run typecheck exits 0 with zero edits outside src/lib/cloister/ and scripts/file-size-baseline.txt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reactive-extract.ac3",
+            "title": "git diff shows CloisterEventStore, cloisterEventStoreProvider, and setCloisterEventStoreProvider remain defined in service.ts (the provider trio does not move)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reactive-extract.ac4",
+            "title": "npx vitest run --configLoader runner exits with 0 failed, including tests/unit/lib/cloister/service-swarm-fastpath.test.ts and tests/unit/lib/cloister/guard-advancing-dispatch.test.ts resolving through the barrel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reactive-extract.ac5",
+            "title": "npm run lint exits 0: the file-size baseline entry for service.ts is lowered via scripts/lint-file-size.sh --update in the same commit, and any moved `any` adds service-reactive.ts to eslint-any-allowlist.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "health-seam",
+        "title": "Extract health-monitoring method bodies to service-health.ts via host-object delegation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-11T05:08:42.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-2149",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "crash-seam",
+            "completion-seam",
+            "alerts-extract"
+          ],
+          "files_scope": [
+            "src/lib/cloister/service.ts",
+            "src/lib/cloister/service-health.ts",
+            "scripts/file-size-baseline.txt",
+            "eslint-any-allowlist.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "lint exits 0 (baseline lowered in-commit)",
+            "full vitest run reports 0 failed"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/service-health.ts and extract the bodies of CloisterService.performHealthCheck (~line 1069), recordHealthEvent (~1762), mapHeartbeatSource (~1877), checkHandoffTriggers (~1802), and checkSpecialistRotations (~1739) using host-object delegation (PRD D2): each extracted function takes a host parameter typed by an interface enumerating EXACTLY the members its moved body uses (fields, and closures like emit/pokeAgent for private methods it calls) — one host interface per function or one shared HealthHost, enumerated from the moved bodies, nothing speculative. Each class method becomes a ≤5-line delegate constructing the host object literal at the call site, closing over `this`. Bodies move verbatim with `this.` → `host.`; no visibility widening; no raw `this` passed. Use `import type` for types pulled from service.ts. Baseline --update in the same commit. This bead establishes the delegation pattern the crash, completion, and alerts seams copy — it gates them via work.inspect."
+        },
+        "items": [
+          {
+            "id": "health-seam.ac1",
+            "title": "service-health.ts contains exported functions performHealthCheck, recordHealthEvent, mapHeartbeatSource, checkHandoffTriggers, and checkSpecialistRotations, each taking an enumerated host parameter, with bodies moved verbatim (this.→host. only)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "health-seam.ac2",
+            "title": "each corresponding CloisterService method is reduced to a ≤5-line delegate that builds the host object literal at the call site, and git diff contains no private→public visibility change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "health-seam.ac3",
+            "title": "npm run typecheck exits 0 and npm run lint exits 0, with the file-size baseline entry lowered and any moved `any` covered by an eslint-any-allowlist.json addition in the same commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "health-seam.ac4",
+            "title": "npx vitest run --configLoader runner exits with 0 failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "crash-seam",
+        "title": "Extract crash/restart/poke method bodies to service-crash.ts via host-object delegation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-11T05:08:42.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-2149",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/service.ts",
+            "src/lib/cloister/service-crash.ts",
+            "scripts/file-size-baseline.txt",
+            "eslint-any-allowlist.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "lint exits 0 (baseline lowered in-commit)",
+            "full vitest run reports 0 failed, including tests/unit/lib/pan-330-dead-session.test.ts via the barrel"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/service-crash.ts and extract, per the health-seam's established delegation pattern, the bodies of: pokeAgent (~line 1315), progressFingerprint (~1324), pokeAgentWithEscalation (~1345), killAgent (~1409), handleAgentCrash (~1430), restartAgent (~1564), checkForMassDeaths (~1596), and the pauseSpawns body (~1630). resumeSpawns and isSpawnPaused STAY as thin public methods on the class delegating to shared state via the host. Preserve the crashTrackers/deathTimestamps/lastPokeTimestamps/pokeProgress map semantics exactly — host fields reference the same Map/array instances owned by the class (pass the instances, never copies). Bodies verbatim; no logic edits; async-only code stays async-only. Baseline --update in the same commit."
+        },
+        "items": [
+          {
+            "id": "crash-seam.ac1",
+            "title": "service-crash.ts exports pokeAgent, progressFingerprint, pokeAgentWithEscalation, killAgent, handleAgentCrash, restartAgent, checkForMassDeaths, and the pauseSpawns internals as host-parameter functions with bodies moved verbatim",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "crash-seam.ac2",
+            "title": "class delegates pass the same Map/array instances (crashTrackers, deathTimestamps, lastPokeTimestamps, pokeProgress) through the host, which preserves mutation semantics — the full suite exits with 0 failed, including tests/unit/lib/pan-330-dead-session.test.ts and tests/e2e/handoff-stuck-escalation.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "crash-seam.ac3",
+            "title": "resumeSpawns and isSpawnPaused remain public methods on CloisterService and git diff contains no private→public visibility change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "crash-seam.ac4",
+            "title": "npm run typecheck exits 0 and npm run lint exits 0 with the file-size baseline entry lowered in the same commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "completion-seam",
+        "title": "Extract checkCompletionMarkers (verification-gate entry) to service-completion.ts via host-object delegation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-11T05:08:42.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-2149",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/service.ts",
+            "src/lib/cloister/service-completion.ts",
+            "scripts/file-size-baseline.txt",
+            "eslint-any-allowlist.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner",
+            "npx vitest run --configLoader runner tests/lib/cloister/ tests/unit/lib/cloister/"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "lint exits 0 (baseline lowered in-commit)",
+            "full vitest run reports 0 failed",
+            "cloister-scoped suites report 0 failed on the explicit second run"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/service-completion.ts and extract the body of CloisterService.checkCompletionMarkers (~line 1188, ~127 lines) per the established delegation pattern. This is the PAN-174 verification-gate entry — the highest-care seam: the processedCompletions Map (retry counters, Infinity = done) must cross the host boundary as the same instance, and the marker-file handling (existsSync/renameSync/unlink flow) moves byte-for-byte with no reordering. After the full suite, ALSO run the cloister-scoped suites explicitly: npx vitest run --configLoader runner tests/lib/cloister/ tests/unit/lib/cloister/. Baseline --update in the same commit."
+        },
+        "items": [
+          {
+            "id": "completion-seam.ac1",
+            "title": "service-completion.ts contains an exported checkCompletionMarkers host-parameter function whose body moved verbatim, and the class method is a ≤5-line delegate that passes the same processedCompletions Map instance",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "completion-seam.ac2",
+            "title": "npx vitest run --configLoader runner exits with 0 failed, and the explicit cloister-scoped run (tests/lib/cloister/ tests/unit/lib/cloister/) also exits with 0 failed, including in-flight-guard.test.ts and deacon-review-synthesis.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "completion-seam.ac3",
+            "title": "git diff for this commit shows move + delegate only: it preserves the completion-marker file-handling order and contains no private→public visibility change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "completion-seam.ac4",
+            "title": "npm run typecheck exits 0 and npm run lint exits 0 with the file-size baseline entry lowered in the same commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "alerts-extract",
+        "title": "Extract checkFPPViolations and checkCostAlerts bodies into the health seam",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-11T05:08:42.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-2149",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/service.ts",
+            "src/lib/cloister/service-health.ts",
+            "src/lib/cloister/service-alerts.ts",
+            "scripts/file-size-baseline.txt",
+            "eslint-any-allowlist.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner",
+            "wc -l src/lib/cloister/service-health.ts"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "lint exits 0 (baseline lowered in-commit)",
+            "full vitest run reports 0 failed, including tests/lib/cloister/service-cost-alerts.test.ts",
+            "service-health.ts under 1000 lines"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Extract the bodies of CloisterService.checkFPPViolations (~line 1660) and checkCostAlerts (~1698, carries the PAN-2402 cost-limit attribution changes) into src/lib/cloister/service-health.ts per the established delegation pattern. Decision rule: if the addition would push service-health.ts to 1,000 lines or more, put them in a new src/lib/cloister/service-alerts.ts instead. getCostSummary stays on the class (public surface). Cost limits remain warn-only — behavior identical. Baseline --update in the same commit."
+        },
+        "items": [
+          {
+            "id": "alerts-extract.ac1",
+            "title": "service-health.ts (or service-alerts.ts per the 1,000-line decision rule) contains the checkFPPViolations and checkCostAlerts host-parameter functions moved verbatim, and wc -l shows the receiving file under 1,000 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "alerts-extract.ac2",
+            "title": "tests/lib/cloister/service-cost-alerts.test.ts passes via the barrel within a full npx vitest run --configLoader runner reporting 0 failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "alerts-extract.ac3",
+            "title": "npm run typecheck exits 0 and npm run lint exits 0 with the file-size baseline entry lowered in the same commit and no private→public change in the diff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "final-audit",
+        "title": "Final size/cycle/introspection audit with contingent service-status.ts extraction",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-11T05:08:42.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-2149",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/service.ts",
+            "src/lib/cloister/service-status.ts",
+            "scripts/file-size-baseline.txt",
+            "scripts/circular-deps-baseline.txt",
+            "tests/lib/cloister/review-agent.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "wc -l src/lib/cloister/service.ts src/lib/cloister/service-reactive.ts src/lib/cloister/service-health.ts src/lib/cloister/service-crash.ts src/lib/cloister/service-completion.ts",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run build",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "every listed file reports under 1,000 lines",
+            "typecheck exits 0",
+            "lint (incl. lint:circular and lint:file-size) exits 0",
+            "npm run build exits 0 with no runtime ESM cycle error",
+            "full vitest run reports 0 failed"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Closing audit of the decomposition. (1) Size: wc -l on service.ts and every service-*.ts seam — all must be under 1,000 lines. Decision rule if service.ts is ≥1,000: extract the bodies of getStatus (~line 1899), getAgentHealth (~1949), and getAllAgentHealth (~1961) into a new src/lib/cloister/service-status.ts per the established delegation pattern until service.ts is under 1,000. (2) Introspection: run tests/lib/cloister/review-agent.test.ts and confirm 'startup recovery logs gated dispatch as a deferral' passes — the matched block (~line 884, 'Re-dispatched recovery review') must still live in service.ts's start(); if any seam moved it, repoint the test's readFileSync target in this commit with assertions unweakened. Also confirm tests/unit/lib/database/agent-backfill.test.ts passes (none of its scanned runtime functions are defined in service.ts today — if that changed, add the owning seam file to its runtimePaths). (3) Cycles: npm run build must exit 0; if lint:circular reports changed cycle lines, run bash scripts/lint-circular-deps.sh --update and carry the audited additions with this issue's ref; a RUNTIME ESM cycle error in the build means stop and report, never a logic workaround. (4) Baseline: bash scripts/lint-file-size.sh --update — the service.ts entry is lowered or dropped, never raised."
+        },
+        "items": [
+          {
+            "id": "final-audit.ac1",
+            "title": "wc -l shows src/lib/cloister/service.ts under 1,000 lines and every service-*.ts seam module under 1,000 lines (applying the service-status.ts fallback extraction if needed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "final-audit.ac2",
+            "title": "the review-agent introspection test 'startup recovery logs gated dispatch as a deferral' passes, with the matched startup-recovery block still resolving (repointed in this commit only if a seam moved it, assertions unweakened)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "final-audit.ac3",
+            "title": "npm run build exits 0 (no runtime ESM cycle) and npm run lint exits 0 including lint:circular and lint:file-size, with any circular-deps baseline change applied via --update and audited",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "final-audit.ac4",
+            "title": "npx vitest run --configLoader runner exits with 0 failed on the final rebased branch, and every symbol previously importable from src/lib/cloister/service.js still resolves (npm run typecheck exits 0 with zero importer edits)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-queue-update",
+        "title": "Update codebase-health campaign docs for the completed decomposition",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-11T05:08:42.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-2149",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/codebase-health/REFACTOR-QUEUE.md",
+            "docs/codebase-health/REMAINING-BACKLOG.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'PAN-2149' docs/codebase-health/REFACTOR-QUEUE.md",
+            "grep -n 'cloister/service' docs/codebase-health/REMAINING-BACKLOG.md"
+          ],
+          "expected_outputs": [
+            "REFACTOR-QUEUE.md row 12 shows the decomposition landed with the new seam layout",
+            "REMAINING-BACKLOG.md no longer lists cloister/service.ts as an oversized pending file"
+          ],
+          "readiness": "sequential",
+          "traces": []
+        },
+        "narrative": {
+          "Action": "Update docs/codebase-health/REFACTOR-QUEUE.md item 12 (PAN-2149 row) to reflect the landed decomposition (barrel + service-reactive/health/crash/completion seams, final line counts) and remove/annotate the cloister/service.ts 2,039-line entry in docs/codebase-health/REMAINING-BACKLOG.md (~line 29). No other doc surfaces change: the decomposition alters no user-facing behavior, CLI, or configuration, so Mintlify pages and CLAUDE.md are deliberately untouched."
+        },
+        "items": [
+          {
+            "id": "docs-queue-update.ac1",
+            "title": "docs/codebase-health/REFACTOR-QUEUE.md row for PAN-2149 shows the decomposition landed and contains the names of the seam modules produced",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-queue-update.ac2",
+            "title": "docs/codebase-health/REMAINING-BACKLOG.md no longer shows cloister/service.ts as an oversized pending decomposition",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion",
+              "acJustification": "doc-only bead touching two campaign tracking files; two ACs cover both files 1:1"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "reactive-extract",
+        "to": "health-seam",
+        "type": "blocks"
+      },
+      {
+        "from": "health-seam",
+        "to": "crash-seam",
+        "type": "blocks"
+      },
+      {
+        "from": "crash-seam",
+        "to": "completion-seam",
+        "type": "blocks"
+      },
+      {
+        "from": "completion-seam",
+        "to": "alerts-extract",
+        "type": "blocks"
+      },
+      {
+        "from": "alerts-extract",
+        "to": "final-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "final-audit",
+        "to": "docs-queue-update",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-11-PAN-2149-decompose-src-lib-cloister-service-ts-2039-lines-into-focused-modules.vbrief.json"
+    }
+  },
+  "status": "active"
+}
