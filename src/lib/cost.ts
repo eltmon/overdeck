@@ -106,6 +106,9 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   // Anthropic - Legacy
   { provider: 'anthropic', model: 'claude-haiku-3', inputPer1k: 0.00025, outputPer1k: 0.00125, cacheReadPer1k: 0.00003, cacheWrite5mPer1k: 0.0003, cacheWrite1hPer1k: 0.0005, currency: 'USD' },
   // OpenAI — prices per developers.openai.com/api/docs/pricing (May 2026)
+  { provider: 'openai', model: 'gpt-5.6-sol', inputPer1k: 0.005, outputPer1k: 0.030, cacheReadPer1k: 0.0005, currency: 'USD' },
+  { provider: 'openai', model: 'gpt-5.6-terra', inputPer1k: 0.0025, outputPer1k: 0.015, cacheReadPer1k: 0.00025, currency: 'USD' },
+  { provider: 'openai', model: 'gpt-5.6-luna', inputPer1k: 0.001, outputPer1k: 0.006, cacheReadPer1k: 0.0001, currency: 'USD' },
   { provider: 'openai', model: 'gpt-5.5', inputPer1k: 0.005, outputPer1k: 0.030, cacheReadPer1k: 0.0005, currency: 'USD' },
   { provider: 'openai', model: 'gpt-5.5-pro', inputPer1k: 0.030, outputPer1k: 0.180, currency: 'USD' },
   { provider: 'openai', model: 'gpt-5.4', inputPer1k: 0.0025, outputPer1k: 0.015, cacheReadPer1k: 0.00025, currency: 'USD' },

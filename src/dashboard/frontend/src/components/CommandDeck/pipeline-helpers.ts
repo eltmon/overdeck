@@ -209,7 +209,8 @@ function isSupervisor(session: SessionNode): boolean {
   return id.includes('-supervisor') || session.role === 'supervisor';
 }
 
-function specialistLabel(type: SessionNode['type']): string {
+export function sessionRoleLabel(type: SessionNode['type']): string {
+  if (type === 'knowledge') return 'knowledge agent';
   if (type === 'reviewer' || type === 'review') return 'reviewer';
   if (type === 'test') return 'test agent';
   if (type === 'planning') return 'planner';
@@ -245,7 +246,7 @@ export function whoLineFor(entry: BucketedFeature): string | null {
 
   const supervisor = sessions.find(isSupervisor);
   const workers = sessions.filter(s => (s.type === 'work' || s.type === 'strike') && !isSupervisor(s));
-  const specialists = sessions.filter(s => ['planning', 'review', 'reviewer', 'test'].includes(s.type) && !isSupervisor(s));
+  const specialists = sessions.filter(s => ['planning', 'knowledge', 'review', 'reviewer', 'test'].includes(s.type) && !isSupervisor(s));
 
   const parts: string[] = [];
   if (workers.length > 0) {
@@ -255,7 +256,7 @@ export function whoLineFor(entry: BucketedFeature): string | null {
     parts.push(`${compactModelName(supervisor.model)} supervisor`);
   }
   if (specialists.length > 0) {
-    parts.push(formatCounts(modelCounts(specialists, s => `${compactModelName(s.model)} ${specialistLabel(s.type)}`)));
+    parts.push(formatCounts(modelCounts(specialists, s => `${compactModelName(s.model)} ${sessionRoleLabel(s.type)}`)));
   }
   if (parts.length === 0) return null;
 

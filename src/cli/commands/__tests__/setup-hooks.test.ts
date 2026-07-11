@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   addOverdeckHookIfMissing,
   parseHookHarness,
+  pruneLegacyPanopticonHook,
   setupHooksCommand,
   type ClaudeSettings,
 } from '../setup/hooks.js';
@@ -175,5 +176,67 @@ describe('setup hooks', () => {
 
     expect(added).toBe(false);
     expect(settings.hooks?.PermissionRequest).toHaveLength(1);
+  });
+
+  // PAN-2530: a re-sync after the PAN-1952 rebrand left the old
+  // panopticon/bin/<script> hook registered alongside the new overdeck/bin one,
+  // so ask-user-question-hook fired twice (one copy still branded "Panopticon").
+  it('prunes a stale panopticon/bin twin when installing the overdeck/bin hook', () => {
+    const settings: ClaudeSettings = {
+      hooks: {
+        PreToolUse: [
+          {
+            matcher: 'AskUserQuestion',
+            hooks: [{ type: 'command', command: '/home/user/.panopticon/bin/ask-user-question-hook' }],
+          },
+        ],
+      },
+    };
+
+    const added = addOverdeckHookIfMissing(
+      settings,
+      'PreToolUse',
+      '/home/user/.overdeck/bin',
+      'ask-user-question-hook',
+      'AskUserQuestion',
+    );
+
+    // The legacy twin is gone and exactly one hook — the overdeck/bin one — remains.
+    expect(added).toBe(true);
+    expect(settings.hooks?.PreToolUse).toEqual([
+      {
+        matcher: 'AskUserQuestion',
+        hooks: [{ type: 'command', command: '/home/user/.overdeck/bin/ask-user-question-hook' }],
+      },
+    ]);
+  });
+
+  it('pruneLegacyPanopticonHook removes only the matching legacy script and leaves others intact', () => {
+    const settings: ClaudeSettings = {
+      hooks: {
+        PreToolUse: [
+          {
+            matcher: 'AskUserQuestion',
+            hooks: [{ type: 'command', command: '$HOME/.panopticon/bin/ask-user-question-hook' }],
+          },
+          {
+            matcher: '.*',
+            hooks: [{ type: 'command', command: '$HOME/.overdeck/bin/pre-tool-hook' }],
+          },
+        ],
+      },
+    };
+
+    const first = pruneLegacyPanopticonHook(settings, 'PreToolUse', 'ask-user-question-hook');
+    const second = pruneLegacyPanopticonHook(settings, 'PreToolUse', 'ask-user-question-hook');
+
+    expect(first).toBe(true);
+    expect(second).toBe(false); // idempotent — nothing left to prune
+    expect(settings.hooks?.PreToolUse).toEqual([
+      {
+        matcher: '.*',
+        hooks: [{ type: 'command', command: '$HOME/.overdeck/bin/pre-tool-hook' }],
+      },
+    ]);
   });
 });

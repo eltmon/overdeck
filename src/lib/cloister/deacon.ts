@@ -47,7 +47,7 @@ import { createInFlightGuard } from './in-flight-guard.js';
 import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
 import { isContextOverflowTail } from '../context-overflow.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
-import { haveSameEffectiveCodeCommit } from '../pipeline-state-paths.js';
+import { haveSameEffectiveCodeCommit, haveSameCodeContribution } from '../pipeline-state-paths.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -161,6 +161,7 @@ import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync } from '../projects.js';
 import { queueBeadsAutoCommit } from '../pan-dir/auto-commit.js';
+import { recreatedStateWarnings } from './state-recreation-patrol.js';
 import { withIssueRecordLock } from '../pan-dir/record-lock.js';
 import { recordMainDivergenceHealth, type ProjectMainDivergence } from './deacon-main-divergence.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
@@ -186,8 +187,13 @@ import { withConcurrencyLimit } from '../concurrency.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { checkStuckAgentRemediation } from './stuck-remediation.js';
+import { decideAgentAutonomousRedrive } from './redrive-gate.js';
 import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
+import { reconcilePipelineLabelsPatrol } from './label-reconciler.js';
+import { pruneTerminalStoppedAgents } from './agent-gc.js';
+import { shouldRunRecoveryJanitor } from './patrol-cadence.js';
+import { recordDeadEndNeedsYou } from './dead-end-trip.js';
 import { reconcileOrphanProposedSpecs, spawnWorkAgentThroughAgentsEndpoint, triggerRebuildAndStart } from './orphan-proposed-reconciler.js';
 import { reconcileTestStatusFromGreenCiWithDeps } from './test-status-green-ci-reconciler.js';
 import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
@@ -1617,14 +1623,21 @@ export async function checkPostReviewCommits(): Promise<string[]> {
         // Fall through to reset if we can't read tree SHAs — safer than skipping
       }
 
+      // State-plane-only commits (same effective code commit) and rebases onto a
+      // newer main (same non-state contribution by patch-id, despite rewritten
+      // SHAs — PAN-2468) move HEAD without changing the branch's own work.
+      // Preserve the verdicts and advance the snapshot rather than re-reviewing.
       try {
-        if (await haveSameEffectiveCodeCommit(workspacePath, status.reviewedAtCommit, currentHead)) {
+        const sameContribution =
+          (await haveSameEffectiveCodeCommit(workspacePath, status.reviewedAtCommit, currentHead)) ||
+          (await haveSameCodeContribution(workspacePath, status.reviewedAtCommit, currentHead));
+        if (sameContribution) {
           setReviewStatusSync(issueId, { reviewedAtCommit: currentHead });
-          console.log(`[deacon] State-only post-review commit for ${issueId}: ${status.reviewedAtCommit.substring(0, 8)} → ${currentHead.substring(0, 8)} — review/test preserved`);
+          console.log(`[deacon] Benign post-review HEAD move for ${issueId}: ${status.reviewedAtCommit.substring(0, 8)} → ${currentHead.substring(0, 8)} — review/test preserved`);
           continue;
         }
       } catch {
-        // Fall through to reset if the diff cannot be inspected.
+        // Fall through to reset if the move cannot be inspected.
       }
 
       // HEAD moved with a real tree change — new commits since review. Reset review pipeline.
@@ -1757,9 +1770,9 @@ export async function applyBootReconciliationDecision(): Promise<BootReconciliat
 }
 
 export async function reconcileAgentLiveness(): Promise<string[]> {
+  if (isDeaconGloballyPaused()) { logDeaconEventSync('reconcileAgentLiveness skipped — deacon globally paused'); return []; }
   return reconcileAgentLivenessWithDeps(autoResumeNotifierDeps());
 }
-
 // Callback set by the server layer to emit Socket.io merge:ready notifications.
 // Deacon is a library module and does not own the Socket.io instance directly.
 let mergeReadyNotifier: ((issueId: string) => void) | null = null;
@@ -1912,6 +1925,8 @@ export async function checkDeadEndAgents(): Promise<string[]> {
       const autoRequeueCount = status.autoRequeueCount || 0;
       if (autoRequeueCount >= 25) {
         console.log(`[deacon] Dead-end detected for ${key} but circuit breaker active (${autoRequeueCount}/25 requeues used)`);
+        const trip = recordDeadEndNeedsYou(key, 'dead-end-rebuild', status.updatedAt ?? 'rework', `Dead-end recovery needs-you: ${key} exhausted 25 requeues`);
+        if (trip) actions.push(trip);
         continue;
       }
 
@@ -1945,24 +1960,20 @@ export async function checkDeadEndAgents(): Promise<string[]> {
       }
 
       if (!sessionExistsSync(agentSessionName)) {
-        // PAN-2209: the work agent's session is gone (context-exhausted, crashed,
-        // or resume-failed after completion) but a review/test rework is needed.
-        // Nothing else respawns it, so the issue stalls indefinitely and an
-        // operator has to hand-recover. For the rework classes (review
-        // blocked/failed, verification failed, tests failed) respawn a fresh work
-        // agent — its kickoff prompt (work-agent-prompt.ts) drains the pending
+        // PAN-2209: respawn a dead work agent whose pending rework kickoff drains
         // `.pan/feedback` so it addresses the review. Merge-CI dead-ends need no
         // work session and keep their prior no-session behavior (they fall through
         // to `continue`; the merge-CI branch below requires a live session).
         if (isReviewBlocked || isVerificationFailed || isTestFailed) {
           const agentState = getAgentStateSync(agentSessionName);
-          if (agentState?.paused === true) {
-            // A deliberate pause (operator, burn-guard, verify-hold) parked this
-            // agent. Respect it — never override an intentional pause to respawn.
-            console.log(`[deacon] PAN-2209: ${issueId} (${statusType}) has a dead session but is paused (${agentState.pausedReason ?? 'no reason'}) — respecting pause`);
+          const gateDecision = decideAgentAutonomousRedrive(agentState ?? {}, getAgentDir(agentSessionName), true);
+          if (gateDecision.decision === 'defer') {
+            console.log(`[deacon] PAN-2209: ${issueId} (${statusType}) re-drive deferred — ${gateDecision.reason}`);
+            const trip = gateDecision.needsYou && recordDeadEndNeedsYou(issueId, 'operator-stopped-rework', status.updatedAt ?? statusType, `Dead-end recovery needs-you: ${issueId} was explicitly stopped before handoff`);
+            if (trip) actions.push(trip);
           } else {
-            deadEndCooldowns.set(key, now);
-            // Engage the shared circuit breaker so a chronically-dying agent
+            if (gateDecision.gateDecision.clearStoppedByUser && agentState) { delete agentState.stoppedByUser; saveAgentStateSync(agentState); }
+            deadEndCooldowns.set(key, now); // Engage the shared circuit breaker so a chronically-dying agent
             // cannot be respawned forever (>=25 requeues halts, checked above).
             setReviewStatusSync(issueId, { autoRequeueCount: autoRequeueCount + 1 });
             // Clear only the system-set `troubled` gate (resume-failure counter
@@ -3154,15 +3165,13 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...stuckActions);
   for (const a of stuckActions) addLog('action', a, state.patrolCycle);
 
-  // API error recovery: nudge agents that stopped due to transient provider errors.
   const apiErrorActions = await checkApiErrorAgents();
   actions.push(...apiErrorActions);
   for (const a of apiErrorActions) addLog('action', a, state.patrolCycle);
-
-  // PAN-1625: reap orphaned dashboard-server processes (failed-restart leftovers
-  // that lost the port but keep running — and can run a second Deacon). Low
-  // cadence (~10 min). Never touches the live server, the port owner, a
-  // just-spawned server, or a workspace-container server — see the reaper module.
+  if (state.patrolCycle % 10 === 0) for (const action of await reconcilePipelineLabelsPatrol()) { actions.push(action); addLog('action', action, state.patrolCycle); }
+  if (state.patrolCycle % 60 === 0) for (const id of pruneTerminalStoppedAgents().removed) actions.push(`[agents-gc] pruned ${id}`);
+  // PAN-1625: reap orphaned dashboard-server processes. Low cadence (~10 min).
+  // Never touches the live server, port owner, or workspace-container server.
   const serverReaperEveryCycles = Math.max(1, Math.round((10 * 60 * 1000) / config.patrolIntervalMs));
   if (state.patrolCycle % serverReaperEveryCycles === 0) {
     const reaperActions = await reapOrphanedDashboardServers();
@@ -3178,14 +3187,12 @@ export async function runPatrol(): Promise<PatrolResult> {
     actions.push(...playwrightActions);
     for (const a of playwrightActions) addLog('action', a, state.patrolCycle);
   }
-
   const projectConfigs = listProjectsSync();
   for (const { config: projectConfig } of projectConfigs) if (projectConfig.path) queueBeadsAutoCommit(projectConfig.path);
+  for (const warning of await recreatedStateWarnings(projectConfigs)) addLog('error', warning, state.patrolCycle);
   const divergenceWarnings = await recordMainDivergenceHealth(state, projectConfigs);
   for (const warning of divergenceWarnings) addLog('warn', warning, state.patrolCycle);
-
-  // Periodic agent state cleanup (PAN-154)
-  if (Math.random() < 0.003) {
+  if (shouldRunRecoveryJanitor('agent-state', state.patrolCycle)) {
     const cleanupActions = await cleanupStaleAgentState();
     actions.push(...cleanupActions);
     for (const a of cleanupActions) addLog('action', a, state.patrolCycle);
@@ -3194,7 +3201,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   // Periodic abandoned-feedback sweep — safety net for workspaces where the
   // event-driven cleanup (new review cycle / merge / close-out) never fired.
   // See docs/REVIEW-AGENT-ARCHITECTURE.md.
-  if (Math.random() < 0.003) {
+  if (shouldRunRecoveryJanitor('feedback', state.patrolCycle)) {
     const feedbackActions = await cleanupAbandonedFeedback();
     actions.push(...feedbackActions);
     for (const a of feedbackActions) addLog('action', a, state.patrolCycle);
@@ -3203,7 +3210,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   // PAN-1908: primary orphan reviewer-session cleanup is reactive
   // (agent.stopped for the owning work agent). This is a thin safety-net
   // sweep for dropped events (PAN-846).
-  if (Math.random() < 0.01) {
+  if (shouldRunRecoveryJanitor('orphan-reviewer', state.patrolCycle)) {
     const orphanActions = await cleanupOrphanReviewerSessions();
     actions.push(...orphanActions);
     for (const a of orphanActions) addLog('action', a, state.patrolCycle);
@@ -3246,7 +3253,7 @@ export async function runPatrol(): Promise<PatrolResult> {
                   const branch = `feature/${issueId.toLowerCase()}`;
                   const { stdout } = await execAsync(
                     `git -C "${resolved.projectPath}" log --oneline origin/main --grep="Merge branch '${branch}'" 2>/dev/null | head -1`,
-                    { encoding: 'utf-8' }
+                    { encoding: 'utf-8', timeout: 15_000 }
                   );
                   if (stdout.trim()) {
                     console.log(`[deacon] PAN-375: merge specialist died but ${issueId} IS merged (${stdout.trim()}). Auto-completing.`);

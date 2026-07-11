@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Effect } from 'effect';
 import { verificationSatisfied } from '../../../../src/lib/review-status.js';
 
 const { mockSetReviewStatus, mockDeliverReviewVerdictFeedback } = vi.hoisted(() => ({
@@ -36,11 +37,16 @@ describe('specialists done command', () => {
         ...update,
       };
     });
-    mockDeliverReviewVerdictFeedback.mockResolvedValue({
+    mockDeliverReviewVerdictFeedback.mockReturnValue(Effect.succeed({
       feedbackPath: '/workspace/.pan/feedback/001-review-agent-changes-requested.md',
       prCommentPosted: true,
       agentMessageSent: true,
-    });
+    }));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it('allows review to signal blocked status', async () => {
@@ -99,6 +105,34 @@ describe('specialists done command', () => {
       verificationNotes: 'Cleared by `pan specialists done review --status passed` override (PAN-1215)',
     });
     expect(mockDeliverReviewVerdictFeedback).not.toHaveBeenCalled();
+  });
+
+  it('PAN-2524: persists the verdict before a hanging feedback delivery times out', async () => {
+    vi.useFakeTimers();
+    mockDeliverReviewVerdictFeedback.mockReturnValue(Effect.never);
+    const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    const completion = doneCommand('review', 'pan-1059', {
+      status: 'blocked',
+      notes: 'durable first',
+    });
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', {
+      reviewStatus: 'blocked',
+      reviewNotes: 'durable first',
+    });
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    await expect(completion).resolves.toBeUndefined();
+  });
+
+  it('forces a successful CLI exit after durable completion', async () => {
+    const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+    const { doneAndExitCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    await doneAndExitCommand('test', 'pan-1059', { status: 'passed' });
+
+    expect(mockSetReviewStatus).toHaveBeenCalled();
+    expect(exit).toHaveBeenCalledWith(0);
   });
 
   it('verificationSatisfied is true after passed override even from failed state (AC10/AC27)', () => {

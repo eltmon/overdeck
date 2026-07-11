@@ -38,7 +38,13 @@ vi.mock('@xterm/xterm', () => ({
     });
     getSelection(): string { return ''; }
     hasSelection(): boolean { return false; }
+    focus = vi.fn();
   },
+}));
+
+// Mock sonner so the paste-failure toast (PAN-2529) is observable in tests.
+vi.mock('sonner', () => ({
+  toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn(), info: vi.fn() },
 }));
 
 vi.mock('@xterm/addon-fit', () => ({
@@ -325,6 +331,32 @@ describe('XTerminal', () => {
     fireEvent.contextMenu(terminalSurface!, { clientX: 32, clientY: 64 });
 
     expect(await screen.findByText('Paste')).toBeInTheDocument();
+  });
+
+  it('surfaces a visible toast when context-menu paste cannot read the clipboard (PAN-2529)', async () => {
+    const { toast } = await import('sonner');
+    const readTextMock = vi.fn().mockRejectedValue(
+      new DOMException('Document is not focused', 'NotAllowedError'),
+    );
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { readText: readTextMock, writeText: vi.fn() },
+      writable: true,
+      configurable: true,
+    });
+
+    const { container } = render(<XTerminal sessionName="test-session" />);
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
+
+    const terminalSurface = container.querySelector('.absolute.inset-0') as HTMLDivElement | null;
+    fireEvent.contextMenu(terminalSurface!, { clientX: 32, clientY: 64 });
+    fireEvent.click(await screen.findByText('Paste'));
+
+    await waitFor(() => {
+      expect(readTextMock).toHaveBeenCalled();
+      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Ctrl+V'));
+    });
   });
 
   it('contains wheel events inside the terminal surface', async () => {

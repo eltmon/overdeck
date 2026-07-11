@@ -10,11 +10,12 @@
  *   1. PAN_YOLO env var ("1"/"true"/"yes" → bypass, "0"/"false"/"no" → auto)
  *   2. ClaudePermissionMode argument (callers that have already resolved CLI/env)
  *   3. config.claude.permissionMode in ~/.overdeck/config.yaml
- *   4. 'auto' (default — uses Claude Code's classifier instead of full bypass)
+ *   4. 'auto' (default — emits `--permission-mode default`, relying on the
+ *      PermissionRequest/PreToolUse auto-approve hooks rather than full bypass)
  *
- * `auto` mode requires `skipAutoPermissionPrompt: true` in ~/.claude/settings.json.
- * Switch to 'bypass' explicitly (config or `--yolo`) on providers that reject the
- * `auto` flag or when you need fully unmoderated execution.
+ * Note: 'auto' is Overdeck's internal mode name, not a Claude Code flag value —
+ * it resolves to `--permission-mode default`. Switch to 'bypass' explicitly
+ * (config or `--yolo`) when you need fully unmoderated execution.
  */
 
 import { Effect } from 'effect';
@@ -77,7 +78,13 @@ export function resolvePermissionModeSync(explicit?: ClaudePermissionMode): Clau
 export function getClaudePermissionFlagsSync(mode?: ClaudePermissionMode): string[] {
   const resolved = mode ?? resolvePermissionModeSync();
   if (resolved === 'auto') {
-    return ['--permission-mode', 'auto'];
+    // 'auto' is Overdeck's internal mode name, NOT a Claude Code --permission-mode
+    // value. Claude Code's valid modes are acceptEdits/bypassPermissions/default/plan;
+    // newer builds strict-validate the choice and reject 'auto' outright, crashing
+    // every interactive agent launch. Emit 'default' — matching buildClaudeUserSettingsSync,
+    // which already maps auto→defaultMode:'default' — and let the PermissionRequest/
+    // PreToolUse auto-approve hooks keep agents non-blocking without full bypass.
+    return ['--permission-mode', 'default'];
   }
   return ['--permission-mode', BYPASS_PERMISSION_MODE];
 }

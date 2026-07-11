@@ -2,21 +2,21 @@
 import { createRequire } from "node:module";
 import { appendFileSync, chmodSync, closeSync, copyFileSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, statSync, writeFileSync } from "fs";
 import { exec, execFile, execFileSync } from "child_process";
-import { dirname, join, sep } from "path";
+import { dirname, join, resolve, sep } from "path";
 import { homedir, totalmem } from "os";
 import { fileURLToPath } from "url";
 import * as NFS from "node:fs";
-import { appendFileSync as appendFileSync$1, existsSync as existsSync$1, mkdirSync as mkdirSync$1, readFileSync as readFileSync$1, writeFileSync as writeFileSync$1 } from "node:fs";
+import { appendFileSync as appendFileSync$1, existsSync as existsSync$1, mkdirSync as mkdirSync$1, readFileSync as readFileSync$1, renameSync, writeFileSync as writeFileSync$1 } from "node:fs";
 import * as Path from "node:path";
-import { dirname as dirname$1, isAbsolute, join as join$1 } from "node:path";
+import { basename, dirname as dirname$1, isAbsolute, join as join$1, resolve as resolve$1 } from "node:path";
 import { readFile } from "node:fs/promises";
 import * as OS from "node:os";
 import * as NodeChildProcess from "node:child_process";
 import { execFile as execFile$1 } from "node:child_process";
 import * as Crypto from "node:crypto";
 import * as NodeUrl from "node:url";
-import { promisify } from "node:util";
 import { mkdir, writeFile } from "fs/promises";
+import { promisify } from "node:util";
 import { promisify as promisify$1 } from "util";
 //#region \0rolldown/runtime.js
 var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod), cb = null), mod.exports);
@@ -12736,6 +12736,30 @@ const DEFAULT_PRICING = [
 	},
 	{
 		provider: "openai",
+		model: "gpt-5.6-sol",
+		inputPer1k: .005,
+		outputPer1k: .03,
+		cacheReadPer1k: 5e-4,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
+		model: "gpt-5.6-terra",
+		inputPer1k: .0025,
+		outputPer1k: .015,
+		cacheReadPer1k: 25e-5,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
+		model: "gpt-5.6-luna",
+		inputPer1k: .001,
+		outputPer1k: .006,
+		cacheReadPer1k: 1e-4,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
 		model: "gpt-5.5",
 		inputPer1k: .005,
 		outputPer1k: .03,
@@ -18670,17 +18694,6 @@ const layer = /* @__PURE__ */ succeed$1(Path$1)({
 	fromFileUrl,
 	toFileUrl
 });
-promisify(execFile$1);
-layer$4.pipe(provide(mergeAll(layer$2, layer)));
-const DEFAULT_STATE_FLUSH_WINDOW_MS = 600 * 1e3;
-parseStateFlushWindowMs(process.env.OVERDECK_STATE_FLUSH_WINDOW_MS);
-function parseStateFlushWindowMs(value) {
-	if (!value) return DEFAULT_STATE_FLUSH_WINDOW_MS;
-	const parsed = Number(value);
-	if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_STATE_FLUSH_WINDOW_MS;
-	return parsed;
-}
-Promise.resolve();
 //#endregion
 //#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/identity.js
 var require_identity = /* @__PURE__ */ __commonJSMin(((exports) => {
@@ -25381,6 +25394,35 @@ function listProjectsSync() {
 		config: projectConfig
 	}));
 }
+/**
+* Resolve the correct project path for an issue based on labels
+*
+* @param project - The project config
+* @param labels - Array of label names from the Linear issue
+* @returns The resolved path (may differ from project.path based on routing rules)
+*/
+/**
+* PAN-1908: resolve the infra-repo checkout path and records subdir for a project.
+*
+* - monorepo / missing pan_records: repoPath = project.path, recordsPath = .pan
+* - polyrepo with pan_records.repo: look up named repo in workspace.repos[]
+* - pan_records.repo = ".": repoPath = project.path
+*/
+function resolveInfraRepo(project) {
+	const recordsPath = project.pan_records?.path ?? ".pan";
+	const repoName = project.pan_records?.repo;
+	if (!repoName || repoName === ".") return {
+		repoPath: project.path,
+		recordsPath
+	};
+	const repos = project.workspace?.repos ?? [];
+	const matching = repos.find((r) => r.name === repoName);
+	if (!matching) throw new Error(`Project pan_records.repo "${repoName}" not found in workspace.repos. Available repos: ${repos.map((r) => r.name).join(", ") || "none"}`);
+	return {
+		repoPath: resolve(project.path, matching.path),
+		recordsPath
+	};
+}
 function resolveProjectPath(project, labels = []) {
 	if (!project.issue_routing || project.issue_routing.length === 0) return project.path;
 	const normalizedLabels = labels.map((l) => l.toLowerCase());
@@ -25435,6 +25477,68 @@ function resolveProjectFromIssueSync(issueId, labels = []) {
 	}
 	return null;
 }
+//#endregion
+//#region ../../src/lib/project-key.ts
+/**
+* Resolve the state-worktree key for a project (PAN-2372).
+*
+* An explicitly passed key wins; otherwise the registered projects.yaml key for
+* this path; otherwise the path basename as a fallback for unregistered
+* projects. This is the single source of truth for the registered-key lookup —
+* reused by both the async state-home door (`state-home.ts`) and the sync read
+* door (`resolveStateReadHomeSync` in `state-read-home.ts`) so they cannot
+* disagree on which state worktree a project lives in.
+*
+* It lives in its own module (rather than `state-home.ts`) so that importing it
+* from the lightweight sync-read door does not transitively pull
+* `child_process` / `state-plane` via the heavier `state-home` module — that
+* coupling previously broke tests that partially mock `child_process`. It
+* imports {@link listProjectsSync} from `projects.js`, so a `vi.mock` of
+* `projects.js` still steers the registry.
+*/
+function projectKey(project, explicit) {
+	if (explicit) return explicit;
+	const projectPath = resolve$1(project.path);
+	return listProjectsSync().find(({ config }) => resolve$1(config.path) === projectPath)?.key ?? basename(projectPath);
+}
+//#endregion
+//#region ../../src/lib/state-read-home.ts
+function validMarker(value) {
+	if (!value || typeof value !== "object") return false;
+	const marker = value;
+	return typeof marker.sourceMainSha === "string" && /^[0-9a-f]{40}$/i.test(marker.sourceMainSha) && typeof marker.stateBranchSha === "string" && /^[0-9a-f]{40}$/i.test(marker.stateBranchSha) && typeof marker.completedAt === "string" && Number.isFinite(Date.parse(marker.completedAt)) && Number.isInteger(marker.version) && Number(marker.version) >= 1;
+}
+function resolveStateReadHomeSync(project, projectKey$1) {
+	const root = join$1(getOverdeckHome(), "state", projectKey(project, projectKey$1));
+	try {
+		if (validMarker(JSON.parse(readFileSync$1(join$1(root, "migration-complete.json"), "utf8")))) return {
+			root,
+			migrated: true
+		};
+	} catch {}
+	try {
+		return {
+			root: resolveInfraRepo(project).repoPath,
+			migrated: false
+		};
+	} catch {
+		return {
+			root: project.path,
+			migrated: false
+		};
+	}
+}
+promisify(execFile$1);
+layer$4.pipe(provide(mergeAll(layer$2, layer)));
+const DEFAULT_STATE_FLUSH_WINDOW_MS = 600 * 1e3;
+parseStateFlushWindowMs(process.env.OVERDECK_STATE_FLUSH_WINDOW_MS);
+function parseStateFlushWindowMs(value) {
+	if (!value) return DEFAULT_STATE_FLUSH_WINDOW_MS;
+	const parsed = Number(value);
+	if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_STATE_FLUSH_WINDOW_MS;
+	return parsed;
+}
+Promise.resolve();
 const RECORD_DIRNAME = "records";
 /** Workspace path for an issue, or null if no project is configured. */
 function getIssueWorkspacePath(issueId) {
@@ -25449,7 +25553,8 @@ function getIssueWorkspacePath(issueId) {
 * (used in tests and non-worktree contexts).
 */
 function getIssueRecordPath(project, issueId) {
-	return join$1(getIssueRecordBasePath(project, issueId), ".pan", RECORD_DIRNAME, `${issueId.toLowerCase()}.json`);
+	const stateHome = resolveStateReadHomeSync(project);
+	return join$1(stateHome.migrated ? join$1(stateHome.root, RECORD_DIRNAME) : join$1(getIssueRecordBasePath(project, issueId), ".pan", RECORD_DIRNAME), `${issueId.toLowerCase()}.json`);
 }
 /** Base directory for an issue record: workspace if it exists, else project root. */
 function getIssueRecordBasePath(project, issueId) {
@@ -25484,19 +25589,61 @@ function preserveCloseOutSync(path, record) {
 	} catch {}
 	return record;
 }
+/**
+* FR-2 (PAN-2372): before a record write, if the existing file is non-empty and
+* fails JSON.parse, preserve the corrupt bytes as a sidecar rather than
+* silently overwriting them. A truncated/malformed record (the "empty/malformed
+* at char 0" symptom that stranded PAN-2253) used to be quietly replaced by the
+* next write, destroying every accumulated statusOverride. Non-empty + unparseable
+* is the only case sidecarred — an absent or empty file is a normal fresh write.
+*/
+function preserveCorruptRecordSync(path) {
+	let raw;
+	try {
+		raw = readFileSync$1(path, "utf-8");
+	} catch {
+		return;
+	}
+	if (raw.length === 0) return;
+	try {
+		JSON.parse(raw);
+		return;
+	} catch {}
+	const sidecar = `${path}.corrupt-${Date.now()}`;
+	try {
+		renameSync(path, sidecar);
+		console.warn(`[record] Preserved corrupt record at ${sidecar} (existing file failed JSON.parse before write)`);
+	} catch (error) {
+		console.warn(`[record] Could not preserve corrupt record at ${path}: ${error instanceof Error ? error.message : String(error)}`);
+	}
+}
+/**
+* FR-1 (PAN-2372): atomic, verified record write. Writes to a same-directory
+* temp file, atomically renames it into place, then read-back verifies the
+* renamed file parses as JSON. A mid-write crash can no longer truncate the
+* record in place (rename is atomic); a write that somehow produces unparseable
+* bytes throws instead of leaving a corrupt record for readers to silently
+* fabricate over. Modeled on writePlanFileAtomic (src/lib/vbrief/dag-cli.ts:101).
+*/
+function writeRecordFileAtomicSync(path, record) {
+	preserveCorruptRecordSync(path);
+	const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
+	writeFileSync$1(tmp, JSON.stringify(record, null, 2), "utf-8");
+	renameSync(tmp, path);
+	JSON.parse(readFileSync$1(path, "utf-8"));
+}
 function writeIssueRecordSync(project, issueId, record) {
 	const path = getIssueRecordPath(project, issueId);
 	const dir = dirname$1(path);
 	if (!existsSync$1(dir)) mkdirSync$1(dir, { recursive: true });
 	const now = (/* @__PURE__ */ new Date()).toISOString();
-	const next = {
+	writeRecordFileAtomicSync(path, {
 		...preserveCloseOutSync(path, record),
 		issueId: issueId.toUpperCase(),
 		schemaVersion: 2,
 		created: record.created || now,
 		updated: now
-	};
-	writeFileSync$1(path, JSON.stringify(next, null, 2), "utf-8");
+	});
 	return path;
 }
 function readIssueRecordSync(project, issueId) {
@@ -25578,6 +25725,24 @@ const MODEL_DEPRECATIONS = {
 function resolveModelIdSync(modelId) {
 	return MODEL_DEPRECATIONS[modelId] || modelId;
 }
+/**
+* Conservative effective ceiling for Codex/ChatGPT subscription models routed
+* through CLIProxy into Claude Code. Claude Code's native auto-compact path does
+* not know the proxied model's larger marketing window; the harness status line
+* reports a 200.0k budget for gpt-5.5 sessions, and PAN-1615 observed hard
+* `input exceeds the context window` 400s instead of a native pre-ceiling
+* compaction. See the context-overflow recovery note in
+* `src/lib/cloister/deacon.ts` for why the deacon owns this recovery path.
+*
+* PAN-1672: 200k is gpt-5.5's *marketing* window, not its effective one via
+* CLIProxy — the backend 400s with `input exceeds the context window` well
+* before 85% of 200k (≈170k) is reached, so proactive compaction (keyed to this
+* budget at CONTEXT_PROACTIVE_COMPACT_HIGH_WATER_PERCENT) never fires in time
+* and agents hard-wedge. Set a conservative effective ceiling so the 85%
+* high-water (≈127.5k) lands comfortably below the real failure zone. Tune up
+* if gpt-5.5's true CLIProxy window is later measured to be higher.
+*/
+const CLIPROXY_CODEX_CONTEXT_WINDOW = 15e4;
 /**
 * Master capability database
 *
@@ -25904,12 +26069,78 @@ const MODEL_CAPABILITIES = {
 		},
 		notes: "Most advanced OpenAI model. Enhanced reasoning and agentic capabilities over GPT-5.4. Pro subscribers only."
 	},
+	"gpt-5.6-sol": {
+		model: "gpt-5.6-sol",
+		provider: "openai",
+		displayName: "GPT-5.6 Sol",
+		costPer1MTokens: 17.5,
+		contextWindow: CLIPROXY_CODEX_CONTEXT_WINDOW,
+		minTier: "plus",
+		skills: {
+			"code-generation": 98,
+			"code-review": 95,
+			debugging: 97,
+			planning: 96,
+			documentation: 93,
+			testing: 95,
+			security: 92,
+			performance: 93,
+			synthesis: 95,
+			speed: 65,
+			"context-length": 95
+		},
+		notes: "OpenAI flagship (July 2026). New default. Successor to GPT-5.5 with improved agentic/shell coding. Effective Claude Code/CLIProxy ceiling is 150K (CLIPROXY_CODEX_CONTEXT_WINDOW), 1M marketing context."
+	},
+	"gpt-5.6-terra": {
+		model: "gpt-5.6-terra",
+		provider: "openai",
+		displayName: "GPT-5.6 Terra",
+		costPer1MTokens: 8.75,
+		contextWindow: CLIPROXY_CODEX_CONTEXT_WINDOW,
+		minTier: "plus",
+		skills: {
+			"code-generation": 97,
+			"code-review": 94,
+			debugging: 96,
+			planning: 95,
+			documentation: 92,
+			testing: 94,
+			security: 91,
+			performance: 92,
+			synthesis: 94,
+			speed: 70,
+			"context-length": 95
+		},
+		notes: "OpenAI balanced tier (July 2026). GPT-5.5-competitive at roughly half the cost. Effective Claude Code/CLIProxy ceiling is 150K (CLIPROXY_CODEX_CONTEXT_WINDOW), 1M marketing context."
+	},
+	"gpt-5.6-luna": {
+		model: "gpt-5.6-luna",
+		provider: "openai",
+		displayName: "GPT-5.6 Luna",
+		costPer1MTokens: 3.5,
+		contextWindow: CLIPROXY_CODEX_CONTEXT_WINDOW,
+		minTier: "plus",
+		skills: {
+			"code-generation": 82,
+			"code-review": 78,
+			debugging: 76,
+			planning: 72,
+			documentation: 80,
+			testing: 76,
+			security: 68,
+			performance: 72,
+			synthesis: 75,
+			speed: 90,
+			"context-length": 90
+		},
+		notes: "OpenAI fastest/cheapest tier (July 2026). Successor to GPT-5.4 Mini's market position. Effective Claude Code/CLIProxy ceiling is 150K (CLIPROXY_CODEX_CONTEXT_WINDOW), 1M marketing context."
+	},
 	"gpt-5.5": {
 		model: "gpt-5.5",
 		provider: "openai",
 		displayName: "GPT-5.5",
 		costPer1MTokens: 10.5,
-		contextWindow: 15e4,
+		contextWindow: CLIPROXY_CODEX_CONTEXT_WINDOW,
 		minTier: "plus",
 		skills: {
 			"code-generation": 97,
@@ -26660,6 +26891,7 @@ const DEFAULT_ROLES = {
 	ship: { model: "workhorse:mid" },
 	strike: { model: "workhorse:expensive" },
 	sequencer: { model: "workhorse:expensive" },
+	knowledge: { model: "workhorse:expensive" },
 	flywheel: {
 		model: "claude-opus-4-8",
 		effort: "high",
@@ -26895,6 +27127,9 @@ const PROVIDERS = {
 		compatibility: "direct",
 		defaultHarness: "codex",
 		models: [
+			"gpt-5.6-sol",
+			"gpt-5.6-terra",
+			"gpt-5.6-luna",
 			"gpt-5.5",
 			"gpt-5.4",
 			"gpt-5.4-mini",
@@ -26903,7 +27138,7 @@ const PROVIDERS = {
 			"gpt-5.2"
 		],
 		tierModels: {
-			opus: "gpt-5.5",
+			opus: "gpt-5.6-sol",
 			sonnet: "gpt-5.4",
 			haiku: "gpt-5.4-mini"
 		},
@@ -27177,6 +27412,9 @@ function getProviderForModelSync(modelId) {
 		"claude-haiku-4-5"
 	].includes(modelId)) return PROVIDERS.anthropic;
 	if ([
+		"gpt-5.6-sol",
+		"gpt-5.6-terra",
+		"gpt-5.6-luna",
 		"gpt-5.5",
 		"gpt-5.4",
 		"gpt-5.4-mini",
@@ -27244,18 +27482,23 @@ const OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK = {
 	allowed: false,
 	reason: "ohmypi cannot run Anthropic models when authenticated via Claude Code subscription. Switch the Anthropic provider to API-key auth, or pick a non-Anthropic model for ohmypi."
 };
-const GPT_5_5_API_KEY_BLOCK = {
+const SUBSCRIPTION_ONLY_MODEL_BLOCK = {
 	allowed: false,
-	reason: "GPT-5.5 needs a ChatGPT/Codex subscription sign-in — it is not served by the plain OpenAI API key. Run `codex login` on the host (workspace containers inherit the host sign-in), or pick a different model."
+	reason: "This OpenAI model needs a ChatGPT/Codex subscription sign-in — it is not served by the plain OpenAI API key. Run `codex login` on the host (workspace containers inherit the host sign-in), or pick a different model."
 };
 /** Models that are gated to ChatGPT subscription auth only (no API-key path). */
-const SUBSCRIPTION_ONLY_OPENAI_MODELS = new Set(["gpt-5.5"]);
+const SUBSCRIPTION_ONLY_OPENAI_MODELS = new Set([
+	"gpt-5.5",
+	"gpt-5.6-sol",
+	"gpt-5.6-terra",
+	"gpt-5.6-luna"
+]);
 /**
 * Check whether a (model, authMode) pair is allowed, independent of harness.
 * Use this in pickers to lock model options that the current auth setup can't reach.
 */
 function canUseModelWithAuthSync(model, authMode) {
-	if (getProviderForModelSync(model).name === "openai" && SUBSCRIPTION_ONLY_OPENAI_MODELS.has(model) && authMode === "api-key") return GPT_5_5_API_KEY_BLOCK;
+	if (getProviderForModelSync(model).name === "openai" && SUBSCRIPTION_ONLY_OPENAI_MODELS.has(model) && authMode === "api-key") return SUBSCRIPTION_ONLY_MODEL_BLOCK;
 	return ALLOWED;
 }
 function canUseHarnessSync(harness, model, authMode) {
@@ -27620,6 +27863,7 @@ const DEFAULT_CONFIG = {
 		extraction: { fallbackChain: [] },
 		observationsEnabled: true,
 		promptTimeInjectionEnabled: true,
+		knowledgeIndexEnabled: true,
 		rollupPendingThreshold: 4,
 		sidebarRefreshIntervalMs: 1e4,
 		workerConcurrency: 4
@@ -27635,6 +27879,7 @@ const DEFAULT_CONFIG = {
 		model: "gpt-4.1-nano",
 		perDayCostCapUsd: 1
 	} },
+	knowledge: { postMergeAutoRetro: false },
 	shadow: {
 		enabled: false,
 		trackers: {
@@ -27924,6 +28169,7 @@ function mergeConfigs(...configs) {
 			},
 			observationsEnabled: DEFAULT_CONFIG.memory.observationsEnabled,
 			promptTimeInjectionEnabled: DEFAULT_CONFIG.memory.promptTimeInjectionEnabled,
+			knowledgeIndexEnabled: DEFAULT_CONFIG.memory.knowledgeIndexEnabled,
 			rollupPendingThreshold: DEFAULT_CONFIG.memory.rollupPendingThreshold,
 			sidebarRefreshIntervalMs: DEFAULT_CONFIG.memory.sidebarRefreshIntervalMs,
 			workerConcurrency: DEFAULT_CONFIG.memory.workerConcurrency
@@ -27934,6 +28180,7 @@ function mergeConfigs(...configs) {
 		},
 		compliance: { mode: DEFAULT_CONFIG.compliance.mode },
 		registry: { classification: { ...DEFAULT_CONFIG.registry.classification } },
+		knowledge: { ...DEFAULT_CONFIG.knowledge },
 		shadow: {
 			enabled: DEFAULT_CONFIG.shadow.enabled,
 			trackers: { ...DEFAULT_CONFIG.shadow.trackers }
@@ -28093,6 +28340,7 @@ function mergeConfigs(...configs) {
 			};
 			if (config.memory.features?.observations !== void 0) result.memory.observationsEnabled = config.memory.features.observations;
 			if (config.memory.features?.prompt_time_injection !== void 0) result.memory.promptTimeInjectionEnabled = config.memory.features.prompt_time_injection;
+			if (config.memory.features?.knowledge_index !== void 0) result.memory.knowledgeIndexEnabled = config.memory.features.knowledge_index;
 			if (config.memory.rollup_pending_threshold !== void 0) result.memory.rollupPendingThreshold = config.memory.rollup_pending_threshold;
 			if (config.memory.sidebar_refresh_interval_ms !== void 0) result.memory.sidebarRefreshIntervalMs = config.memory.sidebar_refresh_interval_ms;
 			if (config.memory.worker_concurrency !== void 0) result.memory.workerConcurrency = config.memory.worker_concurrency;
@@ -28208,6 +28456,9 @@ function mergeConfigs(...configs) {
 		}
 		if (config.issues) {
 			if (typeof config.issues.closed_window_days === "number") result.issues.closedWindowDays = config.issues.closed_window_days;
+		}
+		if (config.knowledge) {
+			if (typeof config.knowledge.post_merge_auto_retro === "boolean") result.knowledge.postMergeAutoRetro = config.knowledge.post_merge_auto_retro;
 		}
 		if (config.experimental) {
 			if (typeof config.experimental.experimentalFeatures === "boolean") result.experimental.experimentalFeatures = config.experimental.experimentalFeatures;

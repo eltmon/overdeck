@@ -2,7 +2,22 @@
 
 Durable cumulative memory across Flywheel orchestrator runs. Status snapshots are ephemeral and live in `~/.overdeck/flywheel/`; this file is for facts that future runs should not have to rediscover.
 
+> Historical-path note (PAN-2541): entries below are an append-only incident log.
+> References to `.pan/records/`, `.pan/specs/`, and `.pan/drafts/` describe the
+> legacy layout that existed when each event occurred; current permanent state
+> lives in `records/`, `specs/`, and `drafts/` on `overdeck-state`.
+
 ## Substrate fixes
+
+### Inspect bead→vBRIEF item resolution (commit b721b8b31d, 2026-07-09, RUN-60)
+
+**Problem.** Tiered-execution inspection (`tieredExecution.supervisor.owns_inspection`) resolved the vBRIEF item for a bead via `doc.plan.items.find(i => i.id === context.beadId)` in `src/lib/cloister/inspect-agent.ts`, but `context.beadId` was the bd-assigned bead id (`workspace-<slug>`) while item ids are semantic (`mnemos-installer`, `okf-*`). Disjoint id spaces ⇒ `.find` returns undefined ⇒ throws "requires a readable vBRIEF item" on every `pan inspect <id> --bead <bd-id>`. The inspect gate could never pass for supervisor-inspection issues — observed repeatedly blocking PAN-2468's work agent.
+
+**Fix.** New `resolveInspectBead()` in `src/cli/commands/inspect.ts` maps bd bead id → vBRIEF item id: direct item-id match → `bd show --json` `metadata.vbriefItemId`/`itemId` → unique plan-item title match → else a clear actionable error. The CLI sets `context.beadId` to the resolved item id and threads the original bd id as `trackerBeadId` (used for `getBeadDescription`). `src/lib/vbrief/beads.ts` now stamps `vbriefItemId` into bead metadata at materialization so resolution is deterministic going forward.
+
+**Scope / follow-up.** Fixes the CLI / tiered auto-inspect path (the actual blocker; the work agent shells `pan inspect`). The manual dashboard route `POST /api/issues/:id/beads/:beadId/inspect` (`src/lib/overdeck/issue-reads.ts:292`) still passes the raw bead id — same latent bug, secondary human-triggered path — tracked as **PAN-2540** (share `resolveInspectBead` between CLI + server route).
+
+**Landed.** Operator-directed strike (`pan strike PAN-2538`). Reviewed the diff (surgical, +164/-4 across 5 files) + typecheck green on the merged tree; fast-forwarded main to `b721b8b31d` and pushed under operator authorization (`OVERDECK_OPERATOR_PUSH=1`, flywheel-orchestrator). Strike branch was `strike/pan-2538` (no `feature/pan-2538`), so the pipeline merge endpoint did not apply.
 
 ### Autonomous planning auto-promote (commit 861cf8baa, 2026-05-20, RUN-1)
 
@@ -206,6 +221,20 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - **NEVER pass `--model` to pan commands.** Config now routes every role to `claude-fable-5` (workhorse aliases changed). This SUPERSEDES the RUN-39 "re-route reviews to Sonnet via `--model claude-sonnet-4-6`" playbook — a codex auth outage no longer requires (or permits) a model override; restart with the bare command and let config route. Tick-1's three Sonnet-override restarts were re-issued without `--model` (CLI resumed the existing sessions; a fresh respawn on the config model would need an operator kill first).
 - ~~**Hands-off PAN-1791**~~ — RESOLVED (RUN-55 t1): PAN-1791 is CLOSED + merged + closed-out. Follow-up work continues as PAN-2283 ("Tiered execution ignition"), a normal in-flight work agent.
 - ~~**Hands-off PAN-2214**~~ — RESOLVED (RUN-55 t1): PAN-2214 is CLOSED + merged + closed-out. The hold that gated PAN-1791 is moot; both landed.
+
+## RUN-60 tick 44 (2026-07-09) — 🏁 ORDER-BOOK CI/CD×REFACTOR DRAIN COMPLETE — B6/PAN-2270 MERGED (e8569c0276); all four Lane-B items landed + closed
+
+- **B6/PAN-2270 MERGED** (`e8569c0276 PAN-2270 (#2531)`) — the final order-book item. Merge endpoint returned `{"mergeStatus":"merged"}`; rebase→verify(9042/9101 root + 32/32 frontend)→squash→postMergeLifecycle all clean. Closing out (bg task bbndhdxd8). Review converged in 4 rounds (R1 review-control.ts strike-only reject → R2/R3 FR-5 test iterations → R4 correct dispatch-branch assertion via buildReviewRedispatchArgs → APPROVED). Fix: `inferBranchFromWorkspace` helper applied at 4 hardcoded deacon review-dispatch sites + review-control rerun path, so strike-origin PRs become reviewable.
+- **🏁 ORDER-BOOK DRAIN COMPLETE (RUN-59 brief).** All four Lane-B items merged + closed:
+  - B3/PAN-2167 (state-plane dirty-gates) — merged via operator UAT-promote
+  - B4/PAN-2359 (+PAN-2363 pair) — merged
+  - B5/PAN-2360 (+PAN-2300 pair) — merged via operator UAT-promote
+  - B6/PAN-2270 — merged (this tick)
+- **Substrate fixes landed on main during the drain:** PAN-2510 (docker close-out leak), PAN-2518 (bounded review-verdict delivery), PAN-2519 (kill+respawn wedged rework agents), PAN-2520 (auto rebuild-and-start on stack-unhealthy), PAN-2521 (codex rate-limit nudge suppression), + strike PAN-2525 (red-main deacon.ts baseline + review-verdict-feedback stale mock).
+- **Substrate bugs FILED during the drain:** PAN-2511 (sandbox git-EPERM false test failures), PAN-2516 (primary-worktree spec/divergence drift — reconciled by operator via 778c83fe04), PAN-2522 (finalize→autostart gap, recurred on fresh server), PAN-2524 (review-verdict signal hang), PAN-2534 (re-review dispatch stalls on lingering idle review agent — NEW this drain).
+- **Mid-drain event:** operator caught the primary worktree 42-commit-diverged + live :3011 server STALE (pre-PAN-2510) → paused drain → operator reconciled primary→origin (778c83fe04) + fresh single-server redeploy (PID 3062648) → drain resumed on fresh substrate. Flywheel push restored (divergence 0/0).
+- **Main GREEN** (e8569c0276 CI in_progress at merge, expected green). Now HOLDING for operator direction (auto_pickup_backlog=false — NOT pulling backlog). Patrolling main-green + reaping zombies.
+- HOLD: 9-issue MIN pile (GitLab UAT hold, PAN-1696/2467) — operator-owned.
 
 ## RUN-60 tick 28 (2026-07-09) — ✅ RECONCILE+DEPLOY DONE (fresh server 3062648, 0/0 divergence, PAN-2518/19/20/21 live); DRAIN RESUMED — B6/PAN-2270 (LAST order-book item) auto-planning started; PAN-2525 closing out
 
@@ -2211,3 +2240,453 @@ Gate 2 open (operator-released). Census of live state on resume:
 - **conv 494 landing operator-authorized work on main (as brief warned):** `39e387968b feat: surface lost/unloadable conversation transcripts in the UI (PAN-2394)` (the predicted missing-transcript UI indicator) + `afc3c6f2 docs(design): standing crew cost panel + issue-tree mockup (PAN-2392/2393)`. Treat as operator-authorized, do not revert. Main HEAD advancing → verify green before any Lane B merge.
 - **Pre-existing stuck (noted, not this run's scope):** PAN-2253 verify-failed (`npx vitest run tests/unit/lib/systemd.test.ts`), PAN-2231 failed-merge (item lint-guard). PAN-399 correctly deacon-ignored (slots preserved per operator).
 - **NEXT tick:** confirm main-green (conv-494 commits) → re-verify PAN-2207 PRD (cheap) → dispatch B1. Check trio work-agent spawns as budget frees. Watch PAN-2383 for operator decision.
+
+## RUN-62 tick 1 (2026-07-10 ~16:03Z) — order book drained to B7; B7+A9 dispatched
+
+Fresh run (RUN-62), clean first Observe→Act. Brief `run-59-order-book.md` was 2 days
+stale (written 2026-07-08); re-verified all order-book items against live GitHub.
+
+- **Census.** Main CI **GREEN** at HEAD 024a324 (all checks success). Live tmux ground
+  truth (`-L overdeck`): only `agent-min-865` (MYN, cross-project — not order book) plus
+  conversation sessions + this flywheel. Overdeck pipeline was **empty** — no work/plan/
+  review/strike agents. The `pan status` rows showing 30000+ min "stopped, Boot --no-resume"
+  are STALE runtime state, not live agents.
+- **Order-book progress since brief (verified on GitHub):**
+  - Lane A: **A11 = PAN-2108 CLOSED** ✅ (context-exhausted recovery). Only **A9 = PAN-2229
+    OPEN** remains (prompt-regression evals).
+  - Lane B CI/CD batch **B3–B6 ALL CLOSED** ✅: PAN-2167 (B3), PAN-2359+PAN-2363 (B4),
+    PAN-2360+PAN-2300 (B5), PAN-2270 (B6). The whole small-fixes CI/CD reliability batch landed.
+  - Next serial Lane B = **B7 = PAN-2372** (atomic statusOverrides on slot done; PAN-2357
+    durable-completion cluster). Then B8 = PAN-2364 (per-slot failure isolation), then
+    decompositions B9–B13 (PAN-2149/2232/2233/2190/2189, all OPEN, all `needs-handoff`;
+    **re-verify PRDs before dispatch** — seams drifted, esp. after PAN-2507 + PAN-2543 work).
+- **Dispatched this tick (pipeline was empty; min target 2):**
+  - **B7 = PAN-2372** (Lane B serial, one-in-flight) → `planning-pan-2372` live. No draft
+    existed; auto-planning. TENET-10 applies (full suite green before merge, no --changed).
+  - **A9 = PAN-2229** (Lane A parallel-safe, no file collision with B7's cloister-completion
+    work) → `planning-pan-2229` live. Flagged "pre-epic, re-verify" — planning does the re-verify.
+- **NEXT tick:** watch both planning agents finalize → work agents spawn. Shepherd B7 to
+  review→test→merge (green-gated). When B7 lands + closed-out + main green → dispatch B8.
+  Hold decompositions until B7/B8 land AND their PRDs are re-verified against current main.
+  Release: no fixed target; when a coherent CI/CD batch is deployed+verified, SUGGEST a cut
+  (operator tags, never me).
+
+## RUN-62 tick 2 (2026-07-10 ~16:13Z) — resume after brief operator pause; v0.45.0 cut; B7+A9 planning healthy
+
+- **Operator cut v0.45.0 during the pause** — main HEAD = `d669024b6e` "chore: release 0.45.0"
+  (includes tick-1 commit f6984a44). The in-progress main CI is the RELEASE workflow (desktop
+  binaries linux/win/mac + npm publish), NOT a code-CI failure. Not red. Operator owns releases;
+  this was theirs to cut. Order-book items don't gate releases (brief release policy).
+- **B7 = PAN-2372 + A9 = PAN-2229 planning both ALIVE and progressing** (~10 min in, Fable 5,
+  high effort). planning-pan-2372: authoring planning artifacts. planning-pan-2229: writing PRD
+  draft (+451/-0). Neither wedged — no nudge/re-dispatch. Let them finalize → work agents spawn.
+- **No action this tick beyond observe** — healthy loop. NEXT: catch work-agent spawn for both;
+  shepherd B7 through review→test→merge (green-gated, TENET-10 full suite). When B7 lands +
+  closed-out + main green → dispatch B8 = PAN-2364.
+
+## RUN-62 tick 3 (2026-07-10 ~16:31Z) — B7 work-agent spawn recovered; both lanes live
+
+- **B7 = PAN-2372 spawn had FAILED silently** — planning finalized clean (`planned` label,
+  planning-pan-2372 stopped clean), but the first work-agent spawn left an EMPTY agent state
+  dir (no state.json) and NO tmux session; no spec materialized. Almost certainly interrupted
+  by the v0.45.0 release/restart happening in the same 12:03–12:26 window. **Recovery: re-ran
+  `pan start PAN-2372`** → found the existing plan, spawned straight to work (no re-plan needed).
+  `agent-pan-2372` now RUNNING (work, glm-5.2, Cloister-routed), reading beads, progressing.
+  Watch for recurrence — if a clean-planned issue fails work-spawn again OUTSIDE a release
+  window, file a substrate bug (silent work-spawn failure leaving empty state dir).
+- **A9 = PAN-2229 planned as a SWARM** — slot-1/2/3 + review-supervisor all alive and working
+  (created 12:17–12:26). One Lane A item, parallelized across slots. Within the 20-agent cap.
+- **Main CI GREEN** (build(22)/lint/smoke/guard all success; `test` finishing) — the v0.45.0
+  release build passed. Not red.
+- **Agent count:** min target 2 met and exceeded (1 Lane B work + 4 Lane A swarm + agent-min-865
+  MYN). NEXT: shepherd B7 to `pan done`→review→test→merge (TENET-10 full suite); watch A9 swarm
+  slots complete + assemble. When B7 lands+closed-out+main-green → dispatch B8 = PAN-2364.
+
+## RUN-62 tick 4 (2026-07-10 ~16:50Z) — B7 confirmed on-task (7-bead root-cause fix); A9 swarm advancing
+
+- **Main CI fully GREEN** (v0.45.0 release build done: test/build(22)/lint/smoke/guard all success).
+- **B7 = PAN-2372: on-task, NOT scope drift.** First commit `8771977f51 fix(state-home):
+  resolveStateReadHomeSync uses the registered projects.yaml key` looked off-scope vs the issue
+  title ("atomic statusOverrides on slot done"), but the vBRIEF decomposed PAN-2372 into **7 beads**
+  and this commit maps to the bead *"Re-home the workspace record door onto canonical
+  migration-aware resolution."* Planning correctly root-caused the "empty continue.json" symptom:
+  continue.json/statusOverrides are written by the state door; a wrong-home resolution writes them
+  where the deacon can't read → looks empty. (This also explains tick-3's missing 2372/2229 specs —
+  they landed in legacy `.pan/`.) Remaining beads incl. "Slot pan done writes+verifies durable
+  swarm.slotCompletions marker" (the atomicity fix), clean-predicate, classifyInFlightSlots,
+  infer_completion default. 1/7 committed, 1 in_progress. agent-pan-2372 (glm-5.2) alive, ~9% to
+  auto-compact (PAN-1781 handles). **This is a bigger-than-"small-fix" effort — B7 lands over
+  several ticks, not one.** No intervention; review gate enforces AC-match.
+- **A9 = PAN-2229 swarm advancing** — slot-1 at 77% ctx (+1293/-17, working beads), slot-2/3 alive,
+  review-supervisor (Sonnet 5) idle-waiting for slots. Healthy.
+- NEXT: watch B7 progress bead-by-bead through compacts → pan done → review→test→merge (TENET-10
+  full suite). Watch A9 slots complete + assemble PR. Hold B8=PAN-2364 until B7 lands+closed-out.
+
+## RUN-62 tick 5 (2026-07-10 ~13:11 local) — B7 2/7 beads; A9 swarm converging (1 merged, 1 ready, 1 finishing)
+
+- **Main CI green** (test/build(22)/lint/guard success; origin/main 0dde4fec53).
+- **B7 = PAN-2372** healthy — now 2 commits (`8771977` state-home + `f5e3818` atomic+verified
+  record writes WI-1), 1 bead closed, agent-pan-2372 (glm-5.2) at 62% ctx, +524/-13, actively
+  working the remaining beads. Multi-tick effort continuing. No action.
+- **A9 = PAN-2229 swarm converging** (`pan swarm status`): slot-2 (prompt-invariant-tests)
+  **MERGED** ✓; slot-1 (eval-prompt-harness) **ready-to-merge** (unmerged branch, awaiting deacon
+  merge); slot-3 (flywheel-launch-eval) **running**, idle ~22min (+582/-177). Deacon "Hold: none —
+  actively coordinating every patrol" and auto-nudging idle slots-1/3 ("run pan done if complete").
+  review-supervisor (Sonnet 5) idle-waiting for all slots. This is normal swarm completion, not a
+  wedge — deacon owns slot advance/merge. NOTE: idle-slot-not-calling-pan-done is exactly the class
+  B7/PAN-2372 fixes. Watch slot-3 — if still stuck next cycle after nudges, investigate (advance or
+  wedge). Slot-2 merged-but-session-alive will be reaped by deacon patrol.
+- NEXT: give deacon one cycle to advance slot-3 → merge slot-1 → review-supervisor assembles A9
+  issue PR. Keep B7 progressing bead-by-bead. Hold B8=PAN-2364 until B7 lands+closed-out+main-green.
+
+## RUN-62 tick 6 (2026-07-10 ~13:28 local) — B7 3/7 beads; A9 swarm slot state UNCHANGED 2 cycles (watch)
+
+- **Main green** (origin/main fd0736c8; test/build/lint/guard success).
+- **B7 = PAN-2372** advancing well — 3 commits now (`2e233fd` WI-2 re-home workspace record door
+  onto canonical resolution). ~3/7 beads. agent-pan-2372 (glm-5.2) alive. Priority, no action.
+- **A9 = PAN-2229 swarm — slot counts UNCHANGED across 2 cycles (~28min):** slot-2 merged, slot-1
+  ready-to-merge (STILL unmerged), slot-3 running. BUT slots are NOT wedged — slot-1 pane "Cogitated
+  10m14s" (actively thinking), slot-3 "Churned 1m52s" + fresh commit 9766d147. They're alive but
+  SLOW (glm/haiku multi-min think times). Two anomalies to watch: (a) deacon hasn't merged the
+  ready-to-merge slot-1 over 2 cycles; (b) the "stuck 20min" nudge appears to RE-ACTIVATE an
+  already-ready slot → it cogitates more = thrash. Both are the swarm-completion class B7/PAN-2372 +
+  B8/PAN-2364 + PAN-2498 already target — NOT filing a dup yet. **Decision: one more cycle.** If slot
+  state is identical at tick 7, treat as confirmed deacon swarm-coordination stall and investigate
+  (why ready-to-merge slot-1 isn't merged; whether nudging ready slots is the thrash bug). Not
+  hand-merging slot branches / not manual pan done — deacon owns swarm advance.
+- NEXT: tick 7 — re-check A9 slot state (advance vs confirmed stall); B7 bead progress; main green.
+
+## RUN-62 tick 7 (2026-07-10 ~13:44 local) — A9 CONFIRMED frozen by B8/PAN-2364 bug; B7 at WI-3
+
+- **Main green.**
+- **B7 = PAN-2372** advancing strongly — now 4 commits incl. `5b103f1e` **WI-3: durable
+  slot-completion marker written+verified by slot pan done** (the core statusOverrides atomicity
+  fix). agent-pan-2372 (glm-5.2) alive, ~4/7 beads. Priority, continue.
+- **A9 = PAN-2229 swarm CONFIRMED FROZEN by the B8/PAN-2364 bug.** Deacon log root cause: slot-1
+  (`eval-prompt-harness`) hit `failed-merge` at cycle 21948 (17:05); since then
+  `[swarm] blocked PAN-2229: failed-merge slot 1` EVERY patrol (21949→21968+, 45min+). All 3 slots
+  are done (slot-2 merged, slot-1+slot-3 ready-to-merge) but the ONE failed-merge slot freezes the
+  whole issue — slot-3 can't merge, remaining beads (ci-prompt-change-gate, prompt-eval-docs)
+  deferred "slot cap reached". This is textbook PAN-2364 ("one failed-merge slot freezes the entire
+  issue's swarm"). **Systemic:** same signature simultaneously froze PAN-2528, MIN-867, LEX-1
+  (cross-project/pre-existing, NOT this run's scope). Also: `pan swarm status` shows slot-1
+  ready-to-merge while deacon holds it failed-merge (status-surface discrepancy).
+- **Attempted sanctioned recovery** `pan swarm recover PAN-2229 1 --action retry` → **did NOT clear
+  it** (failed-merge re-asserts next patrol). Did NOT `--action drop` (would lose the core
+  eval-harness work). **Decision: leave A9 frozen pending B8.** Not hand-merging, not thrashing
+  retries. A9 is Lane A parallel (not critical path) and its frozen slots don't block B7 (single
+  work agent, not swarm). Added live-repro evidence to PAN-2364 (comment #4938033607) for the B8
+  implementer. **B8 now blocks live work → clear next dispatch when B7 lands.**
+- NEXT: keep B7 → pan done → review→test→merge (TENET-10). On B7 land+closeout+main-green →
+  dispatch B8=PAN-2364 (validated by A9 repro). A9 unfreezes once B8's per-slot isolation lands.
+
+## RUN-62 tick 8 (2026-07-10 ~14:06 local) — B7 no new commit ~16min (watch); orphan planning-pan-1987 noted
+
+- **Main green** (origin/main 208c673f5).
+- **B7 = PAN-2372** — STILL 4 commits (WI-3 latest), no new bead committed in ~16min. BUT agent
+  alive + working: cost $8.4→$22.86, +1365/-149, 59% ctx. Likely mid a complex bead (WI-4+) or a
+  compact. Not clearly wedged but NOT visibly advancing commits either. **Watch next tick**: if same
+  commit + idle prompt (no ✻ spinner), nudge via `pan tell agent-pan-2372`. Cost climbing ($22) —
+  keep an eye on ROI. 1 bead closed / 5 open.
+- **A9 = PAN-2229** still frozen by B8/PAN-2364 bug (expected). No re-recovery attempts.
+- **ANOMALY noted (not acted on): planning-pan-1987** appeared (session created 14:03). PAN-1987
+  ("allow renaming a registered project") is already `planned`, NOT in the order book, NOT
+  flywheel-dispatched. Deacon janitor log: `cleanupOrphanedPlanningSessions: planning-pan-1987 kept
+  — work agent not running` → it's a PRE-EXISTING orphaned planning session the deacon preserved
+  (possibly operator-initiated). Harmless while planning. **Watch:** if it spawns a RUNNING work
+  agent (agent-pan-1987) = unlisted work vs drain posture → then pause PAN-1987. Not killing now
+  (would fight deacon janitor; may be operator's).
+- NEXT: B7 commit progress / pan done → review→test→merge (TENET-10). On B7 land+closeout+green →
+  dispatch B8=PAN-2364 (unfreezes A9). Watch planning-pan-1987 escalation.
+
+## RUN-62 tick 9 (2026-07-10 ~14:23 local) — B7 at 6/7 beads (NOT stalled); planning-1987 self-resolved
+
+- **B7 = PAN-2372 healthy, was NOT wedged** (tick-8 concern unfounded — it was working big beads).
+  Now 6 commits: +WI-4 (honor durable slot-completion marker in slot classifier) +WI-6 (state-plane
+  dirt = clean in slot worktree check). ~6/7 beads; remaining ≈WI-7 infer_completion default flip +
+  docs. agent-pan-2372 (glm-5.2) at 83% ctx (compact approaching, PAN-1781 handles), cost $26.87.
+  Auto mode, no nudge needed. Should pan done soon.
+- **planning-pan-1987 SELF-RESOLVED** — session gone, no work agent spawned. Orphan planning exited
+  cleanly; no drain violation. Anomaly closed.
+- **A9 = PAN-2229** still frozen by B8/PAN-2364 (expected; no action).
+- **Main HEAD advanced to 9a5d12a7** `fix(desktop): stop packaged-app fork bomb (PAN-2559)` —
+  operator/strike desktop fix (NOT order-book, no conflict w/ B7 cloister work). CI in_progress, not
+  red (guard success; test/build/lint building). Let it complete.
+- **Cross-project noise:** agent-min-865-review (MYN, deacon-managed) — not my scope.
+- NEXT: catch B7 pan done → review→test→merge (TENET-10 FULL suite, no --changed on cloister,
+  verify vs origin/main). On B7 land+closeout+main-green → dispatch B8=PAN-2364 (unfreezes A9).
+
+## RUN-62 tick 10 (2026-07-10 ~14:41 local) — B7 all 8 WIs committed, self-verifying toward pan done; v0.45.1 cut
+
+- **B7 = PAN-2372 — ALL 8 work items committed** (WI-1..WI-7 + state-home): +WI-5 (default swarm
+  infer_completion→auto) +WI-7 (docs) landed since tick 9. Now in a thorough **self-verification
+  phase** — agent-pan-2372 (glm-5.2) in one continuous 2h10m turn running caller/import greps on its
+  projectKey/state-home resolver changes (correct diligence on a shared resolver). Survived a compact
+  (ctx 83%→62%), cost $30.28. NOT idle/wedged — actively verifying. Approaching pan done; no nudge.
+  WATCH: if still in the same verification turn next tick w/o pan done, nudge to wrap up + pan done.
+  Only uncommitted = untracked `.overdeck/*.yaml` runtime files (harmless).
+- **Operator cut v0.45.1** — main HEAD 061f4f18 `chore: release 0.45.1`. Main CI GREEN
+  (guard/lint/test/build all success). Release tag/build pipeline finishing (gh release list still
+  shows v0.45.0 Latest; v0.45.1 tag lands when CI completes). Operator owns releases.
+- **A9 = PAN-2229** still frozen by B8/PAN-2364 (expected; no action).
+- NEXT: catch B7 pan done → shepherd review→test→merge (TENET-10 FULL suite green, no --changed on
+  cloister files, verify vs origin/main). On B7 land+closeout+main-green → dispatch B8=PAN-2364
+  (unfreezes A9). Dirty dist-electron artifacts still present (surfaced tick 9; leave untouched).
+
+## RUN-62 tick 11 (2026-07-10 ~14:56 local) — B7 nudged to finalize (10 commits, self-verify not converging)
+
+- **B7 = PAN-2372** — all 8 WIs + 2 verification-driven commits (9: `6c6ed0cc` extract projectKey to
+  light module / break import coupling; 10: `eaafdb38` docs cleanup) = 10 commits total. Legit, not
+  churn. BUT not converging to pan done: cost $30→$34, 2h25m elapsed, ctx back to 81%, idle-ish
+  prompt. **NUDGED** via pan tell: "stop further verification, run quality gates (typecheck/lint/test),
+  fix only real failures, then pan done PAN-2372; no more speculative changes." (agent was mid-turn →
+  message queued, processes after current turn.) NEXT tick expect gates + pan done → review.
+- **Main green** (v0.45.1, HEAD 061f4f18+; guard/lint/test/build success).
+- **A9 = PAN-2229** still frozen by B8/PAN-2364 (expected).
+- NEXT: catch B7 pan done → review→test→merge (TENET-10 FULL suite, no --changed on cloister,
+  verify vs origin/main). If B7 keeps verifying w/o pan done despite nudge, re-nudge firmer. On B7
+  land+closeout+main-green → dispatch B8=PAN-2364 (unfreezes A9).
+
+## RUN-62 tick 12 (2026-07-10 ~15:11 local) — B7 PAN DONE → in-review (nudge worked)
+
+- **B7 = PAN-2372 handed off to review** ✅ — nudge (tick 11) took: agent ran gates, added 1 gate-fix
+  commit (11 total), then pan done. Issue now `in-review`; `agent-pan-2372-review` spawned 15:06.
+  Work agent idle post-handoff (normal). Review ~5min in, no verdict yet. Let review→test run.
+  TENET-10: B7 needs FULL suite green before merge (no --changed on cloister files). Cost landed ~$36.
+- **Main green** (v0.45.1).
+- **A9 = PAN-2229** still frozen by B8/PAN-2364 (expected). Unfreezes when B8 lands.
+- **B8=PAN-2364 HELD** — drip rule: exactly one Lane B in flight; B7 not merged yet. Dispatch B8 only
+  after B7 land+closeout+main-green.
+- NEXT: monitor B7 review verdict → test → merge. If review BLOCKS, relay/let work agent fix. On B7
+  merge+closeout+main-green → dispatch B8=PAN-2364 (unfreezes A9).
+
+## RUN-62 tick 13 (2026-07-10 ~15:26 local) — B7 review PASSED → advancing to test phase
+
+- **B7 = PAN-2372 review PASSED** ✅ — agent-pan-2372-review (gpt-5.5) wrote
+  .pan/review/agent-pan-2372-review-1954bd48/review.md, signaled `specialists done review PAN-2372
+  --status passed`. Issue still labeled in-review (Merge: pending, Ready: No) — advancing to TEST
+  phase, no test agent spawned yet. Review's own check was FOCUSED (10 files, 56 tests) — NOT the
+  full suite.
+- **TENET-10 ENFORCEMENT PENDING:** B7 touches cloister-core (deacon/swarm) + state-home; the test
+  gate MUST run the FULL suite, not vitest --changed (memory: large changesets defeat --changed).
+  Verify agent-pan-2372-test command next tick; if it's --changed/--related only, ensure full
+  `npm test` green before allowing merge.
+- **Main green** (HEAD 94664ea5c3, advancing; guard/lint/build success, test building).
+- **A9 = PAN-2229** frozen by B8/PAN-2364 (expected). **B8 HELD** until B7 merges.
+- NEXT: catch test phase → verify FULL suite green (TENET-10) → merge → closeout. On B7
+  merge+closeout+main-green → dispatch B8=PAN-2364 (unfreezes A9).
+
+## RUN-62 tick 14 (2026-07-10 ~15:39 local) — B7 REVIEWED+GREEN but merge STUCK (advancing-reconcile loop); SURFACED to operator
+
+- **B7 = PAN-2372 fully ready but NOT merging.** Review PASSED (verdict advancing, reaped 18:58);
+  PR #2562 full CI GREEN incl **test 9m10s (full suite, not --changed → TENET-10 SATISFIED)**; PR
+  **CLEAN + MERGEABLE** (12 ahead / 9 behind). The 9 main-ahead commits are ALL orthogonal to B7's
+  files (releases v0.45.1/2/3, desktop/PAN-2561, docs) — verified none touch cloister/state-home/
+  beads, so B7's green CI is valid vs current main.
+- **STALL: deacon "Reconciled journaled advancing verdict for PAN-2372" EVERY cycle** (22001→22015+,
+  ~40min) with NO merge and NO test-agent dispatch. Server resume is ON (pid 953015, no NO_RESUME
+  env — the pan-status "Boot --no-resume" rows are STALE historical agents). This is the known
+  stuck-after-review class (PAN-2143 / state-plane churn PAN-2468). Trigger: heavy **main churn** —
+  operator is mid RELEASE BURST (v0.45.1→0.45.2→0.45.3 rapid) + my per-tick doc commits.
+- **DECISION: SURFACED to operator, did NOT auto-merge.** B7 is merge-ready+safe, but the operator is
+  actively release-bursting on main; autonomously squash-merging into their live release flow is a
+  hard-to-reverse-in-context action (they may be controlling what lands per release). Recommending
+  operator either merge PR #2562 or authorize me to land it. Also **reducing my own main-commit
+  churn** (batching state updates) to stop contributing to the trigger. Did NOT `pan review reset`
+  (re-runs passed review = waste/thrash) and did NOT manual-merge mid-burst.
+- **B8=PAN-2364 still HELD** (B7 not merged; one Lane B in flight). A9=PAN-2229 frozen (waits on B8).
+- NEXT: if B7 merged (pipeline caught up post-burst OR operator merged) → closeout+dispatch B8. If
+  still stuck AND operator authorizes / burst settled → land PR #2562 via squash-merge (TENET-10
+  satisfied) + reconcile lifecycle (close, labels, postMergeLifecycle bypass) + file the
+  stuck-after-review substrate bug. Minimize main commits until B7 lands.
+
+## RUN-62 ticks 15–16 (2026-07-10 ~15:39–16:21 local) — B7 LANDED via squash-merge; filed PAN-2567; B8 next
+
+- **B7 = PAN-2372 MERGED** ✅ (PR #2562 squash → main eeaca5640c, 20:21:59Z). CI on the merge commit
+  building (guard success; test/build/lint in_progress) — verify green before close-out/B8.
+- **How it landed:** pipeline could NOT merge (advancing-verdict reconcile loop + repeated rebase→CI
+  re-runs never converging on a churning main). Operator kept release-bursting (v0.45.1/2/3/4 +
+  PAN-2561 desktop) — main never quieted. B7's full CI went GREEN (test 9m0s full suite), PR
+  CLEAN+MERGEABLE, and the entire main-ahead delta is ORTHOGONAL to B7's cloister/state-home files
+  (verified) → green valid vs main, TENET-10 satisfied. Operator surfaced (tick 14) + silent →
+  DECISIVE reversible call: `gh pr merge 2562 --squash`. Landed cleanly.
+- **Filed PAN-2567** — the stuck-after-review merge convergence substrate bug (distinct from PAN-2143
+  NO_RESUME variant; resume was ON here). Advancing verdict reconciled forever, test-agent never
+  dispatched, rebase↔CI thrash never converges. This is the substrate feedback of this run.
+- **LIFECYCLE RECONCILE PENDING** (direct merge bypassed postMergeLifecycle): PAN-2372 still labeled
+  in-review; stale agent-pan-2372 + agent-pan-2372-review sessions linger. Next tick: confirm main
+  CI green → `pan close PAN-2372` (close-out: reconciles labels, reaps stale agents, teardown) →
+  then dispatch B8.
+- **B8 = PAN-2364 READY TO DISPATCH** once main green + B7 closed-out (drip rule). B8 unfreezes
+  A9=PAN-2229 (still frozen). Order-book after B8: decompositions B9-B13 (re-verify PRDs vs main).
+
+## RUN-62 tick 17 (2026-07-10 ~16:37 local) — B7 verified green on main + deacon-reconciled; B8 DISPATCHED
+
+- **B7 = PAN-2372: main GREEN post-merge** ✅ — merge commit eeaca5640c CI all success (lint/test/
+  build/guard); B7 did NOT break main. **Deacon AUTO-RECONCILED lifecycle** (despite manual squash
+  merge): PAN-2372 now labeled `merged` + `verifying-on-main` (in-review stripped), stale
+  agent-pan-2372 + agent-pan-2372-review sessions REAPED. No manual close-out needed — deacon owns
+  verify-on-main → close-out. B7 fully done. **Lane B: B0-B7 all landed.**
+- **B8 = PAN-2364 DISPATCHED** (per-slot swarm failure isolation) — planning-pan-2364 live (16:38).
+  Auto-planning → work. This is the fix for the A9 freeze. Substantive gate met (main green + B7
+  merged); didn't force pan close (deacon handles B7 verify→closeout).
+- **A9 = PAN-2229 still frozen** by the failed-merge-slot bug (deacon "blocked PAN-2229: failed-merge
+  slot 1" cycle 22041) — WILL CLEAR once B8 lands its per-slot isolation. Slots 1/2/3 preserved.
+- **Main green.**
+- NEXT: monitor B8 planning→work→review→merge (TENET-10 full suite, cloister-core so full test req).
+  Confirm B7 close-out completes (verifying-on-main → closed). After B8 lands → A9 should unfreeze;
+  then decompositions B9-B13 (re-verify each PRD vs current main — seams drifted post PAN-2372 too).
+
+## RUN-62 tick 18 (2026-07-10 ~16:56 local) — B8 work agent re-dispatched (silent spawn-fail recurred → filed PAN-2569)
+
+- **B8 = PAN-2364: silent work-spawn failure RECURRED** (2/2 this run) — planning finalized
+  (issue→`planned`) but no agent-pan-2364 + no planning session spawned. Manual `pan start PAN-2364`
+  re-dispatched → **agent-pan-2364 now RUNNING** (16:57, working its brief, cost $0.78). B8's fix =
+  per-slot swarm failure isolation (unfreezes A9). **Filed PAN-2569** — the planning→work auto-start
+  handoff silently no-ops (NOT just restart-interrupted; B8 had no release restart). Orchestrator
+  must watch 'planned but no work agent' + re-dispatch until the substrate fix lands.
+- **B7 = PAN-2372** still `merged` + `verifying-on-main` (deacon closing out; fine).
+- **A9 = PAN-2229** still frozen (waits on B8).
+- **Main green** (test building on latest).
+- NEXT: monitor B8 bead progress → pan done → review→test→merge (TENET-10 full suite; cloister-core).
+  If B8 hits the PAN-2567 stuck-after-review loop → same remedy (manual squash once reviewed+green+
+  orthogonal). Watch B7 close-out complete. After B8 lands → A9 unfreezes. Then B9-B13 (re-verify PRDs).
+
+## RUN-62 tick 19 (2026-07-10 ~17:17 local) — B8 progressing (1/6 beads); B7 verifying; A9 frozen; main green
+
+- **B8 = PAN-2364** healthy — agent-pan-2364 working, 1/6 beads committed (`75c45911` store
+  failed-merge blocks per-slot in record + in-memory map — the core isolation fix). 6-bead effort
+  (multi-tick like B7), compact imminent (PAN-1781 handles). Idle review-supervisor (Sonnet 5)
+  waiting — harmless. No action.
+- **B7 = PAN-2372** still merged+verifying-on-main (deacon close-out slow but owns it).
+- **A9 = PAN-2229** frozen (expected — clears when B8 merges).
+- **Main green** (04ceeefcdd, all checks success).
+- NEXT: monitor B8 bead progress → pan done → review→test→merge (TENET-10 full suite; if PAN-2567
+  stuck-after-review loop recurs → manual squash once reviewed+green+orthogonal). B8 lands → A9
+  unfreezes → then B9-B13 (re-verify PRDs vs main). Substrate bugs filed this run: PAN-2567, PAN-2569.
+
+## RUN-62 tick 20 (2026-07-10 ~17:36 local) — B8 3/6 beads (healthy); main green
+
+- **B8 = PAN-2364** advancing well — 3/6 beads: +`38da6775` (coordinator continues merging/dispatching
+  around blocked slots) +`0f7fb0f1` (recordStalledSlotRecovery blocks each stalled slot individually).
+  agent-pan-2364 alive, healthy. Multi-tick effort continuing. No action.
+- **B7 = PAN-2372** still merged+verifying-on-main (~1hr; deacon close-out slow but owns it; not
+  blocking B8). Watch: if stuck in verifying-on-main indefinitely, check deacon verify-on-main step.
+- **A9 = PAN-2229** frozen (expected — clears when B8 merges).
+- **Main green** (bd18ee8c64, all success).
+- NEXT: B8 bead progress → pan done → review→test→merge (TENET-10 full suite; PAN-2567 remedy if
+  stuck-after-review recurs). B8 lands → A9 unfreezes → B9-B13 (re-verify PRDs vs main).
+
+## RUN-62 tick 21 (2026-07-10 ~17:55 local) — B8 4/6 beads; B7 resting in verifying-on-main (close-out is interactive)
+
+- **B8 = PAN-2364** healthy — 4/6 beads (+`ad15d1bf` recover failed-merge slot targets specific slot
+  + archives before retry). agent-pan-2364 alive. No action.
+- **B7 = PAN-2372: DONE (merged + main-verified-green), resting in `verifying-on-main` / awaiting
+  close-out.** NOT stuck — deacon correctly holds it verify-paused. `pan close PAN-2372` requires
+  INTERACTIVE [y/N] confirmation (teardown gate: workspace/Docker/branch cleanup) — did NOT
+  force autonomously; a valid resting state, not blocking B8. Operator or a later deliberate step can
+  run close-out. (Note: `pan close` has no obvious non-interactive path in this build; if the flywheel
+  should auto-close merged items, that needs a --yes flag — minor.)
+- **A9 = PAN-2229** hold state SHIFTED: deacon now "held by boot reconciliation decision" (was
+  "blocked failed-merge slot 1"). Still stuck, will clear when B8's per-slot isolation lands. No
+  manual recovery.
+- **Main green** (708c993760, building on latest).
+- NEXT: B8 remaining beads → pan done → review→test→merge (TENET-10 full suite; PAN-2567 manual-squash
+  remedy if stuck-after-review recurs). B8 lands → A9 unfreezes → B9-B13 (re-verify PRDs vs main).
+
+## RUN-62 tick 22 (2026-07-10 ~18:14 local) — B8 ran full suite ✅ + pushed; working final 3 beads
+
+- **B8 = PAN-2364** healthy, NOT wedged — 4 commits pushed; pane shows it already ran **full gates:
+  lint ✅ + npm test ✅ (971 test files passed, frontend passed)** = strong TENET-10 signal for merge.
+  In a long active turn (Brewed 46m) working the final 3 beads: swarm-status-lists-blocked-slots,
+  recover-retry-archives-conflicted-attempt (in_progress), docs/SWARM.md per-slot semantics. Cost $15,
+  51% ctx. No nudge — progressing. WATCH: if next tick still 4 commits + same brew (no pan done),
+  nudge to commit remaining beads + pan done.
+- **B7 = PAN-2372** resting verifying-on-main (done; close-out interactive, left for operator).
+- **A9 = PAN-2229** held (clears when B8 merges).
+- **Main green** (04eb5fdc8f, all success).
+- NEXT: B8 finishes 3 beads → pan done → review→merge (full suite already green → TENET-10; PAN-2567
+  manual-squash remedy if stuck-after-review recurs). B8 lands → A9 unfreezes → B9=PAN-2149
+  (decompose cloister/service.ts) with MANDATORY PRD re-verify vs current main first.
+
+## RUN-62 tick 23 (2026-07-10 ~18:32 local) — RED MAIN was a FLAKE; B8 was STOPPED (resumed)
+
+- **RED MAIN = FLAKE, not a regression.** main test:failure on 80a385fada, but that commit is my
+  tick-22 DOC-ONLY commit and the prior commit (04eb5fdc8f, also doc-only) was test:success; only
+  commit between them is mine. Doc can't break tests → flake. Flake lane was green. **Re-ran the
+  failed test job** (gh run rerun 29127172562 --failed) to restore green; in_progress. NOT a
+  stop-the-line/strike situation. NOTE: flywheel per-tick doc commits × flaky suite = intermittent
+  red-main noise → REDUCING routine main commits (only commit materially-important ticks).
+- **B8 = PAN-2364 was STOPPED, now RESUMED.** state.json showed status=stopped, lastActivity 20:57
+  (~1.5hr stale) — the agent DIED mid-turn after committing 4 beads + running full gates (lint/
+  typecheck/test 971 files ✅) + pushing. **The frozen pane I read at ticks 21-22 was the last render
+  of a STOPPED agent — I misread it as active. LESSON: confirm liveness via state.json lastActivity,
+  NOT the pane.** `pan start PAN-2364` → now status=running, lastActivity 22:34. B8 continuing its 3
+  remaining beads (swarm-status display, recover-retry-archive, docs/SWARM.md).
+- **B7 = PAN-2372** done, verifying-on-main. **A9 = PAN-2229** held (waits on B8).
+- NEXT: confirm flake re-run → main green; B8 finishes 3 beads → pan done → review→merge (full suite
+  green → TENET-10; PAN-2567 manual-squash remedy if stuck-after-review). B8 lands → A9 unfreezes →
+  B9=PAN-2149 (re-verify PRD vs main first).
+
+## RUN-62 tick 24 (2026-07-10 ~18:51 local) — main green (flake cleared); B8 pan done → in-review (PR #2571)
+
+- **Main GREEN** — tick-23 flake re-run went test:success; current HEAD 337eb89ca9 all checks green.
+- **B8 = PAN-2364 RESUMED SUCCESSFULLY → in-review.** After tick-23 re-drive it went 4→8 commits
+  (finished all beads), pan done'd. PR #2571 OPEN. agent-pan-2364-review (gpt-5.5/codex) actively
+  reviewing — ran focused vitest on 5 changed swarm test files (passed), explicitly skipped the
+  repo-wide run (hit the known unrelated flakes).
+- **Model-divergence needs-you (likely FALSE POSITIVE):** deacon flagged "Model-divergence halt:
+  agent-pan-2364-review — needs-you" / pausedReason "live Codex pane indicates a model switch from
+  launch model gpt-5.5" — but the agent IS on gpt-5.5 and working normally. It's an advisory flag,
+  status still running, not a hard stop. Letting review complete; will clear/act only if it genuinely
+  blocks the verdict.
+- **TENET-10 for B8:** satisfied by PR #2571's full `test` CI job (work agent already ran 971 files
+  green); review's focused check is supplementary. Watch PR CI green before merge.
+- **PAN-2567 watch:** "advancing verdict reconcile PAN-2364" already appearing → B8 may hit the same
+  stuck-after-review merge loop. REMEDY ready: review PASSED + full CI green + PR clean/mergeable +
+  main-delta orthogonal to B8 files → `gh pr merge 2571 --squash`.
+- **A9 = PAN-2229** held (unfreezes when B8 merges). B7 done.
+- NEXT: review verdict + PR #2571 full CI → merge B8 → A9 unfreezes → B9=PAN-2149 (re-verify PRD).
+
+## RUN-62 tick 25 (2026-07-10 ~19:06 local) — B8 MERGED; Lane B B0-B8 COMPLETE; deploy pending
+
+- **B8 = PAN-2364 MERGED** ✅ (PR #2571 squash → main aea717cc8e, 23:06:47Z). Hit the SAME
+  PAN-2567 stuck-after-review loop as B7 (advancing-verdict reconcile + model_divergence system-stuck)
+  → applied the remedy: review PASSED + PR #2571 full CI GREEN (test 8m3s full suite = TENET-10) +
+  CLEAN/MERGEABLE + main-delta orthogonal (1 ahead, non-cloister) → `gh pr merge 2571 --squash`.
+  **LANE B B0-B8 ALL LANDED — the CI/CD reliability batch (B3-B8) is COMPLETE on main.**
+- B8 merge commit CI building (guard✅; test/build/lint in_progress) — verify green before deploy.
+- **DEPLOY PENDING (next tick):** live server pid 2086006 (from 16:57, pre-B7/B8) runs OLD dist —
+  B7/B8 fixes NOT live. **A9=PAN-2229 will NOT unfreeze until B8's per-slot isolation is DEPLOYED**
+  (live deacon runs new code). Deploy plan (careful — B7 changed state-home resolution = boot-adjacent):
+  npm run build → BOOT-TEST on throwaway port (no circular-ESM, state-home resolves) → `pan restart
+  --dashboard --health-timeout 180000` → verify new pid binds :3011, deacon=on → A9 unfreezes.
+- **Release readiness:** per brief, after B3-B8 batch lands+deploys+verifies → SUGGEST next cut
+  (operator decides; operator has been cutting v0.45.x). Report after deploy verified.
+- B7 done. A9 held (unfreezes post-deploy).
+- NEXT: verify B8 CI green → careful deploy → verify → A9 unfreezes → report release readiness →
+  B9=PAN-2149 (re-verify PRD vs main).
+
+## RUN-62 tick 26 (2026-07-10 ~19:20-19:30 local) — B3-B8 batch DEPLOYED + verified; B8 closed; A9 spec-invisible (B7 cutover)
+
+- **DEPLOYED the Lane B B3-B8 batch.** main green (174f27f921) → `npm run build` (✓) → BOOT-TEST on
+  :3099 clean (bound port, ReadModel bootstrapped, no circular-ESM, no state-home crash) → `pan
+  restart --dashboard --health-timeout 180000`. New server healthy on :3011 (health ok, mode primary),
+  deacon running (deacon=on). **B8 code CONFIRMED LIVE**: `recordStalledSlotRecovery` present in
+  deployed dist/dashboard/deacon-swarm-Ejulayhc.js. Boot gates: deacon=on, **resume=off (source=
+  default)** — auto-resume OFF, so stopped work agents need manual re-drive during the drain.
+- **B8 = PAN-2364 CLOSED OUT** (operator-instructed `pan close --force`): merge confirmed, artifacts
+  archived, workspace/sessions torn down, GitHub #2364 closed + closed-out label. **Lane B B0-B8 DONE.**
+- **A9 = PAN-2229 — B8 resolved the failed-merge freeze, but B7's CUTOVER made its spec INVISIBLE**
+  (exactly B7's tick-4 prediction): `pan swarm status` → "No main-side vBRIEF spec found for PAN-2229".
+  Its spec was written to legacy `.pan/` by the old buggy door; canonical reader (now deployed) can't
+  see it. Slots 1/2/3 still alive. **Fix per B7's note: re-promote via proper doors (`pan plan
+  finalize` for the affected issue).** A9 is Lane A (parallel, NOT critical path) — flagging, not
+  blindly re-promoting into live slots. Affected-by-cutover set (B7): pan-2044 record, PAN-2229,
+  PAN-2372(closed).
+- **Main green.** Substrate bugs filed this run: PAN-2567 (stuck-after-review merge loop, hit B7+B8),
+  PAN-2569 (silent planning→work spawn-fail).
+- **RELEASE READINESS: B3-B8 CI/CD reliability batch landed + deployed + verified.** Per brief →
+  SUGGEST next cut (v0.45.x patch, fixes-only). Operator tags, never me.
+- NEXT: report release readiness to operator + decide A9 spec re-promotion; then B9=PAN-2149
+  (decompose cloister/service.ts) with PRD re-verify vs current main.

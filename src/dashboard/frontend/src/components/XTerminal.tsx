@@ -4,6 +4,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
 import '@xterm/xterm/css/xterm.css';
 import { Sun, Moon, SunMoon } from 'lucide-react';
+import { toast } from 'sonner';
 import { useTheme } from '../hooks/useTheme';
 
 // Terminal background, exported so embedders can match the surrounding chrome.
@@ -236,10 +237,26 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     }
   }, []);
 
-  // Paste from clipboard
+  // Paste from clipboard. Used by the right-click context menu, where there is
+  // no native browser `paste` event to lean on (unlike keyboard Ctrl+V/Cmd+V,
+  // which xterm.js handles natively via its helper textarea's `paste` listener —
+  // see handleKeyDown). This path must go through navigator.clipboard.readText(),
+  // which requires the document to be focused (Chrome throws
+  // "NotAllowedError: Document is not focused" otherwise) and is unsupported for
+  // arbitrary page content in Firefox. Re-focus the terminal first, and surface
+  // a visible, actionable error instead of failing silently. (PAN-2529)
   const pasteFromClipboard = useCallback(async () => {
     const term = terminalInstance.current;
     if (!term) return;
+
+    // Restore focus to xterm's helper textarea — clicking a custom context-menu
+    // item moves focus off the document, which makes readText() reject in Chrome.
+    term.focus();
+
+    if (!navigator.clipboard?.readText) {
+      toast.error('Paste unavailable here — use Ctrl+V / Cmd+V to paste into the terminal.');
+      return;
+    }
 
     try {
       const text = await navigator.clipboard.readText();
@@ -249,6 +266,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       }
     } catch (err) {
       console.error('Failed to read from clipboard:', err);
+      toast.error('Could not read the clipboard — use Ctrl+V / Cmd+V to paste into the terminal.');
     }
   }, []);
 
@@ -268,12 +286,13 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       // If no selection, let terminal handle (interrupt signal)
     }
 
-    // Ctrl+V / Cmd+V: Paste from clipboard
-    if (isCmdOrCtrl && event.key.toLowerCase() === 'v') {
-      event.preventDefault();
-      pasteFromClipboard();
-    }
-  }, [copySelection, pasteFromClipboard]);
+    // Ctrl+V / Cmd+V: do NOT intercept. xterm.js handles paste natively via a
+    // `paste` listener on its helper textarea, which works cross-browser
+    // (including Firefox) and needs no clipboard-read permission because it
+    // rides the browser's trusted paste gesture. Calling preventDefault() +
+    // navigator.clipboard.readText() here suppressed that native path and broke
+    // paste wherever readText() is blocked or unfocused. (PAN-2529)
+  }, [copySelection]);
 
   // Handle context menu (right-click)
   const handleContextMenu = useCallback((event: MouseEvent) => {

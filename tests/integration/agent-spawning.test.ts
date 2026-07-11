@@ -1182,6 +1182,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       { role: 'review' as const, expectedSuffix: '-review', expectedModel: DEFAULT_WORKHORSES.expensive },
       { role: 'test' as const, expectedSuffix: '-test', expectedModel: DEFAULT_WORKHORSES.mid },
       { role: 'ship' as const, expectedSuffix: '-ship', expectedModel: DEFAULT_WORKHORSES.mid },
+      { role: 'knowledge' as const, expectedSuffix: '-knowledge', expectedModel: DEFAULT_WORKHORSES.expensive },
     ])('spawnRun(issueId, $role) writes role and resolves model from workhorses defaults', async ({ role, expectedSuffix, expectedModel }) => {
       const issueId = `PAN-${role.toUpperCase()}-1`;
       const state = await spawnRun(issueId, role, {
@@ -1198,6 +1199,33 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       const { setOption } = await import('../../src/lib/tmux.js');
       expect(setOption).toHaveBeenCalledWith(state.id, 'destroy-unattached', 'off');
       expect(setOption).toHaveBeenCalledWith(`=${state.id}:`, 'remain-on-exit', 'on');
+    });
+
+    it('spawns knowledge as a live role session without triggering the beads gate', async () => {
+      const beadsQuery = await import('../../src/lib/beads-query.js');
+      vi.mocked(beadsQuery.assertIssueHasBeads).mockClear();
+
+      const state = await spawnRun('PAN-KNOW-1', 'knowledge', {
+        workspace: testWorkspace,
+        prompt: 'run /okf study "billing"',
+      });
+
+      expect(state).toMatchObject({
+        id: 'agent-pan-know-1-knowledge',
+        role: 'knowledge',
+        model: DEFAULT_WORKHORSES.expensive,
+        status: 'running',
+      });
+      const { createSession, setOption } = await import('../../src/lib/tmux.js');
+      expect(createSession).toHaveBeenCalledWith(
+        'agent-pan-know-1-knowledge',
+        testWorkspace,
+        expect.any(String),
+        expect.any(Object),
+      );
+      expect(setOption).toHaveBeenCalledWith(state.id, 'destroy-unattached', 'off');
+      expect(setOption).toHaveBeenCalledWith(`=${state.id}:`, 'remain-on-exit', 'on');
+      expect(beadsQuery.assertIssueHasBeads).not.toHaveBeenCalled();
     });
 
     it('launches review sub-roles as interactive sessions, not headless print mode (PAN-1557)', async () => {

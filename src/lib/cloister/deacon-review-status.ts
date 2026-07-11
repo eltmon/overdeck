@@ -17,7 +17,7 @@ import { getAllProjectSpecialistStatuses, getTmuxSessionName } from './specialis
 import { isPaneDead, sessionExistsSync } from '../tmux.js';
 import { describeRunningAgents, releaseAdvancingSlot, tryReserveAdvancingSlot } from './concurrency.js';
 import { tryYieldForAdvancingDispatch } from './preemption.js';
-import { findWorkspacePath } from '../lifecycle/archive-planning.js';
+import { findWorkspacePath, inferBranchFromWorkspace } from '../lifecycle/archive-planning.js';
 import { isIssueClosed } from './issue-closed.js';
 import { shouldSkipDispatchAsMerged } from './merge-verification.js';
 import { getAutoCloseOutCanonicalState } from './deacon-canonical-state.js';
@@ -378,7 +378,7 @@ export async function handleReviewCoordinatorDied(
   try {
     const { spawnReviewRoleForIssue } = await import('./review-agent.js');
     const dispatchResult = await Effect.runPromise(
-      spawnReviewRoleForIssue({ issueId, workspace, branch: `feature/${issueLower}` }),
+      spawnReviewRoleForIssue({ issueId, workspace, branch: inferBranchFromWorkspace(workspace, issueLower) }),
     );
     if (dispatchResult.gated) {
       releaseAdvancingSlot();
@@ -537,7 +537,7 @@ async function reconcileReviewStatusOrphan(issueId: string, rawStatus: ReviewSta
       try {
         const { spawnReviewRoleForIssue } = await import('./review-agent.js');
         const dispatchResult = await Effect.runPromise(
-          spawnReviewRoleForIssue({ issueId, workspace, branch: `feature/${issueLower}` }),
+          spawnReviewRoleForIssue({ issueId, workspace, branch: inferBranchFromWorkspace(workspace, issueLower) }),
         );
         if (dispatchResult.gated) {
           releaseAdvancingSlot();
@@ -754,7 +754,7 @@ export async function recoverStalledReviewConvoys(
         const result = await Effect.runPromise(spawnReviewRoleForIssue({
           issueId,
           workspace,
-          branch: `feature/${issueLower}`,
+          branch: inferBranchFromWorkspace(workspace, issueLower),
           force: true,
         }));
         if (!result.success) {
@@ -843,7 +843,7 @@ export async function checkMissingReviewStatuses(): Promise<string[]> {
         await Effect.runPromise(spawnReviewRoleForIssue({
           issueId,
           workspace,
-          branch: `feature/${issueLower}`,
+          branch: inferBranchFromWorkspace(workspace, issueLower),
         }));
         recordDeaconNudge({
           patrol: 'checkMissingReviewStatuses',

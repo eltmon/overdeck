@@ -57,7 +57,7 @@ export type AgentId = typeof AgentId.Type;
 // Must match VALID_ROLES_SYNC (and the roles actually written to the agents
 // table). PAN-1979: a too-narrow Role enum crashed the AgentsResolver list
 // decode on real `strike`/`flywheel` rows, taking down dashboard boot.
-export const Role = Schema.Literals(['work', 'review', 'plan', 'ship', 'test', 'flywheel', 'strike', 'sequencer']);
+export const Role = Schema.Literals(['work', 'review', 'plan', 'ship', 'test', 'flywheel', 'strike', 'sequencer', 'knowledge']);
 export type Role = typeof Role.Type;
 
 // PAN-1979: a too-narrow Role enum crashed the AgentsResolver list decode
@@ -166,6 +166,35 @@ const decodeAgentRow = (row: unknown): Agent =>
       : row,
   );
 
+// A single undecodable row must never brick dashboard boot. The SHARED runtime
+// `agents` table holds rows written by feature-branch agents running ahead of
+// main (a role/status main doesn't know yet — e.g. PAN-2468's `knowledge`
+// specialist, on feature/pan-2468 only, registered in overdeck.db). `list` is a
+// boot-critical read, so it skips+logs rows it can't decode instead of throwing;
+// PAN-1979 widened the Role enum reactively, but the enum always lags whatever a
+// branch invents. `get(id)` stays strict to surface a genuine decode bug.
+const warnedUndecodableAgentRows = new Set<string>();
+export const decodeAgentRowsLenient = (rows: readonly unknown[]): Agent[] => {
+  const out: Agent[] = [];
+  for (const row of rows) {
+    try {
+      out.push(decodeAgentRow(row));
+    } catch (err) {
+      const id =
+        row && typeof row === 'object' && 'id' in row
+          ? String((row as { id: unknown }).id)
+          : '<unknown>';
+      if (!warnedUndecodableAgentRows.has(id)) {
+        warnedUndecodableAgentRows.add(id);
+        console.warn(
+          `[agents] skipping undecodable agent row ${id}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+  }
+  return out;
+};
+
 const validateModel = (model: string): Effect.Effect<string, InvalidModel> =>
   model.trim().length > 0
     ? Effect.succeed(model.trim())
@@ -212,7 +241,7 @@ export const AgentsResolverLive = Layer.effect(
             : db.q.select().from(overdeckAgents),
         );
 
-        return rows.map((r) => decodeAgentRow(r));
+        return decodeAgentRowsLenient(rows);
       });
 
     const isAlive = (id: AgentId) => tmux.sessionExists(id);
@@ -767,7 +796,7 @@ function listLiveTmuxSessionNamesSync(): Set<string> {
   }
 }
 
-const VALID_ROLES_SYNC = new Set<string>(['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer']);
+const VALID_ROLES_SYNC = new Set<string>(['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer', 'knowledge']);
 
 function parseAgentStateJsonSync(content: string, fallbackId: string): AgentState | null {
   let parsed: Partial<AgentState>;

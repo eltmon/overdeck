@@ -46,6 +46,25 @@ function agent(fields: Partial<AgentState> = {}): AgentState {
 }
 
 describe('reconcileInFlightJournals', () => {
+  it('PAN-2524: reconciles a durable passed verdict and ready-for-merge derivation after its signal dies', async () => {
+    const before = status({ reviewStatus: 'reviewing', testStatus: 'passed', readyForMerge: false });
+    const after = status({
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      readyForMerge: true,
+      updatedAt: '2026-07-07T00:01:00.000Z',
+    });
+    const d = deps({
+      loadReviewStatuses: vi.fn(() => ({ 'PAN-2524': before })),
+      getReviewStatusSync: vi.fn(() => after),
+    });
+
+    await expect(reconcileInFlightJournals(d)).resolves.toEqual([
+      'Reconciled journaled advancing verdict for PAN-2524',
+    ]);
+    expect(d.getReviewStatusSync).toHaveBeenCalledWith('PAN-2524');
+  });
+
   it('calls getReviewStatusSync for in-flight rows and reports rows advanced from the journal', async () => {
     const before = status({ reviewStatus: 'reviewing', updatedAt: '2026-07-07T00:00:00.000Z' });
     const after = status({ reviewStatus: 'passed', updatedAt: '2026-07-07T00:01:00.000Z' });

@@ -1,80 +1,97 @@
-# State-Plane Commit Policy — one rule set for pipeline state in worktrees
+# State-Plane Commit Policy
 
-**Status:** adopted 2026-07-06 (operator-directed). **Owner:** pipeline substrate.
-**Complements:** [`docs/AGENT-STATE-PLANES.md`](AGENT-STATE-PLANES.md) (what the planes are);
-this page owns *who commits pipeline state, when, and which gates must tolerate it*.
+Permanent pipeline state lives on the same repository's orphan branch
+`overdeck-state`, checked out at `${OVERDECK_HOME}/state/<projectKey>`. Its
+tree is flat: `records/`, `continues/`, `specs/`, `drafts/`, `review/`,
+`test/`, `feedback/`, `backlog/`, `notes/`, and `.beads/`.
 
-## Why this page exists
+The completion marker `migration-complete.json` at the tip of
+`origin/overdeck-state` is the only migration authority. A missing branch or
+an unmarked branch is legacy/in-progress; reads continue through the legacy
+`.pan/` fallback and writes remain on the legacy surface until cutover.
 
-Five open issues each patch one symptom of the same missing decision, and an agent
-(PAN-2386) independently invented a sixth, wrong answer (gitignoring `.pan/records/`):
+## Write policy
 
-| Issue | Symptom of the gap |
-| --- | --- |
-| [PAN-2417](https://github.com/eltmon/overdeck/issues/2417) | Recording a verdict as a commit invalidates the verdict it records (self-feeding review loop) |
-| [PAN-2167](https://github.com/eltmon/overdeck/issues/2167) | Pipeline-written records dirty the worktree and block the review clean-tree gate |
-| [PAN-2406](https://github.com/eltmon/overdeck/issues/2406) | verify-merged rejects record-only deltas; polyrepo close-out teardown aborts |
-| [PAN-2375](https://github.com/eltmon/overdeck/issues/2375) | Beads/records auto-commit churn on main (debounce/batch/push policy) |
-| [PAN-2372](https://github.com/eltmon/overdeck/issues/2372) | Slot finishes without writing statusOverrides (durable completion lost) |
-| [PAN-2386](https://github.com/eltmon/overdeck/issues/2386) | Dirty-workspace guard trips on pipeline-written state; agent tried to gitignore records |
+- Domain writers are the only write door. They fetch first and perform locked
+  read-modify-write operations with domain semantics: field-aware record merge,
+  immutable-spec conflict rejection, and append/deduplicate for append-only data.
+- The paths-only auto-commit queue stages concrete writer results on
+  `overdeck-state`; it never rebases or replays a mutation it cannot understand.
+- Every state commit asserts that the dedicated worktree is on
+  `overdeck-state`. A missing/wrong/dirty worktree is surfaced, never discarded.
+- `pan admin state migrate` owns a cross-process project lock. All write doors
+  refuse visibly while it flushes, freezes, manifests, verifies, and cuts over.
+- Code branches may delete legacy state during migration but may never add or
+  modify state paths. `overdeck-state` may never contain source code.
 
-Every fix for these MUST land against the rules below — not another local answer.
+Workspace runtime files are separate and gitignored under `.overdeck/` in the
+workspace. Project context is code-owned at `.overdeck/context/` on `main`.
+Neither belongs to `overdeck-state`.
 
-## Glossary
+## Deletion protection
 
-- **State-plane paths**: `.pan/records/`, `.pan/continues/`, `.pan/continue.json`,
-  `.pan/specs/` (status-field flips only), `.beads/`, `.pan/test/`, `.pan/review/`,
-  `.pan/feedback/`. Everything else is **source**.
-- **Pipeline writer**: Overdeck code (CLI, server, deacon) acting as the single write
-  door for a state file. Agents write state only through `bd`/`pan` commands, never
-  by hand-editing state files.
+The branch must never be deleted — it is the sole home of permanent state and
+shares no history with any code branch. For this repository the protection is
+layered (added 2026-07-10):
 
-## The rules
+- GitHub ruleset `protect-overdeck-state` blocks deletion and force pushes of
+  `refs/heads/overdeck-state`, with no bypass actors.
+- `.husky/pre-push` refuses to push a deletion of the branch.
+- The dedicated state worktree keeps the branch checked out, so git refuses a
+  local `git branch -D`.
+- The universal bundled rule `sync-sources/rules/protect-overdeck-state-branch.md`
+  forbids agents from deleting it in any form, on every machine and project.
 
-1. **State is committed, never ignored.** `.pan/records/` and its siblings are the
-   permanent plane — durable, git-carried, portable. No `.gitignore` may cover them
-   (exception: `.pan/continue.json` stays gitignored by existing policy — it is
-   workspace-session state, mirrored durably into the per-issue record).
-   Scaffold/workspace gitignores cover sub-repo checkouts and build ephemera only.
+The ruleset and hook cover this repository only; each migrated project needs
+its own remote-side rule (see the migration runbook).
 
-2. **Whoever writes state commits it, atomically, in the same operation.** A pipeline
-   step that mutates a state file and returns with a dirty tree is a bug
-   (PAN-2386's root cause). `commit-on-write` is the contract; batching/debounce
-   (PAN-2375) may coalesce commits but never leaves dirt across an operation boundary.
+## Legacy compatibility
 
-3. **State-only commits are invisible to every gate.** A commit whose diff touches
-   only state-plane paths must NOT: reset review/test verdicts or readyForMerge
-   (PAN-2417), fail verify-merged (PAN-2406), trip the clean-tree gate (PAN-2167),
-   or trip the dirty-workspace auto-start guard (PAN-2386). The shared predicate is
-   one function — `isStatePlaneOnlyDiff(baseSha, tipSha)` — used by ALL of these
-   gates; no gate re-implements the path list.
+The old permanent locations (`.pan/records/`, `.pan/continues/`,
+`.pan/specs/`, `.pan/drafts/`, and project `.beads/`) are read-only fallbacks
+during migration. Doctor and the Deacon flag their recreation after the marker
+lands because that indicates a stray writer. They report the data and never
+delete it.
 
-4. **Source commits still reset everything.** If a post-verdict diff touches any
-   non-state path, verdicts reset and gates fire exactly as today. This policy
-   loosens nothing about code review.
+## Migration runbook
 
-5. **Completion is durable or it didn't happen.** An agent/slot finishing work must
-   write its statusOverrides/record delta *and commit it* before signaling done
-   (PAN-2372). "Done" with uncommitted state is not done — the verification gate may
-   check this mechanically.
+The Overdeck/panopticon-cli cutover completed on 2026-07-09 after eight
+resume-safe attempts. Its valid marker is at the tip of
+`origin/overdeck-state`, and `main` contains zero permanent-state paths. Apply
+these operational lessons to the remaining projects: mind-your-now, krux,
+lexerra, and tindra.
 
-6. **One path list, one place.** The canonical state-plane path list lives next to
-   `isStatePlaneOnlyDiff` in `src/lib/` (single source; CI-guarded against parallel
-   copies). Adding a new state file means adding it there, nowhere else.
-
-## Acceptance for the cluster
-
-Each cluster issue closes only when its gate consumes the shared predicate (rule 3/6)
-or its writer honors commit-on-write (rule 2/5). A follow-up sweep verifies no
-`.gitignore` in any template or scaffold covers a permanent-plane path (rule 1).
-
-PAN-2167's working-tree clean gates consume the shared `isStatePlaneOnlyStatus`
-predicate, the porcelain-status companion to `isStatePlaneOnlyDiff`, so
-state-plane-only dirt does not block review or merge flow while mixed/source dirt
-still blocks. The wired gates are:
-
-- `src/dashboard/server/routes/workspaces/review-pipeline.ts` — `pan review request`
-  dirty-workspace gate.
-- `src/lib/work/done-preflight.ts` — `pan done` preflight uncommitted-changes gate.
-- `src/dashboard/server/routes/workspaces/merge-ops.ts` — approve/merge pre-push
-  dirty-workspace gate.
+1. Start from a porcelain-clean code checkout and a clean, correctly attached
+   state worktree. Dirty source or destination state is a pre-mutation failure,
+   not something the migrator cleans up.
+2. Run `pan admin state migrate <project> --dry-run` first. Inspect the manifest
+   and resolve every reported safety gate before the real invocation. The
+   migration is intentionally resumable; interruption checks may stop several
+   attempts as repository state changes.
+3. Do not push interim migration-fix commits to `main` while a real migration
+   attempt is between cleanup and its final marker commit. That creates a
+   transient remote state where `main` is clean but no authoritative marker
+   exists, so every reader correctly remains in legacy mode with no legacy
+   paths to read. Finish or safely resume the migration before publishing code
+   changes that expose that window.
+4. The ancestry guard introduced by `fa07e26a4e` rejects any code branch whose
+   history contains the orphan root of `overdeck-state`; path cleanliness alone
+   is insufficient because merging that ancestry would join the state and code
+   histories.
+5. Marker validation uses the semantics fixed by `2fde45421e`: the
+   `stateBranchSha` recorded in `migration-complete.json` must be an ancestor of
+   (or equal to) the current `origin/overdeck-state` tip. It must not be required
+   to equal the tip's immediate parent, because ordinary post-cutover state
+   commits advance the branch without invalidating migration.
+6. After cutover, rebuild the Beads database in the state worktree with
+   `bd init --prefix <project-prefix>` followed by `bd import`. This remains a
+   manual post-migration step until PAN-2551 automates it. Verify `bd` resolves
+   against `${OVERDECK_HOME}/state/<project>/.beads/`, not the code checkout.
+7. Confirm the remote marker, validate its recorded ancestry, verify `main`
+   carries zero state paths, and run Doctor. Only then treat the project as
+   migrated; a branch without a valid marker remains migration-in-progress and
+   all readers continue to resolve legacy state.
+8. Protect the new branch on the remote: block deletion and force pushes of
+   `overdeck-state` (GitHub: a repository ruleset targeting the branch, as this
+   repository has; GitLab: a protected-branch entry). Deleting the state branch
+   destroys the canonical state plane, and no code branch can restore it.

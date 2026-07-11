@@ -4,14 +4,14 @@ import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem'
 import { FsError } from '../errors.js'
 
 import type { PanFeedbackFile } from './types.js'
-import { getWorkspacePanPaths, ensureWorkspacePanDir } from './continue.js'
+import { getReadableWorkspacePanPaths, ensureWorkspacePanDir } from './continue.js'
 
 export function readFeedback(
   workspacePath: string,
 ): Effect.Effect<PanFeedbackFile[], FsError> {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
-    const { feedbackDir } = getWorkspacePanPaths(workspacePath)
+    const { feedbackDir } = getReadableWorkspacePanPaths(workspacePath)
     const exists = yield* fs.exists(feedbackDir).pipe(Effect.catch(() => Effect.succeed(false)))
     if (!exists) return []
 
@@ -54,7 +54,7 @@ export function writeFeedback(
 export function clearFeedback(workspacePath: string): Effect.Effect<void, FsError> {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
-    const { feedbackDir } = getWorkspacePanPaths(workspacePath)
+    const { feedbackDir } = getReadableWorkspacePanPaths(workspacePath)
     const exists = yield* fs.exists(feedbackDir).pipe(Effect.catch(() => Effect.succeed(false)))
     if (!exists) return
     const entries = yield* fs.readDirectory(feedbackDir).pipe(

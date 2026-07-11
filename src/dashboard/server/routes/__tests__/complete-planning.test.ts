@@ -106,10 +106,11 @@ afterEach(() => {
 describe('completePlanningArtifacts', () => {
   it('serializes concurrent complete-planning attempts for the same issue', async () => {
     const first = beginCompletePlanningLease('PAN-2247');
-    const second = beginCompletePlanningLease('pan-2247');
+    const second = beginCompletePlanningLease('pan-2247', true);
 
     expect(first.started).toBe(true);
     expect(second.started).toBe(false);
+    expect(first.autoSpawnRequested()).toBe(true);
 
     first.release();
     await flush();
@@ -144,6 +145,16 @@ describe('completePlanningArtifacts', () => {
       ['add', '.gitignore'],
     ]);
     expect(commands.flat()).not.toContain('-f');
+  });
+
+  it('does not stage workspace state paths after state migration', () => {
+    const { workspacePath } = makeProject('PAN-2541');
+    mkdirSync(join(workspacePath, '.pan'), { recursive: true });
+    mkdirSync(join(workspacePath, '.beads'), { recursive: true });
+    writeFileSync(join(workspacePath, '.gitignore'), '.overdeck/\n');
+    expect(completePlanningWorkspaceGitAddCommands(workspacePath, true)).toEqual([
+      ['add', '.gitignore'],
+    ]);
   });
 
   it('includes codebase map changes in the main-side promote commit pathspec', async () => {

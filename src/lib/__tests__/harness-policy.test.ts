@@ -109,6 +109,36 @@ describe('canUseHarness', () => {
     }
   })
 
+  it.each(['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'] as const)(
+    'blocks %s + api-key on every harness (subscription-only model)',
+    (model) => {
+      for (const harness of HARNESSES) {
+        const decision = canUseHarnessSync(harness, model, 'api-key')
+        expect(decision.allowed).toBe(false)
+        expect(decision.reason).toBeTruthy()
+        expect(decision.reason!.toLowerCase()).toContain('subscription')
+      }
+    },
+  )
+
+  it.each(['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'] as const)(
+    'allows %s + subscription on every harness',
+    (model) => {
+      for (const harness of HARNESSES) {
+        expect(canUseHarnessSync(harness, model, 'subscription')).toEqual({ allowed: true })
+      }
+    },
+  )
+
+  it.each(['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'] as const)(
+    'allows %s + undefined authMode (no auth context engaged)',
+    (model) => {
+      for (const harness of HARNESSES) {
+        expect(canUseHarnessSync(harness, model, undefined)).toEqual({ allowed: true })
+      }
+    },
+  )
+
   it('AC(PAN-1989): covers the full 4 x 5 x 3 matrix — only ohmypi+anthropic+subscription is blocked', () => {
     const cells: Array<{ harness: RuntimeName; provider: string; authMode: AuthMode | undefined; allowed: boolean }> = []
     for (const harness of HARNESSES) {

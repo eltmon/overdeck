@@ -20,6 +20,11 @@ vi.mock('../../../../src/lib/projects.js', () => ({
   listProjectsSync: mocks.listProjectsSync,
   findProjectByPathSync: () => null,
   getProjectSwarmHotspots: () => [],
+  // PAN-2372 WI-2: getIssueRecordPathForWorkspace now routes through project
+  // resolution. These coordination tests keep records at the workspace
+  // .pan/records/ fixture path, so treat every issue as unregistered and let
+  // the workspace-door fallback resolve it.
+  resolveProjectFromIssueSync: () => null,
 }));
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
@@ -36,6 +41,11 @@ let tempRoot: string;
 beforeEach(async () => {
   tempRoot = await mkdtemp(join(tmpdir(), 'overdeck-swarm-doneness-'));
   mocks.listProjectsSync.mockReset();
+  // PAN-2372: resolveStateReadHomeSync (WI-0) and getIssueRecordPathForWorkspace
+  // (WI-2) both consult listProjectsSync(). Production always returns an array;
+  // seed a valid default so an unseeded mock never yields undefined and throws.
+  // Tests that need a registered project override this with mockReturnValue.
+  mocks.listProjectsSync.mockReturnValue([]);
   mocks.getReviewStatusSync.mockReset();
   mocks.setReviewStatusSync.mockReset();
   mocks.spawnReviewRoleForIssue.mockReset();
@@ -334,5 +344,92 @@ describe('swarm tail dispatch: an in-progress swarm may finish its last item', (
     const actions = await coordinateSwarmSlots();
 
     expect(actions).not.toContain('[swarm] considered PAN-905: swarm eligible');
+  });
+});
+
+describe('PAN-2372 WI-4 unreadable record surfacing (FR-7, AC5)', () => {
+  it('warns naming the issue and treats a corrupt record as no overrides instead of silently absent', async () => {
+    const { coordinateSwarmSlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
+    const projectPath = join(tempRoot, 'project');
+    const workspacePath = join(projectPath, 'workspaces', 'feature-pan-910');
+    mkdirSync(workspacePath, { recursive: true });
+    writeSpec(projectPath, 'PAN-910', makeDoc('PAN-910', 2));
+    // Corrupt record: the file EXISTS but is not parseable JSON.
+    // readIssueRecordForWorkspaceSync returns null for the parse failure, and the
+    // existsSync check in defaultReadStatusOverrides distinguishes that from a
+    // genuinely absent record — surfacing it as a warning instead of silent undefined.
+    const recordsDir = join(workspacePath, '.pan', 'records');
+    mkdirSync(recordsDir, { recursive: true });
+    writeFileSync(join(recordsDir, 'pan-910.json'), '{ this is not valid json');
+    mocks.listProjectsSync.mockReturnValue([{ config: { path: projectPath } }]);
+
+    // coordinateSwarmSlots() with no deps uses defaultDeps, whose readStatusOverrides
+    // IS the real defaultReadStatusOverrides under test.
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const actions = await coordinateSwarmSlots();
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[swarm] record unreadable for PAN-910'));
+    // Did not throw, and without readable overrides the plan's two pending items are
+    // still dispatch-eligible — the corrupt record did not falsely mark anything done.
+    expect(actions).toContain('[swarm] considered PAN-910: swarm eligible');
+    expect(actions).not.toContain(expect.stringContaining('finalized PAN-910'));
+    warnSpy.mockRestore();
+  });
+});
+
+describe('PAN-2372 WI-6 state-plane-aware worktree clean predicate (FR-9)', () => {
+  // defaultIsSlotWorktreeClean now classifies `git status --porcelain` output through the
+  // shared isStatePlaneOnlyStatus classifier: state-plane-only dirt (.pan/continue.json,
+  // .pan/records/...) reads clean, any source file reads dirty, empty porcelain reads clean.
+  // These are real-git tests so the porcelain flows through the actual `git status` the
+  // predicate runs — proving the wiring, not just the classifier in isolation.
+
+  async function setupRepo(name: string): Promise<{ repo: string; git: (...args: string[]) => void }> {
+    const { execFileSync } = await import('node:child_process');
+    const repo = join(tempRoot, name);
+    mkdirSync(repo, { recursive: true });
+    const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, stdio: 'ignore' });
+    git('init', '-b', 'main');
+    git('config', 'user.email', 't@t');
+    git('config', 'user.name', 't');
+    git('commit', '--allow-empty', '-m', 'base');
+    return { repo, git };
+  }
+
+  it('AC1: porcelain listing only a state-plane path (.pan/continue.json) reads clean', async () => {
+    const { defaultIsSlotWorktreeClean } = await import('../../../../src/lib/cloister/deacon-swarm-completion.js');
+    const { repo, git } = await setupRepo('clean-state-plane');
+    // Track a sibling under .pan/ so git lists the untracked continue.json as an individual
+    // state-plane path (a fully-untracked .pan/ would collapse to '?? .pan/'). This models the
+    // realistic workspace where .pan/ holds tracked state-plane infrastructure.
+    mkdirSync(join(repo, '.pan', 'records'), { recursive: true });
+    writeFileSync(join(repo, '.pan', 'records', 'pan-2372.json'), '{"v":1}');
+    git('add', '--force', '.pan/records/pan-2372.json');
+    git('commit', '-m', 'track state-plane');
+    writeFileSync(join(repo, '.pan', 'continue.json'), '{}');
+
+    await expect(defaultIsSlotWorktreeClean(repo)).resolves.toBe(true);
+  });
+
+  it('AC2: a modified source file reads dirty', async () => {
+    const { defaultIsSlotWorktreeClean } = await import('../../../../src/lib/cloister/deacon-swarm-completion.js');
+    const { repo, git } = await setupRepo('dirty-src');
+    mkdirSync(join(repo, 'src', 'lib'), { recursive: true });
+    writeFileSync(join(repo, 'src', 'lib', 'foo.ts'), 'export const x = 1;\n');
+    git('add', 'src/lib/foo.ts');
+    git('commit', '-m', 'track src');
+    writeFileSync(join(repo, 'src', 'lib', 'foo.ts'), 'export const x = 2;\n');
+
+    await expect(defaultIsSlotWorktreeClean(repo)).resolves.toBe(false);
+  });
+
+  it('AC3: an empty worktree reads clean via the shared state-plane classifier', async () => {
+    const { defaultIsSlotWorktreeClean } = await import('../../../../src/lib/cloister/deacon-swarm-completion.js');
+    const { repo } = await setupRepo('empty-clean');
+
+    // Empty porcelain ⇒ isStatePlaneOnlyStatus is vacuously true ⇒ clean. AC1 (state-plane
+    // path ⇒ clean) + AC2 (source path ⇒ dirty) + this empty case together prove the shared
+    // classifier is wired, with no local path list introduced.
+    await expect(defaultIsSlotWorktreeClean(repo)).resolves.toBe(true);
   });
 });

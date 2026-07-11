@@ -204,6 +204,13 @@ behavior at every dispatch site (see the config table below). It complements, an
 the eviction ladder: `shed()` still owns docker-stack reclaim under HARD memory pressure; preemption
 only pauses idle work agents at slot granularity for throughput.
 
+Recovery reconcilers do not bypass the governor. `decideAutonomousRedrive()`
+first applies the unified resume policy and then reads the cached memory verdict;
+under `holding`, stack rebuilds, dead-session respawns, and swarm redispatches
+remain deferred. Role-specific concurrency reservations are acquired only after
+that admission decision. When memory returns to the recovery band, the same
+durable obligation is re-derived on the next deterministic patrol.
+
 ## Config keys and defaults
 
 All keys live under `resources:` in `~/.overdeck/config.yaml`. Snake_case in the YAML file; the

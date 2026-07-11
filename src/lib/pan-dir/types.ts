@@ -8,6 +8,8 @@ import type {
 import type { ContinueSessionEntry, ContinueState } from '../vbrief/continue-state.js'
 
 export const PAN_DIRNAME = '.pan'
+export const WORKSPACE_RUNTIME_DIRNAME = '.overdeck'
+export const LEGACY_WORKSPACE_RUNTIME_DIRNAME = '.pan'
 export const PAN_SPECS_DIRNAME = 'specs'
 export const PAN_DRAFTS_DIRNAME = 'drafts'
 export const PAN_CONTINUES_DIRNAME = 'continues'

@@ -93,9 +93,16 @@ describe('pan admin db gc-agents', () => {
 
     await runGcAgents(['--dry-run']);
 
-    expect(logs.join('\n')).toContain('Would reap 2 agent(s).');
+    // PAN-2543 D10/FR-11: every *stopped* row on a terminal issue prunes,
+    // regardless of role or paused/troubled flags (those gate resume, not GC —
+    // a terminal issue never resumes). Only live/non-stopped rows and rows on
+    // non-terminal issues survive.
+    expect(logs.join('\n')).toContain('Would reap 5 agent(s).');
     expect(logs.join('\n')).toContain('agent-terminal-1');
     expect(logs.join('\n')).toContain('agent-terminal-2');
+    expect(logs.join('\n')).toContain('agent-paused-terminal');
+    expect(logs.join('\n')).toContain('agent-troubled-terminal');
+    expect(logs.join('\n')).toContain('agent-review-terminal');
     expect(listAllAgentsSync().map((agent) => agent.id).sort()).toEqual([
       'agent-open',
       'agent-paused-terminal',
@@ -109,25 +116,22 @@ describe('pan admin db gc-agents', () => {
     expect(existsSync(join(testHome, 'agents', 'agent-terminal-2'))).toBe(true);
   });
 
-  it('reaps stopped work rows for terminal issues and preserves other agents', async () => {
+  it('reaps every stopped row on terminal issues and preserves live/non-terminal rows', async () => {
     seedFixture();
 
     await runGcAgents();
 
-    expect(logs.join('\n')).toContain('Reaped 2 agent(s).');
+    expect(logs.join('\n')).toContain('Reaped 5 agent(s).');
     expect(listAllAgentsSync().map((agent) => agent.id).sort()).toEqual([
       'agent-open',
-      'agent-paused-terminal',
-      'agent-review-terminal',
       'agent-running-terminal',
-      'agent-troubled-terminal',
     ]);
     expect(existsSync(join(testHome, 'agents', 'agent-terminal-1'))).toBe(false);
     expect(existsSync(join(testHome, 'agents', 'agent-terminal-2'))).toBe(false);
-    expect(existsSync(join(testHome, 'agents', 'agent-paused-terminal'))).toBe(true);
-    expect(existsSync(join(testHome, 'agents', 'agent-troubled-terminal'))).toBe(true);
+    expect(existsSync(join(testHome, 'agents', 'agent-paused-terminal'))).toBe(false);
+    expect(existsSync(join(testHome, 'agents', 'agent-troubled-terminal'))).toBe(false);
+    expect(existsSync(join(testHome, 'agents', 'agent-review-terminal'))).toBe(false);
     expect(existsSync(join(testHome, 'agents', 'agent-running-terminal'))).toBe(true);
     expect(existsSync(join(testHome, 'agents', 'agent-open'))).toBe(true);
-    expect(existsSync(join(testHome, 'agents', 'agent-review-terminal'))).toBe(true);
   });
 });

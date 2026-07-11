@@ -23,6 +23,7 @@ import { extractNumberSync, resolveIssueIdSync } from '../../lib/issue-id.js';
 import { getWorkspacePanPaths } from '../../lib/pan-dir/index.js';
 import { restoreTrackedBeadsExport } from '../../lib/bd-mutex.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
+import { resolveStateReadHomeSync, shouldCommitLegacyWorkspaceArtifacts } from '../../lib/state-read-home.js';
 import { findWorkspacePath } from '../../lib/lifecycle/archive-planning.js';
 import { changedFilesVsMain } from '../../lib/flywheel-merge-order.js';
 import {
@@ -188,7 +189,7 @@ async function updateGitHubToInReview(issueId: string, comment?: string): Promis
 
     // Get current labels
     const labelsRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
-      headers,
+      headers, signal: AbortSignal.timeout(15_000),
     });
     const currentLabels = labelsRes.ok ? (await labelsRes.json() as any[]).map((l: any) => l.name) : [];
 
@@ -203,14 +204,14 @@ async function updateGitHubToInReview(issueId: string, comment?: string): Promis
 
     // Update labels (set all at once to replace)
     await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
-      method: 'PUT', headers,
+      method: 'PUT', headers, signal: AbortSignal.timeout(15_000),
       body: JSON.stringify({ labels: targetLabels }),
     });
 
     // Add completion comment
     if (comment) {
       await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/comments`, {
-        method: 'POST', headers,
+        method: 'POST', headers, signal: AbortSignal.timeout(15_000),
         body: JSON.stringify({ body: `🤖 **Agent completed work:**\n\n${comment}` }),
       });
     }
@@ -434,9 +435,30 @@ async function resolveSlotCompletionContext(
   };
 }
 
-async function completeSlotWork(issueId: string, slot: SlotCompletionContext, comment?: string): Promise<void> {
+export async function completeSlotWork(issueId: string, slot: SlotCompletionContext, comment?: string): Promise<void> {
   const now = new Date().toISOString();
   const { saveAgentStateSync } = await import('../../lib/agents.js');
+
+  // PAN-2372 WI-3 / FR-4, FR-5: durably record this slot's completion and verify
+  // it persisted BEFORE any runtime-state write — see persistAndVerifySwarmSlotCompletion.
+  // statusOverrides are intentionally NOT written here; the coordinator (WI-4)
+  // derives item completion from this marker.
+  const { persistAndVerifySwarmSlotCompletion } = await import('../../lib/cloister/deacon-swarm-record.js');
+  const workspacePath = slot.workspacePath ?? process.cwd();
+  const persisted = persistAndVerifySwarmSlotCompletion(workspacePath, issueId, {
+    slotIndex: slot.slotIndex,
+    itemId: slot.slotItemId,
+    agentId: slot.agentId,
+    completedAt: now,
+  });
+  if (!persisted) {
+    console.error(chalk.red(
+      `✗ Slot ${slot.slotIndex} completion did NOT persist to ${issueId}'s record — ` +
+      `refusing to mark the slot done. Re-run \`pan done ${slot.agentId}\` so the ` +
+      `swarm coordinator can observe this slot as completed.`,
+    ));
+    process.exit(1);
+  }
 
   if (slot.agentState) {
     slot.agentState.status = 'stopped';
@@ -591,12 +613,11 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
   // Pre-flight completion checks (unless --force)
   if (!options.force) {
     const { workspacePath } = await resolveDoneWorkspace(issueId, agentId);
-
     if (workspacePath && existsSync(workspacePath)) {
-      // Commit any stale workspace orchestration artifacts from a previous interrupted
-      // pan done run so the uncommitted-changes gate in runPreflightChecks doesn't
-      // reject them.
-      try {
+      const doneProject = (() => { try { return resolveProjectForIssue(issueId); } catch { return null; } })();
+      const migratedState = resolveStateReadHomeSync(doneProject ?? getProjectConfigFromWorkspacePath(workspacePath)).migrated;
+      // Commit stale orchestration artifacts so preflight does not reject them.
+      if (shouldCommitLegacyWorkspaceArtifacts(migratedState)) try {
         const { stdout: preDirty } = await execAsync(
           'git status --porcelain .pan/',
           { cwd: workspacePath, encoding: 'utf-8' }
@@ -629,7 +650,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         return;
       }
 
-      try {
+      if (shouldCommitLegacyWorkspaceArtifacts(migratedState)) try {
         const { stdout: postDirty } = await execAsync(
           'git status --porcelain .pan/',
           { cwd: workspacePath, encoding: 'utf-8' }

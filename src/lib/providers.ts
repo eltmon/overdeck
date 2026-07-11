@@ -94,8 +94,8 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     displayName: 'OpenAI',
     compatibility: 'direct',
     defaultHarness: 'codex',
-    models: ['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.2'],
-    tierModels: { opus: 'gpt-5.5', sonnet: 'gpt-5.4', haiku: 'gpt-5.4-mini' },
+    models: ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.2'],
+    tierModels: { opus: 'gpt-5.6-sol', sonnet: 'gpt-5.4', haiku: 'gpt-5.4-mini' },
     tested: true,
     description: 'First-party Codex CLI harness (default) using ChatGPT-subscription or API-key auth. The local CLIProxyAPI sidecar remains a legacy alternate for routing GPT models into claude-code.',
   },
@@ -326,7 +326,7 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
 
   // Check OpenAI models — supported set + retired IDs (still routed so the
   // deprecation-migration path can fire warnings before remap).
-  if (['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.2', 'gpt-5.5-pro', 'gpt-5.4-pro', 'o3', 'o4-mini', 'o3-deep-research', 'gpt-4o', 'gpt-4o-mini'].includes(modelId)) {
+  if (['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.2', 'gpt-5.5-pro', 'gpt-5.4-pro', 'o3', 'o4-mini', 'o3-deep-research', 'gpt-4o', 'gpt-4o-mini'].includes(modelId)) {
     return PROVIDERS.openai;
   }
 

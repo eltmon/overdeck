@@ -67,9 +67,19 @@ The dashboard Settings -> Tiered Execution panel is the operator-facing edit sur
 
 The panel also shows a resolved-state preview so operators can see the effective tiered-execution state that will be used by routing after global config, project config, and issue context are applied.
 
-On the issue view, any per-issue `plan.metadata.tiered_execution` override is visible as a read-only chip in the issue header/resolution area. Editing that override from the UI is intentionally not supported: there is no plan metadata write door, and the PAN-1124 spec immutability contract keeps vBRIEF plan metadata immutable from dashboard controls. To set or change a per-issue override, update `plan.metadata.tiered_execution` in the vBRIEF plan instead.
+On the issue view, any per-issue `plan.metadata.tiered_execution` override is visible in the issue header/resolution area as an editable **Standing Crew** toggle (PAN-2383). Flipping the toggle writes the override to the per-issue permanent record through the record write door. Because the vBRIEF spec remains immutable under PAN-1124, the override is stored outside the spec and resolved at runtime.
 
 ## Resolution Chain
+
+The following precedence applies when resolving tiered execution for an issue:
+
+- **Per-issue record override** — highest precedence; set by the Standing Crew toggle on the issue view and persisted to the per-issue permanent record.
+- **Plan metadata override** (`plan.metadata.tiered_execution`) — set at planning time in the vBRIEF spec.
+- **Global / project configuration** (`tiered_execution.enabled`) — the default switch in project config.
+
+If a record override is present, it wins over both plan metadata and the global flag. Deleting the record override falls back to plan metadata, and absent both, the global/project flag decides.
+
+Per-bead routing then proceeds as follows:
 
 The router chooses a tier deterministically for each ready bead. Models do not race to decide whether to intervene.
 

@@ -20,6 +20,7 @@ import * as NodeChildProcessSpawner from '@effect/platform-node/NodeChildProcess
 import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem'
 import * as NodePath from '@effect/platform-node/NodePath'
 import { CheckpointError, GitError, InvalidAgentIdError, VcsError } from '../errors.js'
+import { STATE_BRANCH_PATHS } from '../state-plane.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -38,6 +39,15 @@ function assertSafeAgentId(agentId: string): void {
 }
 const CHECKPOINT_AUTHOR_NAME = 'Overdeck'
 const CHECKPOINT_AUTHOR_EMAIL = 'overdeck@users.noreply.github.com'
+
+export function checkpointStateExclusions(): string[] {
+  return [
+    '.overdeck',
+    ...STATE_BRANCH_PATHS.map((path) => path === '.beads/' ? '.beads' : `.pan/${path.slice(0, -1)}`),
+    '.pan/continue.json',
+    '.pan/spec.vbrief.json',
+  ]
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -130,7 +140,7 @@ async function resolveCheckpointCommit(cwd: string, agentId: string, turnId: str
     // can be dropped as "already upstream", causing the verification gate to
     // lose AC progress (PAN-1215).
     try {
-      await execFileAsync('git', ['rm', '--cached', '--ignore-unmatch', '.pan/continue.json', '.pan/spec.vbrief.json'], { cwd, env })
+      await execFileAsync('git', ['rm', '-r', '--cached', '--ignore-unmatch', ...checkpointStateExclusions()], { cwd, env })
     } catch {
       // Non-fatal — files may not exist in the temp index
     }

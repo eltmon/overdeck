@@ -4,10 +4,13 @@ import { parseSequenceJson } from './types.js';
 import type { SequenceDoc, SequenceEdge, SequenceNode, SequenceParseError } from './types.js';
 import { queueAutoCommit } from '../pan-dir/auto-commit.js';
 import { getReviewStatusSync } from '../review-status.js';
+import { getProjectPanPaths } from '../pan-dir/specs.js';
 
 const MACHINE_MARKER = '<!-- machine-readable; do not hand-edit below this line -->';
 const TOP_TIER_SIZE = 80;
-const SEQUENCE_REL_PATH = '.pan/backlog/sequence.md';
+function sequencePath(projectRoot: string): string {
+  return join(getProjectPanPaths(projectRoot).panDir, 'backlog', 'sequence.md');
+}
 
 export type ParseSequenceMdResult = { ok: true; doc: SequenceDoc } | SequenceParseError;
 
@@ -75,7 +78,7 @@ export interface WriteSequenceMdOpts {
  * the correct operator-intended value; prior-preservation is skipped entirely.
  */
 export function writeSequenceMd(projectRoot: string, doc: SequenceDoc, opts?: WriteSequenceMdOpts): void {
-  const outPath = join(projectRoot, SEQUENCE_REL_PATH);
+  const outPath = sequencePath(projectRoot);
 
   // Load prior sequence for merge-preservation (AI resequence path only)
   let priorNodeMap = new Map<string, SequenceNode>();
@@ -144,7 +147,7 @@ export function writeSequenceMd(projectRoot: string, doc: SequenceDoc, opts?: Wr
 
   queueAutoCommit({
     projectRoot,
-    paths: [SEQUENCE_REL_PATH],
+    paths: [outPath],
     subject: `chore(state): update backlog sequence (${doc.project})`,
   });
 }

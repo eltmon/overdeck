@@ -327,6 +327,7 @@ describe('auto-resume gates', () => {
       hasProjectsSync: vi.fn().mockReturnValue(true),
       listProjects: vi.fn().mockReturnValue(projects),
       listProjectsSync: vi.fn().mockReturnValue(projects),
+      findProjectByPathSync: vi.fn(() => projects[0].config),
     }));
     vi.doMock('../../../src/lib/work-agent-lifecycle.js', () => ({
       assertCanStartFresh: vi.fn(),

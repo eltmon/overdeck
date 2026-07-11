@@ -17,6 +17,7 @@ import { sessionRotationRefused } from '../session-rotation.js';
 import { appendContinueSessionEntryForIssue } from '../vbrief/lifecycle-io.js';
 import { createSession, isPaneDead, killSession, listPaneValues, sessionExists } from '../tmux.js';
 import {
+  decideResumeGate,
   getAgentDir,
   getAgentResumeGateBlockReason,
   getAgentStateSync,
@@ -124,15 +125,19 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
   // Check runtime state — allow both suspended (auto-suspend) and stopped/idle (manual stop, crash)
   const runtimeState = getAgentRuntimeStateSync(normalizedId);
   const agentState = getAgentStateSync(normalizedId);
-  const gateBlockReason = agentState ? getAgentResumeGateBlockReason(agentState) : undefined;
+  const gateBlock = agentState ? getAgentResumeGateBlockReason(agentState) : undefined;
+  const gateDecision = decideResumeGate(gateBlock, 'operator-start');
   const bypassTroubledGate = opts?.compact === true && opts.recoverGated === true && agentState?.troubled === true && agentState.paused !== true;
-  if (gateBlockReason && !bypassTroubledGate) {
-    const reason = `Cannot resume ${normalizedId}: ${gateBlockReason}. Clear the gate before resuming.`;
+  if (gateDecision.decision === 'block' && !bypassTroubledGate) {
+    const reason = `Cannot resume ${normalizedId}: ${gateDecision.reason}. Clear the gate before resuming.`;
     logAgentLifecycleSync(normalizedId, `resumeAgent BLOCKED: ${reason}`);
     return { success: false, error: reason };
   }
+  if (gateDecision.decision === 'proceed' && gateDecision.warning) {
+    logAgentLifecycleSync(normalizedId, `resumeAgent: ${gateDecision.warning}`);
+  }
   if (bypassTroubledGate) {
-    logAgentLifecycleSync(normalizedId, `resumeAgent: bypassing troubled gate for explicit compact recovery (${gateBlockReason})`);
+    logAgentLifecycleSync(normalizedId, `resumeAgent: bypassing troubled gate for explicit compact recovery (${gateBlock?.reason})`);
   }
   const hasWorkspace = !!agentState?.workspace && existsSync(agentState.workspace);
   const isPlaceholder = !!agentState && agentState.status === 'starting' && typeof agentState.model === 'string' && agentState.model.startsWith('pending-');

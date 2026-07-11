@@ -19,8 +19,8 @@ agents themselves are taught:
 | --- | --- | --- |
 | **Bundled rule** | `sync-sources/rules/<name>.md` (ships inside the overdeck package) | Engineering rules for **every machine** |
 | **Global layer** (machine context) | `~/.overdeck/context/global.md` | Genuinely **machine-specific** quirks |
-| **Project layer** | `<projectRoot>/.pan/context/project.md` | Guidance for **one project**; committed to that repo |
-| **Workspace layer** | `<workspace>/.pan/context/workspace.md` | Auto-assembled per issue workspace; never hand-edited |
+| **Project layer** | `<projectRoot>/.overdeck/context/project.md` | Guidance for **one project**; committed to that repo |
+| **Workspace layer** | `<workspace>/.overdeck/context/workspace.md` | Auto-assembled per issue workspace; never hand-edited |
 
 The rendered outputs are **harness context files** — never edit those directly.
 Edit the source layer or rule, then run `pan sync`.
@@ -39,7 +39,7 @@ alone routes the content:
 | --- | --- | --- |
 | "add a **universal rule**: …" | every machine, every project | `sync-sources/rules/<name>.md`, `scope: universal` |
 | "add a **dev rule**: …" | Overdeck development only | `sync-sources/rules/<name>.md`, `scope: dev` |
-| "add a **project rule**: …" | one project | `<root>/.pan/context/project.md` |
+| "add a **project rule**: …" | one project | `<root>/.overdeck/context/project.md` |
 | "add a **machine rule**: …" | one machine | `~/.overdeck/context/global.md` |
 
 After any of them: `pan sync`, and the change reaches new sessions.
@@ -90,7 +90,7 @@ Everything outside the markers — in `~/.claude/CLAUDE.md`, a project's
 `CLAUDE.md`, or a project's `AGENTS.md` — is preserved verbatim across every
 sync. The first sync that touches a file with pre-existing hand-authored
 content snapshots it into `~/.overdeck/backups/<timestamp>/context/` before
-writing. A project's files are touched only if its `.pan/context/project.md`
+writing. A project's files are touched only if its `.overdeck/context/project.md`
 exists.
 
 ## Harness-specific blocks

@@ -22,6 +22,7 @@ import {
   type StuckRemediationState,
 } from './stuck-remediation-state.js';
 import { queryReadyBeadsByIssueLabels, resolveBeadsQueryRoot, type ReadyBeadsByIssue } from '../beads-query.js';
+import { recordRecoveryFailure } from './recovery-trip.js';
 
 export interface StuckRemediationOptions {
   now?: number;
@@ -106,6 +107,7 @@ async function evaluateWedgedReworkAgent(
     markAgentTroubled(agentId);
     writeStuckRemediationState(agentId, stageState(3, now, firstStuck));
     logAction(actions, transitionAction(3, issueId, idleMinutes, 'rework-wedge-troubled'));
+    surfaceStuckNeedsYou(agent, issueId, firstStuck, actions);
     return true;
   }
 
@@ -162,6 +164,12 @@ function logAction(actions: string[], action: string): void {
   actions.push(action);
   console.log(action);
   logDeaconEventSync(action);
+}
+
+function surfaceStuckNeedsYou(agent: AgentState, issueId: string, generation: string, actions: string[]): void {
+  if (!agent.workspace) return;
+  const failure = recordRecoveryFailure(agent.workspace, issueId, 'stuck-remediation', generation, 1);
+  if (failure.emitNeedsYou) logAction(actions, `[deacon] needs-you ${issueId}: stuck remediation exhausted`);
 }
 
 async function evaluateAgent(
@@ -223,6 +231,7 @@ async function evaluateAgent(
     markAgentTroubled(agentId);
     writeStuckRemediationState(agentId, stageState(3, now, firstStuck));
     logAction(actions, transitionAction(3, issueId, idleMinutes, 'marked-troubled'));
+    surfaceStuckNeedsYou(agent, issueId, firstStuck, actions);
     return;
   }
 

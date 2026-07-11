@@ -119,6 +119,7 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     },
     observationsEnabled: true,
     promptTimeInjectionEnabled: true,
+    knowledgeIndexEnabled: true,
     rollupPendingThreshold: 4,
     sidebarRefreshIntervalMs: 10_000,
     workerConcurrency: 4,
@@ -138,6 +139,9 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
       model: 'gpt-4.1-nano',
       perDayCostCapUsd: 1,
     },
+  },
+  knowledge: {
+    postMergeAutoRetro: false,
   },
   shadow: {
     enabled: false,

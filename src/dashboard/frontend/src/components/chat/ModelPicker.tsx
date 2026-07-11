@@ -21,6 +21,52 @@ import type { Harness } from '../shared/ModelPicker';
 import { HarnessLogo, ProviderIcon, ProviderDot } from '../shared/branding';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
+/**
+ * Recommended model to auto-flip to when the user switches harness and the
+ * current model is incompatible with the new harness. Pi cannot run Anthropic
+ * on subscription auth, so a non-Anthropic default is the safe pick.
+ */
+const HARNESS_DEFAULT_MODEL: Record<Harness, string> = {
+  'claude-code': 'claude-sonnet-5',
+  'ohmypi': 'gpt-5.6-sol',
+  'codex': 'codex-4o',
+};
+
+/**
+ * Find a model the new harness can run, given the current selection and
+ * the available groups. Preference order:
+ *   1. The harness's hardcoded default if it exists in the loaded groups
+ *      and is allowed.
+ *   2. Any model in the current selection's provider that's allowed.
+ *   3. Any allowed model anywhere.
+ *   4. The original value (caller will surface the error).
+ */
+function pickModelForHarness(
+  newHarness: Harness,
+  currentModel: string,
+  groups: ModelGroup[],
+  policy: HarnessPolicyDecisions,
+): string {
+  const allModels = groups.flatMap((g) => g.models);
+  const isAllowed = (modelId: string) => canUsePickerHarness(newHarness, modelId, policy).allowed;
+
+  const recommended = HARNESS_DEFAULT_MODEL[newHarness];
+  if (allModels.some((m) => m.id === recommended) && isAllowed(recommended)) {
+    return recommended;
+  }
+
+  const currentProvider = allModels.find((m) => m.id === currentModel)?.provider;
+  if (currentProvider) {
+    const sameProviderHit = allModels.find((m) => m.provider === currentProvider && isAllowed(m.id));
+    if (sameProviderHit) return sameProviderHit.id;
+  }
+
+  const anyHit = allModels.find((m) => isAllowed(m.id));
+  if (anyHit) return anyHit.id;
+
+  return currentModel;
+}
+
 export type { Harness } from '../shared/ModelPicker';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -93,6 +139,9 @@ const FALLBACK_GROUPS: ModelGroup[] = [
     provider: 'openai',
     label: 'OpenAI',
     models: [
+      { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
+      { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
+      { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
       { id: 'gpt-5.5', label: 'GPT-5.5', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
       { id: 'gpt-5.4', label: 'GPT-5.4', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
     ],

@@ -32,6 +32,7 @@ const VALID_ROLES = new Set<AgentState['role']>([
   'ship',
   'flywheel',
   'strike',
+  'knowledge',
 ]);
 
 const COLUMN_MAP: Record<keyof DbAgent, string> = {

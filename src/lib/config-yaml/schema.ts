@@ -58,6 +58,7 @@ export interface MemoryConfig {
   features?: {
     observations?: boolean;
     prompt_time_injection?: boolean;
+    knowledge_index?: boolean;
   };
   rollup_pending_threshold?: number;
   sidebar_refresh_interval_ms?: number;
@@ -135,6 +136,15 @@ export interface NormalizedFeatureRegistryConfig {
     model: string;
     perDayCostCapUsd: number;
   };
+}
+
+export interface KnowledgeConfig {
+  /** Spawn `pan knowledge <issue> --retro` after a successful merge lifecycle. Default: false. */
+  post_merge_auto_retro?: boolean;
+}
+
+export interface NormalizedKnowledgeConfig {
+  postMergeAutoRetro: boolean;
 }
 
 export type ManualCompactMode = 'claude-code' | 'overdeck-native';
@@ -490,6 +500,9 @@ export interface YamlConfig {
   /** Knowledge registry population configuration */
   registry?: FeatureRegistryConfig;
 
+  /** OKF/knowledge-agent behavior */
+  knowledge?: KnowledgeConfig;
+
   /** Multi-tool sync configuration */
   tools?: {
     /**
@@ -777,6 +790,7 @@ export interface NormalizedConfig {
     };
     observationsEnabled: boolean;
     promptTimeInjectionEnabled: boolean;
+    knowledgeIndexEnabled: boolean;
     rollupPendingThreshold: number;
     sidebarRefreshIntervalMs: number;
     workerConcurrency: number;
@@ -795,6 +809,9 @@ export interface NormalizedConfig {
 
   /** Knowledge registry population configuration */
   registry: NormalizedFeatureRegistryConfig;
+
+  /** OKF/knowledge-agent behavior */
+  knowledge: NormalizedKnowledgeConfig;
 
   /** Shadow mode configuration */
   shadow: NormalizedShadowConfig;

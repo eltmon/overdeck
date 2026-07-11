@@ -40,8 +40,8 @@ describe('claude-permissions', () => {
   });
 
   describe('getClaudePermissionFlags', () => {
-    it('returns auto flags for explicit auto mode', () => {
-      expect(getClaudePermissionFlagsSync('auto')).toEqual(['--permission-mode', 'auto']);
+    it('emits --permission-mode default for auto mode (auto is not a Claude Code flag value)', () => {
+      expect(getClaudePermissionFlagsSync('auto')).toEqual(['--permission-mode', 'default']);
     });
 
     it('returns bypass permission-mode flags for explicit bypass mode', () => {
@@ -52,7 +52,7 @@ describe('claude-permissions', () => {
     });
 
     it('joins the array as a single string for shell construction', () => {
-      expect(getClaudePermissionFlagsStringSync('auto')).toBe('--permission-mode auto');
+      expect(getClaudePermissionFlagsStringSync('auto')).toBe('--permission-mode default');
       expect(getClaudePermissionFlagsStringSync('bypass')).toBe(
         '--permission-mode bypassPermissions',
       );

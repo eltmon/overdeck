@@ -56,6 +56,17 @@ export let serverWsUrl = "";
 export let isQuitting = false;
 const terminalWindows = new Map<string, BrowserWindow>();
 
+// ─── Single instance lock ─────────────────────────────────────────────────────
+// A second launch must not boot another full app (window, tray, embedded
+// server). Duplicates exit immediately and the running instance is focused
+// via the second-instance event below (PAN-2559).
+
+if (!app.requestSingleInstanceLock()) {
+  app.exit(0);
+}
+
+app.on("second-instance", () => showOrCreateWindow());
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 export function resolveResourcePath(fileName: string): string | null {
@@ -105,6 +116,14 @@ export function resolveServerStaticDir(): string | null {
 export function resolveWindowUrl(): string {
   if (isDevelopment) {
     return process.env.VITE_DEV_SERVER_URL!;
+  }
+  // Serve the window from the embedded server's HTTP origin so the frontend's
+  // relative /api fetches and /ws/* sockets are same-origin, exactly like the
+  // browser dashboard. The overdeck:// protocol page has no working data
+  // layer (relative fetches resolve to the app bundle, PAN-2561) — it is only
+  // the pre-server fallback.
+  if (serverUrl) {
+    return serverUrl;
   }
   return `${DESKTOP_SCHEME}://app/index.html`;
 }
@@ -345,6 +364,13 @@ app.on("ready", () => {
     serverPort = port;
     serverUrl = `http://127.0.0.1:${port}`;
     serverWsUrl = wsUrl;
+    // The ready callback fires again after every server crash-restart. One
+    // window per callback multiplied windows under a crash loop (PAN-2570) —
+    // reuse the existing window and repoint it at the current server URL.
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      void mainWindow.loadURL(resolveWindowUrl());
+      return;
+    }
     mainWindow = createWindow();
     handleAutoStartNag();
   });

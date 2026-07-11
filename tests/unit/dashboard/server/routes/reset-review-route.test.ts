@@ -44,9 +44,10 @@ vi.mock('../../../../../src/lib/cloister/service.js', () => ({ getCloisterServic
 // with resolution/resolutionCount in the patch — that is the bug we are
 // regressing against. vi.hoisted() is required because vi.mock() factory
 // callbacks are hoisted to the top of the file.
-const { saveAgentRuntimeStateMock, getAgentRuntimeStateMock } = vi.hoisted(() => ({
+const { saveAgentRuntimeStateMock, getAgentRuntimeStateMock, findWorkspacePathMock } = vi.hoisted(() => ({
   saveAgentRuntimeStateMock: vi.fn(),
   getAgentRuntimeStateMock: vi.fn(),
+  findWorkspacePathMock: vi.fn(),
 }));
 
 vi.mock('../../../../../src/lib/agents.js', () => ({
@@ -73,6 +74,10 @@ vi.mock('../../../../../src/lib/git/operations.js', () => ({
   MainDivergedError: class MainDivergedError extends Error {},
 }));
 
+vi.mock('../../../../../src/lib/lifecycle/archive-planning.js', () => ({
+  findWorkspacePath: (...args: unknown[]) => findWorkspacePathMock(...args),
+}));
+
 beforeEach(() => {
   testDb = openDatabase(':memory:');
   testDb.pragma('foreign_keys = ON');
@@ -87,7 +92,7 @@ afterEach(() => {
 
 // ─── Import under test (after mocks) ──────────────────────────────────────────
 
-import { processResetReviewPipeline } from '../../../../../src/dashboard/server/routes/workspaces/review-control.js';
+import { processResetReviewPipeline, resolveResetWorkspace, buildReviewRedispatchArgs } from '../../../../../src/dashboard/server/routes/workspaces/review-control.js';
 import { setReviewStatusSync, getReviewStatusSync } from '../../../../../src/lib/review-status.js';
 
 // ─── Route-contract tests ─────────────────────────────────────────────────────
@@ -219,5 +224,118 @@ describe('processResetReviewPipeline — POST /api/review/:issueId/reset route c
     processResetReviewPipeline('PAN-STUCK', true);
 
     expect(saveAgentRuntimeStateMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('resolveResetWorkspace — PAN-2270 strike-workspace recognition', () => {
+  beforeEach(() => {
+    findWorkspacePathMock.mockReset();
+  });
+
+  it('recognizes a strike-only workspace when getWorkspaceInfoForIssue is strike-blind', () => {
+    findWorkspacePathMock.mockReturnValue('/project/workspaces/feature-pan-2270-strike');
+
+    const result = resolveResetWorkspace('PAN-2270', { exists: false }, {
+      projectPath: '/project',
+    });
+
+    expect(result.exists).toBe(true);
+    expect(result.localPath).toBe('/project/workspaces/feature-pan-2270-strike');
+    expect(findWorkspacePathMock).toHaveBeenCalledWith('/project', 'pan-2270');
+  });
+
+  it('prefers getWorkspaceInfoForIssue localPath when it already found a workspace', () => {
+    findWorkspacePathMock.mockReturnValue('/project/workspaces/feature-pan-2270-strike');
+
+    const result = resolveResetWorkspace('PAN-2270', {
+      exists: true,
+      localPath: '/project/workspaces/feature-pan-2270',
+    }, { projectPath: '/project' });
+
+    expect(result.exists).toBe(true);
+    expect(result.localPath).toBe('/project/workspaces/feature-pan-2270');
+  });
+
+  it('returns exists=false when neither source finds a workspace', () => {
+    findWorkspacePathMock.mockReturnValue(null);
+
+    const result = resolveResetWorkspace('PAN-MISSING', { exists: false }, {
+      projectPath: '/project',
+    });
+
+    expect(result.exists).toBe(false);
+    expect(result.localPath).toBeNull();
+  });
+
+  it('returns exists=false when project cannot be resolved', () => {
+    const result = resolveResetWorkspace('PAN-NO-PROJECT', { exists: false }, null);
+
+    expect(result.exists).toBe(false);
+    expect(result.localPath).toBeNull();
+    expect(findWorkspacePathMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('buildReviewRedispatchArgs — PAN-2270 strike dispatch branch assertion', () => {
+  beforeEach(() => {
+    findWorkspacePathMock.mockReset();
+  });
+
+  it('selects strike/<id> branch when the resolved workspace ends in -strike', () => {
+    findWorkspacePathMock.mockReturnValue('/project/workspaces/feature-pan-2270-strike');
+
+    const result = buildReviewRedispatchArgs(
+      'PAN-2270',
+      { localPath: null },
+      { localPath: undefined },
+      { projectPath: '/project' },
+    );
+
+    expect(result).toEqual({
+      workspace: '/project/workspaces/feature-pan-2270-strike',
+      branch: 'strike/pan-2270',
+    });
+  });
+
+  it('preserves feature/<numeric> branch for non-strike workspaces', () => {
+    findWorkspacePathMock.mockReturnValue('/project/workspaces/feature-pan-2270');
+
+    const result = buildReviewRedispatchArgs(
+      'PAN-2270',
+      { localPath: null },
+      { localPath: undefined },
+      { projectPath: '/project' },
+    );
+
+    expect(result).toEqual({
+      workspace: '/project/workspaces/feature-pan-2270',
+      branch: 'feature/2270',
+    });
+  });
+
+  it('prefers resetWorkspace.localPath and derives branch from it', () => {
+    const result = buildReviewRedispatchArgs(
+      'PAN-2270',
+      { localPath: '/project/workspaces/feature-pan-2270-strike' },
+      { localPath: '/project/workspaces/feature-pan-2270' },
+      { projectPath: '/project' },
+    );
+
+    expect(result).toEqual({
+      workspace: '/project/workspaces/feature-pan-2270-strike',
+      branch: 'strike/pan-2270',
+    });
+    expect(findWorkspacePathMock).not.toHaveBeenCalled();
+  });
+
+  it('returns null when project cannot be resolved', () => {
+    const result = buildReviewRedispatchArgs(
+      'PAN-2270',
+      { localPath: null },
+      { localPath: undefined },
+      null,
+    );
+
+    expect(result).toBeNull();
   });
 });

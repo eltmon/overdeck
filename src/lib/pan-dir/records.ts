@@ -10,6 +10,7 @@
 import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { existsSync, promises as fsp } from 'node:fs';
+import { PAN_CONTINUES_DIRNAME, PAN_DIRNAME } from './types.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 import {
@@ -155,7 +156,7 @@ function projectMerges(issueId: string): string[] {
 // ─── Record builder ───────────────────────────────────────────────────────────
 
 async function readLegacyContinueText(projectRoot: string, issueId: string): Promise<string | null> {
-  const path = join(projectRoot, '.pan', 'continues', `${issueId.toLowerCase()}.vbrief.json`);
+  const path = join(projectRoot, PAN_DIRNAME, PAN_CONTINUES_DIRNAME, `${issueId.toLowerCase()}.vbrief.json`);
   try {
     return await fsp.readFile(path, 'utf-8');
   } catch {

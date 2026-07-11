@@ -274,7 +274,7 @@ describe('boot reconciliation', () => {
     expect(listBootReconciliationCandidateIds()).toEqual(['agent-live']);
   });
 
-  it('PAN-2510: opens the grace window in pending on an empty candidate list, then resolves resume_all at expiry', async () => {
+  it('PAN-2510: opens the grace window in pending on an empty candidate list, then safely holds at expiry', async () => {
     // An empty candidate list at stamp time is ambiguous: it can mean "genuinely
     // nothing to resume" (only phantoms) OR "the deacon child has not marked the
     // crashed agents `stopped` yet" (the cross-process boot race). We can't tell
@@ -315,9 +315,9 @@ describe('boot reconciliation', () => {
       graceDeadline: '2026-06-29T15:00:30.000Z',
     });
 
-    // Still nothing genuine to resume by the deadline → harmless resume_all no-op.
+    // Still nothing genuine to resume by the deadline → safe hold default.
     await vi.advanceTimersByTimeAsync(30_000);
-    expect(getBootReconciliationState().decision).toBe('resume_all');
+    expect(getBootReconciliationState().decision).toBe('hold_all');
     expect(onGraceExpired).toHaveBeenCalledTimes(1);
   });
 
@@ -349,7 +349,7 @@ describe('boot reconciliation', () => {
     expect(getBootReconciliationState().decision).toBe('pending');
   });
 
-  it('stamps pending state and flips to resume_all when the grace timer expires', async () => {
+  it('stamps pending state and flips to hold_all when the grace timer expires', async () => {
     const onGraceExpired = vi.fn();
     mocks.agents = [
       stoppedWorkAgent(testHome, 'agent-pan-2076', { workspace: workspacePath(testHome, 'workspace') }),
@@ -378,7 +378,7 @@ describe('boot reconciliation', () => {
 
     await vi.advanceTimersByTimeAsync(30_000);
 
-    expect(getBootReconciliationState().decision).toBe('resume_all');
+    expect(getBootReconciliationState().decision).toBe('hold_all');
     expect(onGraceExpired).toHaveBeenCalledTimes(1);
   });
 

@@ -122,7 +122,7 @@ recovery breaking. (#1921 is meant to be the single write surface; it is not bui
 
 ```
         SOURCES OF TRUTH   (durable · travel with the repo · survive a DB wipe)
-  GitHub (issue/PR status) · git .pan/records (plans, decisions, verdicts) · JSONL · tmux
+  GitHub (issue/PR status) · git `records/` on `overdeck-state` (plans, decisions, verdicts) · JSONL · tmux
                           │  ▲
                   ONE sync layer   (reconstruction #1920 hydrates ▼ ;  writer mirrors ▲ to git)
                           ▼  │
@@ -141,7 +141,7 @@ recovery breaking. (#1921 is meant to be the single write surface; it is not bui
 ```
 
 **The five rules that make it true:**
-1. Durable truth lives **only** in the sources (GitHub, git `.pan/records`, JSONL, tmux). They travel.
+1. Durable truth lives **only** in the sources (GitHub, git `records/` on `overdeck-state`, JSONL, tmux). They travel.
 2. **One sync layer**: reconstruction (#1920) rebuilds the DB from sources; the writer mirrors writes back
    to git for durability/travel.
 3. The **DB is the one surface** running code uses — a cache, never the truth.

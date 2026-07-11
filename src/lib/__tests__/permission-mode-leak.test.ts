@@ -24,11 +24,11 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
 
   // ── Anthropic direct path ──────────────────────────────────────────────────
 
-  it('Anthropic + Auto + bare invocation: no DSP, --permission-mode auto', async () => {
+  it('Anthropic + Auto + bare invocation: no DSP, --permission-mode default', async () => {
     const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6')
     expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
     expect(cmd).not.toMatch(/bypassPermissions/)
-    expect(cmd).toMatch(/--permission-mode auto/)
+    expect(cmd).toMatch(/--permission-mode default/)
   })
 
   // PAN-2087: Claude Code 2.1.195 dropped `--agent <file>` support, so role
@@ -41,7 +41,7 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
     expect(cmd).toMatch(/--append-system-prompt-file '[^']*role-prompts\/work\.md'/)
     expect(cmd).toMatch(/--effort high/)                                  // from roles/work.md frontmatter
     expect(cmd).toMatch(/--model 'claude-sonnet-4-6'/)
-    expect(cmd).toMatch(/--permission-mode auto/)
+    expect(cmd).toMatch(/--permission-mode default/)
     expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
     expect(cmd).not.toMatch(/bypassPermissions/)
   })
@@ -50,7 +50,7 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
     const cmd = await getAgentRuntimeBaseCommand('claude-opus-4-7', 'planning-pan-1', 'roles/plan.md')
     expect(cmd).not.toMatch(/--agent /)
     expect(cmd).toMatch(/--append-system-prompt-file '[^']*role-prompts\/plan\.md'/)
-    expect(cmd).toMatch(/--permission-mode auto/)
+    expect(cmd).toMatch(/--permission-mode default/)
     expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
     expect(cmd).not.toMatch(/bypassPermissions/)
   })
@@ -68,7 +68,7 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
     expect(cmd).not.toMatch(/--agent /)
     expect(cmd).toMatch(/--append-system-prompt-file '[^']*role-prompts\/work\.md'/)
     expect(cmd).toMatch(/--model 'claude-sonnet-4-6'/)
-    expect(cmd).toMatch(/--permission-mode auto/)
+    expect(cmd).toMatch(/--permission-mode default/)
     expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
   })
 
@@ -79,7 +79,7 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
       const cmd = await getRoleRuntimeBaseCommand('claude-sonnet-4-6', 'agent-pan-1-ship', 'ship')
 
       expect(cmd).not.toMatch(/--agent roles\/ship\.md/)
-      expect(cmd).toMatch(/--permission-mode auto/)
+      expect(cmd).toMatch(/--permission-mode default/)
       expect(cmd).toMatch(/--model 'claude-sonnet-4-6'/)
       expect(warnSpy).toHaveBeenCalledTimes(1)
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('roles/ship.md'))
@@ -88,47 +88,47 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
     }
   })
 
-  it('Kimi direct + Auto: no DSP, --permission-mode auto', async () => {
+  it('Kimi direct + Auto: no DSP, --permission-mode default', async () => {
     const cmd = await getAgentRuntimeBaseCommand('kimi-k2.6')
     expect(cmd).toMatch(/^claude /)
     expect(cmd).toMatch(/--model 'kimi-k2\.6'/)
-    expect(cmd).toMatch(/--permission-mode auto/)
+    expect(cmd).toMatch(/--permission-mode default/)
     expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
     expect(cmd).not.toMatch(/bypassPermissions/)
   })
 
-  it('Z.AI direct + Auto: no DSP, --permission-mode auto', async () => {
+  it('Z.AI direct + Auto: no DSP, --permission-mode default', async () => {
     const cmd = await getAgentRuntimeBaseCommand('glm-4.7')
     expect(cmd).toMatch(/^claude /)
     expect(cmd).toMatch(/--model 'glm-4\.7'/)
-    expect(cmd).toMatch(/--permission-mode auto/)
+    expect(cmd).toMatch(/--permission-mode default/)
     expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
     expect(cmd).not.toMatch(/bypassPermissions/)
   })
 
-  it('MiniMax direct + Auto: no DSP, --permission-mode auto', async () => {
+  it('MiniMax direct + Auto: no DSP, --permission-mode default', async () => {
     const cmd = await getAgentRuntimeBaseCommand('minimax-m2.7')
     expect(cmd).toMatch(/^claude /)
     expect(cmd).toMatch(/--model 'minimax-m2\.7'/)
-    expect(cmd).toMatch(/--permission-mode auto/)
+    expect(cmd).toMatch(/--permission-mode default/)
     expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
     expect(cmd).not.toMatch(/bypassPermissions/)
   })
 
-  it('Mimo direct + Auto: no DSP, --permission-mode auto', async () => {
+  it('Mimo direct + Auto: no DSP, --permission-mode default', async () => {
     const cmd = await getAgentRuntimeBaseCommand('mimo-v2.5')
     expect(cmd).toMatch(/^claude /)
     expect(cmd).toMatch(/--model 'mimo-v2\.5'/)
-    expect(cmd).toMatch(/--permission-mode auto/)
+    expect(cmd).toMatch(/--permission-mode default/)
     expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
     expect(cmd).not.toMatch(/bypassPermissions/)
   })
 
-  it('OpenRouter direct + Auto: no DSP, --permission-mode auto', async () => {
+  it('OpenRouter direct + Auto: no DSP, --permission-mode default', async () => {
     const cmd = await getAgentRuntimeBaseCommand('qwen/qwen3.6-plus:free')
     expect(cmd).toMatch(/^claude /)
     expect(cmd).toMatch(/--model 'qwen\/qwen3\.6-plus:free'/)
-    expect(cmd).toMatch(/--permission-mode auto/)
+    expect(cmd).toMatch(/--permission-mode default/)
     expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
     expect(cmd).not.toMatch(/bypassPermissions/)
   })
