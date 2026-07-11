@@ -91,6 +91,16 @@
       "timestamp": "2026-07-11T18:57:49.213Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-11T19:50:04.610Z"
+    },
+    {
+      "timestamp": "2026-07-11T19:52:45.902Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
@@ -207,10 +217,10 @@
       "tests/unit/lib/projects-release-config.test.ts",
       "tests/unit/lib/review-status-release.test.ts"
     ],
-    "recordedAt": "2026-07-11T18:57:42.362Z"
+    "recordedAt": "2026-07-11T19:52:41.073Z"
   },
   "created": "2026-07-11T09:28:34.266Z",
-  "updated": "2026-07-11T19:04:44.231Z",
+  "updated": "2026-07-11T19:58:41.737Z",
   "pipeline": {
     "issueId": "PAN-399",
     "reviewStatus": "pending",
@@ -219,11 +229,11 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-11T19:04:44.200Z",
+    "updatedAt": "2026-07-11T19:58:41.698Z",
     "reviewNotes": "Verification failed at test",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2577",
     "lastVerifiedCommit": "2e1ce576e19b515c3f8fed02237e1947736e1c33",
-    "reviewRequestedAt": "2026-07-11T19:04:38.980Z",
+    "reviewRequestedAt": "2026-07-11T19:58:38.200Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "drizzle/overdeck/0000_overdeck_init.sql",
@@ -337,9 +347,9 @@
         "tests/unit/lib/projects-release-config.test.ts",
         "tests/unit/lib/review-status-release.test.ts"
       ],
-      "recordedAt": "2026-07-11T18:57:42.362Z"
+      "recordedAt": "2026-07-11T19:52:41.073Z"
     },
-    "panDoneRecoveredAt": "2026-07-11T19:04:38.980Z"
+    "panDoneRecoveredAt": "2026-07-11T19:58:38.200Z"
   },
   "closeOut": {
     "usage": {
@@ -352,9 +362,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 54947937,
-            "output": 140146,
-            "cacheRead": 51885568,
+            "input": 55267112,
+            "output": 140484,
+            "cacheRead": 52048128,
             "cacheWrite": 0
           },
           "unknown": {
@@ -365,6 +375,12 @@
           }
         },
         "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 143,
+            "output": 6426,
+            "cacheRead": 1758262,
+            "cacheWrite": 11849
+          },
           "anthropic/claude-opus-4-8": {
             "input": 133,
             "output": 2492,
@@ -412,9 +428,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 4286254,
-            "output": 267414,
-            "cacheRead": 146872064,
+            "input": 4499168,
+            "output": 270920,
+            "cacheRead": 149569792,
             "cacheWrite": 0
           }
         }
@@ -427,9 +443,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 55648297,
-          "output": 169175,
-          "cacheRead": 57577472,
+          "input": 55967472,
+          "output": 169513,
+          "cacheRead": 57740032,
           "cacheWrite": 0
         },
         "unknown": {
@@ -437,6 +453,12 @@
           "output": 120802,
           "cacheRead": 52059520,
           "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 143,
+          "output": 6426,
+          "cacheRead": 1758262,
+          "cacheWrite": 11849
         },
         "anthropic/claude-opus-4-8": {
           "input": 17122,
@@ -457,15 +479,15 @@
           "cacheWrite": 77989
         },
         "custom/kimi-k2.7-code": {
-          "input": 4286254,
-          "output": 267414,
-          "cacheRead": 146872064,
+          "input": 4499168,
+          "output": 270920,
+          "cacheRead": 149569792,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 128.36523,
-        "pricingAsOf": "2026-07-11T19:04:44.228Z"
+        "usd": 132.197695,
+        "pricingAsOf": "2026-07-11T19:58:41.729Z"
       }
     },
     "merges": [
