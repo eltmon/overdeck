@@ -1,19 +1,125 @@
 {
   "issueId": "PAN-1491",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-11T10:51:50.650Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    }
+  ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/dashboard/server/routes/flywheel-substrate-bug-weights.ts",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/FLYWHEEL.md",
+      "docs/flywheel-brief.md",
+      "packages/contracts/src/flywheel.ts",
+      "roles/flywheel.md",
+      "src/cli/commands/__tests__/flywheel.test.ts",
+      "src/cli/commands/flywheel-surfaces.ts",
+      "src/dashboard/frontend/src/components/flywheel/FlywheelStatusDetails.tsx",
+      "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusDetails.test.tsx",
+      "src/dashboard/server/routes/__tests__/flywheel.test.ts",
+      "src/dashboard/server/routes/flywheel.ts",
+      "src/lib/overdeck/__tests__/affected-criteria.test.ts",
+      "src/lib/overdeck/__tests__/substrate-bug-weight.test.ts",
+      "src/lib/overdeck/__tests__/substrate-bug-weights-service.test.ts",
+      "src/lib/overdeck/affected-criteria.ts",
+      "src/lib/overdeck/substrate-bug-weight.ts",
+      "src/lib/overdeck/substrate-bug-weights-service.ts",
+      "vision.mdx"
+    ],
+    "actualChangedFiles": [
+      "docs/FLYWHEEL.md",
+      "docs/flywheel-brief.md",
+      "packages/contracts/src/flywheel.ts",
+      "roles/flywheel.md",
+      "src/cli/commands/__tests__/flywheel.test.ts",
+      "src/cli/commands/flywheel-surfaces.ts",
+      "src/dashboard/frontend/src/components/flywheel/FlywheelStatusDetails.tsx",
+      "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusDetails.test.tsx",
+      "src/dashboard/server/routes/__tests__/flywheel.test.ts",
+      "src/dashboard/server/routes/flywheel-substrate-bug-weights.ts",
+      "src/dashboard/server/routes/flywheel.ts",
+      "src/lib/overdeck/__tests__/affected-criteria.test.ts",
+      "src/lib/overdeck/__tests__/substrate-bug-weight.test.ts",
+      "src/lib/overdeck/__tests__/substrate-bug-weights-service.test.ts",
+      "src/lib/overdeck/affected-criteria.ts",
+      "src/lib/overdeck/substrate-bug-weight.ts",
+      "src/lib/overdeck/substrate-bug-weights-service.ts",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts",
+      "vision.mdx"
+    ],
+    "recordedAt": "2026-07-11T10:51:47.612Z"
+  },
   "created": "2026-07-11T09:48:27.729Z",
-  "updated": "2026-07-11T10:03:22.480Z",
+  "updated": "2026-07-11T10:54:58.278Z",
   "pipeline": {
     "issueId": "PAN-1491",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-11T10:03:22.389Z",
-    "inspectNotes": "Bead b3-weight-fn BLOCKED: commit d813b8b4 does not implement computeSubstrateBugWeight(criteria, stats) at all. The diff only adds optional weight/weightReason fields to the FlywheelSuggestion interface/schema in packages/contracts/src/flywheel.ts:180-190 — no status-multiplier logic, no normalizedDistance calculation, no compound-value field reading (medianMs/p95Ms), no insufficient_data short-circuit, and no reason-string generation exist anywhere in this commit. None of AC1-AC5 can be evaluated because the function under review is absent. This is the same d813b8b4 diff already submitted (and blocked) against bead b2-parse-criteria moments ago — it looks like the wrong commit is being routed to review requests, or the actual b3-weight-fn implementation commit has not landed yet. Required fix: identify and deliver the commit that actually adds computeSubstrateBugWeight, implementing per-criterion status multiplier (red=1.6x per AC1 example: 3*(1+0.6)), a status floor that dominates over raw normalized drift for red vs green (AC2), safe reading of a configured valueField from compound values with graceful fallback to normalizedDistance 0 + floor when the field is absent (AC3), a weight-0 + insufficient-telemetry-reason short circuit when all criteria are insufficient_data (AC4), and a reason string naming the highest-contributing criterion by label/status/value-vs-target (AC5)."
+    "updatedAt": "2026-07-11T10:54:58.234Z",
+    "inspectNotes": "Bead b3-weight-fn BLOCKED: commit d813b8b4 does not implement computeSubstrateBugWeight(criteria, stats) at all. The diff only adds optional weight/weightReason fields to the FlywheelSuggestion interface/schema in packages/contracts/src/flywheel.ts:180-190 — no status-multiplier logic, no normalizedDistance calculation, no compound-value field reading (medianMs/p95Ms), no insufficient_data short-circuit, and no reason-string generation exist anywhere in this commit. None of AC1-AC5 can be evaluated because the function under review is absent. This is the same d813b8b4 diff already submitted (and blocked) against bead b2-parse-criteria moments ago — it looks like the wrong commit is being routed to review requests, or the actual b3-weight-fn implementation commit has not landed yet. Required fix: identify and deliver the commit that actually adds computeSubstrateBugWeight, implementing per-criterion status multiplier (red=1.6x per AC1 example: 3*(1+0.6)), a status floor that dominates over raw normalized drift for red vs green (AC2), safe reading of a configured valueField from compound values with graceful fallback to normalizedDistance 0 + floor when the field is absent (AC3), a weight-0 + insufficient-telemetry-reason short circuit when all criteria are insufficient_data (AC4), and a reason string naming the highest-contributing criterion by label/status/value-vs-target (AC5).",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/1636",
+    "lastVerifiedCommit": "58e625cedb0c122275073cf5f0b7547800025d0f",
+    "reviewRequestedAt": "2026-07-11T10:51:50.651Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "src/dashboard/server/routes/flywheel-substrate-bug-weights.ts",
+        "tests/unit/lib/overdeck/no-loss-matrix.ts"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/FLYWHEEL.md",
+        "docs/flywheel-brief.md",
+        "packages/contracts/src/flywheel.ts",
+        "roles/flywheel.md",
+        "src/cli/commands/__tests__/flywheel.test.ts",
+        "src/cli/commands/flywheel-surfaces.ts",
+        "src/dashboard/frontend/src/components/flywheel/FlywheelStatusDetails.tsx",
+        "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusDetails.test.tsx",
+        "src/dashboard/server/routes/__tests__/flywheel.test.ts",
+        "src/dashboard/server/routes/flywheel.ts",
+        "src/lib/overdeck/__tests__/affected-criteria.test.ts",
+        "src/lib/overdeck/__tests__/substrate-bug-weight.test.ts",
+        "src/lib/overdeck/__tests__/substrate-bug-weights-service.test.ts",
+        "src/lib/overdeck/affected-criteria.ts",
+        "src/lib/overdeck/substrate-bug-weight.ts",
+        "src/lib/overdeck/substrate-bug-weights-service.ts",
+        "vision.mdx"
+      ],
+      "actualChangedFiles": [
+        "docs/FLYWHEEL.md",
+        "docs/flywheel-brief.md",
+        "packages/contracts/src/flywheel.ts",
+        "roles/flywheel.md",
+        "src/cli/commands/__tests__/flywheel.test.ts",
+        "src/cli/commands/flywheel-surfaces.ts",
+        "src/dashboard/frontend/src/components/flywheel/FlywheelStatusDetails.tsx",
+        "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusDetails.test.tsx",
+        "src/dashboard/server/routes/__tests__/flywheel.test.ts",
+        "src/dashboard/server/routes/flywheel-substrate-bug-weights.ts",
+        "src/dashboard/server/routes/flywheel.ts",
+        "src/lib/overdeck/__tests__/affected-criteria.test.ts",
+        "src/lib/overdeck/__tests__/substrate-bug-weight.test.ts",
+        "src/lib/overdeck/__tests__/substrate-bug-weights-service.test.ts",
+        "src/lib/overdeck/affected-criteria.ts",
+        "src/lib/overdeck/substrate-bug-weight.ts",
+        "src/lib/overdeck/substrate-bug-weights-service.ts",
+        "tests/unit/lib/overdeck/no-loss-matrix.ts",
+        "vision.mdx"
+      ],
+      "recordedAt": "2026-07-11T10:51:47.612Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -26,9 +132,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 6520700,
-            "output": 22121,
-            "cacheRead": 5589376,
+            "input": 7359763,
+            "output": 26761,
+            "cacheRead": 6337920,
             "cacheWrite": 0
           }
         },
@@ -88,17 +194,17 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 22811,
-            "output": 7385,
-            "cacheRead": 773901,
-            "cacheWrite": 254877
+            "input": 22813,
+            "output": 7533,
+            "cacheRead": 886846,
+            "cacheWrite": 256982
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1080006,
-            "output": 141898,
-            "cacheRead": 63369984,
+            "input": 1627192,
+            "output": 254491,
+            "cacheRead": 127346176,
             "cacheWrite": 0
           }
         }
@@ -111,9 +217,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 9699838,
-          "output": 62766,
-          "cacheRead": 7153024,
+          "input": 10538901,
+          "output": 67406,
+          "cacheRead": 7901568,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -159,26 +265,71 @@
           "cacheWrite": 243872
         },
         "anthropic/claude-sonnet-5": {
-          "input": 22811,
-          "output": 7385,
-          "cacheRead": 773901,
-          "cacheWrite": 254877
+          "input": 22813,
+          "output": 7533,
+          "cacheRead": 886846,
+          "cacheWrite": 256982
         },
         "custom/kimi-k2.7-code": {
-          "input": 1080006,
-          "output": 141898,
-          "cacheRead": 63369984,
+          "input": 1627192,
+          "output": 254491,
+          "cacheRead": 127346176,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 63.463037,
-        "pricingAsOf": "2026-07-11T10:03:22.465Z"
+        "usd": 77.584125,
+        "pricingAsOf": "2026-07-11T10:54:58.263Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/1636"
+    ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5"
+  "harness": "codex",
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "b8-orchestrator-doc": "completed",
+    "b8-orchestrator-doc.ac1": "completed",
+    "b8-orchestrator-doc.ac2": "completed",
+    "b8-orchestrator-doc.ac3": "completed",
+    "b6-cli": "completed",
+    "b6-cli.ac1": "completed",
+    "b6-cli.ac2": "completed",
+    "b6-cli.ac3": "completed",
+    "b5-route": "completed",
+    "b5-route.ac1": "completed",
+    "b5-route.ac2": "completed",
+    "b5-route.ac3": "completed",
+    "b10-user-docs": "completed",
+    "b10-user-docs.ac1": "completed",
+    "b10-user-docs.ac2": "completed",
+    "b4-service": "completed",
+    "b4-service.ac1": "completed",
+    "b4-service.ac2": "completed",
+    "b4-service.ac3": "completed",
+    "b7-ui": "completed",
+    "b7-ui.ac1": "completed",
+    "b7-ui.ac2": "completed",
+    "b7-ui.ac3": "completed",
+    "b9-producer-doc": "completed",
+    "b9-producer-doc.ac1": "completed",
+    "b9-producer-doc.ac2": "completed",
+    "b3-weight-fn": "completed",
+    "b3-weight-fn.ac1": "completed",
+    "b3-weight-fn.ac2": "completed",
+    "b3-weight-fn.ac3": "completed",
+    "b3-weight-fn.ac4": "completed",
+    "b3-weight-fn.ac5": "completed",
+    "b2-parse-criteria": "completed",
+    "b2-parse-criteria.ac1": "completed",
+    "b2-parse-criteria.ac2": "completed",
+    "b2-parse-criteria.ac3": "completed",
+    "b2-parse-criteria.ac4": "completed",
+    "b1-contract": "completed",
+    "b1-contract.ac1": "completed",
+    "b1-contract.ac2": "completed",
+    "b1-contract.ac3": "completed"
+  }
 }
