@@ -6,6 +6,11 @@
       "timestamp": "2026-07-11T09:47:49.224Z",
       "reason": "end",
       "note": "No deviations. All three PAN-2322 beads (gate override + scrub message, identity-mocked config tests, operator-only skill docs) were implemented and closed in prior sessions. Full test suite passes (971 test files, 9241 tests passed). Working tree clean and branch pushed to origin/feature/pan-2322."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-11T20:03Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-11T20:03:38.906Z"
     }
   ],
   "feedback": [],
@@ -25,7 +30,7 @@
     "recordedAt": "2026-07-11T09:47:42.604Z"
   },
   "created": "2026-07-11T09:43:27.964Z",
-  "updated": "2026-07-11T18:03:13.128Z",
+  "updated": "2026-07-11T20:11:13.376Z",
   "pipeline": {
     "issueId": "PAN-2322",
     "reviewStatus": "reviewing",
@@ -34,9 +39,10 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-11T09:50:39.252Z",
+    "updatedAt": "2026-07-11T20:11:12.801Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: scrubbed OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY from the pipeline-role refusal path message and ServerConfigError variable, and extended the refusal-message test to cover pipeline-role identities.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2574",
-    "lastVerifiedCommit": "90ba8e17bd2655d020e0a3bbca9c373a0861ac2a",
+    "lastVerifiedCommit": "dc9386b3c6954a6e26fcb806c61f485f0cc1783b",
     "reviewRequestedAt": "2026-07-11T09:47:49.225Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -91,9 +97,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 3985752,
-            "output": 70610,
-            "cacheRead": 37471744,
+            "input": 4317475,
+            "output": 81976,
+            "cacheRead": 42176512,
             "cacheWrite": 0
           }
         }
@@ -118,15 +124,15 @@
           "cacheWrite": 106816
         },
         "custom/kimi-k2.7-code": {
-          "input": 3985752,
-          "output": 70610,
-          "cacheRead": 37471744,
+          "input": 4317475,
+          "output": 81976,
+          "cacheRead": 42176512,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 24.885979,
-        "pricingAsOf": "2026-07-11T09:50:39.338Z"
+        "usd": 26.140488,
+        "pricingAsOf": "2026-07-11T20:11:13.316Z"
       }
     },
     "merges": [
