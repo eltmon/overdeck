@@ -80,6 +80,7 @@ export function readJournalStatusSync(
       reviewedAtCommit: p.reviewedAtCommit,
       lastVerifiedCommit: p.lastVerifiedCommit,
       reviewRequestedAt: p.reviewRequestedAt,
+      reviewerVerdicts: p.reviewerVerdicts as ReviewStatus['reviewerVerdicts'],
       autoMerge: p.autoMerge,
       deaconIgnored: p.deaconIgnored,
       deaconIgnoredAt: p.deaconIgnoredAt,

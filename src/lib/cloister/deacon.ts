@@ -30,7 +30,7 @@ import { isStartingWithinGrace } from './agent-grace.js';
 import { recordDeaconNudge } from './deacon-nudge-log.js';
 import { checkInspectAgentTimeouts } from './deacon-inspect.js';
 import { checkApiErrorAgents } from './deacon-api-recovery.js';
-import { checkOrphanedReviewStatuses, recoverStalledReviewConvoys, checkMissingReviewStatuses, checkStuckReviewing, checkCompletedButUnsignaledReviews, monitorReviewConvoySignals, cleanupOrphanedReviewSessions } from './deacon-review.js';
+import { checkOrphanedReviewStatuses, recoverStalledReviewConvoys, checkMissingReviewStatuses, checkStuckReviewing, checkCompletedButUnsignaledReviews, monitorReviewConvoySignals, cleanupOrphanedReviewSessions, checkStalledReviewDiscovery, checkReviewForkCacheMisses } from './deacon-review.js';
 import { getAutoCloseOutCanonicalState } from './deacon-canonical-state.js';
 import { checkReadyForMergeStuck as checkReadyForMergeStuckWithDeps, reconcileStaleMergeStatus, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
 import { reconcileTraefikNetworks } from '../workspace/traefik-connect.js';
@@ -2541,7 +2541,7 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
             try {
               await Effect.runPromise(sendKeys(
                 agentId,
-                `⚠️  Deacon alert: container "${name}" has crashed ${CONTAINER_RESTART_MAX_COUNT} times and auto-restart gave up. The UAT environment at feature-${issueLower}.pan.localhost may be broken. Manual intervention required — check docker logs or re-containerize.`,
+                `⚠️  Deacon alert: container "${name}" has crashed ${CONTAINER_RESTART_MAX_COUNT} times and auto-restart gave up. The UAT environment at feature-${issueLower}.overdeck.localhost may be broken. Manual intervention required — check docker logs or re-containerize.`,
                 'deacon:container-gave-up',
               ));
             } catch {
@@ -2601,7 +2601,7 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
         try {
           await Effect.runPromise(sendKeys(
             agentId,
-            `⚠️  Deacon alert: container "${name}" crashed and restart failed (${(restartErr as Error).message}). The UAT environment at feature-${issueLower}.pan.localhost is likely broken.`,
+            `⚠️  Deacon alert: container "${name}" crashed and restart failed (${(restartErr as Error).message}). The UAT environment at feature-${issueLower}.overdeck.localhost is likely broken.`,
             'deacon:container-restart-failed',
           ));
         } catch {
@@ -2882,17 +2882,17 @@ export async function runPatrol(): Promise<PatrolResult> {
     console.warn(`[deacon] Failed to check workspace existence: ${err.message}`);
   }
 
-  // PAN-1716: Reap completed advancing-role (review/test/ship) sessions that are
-  // still tmux-alive before the dispatchers run, so freed ceiling slots are
-  // available to this same cycle's review/test/ship re-dispatch below.
-  const { checkIdleTerminalAdvancingSessions, checkMergedAdvancingSessions, checkTerminalAdvancingSessions } = await import('./advancing-selfheal.js');
-  const reapedTerminalActions = await checkTerminalAdvancingSessions();
-  actions.push(...reapedTerminalActions);
-  for (const a of reapedTerminalActions) addLog('action', a, state.patrolCycle);
+  // PAN-2579 (warm-by-default lifecycle): the PAN-1716 terminal-advancing reaper
+  // and the PAN-2341 idle-terminal reaper are GONE from this patrol. A completed
+  // review/test/ship session stays warm so the next cycle resumes it with context
+  // intact; it no longer counts against the advancing ceiling (countRunningAgents
+  // excludes warm-idle sessions) and the memory governor sheds it first under
+  // HARD pressure. Only sessions of MERGED issues (past close-out) are reaped.
+  const { checkMergedAdvancingSessions } = await import('./advancing-selfheal.js');
 
-  // PAN-1726: Reap the work session of an already-merged issue (work-role
-  // sibling of the PAN-1716 advancing reaper). An idle merged work agent holds a
-  // PAN-1665 work slot; re-pause + kill it so the slot frees for live work.
+  // PAN-1726: Reap the work session of an already-merged issue. An idle merged
+  // work agent holds a PAN-1665 work slot; re-pause + kill it so the slot frees
+  // for live work. (Merged = past close-out, so the warm policy does not apply.)
   const reapedWorkActions = await checkMergedWorkSessions();
   actions.push(...reapedWorkActions);
   for (const a of reapedWorkActions) addLog('action', a, state.patrolCycle);
@@ -2900,10 +2900,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   const reapedMergedAdvancingActions = await checkMergedAdvancingSessions();
   actions.push(...reapedMergedAdvancingActions);
   for (const a of reapedMergedAdvancingActions) addLog('action', a, state.patrolCycle);
-
-  const reapedIdleTerminalAdvancingActions = await checkIdleTerminalAdvancingSessions();
-  actions.push(...reapedIdleTerminalAdvancingActions);
-  for (const a of reapedIdleTerminalAdvancingActions) addLog('action', a, state.patrolCycle);
 
   // PAN-1778: proactively refresh Claude credentials on active remote agents
   // when the host credentials file changes, with a 15 min fallback cadence.
@@ -3046,6 +3042,15 @@ export async function runPatrol(): Promise<PatrolResult> {
   for (const a of planningCleanupActions) addLog('action', a, state.patrolCycle);
 
   // Notify review synthesis when server-owned convoy reviewers crash or time out.
+  // PAN-1862 Phase A backstops: force the convoy for a parent that never signals
+  // discovery-ready, and report fork cache misses (observability only).
+  const stalledDiscoveryActions = await checkStalledReviewDiscovery();
+  actions.push(...stalledDiscoveryActions);
+  for (const a of stalledDiscoveryActions) addLog('action', a, state.patrolCycle);
+  const forkCacheActions = await checkReviewForkCacheMisses();
+  actions.push(...forkCacheActions);
+  for (const a of forkCacheActions) addLog('action', a, state.patrolCycle);
+
   const reviewerMonitorActions = await monitorReviewConvoySignals();
   actions.push(...reviewerMonitorActions);
   for (const a of reviewerMonitorActions) addLog('action', a, state.patrolCycle);

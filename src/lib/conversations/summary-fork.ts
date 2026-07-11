@@ -559,95 +559,21 @@ export async function generateSummaryForFork(
 }async function reserveSummaryForkSessionPromise(
   cwd: string,
 ): Promise<{ sessionId: string; sessionFile: string }> {
-  const sessionId = randomUUID();
-  const encodedDir = encodeClaudeProjectDir(cwd);
-  const sessionsDir = join(process.env.HOME ?? '', '.claude', 'projects', encodedDir);
-
-  await mkdir(sessionsDir, { recursive: true });
-
-  return {
-    sessionId,
-    sessionFile: join(sessionsDir, `${sessionId}.jsonl`),
-  };
+  // PAN-1862 (NFR-3): delegates to the shared session-fork primitive so the
+  // conversation panel and the review convoy fork through one code path.
+  const { reserveForkSession } = await import('./session-fork.js');
+  return reserveForkSession(cwd);
 }
 
-/**
- * Find the byte offset of the last `compact_boundary` entry in a JSONL file.
- * Returns 0 if no boundary is found.
- */
-async function findLastCompactBoundaryOffset(jsonlPath: string): Promise<number> {
-  const { readFile } = await import('node:fs/promises');
-  const content = await readFile(jsonlPath, 'utf-8');
-  const lines = content.split('\n');
-  let offset = 0;
-  let lastBoundaryOffset = 0;
-  for (const line of lines) {
-    if (line.trim()) {
-      try {
-        const entry = JSON.parse(line);
-        if (entry.type === 'system' && entry.subtype === 'compact_boundary') {
-          lastBoundaryOffset = offset;
-        }
-      } catch { /* skip invalid lines */ }
-    }
-    offset += line.length + 1; // +1 for \n
-  }
-  return lastBoundaryOffset;
-}
-
-/**
- * Sanitize assistant entries by converting thinking blocks to plain text.
- * This prevents API errors when resuming a session cross-model/provider,
- * since thinking block signatures are bound to the original API request.
- */
-function sanitizeEntryForPlainFork(entry: any): any {
-  if (entry.type !== 'assistant' || !entry.message || !Array.isArray(entry.message.content)) {
-    return entry;
-  }
-
-  const sanitizedContent = entry.message.content.map((block: any) => {
-    if (block.type === 'thinking' && typeof block.thinking === 'string') {
-      // Convert thinking block to text block so the new model doesn't
-      // attempt to validate a signature bound to a different API request.
-      return {
-        type: 'text',
-        text: `[Thinking]\n${block.thinking}`,
-      };
-    }
-    return block;
-  });
-
-  return {
-    ...entry,
-    message: {
-      ...entry.message,
-      content: sanitizedContent,
-    },
-  };
-}async function copySessionFromCompactBoundaryPromise(
+async function copySessionFromCompactBoundaryPromise(
   sourcePath: string,
   destPath: string,
 ): Promise<void> {
-  const { readFile, writeFile } = await import('node:fs/promises');
-  const boundaryOffset = await findLastCompactBoundaryOffset(sourcePath);
-  const content = await readFile(sourcePath, 'utf-8');
-  const sliced = boundaryOffset > 0 ? content.slice(boundaryOffset) : content;
+  const { copySessionForFork } = await import('./session-fork.js');
+  return copySessionForFork(sourcePath, destPath, { fullHistory: false });
+}
 
-  // Sanitize each line to strip thinking signatures
-  const sanitizedLines = sliced.split('\n').map((line) => {
-    if (!line.trim()) return line;
-    try {
-      const entry = JSON.parse(line);
-      const sanitized = sanitizeEntryForPlainFork(entry);
-      return JSON.stringify(sanitized);
-    } catch {
-      // Keep malformed lines as-is
-      return line;
-    }
-  });
-
-  await writeFile(destPath, sanitizedLines.join('\n'), 'utf-8');
-}async function createSummaryForkPromise(
+async function createSummaryForkPromise(
   conv: Conversation,
   options: SummaryForkOptions = {},
 ): Promise<SummaryForkResult> {

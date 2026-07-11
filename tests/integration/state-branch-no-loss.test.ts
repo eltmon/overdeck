@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -65,6 +65,47 @@ describe('state branch migration no-loss gate', () => {
     expect(marker.sourceMainSha).toBe(before);
     expect(marker.version).toBe(1);
     await expect(migrateProjectState('fixture', {}, { name: 'Fixture', path: repo })).resolves.toBeUndefined();
+  });
+
+  it('hosts polyrepo state on the designated sub-repo without advancing its main branch', async () => {
+    const projectRoot = join(root, 'polyrepo');
+    const infra = join(projectRoot, 'infra');
+    const infraRemote = join(root, 'infra-origin.git');
+    mkdirSync(join(projectRoot, '.pan', 'records'), { recursive: true });
+    mkdirSync(join(projectRoot, '.beads'), { recursive: true });
+    mkdirSync(infra);
+    writeFileSync(join(projectRoot, '.pan', 'records', 'pan-2.json'), '{"issueId":"PAN-2"}\n');
+    writeFileSync(join(projectRoot, '.beads', 'issues.jsonl'), '{"id":"pan-2"}\n');
+    git(infra, 'init', '-q');
+    git(infra, 'config', 'user.name', 'Migration Test');
+    git(infra, 'config', 'user.email', 'migration@example.com');
+    git(infra, 'config', 'commit.gpgsign', 'false');
+    writeFileSync(join(infra, 'README.md'), 'infra main\n');
+    git(infra, 'add', 'README.md');
+    git(infra, 'commit', '-q', '-m', 'infra fixture');
+    git(infra, 'branch', '-M', 'main');
+    git(root, 'init', '--bare', '-q', infraRemote);
+    git(infra, 'remote', 'add', 'origin', infraRemote);
+    git(infra, 'push', '-q', '-u', 'origin', 'main');
+    const mainBefore = git(infra, 'rev-parse', 'main');
+
+    await migrateProjectState('polyrepo-fixture', {}, {
+      name: 'Polyrepo fixture',
+      path: projectRoot,
+      workspace: { type: 'polyrepo', repos: [{ name: 'infra', path: 'infra' }] },
+      pan_records: { repo: 'infra' },
+    });
+
+    const stateTree = git(infra, 'ls-tree', '-r', '--name-only', 'origin/overdeck-state');
+    expect(stateTree).toContain('records/pan-2.json');
+    expect(stateTree).toContain('.beads/issues.jsonl');
+    expect(stateTree).toContain('migration-complete.json');
+    expect(git(infra, 'rev-parse', 'main')).toBe(mainBefore);
+    expect(git(infra, 'rev-parse', 'origin/main')).toBe(mainBefore);
+    expect(git(infra, 'ls-tree', '-r', '--name-only', 'main')).toBe('README.md');
+    expect(() => git(projectRoot, 'status', '--porcelain')).toThrow();
+    expect(existsSync(join(projectRoot, '.pan'))).toBe(false);
+    expect(existsSync(join(projectRoot, '.beads'))).toBe(false);
   });
 
   it('refuses dirty primary state and lock contention before creating refs', async () => {

@@ -127,7 +127,34 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
 
   const agentId = options.agentId ?? runAgentId(issueId, role, options.subRole);
   if (await Effect.runPromise(sessionExists(agentId))) {
-    throw new Error(`Role run ${agentId} already running. Use 'pan tell' to message it.`);
+    // PAN-2579 (warm-by-default lifecycle): advancing-role sessions are no longer
+    // reaped at verdict time, so a session alive at dispatch time may be a
+    // warm-idle leftover from the PREVIOUS cycle rather than an active run. Reap
+    // it here — at the moment its slot is actually needed — when that is provable
+    // (its phase verdict is terminal, or its pane process has exited). A live
+    // session with a non-terminal verdict is genuinely active: keep throwing so
+    // a concurrent duplicate dispatch cannot stomp it. (Review dispatch reuses
+    // its warm session with context via spawnReviewRoleForIssue's resume path
+    // before ever reaching this guard; test/ship runs start fresh by design.)
+    let reapWarmIdle = false;
+    const advancing = role === 'review' || role === 'test' || role === 'ship';
+    try {
+      const { isPaneDead } = await import('../tmux.js');
+      if (await Effect.runPromise(isPaneDead(agentId))) {
+        reapWarmIdle = true;
+      } else if (advancing) {
+        const { getReviewStatusSync } = await import('../review-status.js');
+        const { isRoleTerminal } = await import('../cloister/reap-terminal-sessions.js');
+        const status = getReviewStatusSync(issueId);
+        reapWarmIdle = !!status && isRoleTerminal(role as 'review' | 'test' | 'ship', status);
+      }
+    } catch { /* probe failure → conservative: treat as active */ }
+    if (!reapWarmIdle) {
+      throw new Error(`Role run ${agentId} already running. Use 'pan tell' to message it.`);
+    }
+    console.log(`[spawn] ${agentId} is warm-idle from the previous cycle — reaping it for the new ${role} dispatch (PAN-2579)`);
+    const { killSession } = await import('../tmux.js');
+    await Effect.runPromise(killSession(agentId)).catch(() => {});
   }
 
   await assertWorkspaceStackHealthyForSpawn(issueId, role, options.allowHost, workspace);

@@ -284,7 +284,8 @@ export class ForgeMergeFailed extends Schema.TaggedErrorClass<ForgeMergeFailed>(
 
 export function readyForMerge(repo: MergeSetRepo): boolean {
   return (
-    repo.reviewStatus === 'passed' &&
+    // PAN-1862 (FR-16): review=skipped (mode none) passes like review=passed.
+    (repo.reviewStatus === 'passed' || repo.reviewStatus === 'skipped') &&
     (repo.testStatus === 'passed' || repo.testStatus === 'skipped')
   );
 }

@@ -77,7 +77,7 @@ export function readPlatformConfigSync(): PlatformConfig {
     dashboardPort: 3010,
     dashboardApiPort: 3011,
     traefikEnabled: false,
-    traefikDomain: 'pan.localhost',
+    traefikDomain: 'overdeck.localhost',
     traefikDir: TRAEFIK_DIR,
   };
   if (!existsSync(CONFIG_FILE)) return defaults;

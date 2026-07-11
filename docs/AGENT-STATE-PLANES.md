@@ -30,6 +30,11 @@ marker exists, read doors use the legacy project `.pan/` and `.beads/` layout.
 Afterward, legacy paths are fallback reads only and their recreation trips
 Doctor/Deacon diagnostics.
 
+For polyrepo projects, `pan_records.repo` designates the infra/state-host
+sub-repository. `resolveInfraRepo()` places `overdeck-state` on that repository,
+not on the project root; migration can still read legacy `.pan/` and `.beads/`
+from a non-Git project root during cutover.
+
 ## Code-owned context and workspace runtime
 
 Project context is reviewed with code on `main` at

@@ -149,7 +149,7 @@ describe('getUatGenerationsPayload', () => {
     vi.clearAllMocks();
     mocks.findProjectByPathSync.mockReturnValue(null);
     mocks.getDashboardIdentity.mockReturnValue({ repoRoot: process.cwd(), mode: 'primary' });
-    mocks.probeUatStack.mockResolvedValue({ status: 'absent', frontendUrl: 'https://uat-pan-otter-0610.pan.localhost' });
+    mocks.probeUatStack.mockResolvedValue({ status: 'absent', frontendUrl: 'https://uat-pan-otter-0610.overdeck.localhost' });
   });
 
   afterEach(async () => {

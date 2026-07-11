@@ -44,13 +44,13 @@ describe('agent permission helpers', () => {
   it('trusts the configured Traefik dashboard origin', () => {
     process.env.PORT = '3011';
     process.env.OVERDECK_TRAEFIK_ENABLED = '1';
-    process.env.OVERDECK_TRAEFIK_DOMAIN = 'pan.localhost';
+    process.env.OVERDECK_TRAEFIK_DOMAIN = 'overdeck.localhost';
     _resetTrustedOriginsForTests();
 
     const result = validateOrigin({
       method: 'POST',
       headers: {
-        origin: 'https://pan.localhost',
+        origin: 'https://overdeck.localhost',
       },
     } as any);
 
@@ -58,11 +58,11 @@ describe('agent permission helpers', () => {
   });
 
   it('trusts explicit comma-separated dashboard origins', () => {
-    process.env.OVERDECK_TRUSTED_ORIGINS = 'https://pan.localhost, https://admin.pan.localhost/path';
+    process.env.OVERDECK_TRUSTED_ORIGINS = 'https://overdeck.localhost, https://admin.overdeck.localhost/path';
     _resetTrustedOriginsForTests();
 
-    expect(validateOrigin({ method: 'POST', headers: { origin: 'https://pan.localhost' } } as any)).toEqual({ ok: true });
-    expect(validateOrigin({ method: 'POST', headers: { origin: 'https://admin.pan.localhost' } } as any)).toEqual({ ok: true });
+    expect(validateOrigin({ method: 'POST', headers: { origin: 'https://overdeck.localhost' } } as any)).toEqual({ ok: true });
+    expect(validateOrigin({ method: 'POST', headers: { origin: 'https://admin.overdeck.localhost' } } as any)).toEqual({ ok: true });
   });
 
   it('rejects WebSocket origins that only match the request Host header', () => {

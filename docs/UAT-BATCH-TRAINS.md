@@ -35,7 +35,7 @@ tree once, continuously, and automatically.
 | **Held out** | A feature excluded from a generation because its conflict could not be resolved confidently (or the agent timed out). Shown on the card with the reason; retried in later generations once the conflicting predecessor merges or its branch changes. |
 | **Generation chain** | Generations accumulate newest-first (`sea-monkey` → `brass-donkey` → `copper-fox`…). The newest **ready** generation is current; older ready/superseded ones stay testable and promotable. Append-only — lifecycle is status flips, never row deletion, so the chain is an audit trail. |
 | **Promote** | The merge. Merging a generation lands its exact tree on main (one no-ff merge), so main receives precisely what was tested — conflict resolutions included. |
-| **UAT stack** | A live dashboard stack serving a generation's branch at `uat-<label>-<codename>-<mmdd>.pan.localhost`, spun on demand from the generation's worktree. **Hard max 2 concurrent.** |
+| **UAT stack** | A live dashboard stack serving a generation's branch at `uat-<label>-<codename>-<mmdd>.overdeck.localhost`, spun on demand from the generation's worktree. **Hard max 2 concurrent.** |
 
 ## Lifecycle
 
@@ -122,7 +122,7 @@ generations invalidate (main moved) and the reconciler rebuilds.
 
 `ensureUatStack` renders the devcontainer on the generation worktree — the folder
 name `uat-<label>-<codename>-<mmdd>` yields the Traefik host
-`uat-<label>-<codename>-<mmdd>.pan.localhost` via the standard `FEATURE_FOLDER`
+`uat-<label>-<codename>-<mmdd>.overdeck.localhost` via the standard `FEATURE_FOLDER`
 template — and runs `docker compose up`. **At most 2 UAT stacks run at once**:
 Docker's default address pool fits ~31 bridge networks, and orphaned UAT stacks
 would eventually block *all* workspace creation. Starting a third tears down the

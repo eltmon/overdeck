@@ -17,7 +17,7 @@ services:
       - overdeck
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.overdeck.rule=Host(`pan.localhost`)"
+      - "traefik.http.routers.overdeck.rule=Host(`overdeck.localhost`)"
       - "traefik.http.routers.overdeck.entrypoints=websecure"
       - "traefik.http.routers.overdeck.tls=true"
       - "traefik.http.services.overdeck.loadbalancer.server.port=3000"

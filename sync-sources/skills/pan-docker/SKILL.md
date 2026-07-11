@@ -79,7 +79,7 @@ cd /path/to/your/project
 cat > .env << 'EOF'
 # Application
 APP_PORT=3000
-HOSTNAME=myapp.pan.localhost
+HOSTNAME=myapp.overdeck.localhost
 COMPOSE_PROJECT_NAME=myapp
 
 # Database (if applicable)
@@ -224,7 +224,7 @@ All templates include Traefik labels for local HTTPS:
 ```yaml
 labels:
   - "traefik.enable=true"
-  - "traefik.http.routers.myapp.rule=Host(`myapp.pan.localhost`)"
+  - "traefik.http.routers.myapp.rule=Host(`myapp.overdeck.localhost`)"
 ```
 
 ### Enable Traefik
@@ -243,7 +243,7 @@ labels:
        name: traefik_default
    ```
 
-3. Access via: https://myapp.pan.localhost
+3. Access via: https://myapp.overdeck.localhost
 
 ## Troubleshooting
 

@@ -59,7 +59,7 @@ The test role verifies that a feature branch is ready to leave review. It owns b
 
 ### Host process boundary
 
-Never start, stop, kill, or restart the host-level Overdeck dashboard, supervisor, or Deacon. Test only the feature workspace's own containers and endpoint (`https://api-feature-<issue>.pan.localhost`). If that isolated stack cannot support verification, report `TESTS FAILED`; do not substitute the primary host dashboard.
+Never start, stop, kill, or restart the host-level Overdeck dashboard, supervisor, or Deacon. Test only the feature workspace's own containers and endpoint (`https://api-feature-<issue>.overdeck.localhost`). If that isolated stack cannot support verification, report `TESTS FAILED`; do not substitute the primary host dashboard.
 
 1. Read the issue, vBRIEF acceptance criteria, test notes, and project instructions.
 2. Run the configured project verification gates, including typecheck, lint, unit tests, integration tests, or any project-specific test command.

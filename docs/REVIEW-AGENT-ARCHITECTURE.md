@@ -11,11 +11,139 @@ For the broader mental model — what a Role is, how it relates to Claude Code s
 ## Invariants
 
 1. **Review is a role, not a server-owned verdict.** Lifecycle dispatch starts `spawnRun(issueId, 'review')`; the dashboard observes state and artifacts.
-2. **The server owns convoy lifecycle.** `spawnReviewRoleForIssue()` spawns the synthesis role and all four convoy reviewers directly, then Deacon monitors reviewer crash/timeout cases.
+2. **The server owns convoy lifecycle.** `spawnReviewRoleForIssue()` spawns the synthesis role; the convoy reviewers are launched either inline (non-Claude harnesses) or by `handleReviewDiscoveryReady()` after the parent's shared-discovery signal (Claude Code, PAN-1862 — see "Warm-parent discovery + fork"). Deacon monitors reviewer crash/timeout cases and backstops a parent that never signals.
 3. **Synthesis is the review decision.** The `review` role waits for `REVIEWER_READY` / `REVIEWER_FAILED` / `REVIEWER_TIMEOUT` messages delivered through `pan tell`, reads ready reviewer outputs, synthesizes their findings, and emits the verdict. Those messages are sent by each reviewer's **launcher** on process exit (PAN-977) — not by the reviewer agent itself, and not by Deacon on the happy path.
 4. **Review never merges.** Approved review transitions the issue toward `test`; branch preparation and push work belongs to `ship`, and final merge remains human-gated.
 5. **Convoy outputs are evidence, not votes.** Security/correctness/performance/requirements findings inform synthesis; the review role decides what blocks.
 6. **Convoy prompts are harness-agnostic templates.** The orchestrator reads each `roles/review-<subRole>.md` template at spawn time and inlines its body into the convoy reviewer's first user message. The convoy never relies on Claude Code's `--agent` flag, never reads a file from the agent's workspace, and never appears as an ambient subagent that a work agent could auto-discover.
+
+---
+
+## Review modes: quick / full (convoy) / none
+
+What *kind* of review runs is a three-scope setting, resolved at the single
+review entry point (`spawnReviewRoleForIssue()` → `resolveReviewMode()`), so the
+trigger route, host auto-dispatch, and every Deacon re-dispatch site honor it:
+
+| Scope | Where it lives | How to set it |
+| --- | --- | --- |
+| **Per-issue** (wins) | the per-issue record (`reviewMode`) | `pan review mode <id> <quick\|full\|none>`, the issue-cockpit **review:** selector, or `POST /api/review/:id/config` |
+| **Per-project** | `.pan.yaml` → `roles.review.mode` | edit the project config (merged over global by `mergeConfigs()`) |
+| **Global** | `~/.overdeck/config.yaml` → `roles.review.mode` | Settings → Roles → Review → *Review mode* selector |
+
+The three modes:
+
+- **`quick` (default)** — ONE review agent (`agent-<id>-review`) performs a single
+  combined pass over the diff (correctness + security + requirements + performance
+  in one report) and signals the verdict itself. No convoy, no synthesis fan-out,
+  no fork. Cheapest AI review that still blocks real problems.
+- **`full`** — the four-reviewer **convoy** (`security`, `correctness`,
+  `performance`, `requirements` — `REVIEW_SUB_ROLES`) plus the synthesis parent
+  as the fifth review role. Highest-scrutiny mode; this is the mode all the
+  PAN-1862 machinery below (discovery fork, selective re-review, per-reviewer
+  verdicts, model-uniformity banner) applies to.
+- **`none`** — no AI review at all. `spawnReviewRoleForIssue()` records
+  `reviewStatus: 'skipped'` (which passes the merge gate exactly like
+  `testStatus: 'skipped'`) and the lifecycle advances as if review approved.
+  The pre-review **verification gate** (typecheck/lint/test floor) still runs —
+  `none` skips only the AI review, never the quality floor.
+
+**Re-review scope** (`full` mode only) is the second knob, same three scopes:
+per-issue record (`pan review scope <id> <all|changed|blockers>` / cockpit
+selector) → `roles.review.reReviewScope` per-project → global; default `changed`.
+It governs which convoy reviewers re-run on a re-review cycle (see "Selective
+re-review" below).
+
+---
+
+## The work ↔ review loop
+
+The full round trip between the work agent and review:
+
+1. **work → review:** the work agent finishes its beads and runs `pan done`,
+   which rebases + pushes, records the durable `reviewRequestedAt` intent in the
+   journal, and triggers review dispatch. If the reactive trigger is dropped, the
+   host auto-dispatches from the journal intent on the next status read
+   (PAN-1988) — no deacon required.
+2. **Review runs** in the resolved mode (above). Sessions are **warm by
+   default** (PAN-2579): recording a verdict never kills the session; re-review
+   resumes reviewers with their prior-cycle context.
+3. **APPROVED / SKIPPED:** `setReviewStatusSync` emits `review.approved`;
+   reactive Cloister dispatches the test role. No agent-to-agent hop is needed.
+4. **BLOCKED / FAILED:** the verdict write is durable FIRST (and guarded — a
+   stale dispatch-side 'reviewing' write can never clobber a terminal verdict,
+   PAN-2578); then `deliverReviewVerdictFeedback` posts the PR comment, writes
+   the feedback file (`.overdeck/feedback/NNN-review-agent-*.md`), and messages
+   the work agent directly. If the work agent is not running, the delivery door
+   RESURRECTS it (unpause pipeline pauses, clear troubled gates, resume stopped
+   agents — PAN-2209/PAN-2461) before ever escalating to the operator.
+5. **work again:** the work agent fixes the findings, commits, and re-runs
+   `pan done` → a NEW review cycle starts (re-request newer than the last
+   dispatch), which in `full` mode is a **selective** re-review.
+
+---
+
+## Warm-parent discovery + fork (PAN-1862, `full` mode on Claude Code)
+
+The convoy's first-cycle cost problem: four reviewers independently reading the
+same diff and files = 4× full-price input. The fix exploits Anthropic's
+content-addressed prompt cache (keyed by a hash of the prefix per model — not
+by session id):
+
+1. **Discovery:** the synthesis parent spawns with a discovery-first prompt —
+   read the context manifest, the committed diff, and the high-risk changed
+   files, so that content lives in the parent's session history (and the warm
+   cache).
+2. **Signal:** the parent runs `pan admin specialists discovery-ready review
+   <id>` exactly once at its turn boundary.
+3. **Fork:** `handleReviewDiscoveryReady()` copies the parent's JSONL to a fresh
+   session id per in-scope reviewer (shared `session-fork.ts` primitive, full
+   history, thinking-blocks sanitized) and launches each with
+   `claude --resume <forkedId>`. The forked reviewers replay a byte-identical
+   prefix → **cache reads (~10% of input price)** instead of re-reading.
+   The kickoff tells each reviewer the context is already in history and why.
+4. **Synthesis:** the parent survives unmodified and synthesizes as always.
+
+Per-reviewer fork conditions (each failure degrades to an independent fresh
+spawn — reviews are never blocked by a cache concern): parent harness is
+`claude-code`, the reviewer resolves to the **same model** as the parent (the
+Settings → Roles red banner warns when the five review roles are not
+model-uniform), and the reviewer has no resumable prior-cycle session of its own
+(its own context beats a re-fork).
+
+Backstops (Deacon patrol): `checkStalledReviewDiscovery` forces the convoy if a
+parent never signals within 8 minutes (or dies); `checkReviewForkCacheMisses`
+reads each forked reviewer's first cost event and reports `cacheRead == 0` as a
+warn-level activity entry + desktop notification, including the discovery→fork
+gap vs the 5-minute cache TTL. Misses are observability only — correctness never
+depends on the cache landing.
+
+---
+
+## Selective re-review + per-reviewer verdicts (PAN-1862, `full` mode)
+
+Synthesis records a **per-reviewer verdict** map alongside the aggregate:
+`reviewerVerdicts[subRole] = { status: passed|blocked, atCommit, findingsPath }`
+(journal-durable; written via `pan admin specialists done review … --reviewers
+"security=passed,correctness=blocked,…"`, or by the Deacon fallback synthesis).
+The workspace HEAD is stamped as `atCommit` on every verdict — a BLOCKED
+aggregate is exactly the cycle whose clean reviewers the next pass wants to skip.
+
+On a re-review cycle, `reviewersToRerun()` decides who actually runs from
+`reReviewScope`:
+
+- `all` — all four, every cycle.
+- `changed` (default) — reviewers that blocked, PLUS any reviewer whose domain
+  is touched by files changed since its `atCommit` (correctness/requirements:
+  any change; security: security-sensitive paths; performance: hot-path files).
+- `blockers` — only reviewers that blocked.
+
+Anything unprovable — no verdict, no commit anchor, an unreachable anchor after
+a rebase, an unknown diff — always re-runs (quality first, NFR-1). Reviewers NOT
+re-run have their verdict **carried forward** as a stub report in the new run
+directory, so synthesis and the Deacon fallback still see one report per
+sub-role, unchanged. The synthesis prompt lists which signals to expect and
+which verdicts are carried.
 
 ---
 

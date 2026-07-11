@@ -312,11 +312,11 @@ async function installCommand(options: InstallOptions): Promise<void> {
 
         // Generate wildcard certificates
         spinner.start('Generating wildcard certificates...');
-        const traefikCertFile = join(TRAEFIK_CERTS_DIR, '_wildcard.pan.localhost.pem');
-        const traefikKeyFile = join(TRAEFIK_CERTS_DIR, '_wildcard.pan.localhost-key.pem');
+        const traefikCertFile = join(TRAEFIK_CERTS_DIR, '_wildcard.overdeck.localhost.pem');
+        const traefikKeyFile = join(TRAEFIK_CERTS_DIR, '_wildcard.overdeck.localhost-key.pem');
 
         execSync(
-          `mkcert -cert-file "${traefikCertFile}" -key-file "${traefikKeyFile}" "pan.localhost" "*.pan.localhost" "*.localhost" localhost 127.0.0.1 ::1`,
+          `mkcert -cert-file "${traefikCertFile}" -key-file "${traefikKeyFile}" "overdeck.localhost" "*.overdeck.localhost" "*.localhost" localhost 127.0.0.1 ::1`,
           { stdio: 'pipe' }
         );
 
@@ -326,7 +326,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
         copyFileSync(traefikCertFile, legacyCertFile);
         copyFileSync(traefikKeyFile, legacyKeyFile);
 
-        spinner.succeed('Wildcard certificates generated (*.pan.localhost, *.localhost)');
+        spinner.succeed('Wildcard certificates generated (*.overdeck.localhost, *.localhost)');
 
         // Generate certs for registered projects and build tls.yml
         const generatedDomains = ensureProjectCertsSync();
@@ -595,7 +595,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
       config.traefik = {
         enabled: true,
         dashboard_port: 8080,
-        domain: 'pan.localhost',
+        domain: 'overdeck.localhost',
         dns_sync_method: dnsMethod,
       };
     } else if (!config.traefik.dns_sync_method) {
@@ -666,7 +666,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
 
   // Ensure base domain DNS entry
   if (config.traefik?.enabled) {
-    const domain = config.traefik.domain || 'pan.localhost';
+    const domain = config.traefik.domain || 'overdeck.localhost';
     const dnsMethod = config.traefik.dns_sync_method || detectDnsSyncMethod();
     spinner.start(`Setting up DNS for ${domain}...`);
     if (ensureBaseDomain(dnsMethod, domain)) {
@@ -688,7 +688,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
 
   if (!options.minimal) {
     console.log(`  1. Run ${chalk.cyan('pan up')} to start Traefik and dashboard (auto-syncs skills)`);
-    console.log(`  2. Access dashboard at ${chalk.cyan(`https://${config.traefik?.domain || 'pan.localhost'}`)}`);
+    console.log(`  2. Access dashboard at ${chalk.cyan(`https://${config.traefik?.domain || 'overdeck.localhost'}`)}`);
   } else {
     console.log(`  1. Run ${chalk.cyan('pan up')} to start the dashboard (auto-syncs skills)`);
     console.log(`  2. Access dashboard at ${chalk.cyan(`http://localhost:${config.dashboard.port}`)}`);

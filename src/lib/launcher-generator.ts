@@ -235,7 +235,7 @@ export function generateLauncherScriptSync(config: LauncherConfig): string {
     lines.push('set -o pipefail');
   }
 
-  // Trust mkcert CA so agent CLI commands can reach https://pan.localhost
+  // Trust mkcert CA so agent CLI commands can reach https://overdeck.localhost
   lines.push('command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"');
 
   // PAN-1678: skip the heavy ~10-core build:docs-index job in any `npm run

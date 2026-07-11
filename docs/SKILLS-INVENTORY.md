@@ -26,7 +26,7 @@ Claude Code gives user-level skills precedence over project-level skills when na
 | `/code-review` | Project | Comprehensive code review covering correctness, security, performance |
 | `/code-review-performance` | Project | Deep performance analysis focusing on algorithms and resources |
 | `/code-review-security` | Project | Deep security analysis focusing on OWASP Top 10 |
-| `/conv-lookup` | Project | Find, review, read, inspect, summarize, or compare Overdeck conversations. Use when the user references a pan.localhost/conv/<id> URL, a conversation ID (e.g. "conv 371", "conversation 108"), a fuzzy reference ("that GPT conversation", "the last Sonnet session"), or asks to review/read/look at/check/summarize/compare conversations. |
+| `/conv-lookup` | Project | Find, review, read, inspect, summarize, or compare Overdeck conversations. Use when the user references a overdeck.localhost/conv/<id> URL, a conversation ID (e.g. "conv 371", "conversation 108"), a fuzzy reference ("that GPT conversation", "the last Sonnet session"), or asks to review/read/look at/check/summarize/compare conversations. |
 | `/crash-investigation` | Project | Investigate system crashes, OOM kills, and unresponsive episodes. Analyzes previous boot logs, identifies memory hogs, tallies per-process-group consumption, checks agent and workspace state, and produces a recovery summary. Use after a hard reset, freeze, or reboot caused by resource exhaustion. |
 | `/dependency-update` | Project | Safe approach to updating dependencies |
 | `/eltmon-stream` | User | Start up and manage the eltmon Twitch stream interaction system (chat TTS, character voices, welcome/roast songs, OBS overlay). Checks that OBS, Ollama, TTS daemon, and chat_tts.py are all running before a stream. |

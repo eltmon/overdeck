@@ -36,7 +36,7 @@ The scope was deliberately narrowed at replan to the two surfaces the issue was 
 
 - **vs PAN-1204**: launcher multi-file (above).
 - **vs PAN-1203**: `~/.overdeck/config.yaml` schema. PAN-1201 adds a `context.*` section (PRD lines 189-204); PAN-1203 adds `docs.*`; PAN-1204 adds `compliance.*`. None of the specs reference a shared schema-merge bead. If three agents land `src/lib/config-yaml.ts` migrations independently, last-write-wins on the YAML normalizer.
-- **vs PAN-1205**: `pan.localhost` vs `artifacts.pan.localhost` lives in PAN-1205 Traefik changes. PAN-1201 docs may reference `overdeck.localhost/context` (per `context-docs-regression`); confirm the actual path is `pan.localhost/context`. Add `context-docs-regression.ac4` to enforce this.
+- **vs PAN-1205**: `overdeck.localhost` vs `artifacts.overdeck.localhost` lives in PAN-1205 Traefik changes. PAN-1201 docs may reference `overdeck.localhost/context` (per `context-docs-regression`); confirm the actual path is `overdeck.localhost/context`. Add `context-docs-regression.ac4` to enforce this.
 
 ---
 
@@ -110,7 +110,7 @@ The most complete plan structurally. Dependencies are clean (DAG-shape: `contrac
 
 ### CRITICAL (must amend before wave 2)
 
-- **`raw-artifact-serving.ac3`** prescribes CSP `default-src 'self' 'unsafe-inline' data: https:` (from PRD line 134) but the bead ac says "self, inline artifact code, data URLs, and HTTPS assets while preventing access to dashboard-origin cookies and storage." That's a CSP *and* a cookie-isolation requirement. Cookie isolation comes from the separate origin, not CSP. **Amendment**: split into two ACs — (a) CSP header exact value, (b) Playwright assertion that an iframe at `artifacts.pan.localhost/a/<slug>` cannot read cookies set on `pan.localhost`. Today these are conflated and the test will be ambiguous.
+- **`raw-artifact-serving.ac3`** prescribes CSP `default-src 'self' 'unsafe-inline' data: https:` (from PRD line 134) but the bead ac says "self, inline artifact code, data URLs, and HTTPS assets while preventing access to dashboard-origin cookies and storage." That's a CSP *and* a cookie-isolation requirement. Cookie isolation comes from the separate origin, not CSP. **Amendment**: split into two ACs — (a) CSP header exact value, (b) Playwright assertion that an iframe at `artifacts.overdeck.localhost/a/<slug>` cannot read cookies set on `overdeck.localhost`. Today these are conflated and the test will be ambiguous.
 - **`artifact-traefik-origin`** modifies the Traefik dynamic template. Per workspace-container rules and the `single-deacon-invariant`, any Traefik change has to be tested in *both* a fresh host install and a workspace devcontainer that comes up via the template. Add an AC: "Workspace devcontainer template at `infra/.devcontainer-template/docker-compose.devcontainer.yml.template` is updated if and only if the artifact subdomain needs to resolve from inside the container." Likely it doesn't — but commit to "no" explicitly so a future agent doesn't add a mount.
 
 ### HIGH
@@ -200,7 +200,7 @@ cd workspaces/feature-pan-1205 && bd create -t test "secret-scanner-fixture-corp
 cd workspaces/feature-pan-1205 && bd create -t test "raw-artifact-csp-vs-origin-isolation — separate CSP header test from cookie-isolation test" \
   --priority high \
   --tags security,artifacts \
-  --description "raw-artifact-serving.ac3 conflates CSP and cookie isolation. Split: (a) HTTP integration test asserting Content-Security-Policy header equals expected exact value; (b) Playwright test setting cookie on pan.localhost, loading /s/<slug>, asserting iframe at artifacts.pan.localhost/a/<slug> cannot read document.cookie or localStorage."
+  --description "raw-artifact-serving.ac3 conflates CSP and cookie isolation. Split: (a) HTTP integration test asserting Content-Security-Policy header equals expected exact value; (b) Playwright test setting cookie on overdeck.localhost, loading /s/<slug>, asserting iframe at artifacts.overdeck.localhost/a/<slug> cannot read document.cookie or localStorage."
 
 # Pi blocker escalation for PAN-1203
 cd workspaces/feature-pan-1203 && bd create -t followup "pi-docs-injection-blocker-escalation — concrete escalation path if Pi has no prompt-submit API" \

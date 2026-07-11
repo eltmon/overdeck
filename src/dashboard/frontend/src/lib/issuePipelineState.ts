@@ -57,7 +57,8 @@ export function derivePipelineState(input: PipelineStateInput): PipelineState {
   if (reviewStatus?.readyForMerge) return 'ready_to_merge';
   if (reviewStatus?.reviewStatus === 'reviewing') return 'in_review_reviewers_running';
   if (reviewStatus?.reviewStatus === 'failed' || reviewStatus?.reviewStatus === 'blocked') return 'in_review_changes_requested';
-  if (reviewStatus?.reviewStatus === 'passed') return 'in_review_approved';
+  // PAN-1862: reviewStatus 'skipped' (review mode none) reads as approved for phase display.
+  if (reviewStatus?.reviewStatus === 'passed' || reviewStatus?.reviewStatus === 'skipped') return 'in_review_approved';
   if (reviewStatus?.testStatus === 'testing') return 'testing_running';
   if (reviewStatus?.testStatus === 'failed' || reviewStatus?.testStatus === 'dispatch_failed') return 'testing_failures';
   if (reviewStatus?.verificationStatus === 'failed') return 'verification_failing';

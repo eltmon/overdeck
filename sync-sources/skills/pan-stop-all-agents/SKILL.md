@@ -33,7 +33,7 @@ Cleanly stops every running work agent plus its associated review-coordinators a
 | `agent-<issue>`              | **kill**    | Work agents |
 | `review-coordinator-*`       | **kill**    | Review pipeline tied to a work agent |
 | `specialist-*-test-agent`    | **kill**    | Test specialist tied to a work agent |
-| `conv-*`                     | **PRESERVE**| Conversation tmux for `pan.localhost/conv/<id>` — these are user-facing chats, not work runs |
+| `conv-*`                     | **PRESERVE**| Conversation tmux for `overdeck.localhost/conv/<id>` — these are user-facing chats, not work runs |
 | `overdeck` (server)        | **PRESERVE** unless stopping dashboard |
 | CLIProxy, Traefik, TLDR      | **PRESERVE** — shared sidecars |
 
@@ -128,7 +128,7 @@ they should ask explicitly; do not assume.
 
 ```bash
 # Dashboard health (should fail if stopped, succeed if left up)
-curl -sk https://pan.localhost/api/health || echo "dashboard down (expected if stopped)"
+curl -sk https://overdeck.localhost/api/health || echo "dashboard down (expected if stopped)"
 
 # Memory should drop noticeably after killing 5+ work agents
 free -h | head -2
@@ -136,7 +136,7 @@ free -h | head -2
 
 ## Why preserve `conv-*`
 
-`conv-*` tmux sessions back the conversation views at `pan.localhost/conv/<id>`. They
+`conv-*` tmux sessions back the conversation views at `overdeck.localhost/conv/<id>`. They
 are durable chat history, not work runs — the JSONL session files are sacred (see
 CLAUDE.md). Killing a `conv-*` session loses the live attach point even if the JSONL
 survives, and there is rarely a reason to do so during a "stop all agents" drain.

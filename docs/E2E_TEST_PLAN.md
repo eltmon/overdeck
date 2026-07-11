@@ -21,8 +21,8 @@ pan install
   - dynamic/overdeck.yml
   - README.md
 - Generates mkcert wildcard certificates:
-  - ~/.overdeck/traefik/certs/_wildcard.pan.localhost.pem
-  - ~/.overdeck/traefik/certs/_wildcard.pan.localhost-key.pem
+  - ~/.overdeck/traefik/certs/_wildcard.overdeck.localhost.pem
+  - ~/.overdeck/traefik/certs/_wildcard.overdeck.localhost-key.pem
 - Creates config.toml with traefik.enabled = true
 - Shows next steps message including DNS setup
 
@@ -32,12 +32,12 @@ ls -la ~/.overdeck/traefik/
 # Should show: docker-compose.yml, traefik.yml, dynamic/, certs/, README.md
 
 cat ~/.overdeck/config.toml | grep -A3 "\[traefik\]"
-# Should show: enabled = true, dashboard_port = 8080, domain = "pan.localhost"
+# Should show: enabled = true, dashboard_port = 8080, domain = "overdeck.localhost"
 ```
 
 ### Step 2: Configure DNS
 ```bash
-echo "127.0.0.1 pan.localhost" | sudo tee -a /etc/hosts
+echo "127.0.0.1 overdeck.localhost" | sudo tee -a /etc/hosts
 ```
 
 ### Step 3: Start Services
@@ -47,20 +47,20 @@ pan up
 
 **Expected Results:**
 - Starts Traefik container via docker-compose
-- Shows Traefik dashboard URL: https://traefik.pan.localhost:8080
+- Shows Traefik dashboard URL: https://traefik.overdeck.localhost:8080
 - Starts dashboard (frontend on 3010, API on 3011)
-- Shows frontend URL: https://pan.localhost
-- Shows API URL: https://pan.localhost/api
+- Shows frontend URL: https://overdeck.localhost
+- Shows API URL: https://overdeck.localhost/api
 
 **Verification:**
 ```bash
 docker ps | grep traefik
 # Should show: overdeck-traefik container running
 
-curl -k https://pan.localhost
+curl -k https://overdeck.localhost
 # Should connect to dashboard frontend
 
-curl -k https://pan.localhost/api/health
+curl -k https://overdeck.localhost/api/health
 # Should connect to dashboard API
 ```
 

@@ -145,7 +145,14 @@ vi.mock('fs', async (importOriginal) => {
 const execMock = vi.hoisted(() => vi.fn());
 vi.mock('child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('child_process')>();
-  return { ...actual, exec: execMock, execFile: vi.fn() };
+  // execFile must invoke its callback or promisify(execFile) callers hang the
+  // test to timeout (PAN-1862's fallback-verdict HEAD probe). Fail fast; the
+  // production code treats a failed probe as "no anchor" and proceeds.
+  const execFileMock = vi.fn((_cmd: unknown, _args: unknown, opts: unknown, cb?: unknown) => {
+    const callback = (typeof opts === 'function' ? opts : cb) as ((err: Error) => void) | undefined;
+    callback?.(new Error('execFile unavailable in tests'));
+  });
+  return { ...actual, exec: execMock, execFile: execFileMock };
 });
 
 import { checkInspectAgentTimeouts, cleanupOrphanedReviewSessions, monitorReviewConvoySignals } from '../deacon.js';
@@ -443,6 +450,16 @@ describe('monitorReviewConvoySignals', () => {
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-880', {
       reviewStatus: 'blocked',
       reviewNotes: '[correctness] Missing null check — `src/example.ts:42`',
+      // PAN-1862 (FR-6): the fallback synthesis persists per-reviewer verdicts so
+      // the next cycle's selective re-review can skip provably-clean reviewers.
+      // No atCommit here — the mocked execFile fails the HEAD probe, and an
+      // unanchored verdict simply re-runs next cycle (fail toward quality).
+      reviewerVerdicts: {
+        security: { status: 'passed', findingsPath: `${reviewDir}/security.md` },
+        correctness: { status: 'blocked', findingsPath: `${reviewDir}/correctness.md` },
+        performance: { status: 'passed', findingsPath: `${reviewDir}/performance.md` },
+        requirements: { status: 'passed', findingsPath: `${reviewDir}/requirements.md` },
+      },
     });
     expect(mockDeliverReviewVerdictFeedback).toHaveBeenCalledWith({
       issueId: 'PAN-880',

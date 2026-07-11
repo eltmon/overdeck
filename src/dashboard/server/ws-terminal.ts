@@ -88,9 +88,9 @@ function markClientReady(hub: PtyHub, ws: WebSocket, readyTimer: ReturnType<type
 function authorizeTerminalUpgrade(request: http.IncomingMessage): { ok: true } | { ok: false; status: number; message: string } {
   // Hotfix for #1166: PAN-457 added an internal-token + session-cookie gate
   // here that broke every terminal panel when the dashboard is reached via
-  // Traefik (https://pan.localhost) instead of `pan up`'s bootstrapped URL.
+  // Traefik (https://overdeck.localhost) instead of `pan up`'s bootstrapped URL.
   // Origin validation is sufficient to block cross-origin browser attacks
-  // (a tab on evil.example.com cannot forge Origin: https://pan.localhost),
+  // (a tab on evil.example.com cannot forge Origin: https://overdeck.localhost),
   // which is the realistic threat model for a localhost dev tool. Re-add the
   // gate properly per the acceptance criteria in #1166 before reintroducing.
   const originCheck = validateOriginHeaders(request.headers, request.method ?? 'GET');

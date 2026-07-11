@@ -9,7 +9,7 @@ export interface StatusHistoryEntry {
 
 export interface ReviewStatus {
   issueId: string;
-  reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
+  reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked' | 'skipped';
   testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
   mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
   inspectStatus?: 'pending' | 'inspecting' | 'passed' | 'failed' | 'error';

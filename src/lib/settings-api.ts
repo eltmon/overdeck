@@ -500,6 +500,16 @@ function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknow
   if (scope !== undefined && scope !== 'pan-only' && scope !== 'all-tracked-projects') {
     errors.push(`${fieldPath}.scope must be pan-only or all-tracked-projects`);
   }
+
+  // PAN-1862: review pipeline knobs (harmless on other roles; only review reads them).
+  const mode = roleConfig.mode;
+  if (mode !== undefined && mode !== 'quick' && mode !== 'full' && mode !== 'none') {
+    errors.push(`${fieldPath}.mode must be quick, full, or none`);
+  }
+  const reReviewScope = roleConfig.reReviewScope;
+  if (reReviewScope !== undefined && reReviewScope !== 'all' && reReviewScope !== 'changed' && reReviewScope !== 'blockers') {
+    errors.push(`${fieldPath}.reReviewScope must be all, changed, or blockers`);
+  }
 }
 
 /** Resolve a role/sub-role model ref (possibly a workhorse: slot) to a concrete model id. */

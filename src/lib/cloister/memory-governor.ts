@@ -288,6 +288,37 @@ export async function shed(): Promise<ShedResult> {
   let verdict = await assessMemoryPressure();
   if (verdict.band !== 'hard') return result;
 
+  // PAN-2579: warm-idle advancing sessions (review/test/ship with a recorded
+  // terminal verdict, kept alive for fast re-review) are the cheapest agent shed —
+  // killing one loses no state (the next dispatch resumes the saved session with
+  // its context) while an active work agent's pause loses momentum. Shed them
+  // before touching any work agent. This shed — plus a reboot — is the ONLY
+  // sanctioned way a warm session dies (see docs/ROLES.md warm-by-default policy).
+  try {
+    const { loadReviewStatuses } = await import('../review-status.js');
+    const { listSessionNames, killSession } = await import('../tmux.js');
+    const { selectNonMergedTerminalAdvancingSessions } = await import('./reap-terminal-sessions.js');
+    const { markAdvancingSessionStopped } = await import('./advancing-selfheal.js');
+    const { Effect } = await import('effect');
+    const aliveSessions = await Effect.runPromise(listSessionNames());
+    const warmIdle = selectNonMergedTerminalAdvancingSessions(loadReviewStatuses(), [...aliveSessions]);
+    for (const session of warmIdle) {
+      if (verdict.band !== 'hard') break;
+      try {
+        await Effect.runPromise(killSession(session));
+        markAdvancingSessionStopped(session);
+        result.pausedAgents.push(session);
+        console.log(`[memory-governor] Shed warm-idle advancing session ${session} under HARD pressure (PAN-2579; resumable with context)`);
+      } catch (err) {
+        console.warn(`[memory-governor] Failed to shed warm-idle session ${session}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      verdict = await assessMemoryPressure();
+    }
+  } catch (err) {
+    console.warn(`[memory-governor] Warm-idle shed step failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
+  }
+  if (verdict.band !== 'hard') return result;
+
   const exemptOperatorStarted = loadCloisterConfigSync().concurrency?.exempt_operator_started;
   const workAgents: ShedCandidateAgent[] = runningAgents
     .filter((a) => a.role === 'work')

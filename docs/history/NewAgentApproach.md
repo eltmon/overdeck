@@ -90,7 +90,7 @@ workspace container** (single-Deacon invariant). Top level (observed):
 | `projects.yaml` | project → repo/tracker config (also `config.yaml`, `config.toml`, `cloister.toml`) |
 | `*.db` (`panopticon.db`, `cloister.db`, `event-store.db`, `events.db`, `dashboard.db`, `cache.db`, `state.db`) | SQLite stores |
 | `review-status.json`, `restart-status.json`, `supervisor-watchdog.json`, `supervisor.pid` | live status files |
-| `certs/`, `traefik/` | TLS + reverse-proxy for `*.pan.localhost` |
+| `certs/`, `traefik/` | TLS + reverse-proxy for `*.overdeck.localhost` |
 | `tldr/`, `cliproxy/`, `tts-voices.json`, `voice-settings.json`, `ui-theme.json` | feature data |
 
 ---
@@ -208,7 +208,7 @@ draft (.pan/drafts/*.md) → proposed → approved → active/running → comple
     collision-checked against `git ls-remote --heads origin 'uat/*'`.
   - `<MMDD>` = month/day.
 - **Workspace/Traefik:** the folder `uat-<label>-<codename>-<MMDD>` yields the host
-  `uat-<label>-<codename>-<MMDD>.pan.localhost` **(code, cloister/uat-stack.ts)**.
+  `uat-<label>-<codename>-<MMDD>.overdeck.localhost` **(code, cloister/uat-stack.ts)**.
 - A generation is a throwaway branch off main with each candidate merged in;
   **promotion** merges the `uat/*` branch into main as one no-ff commit.
 

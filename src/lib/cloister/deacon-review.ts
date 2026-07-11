@@ -16,5 +16,7 @@ export {
 export {
   monitorReviewConvoySignals,
   cleanupOrphanedReviewSessions,
+  checkStalledReviewDiscovery,
+  checkReviewForkCacheMisses,
   synthesizeReviewFromReports,
 } from './deacon-review-signals.js';

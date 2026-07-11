@@ -12,6 +12,7 @@ import {
   markWorkspaceStuck as dbMarkStuck,
   clearWorkspaceStuck as dbClearStuck,
 } from './overdeck/review-status-sync.js';
+import { registerReviewStatusMapReader } from './cloister/review-status-source.js';
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
 import { updateIssueRecordForReviewStatusSync, enrichReviewNotesFromRecordSync, readJournalStatusSync } from './overdeck/review-status-record-sync.js';
 import { needsReviewDispatch } from './review-dispatch-decision.js';
@@ -41,7 +42,7 @@ export interface BlockerReason {
 
 export interface ReviewStatus {
   issueId: string;
-  reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
+  reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked' | 'skipped';
   testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
   mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
   inspectStatus?: 'pending' | 'inspecting' | 'passed' | 'failed' | 'error';
@@ -116,6 +117,13 @@ export interface ReviewStatus {
   deaconIgnoredReason?: string;
   /** PAN-1762: advisory files_scope drift recorded at pan done and surfaced to review. */
   scopeDrift?: ScopeDriftRecord;
+  /**
+   * PAN-1862 (FR-6): per-convoy-reviewer verdicts from the latest full-review cycle,
+   * keyed by sub-role (security/correctness/performance/requirements). Journal-durable
+   * (not a DB column — overlaid on read like reviewRequestedAt). `atCommit` anchors
+   * drift invalidation for selective re-review (reviewersToRerun).
+   */
+  reviewerVerdicts?: Partial<Record<string, { status: 'passed' | 'blocked'; atCommit?: string; findingsPath?: string }>>;
   // PAN-1531: reviewTempStashRef / reviewTempStashMessage / reviewTempStashSequence
   // removed. The review pipeline no longer stashes uncommitted work — the
   // dirty-worktree gate refuses pan done / pan review request before review
@@ -140,7 +148,7 @@ export function reviewGatesPassedSync(
   s: Pick<ReviewStatus, 'reviewStatus' | 'testStatus' | 'verificationStatus' | 'uatStatus' | 'mergeStatus'>,
 ): boolean {
   return (
-    s.reviewStatus === 'passed' &&
+    (s.reviewStatus === 'passed' || s.reviewStatus === 'skipped') &&
     (s.testStatus === 'passed' || s.testStatus === 'skipped') &&
     verificationSatisfied(s) &&
     (s.uatStatus === undefined || s.uatStatus === 'passed') &&
@@ -169,7 +177,9 @@ export function mergeGateEligibility(
   status: Pick<ReviewStatus, 'reviewStatus' | 'testStatus' | 'verificationStatus' | 'mergeStatus'> | null,
 ): MergeGateEligibility {
   if (!status) return { eligible: false, reason: 'no review record' };
-  if (status.reviewStatus !== 'passed') return { eligible: false, reason: `review is ${status.reviewStatus}` };
+  if (status.reviewStatus !== 'passed' && status.reviewStatus !== 'skipped') {
+    return { eligible: false, reason: `review is ${status.reviewStatus}` };
+  }
   if (status.testStatus !== 'passed' && status.testStatus !== 'skipped') {
     return { eligible: false, reason: `test is ${status.testStatus}` };
   }
@@ -177,6 +187,10 @@ export function mergeGateEligibility(
   if (status.mergeStatus === 'merged') return { eligible: false, reason: 'already merged' };
   return { eligible: true };
 }
+// PAN-2579: register the cycle-free status-map reader used by concurrency.ts for
+// warm-idle advancing classification (see cloister/review-status-source.ts).
+registerReviewStatusMapReader(() => getAllReviewStatusesFromDb());
+
 const DEFAULT_STATUS_FILE = join(homedir(), '.overdeck', 'review-status.json');
 
 export function loadReviewStatuses(filePath = DEFAULT_STATUS_FILE): Record<string, ReviewStatus> {
@@ -310,6 +324,26 @@ export function setReviewStatusSync(
     return status as ReviewStatus;
   }
 
+  // PAN-2578: a bare 'reviewing' write must never clobber a terminal blocked/failed verdict.
+  // A review agent can finish FASTER than the dispatch path that spawned it (PAN-399: the
+  // verification gate completed 2 minutes after the agent recorded BLOCKED, and the dispatch
+  // route's redundant `{ reviewStatus: 'reviewing' }` write destroyed the verdict in both the
+  // DB and the journal). Blocked/failed → reviewing is legal ONLY when the caller explicitly
+  // starts a NEW review cycle by carrying reviewSpawnedAt (spawnReviewRoleForIssue does).
+  if (
+    update.reviewStatus === 'reviewing' &&
+    (status.reviewStatus === 'blocked' || status.reviewStatus === 'failed') &&
+    update.reviewSpawnedAt === undefined
+  ) {
+    console.warn(
+      `[review-status] Rejecting stale 'reviewing' write for ${issueId} — a terminal ` +
+      `'${status.reviewStatus}' verdict is already recorded for this review cycle. Only a ` +
+      `new dispatch (carrying reviewSpawnedAt) may re-enter 'reviewing'.`
+    );
+    notifyPipelineSync({ type: 'status_changed', issueId, status: status as ReviewStatus });
+    return status as ReviewStatus;
+  }
+
   // PAN-424: Reject testStatus regression from 'passed' to 'dispatch_failed' or 'failed'.
   // Once tests pass, duplicate dispatch failures must not overwrite the result.
   if (
@@ -322,6 +356,13 @@ export function setReviewStatusSync(
   }
 
   const merged = { ...status, ...update };
+
+  // PAN-1862 (FR-6): reviewerVerdicts is a per-sub-role MAP — a partial update
+  // (synthesis reporting only the reviewers that re-ran this cycle) must merge
+  // with, not replace, the carried-forward entries from prior cycles.
+  if (update.reviewerVerdicts && status.reviewerVerdicts) {
+    merged.reviewerVerdicts = { ...status.reviewerVerdicts, ...update.reviewerVerdicts };
+  }
 
   // Track status transitions in history (last 10 entries)
   const history = [...(status.history || [])];
@@ -513,9 +554,11 @@ export function setReviewStatusSync(
 
   // Reactive Cloister owns review→test and test→ship scheduling. setReviewStatus
   // emits the lifecycle event here so API and direct-import callers share one path.
+  // PAN-1862 (FR-14): reviewStatus 'skipped' (review mode none) advances the
+  // lifecycle exactly like an approved review — same event, same downstream.
   if (
-    update.reviewStatus === 'passed' &&
-    status.reviewStatus !== 'passed' &&
+    (update.reviewStatus === 'passed' || update.reviewStatus === 'skipped') &&
+    status.reviewStatus !== 'passed' && status.reviewStatus !== 'skipped' &&
     updated.testStatus === 'pending'
   ) {
     const canSkipTests =

@@ -697,7 +697,7 @@ export class CloisterService {
 
   private getDashboardApiUrl(): string {
     // Cloister always runs in-process with the dashboard, so it must talk to
-    // its own loopback — never to a public DASHBOARD_URL like https://pan.localhost,
+    // its own loopback — never to a public DASHBOARD_URL like https://overdeck.localhost,
     // which would round-trip through Traefik+TLS and fail validation from inside
     // Node (PAN-845). Use 127.0.0.1 explicitly to avoid the IPv6-first /etc/hosts
     // trap (PAN-841): undici-based fetch connects to [::1] and hangs because the

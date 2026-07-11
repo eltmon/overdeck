@@ -957,7 +957,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       const dashboardUrl = getDashboardApiUrlSync();
 
       // Check if dashboard is running. Use fetch() so https:// URLs work
-      // (e.g. when DASHBOARD_URL points at https://pan.localhost via Traefik).
+      // (e.g. when DASHBOARD_URL points at https://overdeck.localhost via Traefik).
       const checkDashboard = async (): Promise<boolean> => {
         try {
           const controller = new AbortController();
