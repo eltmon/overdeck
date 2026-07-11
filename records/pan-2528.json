@@ -21,6 +21,16 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-11T09:59:23.776Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-11T20:03Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-11T20:03:53.675Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "MiniMax-M3",
+      "timestamp": "2026-07-11T20:03:53.821Z"
     }
   ],
   "feedback": [],
@@ -60,7 +70,7 @@
     "recordedAt": "2026-07-11T09:59:17.529Z"
   },
   "created": "2026-07-11T09:50:24.420Z",
-  "updated": "2026-07-11T12:56:49.401Z",
+  "updated": "2026-07-11T20:14:28.146Z",
   "pipeline": {
     "issueId": "PAN-2528",
     "reviewStatus": "reviewing",
@@ -69,10 +79,10 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-11T12:56:49.256Z",
-    "reviewNotes": "Verification failed at frontend-typecheck",
+    "updatedAt": "2026-07-11T20:14:27.606Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: shared HarnessSelect now disables blocked ohmypi with inline ToS reason; PI_TOS_BLOCK_REASON now names the Claude Code subscription Terms of Service restriction; configuration/harnesses.mdx ## ToS rules section now states that dashboard pickers render ohmypi disabled with inline Terms of Service reason. tests: ModelPicker.render 5/5, chat ModelPicker 8/8, frontend-typecheck clean.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2575",
-    "lastVerifiedCommit": "c5e8a13efdb14b7adaf0d4783a0e1e4a548e5bff",
+    "lastVerifiedCommit": "942917cdcc7c40ec843e24bb427ca41525673c96",
     "reviewRequestedAt": "2026-07-11T12:56:22.566Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -115,9 +125,9 @@
       "byStage": {
         "codex": {
           "openai/gpt-5.5": {
-            "input": 1396958,
-            "output": 7023,
-            "cacheRead": 1240192,
+            "input": 2372550,
+            "output": 12241,
+            "cacheRead": 2121600,
             "cacheWrite": 0
           }
         },
@@ -147,9 +157,9 @@
         },
         "work": {
           "custom/MiniMax-M3": {
-            "input": 8401492,
-            "output": 135797,
-            "cacheRead": 50284708,
+            "input": 9266446,
+            "output": 171251,
+            "cacheRead": 64559928,
             "cacheWrite": 0
           },
           "custom/kimi-k2.7-code": {
@@ -162,9 +172,9 @@
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 1396958,
-          "output": 7023,
-          "cacheRead": 1240192,
+          "input": 2372550,
+          "output": 12241,
+          "cacheRead": 2121600,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -186,9 +196,9 @@
           "cacheWrite": 102609
         },
         "custom/MiniMax-M3": {
-          "input": 8401492,
-          "output": 135797,
-          "cacheRead": 50284708,
+          "input": 9266446,
+          "output": 171251,
+          "cacheRead": 64559928,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
@@ -199,8 +209,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 24.382582,
-        "pricingAsOf": "2026-07-11T12:56:49.359Z"
+        "usd": 25.75278,
+        "pricingAsOf": "2026-07-11T20:14:28.071Z"
       }
     },
     "merges": [
