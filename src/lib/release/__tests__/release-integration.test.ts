@@ -232,6 +232,34 @@ describe('runRelease integration with fake timers', () => {
     expect(mocks.reviewUpdates.at(-1)?.update.releaseStatus).toBe('rolled_back');
   });
 
+  it('marks manual components blocked and the release partial instead of passed', async () => {
+    seedMergeAndProject({
+      components: {
+        api: { trigger: 'auto', smoke_test: 'npm run smoke:api' },
+        worker: { trigger: 'manual' },
+      },
+    });
+
+    const resultPromise = runRelease('PAN-399', '/repo/overdeck', {
+      runCommand: vi.fn(async () => {}),
+    });
+
+    const result = await resultPromise;
+
+    expect(result?.status).toBe('partial');
+    expect(result?.components.map((c) => [c.componentKey, c.status])).toEqual([
+      ['api', 'passed'],
+      ['worker', 'blocked'],
+    ]);
+    expect(mocks.reviewUpdates.at(-1)).toMatchObject({
+      issueId: 'PAN-399',
+      update: {
+        releaseStatus: 'partial',
+        releaseNotes: 'Release awaiting manual step(s): worker.',
+      },
+    });
+  });
+
   it('skips cleanly and returns null when the project has no release config', async () => {
     seedMergeAndProject(undefined);
 

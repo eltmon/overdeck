@@ -103,6 +103,19 @@ export async function runRelease(
     return releaseSet;
   }
 
+  const blockedComponents = releaseSet.components.filter(
+    (component) => component.status === 'blocked',
+  );
+  if (blockedComponents.length > 0) {
+    const blockedKeys = blockedComponents.map((component) => component.componentKey).join(', ');
+    releaseSet = persistReleaseSetStatus(releaseSet, 'partial');
+    setReviewStatusSync(issueId, {
+      releaseStatus: 'partial',
+      releaseNotes: `Release awaiting manual step(s): ${blockedKeys}.`,
+    });
+    return releaseSet;
+  }
+
   releaseSet = persistReleaseSetStatus(releaseSet, 'passed');
   setReviewStatusSync(issueId, { releaseStatus: 'passed' });
   return releaseSet;
