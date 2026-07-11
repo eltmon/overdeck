@@ -1,0 +1,155 @@
+{
+  "issueId": "PAN-2322",
+  "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-11T09:47:49.224Z",
+      "reason": "end",
+      "note": "No deviations. All three PAN-2322 beads (gate override + scrub message, identity-mocked config tests, operator-only skill docs) were implemented and closed in prior sessions. Full test suite passes (971 test files, 9241 tests passed). Working tree clean and branch pushed to origin/feature/pan-2322."
+    }
+  ],
+  "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "src/dashboard/server/config.ts",
+      "sync-sources/dev-skills/pan-dashboard-restart/SKILL.md",
+      "tests/unit/dashboard/config.test.ts"
+    ],
+    "actualChangedFiles": [
+      "src/dashboard/server/config.ts",
+      "sync-sources/dev-skills/pan-dashboard-restart/SKILL.md",
+      "tests/unit/dashboard/config.test.ts"
+    ],
+    "recordedAt": "2026-07-11T09:47:42.604Z"
+  },
+  "created": "2026-07-11T09:43:27.964Z",
+  "updated": "2026-07-11T09:50:39.342Z",
+  "pipeline": {
+    "issueId": "PAN-2322",
+    "reviewStatus": "reviewing",
+    "testStatus": "pending",
+    "verificationStatus": "passed",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-11T09:50:39.252Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2574",
+    "lastVerifiedCommit": "90ba8e17bd2655d020e0a3bbca9c373a0861ac2a",
+    "reviewRequestedAt": "2026-07-11T09:47:49.225Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "src/dashboard/server/config.ts",
+        "sync-sources/dev-skills/pan-dashboard-restart/SKILL.md",
+        "tests/unit/dashboard/config.test.ts"
+      ],
+      "actualChangedFiles": [
+        "src/dashboard/server/config.ts",
+        "sync-sources/dev-skills/pan-dashboard-restart/SKILL.md",
+        "tests/unit/dashboard/config.test.ts"
+      ],
+      "recordedAt": "2026-07-11T09:47:42.604Z"
+    }
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "codex": {
+          "openai/gpt-5.5": {
+            "input": 575331,
+            "output": 4627,
+            "cacheRead": 504064,
+            "cacheWrite": 0
+          }
+        },
+        "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 34299,
+            "output": 11084,
+            "cacheRead": 4964106,
+            "cacheWrite": 55583
+          }
+        },
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 19461,
+            "output": 15687,
+            "cacheRead": 1504049,
+            "cacheWrite": 244444
+          }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 11229,
+            "output": 13959,
+            "cacheRead": 2132625,
+            "cacheWrite": 106816
+          }
+        },
+        "work": {
+          "custom/kimi-k2.7-code": {
+            "input": 3985752,
+            "output": 70610,
+            "cacheRead": 37471744,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.5": {
+          "input": 575331,
+          "output": 4627,
+          "cacheRead": 504064,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 53760,
+          "output": 26771,
+          "cacheRead": 6468155,
+          "cacheWrite": 300027
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 11229,
+          "output": 13959,
+          "cacheRead": 2132625,
+          "cacheWrite": 106816
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 3985752,
+          "output": 70610,
+          "cacheRead": 37471744,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 24.885979,
+        "pricingAsOf": "2026-07-11T09:50:39.338Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2574"
+    ],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
+  "statusOverrides": {
+    "config-test-identity-mock": "completed",
+    "config-test-identity-mock.ac1": "completed",
+    "config-test-identity-mock.ac2": "completed",
+    "config-test-identity-mock.ac3": "completed",
+    "config-test-identity-mock.ac4": "completed",
+    "config-test-identity-mock.ac5": "completed",
+    "document-operator-override": "completed",
+    "document-operator-override.ac1": "completed",
+    "document-operator-override.ac2": "completed",
+    "gate-override-scrub-message": "completed",
+    "gate-override-scrub-message.ac1": "completed",
+    "gate-override-scrub-message.ac2": "completed",
+    "gate-override-scrub-message.ac3": "completed",
+    "gate-override-scrub-message.ac4": "completed"
+  }
+}
