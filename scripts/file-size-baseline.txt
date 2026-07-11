@@ -19,7 +19,6 @@
 1179 src/lib/cloister/deacon-swarm.ts
 3632 src/lib/cloister/deacon.ts
 1409 src/lib/cloister/merge-agent.ts
-1026 src/lib/cloister/service.ts
 1749 src/lib/cloister/specialists.ts
 1194 src/lib/conversations/smart-compaction.ts
 1660 src/lib/database/schema.ts

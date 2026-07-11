@@ -1,17 +1,9 @@
 /** Cloister service: core monitoring for all running agents. */
 import type { HealthState } from '../runtimes/types.js';
 import type { CloisterConfig } from './config.js';
-import type { AgentHealth, HealthSummary } from './health.js';
+import type { AgentHealth } from './health.js';
 import type { DomainEvent } from '@overdeck/contracts';
 import { loadCloisterConfigSync } from './config.js';
-import {
-  getAgentHealth,
-  getMultipleAgentHealth,
-  generateHealthSummary,
-  getAgentsToPoke,
-  getAgentsToKill,
-  getAgentsNeedingAttention,
-} from './health.js';
 // PAN-378: initializeEnabledSpecialists removed — per-project ephemeral specialists
 // are spawned on-demand, no global initialization needed.
 import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
@@ -32,7 +24,6 @@ import {
   stopDeacon,
   isDeaconRunning,
   getDeaconStatus,
-  assessDeaconPatrolFreshness,
   getLastPatrolResult,
   getDeaconLogs,
   runPatrol,
@@ -61,6 +52,7 @@ import {
 } from './service-health.js';
 import { checkCompletionMarkers, type CompletionHost } from './service-completion.js';
 import { checkForMassDeaths as checkForMassDeathsWithHost, handleAgentCrash as handleAgentCrashWithHost, killAgent as killAgentWithHost, pauseSpawns as pauseSpawnsWithHost, pokeAgent as pokeAgentWithHost, pokeAgentWithEscalation as pokeAgentWithEscalationWithHost, progressFingerprint as progressFingerprintWithHost, restartAgent as restartAgentWithHost, type CrashEvent, type CrashHost } from './service-crash.js';
+import { getAllAgentHealth as getAllAgentHealthWithHost, getServiceAgentHealth, getStatus as getStatusWithHost, type CloisterStatus, type StatusHost } from './service-status.js';
 import type { CloisterDomainEventLike } from './service-reactive.js';
 export { spawnFlywheel, pauseFlywheel, resumeFlywheel } from './flywheel.js';
 export {
@@ -72,6 +64,7 @@ export {
   stateToRole,
 } from './service-reactive.js';
 export type { CloisterDomainEventLike, ReactiveIssueState } from './service-reactive.js';
+export type { CloisterStatus } from './service-status.js';
 export { nonRestartableReason } from './service-crash.js';
 
 // State file for cross-process communication
@@ -139,21 +132,6 @@ export function readCloisterStateFile(): { running: boolean; pid?: number; start
     // State file doesn't exist or is corrupted
   }
   return { running: false };
-}
-
-/**
- * Cloister service status
- */
-export interface CloisterStatus {
-  running: boolean;
-  lastCheck: Date | null;
-  config: CloisterConfig;
-  summary: HealthSummary;
-  agentsNeedingAttention: string[];
-  patrol: ReturnType<typeof assessDeaconPatrolFreshness> & {
-    loopRunning: boolean;
-    patrolIntervalMs: number;
-  };
 }
 
 /**
@@ -288,6 +266,20 @@ export class CloisterService {
       checkForMassDeaths: () => service.checkForMassDeaths(),
       pauseSpawns: (reason: string) => service.pauseSpawns(reason),
       emit: (event: CrashEvent) => service.emit(event),
+    };
+  }
+
+  private statusHost(): StatusHost {
+    const service = this;
+    return {
+      get statusCache() { return service._statusCache; },
+      set statusCache(value: CloisterStatus | null) { service._statusCache = value; },
+      get statusCacheAt() { return service._statusCacheAt; },
+      set statusCacheAt(value: number) { service._statusCacheAt = value; },
+      get statusCacheTtlMs() { return service.STATUS_CACHE_TTL_MS; },
+      get lastCheck() { return service.lastCheck; },
+      get config() { return service.config; },
+      isRunning: () => service.isRunning(),
     };
   }
 
@@ -818,80 +810,21 @@ export class CloisterService {
    * calls for every agent, which scales poorly with agent count.
    */
   getStatus(): CloisterStatus {
-    const now = Date.now();
-    if (this._statusCache && now - this._statusCacheAt < this.STATUS_CACHE_TTL_MS) {
-      return this._statusCache;
-    }
-
-    const runningAgents = listRunningAgentsSync().filter((a) => a.tmuxActive);
-    const agentIds = runningAgents.map((a) => a.id);
-
-    const agentHealths: AgentHealth[] = [];
-
-    for (const agentId of agentIds) {
-      const runtime = getRuntimeForAgent(agentId);
-      if (runtime) {
-        const health = getAgentHealth(agentId, runtime);
-        agentHealths.push(health);
-      }
-    }
-
-    const summary = generateHealthSummary(agentHealths);
-    const needsAttention = getAgentsNeedingAttention(agentHealths).map((h) => h.agentId);
-
-    const deaconStatus = getDeaconStatus();
-    const patrol = assessDeaconPatrolFreshness({
-      isRunning: deaconStatus.isRunning,
-      lastPatrol: deaconStatus.state.lastPatrol,
-      patrolIntervalMs: deaconStatus.config.patrolIntervalMs,
-    });
-
-    const status: CloisterStatus = {
-      running: this.isRunning(),
-      lastCheck: this.lastCheck,
-      config: this.config,
-      summary,
-      agentsNeedingAttention: needsAttention,
-      patrol: {
-        ...patrol,
-        loopRunning: deaconStatus.isRunning,
-        patrolIntervalMs: deaconStatus.config.patrolIntervalMs,
-      },
-    };
-
-    this._statusCache = status;
-    this._statusCacheAt = now;
-    return status;
+    return getStatusWithHost(this.statusHost());
   }
 
   /**
    * Get health for a specific agent
    */
   getAgentHealth(agentId: string): AgentHealth | null {
-    const runtime = getRuntimeForAgent(agentId);
-    if (!runtime) {
-      return null;
-    }
-
-    return getAgentHealth(agentId, runtime);
+    return getServiceAgentHealth(this.statusHost(), agentId);
   }
 
   /**
    * Get health for all running agents
    */
   getAllAgentHealth(): AgentHealth[] {
-    const runningAgents = listRunningAgentsSync().filter((a) => a.tmuxActive);
-    const agentHealths: AgentHealth[] = [];
-
-    for (const agent of runningAgents) {
-      const runtime = getRuntimeForAgent(agent.id);
-      if (runtime) {
-        const health = getAgentHealth(agent.id, runtime);
-        agentHealths.push(health);
-      }
-    }
-
-    return agentHealths;
+    return getAllAgentHealthWithHost(this.statusHost());
   }
 
   /**
