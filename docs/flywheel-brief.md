@@ -33,6 +33,10 @@ exists lives in `vision.mdx`. Read both before acting.
   (`gh pr create` if needed, then `gh pr merge --squash`) — never a local git push to
   `origin/main` — then run `pan done <id> --strike`.
 - **Run-specific focus:** none unless given at launch.
+- **Metric-aware prioritization:** within the substrate-hardening tier, order substrate-bug
+  suggestions by the weight returned from `pan flywheel weights --json` (higher first), and set
+  each suggestion's `weight` and `weightReason` from that output. Weight re-orders only within the
+  tier — it never overrides red-main/P0 work and never filters operator-injected items.
 
 ## Stop
 
