@@ -195,7 +195,7 @@ describe('ServerConfig', () => {
         process.env['OVERDECK_AGENT_ID'] = agentId;
 
         await expect(getConfig()).rejects.toThrow(
-          `Refusing OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY=1 for pipeline-role identity`,
+          `Refusing host dashboard port override for pipeline-role identity`,
         );
       },
     );
@@ -307,6 +307,15 @@ describe('ServerConfig', () => {
 
       identityMock.current = { repoRoot: '/home/test/Projects/overdeck', mode: 'peer' };
       delete process.env['OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY'];
+      await expect(getConfig()).rejects.toThrow();
+      try {
+        await getConfig();
+      } catch (err) {
+        expect(String(err)).not.toContain('OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY');
+      }
+
+      process.env['OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY'] = '1';
+      process.env['OVERDECK_AGENT_ID'] = 'agent-pan-2545';
       await expect(getConfig()).rejects.toThrow();
       try {
         await getConfig();
