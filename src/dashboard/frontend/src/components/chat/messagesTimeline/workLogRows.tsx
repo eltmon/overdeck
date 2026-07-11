@@ -35,23 +35,26 @@ export function WorkLogGroup({ entries, hideToolCalls, cwd, issueId }: { entries
     );
   }
 
-  const visible = expanded ? entries : entries.slice(0, MAX_VISIBLE_WORK_LOG_ENTRIES);
+  // Collapsed groups show the NEWEST entries — the head-slice kept the first
+  // six entries from session start visible and buried a live agent's current
+  // activity behind the expand button on long sessions (PAN-2576).
+  const visible = expanded ? entries : entries.slice(-MAX_VISIBLE_WORK_LOG_ENTRIES);
   const hasOverflow = entries.length > MAX_VISIBLE_WORK_LOG_ENTRIES;
 
   return (
     <div className={styles.workLogGroup}>
-      {visible.map((entry) => (
-        <SimpleWorkEntryRow key={entry.id} entry={entry} cwd={cwd} issueId={issueId} />
-      ))}
       {hasOverflow && !expanded && (
         <button
           className={styles.workLogExpandBtn}
           onClick={() => setExpanded(true)}
         >
           <ChevronRight size={12} />
-          Show {entries.length - MAX_VISIBLE_WORK_LOG_ENTRIES} more
+          Show {entries.length - MAX_VISIBLE_WORK_LOG_ENTRIES} earlier
         </button>
       )}
+      {visible.map((entry) => (
+        <SimpleWorkEntryRow key={entry.id} entry={entry} cwd={cwd} issueId={issueId} />
+      ))}
       {expanded && (
         <button
           className={styles.workLogExpandBtn}
