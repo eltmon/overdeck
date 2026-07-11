@@ -72,9 +72,9 @@ describe('getAgentRuntimeBaseCommand permission-mode integration', () => {
     else process.env.PAN_YOLO = ORIGINAL
   })
 
-  it('production default emits --permission-mode auto for an Anthropic model', async () => {
+  it('production default emits --permission-mode default for an Anthropic model', async () => {
     const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6')
-    expect(cmd).toBe("claude --permission-mode auto --model 'claude-sonnet-4-6'")
+    expect(cmd).toBe("claude --permission-mode default --model 'claude-sonnet-4-6'")
     expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
     expect(cmd).not.toMatch(/bypassPermissions/)
   })
