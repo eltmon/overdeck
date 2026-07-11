@@ -1,10 +1,6 @@
 import { Effect } from 'effect';
-import {
-  deleteReleaseSet as dbDelete,
-  getAllReleaseSetsFromDb,
-  getReleaseSetFromDb,
-  upsertReleaseSet as dbUpsert,
-} from './overdeck/release-sync.js';
+import { deleteReleaseSet as dbDelete, getAllReleaseSetsFromDb, getReleaseSetFromDb, upsertReleaseSet as dbUpsert } from './overdeck/release-sync.js';
+import { resolveIssueIdSync } from './issue-id.js';
 import type {
   ReleaseCheckStatus,
   ReleaseComponentState,
@@ -24,11 +20,11 @@ export type {
 } from './release-set-types.js';
 
 export function upsertReleaseSetSync(releaseSet: ReleaseSet): void {
-  dbUpsert(releaseSet);
+  dbUpsert({ ...releaseSet, issueId: resolveIssueIdSync(releaseSet.issueId) });
 }
 
 export function getReleaseSetSync(issueId: string): ReleaseSet | null {
-  return getReleaseSetFromDb(issueId);
+  return getReleaseSetFromDb(resolveIssueIdSync(issueId));
 }
 
 export function getAllReleaseSetsSync(projectKey?: string): ReleaseSet[] {
@@ -36,7 +32,7 @@ export function getAllReleaseSetsSync(projectKey?: string): ReleaseSet[] {
 }
 
 export function deleteReleaseSetSync(issueId: string): void {
-  dbDelete(issueId);
+  dbDelete(resolveIssueIdSync(issueId));
 }
 
 export function withComponentStateSync(

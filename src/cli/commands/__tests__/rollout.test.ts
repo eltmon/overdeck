@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   getReleaseSetSync: vi.fn(),
   runRelease: vi.fn(),
   parseIssueIdSync: vi.fn((id: string) => ({ prefix: id.split('-')[0], numeric: Number(id.split('-')[1]), issueId: id })),
+  resolveIssueIdSync: vi.fn((id: string) => id.toUpperCase()),
   resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'overdeck', projectPath: '/repo/overdeck' })),
 }));
 
@@ -17,6 +18,7 @@ vi.mock('../../../lib/release/release-engine.js', () => ({
 
 vi.mock('../../../lib/issue-id.js', () => ({
   parseIssueIdSync: mocks.parseIssueIdSync,
+  resolveIssueIdSync: mocks.resolveIssueIdSync,
 }));
 
 vi.mock('../../../lib/projects.js', () => ({
@@ -76,6 +78,15 @@ describe('rollout status', () => {
 
     await expect(rolloutStatusCommand('PAN-399')).rejects.toThrow('process.exit unexpectedly called with "1"');
   });
+
+  it('canonicalizes lowercase issue IDs for status lookup', async () => {
+    mocks.getReleaseSetSync.mockReturnValue(makeReleaseSet());
+
+    await rolloutStatusCommand('pan-399');
+
+    expect(mocks.resolveIssueIdSync).toHaveBeenCalledWith('pan-399');
+    expect(mocks.getReleaseSetSync).toHaveBeenCalledWith('PAN-399');
+  });
 });
 
 describe('rollout retry', () => {
@@ -105,5 +116,14 @@ describe('rollout retry', () => {
 
     const output = vi.mocked(console.log).mock.calls.map(call => String(call[0])).join('\n');
     expect(output).toContain('no release config');
+  });
+
+  it('canonicalizes lowercase issue IDs for retry', async () => {
+    mocks.runRelease.mockResolvedValue(makeReleaseSet({ status: 'releasing' }));
+
+    await rolloutRetryCommand('pan-399');
+
+    expect(mocks.resolveIssueIdSync).toHaveBeenCalledWith('pan-399');
+    expect(mocks.runRelease).toHaveBeenCalledWith('PAN-399', '/repo/overdeck');
   });
 });

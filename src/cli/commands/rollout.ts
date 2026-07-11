@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import chalk, { type ChalkInstance } from 'chalk';
-import { parseIssueIdSync } from '../../lib/issue-id.js';
+import { parseIssueIdSync, resolveIssueIdSync } from '../../lib/issue-id.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { getReleaseSetSync, type ReleaseSet } from '../../lib/release-set.js';
 import { runRelease } from '../../lib/release/release-engine.js';
@@ -58,16 +58,17 @@ export async function rolloutStatusCommand(issueId: string): Promise<void> {
     console.error(chalk.red(`Invalid issue ID: ${issueId}`));
     process.exit(1);
   }
+  const canonicalIssueId = resolveIssueIdSync(issueId);
 
-  const resolved = resolveProjectFromIssueSync(issueId);
+  const resolved = resolveProjectFromIssueSync(canonicalIssueId);
   if (!resolved) {
-    console.error(chalk.red(`No project configured for ${issueId}`));
+    console.error(chalk.red(`No project configured for ${canonicalIssueId}`));
     process.exit(1);
   }
 
-  const releaseSet = getReleaseSetSync(issueId);
+  const releaseSet = getReleaseSetSync(canonicalIssueId);
   if (!releaseSet) {
-    console.log(`No release set found for ${issueId}.`);
+    console.log(`No release set found for ${canonicalIssueId}.`);
     return;
   }
 
@@ -79,16 +80,17 @@ export async function rolloutRetryCommand(issueId: string): Promise<void> {
     console.error(chalk.red(`Invalid issue ID: ${issueId}`));
     process.exit(1);
   }
+  const canonicalIssueId = resolveIssueIdSync(issueId);
 
-  const resolved = resolveProjectFromIssueSync(issueId);
+  const resolved = resolveProjectFromIssueSync(canonicalIssueId);
   if (!resolved) {
-    console.error(chalk.red(`No project configured for ${issueId}`));
+    console.error(chalk.red(`No project configured for ${canonicalIssueId}`));
     process.exit(1);
   }
 
-  const releaseSet = await runRelease(issueId, resolved.projectPath);
+  const releaseSet = await runRelease(canonicalIssueId, resolved.projectPath);
   if (!releaseSet) {
-    console.log(`${issueId}: no release config — skipped.`);
+    console.log(`${canonicalIssueId}: no release config — skipped.`);
     return;
   }
 

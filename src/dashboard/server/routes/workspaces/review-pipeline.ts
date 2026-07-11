@@ -21,7 +21,7 @@ import { promisify } from 'node:util';
 import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { parseIssueIdSync, extractPrefixSync } from '../../../../lib/issue-id.js';
+import { parseIssueIdSync, extractPrefixSync, resolveIssueIdSync } from '../../../../lib/issue-id.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { isStatePlaneOnlyStatus } from '../../../../lib/state-plane.js';
 import { EventStoreService } from '../../services/domain-services.js';
@@ -808,10 +808,11 @@ const getReleaseSetRoute = HttpRouter.add(
   '/api/workspaces/:issueId/release',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
-    const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    const rawIssueId = params['issueId'] ?? '';
+    if (!parseIssueIdSync(rawIssueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
+    const issueId = resolveIssueIdSync(rawIssueId);
 
     const releaseSet = getReleaseSetSync(issueId);
     if (!releaseSet) {
