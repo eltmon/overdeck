@@ -532,13 +532,9 @@ describe('spawnReviewRoleForIssue review mode fan-out', () => {
     expect(block).toContain('...(opts.model ? { model: opts.model } : {})');
     expect(block).toContain('...(opts.harness ? { harness: opts.harness } : {})');
     expect(block).toContain('message: `Convoy review spawned: ${run.id}`');
-
-    const convoySrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/lib/cloister/review-convoy.ts'),
-      'utf-8',
-    );
-    expect(convoySrc).toContain('params.inScope.map');
-    expect(convoySrc).toContain('spawnReviewSubRoleForIssue');
+    // The fan-out itself (params.inScope.map -> spawnReviewSubRoleForIssue) lives in
+    // review-convoy.ts and is exercised behaviorally by the review-rerun-scope and
+    // convoy tests — no extra source introspection here (lint:source-introspection).
   });
 
   it('full mode re-review resumes the parent before reusing the convoy fan-out path', async () => {
