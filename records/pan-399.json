@@ -151,6 +151,11 @@
       "timestamp": "2026-07-11T22:19:05.177Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-07-11T22:50:56.271Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
@@ -269,10 +274,10 @@
       "tests/unit/lib/projects-release-config.test.ts",
       "tests/unit/lib/review-status-release.test.ts"
     ],
-    "recordedAt": "2026-07-11T22:18:47.079Z"
+    "recordedAt": "2026-07-11T22:50:49.101Z"
   },
   "created": "2026-07-11T09:28:34.266Z",
-  "updated": "2026-07-11T22:26:24.029Z",
+  "updated": "2026-07-11T22:58:55.872Z",
   "pipeline": {
     "issueId": "PAN-399",
     "reviewStatus": "pending",
@@ -281,11 +286,11 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-11T22:26:24.000Z",
+    "updatedAt": "2026-07-11T22:58:55.846Z",
     "reviewNotes": "Verification failed at typecheck",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2577",
     "lastVerifiedCommit": "3d1876c48fabb8c4c98c848b867698e27f998428",
-    "reviewRequestedAt": "2026-07-11T22:26:21.264Z",
+    "reviewRequestedAt": "2026-07-11T22:58:53.603Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "drizzle/overdeck/0000_overdeck_init.sql",
@@ -401,9 +406,9 @@
         "tests/unit/lib/projects-release-config.test.ts",
         "tests/unit/lib/review-status-release.test.ts"
       ],
-      "recordedAt": "2026-07-11T22:18:47.079Z"
+      "recordedAt": "2026-07-11T22:50:49.101Z"
     },
-    "panDoneRecoveredAt": "2026-07-11T22:26:21.264Z"
+    "panDoneRecoveredAt": "2026-07-11T22:58:53.603Z"
   },
   "closeOut": {
     "usage": {
@@ -482,9 +487,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 4940810,
-            "output": 289166,
-            "cacheRead": 169331968,
+            "input": 4981464,
+            "output": 289574,
+            "cacheRead": 170617600,
             "cacheWrite": 0
           }
         }
@@ -533,15 +538,15 @@
           "cacheWrite": 77989
         },
         "custom/kimi-k2.7-code": {
-          "input": 4940810,
-          "output": 289166,
-          "cacheRead": 169331968,
+          "input": 4981464,
+          "output": 289574,
+          "cacheRead": 170617600,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 140.505967,
-        "pricingAsOf": "2026-07-11T22:26:24.028Z"
+        "usd": 140.790487,
+        "pricingAsOf": "2026-07-11T22:58:55.870Z"
       }
     },
     "merges": [
