@@ -11,6 +11,11 @@
       "id": "D-test-waived",
       "summary": "Test gate waived: Refactor-only seam extraction; no behavior change required new tests. Existing coverage was exercised by scoped Cloister suites and the full Vitest suite.",
       "recordedAt": "2026-07-11T08:16:54.819Z"
+    },
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: Refactor-only seam extraction; no behavior change required new tests. Existing coverage was exercised by scoped Cloister suites and the full Vitest suite.",
+      "recordedAt": "2026-07-11T08:46:32.013Z"
     }
   ],
   "sessionHistory": [
@@ -44,6 +49,11 @@
     },
     {
       "timestamp": "2026-07-11T08:17:03.435Z",
+      "reason": "end",
+      "note": "Test gate waived: Refactor-only seam extraction; no behavior change required new tests. Existing coverage was exercised by scoped Cloister suites and the full Vitest suite."
+    },
+    {
+      "timestamp": "2026-07-11T08:46:43.774Z",
       "reason": "end",
       "note": "Test gate waived: Refactor-only seam extraction; no behavior change required new tests. Existing coverage was exercised by scoped Cloister suites and the full Vitest suite."
     }
@@ -83,10 +93,10 @@
       "src/lib/cloister/service-status.ts",
       "src/lib/cloister/service.ts"
     ],
-    "recordedAt": "2026-07-11T08:16:59.297Z"
+    "recordedAt": "2026-07-11T08:46:36.613Z"
   },
   "created": "2026-07-10T23:44:51.626Z",
-  "updated": "2026-07-11T08:19:09.425Z",
+  "updated": "2026-07-11T08:50:11.691Z",
   "pipeline": {
     "issueId": "PAN-2149",
     "reviewStatus": "reviewing",
@@ -95,11 +105,11 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-11T08:19:09.397Z",
+    "updatedAt": "2026-07-11T08:50:11.662Z",
     "inspectNotes": "Bead health-seam ack: duplicate delivery of already-reviewed commit 74dc13c0, re-confirmed - all 5 functions verbatim (this.->host. only), delegates <=5 lines with no visibility change, file-size baseline lowered 1684->1476, typecheck/lint/vitest all exit 0 (9237 passed, 0 failed).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2573",
     "lastVerifiedCommit": "fac03e7a7fd6cea25b2faf97e5070e34bd4a1ad3",
-    "reviewRequestedAt": "2026-07-11T08:18:02.921Z",
+    "reviewRequestedAt": "2026-07-11T08:48:03.028Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [
@@ -134,7 +144,7 @@
         "src/lib/cloister/service-status.ts",
         "src/lib/cloister/service.ts"
       ],
-      "recordedAt": "2026-07-11T08:16:59.297Z"
+      "recordedAt": "2026-07-11T08:46:36.613Z"
     }
   },
   "closeOut": {
@@ -142,9 +152,9 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 8382054,
-            "output": 5008,
-            "cacheRead": 8023552,
+            "input": 8439203,
+            "output": 5536,
+            "cacheRead": 8063488,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
@@ -154,9 +164,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 457883,
-            "output": 1421,
-            "cacheRead": 376576,
+            "input": 756697,
+            "output": 2089,
+            "cacheRead": 669440,
             "cacheWrite": 0
           }
         },
@@ -179,9 +189,9 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 8382054,
-          "output": 5008,
-          "cacheRead": 8023552,
+          "input": 8439203,
+          "output": 5536,
+          "cacheRead": 8063488,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
@@ -191,9 +201,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 457883,
-          "output": 1421,
-          "cacheRead": 376576,
+          "input": 756697,
+          "output": 2089,
+          "cacheRead": 669440,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -210,8 +220,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 30.41213,
-        "pricingAsOf": "2026-07-11T08:19:09.424Z"
+        "usd": 30.608352,
+        "pricingAsOf": "2026-07-11T08:50:11.690Z"
       }
     },
     "merges": [
