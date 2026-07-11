@@ -2,7 +2,7 @@
   "issueId": "PAN-2229",
   "schemaVersion": 2,
   "created": "2026-07-10T21:05:49.847Z",
-  "updated": "2026-07-11T11:54:06.116Z",
+  "updated": "2026-07-11T13:14:11.604Z",
   "feedback": [],
   "pipeline": {
     "issueId": "PAN-2229",
@@ -35,7 +35,7 @@
     }
   },
   "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "model": "glm-5.2",
   "recoveryTrips": [
     {
       "issue": "PAN-2229",
@@ -44,6 +44,14 @@
       "tripCount": 1,
       "open": true,
       "needsYouEmittedAt": "2026-07-10T23:22:27.105Z"
+    },
+    {
+      "issue": "PAN-2229",
+      "recoveryPath": "stuck-remediation",
+      "obligationGeneration": "2026-07-11T11:44:06.000Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-11T13:14:11.604Z"
     }
   ]
 }
