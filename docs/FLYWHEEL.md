@@ -94,7 +94,25 @@ Flywheel-Affects-Criterion: 1,4
 
 The `gh-issue-trailer-hook` Claude Code PreToolUse Bash hook injects the provenance lines (`Flywheel-Run-Id`, `Flywheel-Filed-By`, and `Flywheel-Discovered-In`) into `gh issue create` calls before later Bash filters run. It handles inline `--body`, `--body-file <path>`, and `--body-file -` stdin bodies, and it leaves commands unchanged when a `Flywheel-Run-Id:` line already exists. `Flywheel-Affects-Criterion` is semantic and must be supplied by the filer in the issue body; the hook does not derive it from environment variables.
 
-Telemetry consumes these trailers as the bridge between GitHub issues and local Flywheel stats. The substrate-bug poller reads candidate GitHub issues, parses the trailer block, stores each issue in the substrate-bug projection, and uses `Flywheel-Discovered-In` for substrate-attributable failure metrics. `Flywheel-Affects-Criterion` feeds the weight model described in **Metric-aware prioritization** below.
+Telemetry consumes these trailers as the bridge between GitHub issues and local Flywheel stats. The substrate-bug poller reads candidate GitHub issues, parses the trailer block, stores each issue in the substrate-bug projection, and uses `Flywheel-Discovered-In` for substrate-attributable failure metrics. `Flywheel-Affects-Criterion` feeds the weight model described below.
+
+## Metric-aware prioritization
+
+Substrate bugs are not all equally urgent: a bug that degrades a v1.0 criterion currently in the red is a bigger blocker than one that touches a green criterion. The Flywheel ranks substrate-bug suggestions within the substrate-hardening tier using a numeric **weight** derived from the bug's declared affected criteria and the latest telemetry.
+
+A substrate bug declares affected criteria with the `Flywheel-Affects-Criterion: N[,M]` trailer line documented above, using the criterion numbers from **Reading the Stats panel** (1–7). Labels of the form `affects-criterion-N` are also accepted as a fallback.
+
+The weight formula is intentionally simple:
+
+- For each affected criterion, if the latest 30-day telemetry shows that criterion as **red** (failing its ready threshold), the bug gets a large status-driven bonus.
+- If the criterion is **yellow** (close to threshold), it gets a smaller bonus.
+- Green criteria contribute no bonus.
+- When telemetry is **insufficient** for a criterion, that criterion contributes zero.
+- Among bugs with the same status-derived score, the bug whose criteria show the **worst trend** (largest negative drift) wins the tiebreak.
+
+The result is a single number (`weight`) and a human-readable `weightReason` such as `Criterion 4 (MTTR) is red`. The orchestrator runs `pan flywheel weights --json` each tick, reads the weight for each substrate bug, and orders suggestions within the substrate-hardening tier by weight descending. Higher-weight bugs are surfaced first, but weight **only re-orders within the tier** — it never override red-main/P0 work or filter operator-injected items.
+
+`pan flywheel weights [--window <dur>] [--issue <id>] [--json]` is the sandbox-safe CLI surface for the same data the dashboard uses. Without `--json` it prints a table; with `--json` it emits the full weighted rows. The dashboard renders the weight as a badge on each substrate-bug suggestion in the Status panel, alongside the `weightReason`, and sorts by priority then weight.
 
 ## Lifecycle
 
