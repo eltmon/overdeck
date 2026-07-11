@@ -140,6 +140,40 @@ describe('FlywheelStatusDetails', () => {
     expect(screen.getByText('No suggestions yet — orchestrator will emit on next tick.')).toBeInTheDocument();
   });
 
+  it('renders weight badge and reason on suggestions that carry them', () => {
+    render(<FlywheelStatusDetails status={{
+      ...status,
+      suggestions: [
+        { priority: 'high', action: 'investigate', issueId: 'PAN-10', rationale: 'Substrate gate is blocked', weight: 4.8, weightReason: 'Criterion 1 is red' },
+        { priority: 'medium', action: 'review', issueId: 'PAN-30', rationale: 'Review is ready' },
+      ],
+    }} />);
+
+    const rows = screen.getAllByTestId('flywheel-suggestion');
+    expect(rows).toHaveLength(2);
+    expect(within(rows[0]).getByTestId('suggestion-weight-badge')).toHaveTextContent('weight 4.8');
+    expect(within(rows[0]).getByTestId('suggestion-weight-reason')).toHaveTextContent('Criterion 1 is red');
+    expect(within(rows[1]).queryByTestId('suggestion-weight-badge')).not.toBeInTheDocument();
+    expect(within(rows[1]).queryByTestId('suggestion-weight-reason')).not.toBeInTheDocument();
+  });
+
+  it('sorts suggestions by priority then weight descending', () => {
+    render(<FlywheelStatusDetails status={{
+      ...status,
+      suggestions: [
+        { priority: 'high', action: 'start', issueId: 'PAN-1', rationale: 'Lower weight', weight: 1.0 },
+        { priority: 'high', action: 'start', issueId: 'PAN-2', rationale: 'Higher weight', weight: 3.5 },
+        { priority: 'urgent', action: 'investigate', issueId: 'PAN-3', rationale: 'Urgent first' },
+      ],
+    }} />);
+
+    const rows = screen.getAllByTestId('flywheel-suggestion');
+    expect(rows).toHaveLength(3);
+    expect(within(rows[0]).getByRole('button', { name: 'PAN-3' })).toBeInTheDocument();
+    expect(within(rows[1]).getByRole('button', { name: 'PAN-2' })).toBeInTheDocument();
+    expect(within(rows[2]).getByRole('button', { name: 'PAN-1' })).toBeInTheDocument();
+  });
+
   it('navigates issue suggestions but leaves system suggestions without click-through', () => {
     const onNavigateAgent = vi.fn();
     const onNavigateIssue = vi.fn();

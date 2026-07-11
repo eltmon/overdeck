@@ -100,12 +100,28 @@ function SuggestionPriorityBadge({ priority }: { priority: FlywheelSuggestion['p
   );
 }
 
+function WeightBadge({ weight }: { weight: number }) {
+  return (
+    <span
+      className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+      title="Substrate-bug weight by affected v1.0 criterion"
+      data-testid="suggestion-weight-badge"
+    >
+      weight {weight}
+    </span>
+  );
+}
+
 function sortSuggestions(suggestions: ReadonlyArray<FlywheelSuggestion>): FlywheelSuggestion[] {
   return suggestions
     .map((suggestion, index) => ({ suggestion, index }))
     .sort((left, right) => {
       const priorityDiff = SUGGESTION_PRIORITY_ORDER[left.suggestion.priority] - SUGGESTION_PRIORITY_ORDER[right.suggestion.priority];
-      return priorityDiff === 0 ? left.index - right.index : priorityDiff;
+      if (priorityDiff !== 0) return priorityDiff;
+      const leftWeight = left.suggestion.weight ?? 0;
+      const rightWeight = right.suggestion.weight ?? 0;
+      if (rightWeight !== leftWeight) return rightWeight - leftWeight;
+      return left.index - right.index;
     })
     .map(({ suggestion }) => suggestion);
 }
@@ -140,6 +156,7 @@ export function FlywheelStatusDetails({ status, onNavigateAgent, onNavigateIssue
                     <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                       {suggestion.action}
                     </span>
+                    {suggestion.weight !== undefined && <WeightBadge weight={suggestion.weight} />}
                     {issueId && (
                       <button type="button" className="font-mono text-xs font-medium text-primary hover:underline" onClick={() => navigateIssue(issueId)}>
                         {issueId}
@@ -147,6 +164,11 @@ export function FlywheelStatusDetails({ status, onNavigateAgent, onNavigateIssue
                     )}
                   </div>
                   <p className="mt-2 text-sm text-foreground">{suggestion.rationale}</p>
+                  {suggestion.weightReason && (
+                    <p className="mt-1 text-xs text-muted-foreground" data-testid="suggestion-weight-reason">
+                      {suggestion.weightReason}
+                    </p>
+                  )}
                 </div>
               );
             })}
