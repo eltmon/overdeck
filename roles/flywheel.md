@@ -79,6 +79,10 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
    then **drive a root-cause fix to `main`** — `pan strike` for a precision fix, `pan plan
    --auto`/work for anything larger. Filing is recordkeeping; the fix is the point. Never
    paper over a broken flow with a hand-edit, a curl, or a fallback that masks it.
+   When you know which v1.0 readiness criterion the bug degrades, include a
+   `Flywheel-Affects-Criterion: N[,M]` trailer line in the issue body using the 1–7 numbering from
+   `docs/FLYWHEEL.md` **Reading the Stats panel**. This lets the Flywheel weight model rank the
+   bug higher when that criterion is the current bottleneck.
    **A `pan tell` nudge that unblocks one stuck/conflicted/blocked agent is the same anti-pattern:**
    it clears one instance while the identical failure recurs for the next issue — a band-aid, not
    a fix. Your job is not to nudge things to keep them moving; it is to identify the **root cause

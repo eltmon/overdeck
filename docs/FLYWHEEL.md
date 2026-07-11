@@ -81,6 +81,7 @@ Substrate bug issues filed during a Flywheel run carry a trailer block at the bo
 Flywheel-Run-Id: RUN-123
 Flywheel-Filed-By: agent
 Flywheel-Discovered-In: PAN-1487
+Flywheel-Affects-Criterion: 1,4
 ```
 
 `Flywheel-Run-Id` identifies the active Flywheel orchestrator run that exposed the bug. The hook only injects the block when the run id matches the canonical `RUN-<number>` form.
@@ -89,9 +90,11 @@ Flywheel-Discovered-In: PAN-1487
 
 `Flywheel-Discovered-In` names the pipeline issue whose run exposed the substrate bug. It is resolved from the filing agent's Overdeck state at `${OVERDECK_HOME}/agents/<agent-id>/state.json`; the line is omitted when no issue id is available.
 
-The `gh-issue-trailer-hook` Claude Code PreToolUse Bash hook injects the trailer into `gh issue create` calls before later Bash filters run. It handles inline `--body`, `--body-file <path>`, and `--body-file -` stdin bodies, and it leaves commands unchanged when a `Flywheel-Run-Id:` line already exists.
+`Flywheel-Affects-Criterion` is an optional, author-supplied line naming the v1.0 readiness criterion (or criteria) the bug degrades. Use the criterion numbers from **Reading the Stats panel** above (1–7), comma-separated. Add this line when the affected criterion is known; omit it when the impact is unclear. The dashboard and `pan flywheel weights` use this line to compute a weight for the bug so the bottleneck criterion rises in the suggestion order.
 
-Telemetry consumes these trailers as the bridge between GitHub issues and local Flywheel stats. The substrate-bug poller reads candidate GitHub issues, parses the trailer block, stores each issue in the substrate-bug projection, and uses `Flywheel-Discovered-In` for substrate-attributable failure metrics.
+The `gh-issue-trailer-hook` Claude Code PreToolUse Bash hook injects the provenance lines (`Flywheel-Run-Id`, `Flywheel-Filed-By`, and `Flywheel-Discovered-In`) into `gh issue create` calls before later Bash filters run. It handles inline `--body`, `--body-file <path>`, and `--body-file -` stdin bodies, and it leaves commands unchanged when a `Flywheel-Run-Id:` line already exists. `Flywheel-Affects-Criterion` is semantic and must be supplied by the filer in the issue body; the hook does not derive it from environment variables.
+
+Telemetry consumes these trailers as the bridge between GitHub issues and local Flywheel stats. The substrate-bug poller reads candidate GitHub issues, parses the trailer block, stores each issue in the substrate-bug projection, and uses `Flywheel-Discovered-In` for substrate-attributable failure metrics. `Flywheel-Affects-Criterion` feeds the weight model described in **Metric-aware prioritization** below.
 
 ## Lifecycle
 
