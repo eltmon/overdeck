@@ -30,7 +30,7 @@ import { isStartingWithinGrace } from './agent-grace.js';
 import { recordDeaconNudge } from './deacon-nudge-log.js';
 import { checkInspectAgentTimeouts } from './deacon-inspect.js';
 import { checkApiErrorAgents } from './deacon-api-recovery.js';
-import { checkOrphanedReviewStatuses, recoverStalledReviewConvoys, checkMissingReviewStatuses, checkStuckReviewing, checkCompletedButUnsignaledReviews, monitorReviewConvoySignals, cleanupOrphanedReviewSessions } from './deacon-review.js';
+import { checkOrphanedReviewStatuses, recoverStalledReviewConvoys, checkMissingReviewStatuses, checkStuckReviewing, checkCompletedButUnsignaledReviews, monitorReviewConvoySignals, cleanupOrphanedReviewSessions, checkStalledReviewDiscovery, checkReviewForkCacheMisses } from './deacon-review.js';
 import { getAutoCloseOutCanonicalState } from './deacon-canonical-state.js';
 import { checkReadyForMergeStuck as checkReadyForMergeStuckWithDeps, reconcileStaleMergeStatus, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
 import { reconcileTraefikNetworks } from '../workspace/traefik-connect.js';
@@ -3042,6 +3042,15 @@ export async function runPatrol(): Promise<PatrolResult> {
   for (const a of planningCleanupActions) addLog('action', a, state.patrolCycle);
 
   // Notify review synthesis when server-owned convoy reviewers crash or time out.
+  // PAN-1862 Phase A backstops: force the convoy for a parent that never signals
+  // discovery-ready, and report fork cache misses (observability only).
+  const stalledDiscoveryActions = await checkStalledReviewDiscovery();
+  actions.push(...stalledDiscoveryActions);
+  for (const a of stalledDiscoveryActions) addLog('action', a, state.patrolCycle);
+  const forkCacheActions = await checkReviewForkCacheMisses();
+  actions.push(...forkCacheActions);
+  for (const a of forkCacheActions) addLog('action', a, state.patrolCycle);
+
   const reviewerMonitorActions = await monitorReviewConvoySignals();
   actions.push(...reviewerMonitorActions);
   for (const a of reviewerMonitorActions) addLog('action', a, state.patrolCycle);

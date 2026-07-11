@@ -525,13 +525,20 @@ describe('spawnReviewRoleForIssue review mode fan-out', () => {
 
     expect(block).toContain('buildReviewRolePrompt');
     expect(block).toContain('buildSelfReviewPrompt');
-    // PAN-1862: the convoy fans out over the selective in-scope set (all four on a
-    // first cycle; a subset on re-review when carried verdicts prove skips safe).
-    expect(block).toContain('inScopeSubRoles.map');
-    expect(block).toContain('spawnReviewSubRoleForIssue');
+    // PAN-1862: the fan-out itself lives in review-convoy.ts — the dispatch block
+    // delegates to launchConvoyReviewersPromise over the selective in-scope set
+    // (all four on a first cycle; a subset when carried verdicts prove skips safe).
+    expect(block).toContain('launchConvoyReviewersPromise');
     expect(block).toContain('...(opts.model ? { model: opts.model } : {})');
     expect(block).toContain('...(opts.harness ? { harness: opts.harness } : {})');
     expect(block).toContain('message: `Convoy review spawned: ${run.id}`');
+
+    const convoySrc = readFileSync(
+      resolve(import.meta.dirname, '../../../src/lib/cloister/review-convoy.ts'),
+      'utf-8',
+    );
+    expect(convoySrc).toContain('params.inScope.map');
+    expect(convoySrc).toContain('spawnReviewSubRoleForIssue');
   });
 
   it('full mode re-review resumes the parent before reusing the convoy fan-out path', async () => {

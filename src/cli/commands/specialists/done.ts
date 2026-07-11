@@ -86,12 +86,13 @@ export async function doneCommand(
       // route does. The synthesis agent signals via this CLI path, so without this
       // the snapshot never happens: canSkipTests can't fire and the deacon's
       // post-review-commit drift detection goes blind, jamming the issue at
-      // passed-but-no-anchor. Runs for EVERY review verdict (not just passed):
-      // per-reviewer verdicts need their atCommit anchor on a BLOCKED aggregate
-      // too — that is exactly the cycle whose clean reviewers selective re-review
-      // wants to skip next time (PAN-1862 FR-6/NFR-1). Included in `update` so it
-      // lands atomically before setReviewStatus evaluates canSkipTests.
-      {
+      // passed-but-no-anchor. Runs for passed verdicts (reviewedAtCommit) AND for
+      // any verdict carrying --reviewers: per-reviewer verdicts need their atCommit
+      // anchor on a BLOCKED aggregate too — that is exactly the cycle whose clean
+      // reviewers selective re-review wants to skip next time (PAN-1862 FR-6/NFR-1).
+      // A bare blocked verdict (no --reviewers) skips the git probe so the durable
+      // write stays synchronous ahead of feedback delivery (PAN-2524).
+      if (options.status === 'passed' || update.reviewerVerdicts) {
         let workspaceHead: string | undefined;
         try {
           const { resolveProjectFromIssueSync } = await import('../../../lib/projects.js');

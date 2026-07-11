@@ -793,6 +793,8 @@ export const ActivityEntryEvent = Schema.Struct({
     issueId: Schema.optional(IssueId),
     /** Dashboard route the feed navigates to on click (e.g. /conv/<name>, /flywheel). */
     link: Schema.optional(Schema.String),
+    /** PAN-1862 (FR-12): fire a desktop notification for this entry (operator-facing warnings). */
+    desktop: Schema.optional(Schema.Boolean),
   }),
 })
 export type ActivityEntryEvent = typeof ActivityEntryEvent.Type
