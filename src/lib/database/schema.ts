@@ -217,6 +217,8 @@ export function initSchema(db: SqliteDatabase): void {
       review_notes          TEXT,
       test_notes            TEXT,
       merge_notes           TEXT,
+      release_status        TEXT,
+      release_notes         TEXT,
       updated_at            TEXT NOT NULL,
       ready_for_merge       INTEGER NOT NULL DEFAULT 0,
       auto_requeue_count    INTEGER DEFAULT 0,
@@ -1727,6 +1729,12 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
       CREATE INDEX IF NOT EXISTS idx_release_set_components_issue_order
         ON release_set_components(issue_id, release_order, component_key);
     `);
+  }
+
+  // v59 -> v60: add release status columns to review_status.
+  if (currentVersion < 60) {
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN release_status TEXT`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN release_notes TEXT`); } catch { /* already exists */ }
   }
 
   // After all migrations, set the version

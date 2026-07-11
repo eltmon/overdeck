@@ -68,6 +68,8 @@ function runOverdeckMigrationSync(db: SqliteDatabase): void {
 function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   try { db.exec('ALTER TABLE `discovered_sessions` ADD COLUMN `harness` text'); } catch { /* already exists or table absent */ }
   try { db.exec("UPDATE `discovered_sessions` SET `harness` = 'claude-code' WHERE `harness` IS NULL"); } catch { /* table absent */ }
+  try { db.exec('ALTER TABLE `review_status` ADD COLUMN `release_status` text'); } catch { /* already exists or table absent */ }
+  try { db.exec('ALTER TABLE `review_status` ADD COLUMN `release_notes` text'); } catch { /* already exists or table absent */ }
   db.exec('CREATE INDEX IF NOT EXISTS `cost_session_id_idx` ON `cost_events` (`session_id`)');
   // PAN-2507: preemptive-scheduler yield attribution on agents. The init
   // migration only runs on a fresh DB, so existing overdeck.db files need these

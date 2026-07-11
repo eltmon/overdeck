@@ -285,6 +285,8 @@ CREATE TABLE `review_status` (
 	`review_notes` text,
 	`test_notes` text,
 	`merge_notes` text,
+	`release_status` text,
+	`release_notes` text,
 	`updated_at` integer NOT NULL,
 	`ready_for_merge` integer DEFAULT 0 NOT NULL,
 	`auto_requeue_count` integer DEFAULT 0,
