@@ -411,7 +411,6 @@ export async function postMergeLifecycle(
     try {
       await transitionIssueToVerifyingOnMain(issueId, projectPath);
       void recordFeatureRegistryLifecycle({ issueId, status: 'merged' });
-      await triggerPostMergeReleaseIfConfigured(issueId, projectPath);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.warn(`[merge-agent] Could not transition issue to verifying_on_main: ${message}`);
@@ -428,6 +427,8 @@ export async function postMergeLifecycle(
       logActivity('merge_failed', `Post-merge verifying_on_main transition failed for ${issueId}: ${message}`);
       throw err;
     }
+
+    await triggerPostMergeReleaseIfConfigured(issueId, projectPath);
 
     // 2. Compact old beads (via lifecycle module)
     try {
@@ -581,7 +582,22 @@ export async function triggerPostMergeReleaseIfConfigured(issueId: string, proje
   }
 
   const { runRelease } = await import('../release/release-engine.js');
-  await runRelease(issueId, projectPath);
+  try {
+    await runRelease(issueId, projectPath);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`[merge-agent] Post-merge release trigger failed for ${issueId}: ${message}`);
+    try {
+      setReviewStatusSync(issueId, {
+        releaseStatus: 'failed',
+        releaseNotes: `Post-merge release trigger failed: ${message}`,
+      });
+    } catch (statusErr: any) {
+      console.warn(`[merge-agent] Could not persist release trigger failure: ${statusErr?.message ?? statusErr}`);
+    }
+    // Release failures are surfaced through release status; the merge itself
+    // has already completed and must not be marked failed (review feedback).
+  }
 }
 
 async function transitionIssueToVerifyingOnMain(issueId: string, projectPath: string): Promise<void> {

@@ -198,7 +198,7 @@ describe('runRelease', () => {
       runCommand,
     });
 
-    expect(runCommand).toHaveBeenCalledWith('npm run version:api', 4321);
+    expect(runCommand).toHaveBeenCalledWith('npm run version:api', 4321, '/repo/overdeck');
     const sourcePath = fileURLToPath(new URL('../release-engine.ts', import.meta.url));
     expect(readFileSync(sourcePath, 'utf-8')).not.toContain('execSync');
   });

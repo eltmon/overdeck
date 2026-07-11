@@ -17,9 +17,10 @@ const execAsync = promisify(exec);
 
 export interface ReleaseEngineOptions {
   commandTimeoutMs?: number;
+  commandCwd?: string;
   healthTimeoutMs?: number;
   healthPollIntervalMs?: number;
-  runCommand?: (command: string, timeoutMs: number) => Promise<void>;
+  runCommand?: (command: string, timeoutMs: number, cwd?: string) => Promise<void>;
   fetchHealth?: (url: string, timeoutMs: number) => Promise<{ ok: boolean; status?: number }>;
   sleep?: (ms: number) => Promise<void>;
   now?: () => Date;
@@ -54,6 +55,7 @@ export async function runRelease(
   }
 
   const now = options.now ?? (() => new Date());
+  options.commandCwd = options.commandCwd ?? projectPath;
   const plan = resolveReleasePlan(project.release);
   let releaseSet = buildReleaseSet(issueId, mergeSet, plan, now().toISOString());
   upsertReleaseSetSync(releaseSet);
@@ -237,15 +239,15 @@ async function runConfiguredCommand(command: string, options: ReleaseEngineOptio
   const timeoutMs = options.commandTimeoutMs ?? DEFAULT_COMMAND_TIMEOUT_MS;
   const runCommand = options.runCommand ?? defaultRunCommand;
   try {
-    await runCommand(command, timeoutMs);
+    await runCommand(command, timeoutMs, options.commandCwd);
     return true;
   } catch {
     return false;
   }
 }
 
-async function defaultRunCommand(command: string, timeoutMs: number): Promise<void> {
-  await execAsync(command, { timeout: timeoutMs });
+async function defaultRunCommand(command: string, timeoutMs: number, cwd?: string): Promise<void> {
+  await execAsync(command, { timeout: timeoutMs, cwd });
 }
 
 async function defaultFetchHealth(url: string, timeoutMs: number): Promise<{ ok: boolean; status?: number }> {

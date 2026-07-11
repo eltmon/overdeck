@@ -273,4 +273,32 @@ describe('runRelease integration with fake timers', () => {
       update: { releaseStatus: 'skipped', releaseNotes: 'No release config found for project.' },
     });
   });
+
+  it('runs verification commands in the project root by default', async () => {
+    seedMergeAndProject({
+      components: {
+        api: { trigger: 'auto', smoke_test: 'npm run smoke:api' },
+      },
+    });
+
+    const runCommand = vi.fn(async () => {});
+    await runRelease('PAN-399', '/repo/overdeck', { runCommand });
+
+    expect(runCommand).toHaveBeenCalledTimes(1);
+    expect(runCommand).toHaveBeenCalledWith('npm run smoke:api', expect.any(Number), '/repo/overdeck');
+  });
+
+  it('allows callers to override the command working directory', async () => {
+    seedMergeAndProject({
+      components: {
+        api: { trigger: 'auto', smoke_test: 'npm run smoke:api' },
+      },
+    });
+
+    const runCommand = vi.fn(async () => {});
+    await runRelease('PAN-399', '/repo/overdeck', { runCommand, commandCwd: '/custom/path' });
+
+    expect(runCommand).toHaveBeenCalledTimes(1);
+    expect(runCommand).toHaveBeenCalledWith('npm run smoke:api', expect.any(Number), '/custom/path');
+  });
 });
