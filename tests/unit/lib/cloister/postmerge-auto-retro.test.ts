@@ -103,6 +103,8 @@ vi.mock('../../../../src/lib/tracker-utils.js', () => ({
 vi.mock('../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: vi.fn().mockReturnValue(null),
   resolveProjectFromIssueSync: vi.fn().mockReturnValue(null),
+  getProjectSync: vi.fn().mockReturnValue(null),
+  findProjectByPathSync: vi.fn().mockReturnValue(null),
   loadProjectsConfig: vi.fn().mockReturnValue({ projects: {} }),
   loadProjectsConfigSync: vi.fn().mockReturnValue({ projects: {} }),
 }));

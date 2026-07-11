@@ -70,6 +70,7 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   try { db.exec("UPDATE `discovered_sessions` SET `harness` = 'claude-code' WHERE `harness` IS NULL"); } catch { /* table absent */ }
   try { db.exec('ALTER TABLE `review_status` ADD COLUMN `release_status` text'); } catch { /* already exists or table absent */ }
   try { db.exec('ALTER TABLE `review_status` ADD COLUMN `release_notes` text'); } catch { /* already exists or table absent */ }
+  ensureReleaseSetTablesSync(db);
   db.exec('CREATE INDEX IF NOT EXISTS `cost_session_id_idx` ON `cost_events` (`session_id`)');
   // PAN-2507: preemptive-scheduler yield attribution on agents. The init
   // migration only runs on a fresh DB, so existing overdeck.db files need these
@@ -85,6 +86,47 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   try { db.exec('ALTER TABLE `agents` ADD COLUMN `review_forked_from_parent` integer'); } catch { /* already exists or table absent */ }
   try { db.exec('ALTER TABLE `agents` ADD COLUMN `yielded_at` integer'); } catch { /* already exists or table absent */ }
   try { db.exec('ALTER TABLE `agents` ADD COLUMN `last_yield_resume_at` integer'); } catch { /* already exists or table absent */ }
+}
+
+/**
+ * Idempotent schema top-up for release set tables (PAN-399). Existing overdeck.db
+ * files created before the release-set feature need these tables added without
+ * requiring a full migration reset.
+ */
+function ensureReleaseSetTablesSync(db: SqliteDatabase): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS \`release_sets\` (
+      \`issue_id\` text PRIMARY KEY NOT NULL,
+      \`project_key\` text NOT NULL,
+      \`project_path\` text NOT NULL,
+      \`workspace_type\` text NOT NULL,
+      \`status\` text DEFAULT 'pending' NOT NULL,
+      \`created_at\` integer NOT NULL,
+      \`updated_at\` integer NOT NULL,
+      FOREIGN KEY (\`issue_id\`) REFERENCES \`issues\`(\`id\`) ON UPDATE no action ON DELETE no action
+    )
+  `);
+  db.exec('CREATE INDEX IF NOT EXISTS \`release_sets_project_idx\` ON \`release_sets\` (\`project_key\`,\`updated_at\`)');
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS \`release_set_components\` (
+      \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+      \`issue_id\` text NOT NULL,
+      \`component_key\` text NOT NULL,
+      \`provider\` text,
+      \`trigger\` text NOT NULL,
+      \`release_order\` integer DEFAULT 0 NOT NULL,
+      \`required\` integer DEFAULT true NOT NULL,
+      \`status\` text DEFAULT 'pending' NOT NULL,
+      \`health_status\` text,
+      \`version_status\` text,
+      \`smoke_status\` text,
+      \`rollback_status\` text,
+      \`notes\` text,
+      FOREIGN KEY (\`issue_id\`) REFERENCES \`release_sets\`(\`issue_id\`) ON UPDATE no action ON DELETE cascade
+    )
+  `);
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS \`release_set_components_issue_component_idx\` ON \`release_set_components\` (\`issue_id\`,\`component_key\`)');
+  db.exec('CREATE INDEX IF NOT EXISTS \`release_set_components_issue_order_idx\` ON \`release_set_components\` (\`issue_id\`,\`release_order\`,\`component_key\`)');
 }
 
 export function getOverdeckDatabaseSync(dbPath = getOverdeckDatabasePath()): SqliteDatabase {

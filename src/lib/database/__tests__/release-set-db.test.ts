@@ -1,23 +1,25 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { openDatabase, type SqliteDatabase } from '../driver.js';
-import { initSchema } from '../schema.js';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import {
+  setupOverdeckTestDb,
+  teardownOverdeckTestDb,
+  type OverdeckTestDb,
+} from '../../../../tests/helpers/overdeck-test-db.js';
 import type { ReleaseSet } from '../../release-set.js';
 
-let testDb: SqliteDatabase;
-
-vi.mock('../index.js', () => ({
-  getDatabase: () => testDb,
-  DatabaseError: class DatabaseError extends Error {},
-}));
+let odb: OverdeckTestDb;
 
 beforeEach(() => {
-  testDb = openDatabase(':memory:');
-  testDb.pragma('foreign_keys = ON');
-  initSchema(testDb);
+  odb = setupOverdeckTestDb();
+  // The release_sets table has a foreign key to issues(id).
+  odb.raw().prepare('INSERT INTO issues (id, stage, updated_at) VALUES (?, ?, ?)').run(
+    'PAN-399',
+    'open',
+    Date.now(),
+  );
 });
 
 afterEach(() => {
-  testDb.close();
+  teardownOverdeckTestDb(odb);
 });
 
 import {
@@ -103,7 +105,7 @@ describe('release-set-db', () => {
     deleteReleaseSetSync('PAN-399');
 
     expect(getReleaseSetSync('PAN-399')).toBeNull();
-    const components = testDb.prepare('SELECT * FROM release_set_components WHERE issue_id = ?').all('PAN-399');
+    const components = odb.raw().prepare('SELECT * FROM release_set_components WHERE issue_id = ?').all('PAN-399');
     expect(components).toHaveLength(0);
   });
 });

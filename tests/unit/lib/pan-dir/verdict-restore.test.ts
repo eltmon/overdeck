@@ -340,6 +340,8 @@ describe('restoreReviewStatusFromRecords', () => {
       'deacon_ignored_at',
       'deacon_ignored_reason',
       'merge_step',
+      'release_status',
+      'release_notes',
     ]);
 
     // Columns re-derived live or computed by the write path after restore

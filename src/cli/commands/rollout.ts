@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import chalk from 'chalk';
+import chalk, { type ChalkInstance } from 'chalk';
 import { parseIssueIdSync } from '../../lib/issue-id.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { getReleaseSetSync, type ReleaseSet } from '../../lib/release-set.js';
@@ -21,7 +21,7 @@ export function registerRolloutCommands(program: Command): void {
     .action(rolloutRetryCommand);
 }
 
-function statusColor(status: string): chalk.Chalk {
+function statusColor(status: string): ChalkInstance {
   switch (status) {
     case 'passed':
       return chalk.green;
