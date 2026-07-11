@@ -2541,7 +2541,7 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
             try {
               await Effect.runPromise(sendKeys(
                 agentId,
-                `⚠️  Deacon alert: container "${name}" has crashed ${CONTAINER_RESTART_MAX_COUNT} times and auto-restart gave up. The UAT environment at feature-${issueLower}.pan.localhost may be broken. Manual intervention required — check docker logs or re-containerize.`,
+                `⚠️  Deacon alert: container "${name}" has crashed ${CONTAINER_RESTART_MAX_COUNT} times and auto-restart gave up. The UAT environment at feature-${issueLower}.overdeck.localhost may be broken. Manual intervention required — check docker logs or re-containerize.`,
                 'deacon:container-gave-up',
               ));
             } catch {
@@ -2601,7 +2601,7 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
         try {
           await Effect.runPromise(sendKeys(
             agentId,
-            `⚠️  Deacon alert: container "${name}" crashed and restart failed (${(restartErr as Error).message}). The UAT environment at feature-${issueLower}.pan.localhost is likely broken.`,
+            `⚠️  Deacon alert: container "${name}" crashed and restart failed (${(restartErr as Error).message}). The UAT environment at feature-${issueLower}.overdeck.localhost is likely broken.`,
             'deacon:container-restart-failed',
           ));
         } catch {

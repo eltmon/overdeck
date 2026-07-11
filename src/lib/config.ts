@@ -215,7 +215,7 @@ const DEFAULT_CONFIG: OverdeckConfig = {
   traefik: {
     enabled: false,
     dashboard_port: 8080,
-    domain: 'pan.localhost',
+    domain: 'overdeck.localhost',
   },
   remote: {
     enabled: false,
@@ -401,7 +401,7 @@ export function getDefaultConfigSync(): OverdeckConfig {
  * e.g. http://127.0.0.1:3011) wins over DASHBOARD_URL, then config, then the
  * localhost default. This is deliberate: internal API calls must hit the
  * loopback, never a public Traefik host. A stale public DASHBOARD_URL (e.g.
- * https://pan.localhost) is routinely inherited from the dashboard process env
+ * https://overdeck.localhost) is routinely inherited from the dashboard process env
  * and 404s the API — and it breaks again on the pan→overdeck host rename. The
  * runtime already standardized on OVERDECK_DASHBOARD_URL (agent-runtime.ts,
  * cli/commands/merge.ts, flywheel.ts); this resolver now matches them.

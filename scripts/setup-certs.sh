@@ -1,6 +1,6 @@
 #!/bin/bash
 # Setup local HTTPS certificates for Overdeck using mkcert
-# This script generates trusted certificates for *.pan.localhost
+# This script generates trusted certificates for *.overdeck.localhost
 
 set -e
 
@@ -44,15 +44,15 @@ fi
 # Create certs directory if it doesn't exist
 mkdir -p "$CERTS_DIR"
 
-# Generate certificates for pan.localhost
+# Generate certificates for overdeck.localhost
 echo ""
-echo "Generating certificates for *.pan.localhost..."
+echo "Generating certificates for *.overdeck.localhost..."
 cd "$CERTS_DIR"
 
-# Generate wildcard cert for pan.localhost
-mkcert -cert-file "_wildcard.pan.localhost.pem" \
-       -key-file "_wildcard.pan.localhost-key.pem" \
-       "pan.localhost" "*.pan.localhost"
+# Generate wildcard cert for overdeck.localhost
+mkcert -cert-file "_wildcard.overdeck.localhost.pem" \
+       -key-file "_wildcard.overdeck.localhost-key.pem" \
+       "overdeck.localhost" "*.overdeck.localhost"
 
 echo ""
 echo -e "${GREEN}Certificates generated successfully!${NC}"
@@ -63,4 +63,4 @@ echo ""
 echo "You can now start Traefik:"
 echo "  cd templates/traefik && docker compose up -d"
 echo ""
-echo "Access the dashboard at: https://pan.localhost"
+echo "Access the dashboard at: https://overdeck.localhost"

@@ -4,7 +4,7 @@
  * Each ready generation can serve a real dashboard stack from its persistent
  * worktree: the devcontainer renders via the standard FEATURE_FOLDER template,
  * so the folder name (`uat-<label>-<codename>-<mmdd>`) yields the Traefik host
- * `uat-<label>-<codename>-<mmdd>.pan.localhost` with zero new infra.
+ * `uat-<label>-<codename>-<mmdd>.overdeck.localhost` with zero new infra.
  *
  * HARD INVARIANT — max 2 UAT stacks run concurrently. Docker's default
  * address pool fits ~31 bridge networks; accumulating UAT stacks would
@@ -137,7 +137,7 @@ export async function uatFrontendUrl(gen: UatGeneration, deps: Partial<UatStackD
       if (hostMatch?.[1]) return `https://${hostMatch[1]}`;
     } catch { /* fall through to convention */ }
   }
-  return `https://${folder}.pan.localhost`;
+  return `https://${folder}.overdeck.localhost`;
 }
 
 export type UatStackStatus = 'running' | 'absent';

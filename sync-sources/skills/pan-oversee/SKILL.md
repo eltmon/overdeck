@@ -166,7 +166,7 @@ curl -s -X POST http://localhost:3011/api/agents \
 ```
 
 Or use the dashboard UI via Playwright:
-1. Navigate to `https://pan.localhost`
+1. Navigate to `https://overdeck.localhost`
 2. Find the issue card for PAN-{ID}
 3. Click "Start Agent" or "Resume"
 

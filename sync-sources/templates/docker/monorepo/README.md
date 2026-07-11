@@ -60,8 +60,8 @@ docker compose logs -f
 | Redis | localhost:6379 | 6379 |
 
 With Traefik:
-- Frontend: https://app.pan.localhost
-- Backend: https://api.app.pan.localhost
+- Frontend: https://app.overdeck.localhost
+- Backend: https://api.app.overdeck.localhost
 
 ## Environment Variables
 
@@ -73,7 +73,7 @@ FRONTEND_PORT=5173
 BACKEND_PORT=3001
 
 # Traefik
-HOSTNAME=myapp.pan.localhost
+HOSTNAME=myapp.overdeck.localhost
 COMPOSE_PROJECT_NAME=myapp
 
 # Database

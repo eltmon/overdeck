@@ -29,7 +29,7 @@ docker compose logs -f app
 | ASP.NET App | http://localhost:5000 | 5000 |
 | SQL Server | localhost:1433 | 1433 |
 
-With Traefik: https://app.pan.localhost
+With Traefik: https://app.overdeck.localhost
 
 ## Environment Variables
 
@@ -38,7 +38,7 @@ Create a `.env` file:
 ```bash
 APP_PORT=5000
 HTTPS_PORT=5001
-HOSTNAME=myapp.pan.localhost
+HOSTNAME=myapp.overdeck.localhost
 COMPOSE_PROJECT_NAME=myapp
 
 # Database

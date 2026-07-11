@@ -673,7 +673,7 @@ program
     // Check if Traefik is enabled
     const configFile = join(process.env.HOME || '', '.overdeck', 'config.toml');
     let traefikEnabled = false;
-    let traefikDomain = 'pan.localhost';
+    let traefikDomain = 'overdeck.localhost';
     let dashboardPort = 3010;
     let dashboardApiPort = 3011;
 
@@ -682,7 +682,7 @@ program
         const configContent = readFileSync(configFile, 'utf-8');
         const config = parse(configContent) as any;
         traefikEnabled = config.traefik?.enabled === true;
-        traefikDomain = config.traefik?.domain || 'pan.localhost';
+        traefikDomain = config.traefik?.domain || 'overdeck.localhost';
         dashboardPort = config.dashboard?.port || 3010;
         dashboardApiPort = config.dashboard?.api_port || 3011;
       } catch (error) {

@@ -214,7 +214,7 @@ function parseAgentHarness(value: string | undefined): ArtifactMetadata['agentHa
 }
 
 function resolveArtifactUrls(slug: string, options: ArtifactLifecycleOptions): ArtifactUrls {
-  const domain = options.baseDomain ?? process.env.PAN_ARTIFACT_DOMAIN ?? 'pan.localhost';
+  const domain = options.baseDomain ?? process.env.PAN_ARTIFACT_DOMAIN ?? 'overdeck.localhost';
   return {
     wrapperUrl: `https://${domain}/s/${slug}`,
     rawUrl: `https://artifacts.${domain}/a/${slug}`,

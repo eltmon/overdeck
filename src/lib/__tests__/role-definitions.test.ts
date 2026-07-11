@@ -156,7 +156,7 @@ describe('role definitions', () => {
     for (const role of ['work', 'review', 'test']) {
       const { body } = splitFrontmatter(readRepoFile(`roles/${role}.md`));
       expect(body).toContain('Never start, stop, kill, or restart the host-level Overdeck dashboard');
-      expect(body).toContain('https://api-feature-<issue>.pan.localhost');
+      expect(body).toContain('https://api-feature-<issue>.overdeck.localhost');
     }
   });
 

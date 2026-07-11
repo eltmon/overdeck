@@ -3,7 +3,7 @@
  *
  * Generation worktrees are PERSISTENT under `<projectRoot>/workspaces/` — the
  * live UAT stack serves from them, and the deterministic daily folder name yields the Traefik
- * host (`uat-<label>-<codename>-<mmdd>.pan.localhost`) via the standard
+ * host (`uat-<label>-<codename>-<mmdd>.overdeck.localhost`) via the standard
  * FEATURE_FOLDER devcontainer template.
  *
  * Pure I/O — exercised live; the orchestrator (uat-generation-engine.ts) holds

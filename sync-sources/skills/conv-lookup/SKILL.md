@@ -1,6 +1,6 @@
 ---
 name: conv-lookup
-description: Find, review, read, inspect, summarize, or compare Overdeck conversations. Use when the user references a pan.localhost/conv/<id> URL, a conversation ID (e.g. "conv 371", "conversation 108"), a fuzzy reference ("that GPT conversation", "the last Sonnet session"), or asks to review/read/look at/check/summarize/compare conversations. Maps conversation IDs to Claude Code JSONL session files and parses session content. Read-only.
+description: Find, review, read, inspect, summarize, or compare Overdeck conversations. Use when the user references a overdeck.localhost/conv/<id> URL, a conversation ID (e.g. "conv 371", "conversation 108"), a fuzzy reference ("that GPT conversation", "the last Sonnet session"), or asks to review/read/look at/check/summarize/compare conversations. Maps conversation IDs to Claude Code JSONL session files and parses session content. Read-only.
 triggers:
   - review conversation
   - read conversation
@@ -12,7 +12,7 @@ triggers:
   - compare conversations
   - what was in conversation
   - that conversation
-  - pan.localhost/conv
+  - overdeck.localhost/conv
   - conv/
   - conv 
   - conversation
@@ -20,18 +20,18 @@ triggers:
 
 # Conversation Lookup
 
-Use this skill whenever the user references a Overdeck conversation — by `pan.localhost/conv/<id>` URL, numeric id, conversation name, or a fuzzy reference like "that GPT conversation". Handles single-conversation review, recent-conversation listing, search, and side-by-side comparison.
+Use this skill whenever the user references a Overdeck conversation — by `overdeck.localhost/conv/<id>` URL, numeric id, conversation name, or a fuzzy reference like "that GPT conversation". Handles single-conversation review, recent-conversation listing, search, and side-by-side comparison.
 
 ## When to use
 
 - User asks about a specific conversation ID (e.g., "check conv/108", "what was happening in conversation 42?")
-- User pastes a `https://pan.localhost/conv/<id>` URL and asks you to review, read, or look at it
+- User pastes a `https://overdeck.localhost/conv/<id>` URL and asks you to review, read, or look at it
 - User wants to compare two conversations (e.g., voice/style diff across models)
 - User wants to resume or summarize a past conversation
 - User asks for recent conversation history
 - Need to find the JSONL session file for a conversation to analyze its content
 
-> **Do not** try `WebFetch` on `pan.localhost/conv/<id>` — the dashboard is an SPA and WebFetch will return empty page chrome. Always go through the script / `pan conv` CLI.
+> **Do not** try `WebFetch` on `overdeck.localhost/conv/<id>` — the dashboard is an SPA and WebFetch will return empty page chrome. Always go through the script / `pan conv` CLI.
 
 ## "Which conversation am I in?"
 

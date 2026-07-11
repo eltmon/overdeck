@@ -35,8 +35,8 @@ and stopped without making progress.
 - The `server` service inside a workspace container is a development-time
   read/UI peer only — not a second orchestrator. It will start cleanly with no
   agent state; that's intentional. To inspect the host's running orchestrator,
-  open `https://pan.localhost` (host) rather than the workspace's
-  `https://api-feature-pan-XXX.pan.localhost`.
+  open `https://overdeck.localhost` (host) rather than the workspace's
+  `https://api-feature-pan-XXX.overdeck.localhost`.
 
 ### History
 

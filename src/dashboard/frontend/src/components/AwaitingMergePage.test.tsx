@@ -110,8 +110,8 @@ describe('AwaitingMergeRow UAT context', () => {
 
   it('renders inline UAT stack startup state in the merge row', () => {
     renderRow({
-      frontendUrl: 'https://feature-pan-1686.pan.localhost',
-      apiUrl: 'https://api-feature-pan-1686.pan.localhost',
+      frontendUrl: 'https://feature-pan-1686.overdeck.localhost',
+      apiUrl: 'https://api-feature-pan-1686.overdeck.localhost',
       stackHealthy: false,
       stackHealth: {
         healthy: false,
