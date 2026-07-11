@@ -60,7 +60,7 @@
     "recordedAt": "2026-07-11T09:59:17.529Z"
   },
   "created": "2026-07-11T09:50:24.420Z",
-  "updated": "2026-07-11T10:03:08.221Z",
+  "updated": "2026-07-11T12:15:51.280Z",
   "pipeline": {
     "issueId": "PAN-2528",
     "reviewStatus": "reviewing",
@@ -208,8 +208,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "MiniMax-M3",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "disable-ohmypi-harness-select": "completed",
     "disable-ohmypi-harness-select.ac1": "completed",
