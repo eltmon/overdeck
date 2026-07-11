@@ -28,13 +28,22 @@ describe('parseNodeVersion', () => {
 
 describe('meetsMinimum', () => {
   it('rejects Node 20', () => {
-    expect(meetsMinimum({ major: 20 })).toBe(false);
+    expect(meetsMinimum({ major: 20, minor: 19 })).toBe(false);
   });
-  it('accepts Node 22', () => {
-    expect(meetsMinimum({ major: 22 })).toBe(true);
+  it('rejects Node 22.5 (below the node:sqlite 22.16 floor)', () => {
+    expect(meetsMinimum({ major: 22, minor: 5 })).toBe(false);
+  });
+  it('rejects Node 22.15 (just below the floor)', () => {
+    expect(meetsMinimum({ major: 22, minor: 15 })).toBe(false);
+  });
+  it('accepts Node 22.16 (exactly the floor)', () => {
+    expect(meetsMinimum({ major: 22, minor: 16 })).toBe(true);
+  });
+  it('accepts Node 22.23', () => {
+    expect(meetsMinimum({ major: 22, minor: 23 })).toBe(true);
   });
   it('accepts Node 24', () => {
-    expect(meetsMinimum({ major: 24 })).toBe(true);
+    expect(meetsMinimum({ major: 24, minor: 0 })).toBe(true);
   });
 });
 
@@ -71,6 +80,16 @@ describe('findCompatibleNode', () => {
     const probe = (p: string): NodeCandidate | null =>
       p === '/old/node' ? cand(p, 20, 19) : null;
     expect(findCompatibleNode(['/old/node', '/missing/node'], probe)).toBeNull();
+  });
+
+  it('rejects a 22.5 in favor of a 22.16 (minor-version floor)', () => {
+    const probe = (p: string): NodeCandidate | null => {
+      if (p === '/pre/node') return cand(p, 22, 5);
+      if (p === '/ok/node') return cand(p, 22, 16);
+      return null;
+    };
+    const best = findCompatibleNode(['/pre/node', '/ok/node'], probe);
+    expect(best?.path).toBe('/ok/node');
   });
 
   it('de-duplicates repeated paths', () => {
