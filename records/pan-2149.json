@@ -28,44 +28,86 @@
   ],
   "feedback": [],
   "created": "2026-07-10T23:44:51.626Z",
-  "updated": "2026-07-11T05:13:42.027Z",
+  "updated": "2026-07-11T05:42:27.972Z",
   "pipeline": {
     "issueId": "PAN-2149",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-11T05:13:41.995Z"
+    "updatedAt": "2026-07-11T05:42:27.901Z",
+    "inspectNotes": "Bead health-seam ack: all 5 functions verbatim (this.->host. only, verified programmatically), delegates <=5 lines with no visibility change (shared healthHost() factory instead of inline literal per call site — non-blocking, avoids 5x duplication), file-size baseline lowered 1684->1476, no any moved, typecheck/lint/vitest all exit 0 (9237 passed, 0 failed)."
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 1059886,
+            "output": 1331,
+            "cacheRead": 976896,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.5": {
+            "input": 10126953,
+            "output": 25716,
+            "cacheRead": 9695744,
+            "cacheWrite": 0
+          }
+        },
         "plan": {
           "anthropic/claude-fable-5": {
-            "input": 16007,
-            "output": 37690,
-            "cacheRead": 3703236,
-            "cacheWrite": 160767
+            "input": 19415,
+            "output": 40360,
+            "cacheRead": 4065765,
+            "cacheWrite": 165191
+          }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 26353,
+            "output": 5183,
+            "cacheRead": 720583,
+            "cacheWrite": 99792
           }
         }
       },
       "totals": {
+        "openai/codex-auto-review": {
+          "input": 1059886,
+          "output": 1331,
+          "cacheRead": 976896,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.5": {
+          "input": 10126953,
+          "output": 25716,
+          "cacheRead": 9695744,
+          "cacheWrite": 0
+        },
         "anthropic/claude-fable-5": {
-          "input": 16007,
-          "output": 37690,
-          "cacheRead": 3703236,
-          "cacheWrite": 160767
+          "input": 19415,
+          "output": 40360,
+          "cacheRead": 4065765,
+          "cacheWrite": 165191
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 26353,
+          "output": 5183,
+          "cacheRead": 720583,
+          "cacheWrite": 99792
         }
       },
       "costAtCloseOut": {
-        "usd": 7.757398,
-        "pricingAsOf": "2026-07-11T05:13:42.023Z"
+        "usd": 16.616338,
+        "pricingAsOf": "2026-07-11T05:42:27.971Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5"
+  "harness": "claude-code",
+  "model": "claude-sonnet-5"
 }
