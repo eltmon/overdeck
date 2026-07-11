@@ -77,6 +77,7 @@ export async function listSubstrateBugWeights(
   });
 
   const sorted = scored.sort((a, b) => {
+    if (a.bug.filedBy !== b.bug.filedBy) return a.bug.filedBy === 'operator' ? -1 : 1;
     if (b.weight !== a.weight) return b.weight - a.weight;
     return a.bug.filedAt.localeCompare(b.bug.filedAt);
   });

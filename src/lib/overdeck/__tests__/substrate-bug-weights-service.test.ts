@@ -133,6 +133,41 @@ describe('listSubstrateBugWeights', () => {
     expect(rows[0].weight).toBeGreaterThan(rows[1].weight);
   });
 
+  it('keeps operator-filed bugs ahead of higher-weight agent-filed bugs', async () => {
+    const stats = makeStats({
+      c1_bugRate: criterion({
+        label: 'Substrate-bug discovery rate',
+        value: 0.032,
+        target: 0.02,
+        status: 'red',
+      }),
+    });
+    const bugs = [
+      makeBug({
+        issueId: 'PAN-AGENT',
+        filedAt: '2026-07-01T00:00:00.000Z',
+        filedBy: 'agent',
+        affectedCriteria: [1],
+      }),
+      makeBug({
+        issueId: 'PAN-OPERATOR',
+        filedAt: '2026-07-03T00:00:00.000Z',
+        filedBy: 'operator',
+        affectedCriteria: [],
+      }),
+    ];
+
+    const rows = await listSubstrateBugWeights('30d', {
+      stats,
+      completedPipelineRuns: 5,
+      listBugs: () => bugs,
+      now: () => new Date('2026-07-07T00:00:00.000Z'),
+    });
+
+    expect(rows.map((row) => row.issueId)).toEqual(['PAN-OPERATOR', 'PAN-AGENT']);
+    expect(rows[0].weight).toBeLessThan(rows[1].weight);
+  });
+
   it('exposes required fields on every row', async () => {
     const stats = makeStats();
     const bugs = [
