@@ -559,16 +559,19 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
               'workspaces',
               `feature-${issueId.toLowerCase()}`
             );
-            setReviewStatus(issueId, { testStatus: 'testing' });
             // PAN-1048 R1: spawn the test role via the role primitive instead
             // of the legacy spawnEphemeralSpecialist machinery. Reactive
             // Cloister normally drives this on lifecycle transitions; this
             // path is a manual re-dispatch for already-approved reviews.
+            // PAN-2579: set 'testing' only AFTER the spawn succeeds — a pre-set
+            // non-terminal status would make spawnRun's warm-idle reaper treat a
+            // leftover warm test session as active and refuse the dispatch.
             const { spawnRun } = yield* Effect.promise(() => import('../../../../lib/agents.js'));
             try {
               const testRun = yield* Effect.promise(() => spawnRun(issueId, 'test', {
                 workspace: workspacePath,
               }));
+              setReviewStatus(issueId, { testStatus: 'testing' });
               console.log(
                 `[request-review] Test role spawned for ${issueId} as ${testRun.id}`
               );

@@ -12,6 +12,7 @@ import {
   markWorkspaceStuck as dbMarkStuck,
   clearWorkspaceStuck as dbClearStuck,
 } from './overdeck/review-status-sync.js';
+import { registerReviewStatusMapReader } from './cloister/review-status-source.js';
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
 import { updateIssueRecordForReviewStatusSync, enrichReviewNotesFromRecordSync, readJournalStatusSync } from './overdeck/review-status-record-sync.js';
 import { needsReviewDispatch } from './review-dispatch-decision.js';
@@ -177,6 +178,10 @@ export function mergeGateEligibility(
   if (status.mergeStatus === 'merged') return { eligible: false, reason: 'already merged' };
   return { eligible: true };
 }
+// PAN-2579: register the cycle-free status-map reader used by concurrency.ts for
+// warm-idle advancing classification (see cloister/review-status-source.ts).
+registerReviewStatusMapReader(() => getAllReviewStatusesFromDb());
+
 const DEFAULT_STATUS_FILE = join(homedir(), '.overdeck', 'review-status.json');
 
 export function loadReviewStatuses(filePath = DEFAULT_STATUS_FILE): Record<string, ReviewStatus> {

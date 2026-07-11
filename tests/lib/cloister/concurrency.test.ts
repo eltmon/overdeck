@@ -59,7 +59,6 @@ describe('concurrency governor — config + counting', () => {
     vi.doUnmock('../../../src/lib/cloister/config.js');
     vi.doUnmock('../../../src/lib/agents.js');
     vi.doUnmock('../../../src/lib/overdeck/agents.js');
-    vi.doUnmock('../../../src/lib/overdeck/review-status-sync.js');
   });
 
   it('falls back to safe defaults when config omits/garbles concurrency', async () => {
@@ -106,12 +105,11 @@ describe('concurrency governor — config + counting', () => {
     vi.doMock('../../../src/lib/overdeck/agents.js', () => ({
       countAgentsByStatus: (status: string) => (status === 'running' ? { work: 1, review: 2, test: 1 } : {}),
     }));
-    vi.doMock('../../../src/lib/overdeck/review-status-sync.js', () => ({
-      getAllReviewStatusesFromDb: () => ({
-        'PAN-1': { reviewStatus: 'blocked' },   // warm-idle: verdict recorded, session kept for re-review
-        'PAN-2': { reviewStatus: 'reviewing' }, // actively reviewing — counts
-        'PAN-3': { testStatus: 'passed' },      // warm-idle test session
-      }),
+    const { registerReviewStatusMapReader } = await import('../../../src/lib/cloister/review-status-source.js');
+    registerReviewStatusMapReader(() => ({
+      'PAN-1': { reviewStatus: 'blocked' },   // warm-idle: verdict recorded, session kept for re-review
+      'PAN-2': { reviewStatus: 'reviewing' }, // actively reviewing — counts
+      'PAN-3': { testStatus: 'passed' },      // warm-idle test session
     }));
     const { countRunningAgents } = await import('../../../src/lib/cloister/concurrency.js');
     // 3 advancing rows − 2 warm-idle = 1 counted; warm sessions are free capacity.

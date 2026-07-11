@@ -291,15 +291,14 @@ export async function deliverAgentMessage(
  * session whose pane process has EXITED (a remain-on-exit corpse) succeeds at the
  * tmux level while the message lands nowhere — the zombie-kickoff failure mode
  * (PAN-2179): callers saw ok:true, treated feedback as delivered, and the issue
- * silently stalled. Verify the target can actually receive BEFORE pasting, and
- * throw the same MessageDeliveryFailed shape the strict socket methods use so
- * every caller's existing failure path fires instead of a false success.
+ * silently stalled. Verify a live pane BEFORE pasting, and throw the same
+ * MessageDeliveryFailed shape the strict socket methods use so every caller's
+ * existing failure path fires instead of a false success. (A fully MISSING
+ * session needs no check here — tmux send-keys itself errors loudly on it.)
  */
 async function assertTmuxTargetCanReceive(normalizedId: string, caller: string): Promise<void> {
   const alive = await Effect.runPromise(sessionExists(normalizedId));
-  if (!alive) {
-    throw new Error(`MessageDeliveryFailed: tmux delivery failed for ${normalizedId} (${caller}): session-missing`);
-  }
+  if (!alive) return; // send-keys will fail loudly on its own for a missing session
   const paneDead = await Effect.runPromise(isPaneDead(normalizedId));
   if (paneDead) {
     throw new Error(`MessageDeliveryFailed: tmux delivery failed for ${normalizedId} (${caller}): pane-dead (session alive but the harness process has exited)`);

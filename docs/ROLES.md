@@ -40,7 +40,7 @@ Consequences:
 - **BLOCKED feedback goes agent-to-agent.** The review agent's `pan admin specialists done review --status blocked` delivers feedback directly to the live work agent (`deliverReviewVerdictFeedback` → `messageAgent`); the deacon is a recovery backstop, not the primary path.
 - **Idle-warm sessions are free capacity**, not load: they must not count against the advancing-role concurrency ceiling, and they are the first thing the governor sheds under memory pressure.
 
-> **Implementation status (2026-07-11):** the code still reaps review/test/ship sessions immediately after their verdict (PAN-1716, `src/lib/cloister/reap-terminal-sessions.ts`) because idle sessions used to count against the advancing ceiling and livelock dispatch. PAN-2579 tracks moving eviction to the resource governor and fixing the ceiling accounting; PAN-1131 tracks making re-dispatch able to distinguish a warm-idle reviewer from an actively-reviewing one.
+> **Implementation status (2026-07-11, landed):** reap-on-verdict is gone — `pan specialists done` (CLI and HTTP route) records the verdict and leaves the session alive; the deacon's terminal/idle-terminal advancing reapers are removed (only MERGED-issue sessions still reap). `countRunningAgents()` excludes warm-idle advancing sessions from the ceiling, the memory governor sheds them first under HARD pressure, and the review dispatch guard distinguishes finished-idle (warm-reuse for a newer request) from actively-reviewing (PAN-1131). Full convoy-wide warm re-review with selective sub-reviewer resume remains tracked by PAN-1862.
 
 ---
 
