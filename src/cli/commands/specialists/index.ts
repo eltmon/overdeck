@@ -44,6 +44,7 @@ export function registerSpecialistsCommands(program: Command): void {
     .description('Signal specialist completion (deterministic status update)')
     .requiredOption('--status <status>', 'Result status: passed, failed, or review-only blocked')
     .option('--notes <notes>', 'Optional notes about the result')
+    .option('--reviewers <verdicts>', 'PAN-1862 (review only): per-reviewer verdicts, e.g. "security=passed,correctness=blocked"')
     .action(doneAndExitCommand);
 
   // pan specialists logs <project> <type> [runId]

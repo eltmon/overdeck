@@ -418,3 +418,32 @@ describe("reviewStatus 'skipped' — review mode none (PAN-1862 FR-14/FR-16)", (
     expect(result.readyForMerge).toBe(false);
   });
 });
+
+describe('reviewerVerdicts map merge (PAN-1862 FR-6)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    journal.readJournalStatusSync.mockReturnValue(null);
+    journal.enrichReviewNotesFromRecordSync.mockImplementation((_id: string, s: ReviewStatus) => s);
+  });
+
+  it('a partial verdict update merges with carried-forward entries instead of replacing them', () => {
+    db.getFromDb.mockReturnValue(dbRow({
+      reviewStatus: 'blocked',
+      reviewerVerdicts: {
+        security: { status: 'passed', atCommit: 'aaaa1111' },
+        correctness: { status: 'blocked', atCommit: 'aaaa1111' },
+      },
+    }));
+
+    const result = setReviewStatusSync('PAN-1866', {
+      reviewStatus: 'passed',
+      reviewSpawnedAt: '2026-07-11T13:00:00.000Z',
+      reviewerVerdicts: { correctness: { status: 'passed', atCommit: 'bbbb2222' } },
+    });
+
+    expect(result.reviewerVerdicts).toEqual({
+      security: { status: 'passed', atCommit: 'aaaa1111' },     // carried forward, untouched
+      correctness: { status: 'passed', atCommit: 'bbbb2222' },  // updated by this cycle
+    });
+  });
+});

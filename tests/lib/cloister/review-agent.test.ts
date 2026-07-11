@@ -525,7 +525,9 @@ describe('spawnReviewRoleForIssue review mode fan-out', () => {
 
     expect(block).toContain('buildReviewRolePrompt');
     expect(block).toContain('buildSelfReviewPrompt');
-    expect(block).toContain('REVIEW_SUB_ROLES.map');
+    // PAN-1862: the convoy fans out over the selective in-scope set (all four on a
+    // first cycle; a subset on re-review when carried verdicts prove skips safe).
+    expect(block).toContain('inScopeSubRoles.map');
     expect(block).toContain('spawnReviewSubRoleForIssue');
     expect(block).toContain('...(opts.model ? { model: opts.model } : {})');
     expect(block).toContain('...(opts.harness ? { harness: opts.harness } : {})');

@@ -21,6 +21,8 @@ import {
 
 interface DoneOptions {
   status: 'passed' | 'failed' | 'blocked';
+  /** PAN-1862 (FR-6): "security=passed,correctness=blocked" per-reviewer verdicts. */
+  reviewers?: string;
   notes?: string;
 }
 
@@ -63,14 +65,34 @@ export async function doneCommand(
     case 'review':
       update.reviewStatus = options.status as ReviewStatus['reviewStatus'];
       if (options.notes) update.reviewNotes = options.notes;
-      if (options.status === 'passed') {
-        // Snapshot the workspace HEAD into reviewedAtCommit — the same way the
-        // /api/specialists/done HTTP route does. The synthesis agent signals
-        // via this CLI path, so without this the snapshot never happens:
-        // canSkipTests can't fire and the deacon's post-review-commit drift
-        // detection goes blind, jamming the issue at passed-but-no-anchor.
-        // Included in `update` so it lands atomically before setReviewStatus
-        // evaluates canSkipTests.
+      // PAN-1862 (FR-6): persist per-reviewer verdicts so selective re-review
+      // (reviewersToRerun) can skip provably-clean reviewers next cycle. The
+      // synthesis agent passes --reviewers "security=passed,correctness=blocked".
+      // Anchored to the workspace HEAD recorded below; malformed entries are
+      // dropped with a warning rather than failing the verdict write.
+      if (options.reviewers) {
+        const verdicts: NonNullable<ReviewStatus['reviewerVerdicts']> = {};
+        for (const pair of options.reviewers.split(',')) {
+          const [subRole, verdict] = pair.split('=').map(t => t.trim().toLowerCase());
+          if (subRole && (verdict === 'passed' || verdict === 'blocked')) {
+            verdicts[subRole] = { status: verdict };
+          } else if (pair.trim()) {
+            console.warn(chalk.yellow(`  ⚠ Ignoring malformed --reviewers entry: "${pair.trim()}" (want subRole=passed|blocked)`));
+          }
+        }
+        if (Object.keys(verdicts).length > 0) update.reviewerVerdicts = verdicts;
+      }
+      // Snapshot the workspace HEAD — the same way the /api/specialists/done HTTP
+      // route does. The synthesis agent signals via this CLI path, so without this
+      // the snapshot never happens: canSkipTests can't fire and the deacon's
+      // post-review-commit drift detection goes blind, jamming the issue at
+      // passed-but-no-anchor. Runs for EVERY review verdict (not just passed):
+      // per-reviewer verdicts need their atCommit anchor on a BLOCKED aggregate
+      // too — that is exactly the cycle whose clean reviewers selective re-review
+      // wants to skip next time (PAN-1862 FR-6/NFR-1). Included in `update` so it
+      // lands atomically before setReviewStatus evaluates canSkipTests.
+      {
+        let workspaceHead: string | undefined;
         try {
           const { resolveProjectFromIssueSync } = await import('../../../lib/projects.js');
           const { existsSync } = await import('node:fs');
@@ -85,13 +107,19 @@ export async function doneCommand(
             if (existsSync(workspacePath)) {
               const { getWorkspaceGitInfo } = await import('../../../lib/git-utils.js');
               const { HEAD } = await Effect.runPromise(getWorkspaceGitInfo(workspacePath));
-              if (HEAD) update.reviewedAtCommit = HEAD;
+              if (HEAD) workspaceHead = HEAD;
             }
           }
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
-          console.warn(chalk.yellow(`  ⚠ Could not snapshot reviewedAtCommit: ${message}`));
+          console.warn(chalk.yellow(`  ⚠ Could not snapshot workspace HEAD: ${message}`));
         }
+        if (workspaceHead && update.reviewerVerdicts) {
+          for (const v of Object.values(update.reviewerVerdicts)) if (v) v.atCommit = workspaceHead;
+        }
+        if (workspaceHead && options.status === 'passed') update.reviewedAtCommit = workspaceHead;
+      }
+      if (options.status === 'passed') {
         // Clear any stale verificationStatus='failed' so the override unblocks
         // readyForMerge. A human passing review assumes responsibility for the gate.
         update.verificationStatus = 'passed';

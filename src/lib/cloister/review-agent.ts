@@ -37,7 +37,7 @@
  */
 
 import { exec } from 'child_process';
-import { mkdir, readFile, rm } from 'fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { promisify } from 'util';
 import { Effect } from 'effect';
@@ -50,6 +50,7 @@ import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } fr
 import { buildRealConflictGateDeps, getCachedConflictGateMergeability, resolveConflictGate } from './conflict-gate.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
+import { reviewersToRerun, type ReviewerVerdictsMap, type ReReviewScope } from './review-rerun-scope.js';
 import { shouldSkipDispatchAsMerged } from './merge-verification.js';
 import { readIssueRecordSync, resolveProjectForIssue } from '../pan-dir/record.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
@@ -156,30 +157,49 @@ function buildReviewRolePrompt(opts: {
   reviewDir: string;
   contextManifestPath?: string;
   tier1Summary?: string;
+  /** PAN-1862 (FR-9): sub-roles actually running this cycle (default: all four). */
+  inScopeSubRoles?: ReviewSubRole[];
+  /** PAN-1862 (FR-9): sub-roles whose passed verdicts are carried forward this cycle. */
+  carriedSubRoles?: Array<{ subRole: ReviewSubRole; atCommit?: string }>;
 }): string {
+  const inScope = opts.inScopeSubRoles && opts.inScopeSubRoles.length > 0 ? opts.inScopeSubRoles : [...REVIEW_SUB_ROLES];
+  const carried = opts.carriedSubRoles ?? [];
   const subRoleFiles = REVIEW_SUB_ROLES.map(r => `  ${join(opts.reviewDir, `${r}.md`)}`).join('\n');
-  const expectedSignals = REVIEW_SUB_ROLES.map(r => `  REVIEWER_READY ${r} <outputPath> or REVIEWER_FAILED ${r} <reason> or REVIEWER_TIMEOUT ${r} <reason>`).join('\n');
+  const expectedSignals = inScope.map(r => `  REVIEWER_READY ${r} <outputPath> or REVIEWER_FAILED ${r} <reason> or REVIEWER_TIMEOUT ${r} <reason>`).join('\n');
   const synthesisPath = join(opts.reviewDir, 'synthesis.md');
+  const runningDesc = inScope.length === REVIEW_SUB_ROLES.length
+    ? 'the four convoy reviewers (security, correctness, performance, requirements)'
+    : `${inScope.length} convoy reviewer(s) this cycle (${inScope.join(', ')})`;
+  const carriedSection = carried.length > 0
+    ? [
+        '',
+        `CARRIED-FORWARD VERDICTS (PAN-1862 selective re-review): ${carried.map(c => c.subRole).join(', ')}.`,
+        'These reviewers PASSED the prior cycle and none of their domain files changed',
+        'since, so they were NOT re-run. Their stub reports are already written in the',
+        'review directory — treat each as a passed verdict. Do NOT wait for signals',
+        'from them; they will never arrive.',
+      ].join('\n')
+    : '';
   const prompt = [
     `STANDBY — REVIEW SYNTHESIS for ${opts.issueId}`,
     '',
-    'Do NOT do anything yet. The Overdeck server has already spawned the four',
-    'convoy reviewers (security, correctness, performance, requirements) and they',
-    'are running in parallel right now. Your work begins only once they finish.',
+    `Do NOT do anything yet. The Overdeck server has already spawned ${runningDesc}`,
+    'and they are running in parallel right now. Your work begins only once they finish.',
     '',
-    'You will receive exactly one `pan tell` signal per sub-role as each reviewer',
-    'finishes — these are delivered to you as user messages:',
+    `You will receive exactly one \`pan tell\` signal per RUNNING sub-role as each`,
+    'reviewer finishes — these are delivered to you as user messages:',
     expectedSignals,
+    carriedSection,
     '',
-    'Until all four terminal signals have arrived: do nothing. Do not read the',
+    `Until all ${inScope.length} terminal signal(s) have arrived: do nothing. Do not read the`,
     'reviewer output files, do not run git, do not inspect tmux sessions, do not',
     'poll anything. Just wait — the reviewers notify you when they finish, and',
     'Deacon is the failsafe if one never starts or never completes. Acting early',
     'wastes tokens reviewing nothing.',
     '',
-    'Once you have all four terminal signals, follow roles/review.md exactly to',
-    'read the reports, synthesize the verdict, write the synthesis report, and',
-    'signal the status.',
+    `Once you have all ${inScope.length} terminal signal(s), follow roles/review.md exactly to`,
+    'read the reports (including any carried-forward stubs), synthesize the verdict,',
+    'write the synthesis report, and signal the status.',
     '',
     '── Review context ──',
     `Issue: ${opts.issueId}`,
@@ -206,9 +226,12 @@ function buildReviewRolePrompt(opts: {
     'Convoy reviewer output files (read each one ONLY after its REVIEWER_READY signal):',
     subRoleFiles,
     '',
-    'After writing the synthesis report, signal the verdict with Overdeck CLI:',
-    `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>"`,
-    `  pan admin specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>"`,
+    'After writing the synthesis report, signal the verdict with Overdeck CLI,',
+    'including a per-reviewer verdict for each sub-role that RAN this cycle',
+    '(PAN-1862 — this is what lets the next re-review skip provably-clean reviewers;',
+    'do NOT list carried-forward sub-roles, their verdicts are already recorded):',
+    `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>" --reviewers "${inScope.map(r => `${r}=passed`).join(',')}"`,
+    `  pan admin specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>" --reviewers "<subRole>=passed|blocked for each of: ${inScope.join(', ')}>"`,
     '',
     // PAN-2007: do NOT tell the agent to `exit`. The session is kept alive through
     // the pipeline (KEEP_SPECIALIST_SESSIONS_ALIVE) so it can be reused for the next
@@ -656,12 +679,75 @@ function buildSelfReviewPrompt(opts: {
     }
 
     const fullReview = isExtendedReviewEnabled(opts.issueId);
+
+    // PAN-1862 (FR-7/FR-8/NFR-1): selective re-review. From the prior cycle's
+    // per-reviewer verdicts + the files changed since their commit anchor, decide
+    // which convoy reviewers actually run this cycle. First cycle (no verdicts),
+    // mixed/missing anchors, or an undeterminable diff -> ALL run (quality first).
+    let inScopeSubRoles: ReviewSubRole[] = [...REVIEW_SUB_ROLES];
+    let carriedSubRoles: Array<{ subRole: ReviewSubRole; atCommit?: string }> = [];
+    let reReviewScope: ReReviewScope = 'changed';
+    if (fullReview) {
+      try {
+        reReviewScope = resolveReReviewScope();
+        const priorVerdicts = getReviewStatusSync(opts.issueId)?.reviewerVerdicts as ReviewerVerdictsMap | undefined;
+        let changedFiles: string[] | undefined;
+        const anchors = new Set(
+          Object.values(priorVerdicts ?? {}).map(v => v?.atCommit).filter((c): c is string => !!c),
+        );
+        if (anchors.size === 1) {
+          try {
+            const { stdout } = await execAsync(`git diff --name-only ${[...anchors][0]}..HEAD`, {
+              cwd: opts.workspace, encoding: 'utf-8', timeout: 15_000,
+            });
+            changedFiles = stdout.split('\n').map(l => l.trim()).filter(Boolean);
+          } catch { /* anchor unreachable (rebase) -> unknown drift -> all run */ }
+        }
+        inScopeSubRoles = reviewersToRerun({ scope: reReviewScope, priorVerdicts, changedFiles });
+        carriedSubRoles = REVIEW_SUB_ROLES
+          .filter(r => !inScopeSubRoles.includes(r))
+          .map(r => ({ subRole: r, atCommit: priorVerdicts?.[r]?.atCommit }));
+        if (carriedSubRoles.length > 0) {
+          console.log(`[review-agent] Selective re-review for ${opts.issueId} (scope=${reReviewScope}): re-running [${inScopeSubRoles.join(', ')}], carrying forward [${carriedSubRoles.map(c => c.subRole).join(', ')}]`);
+        }
+      } catch (scopeErr) {
+        console.warn(`[review-agent] Selective re-review scope resolution failed for ${opts.issueId} — running the full convoy:`, scopeErr);
+        inScopeSubRoles = [...REVIEW_SUB_ROLES];
+        carriedSubRoles = [];
+      }
+    }
+
     const prompt = fullReview
-      ? buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary })
+      ? buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary, inScopeSubRoles, carriedSubRoles })
       : buildSelfReviewPrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary });
 
     const spawnConvoyReviewers = async (synthesisAgentId: string) => {
-      const reviewerResults = await Promise.all(REVIEW_SUB_ROLES.map(async (subRole) => {
+      // PAN-1862 (FR-8): materialize carried-forward verdicts as stub reports in the
+      // NEW run directory so synthesis and the deacon fallback still see one report
+      // per sub-role, exactly as when every reviewer runs. Blocking-findings
+      // extraction on a stub finds none -> the sub-role reads as passed.
+      if (carriedSubRoles.length > 0) {
+        await mkdir(reviewDir, { recursive: true });
+        for (const carried of carriedSubRoles) {
+          const stubPath = reviewerAgentOutputPath(opts.workspace, runId, carried.subRole);
+          const anchorNote = carried.atCommit ? ` at commit ${carried.atCommit.slice(0, 8)}` : '';
+          await writeFile(stubPath, [
+            `# ${carried.subRole} review — VERDICT CARRIED FORWARD`,
+            '',
+            '## Verdict: APPROVED (carried forward — reviewer not re-run this cycle)',
+            '',
+            `This reviewer passed the prior cycle${anchorNote} and no files in its domain`,
+            `changed since (reReviewScope=${reReviewScope}, PAN-1862 selective re-review).`,
+            'Its prior findings report remains the report of record for that verdict.',
+            '',
+            '## Findings',
+            '',
+            'None.',
+            '',
+          ].join('\n'), 'utf-8');
+        }
+      }
+      const reviewerResults = await Promise.all(inScopeSubRoles.map(async (subRole) => {
         const outputPath = reviewerAgentOutputPath(opts.workspace, runId, subRole);
         const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
           issueId: opts.issueId,
@@ -957,6 +1043,12 @@ export { reviewResumeDecision } from './review-resume-decision.js';
  */
 export function isReviewStaleSync(issueId: string): boolean {
   return listAgentIdsByPrefixSync(`agent-${issueId.toLowerCase()}-review-`).length > 0;
+}
+
+/** PAN-1862 (FR-7): resolved re-review scope — merged config, default 'changed'. */
+export function resolveReReviewScope(): ReReviewScope {
+  const scope = loadYamlConfig().config.roles?.review?.reReviewScope;
+  return scope === 'all' || scope === 'blockers' ? scope : 'changed';
 }
 
 export function resolveReviewMode(issueId?: string): ReviewMode {

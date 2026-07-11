@@ -18,6 +18,8 @@ type DeaconReviewSynthesis = {
   verdict: 'passed' | 'blocked';
   topBlocker: string;
   body: string;
+  /** PAN-1862 (FR-6): per-sub-role outcome derived from each report's blocking findings. */
+  reviewerVerdicts: Record<string, { status: 'passed' | 'blocked'; findingsPath?: string }>;
 };
 
 function extractMarkdownSection(markdown: string, heading: string): string {
@@ -51,6 +53,14 @@ export function synthesizeReviewFromReports(opts: {
     })),
   );
   const verdict: 'passed' | 'blocked' = blockers.length > 0 ? 'blocked' : 'passed';
+  // PAN-1862 (FR-6): per-reviewer verdicts — a report with >=1 blocking finding blocks.
+  const reviewerVerdicts: Record<string, { status: 'passed' | 'blocked'; findingsPath?: string }> = {};
+  for (const report of opts.reports) {
+    reviewerVerdicts[report.subRole] = {
+      status: blockers.some(b => b.subRole === report.subRole) ? 'blocked' : 'passed',
+      findingsPath: report.path,
+    };
+  }
   const topBlocker = blockers[0] ? `[${blockers[0].subRole}] ${blockers[0].title}` : '';
   const blockerSection = blockers.length > 0
     ? blockers.map(blocker => `### [${blocker.subRole}] ${blocker.title}\nSource: ${blocker.path}`).join('\n\n')
@@ -89,7 +99,7 @@ export function synthesizeReviewFromReports(opts: {
     '',
   ].join('\n');
 
-  return { verdict, topBlocker, body };
+  return { verdict, topBlocker, body, reviewerVerdicts };
 }
 
 /**
@@ -216,9 +226,22 @@ async function nudgeSynthesisForCompleteReviewerReports(states: readonly AgentSt
         reports,
       });
       writeFileSync(join(reviewDir, 'synthesis.md'), synthesis.body);
+      // PAN-1862 (FR-6): anchor each reviewer verdict to the reviewed HEAD so the
+      // next cycle's reviewersToRerun can skip provably-clean reviewers.
+      let fallbackHead: string | undefined;
+      try {
+        const { execFile } = await import('node:child_process');
+        const { promisify } = await import('node:util');
+        const { stdout } = await promisify(execFile)('git', ['rev-parse', 'HEAD'], { cwd: state.workspace, encoding: 'utf-8', timeout: 10_000 });
+        fallbackHead = stdout.trim() || undefined;
+      } catch { /* non-fatal — verdicts without an anchor simply re-run next cycle */ }
+      const anchoredVerdicts = Object.fromEntries(
+        Object.entries(synthesis.reviewerVerdicts).map(([subRole, v]) => [subRole, { ...v, ...(fallbackHead ? { atCommit: fallbackHead } : {}) }]),
+      );
       setReviewStatusSync(state.issueId, {
         reviewStatus: synthesis.verdict,
         reviewNotes: synthesis.topBlocker || 'Review approved by Deacon fallback from completed reviewer reports',
+        reviewerVerdicts: anchoredVerdicts,
       });
       if (synthesis.verdict === 'blocked') {
         await Effect.runPromise(deliverReviewVerdictFeedback({

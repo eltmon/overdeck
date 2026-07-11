@@ -359,6 +359,8 @@ export interface RoleSubConfig {
 export type RoleEffort = EffortLevel;
 export const ROLE_EFFORTS: readonly RoleEffort[] = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
 export type ReviewMode = 'quick' | 'full' | 'none';
+/** PAN-1862 (FR-7): which convoy reviewers re-run on a re-review cycle. */
+export type ReReviewScope = 'all' | 'changed' | 'blockers';
 export type FlywheelScope = 'pan-only' | 'all-tracked-projects';
 
 export interface RoleConfig {
@@ -366,6 +368,8 @@ export interface RoleConfig {
   harness?: 'claude-code' | 'ohmypi' | 'codex';
   effort?: RoleEffort;
   mode?: ReviewMode;
+  /** PAN-1862 (FR-7): re-review scope for the review role (default 'changed'). */
+  reReviewScope?: ReReviewScope;
   /**
    * Target minimum concurrent agents the role should keep launched. The
    * orchestrator MUST be aggressive about reaching this number — if the active

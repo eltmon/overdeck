@@ -117,6 +117,13 @@ export interface ReviewStatus {
   deaconIgnoredReason?: string;
   /** PAN-1762: advisory files_scope drift recorded at pan done and surfaced to review. */
   scopeDrift?: ScopeDriftRecord;
+  /**
+   * PAN-1862 (FR-6): per-convoy-reviewer verdicts from the latest full-review cycle,
+   * keyed by sub-role (security/correctness/performance/requirements). Journal-durable
+   * (not a DB column — overlaid on read like reviewRequestedAt). `atCommit` anchors
+   * drift invalidation for selective re-review (reviewersToRerun).
+   */
+  reviewerVerdicts?: Partial<Record<string, { status: 'passed' | 'blocked'; atCommit?: string; findingsPath?: string }>>;
   // PAN-1531: reviewTempStashRef / reviewTempStashMessage / reviewTempStashSequence
   // removed. The review pipeline no longer stashes uncommitted work — the
   // dirty-worktree gate refuses pan done / pan review request before review
@@ -349,6 +356,13 @@ export function setReviewStatusSync(
   }
 
   const merged = { ...status, ...update };
+
+  // PAN-1862 (FR-6): reviewerVerdicts is a per-sub-role MAP — a partial update
+  // (synthesis reporting only the reviewers that re-ran this cycle) must merge
+  // with, not replace, the carried-forward entries from prior cycles.
+  if (update.reviewerVerdicts && status.reviewerVerdicts) {
+    merged.reviewerVerdicts = { ...status.reviewerVerdicts, ...update.reviewerVerdicts };
+  }
 
   // Track status transitions in history (last 10 entries)
   const history = [...(status.history || [])];
