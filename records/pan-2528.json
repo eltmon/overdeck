@@ -1,0 +1,236 @@
+{
+  "issueId": "PAN-2528",
+  "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-11T09:55:40.694Z",
+      "reason": "end",
+      "note": "All 5 PAN-2528 beads complete and on branch feature/pan-2528; tests pass (harness-policy 38, settings-harness-policy 7, ModelPicker render 2, chat ModelPicker 8). Changes: 1) /api/settings/harness-policy now emits 'ohmypi' key (workspace-d549r), 2) HarnessSelect disables blocked ohmypi with inline reason (workspace-iiouu), 3) chat ModelPicker disables blocked harness options (workspace-3y8v2), 4) docs/harnesses.mdx documents up-front picker ToS behavior (workspace-v0dmh), 5) ohmypi Anthropic subscription block reworded to cite Claude Code subscription ToS (workspace-jkyt6). No anomalies."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-11T09:56Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-07-11T09:56:41.559Z"
+    },
+    {
+      "timestamp": "2026-07-11T09:59:21.901Z",
+      "reason": "end",
+      "note": "PAN-2528 verification gate retry: removed dead pickModelForHarness function and HARNESS_DEFAULT_MODEL constant from chat/ModelPicker.tsx (commit c5e8a13efd) that frontend-typecheck flagged as TS6133. No other source changes; tests pass (ModelPicker render 2, chat ModelPicker 8)."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-11T09:59:23.776Z"
+    }
+  ],
+  "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-baseline.txt",
+      "src/lib/harness-policy-decisions.ts"
+    ],
+    "declaredScopeUntouched": [
+      "configuration/harnesses.mdx",
+      "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.module.css",
+      "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.render.test.tsx",
+      "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.tsx"
+    ],
+    "declaredScope": [
+      "configuration/harnesses.mdx",
+      "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+      "src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx",
+      "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.module.css",
+      "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.render.test.tsx",
+      "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.tsx",
+      "src/dashboard/server/routes/settings.ts",
+      "src/lib/__tests__/harness-policy.test.ts",
+      "src/lib/harness-policy.ts",
+      "tests/unit/dashboard/server/routes/settings-harness-policy.test.ts"
+    ],
+    "actualChangedFiles": [
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+      "src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx",
+      "src/dashboard/server/routes/settings.ts",
+      "src/lib/__tests__/harness-policy.test.ts",
+      "src/lib/harness-policy-decisions.ts",
+      "src/lib/harness-policy.ts",
+      "tests/unit/dashboard/server/routes/settings-harness-policy.test.ts"
+    ],
+    "recordedAt": "2026-07-11T09:59:17.529Z"
+  },
+  "created": "2026-07-11T09:50:24.420Z",
+  "updated": "2026-07-11T09:59:55.253Z",
+  "pipeline": {
+    "issueId": "PAN-2528",
+    "reviewStatus": "reviewing",
+    "testStatus": "pending",
+    "verificationStatus": "running",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-11T09:59:27.398Z",
+    "reviewNotes": "Verification failed at frontend-typecheck",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2575",
+    "reviewRequestedAt": "2026-07-11T09:59:21.902Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "scripts/file-size-baseline.txt",
+        "src/lib/harness-policy-decisions.ts"
+      ],
+      "declaredScopeUntouched": [
+        "configuration/harnesses.mdx",
+        "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.module.css",
+        "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.render.test.tsx",
+        "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.tsx"
+      ],
+      "declaredScope": [
+        "configuration/harnesses.mdx",
+        "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx",
+        "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.module.css",
+        "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.render.test.tsx",
+        "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.tsx",
+        "src/dashboard/server/routes/settings.ts",
+        "src/lib/__tests__/harness-policy.test.ts",
+        "src/lib/harness-policy.ts",
+        "tests/unit/dashboard/server/routes/settings-harness-policy.test.ts"
+      ],
+      "actualChangedFiles": [
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx",
+        "src/dashboard/server/routes/settings.ts",
+        "src/lib/__tests__/harness-policy.test.ts",
+        "src/lib/harness-policy-decisions.ts",
+        "src/lib/harness-policy.ts",
+        "tests/unit/dashboard/server/routes/settings-harness-policy.test.ts"
+      ],
+      "recordedAt": "2026-07-11T09:59:17.529Z"
+    }
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "codex": {
+          "openai/gpt-5.5": {
+            "input": 731758,
+            "output": 4732,
+            "cacheRead": 646656,
+            "cacheWrite": 0
+          }
+        },
+        "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 674,
+            "output": 7673,
+            "cacheRead": 5498732,
+            "cacheWrite": 15546
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 19701,
+            "output": 52114,
+            "cacheRead": 7002268,
+            "cacheWrite": 179550
+          }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 16079,
+            "output": 3977,
+            "cacheRead": 1465860,
+            "cacheWrite": 102609
+          }
+        },
+        "work": {
+          "custom/MiniMax-M3": {
+            "input": 8397866,
+            "output": 134920,
+            "cacheRead": 49429156,
+            "cacheWrite": 0
+          },
+          "custom/kimi-k2.7-code": {
+            "input": 3098328,
+            "output": 57937,
+            "cacheRead": 21998080,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.5": {
+          "input": 731758,
+          "output": 4732,
+          "cacheRead": 646656,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 674,
+          "output": 7673,
+          "cacheRead": 5498732,
+          "cacheWrite": 15546
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 19701,
+          "output": 52114,
+          "cacheRead": 7002268,
+          "cacheWrite": 179550
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 16079,
+          "output": 3977,
+          "cacheRead": 1465860,
+          "cacheWrite": 102609
+        },
+        "custom/MiniMax-M3": {
+          "input": 8397866,
+          "output": 134920,
+          "cacheRead": 49429156,
+          "cacheWrite": 0
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 3098328,
+          "output": 57937,
+          "cacheRead": 21998080,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 23.656623,
+        "pricingAsOf": "2026-07-11T09:59:27.491Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2575"
+    ],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "MiniMax-M3",
+  "statusOverrides": {
+    "disable-ohmypi-harness-select": "completed",
+    "disable-ohmypi-harness-select.ac1": "completed",
+    "disable-ohmypi-harness-select.ac2": "completed",
+    "disable-ohmypi-harness-select.ac3": "completed",
+    "disable-ohmypi-harness-select.ac4": "completed",
+    "disable-ohmypi-chat-picker": "completed",
+    "disable-ohmypi-chat-picker.ac1": "completed",
+    "disable-ohmypi-chat-picker.ac2": "completed",
+    "disable-ohmypi-chat-picker.ac3": "completed",
+    "disable-ohmypi-chat-picker.ac4": "completed",
+    "docs-picker-tos-behavior": "completed",
+    "docs-picker-tos-behavior.ac1": "completed",
+    "docs-picker-tos-behavior.ac2": "completed",
+    "tos-reason-copy": "completed",
+    "tos-reason-copy.ac1": "completed",
+    "tos-reason-copy.ac2": "completed",
+    "tos-reason-copy.ac3": "completed",
+    "fix-harness-policy-api-key": "completed",
+    "fix-harness-policy-api-key.ac1": "completed",
+    "fix-harness-policy-api-key.ac2": "completed",
+    "fix-harness-policy-api-key.ac3": "completed",
+    "fix-harness-policy-api-key.ac4": "completed"
+  }
+}
