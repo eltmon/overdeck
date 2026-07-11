@@ -30,7 +30,7 @@
     "recordedAt": "2026-07-11T09:47:42.604Z"
   },
   "created": "2026-07-11T09:43:27.964Z",
-  "updated": "2026-07-11T20:11:13.376Z",
+  "updated": "2026-07-11T23:35:32.479Z",
   "pipeline": {
     "issueId": "PAN-2322",
     "reviewStatus": "reviewing",
@@ -39,7 +39,7 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-11T20:11:12.801Z",
+    "updatedAt": "2026-07-11T23:35:32.287Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues: scrubbed OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY from the pipeline-role refusal path message and ServerConfigError variable, and extended the refusal-message test to cover pipeline-role identities.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2574",
     "lastVerifiedCommit": "dc9386b3c6954a6e26fcb806c61f485f0cc1783b",
@@ -65,9 +65,9 @@
       "byStage": {
         "codex": {
           "openai/gpt-5.5": {
-            "input": 575331,
-            "output": 4627,
-            "cacheRead": 504064,
+            "input": 743115,
+            "output": 5816,
+            "cacheRead": 628992,
             "cacheWrite": 0
           }
         },
@@ -97,18 +97,18 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 4317475,
-            "output": 81976,
-            "cacheRead": 42176512,
+            "input": 4318929,
+            "output": 82082,
+            "cacheRead": 42393600,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 575331,
-          "output": 4627,
-          "cacheRead": 504064,
+          "input": 743115,
+          "output": 5816,
+          "cacheRead": 628992,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -124,15 +124,15 @@
           "cacheWrite": 106816
         },
         "custom/kimi-k2.7-code": {
-          "input": 4317475,
-          "output": 81976,
-          "cacheRead": 42176512,
+          "input": 4318929,
+          "output": 82082,
+          "cacheRead": 42393600,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 26.140488,
-        "pricingAsOf": "2026-07-11T20:11:13.316Z"
+        "usd": 26.495954,
+        "pricingAsOf": "2026-07-11T23:35:32.441Z"
       }
     },
     "merges": [
