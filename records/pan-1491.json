@@ -1,0 +1,184 @@
+{
+  "issueId": "PAN-1491",
+  "schemaVersion": 2,
+  "feedback": [],
+  "created": "2026-07-11T09:48:27.729Z",
+  "updated": "2026-07-11T09:53:34.210Z",
+  "pipeline": {
+    "issueId": "PAN-1491",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "inspectStatus": "failed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-11T09:53:34.076Z",
+    "inspectNotes": "Bead b2-parse-criteria BLOCKED: commit d813b8b4 does not implement parseAffectedCriteria(body, labels) at all. The diff only adds optional weight/weightReason fields to FlywheelSuggestion in packages/contracts/src/flywheel.ts:180-190 — no trailer parsing, no label parsing, no range validation, no union/sort logic exists anywhere in this commit. None of AC1-AC4 can be evaluated because the function under test is absent. This commit appears to belong to a different bead (weight/weightReason schema extension) and was delivered against the wrong review request. Required fix: land a commit that actually adds parseAffectedCriteria(body, labels) implementing trailer regex parsing (Flywheel-Affects-Criterion / Affects-Criterion, case-insensitive, comma/space separated, dedup), label parsing (affects-criterion-N pattern), range filtering (1-7 or whatever the valid criterion range is, excluding 0 and 8 per AC3), sorted union of both sources, and empty-array fallback for null/empty body with no labels or only unrelated Flywheel-* trailers."
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 990232,
+            "output": 2533,
+            "cacheRead": 554752,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.5": {
+            "input": 6520700,
+            "output": 22121,
+            "cacheRead": 5589376,
+            "cacheWrite": 0
+          }
+        },
+        "implementation": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 126,
+            "output": 9951,
+            "cacheRead": 4092666,
+            "cacheWrite": 296574
+          },
+          "anthropic/claude-opus-4-7": {
+            "input": 51,
+            "output": 32119,
+            "cacheRead": 2900344,
+            "cacheWrite": 214748
+          },
+          "anthropic/claude-sonnet-4-6": {
+            "input": 17021,
+            "output": 21789,
+            "cacheRead": 3446073,
+            "cacheWrite": 462911
+          },
+          "custom/kimi-k2.6": {
+            "input": 225064,
+            "output": 1413,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.5": {
+            "input": 3179138,
+            "output": 40645,
+            "cacheRead": 1563648,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 271,
+            "output": 200,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "cliproxy/gpt-5.4-mini": {
+            "input": 34740,
+            "output": 9470,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 31192,
+            "output": 96160,
+            "cacheRead": 21358853,
+            "cacheWrite": 243872
+          }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 8794,
+            "output": 6395,
+            "cacheRead": 648892,
+            "cacheWrite": 169604
+          }
+        },
+        "work": {
+          "custom/kimi-k2.7-code": {
+            "input": 1070026,
+            "output": 137740,
+            "cacheRead": 62109184,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/codex-auto-review": {
+          "input": 990232,
+          "output": 2533,
+          "cacheRead": 554752,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.5": {
+          "input": 9699838,
+          "output": 62766,
+          "cacheRead": 7153024,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 126,
+          "output": 9951,
+          "cacheRead": 4092666,
+          "cacheWrite": 296574
+        },
+        "anthropic/claude-opus-4-7": {
+          "input": 51,
+          "output": 32119,
+          "cacheRead": 2900344,
+          "cacheWrite": 214748
+        },
+        "anthropic/claude-sonnet-4-6": {
+          "input": 17021,
+          "output": 21789,
+          "cacheRead": 3446073,
+          "cacheWrite": 462911
+        },
+        "custom/kimi-k2.6": {
+          "input": 225064,
+          "output": 1413,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-haiku-4-5": {
+          "input": 271,
+          "output": 200,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 34740,
+          "output": 9470,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 31192,
+          "output": 96160,
+          "cacheRead": 21358853,
+          "cacheWrite": 243872
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 8794,
+          "output": 6395,
+          "cacheRead": 648892,
+          "cacheWrite": 169604
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 1070026,
+          "output": 137740,
+          "cacheRead": 62109184,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 62.921257,
+        "pricingAsOf": "2026-07-11T09:53:34.192Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "claude-sonnet-5"
+}
