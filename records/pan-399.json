@@ -116,6 +116,21 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-11T20:25:15.654Z"
+    },
+    {
+      "timestamp": "2026-07-11T20:48:23.982Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-11T20:48:27.212Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-11T20:48:27.258Z"
     }
   ],
   "feedback": [],
@@ -126,6 +141,7 @@
       "scripts/file-size-baseline.txt",
       "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
       "src/dashboard/frontend/src/lib/workspace-types.ts",
+      "src/dashboard/server/read-model.ts",
       "src/lib/database/__tests__/pending-auto-merges-schema.test.ts",
       "src/lib/database/review-status-db.ts",
       "src/lib/overdeck/infra.ts",
@@ -194,6 +210,7 @@
       "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/__tests__/ReviewPipelineSection.test.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
       "src/dashboard/frontend/src/lib/workspace-types.ts",
+      "src/dashboard/server/read-model.ts",
       "src/dashboard/server/routes/workspaces/review-pipeline.ts",
       "src/lib/cloister/__tests__/release-trigger.test.ts",
       "src/lib/cloister/merge-agent.ts",
@@ -232,23 +249,23 @@
       "tests/unit/lib/projects-release-config.test.ts",
       "tests/unit/lib/review-status-release.test.ts"
     ],
-    "recordedAt": "2026-07-11T19:52:41.073Z"
+    "recordedAt": "2026-07-11T20:48:18.808Z"
   },
   "created": "2026-07-11T09:28:34.266Z",
-  "updated": "2026-07-11T20:25:21.713Z",
+  "updated": "2026-07-11T20:51:37.560Z",
   "pipeline": {
     "issueId": "PAN-399",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-11T20:25:21.604Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-11T20:51:37.427Z",
+    "reviewNotes": "Review role spawn failed: Role run agent-pan-399-review already running. Use 'pan tell' to message it.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2577",
-    "lastVerifiedCommit": "b3f30f116de7eee868fae7893a4949eb1009d8e8",
-    "reviewRequestedAt": "2026-07-11T19:58:38.200Z",
+    "lastVerifiedCommit": "3d1876c48fabb8c4c98c848b867698e27f998428",
+    "reviewRequestedAt": "2026-07-11T20:48:23.984Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "drizzle/overdeck/0000_overdeck_init.sql",
@@ -256,6 +273,7 @@
         "scripts/file-size-baseline.txt",
         "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
         "src/dashboard/frontend/src/lib/workspace-types.ts",
+        "src/dashboard/server/read-model.ts",
         "src/lib/database/__tests__/pending-auto-merges-schema.test.ts",
         "src/lib/database/review-status-db.ts",
         "src/lib/overdeck/infra.ts",
@@ -324,6 +342,7 @@
         "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/__tests__/ReviewPipelineSection.test.tsx",
         "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
         "src/dashboard/frontend/src/lib/workspace-types.ts",
+        "src/dashboard/server/read-model.ts",
         "src/dashboard/server/routes/workspaces/review-pipeline.ts",
         "src/lib/cloister/__tests__/release-trigger.test.ts",
         "src/lib/cloister/merge-agent.ts",
@@ -362,7 +381,7 @@
         "tests/unit/lib/projects-release-config.test.ts",
         "tests/unit/lib/review-status-release.test.ts"
       ],
-      "recordedAt": "2026-07-11T19:52:41.073Z"
+      "recordedAt": "2026-07-11T20:48:18.808Z"
     }
   },
   "closeOut": {
@@ -376,9 +395,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 56286602,
-            "output": 142928,
-            "cacheRead": 53047296,
+            "input": 58126230,
+            "output": 146543,
+            "cacheRead": 54819200,
             "cacheWrite": 0
           },
           "unknown": {
@@ -442,9 +461,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 4539820,
-            "output": 274974,
-            "cacheRead": 155745536,
+            "input": 4790014,
+            "output": 275690,
+            "cacheRead": 156378368,
             "cacheWrite": 0
           }
         }
@@ -457,9 +476,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 56986962,
-          "output": 171957,
-          "cacheRead": 58739200,
+          "input": 58826590,
+          "output": 175572,
+          "cacheRead": 60511104,
           "cacheWrite": 0
         },
         "unknown": {
@@ -493,15 +512,15 @@
           "cacheWrite": 77989
         },
         "custom/kimi-k2.7-code": {
-          "input": 4539820,
-          "output": 274974,
-          "cacheRead": 155745536,
+          "input": 4790014,
+          "output": 275690,
+          "cacheRead": 156378368,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 134.10043100000001,
-        "pricingAsOf": "2026-07-11T20:25:21.704Z"
+        "usd": 135.794241,
+        "pricingAsOf": "2026-07-11T20:51:37.518Z"
       }
     },
     "merges": [
@@ -509,8 +528,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "release-engine-tests": "completed",
     "release-engine-tests.ac1": "completed",
