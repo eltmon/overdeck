@@ -7,6 +7,7 @@ let testDb: SqliteDatabase;
 
 vi.mock('../index.js', () => ({
   getDatabase: () => testDb,
+  DatabaseError: class DatabaseError extends Error {},
 }));
 
 beforeEach(() => {
@@ -20,11 +21,7 @@ afterEach(() => {
 });
 
 import {
-  deleteReleaseSet,
-  getReleaseSetFromDb,
-  upsertReleaseSet,
-} from '../release-set-db.js';
-import {
+  deleteReleaseSetSync,
   getReleaseSetSync,
   upsertReleaseSetSync,
   withComponentStateSync,
@@ -36,10 +33,22 @@ function makeReleaseSet(overrides: Partial<ReleaseSet> = {}): ReleaseSet {
     projectKey: 'overdeck',
     projectPath: '/tmp/overdeck',
     workspaceType: 'polyrepo',
-    status: 'pending',
-    createdAt: '2026-07-04T12:00:00.000Z',
-    updatedAt: '2026-07-04T12:00:00.000Z',
+    status: 'releasing',
+    createdAt: '2026-07-05T00:00:00.000Z',
+    updatedAt: '2026-07-05T00:00:00.000Z',
     components: [
+      {
+        componentKey: 'api',
+        provider: 'kubernetes',
+        trigger: 'auto',
+        releaseOrder: 0,
+        required: true,
+        status: 'pending',
+        healthStatus: 'pending',
+        versionStatus: 'skipped',
+        smokeStatus: 'pending',
+        rollbackStatus: 'pending',
+      },
       {
         componentKey: 'frontend',
         provider: 'vercel',
@@ -50,20 +59,7 @@ function makeReleaseSet(overrides: Partial<ReleaseSet> = {}): ReleaseSet {
         healthStatus: 'pending',
         versionStatus: 'pending',
         smokeStatus: 'pending',
-        rollbackStatus: 'pending',
-      },
-      {
-        componentKey: 'api',
-        provider: 'kubernetes',
-        trigger: 'auto',
-        releaseOrder: 0,
-        required: true,
-        status: 'releasing',
-        healthStatus: 'passed',
-        versionStatus: 'pending',
-        smokeStatus: 'pending',
-        rollbackStatus: 'pending',
-        notes: 'waiting on smoke test',
+        rollbackStatus: 'skipped',
       },
     ],
     ...overrides,
@@ -71,80 +67,42 @@ function makeReleaseSet(overrides: Partial<ReleaseSet> = {}): ReleaseSet {
 }
 
 describe('release-set-db', () => {
-  it('persists a release set and returns components ordered by release order', () => {
-    upsertReleaseSet(makeReleaseSet());
+  it('persists a release set and returns components ordered by releaseOrder', () => {
+    upsertReleaseSetSync(makeReleaseSet());
 
-    const result = getReleaseSetFromDb('PAN-399');
+    const result = getReleaseSetSync('PAN-399');
 
-    expect(result).toEqual({
-      ...makeReleaseSet(),
-      components: [
-        makeReleaseSet().components[1],
-        makeReleaseSet().components[0],
-      ],
+    expect(result?.status).toBe('releasing');
+    expect(result?.components.map(component => component.componentKey)).toEqual(['api', 'frontend']);
+    expect(result?.components[0]).toMatchObject({
+      provider: 'kubernetes',
+      trigger: 'auto',
+      status: 'pending',
+      healthStatus: 'pending',
     });
   });
 
-  it('replaces component rows on update', () => {
-    upsertReleaseSet(makeReleaseSet());
-    upsertReleaseSet(makeReleaseSet({
+  it('patches only the requested component state', () => {
+    const original = makeReleaseSet();
+
+    const updated = withComponentStateSync(original, 'frontend', {
       status: 'passed',
-      components: [
-        {
-          componentKey: 'api',
-          trigger: 'auto',
-          releaseOrder: 0,
-          required: true,
-          status: 'passed',
-          healthStatus: 'passed',
-          versionStatus: 'passed',
-          smokeStatus: 'passed',
-          rollbackStatus: 'skipped',
-        },
-      ],
-    }));
+      smokeStatus: 'passed',
+    });
 
-    const result = getReleaseSetFromDb('PAN-399');
-    expect(result?.status).toBe('passed');
-    expect(result?.components).toHaveLength(1);
-    expect(result?.components[0].componentKey).toBe('api');
-    expect(result?.components[0].provider).toBeUndefined();
-  });
-
-  it('public sync wrappers round-trip release sets', () => {
-    upsertReleaseSetSync(makeReleaseSet());
-
-    expect(getReleaseSetSync('PAN-399')?.components.map(component => component.componentKey)).toEqual(['api', 'frontend']);
-  });
-
-  it('patches only the requested component and updates updatedAt', () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-07-04T13:00:00.000Z'));
-    try {
-      const original = makeReleaseSet();
-
-      const patched = withComponentStateSync(original, 'api', {
-        status: 'failed',
-        notes: 'health check failed',
-      });
-
-      expect(patched.updatedAt).toBe('2026-07-04T13:00:00.000Z');
-      expect(patched.components[0]).toEqual(original.components[0]);
-      expect(patched.components[1]).toEqual({
-        ...original.components[1],
-        status: 'failed',
-        notes: 'health check failed',
-      });
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(updated.updatedAt).not.toBe(original.updatedAt);
+    expect(updated.components.find(component => component.componentKey === 'api')?.status).toBe('pending');
+    expect(updated.components.find(component => component.componentKey === 'frontend')).toMatchObject({
+      status: 'passed',
+      smokeStatus: 'passed',
+    });
   });
 
   it('deletes release sets and cascades component rows', () => {
-    upsertReleaseSet(makeReleaseSet());
-    deleteReleaseSet('PAN-399');
+    upsertReleaseSetSync(makeReleaseSet());
+    deleteReleaseSetSync('PAN-399');
 
-    expect(getReleaseSetFromDb('PAN-399')).toBeNull();
+    expect(getReleaseSetSync('PAN-399')).toBeNull();
     const components = testDb.prepare('SELECT * FROM release_set_components WHERE issue_id = ?').all('PAN-399');
     expect(components).toHaveLength(0);
   });

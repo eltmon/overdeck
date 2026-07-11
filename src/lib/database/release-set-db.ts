@@ -37,8 +37,8 @@ export function upsertReleaseSet(releaseSet: ReleaseSet): void {
 
     const insertComponent = db.prepare(`
       INSERT INTO release_set_components (
-        issue_id, component_key, provider, trigger, release_order, required,
-        status, health_status, version_status, smoke_status, rollback_status, notes
+        issue_id, component_key, provider, trigger, release_order, required, status,
+        health_status, version_status, smoke_status, rollback_status, notes
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
@@ -46,15 +46,15 @@ export function upsertReleaseSet(releaseSet: ReleaseSet): void {
       insertComponent.run(
         set.issueId,
         component.componentKey,
-        component.provider ?? '',
+        component.provider ?? null,
         component.trigger,
         component.releaseOrder,
         component.required ? 1 : 0,
         component.status,
-        component.healthStatus,
-        component.versionStatus,
-        component.smokeStatus,
-        component.rollbackStatus,
+        component.healthStatus ?? null,
+        component.versionStatus ?? null,
+        component.smokeStatus ?? null,
+        component.rollbackStatus ?? null,
         component.notes ?? null,
       );
     }
@@ -111,41 +111,41 @@ interface DbReleaseSetRow {
   updated_at: string;
 }
 
-interface DbReleaseSetComponentRow {
+interface DbReleaseComponentRow {
   component_key: string;
-  provider: string;
+  provider: string | null;
   trigger: string;
   release_order: number;
   required: number;
   status: string;
-  health_status: string;
-  version_status: string;
-  smoke_status: string;
-  rollback_status: string;
+  health_status: string | null;
+  version_status: string | null;
+  smoke_status: string | null;
+  rollback_status: string | null;
   notes: string | null;
 }
 
 function getComponentsFromDb(issueId: string): ReleaseComponentState[] {
   const db = getDatabase();
   const rows = db.prepare(`
-    SELECT component_key, provider, trigger, release_order, required,
-           status, health_status, version_status, smoke_status, rollback_status, notes
+    SELECT component_key, provider, trigger, release_order, required, status,
+           health_status, version_status, smoke_status, rollback_status, notes
     FROM release_set_components
     WHERE issue_id = ?
     ORDER BY release_order ASC, component_key ASC
-  `).all(issueId) as DbReleaseSetComponentRow[];
+  `).all(issueId) as DbReleaseComponentRow[];
 
   return rows.map(row => ({
     componentKey: row.component_key,
-    provider: row.provider || undefined,
-    trigger: row.trigger,
+    provider: row.provider ?? undefined,
+    trigger: row.trigger as ReleaseComponentState['trigger'],
     releaseOrder: row.release_order,
     required: row.required === 1,
     status: row.status as ReleaseComponentState['status'],
-    healthStatus: row.health_status as ReleaseComponentState['healthStatus'],
-    versionStatus: row.version_status as ReleaseComponentState['versionStatus'],
-    smokeStatus: row.smoke_status as ReleaseComponentState['smokeStatus'],
-    rollbackStatus: row.rollback_status as ReleaseComponentState['rollbackStatus'],
+    healthStatus: row.health_status as ReleaseComponentState['healthStatus'] ?? undefined,
+    versionStatus: row.version_status as ReleaseComponentState['versionStatus'] ?? undefined,
+    smokeStatus: row.smoke_status as ReleaseComponentState['smokeStatus'] ?? undefined,
+    rollbackStatus: row.rollback_status as ReleaseComponentState['rollbackStatus'] ?? undefined,
     notes: row.notes ?? undefined,
   }));
 }
