@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
@@ -8,7 +8,7 @@ import { Effect } from 'effect';
 
 import { ensureWorkspaceBeadsRedirect } from '../workspace-beads.js';
 import { flushAutoCommits } from '../../../lib/pan-dir/auto-commit.js';
-import { getProjectSync, type ProjectConfig } from '../../../lib/projects.js';
+import { getProjectSync, resolveInfraRepo, type ProjectConfig } from '../../../lib/projects.js';
 import { STATE_BRANCH, MIGRATION_COMPLETE_MARKER, clearStateMigrationCache, stateWorktreePath } from '../../../lib/state-home.js';
 import { STATE_BRANCH_PATHS } from '../../../lib/state-plane.js';
 import { acquireStateMigrationLock } from '../../../lib/state-migration-lock.js';
@@ -54,6 +54,26 @@ async function createOrphanStateCommit(repo: string, sourceSha: string): Promise
   } finally {
     rmSync(index, { force: true });
   }
+}
+
+function copyLegacyState(sourceRoot: string, stateRoot: string): StateMigrationManifestEntry[] {
+  const manifest: StateMigrationManifestEntry[] = [];
+  for (const sourcePath of STATE_BRANCH_PATHS) {
+    const source = join(sourceRoot, sourcePath === '.beads/' ? '.beads' : '.pan', sourcePath === '.beads/' ? '' : sourcePath);
+    if (!existsSync(source)) continue;
+    const destination = join(stateRoot, sourcePath);
+    cpSync(source, destination, { recursive: true, preserveTimestamps: true });
+    const visit = (sourceDir: string, destinationDir: string): void => {
+      for (const entry of readdirSync(sourceDir, { withFileTypes: true })) {
+        const sourceEntry = join(sourceDir, entry.name);
+        const destinationEntry = join(destinationDir, entry.name);
+        if (entry.isDirectory()) visit(sourceEntry, destinationEntry);
+        else if (entry.isFile()) manifest.push(manifestEntry(sourceEntry, destinationEntry));
+      }
+    };
+    visit(source, destination);
+  }
+  return manifest;
 }
 
 function workspacePaths(repo: string): string[] {
@@ -102,12 +122,14 @@ export async function migrateProjectState(
 ): Promise<void> {
   const project = projectOverride ?? getProjectSync(projectKey);
   if (!project) throw new Error(`Unknown project: ${projectKey}`);
-  const repo = project.path;
+  const { repoPath: repo } = resolveInfraRepo(project);
+  const legacyStateSource = project.path;
+  const sourceIsHostRepo = legacyStateSource === repo;
   const stateRoot = stateWorktreePath(project, { projectKey });
   console.log(`PAN-2541 state migration plan for ${projectKey}:`);
-  console.log(`  ${repo}/.pan/{${STATE_BRANCH_PATHS.filter((p) => p !== '.beads/').map((p) => p.slice(0, -1)).join(',')}} -> ${stateRoot}/`);
-  console.log(`  ${repo}/.beads -> ${stateRoot}/.beads`);
-  console.log(`  ${repo}/.pan/context -> ${repo}/.overdeck/context`);
+  console.log(`  ${legacyStateSource}/.pan/{${STATE_BRANCH_PATHS.filter((p) => p !== '.beads/').map((p) => p.slice(0, -1)).join(',')}} -> ${stateRoot}/`);
+  console.log(`  ${legacyStateSource}/.beads -> ${stateRoot}/.beads`);
+  console.log(`  ${legacyStateSource}/.pan/context -> ${legacyStateSource}/.overdeck/context`);
   if (options.dryRun) return;
 
   const release = acquireStateMigrationLock(projectKey);
@@ -141,24 +163,37 @@ export async function migrateProjectState(
       await git(repo, ['worktree', 'add', stateRoot, STATE_BRANCH]);
     }
 
-    const manifest = await trackedManifest(repo, sourceMainSha, stateRoot);
-    const untracked = (await git(repo, ['ls-files', '--others', '--', '.pan'])).split('\n')
-      .filter((path) => path.split('/').length === 2 && existsSync(join(repo, path)) && lstatSync(join(repo, path)).isFile());
+    const manifest = sourceIsHostRepo
+      ? await trackedManifest(repo, sourceMainSha, stateRoot)
+      : copyLegacyState(legacyStateSource, stateRoot);
+    if (!sourceIsHostRepo && manifest.length > 0) {
+      await git(stateRoot, ['add', '--all']);
+      await git(stateRoot, ['commit', '-m', 'chore(state): seed legacy project state']);
+      await git(stateRoot, ['push', 'origin', STATE_BRANCH]);
+    }
+    const untracked = sourceIsHostRepo
+      ? (await git(repo, ['ls-files', '--others', '--', '.pan'])).split('\n')
+        .filter((path) => path.split('/').length === 2 && existsSync(join(repo, path)) && lstatSync(join(repo, path)).isFile())
+      : existsSync(join(legacyStateSource, '.pan'))
+        ? readdirSync(join(legacyStateSource, '.pan'), { withFileTypes: true })
+          .filter((entry) => entry.isFile())
+          .map((entry) => `.pan/${entry.name}`)
+        : [];
     for (const path of untracked) {
-      if (!existsSync(join(repo, path))) continue;
+      if (!existsSync(join(legacyStateSource, path))) continue;
       const destination = join(stateRoot, 'notes', path.slice('.pan/'.length));
       if (existsSync(destination)) {
         // A byte-identical destination is this migration's own interrupted
         // prior copy — resume over it. Only differing content is a genuine
         // collision worth refusing.
-        const identical = readFileSync(join(repo, path)).equals(readFileSync(destination));
+        const identical = readFileSync(join(legacyStateSource, path)).equals(readFileSync(destination));
         if (!identical) throw new Error(`Untracked-note destination collision: ${destination}`);
-        manifest.push(manifestEntry(join(repo, path), destination));
+        manifest.push(manifestEntry(join(legacyStateSource, path), destination));
         continue;
       }
       mkdirSync(dirname(destination), { recursive: true });
-      copyFileSync(join(repo, path), destination);
-      manifest.push(manifestEntry(join(repo, path), destination));
+      copyFileSync(join(legacyStateSource, path), destination);
+      manifest.push(manifestEntry(join(legacyStateSource, path), destination));
     }
     if (untracked.length > 0) {
       await git(stateRoot, ['add', 'notes']);
@@ -173,28 +208,40 @@ export async function migrateProjectState(
     for (const workspace of workspacePaths(repo)) await ensureWorkspaceBeadsRedirect(workspace, project);
     if (await git(repo, ['rev-parse', 'main']) !== sourceMainSha) throw new Error('main advanced during migration; refusing cleanup');
 
-    await git(repo, ['rm', '-r', '--cached', '--ignore-unmatch', '.pan/records', '.pan/continues', '.pan/specs', '.pan/drafts', '.pan/review', '.pan/test', '.pan/feedback', '.pan/backlog', '.pan/notes', '.beads']);
-    const oldContext = join(repo, '.pan', 'context');
-    const newContext = join(repo, '.overdeck', 'context');
+    if (sourceIsHostRepo) {
+      await git(repo, ['rm', '-r', '--cached', '--ignore-unmatch', '.pan/records', '.pan/continues', '.pan/specs', '.pan/drafts', '.pan/review', '.pan/test', '.pan/feedback', '.pan/backlog', '.pan/notes', '.beads']);
+    }
+    const oldContext = join(legacyStateSource, '.pan', 'context');
+    const newContext = join(legacyStateSource, '.overdeck', 'context');
+    let movedContext = false;
     if (existsSync(oldContext) && !existsSync(newContext)) {
       mkdirSync(dirname(newContext), { recursive: true });
       renameSync(oldContext, newContext);
+      movedContext = true;
     }
-    rewriteGitignore(repo);
+    rewriteGitignore(legacyStateSource);
     // Resume tolerance: a prior attempt may already have committed the
     // context deletions — `git add -u` exits 128 on a pathspec with no
     // tracked entries left.
-    if (await git(repo, ['ls-files', '--', '.pan/context'])) {
-      await git(repo, ['add', '-u', '--', '.pan/context']);
-    }
-    await git(repo, ['add', '--', '.gitignore', '.overdeck/context']);
-    // Resume tolerance: skip when a prior attempt already committed the cleanup.
-    if (await git(repo, ['diff', '--cached', '--name-only'])) {
-      await git(repo, ['commit', '-m', 'chore(state): move permanent state to overdeck-state']);
+    if (sourceIsHostRepo) {
+      if (await git(repo, ['ls-files', '--', '.pan/context'])) {
+        await git(repo, ['add', '-u', '--', '.pan/context']);
+      }
+      const addPaths = ['.gitignore'];
+      if (movedContext || existsSync(newContext)) addPaths.push('.overdeck/context');
+      await git(repo, ['add', '--', ...addPaths]);
+      // Resume tolerance: skip when a prior attempt already committed the cleanup.
+      if (await git(repo, ['diff', '--cached', '--name-only'])) {
+        await git(repo, ['commit', '-m', 'chore(state): move permanent state to overdeck-state']);
+      }
     }
 
     verifyStateMigrationManifest(manifest);
     for (const entry of manifest) rmSync(entry.source, { force: true });
+    if (!sourceIsHostRepo) {
+      rmSync(join(legacyStateSource, '.pan'), { recursive: true, force: true });
+      rmSync(join(legacyStateSource, '.beads'), { recursive: true, force: true });
+    }
     stateSha = await git(stateRoot, ['rev-parse', 'HEAD']);
     writeFileSync(join(stateRoot, MIGRATION_COMPLETE_MARKER), `${JSON.stringify({
       sourceMainSha,
