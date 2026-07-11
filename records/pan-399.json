@@ -272,20 +272,20 @@
     "recordedAt": "2026-07-11T22:18:47.079Z"
   },
   "created": "2026-07-11T09:28:34.266Z",
-  "updated": "2026-07-11T22:22:57.724Z",
+  "updated": "2026-07-11T22:26:24.029Z",
   "pipeline": {
     "issueId": "PAN-399",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-11T22:22:57.690Z",
+    "updatedAt": "2026-07-11T22:26:24.000Z",
     "reviewNotes": "Verification failed at typecheck",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2577",
     "lastVerifiedCommit": "3d1876c48fabb8c4c98c848b867698e27f998428",
-    "reviewRequestedAt": "2026-07-11T22:22:53.650Z",
+    "reviewRequestedAt": "2026-07-11T22:26:21.264Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "drizzle/overdeck/0000_overdeck_init.sql",
@@ -403,7 +403,7 @@
       ],
       "recordedAt": "2026-07-11T22:18:47.079Z"
     },
-    "panDoneRecoveredAt": "2026-07-11T22:22:53.650Z"
+    "panDoneRecoveredAt": "2026-07-11T22:26:21.264Z"
   },
   "closeOut": {
     "usage": {
@@ -482,9 +482,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 4940352,
-            "output": 289102,
-            "cacheRead": 169002752,
+            "input": 4940810,
+            "output": 289166,
+            "cacheRead": 169331968,
             "cacheWrite": 0
           }
         }
@@ -533,15 +533,15 @@
           "cacheWrite": 77989
         },
         "custom/kimi-k2.7-code": {
-          "input": 4940352,
-          "output": 289102,
-          "cacheRead": 169002752,
+          "input": 4940810,
+          "output": 289166,
+          "cacheRead": 169331968,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 140.442725,
-        "pricingAsOf": "2026-07-11T22:22:57.722Z"
+        "usd": 140.505967,
+        "pricingAsOf": "2026-07-11T22:26:24.028Z"
       }
     },
     "merges": [
