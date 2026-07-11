@@ -7,6 +7,7 @@ import { jsonResponse } from '../http-helpers.js';
 import { FlywheelRunId, FlywheelStats, FlywheelStatus, type FlywheelStats as FlywheelStatsPayload } from '@overdeck/contracts';
 import { emitActivityTtsSync } from '../../../lib/activity-logger.js';
 import { httpHandler } from './http-handler.js';
+import { getSubstrateBugWeightsRoute } from './flywheel-substrate-bug-weights.js';
 import { validateOrigin } from './origin-validation.js';
 import {
   getFlywheelRunDetail,
@@ -29,7 +30,7 @@ import {
   startFlywheelRunForDashboard,
 } from '../services/flywheel-actions.js';
 import { readFlywheelState } from '../services/flywheel-state.js';
-import { listSubstrateBugWeights } from '../../../lib/overdeck/substrate-bug-weights-service.js';
+import { computeFlywheelStats, parseFlywheelStatsWindow } from '../services/flywheel-telemetry.js';
 import { derivePipelineRunStatsInputs } from '../services/pipeline-run-metrics.js';
 import {
   isFlywheelAutoPickupBacklog,
@@ -58,7 +59,6 @@ import {
   type ScheduleAutoMergeResult,
 } from '../../../lib/overdeck/merge-sync.js';
 import { getMergeBackendRoute } from './flywheel-merge-backend.js';
-
 const DEFAULT_BRIEF_PATH = 'docs/flywheel-brief.md';
 const FLYWHEEL_CONVERSATION_NAME = 'flywheel-orchestrator';
 const AUTO_MERGE_POLL_LIMIT = 100;
@@ -539,20 +539,6 @@ const getFlywheelStatsRoute = HttpRouter.add(
   })),
 );
 
-const getSubstrateBugWeightsRoute = HttpRouter.add(
-  'GET',
-  '/api/flywheel/substrate-bug-weights',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const window = HttpServerRequest.toURL(request).pipe(Option.match({
-      onNone: () => undefined,
-      onSome: (url) => url.searchParams.get('window'),
-    }));
-    const rows = yield* Effect.promise(() => listSubstrateBugWeights(window ?? '30d'));
-    return jsonResponse(rows);
-  })),
-);
-
 const getFlywheelConfigRoute = HttpRouter.add(
   'GET',
   '/api/flywheel/config',
@@ -1016,5 +1002,4 @@ export const flywheelRouteLayer = Layer.mergeAll(
   getFlywheelBriefRoute,
   postFlywheelBriefRoute,
 );
-
 export default flywheelRouteLayer;
