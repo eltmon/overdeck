@@ -1,16 +1,10 @@
 ---
 scope: dev
 ---
-### Agents must be persistent, lifecycle-managed sessions — never one-shot execs
+### Agents must be persistent sessions — never one-shot execs
 
-Overdeck agents must run as persistent sessions the dashboard and Deacon can
-observe, message, interrupt, resume, and recover. Never spawn agents through
-one-shot/headless execution (`codex exec`, `claude -p`, …) — a one-turn
-command exits, loses lifecycle state, and becomes orphaned.
-
-Persistent does NOT mean TUI. A structured-protocol server with resumable
-sessions (e.g. `codex app-server`, adopted in PAN-2597) satisfies this rule
-just as a tmux TUI does.
-
-If no reliable persistent path is wired for a harness, do not spawn that
-agent — surface the blocker to the operator.
+Never spawn agents via one-shot/headless execution (`codex exec`, `claude -p`):
+a one-turn command loses lifecycle state and becomes orphaned. Persistent ≠ TUI —
+structured transports with resumable sessions (`codex app-server`, PAN-2597)
+qualify. If no persistent path is wired for a harness, don't spawn; surface the
+blocker.
