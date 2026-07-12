@@ -355,7 +355,12 @@ export function DiffPanel({
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
-  const diffOpen = urlParams.diff === '1'
+  // Inline embedding (drawer Files tab, conversation side panel) is always
+  // rendered — the parent already decided to show it by mounting it, and
+  // driving embed state off the global ?diff=1 URL would both leave the Files
+  // tab blank and cross-contaminate other ?diff consumers. The ?diff=1 URL
+  // param still gates the popout/sheet (sheet-mode) toggle path.
+  const diffOpen = mode === 'inline' || urlParams.diff === '1'
   const selectedTurnId = urlParams.diffTurnId ?? null
   const selectedFilePath = selectedTurnId !== null ? (urlParams.diffFilePath ?? null) : null
 

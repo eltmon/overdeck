@@ -82,10 +82,19 @@ function DrawerPlanPanel({ issueId }: { issueId: string }) {
     queryKey: ['drawer-vbrief-plan', issueId],
     queryFn: async () => {
       const res = await fetch(`/api/workspaces/${issueId}/plan`);
-      if (!res.ok) return null;
+      // AC-17: 404 = no plan for this workspace yet → empty (delegate to
+      // VBriefViewer). Any other non-OK status (or a network throw) is a
+      // genuine fetch failure → render the error line. Returning null for all
+      // non-OK (the old behavior) swallowed real errors and rendered an empty
+      // plan instead of the required error line.
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`plan fetch failed: ${res.status}`);
       return res.json() as Promise<VBriefDocument>;
     },
+    // AC-18: the panel unmounts when the plan tab is inactive; without a
+    // staleTime, switching away and back refetches and flickers.
     retry: false,
+    staleTime: 60_000,
   });
 
   return (
@@ -179,8 +188,22 @@ function DrawerFilesPanel({ issueId, agentId }: { issueId: string; agentId: stri
     refetchInterval: 5000,
   });
 
-  if (!hasWorkspace || !agentId) {
+  // AC-34: the Files tab renders the branch-vs-main diff whenever a workspace
+  // branch exists. The "no workspace branch" empty state must reflect exactly
+  // that condition — not also an agentId check that would wrongly show "No
+  // workspace branch yet" for a workspace that does exist.
+  if (!hasWorkspace) {
     return <p className="text-[12px] text-muted-foreground">No workspace branch yet.</p>;
+  }
+  // The work agent's diff (/api/agents/:id/diffs) IS the feature/<issue> vs
+  // main diff. pickDefaultDrawerAgent returns the work agent including ended
+  // ones, so an agentId exists for any workspace that has ever had an agent
+  // (its creator). There is no workspace-scoped diff endpoint, so a branch
+  // with no agent session at all has no diff source — surface that distinctly
+  // rather than spinning on the diffData === undefined loading gate (the
+  // summaries query is disabled without an agentId).
+  if (!agentId) {
+    return <p className="text-[12px] text-muted-foreground">No agent session for this workspace yet.</p>;
   }
 
   // Gate the initial fetch so DiffPanel doesn't mount with an empty summary list
@@ -340,7 +363,7 @@ export function IssueDrawer() {
               {issue?.title ?? 'Issue details'}
             </h2>
             <div data-testid="drawer-header-meta" className="mt-[8px] flex items-center gap-[8px]">
-              <span className="rounded-md bg-accent px-[8px] py-[2px] text-[12px] text-muted-foreground">
+              <span className="rounded-[var(--radius-md)] bg-accent px-[8px] py-[2px] text-[12px] text-muted-foreground">
                 {branchLabel}
               </span>
               <span className="text-[12px] text-[var(--signal-cost-foreground)]">
