@@ -27787,6 +27787,7 @@ const DEFAULT_DOCS_TRIGGER_REGEXES = [
 const DEFAULT_CONFIG = {
 	tmux: { configMode: "managed" },
 	enabledProviders: new Set(["anthropic"]),
+	defaultConversationModel: "claude-sonnet-5",
 	apiKeys: {},
 	providerAuth: {},
 	providerPlan: {},
@@ -27943,7 +27944,7 @@ const DEFAULT_CONFIG = {
 		streamdownRenderer: false,
 		showHarnessModelPermutations: false
 	},
-	claude: { permissionMode: "auto" },
+	claude: { permissionMode: "bypass" },
 	codex: { permissionMode: "auto-review" }
 };
 /**
@@ -31224,6 +31225,24 @@ function ensureRuntimeIndexesSync(db) {
 	db.exec("CREATE INDEX IF NOT EXISTS `cost_session_id_idx` ON `cost_events` (`session_id`)");
 	try {
 		db.exec("ALTER TABLE `agents` ADD COLUMN `yielded_by_scheduler` integer");
+	} catch {}
+	try {
+		db.exec("ALTER TABLE `agents` ADD COLUMN `review_discovery_pending` integer");
+	} catch {}
+	try {
+		db.exec("ALTER TABLE `agents` ADD COLUMN `review_context_manifest_path` text");
+	} catch {}
+	try {
+		db.exec("ALTER TABLE `agents` ADD COLUMN `review_discovery_ready_at` integer");
+	} catch {}
+	try {
+		db.exec("ALTER TABLE `agents` ADD COLUMN `review_convoy_forked_at` integer");
+	} catch {}
+	try {
+		db.exec("ALTER TABLE `agents` ADD COLUMN `review_fork_cache_checked` integer");
+	} catch {}
+	try {
+		db.exec("ALTER TABLE `agents` ADD COLUMN `review_forked_from_parent` integer");
 	} catch {}
 	try {
 		db.exec("ALTER TABLE `agents` ADD COLUMN `yielded_at` integer");
