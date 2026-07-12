@@ -12,37 +12,159 @@
       "timestamp": "2026-07-12T21:00:30.441Z",
       "reason": "start",
       "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-07-12T21:40:48.696Z",
+      "reason": "end",
+      "note": "Anomaly: the first full npm test run failed in the sandbox because spawned tests could not find bun on PATH; rerun with /home/eltmon/.bun/bin on PATH passed. Completed docs RAG live reindex, missing-index CLI hint, build-script live materialization, docs injection service, memory-hook wiring, and ops documentation. Gates passed: npm run typecheck, npm run lint, PATH=/home/eltmon/.bun/bin:/home/eltmon/.config/nvm/versions/node/v22.22.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/codex-path:/home/eltmon/.local/bin:/home/eltmon/bin:/home/eltmon/.overdeck/agents/agent-pan-2603/codex-home/tmp/arg0/codex-arg0T5jyOz:/home/eltmon/.config/nvm/versions/node/v22.22.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/codex-path:/home/eltmon/.config/nvm/versions/node/v22.22.0/bin:/home/eltmon/.cargo/bin:/home/eltmon/.local/share/../bin:/home/eltmon/.local/bin:/home/eltmon/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin npm test. Pushed feature/pan-2603 to origin."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T21:43:45.302Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-12T21:48Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-07-12T21:48:38.850Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T21:48:38.940Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-12T21:49Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-12T21:49:26.092Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-07-12T21:48:38Z",
+      "markdownBody": "VERIFICATION STUCK for PAN-2603 (attempt 2/3):\n\nFailed check: lint\n\nVerification FAILED at lint (66854ms):\n\n rolldown-plugin-dts:generate (59%)\n  - tsdown:deps (37%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\ncomm: file 1 is not in sorted order\ncomm: input is not in sorted order\ncomm: file 1 is not in sorted order\ncomm: input is not in sorted order\n✖ new circular dependencies found — these must be removed, not baselined:\n    src/dashboard/frontend/src/components/chat/ConversationPanel.tsx > src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/dividers.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts\n    src/dashboard/frontend/src/components/conversations/SessionDetail.tsx > src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx\n    src/lib/agents/tier-table.ts > src/lib/pan-dir/record.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts\n✖ stale baseline entries — run: bash scripts/lint-circular-deps.sh --update\n    src/dashboard/frontend/src/components/chat/ConversationPanel.tsx > src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/dividers.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts\n    src/dashboard/frontend/src/components/conversations/SessionDetail.tsx > src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx\n    src/lib/agents/tier-table.ts > src/lib/pan-dir/record.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts\n\ncircular-dependency guard failed. Break the cycle, or manually edit the baseline in an issue-referenced commit to accept audited growth.\n\n\n## NEEDS-YOU: Verification stuck\n\nThis was the final allowed verification attempt. The work agent is paused so it does not keep spending cycles on the same failing gate.\n\nAn operator needs to inspect PAN-2603, decide whether to fix-forward manually, restart the agent with new instructions, or move the issue through the normal pipeline. Do not re-request review automatically."
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-12T21:49:26Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2603\n\n# Review Synthesis — PAN-2603 — 2026-07-12T17:58:00-04:00\n\n## Verdict: CHANGES REQUESTED — `/api/memory/inject` drops existing prompt-time memory context and adds unsafe/expensive docs injection on the hot path\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2603/.pan/review/agent-pan-2603-review-1394ae0c/context.json\n- Branch: feature/pan-2603\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2603\n- HEAD reviewed: 1394ae0ce5f8c40b335c434e46c233c6044206e5\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2603/.pan/review/agent-pan-2603-review-1394ae0c/security.md | 1 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2603/.pan/review/agent-pan-2603-review-1394ae0c/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2603/.pan/review/agent-pan-2603-review-1394ae0c/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2603/.pan/review/agent-pan-2603-review-1394ae0c/requirements.md | 0 |\n\n## Blocking Findings\n\n### [security] Raw docs snippets are injected as trusted Claude instructions — `src/lib/docs/injection.ts:69`\n`buildDocsInjectionContext` returns `formatDocsQueryMarkdown(result)` and `handleMemoryInjectFastPathBody` appends the resulting docs block directly into the hook response. The snippets come from the indexed corpus and are not framed as untrusted reference material; only the closing `</overdeck-docs>` tag is escaped. A malicious or compromised corpus entry can therefore present ordinary model-visible commands inside prompt-time context. The fix should add explicit non-authoritative framing/fencing and a regression test with adversarial corpus text.\n\n### [correctness] `/api/memory/inject` no longer returns prompt-time memory context — `src/dashboard/server/routes/hooks.ts:333`\nThe route now returns `fastResult`, while the original `handleMemoryInjectBody` call runs fire-and-forget and its context is never included in the JSON returned to the Claude Code hook. The fast path stubs `injectMemory` with an empty context, so the installed `UserPromptSubmit` hook no longer receives existing `<overdeck-memory>` context on the main prompt-injection path. Preserve the endpoint response contract or explicitly restructure the hook/server composition so expected memory context is still emitted.\n\n### [performance] Prompt-time docs injection synchronously scans the full docs embedding index — `src/dashboard/server/routes/hooks.ts:333`\nThe latency-sensitive `/api/memory/inject` route awaits `handleMemoryInjectFastPathBody`, which awaits `buildDocsInjectionContext` and `queryDocsIndex`. That query path uses synchronous SQLite work on the Node dashboard event loop and, after FTS hits, scans/materializes/sorts the full `docs_embeddings` table before slicing to `maxVectorRows`. This makes prompt submit latency scale with corpus size and blocks unrelated dashboard HTTP/WebSocket work. Keep docs retrieval off the hot response path or make the query strategy bounded and non-blocking before approval.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2603/.pan/review/agent-pan-2603-review-1394ae0c/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2603 -m \"Fixed review issues\"`"
+    }
+  ],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/DOCS-RAG.md",
+      "docs/prds/planned/PAN-1203-overdeck-docs-rag.md",
+      "scripts/build-docs-index.mjs",
+      "src/cli/commands/__tests__/docs.test.ts",
+      "src/cli/commands/docs.ts",
+      "src/dashboard/server/routes/__tests__/hooks-docs-inject.test.ts",
+      "src/dashboard/server/routes/hooks.ts",
+      "src/index.ts",
+      "src/lib/docs/__tests__/injection.test.ts",
+      "src/lib/docs/injection.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/DOCS-RAG.md",
+      "docs/prds/planned/PAN-1203-overdeck-docs-rag.md",
+      "scripts/build-docs-index.mjs",
+      "src/cli/commands/__tests__/docs.test.ts",
+      "src/cli/commands/docs.ts",
+      "src/dashboard/server/routes/__tests__/hooks-docs-inject.test.ts",
+      "src/dashboard/server/routes/hooks.ts",
+      "src/index.ts",
+      "src/lib/docs/__tests__/injection.test.ts",
+      "src/lib/docs/injection.ts"
+    ],
+    "recordedAt": "2026-07-12T21:40:42.752Z"
+  },
   "created": "2026-07-12T20:44:53.021Z",
-  "updated": "2026-07-12T21:15:47.057Z",
+  "updated": "2026-07-12T21:49:26.092Z",
   "pipeline": {
     "issueId": "PAN-2603",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-12T21:15:46.382Z",
-    "inspectNotes": "Bead docs-injection-service ack: buildDocsInjectionContext gates via evaluateDocsPromptGate before any write, only advances budget/records telemetry once on a real hit (zero-result and missing-index paths short-circuit before recordDocsInjection), and swallows errors without throwing per AC1-5; covered by injection.test.ts."
+    "panDoneRecoveredAt": "2026-07-12T21:41:23.108Z",
+    "updatedAt": "2026-07-12T21:49:25.357Z",
+    "reviewNotes": "/api/memory/inject drops memory context and docs injection needs trust-boundary/performance fixes",
+    "verificationNotes": "Verification FAILED at lint (66854ms):\n\n rolldown-plugin-dts:generate (59%)\n  - tsdown:deps (37%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\ncomm: file 1 is not in sorted order\ncomm: input is not in sorted order\ncomm: file 1 is not in sorted order\ncomm: input is not in sorted order\n✖ new circular dependencies found — these must be removed, not baselined:\n    src/dashboard/frontend/src/components/chat/ConversationPanel.tsx > src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/dividers.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts\n    src/dashboard/frontend/src/components/conversations/SessionDetail.tsx > src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx\n    src/lib/agents/tier-table.ts > src/lib/pan-dir/record.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts\n✖ stale baseline entries — run: bash scripts/lint-circular-deps.sh --update\n    src/dashboard/frontend/src/components/chat/ConversationPanel.tsx > src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/dividers.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts\n    src/dashboard/frontend/src/components/conversations/SessionDetail.tsx > src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx\n    src/lib/agents/tier-table.ts > src/lib/pan-dir/record.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts\n\ncircular-dependency guard failed. Break the cycle, or manually edit the baseline in an issue-referenced commit to accept audited growth.\n",
+    "inspectNotes": "Bead docs-injection-service ack: buildDocsInjectionContext gates via evaluateDocsPromptGate before any write, only advances budget/records telemetry once on a real hit (zero-result and missing-index paths short-circuit before recordDocsInjection), and swallows errors without throwing per AC1-5; covered by injection.test.ts.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2605",
+    "reviewRequestedAt": "2026-07-12T21:41:23.108Z",
+    "reviewSpawnedAt": "2026-07-12T21:43:43.119Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/DOCS-RAG.md",
+        "docs/prds/planned/PAN-1203-overdeck-docs-rag.md",
+        "scripts/build-docs-index.mjs",
+        "src/cli/commands/__tests__/docs.test.ts",
+        "src/cli/commands/docs.ts",
+        "src/dashboard/server/routes/__tests__/hooks-docs-inject.test.ts",
+        "src/dashboard/server/routes/hooks.ts",
+        "src/index.ts",
+        "src/lib/docs/__tests__/injection.test.ts",
+        "src/lib/docs/injection.ts"
+      ],
+      "actualChangedFiles": [
+        "docs/DOCS-RAG.md",
+        "docs/prds/planned/PAN-1203-overdeck-docs-rag.md",
+        "scripts/build-docs-index.mjs",
+        "src/cli/commands/__tests__/docs.test.ts",
+        "src/cli/commands/docs.ts",
+        "src/dashboard/server/routes/__tests__/hooks-docs-inject.test.ts",
+        "src/dashboard/server/routes/hooks.ts",
+        "src/index.ts",
+        "src/lib/docs/__tests__/injection.test.ts",
+        "src/lib/docs/injection.ts"
+      ],
+      "recordedAt": "2026-07-12T21:40:42.752Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "blocked",
+        "atCommit": "1394ae0ce5f8c40b335c434e46c233c6044206e5"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "1394ae0ce5f8c40b335c434e46c233c6044206e5"
+      },
+      "performance": {
+        "status": "blocked",
+        "atCommit": "1394ae0ce5f8c40b335c434e46c233c6044206e5"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "1394ae0ce5f8c40b335c434e46c233c6044206e5"
+      }
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 989026,
-            "output": 1715,
-            "cacheRead": 901632,
+            "input": 3539862,
+            "output": 4117,
+            "cacheRead": 3365376,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 6437929,
-            "output": 17940,
-            "cacheRead": 6268800,
+            "input": 19179203,
+            "output": 55766,
+            "cacheRead": 18434048,
             "cacheWrite": 0
           }
         },
@@ -53,19 +175,27 @@
             "cacheRead": 6161502,
             "cacheWrite": 171754
           }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 14020,
+            "output": 4042,
+            "cacheRead": 115828,
+            "cacheWrite": 80125
+          }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 989026,
-          "output": 1715,
-          "cacheRead": 901632,
+          "input": 3539862,
+          "output": 4117,
+          "cacheRead": 3365376,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 6437929,
-          "output": 17940,
-          "cacheRead": 6268800,
+          "input": 19179203,
+          "output": 55766,
+          "cacheRead": 18434048,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -73,16 +203,50 @@
           "output": 54208,
           "cacheRead": 6161502,
           "cacheWrite": 171754
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 14020,
+          "output": 4042,
+          "cacheRead": 115828,
+          "cacheWrite": 80125
         }
       },
       "costAtCloseOut": {
-        "usd": 15.679682,
-        "pricingAsOf": "2026-07-12T21:15:46.875Z"
+        "usd": 26.069154,
+        "pricingAsOf": "2026-07-12T21:49:25.408Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2605"
+    ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5"
+  "harness": "codex",
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "ops-doc": "completed",
+    "ops-doc.ac1": "completed",
+    "ops-doc.ac2": "completed",
+    "wire-hook-inject": "completed",
+    "wire-hook-inject.ac1": "completed",
+    "wire-hook-inject.ac2": "completed",
+    "wire-hook-inject.ac3": "completed",
+    "wire-hook-inject.ac4": "completed",
+    "cli-missing-index-hint": "completed",
+    "cli-missing-index-hint.ac1": "completed",
+    "cli-missing-index-hint.ac2": "completed",
+    "docs-injection-service": "completed",
+    "docs-injection-service.ac1": "completed",
+    "docs-injection-service.ac2": "completed",
+    "docs-injection-service.ac3": "completed",
+    "docs-injection-service.ac4": "completed",
+    "docs-injection-service.ac5": "completed",
+    "build-script-materialize": "completed",
+    "build-script-materialize.ac1": "completed",
+    "build-script-materialize.ac2": "completed",
+    "reindex-live-path": "completed",
+    "reindex-live-path.ac1": "completed",
+    "reindex-live-path.ac2": "completed",
+    "reindex-live-path.ac3": "completed"
+  }
 }
