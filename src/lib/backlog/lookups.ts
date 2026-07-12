@@ -14,7 +14,7 @@ import { createBeadsResolver } from '../beads/resolver.js';
  */
 export function buildClassifyLookups(
   projectRoot: string,
-  opts?: { labels?: (id: string) => readonly string[] },
+  opts?: { labels?: (id: string) => readonly string[]; issuesWithBeads?: ReadonlySet<string> },
 ): ClassifyLookups {
   // Labels come from the in-memory issue service (server-side). A CLI/sandbox process cannot
   // reach that singleton, so callers there must pass `opts.labels` (e.g. gh-derived) — without
@@ -46,8 +46,12 @@ export function buildClassifyLookups(
     }
   }
   const workspacesDir = join(projectRoot, 'workspaces');
-  const beadsIssues = new Set<string>();
-  if (existsSync(workspacesDir)) {
+  // Server callers MUST pass opts.issuesWithBeads (computed async from one bulk
+  // resolver read): the sync fallback below runs execFileSync('bd') once per
+  // workspace (~2s each × ~30 dirs) and BLOCKS the event loop for a minute —
+  // acceptable only in CLI/sandbox processes that cannot share the async path.
+  const beadsIssues = new Set<string>(opts?.issuesWithBeads ?? []);
+  if (!opts?.issuesWithBeads && existsSync(workspacesDir)) {
     for (const dir of readdirSync(workspacesDir)) {
       const m = /^feature-([a-z]+-\d+)$/i.exec(dir);
       if (m) {

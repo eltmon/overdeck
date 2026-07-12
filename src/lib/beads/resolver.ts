@@ -44,7 +44,9 @@ function parseRecords(stdout: string): BeadRecord[] {
 }
 
 async function defaultExecute(args: string[], cwd: string): Promise<string> {
-  const { stdout } = await execFileAsync('bd', args, { cwd, encoding: 'utf8', timeout: 10_000 });
+  // 64MB buffer: bulk reads (getAllBeads on a 3k+-bead project) exceed Node's
+  // 1MB execFile default, which surfaces as maxBuffer errors + retry thrash.
+  const { stdout } = await execFileAsync('bd', args, { cwd, encoding: 'utf8', timeout: 30_000, maxBuffer: 64 * 1024 * 1024 });
   return typeof stdout === 'string' ? stdout : String((stdout as unknown as { stdout?: string }).stdout ?? stdout);
 }
 
