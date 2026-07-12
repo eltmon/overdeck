@@ -100,17 +100,18 @@
   ],
   "feedback": [],
   "created": "2026-07-12T20:45:31.659Z",
-  "updated": "2026-07-12T21:25:51.320Z",
+  "updated": "2026-07-12T21:27:58.069Z",
   "pipeline": {
     "issueId": "PAN-1232",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-12T21:24:47.226Z",
-    "reviewNotes": "Verification failed at lint",
+    "updatedAt": "2026-07-12T21:27:57.978Z",
+    "reviewNotes": "Verification failed at build",
+    "verificationNotes": "Verification FAILED at build (68227ms):\n\nverdeck/workspaces/feature-pan-1232/node_modules/.bun/tsdown@0.21.10/node_modules/tsdown/dist/build-CgGnBlCD.mjs:760:19)\n    at async Promise.all (index 0)\n    at async buildWithConfigs (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/node_modules/.bun/tsdown@0.21.10/node_modules/tsdown/dist/build-CgGnBlCD.mjs:716:18)\n    at async CAC.<anonymous> (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/node_modules/.bun/tsdown@0.21.10/node_modules/tsdown/dist/run.mjs:25:2)\n    at async runCLI (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/node_modules/.bun/tsdown@0.21.10/node_modules/tsdown/dist/run.mjs:49:3)\n\nbuild:dashboard:server:bundle failed with exit code 1\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - tsdown:deps (54%)\n  - rolldown-plugin-dts:generate (46%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m ../../../node_modules/.bun/@pierre+diffs@1.1.22/node_modules/@pierre/diffs/dist/index.js is dynamically imported by src/components/chat/ChatMarkdown.tsx, src/components/chat/MarkdownFileLink.tsx but also statically imported by src/components/DiffPanel.tsx, dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/components/vbrief/PlanMapViewer.tsx is dynamically imported by src/components/vbrief/VBriefViewer.tsx but also statically imported by src/components/BeadsTasksPanel.tsx, src/components/Stage/cockpit/PlanMapCard.tsx, dynamic import will not move module into another chunk.\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2604",
     "reviewRequestedAt": "2026-07-12T21:24:43.006Z",
     "reviewSpawnedAt": "2026-07-12T21:24:44.841Z"
@@ -126,9 +127,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 1480582,
-            "output": 8111,
-            "cacheRead": 1212672,
+            "input": 2131945,
+            "output": 13626,
+            "cacheRead": 1768448,
             "cacheWrite": 0
           }
         }
@@ -141,15 +142,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 1480582,
-          "output": 8111,
-          "cacheRead": 1212672,
+          "input": 2131945,
+          "output": 13626,
+          "cacheRead": 1768448,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 2.189216,
-        "pricingAsOf": "2026-07-12T21:24:47.349Z"
+        "usd": 3.110489,
+        "pricingAsOf": "2026-07-12T21:27:58.047Z"
       }
     },
     "merges": [
@@ -157,8 +158,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "glm-5.2",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "tab-files": "completed",
     "tab-files.ac1": "completed",
