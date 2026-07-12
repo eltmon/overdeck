@@ -1,4 +1,6 @@
 import { execFile } from 'node:child_process';
+import { readdir, stat } from 'node:fs/promises';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 import { withBdProcessLock, type BdProcessLockOptions } from '../bd-process-lock.js';
@@ -40,6 +42,12 @@ function errorText(error: unknown): string {
   return [record.stderr, record.message, record.stdout].filter((value) => typeof value === 'string').join('\n');
 }
 
+export function formatMutationBatchFailure(result: Extract<MutationBatchResult<unknown>, { ok: false }>): string {
+  if (!('cause' in result)) return result.message;
+  const cause = errorText(result.cause).trim();
+  return cause ? `${result.message}\nCause: ${cause}` : result.message;
+}
+
 function isConflict(error: unknown): boolean {
   return /conflict|non-fast-forward|rejected|diverge/i.test(errorText(error));
 }
@@ -76,6 +84,17 @@ async function readRemoteHead(client: BdMutationClient): Promise<string | null> 
   }
 }
 
+async function hasExistingEmbeddedDoltStore(cwd: string): Promise<boolean> {
+  try {
+    const storePath = join(cwd, '.beads', 'embeddeddolt');
+    const storeStat = await stat(storePath);
+    if (!storeStat.isDirectory()) return false;
+    return (await readdir(storePath)).length > 0;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * The only canonical beads mutation transaction boundary.
  *
@@ -102,7 +121,9 @@ export async function runMutationBatch<T>(
   return withLock(`beads mutation: ${context.reason}`, async () => {
     let value: T;
     try {
-      await client.run(['bootstrap', '--yes', '--json']);
+      if (!(await hasExistingEmbeddedDoltStore(cwd))) {
+        await client.run(['bootstrap', '--yes', '--json']);
+      }
       await client.run(['dolt', 'pull']);
       recordBeadsPull(telemetryKey, await readHead(client), await readRemoteHead(client));
       value = await mutate(client);

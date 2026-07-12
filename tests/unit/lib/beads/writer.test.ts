@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-import { runMutationBatch } from '../../../../src/lib/beads/writer.js';
+import { formatMutationBatchFailure, runMutationBatch } from '../../../../src/lib/beads/writer.js';
 
 function harness(failOn?: string) {
   const calls: string[] = [];
@@ -17,20 +20,60 @@ function harness(failOn?: string) {
   return { calls, execute, exportSnapshot, withLock };
 }
 
+async function withProjectDir<T>(hasEmbeddedStore: boolean, fn: (cwd: string) => Promise<T>): Promise<T> {
+  const cwd = await mkdtemp(join(tmpdir(), 'beads-writer-'));
+  try {
+    if (hasEmbeddedStore) {
+      const storePath = join(cwd, '.beads', 'embeddeddolt', 'overdeck');
+      await mkdir(storePath, { recursive: true });
+      await writeFile(join(storePath, 'store'), 'present');
+    }
+    return await fn(cwd);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+}
+
 describe('runMutationBatch', () => {
-  it('locks, pulls, performs multiple operations, commits, exports, and pushes once', async () => {
+  it('uses an existing embedded Dolt store without bootstrapping, then pulls, commits, exports, and pushes once', async () => {
     const h = harness();
-    const result = await runMutationBatch(
-      { project: { workspacePath: '/tmp/project' }, reason: 'close planned beads' },
-      async (bd) => {
-        await bd.mutate(['close', 'one']);
-        await bd.mutate(['close', 'two']);
-        return 2;
-      },
-      h,
+    const result = await withProjectDir(true, (workspacePath) =>
+      runMutationBatch(
+        { project: { workspacePath }, reason: 'close planned beads' },
+        async (bd) => {
+          await bd.mutate(['close', 'one']);
+          await bd.mutate(['close', 'two']);
+          return 2;
+        },
+        h,
+      ),
     );
     expect(result).toMatchObject({ ok: true, value: 2 });
     expect(h.withLock).toHaveBeenCalledOnce();
+    expect(h.calls).toEqual([
+      'lock',
+      'dolt pull',
+      'vc status',
+      'dolt remote show origin --json',
+      'close one --dolt-auto-commit batch',
+      'close two --dolt-auto-commit batch',
+      'dolt commit -m close planned beads',
+      'export-snapshot',
+      'dolt push',
+      'vc status',
+    ]);
+  });
+
+  it('bootstraps when the embedded Dolt store is absent or empty', async () => {
+    const h = harness();
+    const result = await withProjectDir(false, (workspacePath) =>
+      runMutationBatch(
+        { project: { workspacePath }, reason: 'close planned beads' },
+        (bd) => bd.mutate(['close', 'one']),
+        h,
+      ),
+    );
+    expect(result).toMatchObject({ ok: true, value: '' });
     expect(h.calls).toEqual([
       'lock',
       'bootstrap --yes --json',
@@ -38,7 +81,6 @@ describe('runMutationBatch', () => {
       'vc status',
       'dolt remote show origin --json',
       'close one --dolt-auto-commit batch',
-      'close two --dolt-auto-commit batch',
       'dolt commit -m close planned beads',
       'export-snapshot',
       'dolt push',
@@ -59,6 +101,22 @@ describe('runMutationBatch', () => {
     expect(result).toMatchObject({ ok: false, needsOperatorRecovery: true });
     expect(h.calls).not.toContain('dolt push');
     expect(h.calls.some((call) => call.startsWith('dolt commit'))).toBe(false);
+  });
+
+  it('formats operator recovery failures with the captured cause', async () => {
+    const cause = Object.assign(new Error('operation failed'), {
+      stderr: 'Bootstrap failed: clone from remote: database exists',
+    });
+    const formatted = formatMutationBatchFailure({
+      ok: false,
+      needsOperatorRecovery: true,
+      localHead: null,
+      message: 'The mutation batch failed before push.',
+      cause,
+    });
+
+    expect(formatted).toContain('The mutation batch failed before push.');
+    expect(formatted).toContain('Bootstrap failed: clone from remote: database exists');
   });
 
   it('returns a typed conflict when push is rejected and never force-pushes', async () => {

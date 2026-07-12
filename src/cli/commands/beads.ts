@@ -14,7 +14,7 @@ import { promisify } from 'util';
 import { platform } from 'os';
 import { registerBeadsReconcileCommand } from './admin/beads-reconcile.js';
 import { standardizeBeadsConfig } from '../../lib/beads/config-standardize.js';
-import { runMutationBatch, type BdMutationClient } from '../../lib/beads/writer.js';
+import { formatMutationBatchFailure, runMutationBatch, type BdMutationClient } from '../../lib/beads/writer.js';
 import { assertSupportedBdVersion, readInstalledBdVersion } from '../../lib/beads/version.js';
 
 const execAsync = promisify(exec);
@@ -129,7 +129,7 @@ async function compactCommand(options: CompactOptions): Promise<void> {
       { project: { workspacePath: cwd }, reason: `compact beads older than ${days} days` },
       (bd) => bd.mutate(['admin', 'compact', '--days', String(days)]),
     );
-    if (!compacted.ok) throw new Error(compacted.message);
+    if (!compacted.ok) throw new Error(formatMutationBatchFailure(compacted));
 
     spinner.succeed(`Compacted ${count} beads older than ${days} days`);
 
@@ -232,7 +232,7 @@ export function registerBeadsCommands(program: Command): void {
 
   const mutate = async <T>(reason: string, fn: (bd: BdMutationClient) => Promise<T>): Promise<T> => {
     const result = await runMutationBatch({ project: { workspacePath: process.cwd() }, reason }, fn);
-    if (!result.ok) throw new Error(result.message);
+    if (!result.ok) throw new Error(formatMutationBatchFailure(result));
     return result.value;
   };
 
