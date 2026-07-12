@@ -6,6 +6,9 @@ import { useDashboardStore } from '../../lib/store';
 import { cn } from '../../lib/utils';
 import { trackerIssueUrl } from '../../lib/issueLinks';
 import { toast } from 'sonner';
+import { DiffPanel } from '../DiffPanel';
+import { DiffWorkerPoolProvider } from '../DiffWorkerPoolProvider';
+import type { TurnDiffSummary } from '../chat/chat-types';
 import DrawerActionBar from './DrawerActionBar';
 import DrawerActiveAgent, { formatSpend } from './DrawerActiveAgent';
 import { DrawerAgentSession, pickDefaultDrawerAgent } from './DrawerAgentSession';
@@ -143,6 +146,61 @@ function DrawerWorkspaceSection({ issueId }: { issueId: string }) {
   );
 }
 
+/** PRD §6 — Files tab. Renders the existing DiffPanel for the issue's work
+ * agent (its diff route /api/agents/:id/diffs is the branch-vs-main diff).
+ * Falls back to a 12px muted empty state when no workspace branch exists yet.
+ * Adds no server endpoint — DiffPanel's own route is reused. */
+function DrawerFilesPanel({ issueId, agentId }: { issueId: string; agentId: string | null }) {
+  // Same query key as DrawerWorkspaceSection so the existence check dedupes to
+  // one network call per issue.
+  const { data: workspace } = useQuery<WorkspaceInfo | null>({
+    queryKey: ['drawer-workspace', issueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}`);
+      if (!res.ok) return null;
+      return res.json() as Promise<WorkspaceInfo>;
+    },
+    retry: false,
+  });
+
+  const hasWorkspace = !!workspace?.exists;
+
+  // Turn summaries feed DiffPanel's turn strip. Fetched only once a workspace
+  // branch AND a work agent exist; DiffPanel fetches the per-turn / vs-main file
+  // content itself from the same /api/agents/:id/diffs base.
+  const { data: diffData } = useQuery<{ summaries: TurnDiffSummary[] } | null>({
+    queryKey: ['agent-diff-summaries', agentId],
+    queryFn: async () => {
+      const res = await fetch(`/api/agents/${encodeURIComponent(agentId!)}/diffs`);
+      if (!res.ok) return null;
+      return res.json() as Promise<{ summaries: TurnDiffSummary[] }>;
+    },
+    enabled: hasWorkspace && !!agentId,
+    refetchInterval: 5000,
+  });
+
+  if (!hasWorkspace || !agentId) {
+    return <p className="text-[12px] text-muted-foreground">No workspace branch yet.</p>;
+  }
+
+  // Gate the initial fetch so DiffPanel doesn't mount with an empty summary list
+  // and flash a misleading "No completed turns yet" before data arrives
+  // (same guard as the standalone diff popout).
+  if (diffData === undefined) {
+    return <p className="text-[12px] text-muted-foreground">Loading files…</p>;
+  }
+
+  return (
+    <DiffWorkerPoolProvider>
+      <DiffPanel
+        mode="inline"
+        agentId={agentId}
+        turnDiffSummaries={diffData?.summaries ?? []}
+      />
+    </DiffWorkerPoolProvider>
+  );
+}
+
 function tabLabel(tab: string) {
   return tab.replace(/-/g, ' ').replace(/\b\w/g, (match) => match.toUpperCase());
 }
@@ -183,6 +241,11 @@ export function IssueDrawer() {
         : issue?.priority === 3
           ? 'bg-muted-foreground'
           : 'bg-transparent';
+
+  // Canonical work agent for the Files tab — the agent whose branch diff we show.
+  // Independent of the Conversation/Terminal selection (effectiveAgentId) so the
+  // Files tab always reflects the issue's work, not a user-picked peer session.
+  const filesAgentId = pickDefaultDrawerAgent(agents)?.id ?? null;
 
   // Selected agent for the Conversation/Terminal tabs. Owned here so the choice
   // survives a Conversation ⇄ Terminal tab switch; falls back to the default
@@ -316,7 +379,7 @@ export function IssueDrawer() {
           <div
             className={cn(
               'flex min-w-0 flex-col',
-              drawer.tab === 'conversation' || drawer.tab === 'terminal'
+              drawer.tab === 'conversation' || drawer.tab === 'terminal' || drawer.tab === 'files'
                 ? 'min-h-0 p-[14px]'
                 : 'overflow-auto px-[22px] py-[18px]',
             )}
@@ -361,6 +424,10 @@ export function IssueDrawer() {
                 agentId={effectiveAgentId}
                 onSelectAgent={setSelectedAgentId}
               />
+            ) : drawer.tab === 'files' ? (
+              <div data-testid="drawer-tab-panel-files" className="min-h-0 flex-1">
+                <DrawerFilesPanel issueId={drawer.issueId} agentId={filesAgentId} />
+              </div>
             ) : (
               <DrawerTabPlaceholder tab={drawer.tab} />
             )}
