@@ -10,8 +10,7 @@
 
 # Use no-db mode: JSONL-only, no Dolt database
 # When true, bd will use .beads/issues.jsonl as the source of truth
-no-db: true
-
+# no-db removed 2026-07-12 (unsupported legacy mode, PAN-2564 FR-8)
 # Enable JSON output by default
 # json: false
 
@@ -52,7 +51,8 @@ no-db: true
 # - linear.api-key
 # - github.org
 # - github.repo
-
 export.git-add: false
+sync:
+    remote: "git+ssh://git@github.com/eltmon/overdeck.git"
 
-sync.remote: "git+ssh://git@github.com/eltmon/panopticon-cli.git"
+# sync.remote: "git+ssh://git@github.com/eltmon/overdeck.git"
