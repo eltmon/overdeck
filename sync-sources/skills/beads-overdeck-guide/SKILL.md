@@ -87,13 +87,13 @@ Never run `bd init` inside a redirect-managed worktree. If `.beads/redirect` exi
 
 ```bash
 # Start work on a bead
-bd update overdeck-abc --status in_progress
+pan beads update overdeck-abc --status in_progress
 
 # Add progress notes (CRITICAL for crash recovery)
 bd comments add overdeck-abc "Implemented parseClaudeSession refactor"
 
 # Complete a bead
-bd close overdeck-abc --reason "Per-message costing implemented"
+pan beads close overdeck-abc --reason "Per-message costing implemented"
 
 # Check dependencies
 bd dep tree overdeck-abc
@@ -104,7 +104,7 @@ bd dep tree overdeck-abc
 | Type | Example | Where Used |
 |------|---------|------------|
 | **Linear Issue ID** | `PAN-116` | GitHub issues, titles, labels |
-| **Bead ID** | `overdeck-abc` | bd commands (`bd show`, `bd update`) |
+| **Bead ID** | `overdeck-abc` | bd commands (`bd show`, `pan beads update`) |
 
 **Key insight:** `bd list --id` expects bead IDs, not Linear IDs.
 
@@ -122,10 +122,10 @@ The following commands do NOT exist. Agents frequently hallucinate them:
 
 | Invalid Command | Correct Replacement |
 |-----------------|---------------------|
-| `bd claim <id>` | `bd update <id> --claim` |
-| `bd start <id>` | `bd update <id> --status in_progress` |
-| `bd move <id>` | `bd update <id>` (with relevant flags) |
-| `bd refile <id>` | `bd update <id>` (with relevant flags) |
+| `bd claim <id>` | `pan beads claim <id>` |
+| `bd start <id>` | `pan beads update <id> --status in_progress` |
+| `bd move <id>` | `pan beads update <id>` (with relevant flags) |
+| `bd refile <id>` | `pan beads update <id>` (with relevant flags) |
 
 ## Quick Cheat Sheet
 
@@ -133,10 +133,10 @@ The following commands do NOT exist. Agents frequently hallucinate them:
 |------|---------|
 | Find beads for issue | `bd list --title-contains "PAN-XXX" --all` |
 | Find open work | `bd ready` or `bd list --status open` |
-| Start a bead | `bd update <bead-id> --status in_progress` |
-| Claim a bead | `bd update <bead-id> --claim` |
+| Start a bead | `pan beads update <bead-id> --status in_progress` |
+| Claim a bead | `pan beads claim <bead-id>` |
 | Add notes | `bd comments add <bead-id> "notes"` |
-| Complete bead | `bd close <bead-id> --reason "done"` |
+| Complete bead | `pan beads close <bead-id> --reason "done"` |
 | Show bead details | `bd show <bead-id>` |
 | Bulk close beads | `printf 'close <id> done\n' | bd batch` |
 | Check blockers | `bd dep tree <bead-id>` |
@@ -163,7 +163,7 @@ For complete beads documentation, see the main `beads` skill:
 2. **`--id` expects bead IDs** (overdeck-abc), not Linear IDs (PAN-116)
 3. **Always add comments** - They survive compaction and help the next agent
 4. **Persist at session end** - `bd dolt commit -m "session update"` commits pending local Dolt changes
-5. **NEVER use `bd claim`** - Use `bd update <id> --claim` instead
+5. **NEVER use `bd claim`** - Use `pan beads claim <id>` instead
 6. **Check blockers before closing** - Run `bd dep tree <id>` first; close blockers before using `--force`
 7. **NEVER run `bd init` in redirect-managed worktrees** - Use the existing `.beads/redirect` plus `bd ping --json` / `bd doctor --fix`
 
@@ -181,7 +181,7 @@ bd list --title-contains "PAN-116" --all
 bd show overdeck-abc
 
 # 3. Start work
-bd update overdeck-abc --status in_progress
+pan beads update overdeck-abc --status in_progress
 
 # 4. Do the work...
 
@@ -189,7 +189,7 @@ bd update overdeck-abc --status in_progress
 bd comments add overdeck-abc "Implemented per-message costing logic"
 
 # 6. Complete
-bd close overdeck-abc --reason "Refactored parseClaudeSession to calculate cost per-message"
+pan beads close overdeck-abc --reason "Refactored parseClaudeSession to calculate cost per-message"
 
 # 7. Persist pending Dolt changes
 bd dolt commit -m "PAN-116 session update"

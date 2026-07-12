@@ -14,6 +14,7 @@ import { promisify } from 'util';
 import { platform } from 'os';
 import { registerBeadsReconcileCommand } from './admin/beads-reconcile.js';
 import { standardizeBeadsConfig } from '../../lib/beads/config-standardize.js';
+import { runMutationBatch, type BdMutationClient } from '../../lib/beads/writer.js';
 
 const execAsync = promisify(exec);
 
@@ -223,6 +224,69 @@ async function statsCommand(): Promise<void> {
 export function registerBeadsCommands(program: Command): void {
   const beads = program.command('beads').description('Beads issue tracker management');
   registerBeadsReconcileCommand(beads);
+
+  const mutate = async <T>(reason: string, fn: (bd: BdMutationClient) => Promise<T>): Promise<T> => {
+    const result = await runMutationBatch({ project: { workspacePath: process.cwd() }, reason }, fn);
+    if (!result.ok) throw new Error(result.message);
+    return result.value;
+  };
+
+  beads.command('claim <ids...>')
+    .description('Atomically claim one or more beads through the canonical writer')
+    .action((ids: string[]) => mutate(`claim ${ids.join(', ')}`, async (bd) => {
+      for (const id of ids) await bd.mutate(['update', id, '--claim']);
+    }));
+
+  beads.command('update <id>')
+    .description('Update a bead through the canonical writer')
+    .option('--status <status>')
+    .option('--title <title>')
+    .option('--priority <priority>')
+    .option('--add-label <label>')
+    .option('--remove-label <label>')
+    .action(async (id: string, options: Record<string, string | undefined>) => { await mutate(`update ${id}`, (bd) => {
+      const args = ['update', id];
+      for (const [key, value] of Object.entries(options)) if (value !== undefined) args.push(`--${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`, value);
+      return bd.mutate(args);
+    }); });
+
+  beads.command('close <ids...>')
+    .description('Close beads and publish their Dolt commit durably')
+    .option('--reason <reason>', 'Completion reason', 'completed')
+    .action((ids: string[], options: { reason: string }) => mutate(`close ${ids.join(', ')}`, async (bd) => {
+      for (const id of ids) await bd.mutate(['close', id, '--reason', options.reason]);
+    }));
+
+  beads.command('create [title]')
+    .option('--title <title>')
+    .option('--type <type>', 'Record type', 'task')
+    .option('--priority <priority>', 'Priority', '2')
+    .option('--labels <labels>')
+    .option('--parent <parent>')
+    .action((title: string | undefined, options: { title?: string; type: string; priority: string; labels?: string; parent?: string }) => {
+      const resolvedTitle = options.title ?? title;
+      if (!resolvedTitle) throw new Error('pan beads create requires a title');
+      return mutate(`create ${resolvedTitle}`, (bd) => {
+      const args = ['create', '--title', resolvedTitle, '--type', options.type, '--priority', options.priority, '--json'];
+      if (options.labels) args.push('--labels', options.labels);
+      if (options.parent) args.push('--parent', options.parent);
+      return bd.mutate(args);
+      }).then((output) => console.log(output));
+    });
+
+  const dep = beads.command('dep').description('Mutate bead dependencies through the canonical writer');
+  for (const verb of ['add', 'remove'] as const) {
+    dep.command(`${verb} <issue> <dependency>`)
+      .option('--type <type>', 'Dependency type', 'blocks')
+      .action(async (issue: string, dependency: string, options: { type: string }) => { await mutate(`dependency ${verb}`, (bd) => bd.mutate(['dep', verb, issue, dependency, '--type', options.type])); });
+  }
+
+  beads.command('delete <ids...>')
+    .description('Delete beads through the canonical writer')
+    .requiredOption('--yes', 'Confirm deletion')
+    .action((ids: string[]) => mutate(`delete ${ids.join(', ')}`, async (bd) => {
+      for (const id of ids) await bd.mutate(['delete', id, '--yes']);
+    }));
 
   beads
     .command('compact')
