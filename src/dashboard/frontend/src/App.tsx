@@ -515,13 +515,49 @@ export default function App() {
   } = usePendingInputDialogs({ agents, issues });
   useDesktopActivityNotifications();
 
+  // PAN-1234: global 'g' chord state for lens navigation (g p, g b, g a, g c).
+  const chordRef = useRef<{ prefix: string | null; timer: ReturnType<typeof setTimeout> | null }>({ prefix: null, timer: null });
+
   // Global keyboard shortcuts: / for search, Cmd+K for command palette
   useEffect(() => {
+    const CHORD_TIMEOUT_MS = 1500;
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMac = navigator.platform.includes('Mac');
       const isCmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
       const target = e.target as HTMLElement;
       const inInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+      // PAN-1234: lens-navigation chord (e.g. g p → Pipeline). Disabled inside
+      // inputs/textareas/contentEditable or while the command palette is open.
+      if (!inInput && !isPaletteOpen) {
+        if (e.key === 'g') {
+          e.preventDefault();
+          chordRef.current.prefix = 'g';
+          if (chordRef.current.timer) clearTimeout(chordRef.current.timer);
+          chordRef.current.timer = setTimeout(() => {
+            chordRef.current.prefix = null;
+            chordRef.current.timer = null;
+          }, CHORD_TIMEOUT_MS);
+          return;
+        }
+
+        if (chordRef.current.prefix === 'g') {
+          if (chordRef.current.timer) clearTimeout(chordRef.current.timer);
+          chordRef.current.timer = null;
+          chordRef.current.prefix = null;
+
+          const lens = e.key === 'p' ? 'pipeline'
+            : e.key === 'b' ? 'kanban'
+            : e.key === 'a' ? 'agents'
+            : e.key === 'c' ? 'command-deck'
+            : null;
+          if (lens) {
+            e.preventDefault();
+            setActiveTab(lens);
+          }
+          return;
+        }
+      }
 
       if (e.key === '/' && !inInput) {
         e.preventDefault();
@@ -533,8 +569,11 @@ export default function App() {
     };
 
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      if (chordRef.current.timer) clearTimeout(chordRef.current.timer);
+    };
+  }, [isPaletteOpen, setActiveTab, setIsSearchOpen, setIsPaletteOpen]);
 
   // Listen for menu actions from desktop app (open-settings, etc.)
   useEffect(() => {

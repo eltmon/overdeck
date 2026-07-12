@@ -639,6 +639,15 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
                   </button>
                 </div>
               </div>
+              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                <span>Lens:</span>
+                <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground">g</kbd>
+                <span>+</span>
+                <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground" title="Pipeline">p</kbd>
+                <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground" title="Board">b</kbd>
+                <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground" title="Agents">a</kbd>
+                <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground" title="Command Deck">c</kbd>
+              </div>
               <div className="flex items-center gap-1.5">
                 <span className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${
                   isDev
