@@ -121,17 +121,34 @@
       "reason": "feedback",
       "note": "[2026-07-12T09:34Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-12T09:34:23.009Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-12T09:34:22Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2149\n\n# Review Synthesis — PAN-2149 — 2026-07-12T05:33:52-04:00\n\n## Verdict: CHANGES REQUESTED — reviewer infrastructure failures for security, performance, and requirements\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2149/.pan/review/agent-pan-2149-review-555776b7/context.json\n- Branch: feature/pan-2149\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2149\n- HEAD reviewed: 555776b7545a8092779381ee66b45a66e2206f41\n- Cycle number: 5\n- Prior cycle SHA: 6bf20f9406587c4becd8707f7a0b485bb875d2bf\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | failed | — | infrastructure failure |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2149/.pan/review/agent-pan-2149-review-555776b7/correctness.md | 0 |\n| performance | failed | — | infrastructure failure |\n| requirements | failed | — | infrastructure failure |\n\n## Blocking Findings\n\n### [security] Reviewer failed before producing a usable report\nSignal reason: `Role run agent-pan-2149-review-security already running. Use 'pan tell' to message it.`\n\nThe review role requires all four sub-role reports to be readable before approval. A failed reviewer is a blocking infrastructure failure.\n\n### [performance] Reviewer failed before producing a usable report\nSignal reason: `Role run agent-pan-2149-review-performance already running. Use 'pan tell' to message it.`\n\nThe review role requires all four sub-role reports to be readable before approval. A failed reviewer is a blocking infrastructure failure.\n\n### [requirements] Reviewer failed before producing a usable report\nSignal reason: `Role run agent-pan-2149-review-requirements already running. Use 'pan tell' to message it.`\n\nThe review role requires all four sub-role reports to be readable before approval. A failed reviewer is a blocking infrastructure failure.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\n- correctness\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2149/.pan/review/agent-pan-2149-review-555776b7/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2149 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T09:46:49.853Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T09:46:54.812Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T09:46:54.814Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T09:46:54.815Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T09:46:54.833Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [
@@ -169,22 +186,24 @@
     "recordedAt": "2026-07-12T09:29:28.722Z"
   },
   "created": "2026-07-10T23:44:51.626Z",
-  "updated": "2026-07-12T09:34:23.009Z",
+  "updated": "2026-07-12T09:50:43.419Z",
   "pipeline": {
     "issueId": "PAN-2149",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-12T09:32:53.932Z",
-    "reviewNotes": "Review reset by deacon: no active review session after 821min",
+    "updatedAt": "2026-07-12T09:50:43.379Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - scripts/file-size-baseline.txt",
     "inspectNotes": "Bead health-seam ack: duplicate delivery of already-reviewed commit 74dc13c0, re-confirmed - all 5 functions verbatim (this.->host. only), delegates <=5 lines with no visibility change, file-size baseline lowered 1684->1476, typecheck/lint/vitest all exit 0 (9237 passed, 0 failed).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2573",
-    "lastVerifiedCommit": "555776b7545a8092779381ee66b45a66e2206f41",
-    "reviewRequestedAt": "2026-07-12T09:29:33.599Z",
-    "reviewSpawnedAt": "2026-07-12T09:29:34.252Z",
+    "lastVerifiedCommit": "f3ee5f2bdfd27c61f03f40b3b79a9497f8207874",
+    "reviewRequestedAt": "2026-07-12T09:50:39.156Z",
+    "reviewSpawnedAt": "2026-07-12T09:46:47.995Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [
@@ -220,22 +239,23 @@
         "src/lib/cloister/service.ts"
       ],
       "recordedAt": "2026-07-12T09:29:28.722Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-12T09:50:39.156Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 8685399,
-            "output": 7489,
-            "cacheRead": 8219648,
+            "input": 10381683,
+            "output": 8394,
+            "cacheRead": 9720832,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 38126997,
-            "output": 115215,
-            "cacheRead": 36329216,
+            "input": 45790650,
+            "output": 138897,
+            "cacheRead": 43365120,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
@@ -264,15 +284,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 8685399,
-          "output": 7489,
-          "cacheRead": 8219648,
+          "input": 10381683,
+          "output": 8394,
+          "cacheRead": 9720832,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 38126997,
-          "output": 115215,
-          "cacheRead": 36329216,
+          "input": 45790650,
+          "output": 138897,
+          "cacheRead": 43365120,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
@@ -295,8 +315,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 42.632521000000004,
-        "pricingAsOf": "2026-07-12T09:32:54.036Z"
+        "usd": 49.999678,
+        "pricingAsOf": "2026-07-12T09:50:43.415Z"
       }
     },
     "merges": [
