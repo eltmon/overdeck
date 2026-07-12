@@ -92,17 +92,34 @@
       "reason": "feedback",
       "note": "[2026-07-12T23:14Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-12T23:14:13.479Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-12T23:14:13Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2597\n\n# Review Synthesis — PAN-2597 — 2026-07-13T00:18:00-04:00\n\n## Verdict: CHANGES REQUESTED — Codex app-server launch/delivery cannot start a first turn because the selected model is never provided\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2597/.pan/review/agent-pan-2597-review-d6edf501/context.json`\n- Branch: `feature/pan-2597`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2597`\n- HEAD reviewed: `d6edf5019c913f98bb4640417353cc0763df3122`\n- Cycle number: 3\n- Prior cycle SHA: `930fdfd0ee673d491c26c5bd9dfbb22d7d16a42a` from prior `context.json`; prior `synthesis.md` was missing\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2597/.pan/review/agent-pan-2597-review-d6edf501/security.md` | 1 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2597/.pan/review/agent-pan-2597-review-d6edf501/correctness.md` | 3 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2597/.pan/review/agent-pan-2597-review-d6edf501/performance.md` | 3 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2597/.pan/review/agent-pan-2597-review-d6edf501/requirements.md` | 2 |\n\n## Blocking Findings\n\n### [correctness, requirements] App-server first-turn delivery has no model — `src/lib/launcher-generator.ts:758`\nFresh Codex app-server launches build `node <hostPath>` plus optional `--resume`, but do not pass the resolved model. The host supports `--model` and rejects a first message when neither the op nor the host launch supplied one (`src/lib/codex/app-server-host.ts:151`-`157`). Delivery posts `{ op: 'message', content, meta }` without a model (`src/lib/agents/delivery.ts:222`).\n\nImpact: default Codex app-server agents can reach readiness but reject the kickoff prompt, then the fallback pane path calls the same model-required handler and still cannot start a thread. This violates the app-server host ops, launcher mode, delivery tier, and resume/recovery requirements.\n\n### [correctness, performance] App-server readiness/status requests can hang indefinitely — `src/lib/agents/runtime-command.ts:330`\n`postAppServerStatus` uses `httpRequest` over the app-server Unix socket without a request/socket timeout. `waitForCodexAppServerReady` awaits that status call inside its readiness loop, so a host that accepts the connection but never responds prevents the outer readiness deadline from being checked.\n\nImpact: spawn or restart readiness can hang past the intended 30 second timeout and block lifecycle progress instead of recording a startup failure.\n\n### [correctness, performance] App-server interrupt can hang before kill escalation — `src/lib/runtimes/codex.ts:81`\n`postAppServerInterrupt` posts `{ op: 'interrupt' }` without a request/socket timeout, and `killAgent` awaits it before the existing SIGTERM/SIGKILL ladder.\n\nImpact: stopping or restarting a wedged Codex app-server agent can stall before the escalation path that should tear down the tmux session/process group.\n\n### [performance] Dashboard app-server approval/status requests can pin route handlers — `src/lib/overdeck/conversation-delivery.ts:451`\n`postCodexAppServerOp` has no request/socket timeout. Both pending-input polling and approval submission depend on this helper.\n\nImpact: a stuck app-server can leave dashboard route handlers and pending-input probes waiting indefinitely instead of surfacing a bounded control failure.\n\n### [security, correctness] Approval submissions are not bound to the displayed request id — `src/lib/overdeck/conversation-delivery.ts:162`\nThe pending-input snapshot exposes the live approval id in `toolUseId`, but approval submission only sends `optionNumber`. `handleConversationCodexApproval` re-reads the current first pending approval at submit time and applies the operator decision to that request. The host also accepts an arbitrary `requestId` without checking that it is still a pending approval request.\n\nImpact: if the pending approval queue changes between render and click, an accept/reject can apply to a different command than the operator reviewed.\n\n### [requirements] Pi/ohmypi runtime transports changed despite explicit non-goal — `src/lib/runtimes/pi.ts:264`\nThe requirements reviewer found that `src/lib/runtimes/pi.ts` and `src/lib/runtimes/ohmypi.ts` are changed in this PR, including their `killAgent` implementations, despite NonGoal 5 requiring no changes to Pi/ohmypi or Claude Code transports.\n\nImpact: the PR crosses an explicit must-not boundary. Move or revert those runtime transport changes unless the scope is explicitly revised.\n\n## Non-blocking Findings\n\n### [security] Absolute local path in protocol docs — `docs/CODEX-APP-SERVER-PROTOCOL.md:31`\nThe protocol documentation includes `/home/eltmon/Projects/t3code/...` references. This leaks local directory layout and is not portable. Replace with repository-relative or label-style references.\n\n## Scope Note\nAll blocking findings are in files touched by the PR diff. The review directory count is 3, but both earlier review directories lack `synthesis.md`; because there is no prior synthesis verdict establishing what was already passed or demoted, I did not demote current Tier 1 reviewer blockers under the cycle-3 convergence gate. The prior `context.json` SHA (`930fdfd0ee673d491c26c5bd9dfbb22d7d16a42a`) is recorded for traceability.\n\n## Clean Sub-roles\nNone. All four sub-roles reported at least one blocking finding.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2597/.pan/review/agent-pan-2597-review-d6edf501/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2597 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T23:31:18.335Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T23:31:22.833Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T23:31:22.860Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T23:31:22.861Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T23:31:22.862Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/server/services/codex-conversation-parser.ts",
@@ -193,7 +210,7 @@
     "recordedAt": "2026-07-12T19:53:15.419Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-12T23:14:13.479Z",
+  "updated": "2026-07-12T23:31:29.590Z",
   "pipeline": {
     "issueId": "PAN-2597",
     "reviewStatus": "reviewing",
@@ -204,13 +221,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-12T20:09:29.387Z",
-    "updatedAt": "2026-07-12T23:07:34.620Z",
-    "reviewNotes": "Agent re-review request (2/25): fixed supervisor launcher test",
+    "updatedAt": "2026-07-12T23:31:29.495Z",
+    "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
     "verificationNotes": "Verification FAILED at test (147943ms):\n\n1m+ unset TMUX TMUX_PANE STY\u001b[39m\n\u001b[31m+ command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS=\"$(mkcert -CAROOT)/rootCA.pem\"\u001b[39m\n\u001b[31m+ export SKIP_DOCS_INDEX=1\u001b[39m\n\u001b[31m+ export TERM=xterm-256color\u001b[39m\n\u001b[31m+ export COLORTERM=truecolor\u001b[39m\n\u001b[31m+ export LANG=C.UTF-8\u001b[39m\n\u001b[31m+ export LC_ALL=C.UTF-8\u001b[39m\n\u001b[31m+ export COLORFGBG='15;0'\u001b[39m\n\u001b[31m+ export OVERDECK_AGENT_ID='conv-codex-resume-supervisor-test'\u001b[39m\n\u001b[31m+ export OVERDECK_ISSUE_ID='PAN-1405'\u001b[39m\n\u001b[31m+ export OVERDECK_DASHBOARD_URL=\"http://127.0.0.1:3011\"\u001b[39m\n\u001b[31m+ \u001b[7mexport CODEX_HOME='/tmp/pan-conv-supervisor-1783887714345-id0d17dys0s/agents/conv-\u001b[27mcodex\u001b[7m-\u001b[27mresume\u001b[7m-supervisor-test/codex-home'\u001b[27m\u001b[39m\n\u001b[31m+ cd -- '/tmp'\u001b[39m\n\u001b[31m+ unset ANTHROPIC_API_KEY\u001b[39m\n\u001b[31m+ unset ANTHROPIC_BASE_URL\u001b[39m\n\u001b[31m+ unset ANTHROPIC_AUTH_TOKEN\u001b[39m\n\u001b[31m+ unset OPENAI_API_KEY\u001b[39m\n\u001b[31m+ unset GEMINI_API_KEY\u001b[39m\n\u001b[31m+ unset API_TIMEOUT_MS\u001b[39m\n\u001b[31m+ unset CLAUDE_CODE_API_KEY_HELPER_TTL_MS\u001b[39m\n\u001b[31m+ unset CLAUDE_CODE_AUTO_COMPACT_WINDOW\u001b[39m\n\u001b[31m+ trap '' HUP\u001b[39m\n\u001b[31m+ node '/home/eltmon/Projects/overdeck/workspaces/feature-pan-2597/dist/codex-app-server-host.js' --resume '019eaaec-4dfa-7ab1-90ba-9104d16534d1'\u001b[39m\n\u001b[31m+ echo \"\"\u001b[39m\n\u001b[31m+ echo \"Conversation session ended. Close this panel or click Resume to start a new session.\"\u001b[39m\n\u001b[31m+ while true; do sleep 60; done\u001b[39m\n\u001b[31m+\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts:\u001b[2m194:22\u001b[22m\u001b[39m\n    \u001b[90m192|\u001b[39m\n    \u001b[90m193|\u001b[39m     \u001b[35mconst\u001b[39m launcher \u001b[33m=\u001b[39m \u001b[34mlauncherFor\u001b[39m(session)\u001b[33m;\u001b[39m\n    \u001b[90m194|\u001b[39m     expect(launcher).toContain(`/dist/pty-supervisor.js' codex resume …\n    \u001b[90m   |\u001b[39m                      \u001b[31m^\u001b[39m\n    \u001b[90m195|\u001b[39m     \u001b[34mexpect\u001b[39m(launcher)\u001b[33m.\u001b[39mnot\u001b[33m.\u001b[39m\u001b[34mtoContain\u001b[39m(\u001b[32m'codex exec resume'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m196|\u001b[39m   })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/16]⎯\u001b[22m\u001b[39m\n\n",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
     "reviewRequestedAt": "2026-07-12T20:09:29.387Z",
-    "reviewSpawnedAt": "2026-07-12T23:07:15.311Z",
+    "reviewSpawnedAt": "2026-07-12T23:31:15.331Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/server/services/codex-conversation-parser.ts",
@@ -306,15 +323,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 16599287,
-            "output": 13005,
-            "cacheRead": 15754240,
+            "input": 17391095,
+            "output": 13783,
+            "cacheRead": 16503296,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 70141940,
-            "output": 174701,
-            "cacheRead": 67864960,
+            "input": 86111785,
+            "output": 227885,
+            "cacheRead": 83087232,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
@@ -343,15 +360,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 16599287,
-          "output": 13005,
-          "cacheRead": 15754240,
+          "input": 17391095,
+          "output": 13783,
+          "cacheRead": 16503296,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 70141940,
-          "output": 174701,
-          "cacheRead": 67864960,
+          "input": 86111785,
+          "output": 227885,
+          "cacheRead": 83087232,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
@@ -374,8 +391,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 66.44624,
-        "pricingAsOf": "2026-07-12T23:07:34.802Z"
+        "usd": 79.390761,
+        "pricingAsOf": "2026-07-12T23:31:29.584Z"
       }
     },
     "merges": [
