@@ -276,6 +276,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-12T07:06:24.789Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T07:56:46.793Z"
     }
   ],
   "feedback": [],
@@ -405,21 +410,23 @@
     "recordedAt": "2026-07-12T07:06:16.522Z"
   },
   "created": "2026-07-11T09:28:34.266Z",
-  "updated": "2026-07-12T07:10:18.972Z",
+  "updated": "2026-07-12T07:56:47.429Z",
   "pipeline": {
     "issueId": "PAN-399",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-12T07:10:18.912Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "panDoneRecoveredAt": "2026-07-12T07:56:37.224Z",
+    "updatedAt": "2026-07-12T07:56:47.386Z",
+    "reviewNotes": "Review role spawn failed: Harness codex (provider default for gpt-5.5) has no installed codex binary at spawn — refusing to silently fall back to claude-code. Install codex (check its PATH) and retry.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2577",
     "reviewedAtCommit": "a2edef4778231d558c49b0e76d6bb33ba3dee46f",
     "lastVerifiedCommit": "15104601297cfbf9bd6c5a8b1bbd22ce0c848989",
-    "reviewRequestedAt": "2026-07-12T07:06:21.876Z",
+    "reviewRequestedAt": "2026-07-12T07:56:37.224Z",
+    "reviewSpawnedAt": "2026-07-12T07:56:45.308Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "drizzle/overdeck/0000_overdeck_init.sql",
@@ -623,9 +630,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 6782449,
-            "output": 385927,
-            "cacheRead": 226941184,
+            "input": 6785939,
+            "output": 386763,
+            "cacheRead": 228286720,
             "cacheWrite": 0
           }
         }
@@ -674,15 +681,15 @@
           "cacheWrite": 77989
         },
         "custom/kimi-k2.7-code": {
-          "input": 6782449,
-          "output": 385927,
-          "cacheRead": 226941184,
+          "input": 6785939,
+          "output": 386763,
+          "cacheRead": 228286720,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 161.822441,
-        "pricingAsOf": "2026-07-12T07:10:18.962Z"
+        "usd": 162.084753,
+        "pricingAsOf": "2026-07-12T07:56:47.425Z"
       }
     },
     "merges": [
@@ -690,8 +697,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "release-engine-tests": "completed",
     "release-engine-tests.ac1": "completed",
