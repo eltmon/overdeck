@@ -5,6 +5,7 @@ import { promisify } from 'util';
 import { findProjectByPathSync, type ProjectConfig } from '../../lib/projects.js';
 import { ensureStateWorktree, resolveStateHome } from '../../lib/state-home.js';
 import { runMutationBatch } from '../../lib/beads/writer.js';
+import { resolveCanonicalBeadsHome } from '../../lib/beads/home.js';
 
 const execAsync = promisify(exec);
 const REDIRECT_MANAGED_BEADS_VERSION = 1 * 10000 + 0 * 100 + 4;
@@ -40,7 +41,7 @@ export async function ensureWorkspaceBeadsRedirect(
       if (status.status === 'dirty' || status.status === 'error' || status.status === 'legacy') {
         throw new Error(`Cannot repair workspace beads redirect: state worktree ${status.status}`);
       }
-      expectedTarget = join(stateHome.worktreePath, '.beads');
+      expectedTarget = resolveCanonicalBeadsHome(workspacePath, project) ?? join(stateHome.worktreePath, '.beads');
     }
   }
 

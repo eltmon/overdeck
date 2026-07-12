@@ -4,6 +4,7 @@ import { mkdir, open, readFile, realpath, unlink } from 'node:fs/promises';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { Data, Effect } from 'effect';
 import { getOverdeckHome } from './paths.js';
+import { resolveCanonicalBeadsHome } from './beads/home.js';
 
 const TRANSIENT_BD_ERRNO_CODES = new Set(['EAGAIN', 'EBUSY', 'EWOULDBLOCK', 'ETIMEDOUT']);
 
@@ -173,6 +174,9 @@ async function realpathIfExists(path: string): Promise<string> {
 }
 
 export async function resolveSharedBeadsDir(workspacePath = process.cwd()): Promise<string> {
+  const canonical = resolveCanonicalBeadsHome(workspacePath);
+  if (canonical) return realpathIfExists(canonical);
+
   const beadsDir = resolve(workspacePath, '.beads');
   const redirectPath = join(beadsDir, 'redirect');
 
