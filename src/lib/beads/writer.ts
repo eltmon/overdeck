@@ -3,6 +3,7 @@ import { promisify } from 'node:util';
 
 import { withBdProcessLock, type BdProcessLockOptions } from '../bd-process-lock.js';
 import { exportBeadsJsonl } from './export.js';
+import { recordBeadsConflict, recordBeadsPull, recordBeadsPush, recordBeadsSyncError } from './telemetry.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -92,6 +93,7 @@ export async function runMutationBatch<T>(
   const exportSnapshot = dependencies.exportSnapshot ?? defaultExportSnapshot;
   const withLock = dependencies.withLock ?? withBdProcessLock;
   const cwd = context.project.workspacePath;
+  const telemetryKey = context.project.projectKey ?? cwd;
   const client: BdMutationClient = {
     run: (args) => execute(args, cwd),
     mutate: (args) => execute([...args, '--dolt-auto-commit', 'batch'], cwd),
@@ -102,12 +104,14 @@ export async function runMutationBatch<T>(
     try {
       await client.run(['bootstrap', '--yes', '--json']);
       await client.run(['dolt', 'pull']);
+      recordBeadsPull(telemetryKey, await readHead(client), await readRemoteHead(client));
       value = await mutate(client);
       await client.run(['dolt', 'commit', '-m', context.reason]);
       await exportSnapshot(client, cwd);
     } catch (error) {
       const localHead = await readHead(client);
       if (isConflict(error)) {
+        recordBeadsConflict(telemetryKey, errorText(error));
         return {
           ok: false,
           conflict: true,
@@ -116,6 +120,7 @@ export async function runMutationBatch<T>(
           message: 'The Dolt histories conflict. Nothing was pushed; pull and reconcile the working set before retrying.',
         };
       }
+      recordBeadsSyncError(telemetryKey, errorText(error));
       return {
         ok: false,
         needsOperatorRecovery: true,
@@ -127,8 +132,11 @@ export async function runMutationBatch<T>(
 
     try {
       await client.run(['dolt', 'push']);
-      return { ok: true, value, localHead: await readHead(client) };
+      const localHead = await readHead(client);
+      recordBeadsPush(telemetryKey, localHead);
+      return { ok: true, value, localHead };
     } catch (error) {
+      recordBeadsConflict(telemetryKey, errorText(error));
       return {
         ok: false,
         conflict: true,

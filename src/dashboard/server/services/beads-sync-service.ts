@@ -4,6 +4,7 @@ import { promisify } from 'node:util';
 import { withBdProcessLock } from '../../../lib/bd-process-lock.js';
 import { listProjectsSync } from '../../../lib/projects.js';
 import { resolveStateReadHomeSync } from '../../../lib/state-read-home.js';
+import { getBeadsHealth, recordBeadsPull, recordBeadsSyncError } from '../../../lib/beads/telemetry.js';
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_INTERVAL_MS = 15_000;
@@ -70,6 +71,7 @@ export function createBeadsSyncService(dependencies: BeadsSyncServiceDependencie
           const after = parseHead(await execute(['vc', 'status'], project.beadsCwd));
           const lastSyncedAt = new Date(now()).toISOString();
           healthByProject.set(project.key, { localHead: after, lastSyncedAt, lastError: null });
+          recordBeadsPull(project.key, after, after, new Date(lastSyncedAt));
           if (after && after !== before) {
             emit({
               type: 'beads.freshness_changed',
@@ -86,6 +88,7 @@ export function createBeadsSyncService(dependencies: BeadsSyncServiceDependencie
           ...previous,
           lastError: 'Beads synchronization failed; dashboard bead progress may be stale. ' + (error instanceof Error ? error.message : String(error)),
         });
+        recordBeadsSyncError(project.key, getBeadsSyncHealth(project.key).lastError!);
       }
     }
   }
@@ -101,3 +104,5 @@ export function createBeadsSyncService(dependencies: BeadsSyncServiceDependencie
 
   return { run, syncOnce, stop: () => { stopped = true; } };
 }
+
+export { getBeadsHealth };

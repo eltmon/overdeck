@@ -20,7 +20,7 @@ import { loadRemoteAgentState } from '../remote/remote-agents.js';
 import { loadWorkspaceMetadataSync as loadWorkspaceMetadataStatic } from '../remote/workspace-metadata.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { createBeadsResolver } from '../beads/resolver.js';
-import { getBeadsSyncHealth } from '../../dashboard/server/services/beads-sync-service.js';
+import { getBeadsHealth } from '../beads/telemetry.js';
 
 function isGitHubIssue(issueId: string): {
   isGitHub: boolean;
@@ -237,17 +237,18 @@ export function getIssueBeads(id: string) {
     // Suppress unused variable warning — remoteVmName available for callers if needed
     void remoteVmName;
 
-    const freshness = resolvedProject ? getBeadsSyncHealth(resolvedProject.projectKey) : getBeadsSyncHealth('');
+    const freshness = yield* Effect.promise(() => getBeadsHealth(resolvedProject?.projectKey ?? '', (workspacePath && existsSync(workspacePath)) ? workspacePath : (projectPath || homedir())));
     return jsonResponse({
       tasks,
       workspacePath,
       count: tasks.length,
       source: querySource,
       isRemote: isRemoteWorkspace,
-      lastSyncedAt: freshness.lastSyncedAt,
-      freshnessAgeMs: freshness.lastSyncedAt ? Math.max(0, Date.now() - Date.parse(freshness.lastSyncedAt)) : null,
-      stale: Boolean(staleReason || freshness.lastError),
-      syncError: staleReason ?? freshness.lastError,
+      lastSyncedAt: freshness.lastSuccessfulPullAt,
+      freshnessAgeMs: freshness.freshnessAgeMs,
+      stale: Boolean(staleReason || freshness.lastSyncError),
+      syncError: staleReason ?? freshness.lastSyncError,
+      health: freshness,
     });
   });
 }

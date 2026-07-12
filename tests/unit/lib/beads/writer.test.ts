@@ -35,6 +35,8 @@ describe('runMutationBatch', () => {
       'lock',
       'bootstrap --yes --json',
       'dolt pull',
+      'vc status',
+      'dolt remote show origin --json',
       'close one --dolt-auto-commit batch',
       'close two --dolt-auto-commit batch',
       'dolt commit -m close planned beads',
