@@ -164,6 +164,17 @@ export interface ProjectConfig {
   quality_gates?: Record<string, QualityGateConfig>;
   /** Release components and rollout checks for coordinated post-merge release. */
   release?: ReleaseConfig;
+  /**
+   * PAN-2555: publish/release pipeline visibility on the Command Deck.
+   * `npm_packages` lists published package names (inferred from the project
+   * root package.json name when unset and not private); `release_workflow`
+   * names the tag-triggered workflow file (inferred as release.yml when the
+   * file exists in the checkout).
+   */
+  publish?: {
+    npm_packages?: string[];
+    release_workflow?: string;
+  };
   /** Package manager for dependency installation in workspaces (bun, npm, pnpm) */
   package_manager?: 'bun' | 'npm' | 'pnpm';
   /** Local workspace packages that need building before quality gates (e.g., @overdeck/contracts) */

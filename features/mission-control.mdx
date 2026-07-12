@@ -28,6 +28,12 @@ Projects appear as collapsible folders. Each active feature shows:
 
 State labels are computed from multiple signals: tmux session presence, heartbeat freshness (10-minute threshold), review/test status from the central `review-status.json`, and agent state files.
 
+## Release / Publish Indicator
+
+The project HOME tab shows a compact **Release** row for projects with a publish pipeline: the most recent release-workflow run (live spinner while in progress, then ✓/✕ with the tag deep-linked to the GitHub Actions run), the latest GitHub Release, and each published npm package's `latest` dist-tag linked to the registry. A **partial failure** — the npm publish succeeded but a build matrix job failed, so the GitHub Release was skipped — is called out explicitly with links to the failing jobs, since that shape is otherwise invisible.
+
+Per-project resolution lives in `projects.yaml` under `publish` (`npm_packages`, `release_workflow`), with inference fallbacks: the project root `package.json` name (when not `private`) and `.github/workflows/release.yml` (when present in the checkout). Projects with no publish pipeline simply don't show the row. The surface is read-only — cutting a release stays in the CLI (`pan release stable`).
+
 ## Activity View
 
 When you click a feature, the main panel shows all agent sessions unified into one scrollable view. Each session appears as a collapsible section with:
