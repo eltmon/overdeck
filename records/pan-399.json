@@ -405,20 +405,20 @@
     "recordedAt": "2026-07-12T07:06:16.522Z"
   },
   "created": "2026-07-11T09:28:34.266Z",
-  "updated": "2026-07-12T07:06:26.233Z",
+  "updated": "2026-07-12T07:10:18.972Z",
   "pipeline": {
     "issueId": "PAN-399",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-12T07:06:26.159Z",
+    "updatedAt": "2026-07-12T07:10:18.912Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2577",
     "reviewedAtCommit": "a2edef4778231d558c49b0e76d6bb33ba3dee46f",
-    "lastVerifiedCommit": "5cdae1d467921782f0096873f8253837ee4bb7ac",
+    "lastVerifiedCommit": "15104601297cfbf9bd6c5a8b1bbd22ce0c848989",
     "reviewRequestedAt": "2026-07-12T07:06:21.876Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -557,9 +557,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 66434926,
-            "output": 173975,
-            "cacheRead": 62259200,
+            "input": 67495978,
+            "output": 175893,
+            "cacheRead": 63139584,
             "cacheWrite": 0
           },
           "unknown": {
@@ -638,9 +638,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 67135286,
-          "output": 203004,
-          "cacheRead": 67951104,
+          "input": 68196338,
+          "output": 204922,
+          "cacheRead": 68831488,
           "cacheWrite": 0
         },
         "unknown": {
@@ -681,8 +681,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 160.421369,
-        "pricingAsOf": "2026-07-12T07:06:26.232Z"
+        "usd": 161.822441,
+        "pricingAsOf": "2026-07-12T07:10:18.962Z"
       }
     },
     "merges": [
@@ -690,8 +690,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "release-engine-tests": "completed",
     "release-engine-tests.ac1": "completed",
