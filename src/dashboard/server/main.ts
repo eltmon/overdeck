@@ -5,6 +5,8 @@
  * Usage (prod):  node dist/dashboard/server.js
  */
 
+// PAN-2593: MUST stay the first import — fixes child PATH before anything spawns.
+import './path-env.js';
 import { Effect } from 'effect';
 import { initDashboardLogFile } from './server-log-file.js';
 import { ServerConfigLayer } from './config.js';
