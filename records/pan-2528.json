@@ -31,6 +31,11 @@
       "reason": "resume",
       "agentModel": "MiniMax-M3",
       "timestamp": "2026-07-11T20:03:53.821Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T19:17:41.686Z"
     }
   ],
   "feedback": [],
@@ -70,7 +75,7 @@
     "recordedAt": "2026-07-11T09:59:17.529Z"
   },
   "created": "2026-07-11T09:50:24.420Z",
-  "updated": "2026-07-12T09:54:17.176Z",
+  "updated": "2026-07-12T19:17:41.686Z",
   "pipeline": {
     "issueId": "PAN-2528",
     "reviewStatus": "reviewing",
@@ -80,12 +85,13 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-12T09:54:16.988Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: shared HarnessSelect now disables blocked ohmypi with inline ToS reason; PI_TOS_BLOCK_REASON now names the Claude Code subscription Terms of Service restriction; configuration/harnesses.mdx ## ToS rules section now states that dashboard pickers render ohmypi disabled with inline Terms of Service reason. tests: ModelPicker.render 5/5, chat ModelPicker 8/8, frontend-typecheck clean.",
+    "panDoneRecoveredAt": "2026-07-12T19:16:57.012Z",
+    "updatedAt": "2026-07-12T19:17:14.831Z",
+    "reviewNotes": "Review reset by deacon: no active review session after 561min",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2575",
     "lastVerifiedCommit": "942917cdcc7c40ec843e24bb427ca41525673c96",
-    "reviewRequestedAt": "2026-07-11T12:56:22.566Z",
-    "reviewSpawnedAt": "2026-07-12T09:54:16.988Z",
+    "reviewRequestedAt": "2026-07-12T19:16:57.012Z",
+    "reviewSpawnedAt": "2026-07-12T19:17:14.830Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -127,9 +133,9 @@
       "byStage": {
         "codex": {
           "openai/gpt-5.5": {
-            "input": 6033182,
-            "output": 31711,
-            "cacheRead": 5403904,
+            "input": 9602947,
+            "output": 51681,
+            "cacheRead": 8596608,
             "cacheWrite": 0
           }
         },
@@ -174,9 +180,9 @@
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 6033182,
-          "output": 31711,
-          "cacheRead": 5403904,
+          "input": 9602947,
+          "output": 51681,
+          "cacheRead": 8596608,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -211,8 +217,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 29.870756,
-        "pricingAsOf": "2026-07-12T09:54:17.138Z"
+        "usd": 33.951513,
+        "pricingAsOf": "2026-07-12T19:17:14.891Z"
       }
     },
     "merges": [
