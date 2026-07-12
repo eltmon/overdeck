@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { mkdir, open, readFile, realpath, unlink } from 'node:fs/promises';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { Data, Effect } from 'effect';
@@ -289,9 +290,10 @@ function matchesHolder(actual: BdProcessLockHolder | null, expected: BdProcessLo
  * and only unlink the underlying lock file when the outermost holder releases.
  */
 const heldBdProcessLocks = new Map<string, { holder: BdProcessLockHolder; count: number }>();
+const bdLockExecution = new AsyncLocalStorage<Set<string>>();
 
-function isLockHeldByCurrentProcess(path: string): boolean {
-  return heldBdProcessLocks.has(path);
+function isLockHeldByCurrentExecution(path: string): boolean {
+  return bdLockExecution.getStore()?.has(path) === true && heldBdProcessLocks.has(path);
 }
 
 async function acquireStaleBreaker(
@@ -361,7 +363,7 @@ export async function acquireBdProcessLock(
   await mkdir(dirname(path), { recursive: true });
 
   // Reentrant acquisition: if this process already holds the lock, reuse it.
-  if (isLockHeldByCurrentProcess(path)) {
+  if (isLockHeldByCurrentExecution(path)) {
     const held = heldBdProcessLocks.get(path)!;
     held.count += 1;
     let released = false;
@@ -459,7 +461,8 @@ export async function withBdProcessLock<T>(
 ): Promise<T> {
   const handle = await acquireBdProcessLock(caller, options);
   try {
-    return await fn();
+    const inherited = bdLockExecution.getStore() ?? new Set<string>();
+    return await bdLockExecution.run(new Set([...inherited, handle.path]), fn);
   } finally {
     await handle.release();
   }

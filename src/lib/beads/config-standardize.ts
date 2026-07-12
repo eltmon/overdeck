@@ -54,7 +54,11 @@ export async function standardizeBeadsConfig(projectPath: string, dryRun = false
     }).join('\n');
     const configured = /^sync\.remote\s*:\s*(.+)\s*$/m.exec(withoutLegacy)?.[1]?.trim().replace(/^['"]|['"]$/g, '');
     remoteMatches = !configured || configured === expectedRemote;
-    if (!dryRun && removedNoDb) await writeFile(configPath, withoutLegacy);
+    const autoPushOff = /^dolt\.auto-push\s*:\s*false\s*$/m.test(withoutLegacy);
+    const standardized = autoPushOff
+      ? withoutLegacy
+      : `${withoutLegacy.trimEnd()}\ndolt.auto-push: false\n`;
+    if (!dryRun && (removedNoDb || !autoPushOff)) await writeFile(configPath, standardized);
   }
   const missingProjectIgnores = await appendMissing(join(projectPath, '.gitignore'), PROJECT_IGNORE_LINES, dryRun);
   const missingBeadsIgnores = await appendMissing(join(beadsDir, '.gitignore'), BEADS_IGNORE_LINES, dryRun);
