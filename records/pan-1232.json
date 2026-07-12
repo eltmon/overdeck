@@ -111,34 +111,52 @@
       "reason": "feedback",
       "note": "[2026-07-12T21:49Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-12T21:49:50.094Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-12T21:49:50Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1232\n\n# Review Synthesis — PAN-1232 — 2026-07-12T17:49:10-04:00\n\n## Verdict: CHANGES REQUESTED — Files tab renders blank on the main path and six in-scope acceptance criteria remain unmet\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/.pan/review/agent-pan-1232-review-63ca56ef/context.json\n- Branch: feature/pan-1232\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1232\n- HEAD reviewed: 63ca56ef19fe0c3530a5a1b1f9ebb0f05fff5c6a\n- Cycle number: 3\n- Prior cycle SHA: 6be527fe86b9eb2e6c4bce20176519158b246b1f\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/.pan/review/agent-pan-1232-review-63ca56ef/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/.pan/review/agent-pan-1232-review-63ca56ef/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/.pan/review/agent-pan-1232-review-63ca56ef/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/.pan/review/agent-pan-1232-review-63ca56ef/requirements.md | 6 |\n\n## Blocking Findings\n\n### [correctness] Files tab renders blank because `DiffPanel` is URL-gated — `src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx:185`\n`DrawerFilesPanel` mounts `<DiffPanel mode=\"inline\" agentId={agentId} turnDiffSummaries={diffData?.summaries ?? []} />`, but `DiffPanel` returns `null` unless `urlParams.diff === '1'`. Normal navigation to `drawer.tab === 'files'` does not set `diff=1`, so after the diff-summary query resolves the Files tab can become blank instead of showing the branch-vs-main diff. The fix should make inline embedding explicitly open, or initialize the required diff URL state before mounting `DiffPanel`, without relying on unrelated global URL state.\n\n### [requirements] Plan-tab HTTP errors render as an empty plan instead of the required error line — `src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx:76`\nScope: in_pr_scope. AC-17 requires failed plan fetches to render a 12px muted error line while empty plans delegate to `VBriefViewer`. `DrawerPlanPanel` returns `null` for non-OK HTTP responses, leaving `isError` false and rendering `VBriefViewer doc={null}` instead of the error line.\n\n### [requirements] Plan tab can refetch on tab remount because no `staleTime` is configured — `src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx:72`\nScope: in_pr_scope. AC-18 requires switching away from the plan tab and back not to refetch within the expected React Query freshness window. The plan panel unmounts when inactive and its `useQuery` options do not configure `staleTime`, so remounting can refetch and flicker.\n\n### [requirements] Conversation empty state uses 13px text, not required 12px text — `src/dashboard/frontend/src/components/drawer/DrawerAgentSession.tsx:140`\nScope: in_pr_scope. AC-22 requires a 12px muted empty state when no active agent exists for the conversation tab. The shared no-agent branch renders `text-[13px] leading-6 text-muted-foreground`.\n\n### [requirements] Terminal empty state uses 13px text, not required 12px text — `src/dashboard/frontend/src/components/drawer/DrawerAgentSession.tsx:140`\nScope: in_pr_scope. AC-27 requires a 12px muted empty state when no active agent exists for the terminal tab. The same shared no-agent branch renders `text-[13px]`, so the terminal tab misses the specified typography.\n\n### [requirements] Files tab does not render `DiffPanel` for a workspace branch unless an agent id is also present — `src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx:174`\nScope: in_pr_scope. AC-34 requires the Files tab to render `DiffPanel` scoped to `feature/<issue-id>` vs `main` when a workspace branch exists. `DrawerFilesPanel` also requires `agentId`; if the workspace exists but `agentId` is null, it renders the empty state instead.\n\n### [requirements] Branch chip radius does not use `var(--radius-md)` — `src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx:335`\nScope: in_pr_scope. AC-6 requires the branch chip to use background `var(--accent)`, radius `var(--radius-md)`, and 12px muted text. The chip uses `rounded-md bg-accent px-[8px] py-[2px] text-[12px] text-muted-foreground`; only the radius token is noncompliant.\n\n## Non-blocking Findings\n\n### [performance] Avoid deriving the full activity list twice for the Activity tab — `src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx:44`\nThe Activity tab calls `useDrawerData()` inside `DrawerActivityPanel()` while `IssueDrawer()` already calls the same hook for the issue. This repeats filtering, mapping, and sorting for the uncapped activity list. The performance reviewer classified this as non-blocking because the cost is small for typical issue activity, but recommended passing `activityFull` from the parent drawer instead.\n\n### [requirements] Changed backlog route has no mapped requirement\nThe requirements reviewer noted that `src/dashboard/server/routes/backlog.ts` is in the changed-file set but no acceptance criterion, trace item, non-goal, or stub finding in the manifest maps to backlog sequence route behavior.\n\n### [advisory] CodeRabbit nitpick\nCodeRabbit suggested reusing the shared `isActiveAgent` helper in `IssueDrawer.tsx` instead of duplicating the active-agent predicate. This was advisory and non-gating in the review context.\n\n## Clean Sub-roles\n- security\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/.pan/review/agent-pan-1232-review-63ca56ef/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1232 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:02:57.122Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:03:02.282Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:03:02.301Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:03:02.302Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:03:02.303Z"
     }
   ],
+  "feedback": [],
   "created": "2026-07-12T20:45:31.659Z",
-  "updated": "2026-07-12T21:49:50.094Z",
+  "updated": "2026-07-12T22:03:02.303Z",
   "pipeline": {
     "issueId": "PAN-1232",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-12T21:44:39.711Z",
+    "panDoneRecoveredAt": "2026-07-12T22:02:39.443Z",
+    "updatedAt": "2026-07-12T22:02:55.352Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed build",
-    "verificationNotes": "Verification FAILED at build (68227ms):\n\nverdeck/workspaces/feature-pan-1232/node_modules/.bun/tsdown@0.21.10/node_modules/tsdown/dist/build-CgGnBlCD.mjs:760:19)\n    at async Promise.all (index 0)\n    at async buildWithConfigs (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/node_modules/.bun/tsdown@0.21.10/node_modules/tsdown/dist/build-CgGnBlCD.mjs:716:18)\n    at async CAC.<anonymous> (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/node_modules/.bun/tsdown@0.21.10/node_modules/tsdown/dist/run.mjs:25:2)\n    at async runCLI (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/node_modules/.bun/tsdown@0.21.10/node_modules/tsdown/dist/run.mjs:49:3)\n\nbuild:dashboard:server:bundle failed with exit code 1\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - tsdown:deps (54%)\n  - rolldown-plugin-dts:generate (46%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m ../../../node_modules/.bun/@pierre+diffs@1.1.22/node_modules/@pierre/diffs/dist/index.js is dynamically imported by src/components/chat/ChatMarkdown.tsx, src/components/chat/MarkdownFileLink.tsx but also statically imported by src/components/DiffPanel.tsx, dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/components/vbrief/PlanMapViewer.tsx is dynamically imported by src/components/vbrief/VBriefViewer.tsx but also statically imported by src/components/BeadsTasksPanel.tsx, src/components/Stage/cockpit/PlanMapCard.tsx, dynamic import will not move module into another chunk.\n\n",
+    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/dashboard/server/routes/backlog.ts",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2604",
     "lastVerifiedCommit": "63ca56ef19fe0c3530a5a1b1f9ebb0f05fff5c6a",
-    "reviewRequestedAt": "2026-07-12T21:24:43.006Z",
-    "reviewSpawnedAt": "2026-07-12T21:44:23.369Z"
+    "reviewRequestedAt": "2026-07-12T22:02:39.443Z",
+    "reviewSpawnedAt": "2026-07-12T22:02:55.351Z"
   },
   "closeOut": {
     "usage": {
@@ -151,9 +169,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 2568844,
-            "output": 21490,
-            "cacheRead": 2180992,
+            "input": 6001595,
+            "output": 43045,
+            "cacheRead": 5268992,
             "cacheWrite": 0
           }
         }
@@ -166,15 +184,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 2568844,
-          "output": 21490,
-          "cacheRead": 2180992,
+          "input": 6001595,
+          "output": 43045,
+          "cacheRead": 5268992,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 3.674456,
-        "pricingAsOf": "2026-07-12T21:44:39.853Z"
+        "usd": 7.5888610000000005,
+        "pricingAsOf": "2026-07-12T22:02:55.449Z"
       }
     },
     "merges": [
