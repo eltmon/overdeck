@@ -2,7 +2,7 @@
 
 **Issue:** [PAN-1203](https://github.com/eltmon/overdeck/issues/1203)
 **Parent epic:** [PAN-1200](https://github.com/eltmon/overdeck/issues/1200)
-**Status:** Planned
+**Status:** Shipped — integration completed by PAN-2603
 **Date:** 2026-05-18
 
 ---
