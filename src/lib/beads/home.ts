@@ -7,11 +7,15 @@ import { detectLiveDoltLayout } from './dolt-layout.js';
 
 export function resolveCanonicalBeadsHome(
   workspacePath = process.cwd(),
-  project: ProjectConfig | null = findProjectByPathSync(workspacePath),
+  project?: ProjectConfig | null,
 ): string | null {
-  if (!project) return null;
-  const stateHome = resolveStateReadHomeSync(project);
-  return resolve(stateHome.migrated ? stateHome.root : project.path, '.beads');
+  let resolvedProject = project;
+  if (resolvedProject === undefined) {
+    try { resolvedProject = findProjectByPathSync(workspacePath); } catch { resolvedProject = null; }
+  }
+  if (!resolvedProject) return null;
+  const stateHome = resolveStateReadHomeSync(resolvedProject);
+  return resolve(stateHome.migrated ? stateHome.root : resolvedProject.path, '.beads');
 }
 
 function readProjectId(beadsDir: string): string | null {

@@ -2,6 +2,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { getReviewStatusSync } from '../review-status.js';
 import type { ClassifyLookups } from './pickup.js';
+import { createBeadsResolver } from '../beads/resolver.js';
 
 /**
  * Build the {@link ClassifyLookups} the shared pickup module needs from live project
@@ -49,7 +50,11 @@ export function buildClassifyLookups(
   if (existsSync(workspacesDir)) {
     for (const dir of readdirSync(workspacesDir)) {
       const m = /^feature-([a-z]+-\d+)$/i.exec(dir);
-      if (m && existsSync(join(workspacesDir, dir, '.beads', 'issues.jsonl'))) beadsIssues.add(m[1]!.toUpperCase());
+      if (m) {
+        const issueId = m[1]!.toUpperCase();
+        const result = createBeadsResolver(join(workspacesDir, dir)).getBeadsForIssueSync(issueId);
+        if (result.ok && result.value.length > 0) beadsIssues.add(issueId);
+      }
     }
   }
 

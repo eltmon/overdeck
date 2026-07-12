@@ -59,8 +59,7 @@ export async function initializeWorkspaceBeads(workspacePath: string, issueId: s
     assertSupportedBdVersion(beadsVersion);
     {
       // Supported bd versions use the shared canonical database with issue labels.
-      // The worktree's .beads/ directory is created from git (only issues.jsonl is committed),
-      // so it lacks the redirect file needed to find the main repo's Dolt database.
+      // The worktree's gitignored redirect must be recreated locally.
       // We must create .beads/redirect explicitly — it is gitignored so cannot be inherited.
       await ensureWorkspaceBeadsRedirect(workspacePath);
 

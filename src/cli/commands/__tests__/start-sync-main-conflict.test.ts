@@ -74,6 +74,12 @@ vi.mock('child_process', async () => {
     execFileSync: execFileSyncMock,
   };
 });
+vi.mock('../../../lib/beads/resolver.js', () => ({
+  createBeadsResolver: () => ({
+    getBeadsForIssueSync: () => ({ ok: true, value: [{ id: 'bead-1', title: 'Implement issue', status: 'open', labels: [] }] }),
+    getBeadsForIssue: async () => ({ ok: true, value: [{ id: 'bead-1', title: 'Implement issue', status: 'open', labels: [] }] }),
+  }),
+}));
 
 vi.mock('../../../lib/work-agent-lifecycle.js', () => ({
   assertCanStartFreshSync: vi.fn(() => ({ canStartFresh: true })),

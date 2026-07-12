@@ -21,7 +21,7 @@ import { promisify } from 'node:util';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { messageAgent, getAgentState, spawnAgent } from '../../../../lib/agents.js';
-import { queryBeadsForIssue, type BeadEntry } from '../../../../lib/beads-query.js';
+import { queryBeadsForIssue } from '../../../../lib/beads-query.js';
 import { syncMainIntoWorkspace } from '../../../../lib/cloister/merge-agent.js';
 import { MainDivergedError, gitPush } from '../../../../lib/git/operations.js';
 import { listGitOperationsSync } from '../../../../lib/git-activity.js';
@@ -168,34 +168,6 @@ export async function reconcileGitHubMergeStatus(issueId: string, status: Pick<R
 }
 
 
-async function readBeadsFromJsonl(workspacePath: string, issueId: string): Promise<BeadEntry[]> {
-  try {
-    const jsonlPath = join(workspacePath, '.beads', 'issues.jsonl');
-    if (!existsSync(jsonlPath)) return [];
-    const raw = await readFile(jsonlPath, 'utf-8');
-    const issueLower = issueId.toLowerCase();
-    const beads: BeadEntry[] = [];
-    for (const line of raw.split('\n')) {
-      if (!line.trim()) continue;
-      try {
-        const entry = JSON.parse(line);
-        const labels = Array.isArray(entry.labels) ? entry.labels : [];
-        if (labels.some((l: string) => l.toLowerCase() === issueLower)) {
-          beads.push({
-            id: String(entry.id ?? ''),
-            title: String(entry.title ?? ''),
-            status: String(entry.status ?? 'open'),
-            labels: labels as string[],
-          });
-        }
-      } catch { /* skip malformed lines */ }
-    }
-    return beads;
-  } catch {
-    return [];
-  }
-}
-
 /**
  * Build a rich PR body with issue link, beads task summary, and AC checklist
  * from the vBRIEF plan. Exported for testing.
@@ -240,11 +212,7 @@ export async function buildRichPRBody(issueId: string, workspacePath: string): P
     const queryResult = await Effect.runPromise(
       queryBeadsForIssue(workspacePath, issueId, { acquisitionTimeoutMs: 500 }),
     );
-    let beads = queryResult.beads;
-    if (beads.length === 0) {
-      // Fallback: read from .beads/issues.jsonl when bd CLI is unavailable
-      beads = await readBeadsFromJsonl(workspacePath, issueId);
-    }
+    const beads = queryResult.beads;
     if (beads.length > 0) {
       lines.push('## Implementation Tasks');
       lines.push('');

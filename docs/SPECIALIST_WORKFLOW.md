@@ -144,7 +144,7 @@ When a user clicks **Start Agent** in the dashboard (`POST /api/agents`), the sy
 
 ### Beads Prerequisite
 
-Beads are a hard prerequisite for starting work agents. The `POST /api/agents` endpoint returns **422** if `.beads/issues.jsonl` does not exist in the workspace. Cloister automatically creates beads from the vBRIEF plan via `createBeadsFromVBrief()` when planning completes. Manual `bd create` is no longer needed.
+Beads are a hard prerequisite for starting work agents. The `POST /api/agents` endpoint returns **422** if the canonical Dolt resolver reports no beads for the issue. Cloister automatically creates beads from the vBRIEF plan through the canonical writer when planning completes. Raw mutation commands are not needed.
 
 ### DAG-Aware Task Scheduling
 

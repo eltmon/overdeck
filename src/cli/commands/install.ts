@@ -687,8 +687,8 @@ async function installCommand(options: InstallOptions): Promise<void> {
   }
 
   console.log(`  4. In each project root, initialize beads task tracking:`);
-  console.log(`     ${chalk.cyan('cd /path/to/your-project && bd init --prefix <project-name>')}`);
-  console.log(`     ${chalk.dim('e.g. bd init --prefix overdeck  (enables agent task tracking for this project)')}`);
+  console.log(`     ${chalk.cyan('cd /path/to/your-project && pan sync')}`);
+  console.log(`     ${chalk.dim('pan sync bootstraps the registered project canonical beads home')}`);
   console.log(`  5. Create a workspace with ${chalk.cyan('pan workspace create <issue-id>')}`);
   console.log('');
 }

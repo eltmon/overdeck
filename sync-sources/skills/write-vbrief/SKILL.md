@@ -189,7 +189,7 @@ pan plan finalize
 
 This atomically:
 1. Reads `.pan/spec.vbrief.json`
-2. Creates beads via `bd create` (one per `items[]` entry, edges respected)
+2. Creates beads through the canonical writer (one per `items[]` entry, edges respected)
 3. Sets `plan.status` to `"proposed"`
 4. Promotes the canonical spec into `<projectRoot>/.pan/specs/<YYYY-MM-DD>-<ISSUE>-<slug>.vbrief.json`
 5. Commits on main, pushes, transitions the tracker issue to Planned

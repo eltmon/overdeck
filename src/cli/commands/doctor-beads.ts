@@ -1,11 +1,17 @@
 import { detectCanonicalBeadsSplitBrain } from '../../lib/beads/home.js';
 import { listProjectsSync } from '../../lib/projects.js';
-import type { CheckResult } from './doctor.js';
 import { MINIMUM_BD_VERSION, isSupportedBdVersion, readInstalledBdVersionSync, unsupportedBdVersionMessage } from '../../lib/beads/version.js';
 
-export function checkCanonicalBeadsHomes(): CheckResult[] {
+interface BeadsDoctorCheck {
+  name: string;
+  status: 'ok' | 'warn' | 'error';
+  message: string;
+  fix?: string;
+}
+
+export function checkCanonicalBeadsHomes(): BeadsDoctorCheck[] {
   const version = readInstalledBdVersionSync();
-  const versionCheck: CheckResult[] = version && !isSupportedBdVersion(version) ? [{
+  const versionCheck: BeadsDoctorCheck[] = version && !isSupportedBdVersion(version) ? [{
     name: 'Beads CLI version policy',
     status: 'error',
     message: unsupportedBdVersionMessage(version),

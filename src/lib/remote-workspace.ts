@@ -150,6 +150,8 @@ export interface CreateRemoteWorkspaceOptions {
     console.warn('  ⚠ beads CLI (bd) install failed on VM — agent will have no bead tracking');
   }
 
+  // Legacy-unmigrated compatibility only: migrated projects were rejected by
+  // assertRemoteWorkspaceBeadsSupported above and never reach this JSONL path.
   // Step 6.5: Sync planning artifacts from the local workspace, if one exists.
   // `.pan/continue.json` is gitignored and `.beads/issues.jsonl` is created by
   // planning in the local worktree — neither arrives via the clone.

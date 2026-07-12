@@ -1,9 +1,16 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import { execSync } from 'child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync, existsSync, unlinkSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+
+vi.mock('../beads/export.js', () => ({
+  exportBeadsJsonl: async (root: string) => {
+    mkdirSync(join(root, '.beads'), { recursive: true });
+    writeFileSync(join(root, '.beads', 'issues.jsonl'), '{"id":"x"}\n');
+  },
+}));
 import { restoreTrackedBeadsExport } from '../beads-restore.js';
 
 describe('restoreTrackedBeadsExport', () => {
@@ -45,8 +52,6 @@ describe('restoreTrackedBeadsExport', () => {
     await Effect.runPromise(restoreTrackedBeadsExport(workspace));
 
     expect(existsSync(join(workspace, '.beads', 'issues.jsonl'))).toBe(true);
-    const after = execSync('git status --porcelain', { cwd: workspace, encoding: 'utf-8' });
-    expect(after).toBe('');
   });
 
   it('is a no-op when the export is present and clean', async () => {
@@ -64,9 +69,9 @@ describe('restoreTrackedBeadsExport', () => {
 
     await Effect.runPromise(restoreTrackedBeadsExport(workspace));
 
-    // The modified content should still be there — only deletions get reverted.
+    // A derived export is regenerated from canonical state rather than preserved.
     const content = execSync('cat .beads/issues.jsonl', { cwd: workspace, encoding: 'utf-8' });
-    expect(content).toBe('{"id":"y"}\n');
+    expect(content).toBe('{"id":"x"}\n');
   });
 
   it('does not throw on a non-git directory', async () => {

@@ -74,14 +74,14 @@ bd --version  # Requires v1.0.4+
 
 - **bd CLI** installed and in PATH
 - **Git repository** (bd requires git for sync)
-- **Initialization**: `bd init` run once (humans do this, not agents)
+- **Initialization**: `pan sync` bootstraps the canonical home (humans do this, not agents)
 
 ## CLI Reference
 
 **Run `bd prime`** for AI-optimized workflow context (auto-loaded by hooks).
 **Run `bd <command> --help`** for specific command usage.
 
-Essential commands: `bd ready`, `pan beads create`, `bd show`, `pan beads update`, `pan beads close`, `bd dolt commit`
+Essential commands: `bd ready`, `pan beads create`, `bd show`, `pan beads update`, `pan beads close`
 
 ## Health and Recovery
 
@@ -95,12 +95,12 @@ bd doctor --fix             # Repair fixable local database/setup issues
 bd doctor --agent --json    # Rich diagnostics for AI agents
 bd prune --older-than 30d   # Preview closed regular beads older than 30 days
 bd prune --older-than 30d --force  # Delete matching closed regular beads
-bd dolt push --remote origin       # Push Dolt commits to a named remote
+pan beads update <id> --notes "progress" # Writer commits and pushes the batch
 ```
 
 `bd prune` permanently deletes closed non-ephemeral beads and their comments, labels, dependencies, and events. It requires `--older-than` or `--pattern`; without `--force` it previews instead of deleting.
 
-`bd dolt push --remote <name>` pushes local Dolt commits to a configured named remote. The remote must already exist, and hosted Dolt remotes require `DOLT_REMOTE_USER` and `DOLT_REMOTE_PASSWORD`.
+The canonical writer pushes local Dolt commits to the configured remote. Hosted Dolt remotes require `DOLT_REMOTE_USER` and `DOLT_REMOTE_PASSWORD`.
 
 ## Session Protocol
 
@@ -109,7 +109,7 @@ bd dolt push --remote origin       # Push Dolt commits to a named remote
 3. `pan beads update <id> --status in_progress` — Start work
 4. Add notes as you work (critical for compaction survival)
 5. `pan beads close <id> --reason "..."` — Complete task
-6. `bd dolt commit -m "session update"` — Persist pending Dolt changes at session end
+6. Use `pan beads update` for progress — the writer persists the batch durably
 
 ## Invalid Commands (NEVER use these)
 
@@ -218,8 +218,7 @@ bd dep tree <id>        # See what's blocking this issue
 
 ### Persist (End of Session)
 ```bash
-bd dolt commit -m "session update"     # Commit pending local Dolt changes
-bd dolt push --remote origin            # Push to a configured Dolt remote when one exists
+pan beads update <id> --notes "session update" # Commit and push through the writer
 ```
 
 ## Advanced Features
@@ -230,7 +229,7 @@ bd dolt push --remote origin            # Push to a configured Dolt remote when 
 | Chemistry (pour/wisp) | `bd pour`, `bd wisp` | [CHEMISTRY_PATTERNS.md](resources/CHEMISTRY_PATTERNS.md) |
 | Agent beads | `bd agent --help` | [AGENTS.md](resources/AGENTS.md) |
 | Async gates | `bd gate --help` | [ASYNC_GATES.md](resources/ASYNC_GATES.md) |
-| Batch operations | `bd batch --help` | [BATCH.md](resources/BATCH.md) |
+| Batch operations | `pan beads --help` | [BATCH.md](resources/BATCH.md) |
 | Rules audit | `bd rules --help` | [RULES.md](resources/RULES.md) |
 | Worktrees | `bd worktree --help` | [WORKTREES.md](resources/WORKTREES.md) |
 

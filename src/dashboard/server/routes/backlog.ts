@@ -21,6 +21,7 @@ import {
   type ForecastNode, type LaneBlock,
 } from '../../../lib/backlog/pickup.js';
 import { buildClassifyLookups } from '../../../lib/backlog/lookups.js';
+import { createBeadsResolver } from '../../../lib/beads/resolver.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { getBacklogSequenceForRoot, clearBacklogSequence } from '../../../lib/overdeck/backlog.js';
 import { isFlywheelAutoPickupBacklog } from '../../../lib/overdeck/control-settings.js';
@@ -83,9 +84,9 @@ const getBacklogSequenceRoute = HttpRouter.add(
           for (const dir of readdirSync(workspacesDir)) {
             const match = /^feature-([a-z]+-\d+)$/i.exec(dir);
             if (match) {
-              if (existsSync(join(workspacesDir, dir, '.beads', 'issues.jsonl'))) {
-                issuesWithBeads.add(match[1]!.toUpperCase());
-              }
+              const issueId = match[1]!.toUpperCase();
+              const result = yield* Effect.promise(() => createBeadsResolver(join(workspacesDir, dir)).issueHasBeads(issueId));
+              if (result.ok && result.value) issuesWithBeads.add(issueId);
             }
           }
         }

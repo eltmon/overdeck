@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 
 import { BdTransientFailure, runBdWithRetry, type RunBdWithRetryOptions } from '../bd-process-lock.js';
@@ -45,7 +45,7 @@ function parseRecords(stdout: string): BeadRecord[] {
 
 async function defaultExecute(args: string[], cwd: string): Promise<string> {
   const { stdout } = await execFileAsync('bd', args, { cwd, encoding: 'utf8', timeout: 10_000 });
-  return stdout;
+  return typeof stdout === 'string' ? stdout : String((stdout as unknown as { stdout?: string }).stdout ?? stdout);
 }
 
 export class BeadsResolver {
@@ -79,6 +79,20 @@ export class BeadsResolver {
 
   getBeadsForIssue(issueId: string): Promise<BeadsReadResult<BeadRecord[]>> {
     return this.#read(`query beads for ${issueId}`, ['list', '--json', '-l', issueId.toLowerCase(), '--status', 'all', '--limit', '0']);
+  }
+
+  getBeadsForIssueSync(issueId: string): BeadsReadResult<BeadRecord[]> {
+    try {
+      const stdout = execFileSync('bd', ['list', '--json', '-l', issueId.toLowerCase(), '--status', 'all', '--limit', '0'], {
+        cwd: this.#workspacePath,
+        encoding: 'utf8',
+        timeout: 10_000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      return { ok: true, value: parseRecords(stdout) };
+    } catch (error) {
+      return { ok: false, reason: 'The canonical beads database could not answer the synchronous issue query; bead state is stale, not empty.', transient: false, error };
+    }
   }
 
   getReadyBeads(): Promise<BeadsReadResult<BeadRecord[]>> {

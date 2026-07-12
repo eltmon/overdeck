@@ -10,5 +10,5 @@ import { Effect } from 'effect';
 import { exportBeadsJsonl } from './beads/export.js';
 
 export const restoreTrackedBeadsExport = (workspacePath: string): Effect.Effect<void, never> =>
-  Effect.promise(() => exportBeadsJsonl(workspacePath).then(() => undefined))
+  Effect.tryPromise({ try: () => exportBeadsJsonl(workspacePath).then(() => undefined), catch: () => undefined })
     .pipe(Effect.catch(() => Effect.void));

@@ -2,7 +2,7 @@ import { exec } from 'child_process';
 import { existsSync } from 'fs';
 import { readdir, readFile } from 'fs/promises';
 import { readFileSync, readdirSync } from 'fs';
-import { isAbsolute, join, resolve } from 'path';
+import { join } from 'path';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 
@@ -17,6 +17,7 @@ import { isGitHubAppConfigured, listPullRequestsForHead } from '../github-app.js
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { loadCloisterConfig } from './config.js';
 import { clearIssueClosedCache, isIssueClosed } from './issue-closed.js';
+import { createBeadsResolver } from '../beads/resolver.js';
 
 const DEFAULT_ATTEMPT_INTERVAL_MS = 5 * 60 * 1000;
 const execAsync = promisify(exec);
@@ -136,43 +137,10 @@ async function readJsonFile<T>(path: string): Promise<T | null> {
   }
 }
 
-async function resolveBeadsIssuesPath(projectPath: string, issueId: string): Promise<string | null> {
+async function countBeadsForIssue(projectPath: string, issueId: string): Promise<number | null> {
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
-  const beadsDir = join(workspacePath, '.beads');
-  const localIssuesPath = join(beadsDir, 'issues.jsonl');
-  if (existsSync(localIssuesPath)) return localIssuesPath;
-
-  const redirectPath = join(beadsDir, 'redirect');
-  if (!existsSync(redirectPath)) return null;
-
-  try {
-    const redirected = (await readFile(redirectPath, 'utf-8')).trim();
-    if (!redirected) return null;
-    return join(isAbsolute(redirected) ? redirected : resolve(workspacePath, redirected), 'issues.jsonl');
-  } catch {
-    return null;
-  }
-}
-
-async function countBeadsForIssue(projectPath: string, issueId: string): Promise<number> {
-  const beadsPath = await resolveBeadsIssuesPath(projectPath, issueId);
-  if (!beadsPath || !existsSync(beadsPath)) return 0;
-
-  try {
-    const raw = await readFile(beadsPath, 'utf-8');
-    return raw.split('\n').filter(Boolean).filter((line) => {
-      try {
-        const record = JSON.parse(line) as { _type?: unknown; labels?: unknown };
-        return record._type === 'issue'
-          && Array.isArray(record.labels)
-          && record.labels.some((label) => typeof label === 'string' && label.toLowerCase() === issueId.toLowerCase());
-      } catch {
-        return false;
-      }
-    }).length;
-  } catch {
-    return 0;
-  }
+  const result = await createBeadsResolver(existsSync(workspacePath) ? workspacePath : projectPath).countBeadsForIssue(issueId);
+  return result.ok ? result.value : null;
 }
 
 async function defaultGetAgentState(agentId: string): Promise<Pick<AgentState, 'status' | 'paused' | 'troubled'> | null> {

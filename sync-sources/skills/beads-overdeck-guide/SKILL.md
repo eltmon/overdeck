@@ -138,7 +138,7 @@ The following commands do NOT exist. Agents frequently hallucinate them:
 | Add notes | `bd comments add <bead-id> "notes"` |
 | Complete bead | `pan beads close <bead-id> --reason "done"` |
 | Show bead details | `bd show <bead-id>` |
-| Bulk close beads | `printf 'close <id> done\n' | bd batch` |
+| Bulk close beads | `pan beads close <id>... --reason "done"` |
 | Check blockers | `bd dep tree <bead-id>` |
 
 ## When to Use Each Filter
@@ -162,7 +162,7 @@ For complete beads documentation, see the main `beads` skill:
 1. **No `--issue` flag exists** - Use `--title-contains` instead
 2. **`--id` expects bead IDs** (overdeck-abc), not Linear IDs (PAN-116)
 3. **Always add comments** - They survive compaction and help the next agent
-4. **Persist at session end** - `bd dolt commit -m "session update"` commits pending local Dolt changes
+4. **Persist through the writer** - every `pan beads` mutation commits, exports, and pushes its batch
 5. **NEVER use `bd claim`** - Use `pan beads claim <id>` instead
 6. **Check blockers before closing** - Run `bd dep tree <id>` first; close blockers before using `--force`
 7. **NEVER run `bd init` in redirect-managed worktrees** - Use the existing `.beads/redirect` plus `bd ping --json` / `bd doctor --fix`
@@ -192,5 +192,5 @@ bd comments add overdeck-abc "Implemented per-message costing logic"
 pan beads close overdeck-abc --reason "Refactored parseClaudeSession to calculate cost per-message"
 
 # 7. Persist pending Dolt changes
-bd dolt commit -m "PAN-116 session update"
+pan beads update <bead-id> --notes "PAN-116 session update"
 ```

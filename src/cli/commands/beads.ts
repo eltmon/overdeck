@@ -88,7 +88,7 @@ async function compactCommand(options: CompactOptions): Promise<void> {
   const beadsDir = join(cwd, '.beads');
   if (!existsSync(beadsDir)) {
     console.error(chalk.red('Error: No .beads directory found in current directory'));
-    console.log(chalk.dim('Run bd init to initialize beads'));
+    console.log(chalk.dim('Run pan sync to bootstrap the canonical beads home'));
     process.exit(1);
   }
 
@@ -125,7 +125,11 @@ async function compactCommand(options: CompactOptions): Promise<void> {
 
     // Run compaction
     spinner.text = 'Running compaction...';
-    await execAsync(`bd admin compact --days ${days}`, { cwd, encoding: 'utf-8' });
+    const compacted = await runMutationBatch(
+      { project: { workspacePath: cwd }, reason: `compact beads older than ${days} days` },
+      (bd) => bd.mutate(['admin', 'compact', '--days', String(days)]),
+    );
+    if (!compacted.ok) throw new Error(compacted.message);
 
     spinner.succeed(`Compacted ${count} beads older than ${days} days`);
 
@@ -243,6 +247,9 @@ export function registerBeadsCommands(program: Command): void {
     .option('--status <status>')
     .option('--title <title>')
     .option('--priority <priority>')
+    .option('--notes <notes>')
+    .option('--description <description>')
+    .option('--assignee <assignee>')
     .option('--add-label <label>')
     .option('--remove-label <label>')
     .action(async (id: string, options: Record<string, string | undefined>) => { await mutate(`update ${id}`, (bd) => {
@@ -264,13 +271,17 @@ export function registerBeadsCommands(program: Command): void {
     .option('--priority <priority>', 'Priority', '2')
     .option('--labels <labels>')
     .option('--parent <parent>')
-    .action((title: string | undefined, options: { title?: string; type: string; priority: string; labels?: string; parent?: string }) => {
+    .option('--description <description>')
+    .option('--deps <dependencies>')
+    .action((title: string | undefined, options: { title?: string; type: string; priority: string; labels?: string; parent?: string; description?: string; deps?: string }) => {
       const resolvedTitle = options.title ?? title;
       if (!resolvedTitle) throw new Error('pan beads create requires a title');
       return mutate(`create ${resolvedTitle}`, (bd) => {
       const args = ['create', '--title', resolvedTitle, '--type', options.type, '--priority', options.priority, '--json'];
       if (options.labels) args.push('--labels', options.labels);
       if (options.parent) args.push('--parent', options.parent);
+      if (options.description) args.push('--description', options.description);
+      if (options.deps) args.push('--deps', options.deps);
       return bd.mutate(args);
       }).then((output) => console.log(output));
     });
