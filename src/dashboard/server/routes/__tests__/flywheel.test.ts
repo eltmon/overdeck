@@ -355,7 +355,23 @@ describe('GET /api/flywheel/substrate-bug-weights', () => {
     expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenLastCalledWith('12h', expect.objectContaining({ limit: 50, offset: 0 }));
   });
 
-  it('falls back to the default window for malformed or empty values', async () => {
+  it('clamps windows to a documented maximum of 365 days', async () => {
+    substrateBugWeightsMocks.listSubstrateBugWeights.mockResolvedValue([]);
+
+    const huge = await requestFlywheelRoute('/api/flywheel/substrate-bug-weights?window=999999d');
+    expect(huge.status).toBe(200);
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenLastCalledWith('365d', expect.objectContaining({ limit: 50, offset: 0 }));
+
+    const overMax = await requestFlywheelRoute('/api/flywheel/substrate-bug-weights?window=366d');
+    expect(overMax.status).toBe(200);
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenLastCalledWith('365d', expect.objectContaining({ limit: 50, offset: 0 }));
+
+    const atMax = await requestFlywheelRoute('/api/flywheel/substrate-bug-weights?window=365d');
+    expect(atMax.status).toBe(200);
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenLastCalledWith('365d', expect.objectContaining({ limit: 50, offset: 0 }));
+  });
+
+  it('falls back to the default window for malformed, empty, or non-positive values', async () => {
     substrateBugWeightsMocks.listSubstrateBugWeights.mockResolvedValue([]);
     const malformed = await requestFlywheelRoute('/api/flywheel/substrate-bug-weights?window=abc');
     expect(malformed.status).toBe(200);
@@ -363,6 +379,10 @@ describe('GET /api/flywheel/substrate-bug-weights', () => {
 
     const empty = await requestFlywheelRoute('/api/flywheel/substrate-bug-weights?window=');
     expect(empty.status).toBe(200);
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenLastCalledWith('30d', expect.objectContaining({ limit: 50, offset: 0 }));
+
+    const zero = await requestFlywheelRoute('/api/flywheel/substrate-bug-weights?window=0d');
+    expect(zero.status).toBe(200);
     expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenLastCalledWith('30d', expect.objectContaining({ limit: 50, offset: 0 }));
   });
 

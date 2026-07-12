@@ -55,39 +55,38 @@ export async function listSubstrateBugWeights(
   const bugs = await listBugs(since, until);
   const insufficientTelemetry = completedPipelineRuns < 3;
 
-  const rows = bugs.map((bug) => {
+  const scored = bugs.map((bug) => {
     const affectedCriteria = bug.affectedCriteria;
 
     if (insufficientTelemetry) {
       return {
-        issueId: bug.issueId,
-        severity: bug.severity,
-        filedBy: bug.filedBy,
-        affectedCriteria,
+        bug,
         weight: 0,
         weightReason: `Insufficient telemetry: ${completedPipelineRuns} completed pipeline run${completedPipelineRuns === 1 ? '' : 's'} in window (need 3)`,
       };
     }
 
     const { weight, reason } = computeSubstrateBugWeight(affectedCriteria, stats);
-    return {
-      issueId: bug.issueId,
-      severity: bug.severity,
-      filedBy: bug.filedBy,
-      affectedCriteria,
-      weight,
-      weightReason: reason,
-    };
+    return { bug, weight, weightReason: reason };
   });
 
-  const sorted = rows.sort((a, b) => {
+  const sorted = scored.sort((a, b) => {
     if (b.weight !== a.weight) return b.weight - a.weight;
-    return a.issueId.localeCompare(b.issueId);
+    return a.bug.filedAt.localeCompare(b.bug.filedAt);
   });
+
+  const rows = sorted.map((item) => ({
+    issueId: item.bug.issueId,
+    severity: item.bug.severity,
+    filedBy: item.bug.filedBy,
+    affectedCriteria: item.bug.affectedCriteria,
+    weight: item.weight,
+    weightReason: item.weightReason,
+  }));
 
   const offset = Math.max(0, deps.offset ?? 0);
   if (deps.limit !== undefined) {
-    return sorted.slice(offset, offset + deps.limit);
+    return rows.slice(offset, offset + deps.limit);
   }
-  return offset > 0 ? sorted.slice(offset) : sorted;
+  return offset > 0 ? rows.slice(offset) : rows;
 }

@@ -191,7 +191,7 @@ describe('listSubstrateBugWeights', () => {
     }
   });
 
-  it('ties on weight are broken by issueId ascending', async () => {
+  it('ties on weight are broken by filedAt ascending', async () => {
     const stats = makeStats();
     const bugs = [
       makeBug({ issueId: 'PAN-LATER', filedAt: '2026-07-03T00:00:00.000Z', body: 'Flywheel-Affects-Criterion: 1' }),

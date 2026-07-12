@@ -5,12 +5,28 @@ import { httpHandler } from './http-handler.js';
 import { listSubstrateBugWeights } from '../../../lib/overdeck/substrate-bug-weights-service.js';
 
 const DEFAULT_WINDOW = '30d';
+const MAX_WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 
+const DURATION_UNITS_MS: Record<string, number> = {
+  ms: 1,
+  s: 1000,
+  m: 60 * 1000,
+  h: 60 * 60 * 1000,
+  d: 24 * 60 * 60 * 1000,
+};
+
 function parseWindow(value: string | null | undefined): string {
   if (!value) return DEFAULT_WINDOW;
-  return /^\d+(ms|s|m|h|d)$/.test(value) ? value : DEFAULT_WINDOW;
+  const match = /^(\d+)(ms|s|m|h|d)$/.exec(value);
+  if (!match) return DEFAULT_WINDOW;
+  const amount = Number(match[1]);
+  const unitMs = DURATION_UNITS_MS[match[2]] ?? 0;
+  if (!Number.isInteger(amount) || amount <= 0 || unitMs === 0) return DEFAULT_WINDOW;
+  const ms = amount * unitMs;
+  if (ms > MAX_WINDOW_MS) return '365d';
+  return value;
 }
 
 function parseLimit(value: string | null | undefined): number {
