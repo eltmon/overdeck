@@ -99,6 +99,40 @@ Approval replies are JSON-RPC responses to the server request `id`:
 t3code matches this shape by converting provider answers into
 `Record<string, { answers: string[] }>` before writing `{ id, result: { answers } }`.
 
+## Transcript And Cost Continuity
+
+Checkpoint C1 was verified with a live `codex-cli 0.144.1 app-server` session
+using an isolated `CODEX_HOME` at `/tmp/pan-2597-codex-live-yIYlP5`.
+`thread/start` returned a planned rollout path immediately, but Codex did not
+create the JSONL until the first `turn/start` completed.
+
+After a minimal prompt (`Reply with exactly OK.`), Codex wrote:
+
+```text
+/tmp/pan-2597-codex-live-yIYlP5/sessions/2026/07/12/rollout-2026-07-12T14-28-38-019f5796-a6eb-7ec0-91e6-ac452b37e193.jsonl
+```
+
+The existing rollout path helpers worked unchanged:
+
+- `findLatestRollout(codexHome)` returned the live JSONL.
+- `findRolloutPath(codexHome, "019f5796-a6eb-7ec0-91e6-ac452b37e193")`
+  returned the same JSONL.
+
+The existing cost parser also worked unchanged. `parseCodexSessionSync` returned
+one assistant message, model `gpt-5.6-sol`, 26,389 input tokens, 9,984 cached
+input tokens, 5 output tokens, and total cost `0.087167`.
+`parseCodexSessionCostEventsSync` emitted one cost event with the same usage.
+
+The existing conversation reader path worked unchanged. `getCachedMessages`
+already treats `rollout-*.jsonl` as Codex and dispatches to
+`parseCodexConversationMessages`; that parser returned two chat messages
+(`user`, `assistant`), total tokens `26394`, total cost `0.087167`, and the
+assistant text `OK`.
+
+No fallback transcript adapter is required for app-server. The durable transcript
+and cost source remains the Codex rollout JSONL under the per-agent
+`CODEX_HOME/sessions/YYYY/MM/DD/` tree.
+
 ## Divergences
 
 1. `item/fileRead/requestApproval` appears in t3code's pending approval union and
