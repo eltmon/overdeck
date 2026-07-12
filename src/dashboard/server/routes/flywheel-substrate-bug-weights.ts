@@ -5,6 +5,7 @@ import { httpHandler } from './http-handler.js';
 import { listSubstrateBugWeights } from '../../../lib/overdeck/substrate-bug-weights-service.js';
 
 const DEFAULT_WINDOW = '30d';
+// HTTP windows are capped at 365 days to bound request-path work; see docs/FLYWHEEL.md.
 const MAX_WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
