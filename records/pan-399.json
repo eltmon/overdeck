@@ -323,7 +323,7 @@
     "recordedAt": "2026-07-12T01:24:02.241Z"
   },
   "created": "2026-07-11T09:28:34.266Z",
-  "updated": "2026-07-12T01:32:11.702Z",
+  "updated": "2026-07-12T02:35:48.838Z",
   "pipeline": {
     "issueId": "PAN-399",
     "reviewStatus": "pending",
@@ -606,8 +606,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "release-engine-tests": "completed",
     "release-engine-tests.ac1": "completed",
