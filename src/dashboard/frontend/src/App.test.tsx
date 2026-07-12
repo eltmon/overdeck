@@ -573,3 +573,70 @@ describe('App channel permission requests', () => {
     expect(mockToastSuccess).toHaveBeenCalledWith('Denied permission request for agent-987')
   })
 })
+
+describe('App global lens chord shortcuts', () => {
+  beforeEach(() => {
+    window.history.replaceState(null, '', '/');
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/version') {
+        return new Response(JSON.stringify({ version: '0.5.0' }), { status: 200 });
+      }
+      if (url === '/api/tracker-status') {
+        return new Response(JSON.stringify({ primary: 'github', configured: [] }), { status: 200 });
+      }
+      if (url === '/api/confirmations') {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+      return new Response(JSON.stringify([]), { status: 200 });
+    }));
+  });
+
+  it('navigates to Pipeline with g p', () => {
+    renderApp();
+    fireEvent.keyDown(document, { key: 'g' });
+    fireEvent.keyDown(document, { key: 'p' });
+    expect(window.location.pathname).toBe('/pipeline');
+  });
+
+  it('navigates to Board with g b', () => {
+    renderApp();
+    fireEvent.keyDown(document, { key: 'g' });
+    fireEvent.keyDown(document, { key: 'b' });
+    expect(window.location.pathname).toBe('/board');
+  });
+
+  it('navigates to Agents with g a', () => {
+    renderApp();
+    fireEvent.keyDown(document, { key: 'g' });
+    fireEvent.keyDown(document, { key: 'a' });
+    expect(window.location.pathname).toBe('/agents');
+  });
+
+  it('navigates to Command Deck with g c', () => {
+    renderApp();
+    fireEvent.keyDown(document, { key: 'g' });
+    fireEvent.keyDown(document, { key: 'c' });
+    expect(window.location.pathname).toBe('/command-deck');
+  });
+
+  it('does not trigger the chord when focus is inside an input', () => {
+    renderApp();
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.focus();
+    fireEvent.keyDown(input, { key: 'g' });
+    fireEvent.keyDown(input, { key: 'p' });
+    expect(window.location.pathname).toBe('/');
+    document.body.removeChild(input);
+  });
+
+  it('cancels the chord on an unbound second key', () => {
+    renderApp();
+    fireEvent.keyDown(document, { key: 'g' });
+    fireEvent.keyDown(document, { key: 'q' });
+    expect(window.location.pathname).toBe('/');
+    fireEvent.keyDown(document, { key: 'p' });
+    expect(window.location.pathname).toBe('/');
+  });
+});
