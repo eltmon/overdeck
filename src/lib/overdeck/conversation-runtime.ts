@@ -9,7 +9,7 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, BYPASS_PERMISSION_MODE } from '../claude-permissions.js';
-import { getProjectSync } from '../projects.js';
+import { getProjectSync, listProjectsSync } from '../projects.js';
 import { getDefaultCwd } from '../default-cwd.js';
 import {
   listConversations,
@@ -714,6 +714,23 @@ export async function spawnConversationSession(
   await Effect.runPromise(setOption(tmuxSession, 'destroy-unattached', 'off'));
   await Effect.runPromise(setOption(exactPaneTarget(tmuxSession), 'remain-on-exit', 'on'));
 }
+/**
+ * Resolve a conversation's cwd from a project identifier.
+ *
+ * The Command Deck identifies projects by display name, not yaml key
+ * (PAN-2590) — accept either, like GET /api/session-trees does.
+ */
+export function resolveProjectCwd(projectKey: string): { cwd: string } | { error: string } {
+  const projectConfig = getProjectSync(projectKey)
+    ?? listProjectsSync().find((p) => p.config.name === projectKey)?.config
+    ?? null;
+  if (!projectConfig) return { error: `Unknown project: ${projectKey}` };
+  if (!projectConfig.path || !existsSync(projectConfig.path)) {
+    return { error: `Project path does not exist: ${projectConfig.path || '(unset)'} (project: ${projectKey})` };
+  }
+  return { cwd: projectConfig.path };
+}
+
 export interface ConversationCreateRequestBody { [key: string]: unknown }
 export async function handleConversationCreate(
   body: ConversationCreateRequestBody,
@@ -731,9 +748,9 @@ export async function handleConversationCreate(
     if (effort && !SAFE_EFFORT_PATTERN.test(effort)) return jsonResponse({ error: 'Invalid effort' }, { status: 400 });
     let cwd = getDefaultCwd();
     if (projectKey) {
-      const projectConfig = getProjectSync(projectKey);
-      if (projectConfig?.path && existsSync(projectConfig.path)) cwd = projectConfig.path;
-      else return jsonResponse({ error: `Unknown project: ${projectKey}` }, { status: 400 });
+      const resolved = resolveProjectCwd(projectKey);
+      if ('error' in resolved) return jsonResponse({ error: resolved.error }, { status: 400 });
+      cwd = resolved.cwd;
     }
     if (message && message.length > 50_000) {
       return jsonResponse({ error: 'message exceeds maximum length of 50000 characters' }, { status: 400 });
