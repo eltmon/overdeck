@@ -329,6 +329,12 @@ interface DiffPanelProps {
   turnDiffSummaries: TurnDiffSummary[]
   onClose?: () => void
   diffUrlPrefix?: string
+  /** View selected on a fresh mount with no `?diff` session in the URL.
+   *  `'full'` (default) = the all-turns checkpoint thread; `'vs-main'` = the
+   *  current workspace branch vs main. The drawer Files tab uses `'vs-main'`
+   *  so it opens on the branch diff. Once the user clicks any turn chip the
+   *  `?diff=1` URL takes over and this default no longer applies. */
+  defaultView?: 'full' | 'vs-main'
 }
 
 export function DiffPanel({
@@ -337,6 +343,7 @@ export function DiffPanel({
   turnDiffSummaries,
   onClose,
   diffUrlPrefix,
+  defaultView = 'full',
 }: DiffPanelProps) {
   const { resolvedTheme } = useTheme()
   const { prefs: diffPrefs, update: updateDiffPrefs } = useDiffPreferences()
@@ -361,7 +368,17 @@ export function DiffPanel({
   // tab blank and cross-contaminate other ?diff consumers. The ?diff=1 URL
   // param still gates the popout/sheet (sheet-mode) toggle path.
   const diffOpen = mode === 'inline' || urlParams.diff === '1'
-  const selectedTurnId = urlParams.diffTurnId ?? null
+  // The URL is authoritative once a diff session is open in it (`?diff=1`) —
+  // that covers every chip click (All turns / vs main / per-turn). Before that,
+  // a fresh inline embed (e.g. the drawer Files tab) falls back to `defaultView`
+  // so it can open on the branch-vs-main diff instead of the all-turns thread.
+  const urlTurnId = urlParams.diffTurnId ?? null
+  const selectedTurnId =
+    urlParams.diff === '1'
+      ? urlTurnId
+      : defaultView === 'vs-main'
+        ? 'vs-main'
+        : urlTurnId
   const selectedFilePath = selectedTurnId !== null ? (urlParams.diffFilePath ?? null) : null
 
   // Sort summaries by turn count (newest first)
@@ -704,7 +721,7 @@ export function DiffPanel({
 
   return (
     <DiffPanelShell mode={mode} header={headerRow}>
-      {orderedTurnDiffSummaries.length === 0 ? (
+      {orderedTurnDiffSummaries.length === 0 && !isVsMain ? (
         <div className="flex flex-1 items-center justify-center px-5 text-center text-xs text-muted-foreground/70">
           No completed turns yet.
         </div>

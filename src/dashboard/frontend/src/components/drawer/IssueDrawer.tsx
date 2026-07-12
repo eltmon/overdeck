@@ -188,36 +188,25 @@ function DrawerFilesPanel({ issueId, agentId }: { issueId: string; agentId: stri
     refetchInterval: 5000,
   });
 
-  // AC-34: the Files tab renders the branch-vs-main diff whenever a workspace
-  // branch exists. The "no workspace branch" empty state must reflect exactly
-  // that condition — not also an agentId check that would wrongly show "No
-  // workspace branch yet" for a workspace that does exist.
+  // AC-34: the Files tab renders the branch-vs-main DiffPanel whenever a
+  // workspace branch exists — the absence of a branch is the only empty state.
+  // The diff route is agent-scoped (/api/agents/:id/diffs/vs-main resolves the
+  // agent's workspace, which is the feature/<issue-id> branch), and a workspace
+  // branch always has the agent that created it in the drawer's agents list
+  // (pickDefaultDrawerAgent includes ended agents), so `agentId` is non-null
+  // for any real workspace. The `?? ''` is a defensive fallback for the
+  // inconsistent-data edge case; DiffPanel surfaces the resulting fetch
+  // failure through its own error state instead of a misleading custom message.
   if (!hasWorkspace) {
     return <p className="text-[12px] text-muted-foreground">No workspace branch yet.</p>;
-  }
-  // The work agent's diff (/api/agents/:id/diffs) IS the feature/<issue> vs
-  // main diff. pickDefaultDrawerAgent returns the work agent including ended
-  // ones, so an agentId exists for any workspace that has ever had an agent
-  // (its creator). There is no workspace-scoped diff endpoint, so a branch
-  // with no agent session at all has no diff source — surface that distinctly
-  // rather than spinning on the diffData === undefined loading gate (the
-  // summaries query is disabled without an agentId).
-  if (!agentId) {
-    return <p className="text-[12px] text-muted-foreground">No agent session for this workspace yet.</p>;
-  }
-
-  // Gate the initial fetch so DiffPanel doesn't mount with an empty summary list
-  // and flash a misleading "No completed turns yet" before data arrives
-  // (same guard as the standalone diff popout).
-  if (diffData === undefined) {
-    return <p className="text-[12px] text-muted-foreground">Loading files…</p>;
   }
 
   return (
     <DiffWorkerPoolProvider>
       <DiffPanel
         mode="inline"
-        agentId={agentId}
+        agentId={agentId ?? ''}
+        defaultView="vs-main"
         turnDiffSummaries={diffData?.summaries ?? []}
       />
     </DiffWorkerPoolProvider>

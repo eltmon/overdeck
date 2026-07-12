@@ -184,6 +184,28 @@ describe('IssueDrawer', () => {
     expect(screen.getByTestId('drawer-tab-panel-files')).toBeInTheDocument();
   });
 
+  it('Files tab renders the branch-vs-main DiffPanel when a workspace branch exists (AC-34)', async () => {
+    // Stub a fresh fetch spy so we can assert which diff endpoint is requested.
+    const fetchSpy = mockFetch();
+    vi.stubGlobal('fetch', fetchSpy);
+
+    useDashboardStore.getState().openIssue('PAN-1', 'files');
+
+    renderDrawer();
+
+    // The workspace-exists mock returns exists:true. AC-34 requires DiffPanel
+    // to render on workspace existence alone — no "No agent session" gate.
+    expect(await screen.findByTestId('drawer-tab-panel-files')).toBeInTheDocument();
+    expect(screen.queryByText('No agent session for this workspace yet.')).not.toBeInTheDocument();
+
+    // defaultView="vs-main" → DiffPanel opens on the branch-vs-main diff, not
+    // the all-turns checkpoint thread (/diffs/full).
+    await waitFor(() => {
+      expect(fetchSpy.mock.calls.some(([url]) => String(url).includes('/diffs/vs-main'))).toBe(true);
+    });
+    expect(fetchSpy.mock.calls.some(([url]) => String(url).includes('/diffs/full'))).toBe(false);
+  });
+
   it('renders the artifacts tab with artifact cards and quick actions', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', {
