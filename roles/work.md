@@ -57,14 +57,14 @@ Never start, stop, kill, or restart the host-level Overdeck dashboard, superviso
 For every bead:
 
 1. `bd ready -l <issue-label>` — find the next unblocked bead scoped to this issue.
-2. `bd update <bead-id> --claim` — claim it.
+2. `pan beads claim <bead-id>` — claim it.
 3. Implement only that bead.
 4. `git add` specific files and `git commit` — one bead = one commit.
-5. `bd close <bead-id> --reason="…"`. (`bd close` writes bead status to the per-issue record automatically — do **not** write to the record or `.overdeck/continue.json` directly.)
+5. `pan beads close <bead-id> --reason="…"`. (The canonical writer records bead status automatically — do **not** write to the record or `.overdeck/continue.json` directly.)
 6. Re-read this bead's plan-item metadata (merged view via the spec on main) after the commit.
 7. If `metadata.requiresInspection === true`, run `pan inspect <ISSUE-ID> --bead <bead-id>` for `inspectionDepth: "fast"` or omitted, or add `--deep` for `inspectionDepth: "deep"`, then wait for the verdict via `pan tell`.
 8. If `metadata.requiresInspection === false`, skip inspection and continue.
-9. On `INSPECTION BLOCKED`: fix with a new commit, `bd close` again, then re-run the same inspection.
+9. On `INSPECTION BLOCKED`: fix with a new commit, `pan beads close` again, then re-run the same inspection.
 10. Continue with the next ready bead.
 
 Never batch multiple beads into a single commit. A one-bead diff is what makes inspection, review, and rollback tractable.

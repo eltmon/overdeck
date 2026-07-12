@@ -19,6 +19,11 @@
   border-bottom: 1px solid var(--border);
 }
 .title { font-size: 13px; }
+.freshness { font-size: 10px; color: var(--muted-foreground); }
+.stale {
+  font-size: 10px; color: var(--warning-foreground); border: 1px solid var(--warning);
+  border-radius: 999px; padding: 2px 6px;
+}
 .counts { margin-left: auto; display: flex; align-items: center; gap: 9px; font-size: 11px; color: var(--muted-foreground); }
 .count { display: inline-flex; align-items: center; gap: 5px; }
 .cdot { width: 7px; height: 7px; border-radius: 50%; }

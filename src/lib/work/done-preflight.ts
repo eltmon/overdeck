@@ -1,7 +1,6 @@
 import { existsSync, readdirSync } from 'fs';
-import { readFile } from 'fs/promises';
-import { join, resolve } from 'path';
-import { exec, execFile } from 'child_process';
+import { join } from 'path';
+import { exec } from 'child_process';
 import { promisify } from 'util';
 import chalk from 'chalk';
 import { Effect } from 'effect';
@@ -9,18 +8,18 @@ import { ProcessSpawnError } from '../errors.js';
 import { isStatePlaneOnlyStatus } from '../state-plane.js';
 import { getVBriefACStatusSync, syncBeadStatusToVBrief } from '../vbrief/beads.js';
 import { runTestRequirementCheck } from './test-requirement-gate.js';
+import { createBeadsResolver } from '../beads/resolver.js';
 
 const execAsync = promisify(exec);
-const execFileAsync = promisify(execFile);
 
 const BD_LIST_TIMEOUT_MS = 10_000;
 
 type BeadRecord = Record<string, unknown>;
 
 function errorCode(error: unknown): unknown {
-  return error instanceof Error
-    ? (error as unknown as Record<string, unknown>).code
-    : undefined;
+  if (!error || typeof error !== 'object') return undefined;
+  const record = error as Record<string, unknown>;
+  return record.code ?? errorCode(record.cause);
 }
 
 function isMissingCommand(error: unknown): boolean {
@@ -29,40 +28,13 @@ function isMissingCommand(error: unknown): boolean {
 }
 
 function isTimeout(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  const record = error as unknown as Record<string, unknown>;
+  if (!error || typeof error !== 'object') return false;
+  const record = error as Record<string, unknown>;
   return record.killed === true ||
     record.signal === 'SIGTERM' ||
     record.signal === 'SIGKILL' ||
-    /timed out|timeout/i.test(error.message);
-}
-
-async function readIssueBeadsFromJsonl(workspacePath: string, issueId: string): Promise<BeadRecord[] | null> {
-  // Workspaces share main's beads DB via `.beads/redirect`; the workspace-local
-  // issues.jsonl is a frozen snapshot from workspace-creation time and does NOT
-  // reflect bead closes made against the redirected DB. Follow the redirect so the
-  // completion gate reads the live bead ledger, not a stale snapshot (PAN-2195:
-  // a stale snapshot produced false "open beads" / "unchecked ACs" and blocked
-  // `pan done` for completed work after a replan).
-  const beadsDir = join(workspacePath, '.beads');
-  let jsonlPath = join(beadsDir, 'issues.jsonl');
-  const redirectPath = join(beadsDir, 'redirect');
-  if (existsSync(redirectPath)) {
-    const target = (await readFile(redirectPath, 'utf-8')).trim();
-    if (target) jsonlPath = join(resolve(workspacePath, target), 'issues.jsonl');
-  }
-  if (!existsSync(jsonlPath)) return null;
-
-  const label = issueId.toLowerCase();
-  return (await readFile(jsonlPath, 'utf-8'))
-    .split('\n')
-    .filter((line) => line.trim().length > 0)
-    .map((line) => JSON.parse(line) as BeadRecord)
-    .filter((bead) => {
-      const labelsMatch = Array.isArray(bead.labels) && bead.labels.map(String).includes(label);
-      const titleMatch = typeof bead.title === 'string' && bead.title.toLowerCase().includes(label);
-      return labelsMatch || titleMatch;
-    });
+    /timed out|timeout/i.test(String(record.message ?? '')) ||
+    isTimeout(record.cause);
 }
 
 async function listBeadsByStatus(
@@ -77,27 +49,9 @@ async function listBeadsByStatus(
 
   // Prefer the workspace beads DB directly — it is authoritative for this issue
   // and avoids the PAN-XXX label/title filtering pitfall (PAN-1812).
-  const jsonlBeads = await readIssueBeadsFromJsonl(workspacePath, issueId);
-  if (jsonlBeads !== null) {
-    return JSON.stringify(jsonlBeads.filter((bead) => bead.status === status));
-  }
-
-  try {
-    const { stdout } = await execFileAsync(
-      'bd',
-      ['list', '--status', status, '--title-contains', issueId.toLowerCase(), '--limit', '0', '--json'],
-      {
-        cwd: workspacePath,
-        encoding: 'utf-8',
-        timeout: BD_LIST_TIMEOUT_MS,
-        killSignal: 'SIGKILL',
-      },
-    );
-    return stdout;
-  } catch (error) {
-    if (!isMissingCommand(error) && !isTimeout(error)) throw error;
-    throw error;
-  }
+  const result = await createBeadsResolver(workspacePath).getBeadsForIssue(issueId);
+  if (!result.ok) throw result.error;
+  return JSON.stringify(result.value.filter((bead) => bead.status === status));
 }async function checkOpenBeadsPromise(workspacePath: string, issueId: string, preloadedBeads?: BeadRecord[] | null): Promise<string[]> {
   let stdout: string;
   try {
@@ -109,6 +63,7 @@ async function listBeadsByStatus(
       // let the completion gate pass while the bead source of truth is unavailable.
       return [`  Open beads check timed out after ${BD_LIST_TIMEOUT_MS / 1000}s — cannot verify whether open beads exist; retry or resolve bead store lock contention`];
     }
+    if (error instanceof SyntaxError) return ['  Open beads check received invalid output from the canonical resolver'];
     return ['  Open beads check failed — run `bd list --status open` to diagnose'];
   }
 
@@ -124,7 +79,7 @@ async function listBeadsByStatus(
   const lines: string[] = [`  Open beads (${beads.length}):`];
   for (const bead of beads as Array<Record<string, unknown>>) {
     const id = String(bead.id ?? bead.beadId ?? '?');
-    const task = String(bead.task ?? bead.subject ?? bead.title ?? 'untitled');
+    const task = String(bead.task ?? bead.subject ?? (bead.title || 'untitled'));
     lines.push(`    - ${id} ${task}`);
   }
   return lines;

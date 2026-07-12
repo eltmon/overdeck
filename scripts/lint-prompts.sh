@@ -44,7 +44,7 @@ check_bead_order_file() {
       in_section && /^[0-9]+\./ {
         step=$1
         sub(/\./, "", step)
-        if (!close_step && index($0, "bd close")) close_step=step
+        if (!close_step && index($0, "pan beads close")) close_step=step
         if (!inspect_step && index($0, "pan inspect")) inspect_step=step
       }
       END {
@@ -55,7 +55,7 @@ check_bead_order_file() {
     ' "$ROOT/$file"
   )"
   if [[ "$result" != "ok" ]]; then
-    fail "bead-loop-order: $file has bd close not before pan inspect ($result)"
+    fail "bead-loop-order: $file has pan beads close not before pan inspect ($result)"
   fi
   return 0
 }
@@ -213,7 +213,7 @@ EOF
 3. implement
 4. git commit
 5. update continue
-6. bd close bead
+6. pan beads close bead
 7. read metadata
 8. skip if false
 9. pan inspect ISSUE --bead bead
@@ -228,12 +228,12 @@ EOF
 3. implement
 4. git commit
 5. update continue
-6. bd close bead
+6. pan beads close bead
 7. read metadata
 8. pan inspect ISSUE --bead bead
 EOF
   cat > "$root/src/lib/cloister/verification-runner.ts" <<'EOF'
-Close every completed bead with bd close.
+Close every completed bead with pan beads close.
 EOF
   for file in "$root/sync-sources/skills/write-vbrief/SKILL.md" "$root/docs/VBRIEF.md"; do
     cat > "$file" <<'EOF'
@@ -265,7 +265,7 @@ self_test() {
 from pathlib import Path
 import sys
 p = Path(sys.argv[1])
-p.write_text(p.read_text().replace('6. bd close bead\n7. read metadata\n8. pan inspect ISSUE --bead bead', '6. read metadata\n7. pan inspect ISSUE --bead bead\n8. bd close bead'))
+p.write_text(p.read_text().replace('6. pan beads close bead\n7. read metadata\n8. pan inspect ISSUE --bead bead', '6. read metadata\n7. pan inspect ISSUE --bead bead\n8. pan beads close bead'))
 PY"
   expect_self_test_failure "single-workflow-copy" \
     "printf '%s\n' '## MANDATORY: One Bead At A Time' >> \"\$tmp/src/lib/cloister/prompts/work.md\""

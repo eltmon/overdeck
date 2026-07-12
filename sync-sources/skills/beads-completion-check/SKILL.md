@@ -56,7 +56,7 @@ Found N open bead(s) that must be resolved:
 | pan-124 | Add tests for Y | P3 | in_progress |
 
 ACTION REQUIRED:
-1. Close completed beads: bd close <id> --reason "Completed"
+1. Close completed beads: pan beads close <id> --reason "Completed"
 2. Or document why they should remain open
 3. Re-run review after resolution
 ```

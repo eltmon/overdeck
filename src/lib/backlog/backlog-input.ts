@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import type { Issue, IssueState, TrackerType } from '../tracker/interface.js';
 import { getReviewStatusSync } from '../review-status.js';
+import { createBeadsResolver } from '../beads/resolver.js';
 import { parseSequenceMd } from './sequence-io.js';
 import type { SequenceDoc } from './types.js';
 
@@ -136,9 +137,9 @@ export async function collectOpenBacklog(
       for (const dir of readdirSync(workspacesDir)) {
         const match = /^feature-([a-z]+-\d+)$/i.exec(dir);
         if (match) {
-          if (existsSync(join(workspacesDir, dir, '.beads', 'issues.jsonl'))) {
-            issuesWithBeads.add(match[1]!.toUpperCase());
-          }
+          const issueId = match[1]!.toUpperCase();
+          const result = await createBeadsResolver(join(workspacesDir, dir)).issueHasBeads(issueId);
+          if (result.ok && result.value) issuesWithBeads.add(issueId);
         }
       }
     }

@@ -82,13 +82,8 @@ describe('runPreflightChecks', () => {
   });
 
   it('aggregates failures from open beads AND uncommitted changes', async () => {
-    mockExecFileFn.mockImplementation((_file: string, args: string[], _opts: unknown, cb: Function) => {
-      if (args.includes('open')) {
-        cb(null, { stdout: JSON.stringify([{ id: 'bead-aaa', title: 'Unfinished work' }]), stderr: '' });
-      } else {
-        // closed beads
-        cb(null, { stdout: '[]', stderr: '' });
-      }
+    mockExecFileFn.mockImplementation((_file: string, _args: string[], _opts: unknown, cb: Function) => {
+      cb(null, { stdout: JSON.stringify([{ id: 'bead-aaa', title: 'Unfinished work', status: 'open' }]), stderr: '' });
     });
     mockExecFn.mockImplementation((cmd: string, _opts: unknown, cb: Function) => {
       if (cmd.includes('git status --porcelain')) {
@@ -126,7 +121,7 @@ describe('runPreflightChecks', () => {
     expect(capturedCmds.some((c) => c.includes('git add'))).toBe(false);
   });
 
-  it('calls bd list --status closed to sync beads to vBRIEF before AC check', async () => {
+  it('calls the canonical issue-label query before the AC check', async () => {
     const capturedArgs: string[][] = [];
     mockExecFileFn.mockImplementation((_file: string, args: string[], _opts: unknown, cb: Function) => {
       capturedArgs.push(args);
@@ -140,21 +135,16 @@ describe('runPreflightChecks', () => {
     const { runPreflightChecks } = await import('../../../src/lib/work/done-preflight.js');
     await Effect.runPromise(runPreflightChecks(tempDir, 'PAN-714'));
 
-    expect(capturedArgs.some((args) => args.includes('closed'))).toBe(true);
+    expect(capturedArgs.some((args) => args.includes('-l') && args.includes('pan-714'))).toBe(true);
   });
 
   it('calls syncBeadStatusToVBrief for each closed bead', async () => {
     const closedBeads = [
-      { id: 'bead-c1', title: 'Task one' },
-      { id: 'bead-c2', title: 'Task two' },
+      { id: 'bead-c1', title: 'Task one', status: 'closed' },
+      { id: 'bead-c2', title: 'Task two', status: 'closed' },
     ];
-    mockExecFileFn.mockImplementation((_file: string, args: string[], _opts: unknown, cb: Function) => {
-      if (args.includes('closed')) {
-        cb(null, { stdout: JSON.stringify(closedBeads), stderr: '' });
-      } else {
-        // open beads
-        cb(null, { stdout: '[]', stderr: '' });
-      }
+    mockExecFileFn.mockImplementation((_file: string, _args: string[], _opts: unknown, cb: Function) => {
+      cb(null, { stdout: JSON.stringify(closedBeads), stderr: '' });
     });
     mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
       cb(null, { stdout: '', stderr: '' });
@@ -170,7 +160,7 @@ describe('runPreflightChecks', () => {
     expect(mockSyncBeadStatusToVBrief).toHaveBeenCalledWith('bead-c2', tempDir, 'completed', 'Task two');
   });
 
-  it('uses workspace beads DB (issues.jsonl) as authoritative when present (PAN-1812)', async () => {
+  it('ignores a workspace derived export when canonical Dolt returns no beads', async () => {
     mkdirSync(join(tempDir, '.beads'));
     writeFileSync(join(tempDir, '.beads', 'issues.jsonl'), JSON.stringify({
       id: 'bead-jsonl',
@@ -192,6 +182,6 @@ describe('runPreflightChecks', () => {
     const { runPreflightChecks } = await import('../../../src/lib/work/done-preflight.js');
     await Effect.runPromise(runPreflightChecks(tempDir, 'PAN-714'));
 
-    expect(mockSyncBeadStatusToVBrief).toHaveBeenCalledWith('bead-jsonl', tempDir, 'completed', 'pan-714: JSONL task');
+    expect(mockSyncBeadStatusToVBrief).not.toHaveBeenCalled();
   });
 });

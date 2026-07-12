@@ -5,7 +5,7 @@ import { join, dirname, resolve } from 'path';
 import { homedir } from 'os';
 import { createInterface } from 'readline/promises';
 import { promisify } from 'util';
-import { exec, execFile, execFileSync } from 'child_process';
+import { exec, execFile } from 'child_process';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -32,10 +32,10 @@ import {
 } from './planning-stream.js';
 import {
   BdTransientFailure,
-  isTransientBdError,
-  runBdWithRetry,
   type RunBdWithRetryOptions,
 } from '../../lib/bd-process-lock.js';
+import { createBeadsResolver } from '../../lib/beads/resolver.js';
+import { runMutationBatch } from '../../lib/beads/writer.js';
 
 export const RETRYABLE_BD_LOCK_EXIT_CODE = 75;
 const PAN_START_BD_RETRY_OPTIONS: Omit<RunBdWithRetryOptions, 'workspacePath'> = { maxAttempts: 12, initialDelayMs: 1_000, maxDelayMs: 5_000, acquisitionTimeoutMs: 180_000 };
@@ -607,28 +607,9 @@ import {
 
 export type BeadsTaskCountResult = {
   count: number;
-  source: 'bd' | 'jsonl-fallback';
+  source: 'bd' | 'stale';
   transientFailure?: unknown;
 };
-
-function countBeadsTasksFromJsonl(workspacePath: string, label?: string): number {
-  const jsonlPath = join(workspacePath, '.beads', 'issues.jsonl');
-  if (!existsSync(jsonlPath)) return 0;
-  if (!label) return readFileSync(jsonlPath, 'utf-8').split('\n').filter((line) => line.trim()).length;
-
-  let count = 0;
-  for (const line of readFileSync(jsonlPath, 'utf-8').split('\n')) {
-    if (!line.trim()) continue;
-    try {
-      const entry = JSON.parse(line);
-      const labels: string[] = Array.isArray(entry.labels) ? entry.labels : [];
-      if (labels.some((candidate) => candidate.toLowerCase() === label || candidate.toLowerCase() === `workspace:${label}`)) {
-        count += 1;
-      }
-    } catch { /* skip malformed lines */ }
-  }
-  return count;
-}
 
 /**
  * Check whether a workspace has beads tasks (planning must create them before work begins).
@@ -636,26 +617,10 @@ function countBeadsTasksFromJsonl(workspacePath: string, label?: string): number
  * Exported for testing.
  */
 export function countBeadsTasksDetailed(workspacePath: string, issueId?: string): BeadsTaskCountResult {
-  const label = issueId?.toLowerCase();
-  try {
-    const args = label
-      ? ['list', '--json', '-l', label, '--status', 'all', '--limit', '0']
-      : ['list', '--json', '--limit', '0'];
-    const output = execFileSync('bd', args, {
-      cwd: workspacePath,
-      encoding: 'utf-8',
-      timeout: 10000,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-    const tasks = JSON.parse(output.trim() || '[]');
-    return { count: Array.isArray(tasks) ? tasks.length : 0, source: 'bd' };
-  } catch (error) {
-    return {
-      count: countBeadsTasksFromJsonl(workspacePath, label),
-      source: 'jsonl-fallback',
-      transientFailure: isTransientBdError(error) ? error : undefined,
-    };
-  }
+  const resolver = createBeadsResolver(workspacePath);
+  const result = issueId ? resolver.getBeadsForIssueSync(issueId) : null;
+  if (result?.ok) return { count: result.value.length, source: 'bd' };
+  return { count: 0, source: 'stale', transientFailure: result && !result.ok ? result.error : undefined };
 }
 
 export function countBeadsTasks(workspacePath: string, issueId?: string): number {
@@ -667,29 +632,12 @@ export async function countBeadsTasksDetailedWithRetry(
   issueId?: string,
   retryOptions: Omit<RunBdWithRetryOptions, 'workspacePath'> = {},
 ): Promise<BeadsTaskCountResult> {
-  const label = issueId?.toLowerCase();
-  try {
-    const args = label
-      ? ['list', '--json', '-l', label, '--status', 'all', '--limit', '0']
-      : ['list', '--json', '--limit', '0'];
-    const { stdout } = await runBdWithRetry(
-      `pan start beads count ${issueId ?? 'all'}`,
-      () => execFileAsync('bd', args, {
-        cwd: workspacePath,
-        encoding: 'utf-8',
-        timeout: 10000,
-      }),
-      { ...PAN_START_BD_RETRY_OPTIONS, ...retryOptions, workspacePath },
-    );
-    const tasks = JSON.parse(stdout.trim() || '[]');
-    return { count: Array.isArray(tasks) ? tasks.length : 0, source: 'bd' };
-  } catch (error) {
-    return {
-      count: countBeadsTasksFromJsonl(workspacePath, label),
-      source: 'jsonl-fallback',
-      transientFailure: error instanceof BdTransientFailure || isTransientBdError(error) ? error : undefined,
-    };
-  }
+  const result = issueId
+    ? await createBeadsResolver(workspacePath, { retry: { ...PAN_START_BD_RETRY_OPTIONS, ...retryOptions } }).getBeadsForIssue(issueId)
+    : await createBeadsResolver(workspacePath, { retry: { ...PAN_START_BD_RETRY_OPTIONS, ...retryOptions } }).getAllBeads();
+  return result.ok
+    ? { count: result.value.length, source: 'bd' }
+    : { count: 0, source: 'stale', transientFailure: result.error };
 }
 
 export function hasBeadsTasks(workspacePath: string, issueId?: string): boolean {
@@ -1370,13 +1318,11 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       if (!hasPlanningState) {
         spinner.text = `Auto-creating bead for simple issue ${id}...`;
         try {
-          const { execSync } = require('child_process');
-          execSync(`bd create "${id}: Implement issue" --type task -l "${id.toLowerCase()},difficulty:simple"`, {
-            cwd: workspace,
-            encoding: 'utf-8',
-            timeout: 10000,
-            stdio: ['pipe', 'pipe', 'pipe'],
-          });
+          const created = await runMutationBatch(
+            { project: { workspacePath: workspace }, reason: `create simple implementation bead for ${id}` },
+            (bd) => bd.mutate(['create', `${id}: Implement issue`, '--type', 'task', '-l', `${id.toLowerCase()},difficulty:simple`]),
+          );
+          if (!created.ok) throw new Error(created.message);
         } catch (bdErr) {
           await failPostCreateValidation({
             spinner,
@@ -1410,7 +1356,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
                 }
                 console.log('');
                 console.log(chalk.red(`Planning must create a task breakdown before work begins.`));
-                console.log(chalk.dim(`Run planning again and ensure it creates beads with "bd create".`));
+                console.log(chalk.dim('Run planning again and ensure it creates beads through the canonical writer.'));
                 console.log('');
                 console.log(chalk.bold('To re-run planning:'));
                 console.log(`  ${chalk.cyan(`Open the dashboard and click 'Plan' for ${id}`)}`);

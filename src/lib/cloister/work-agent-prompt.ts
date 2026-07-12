@@ -587,7 +587,7 @@ export function extractBeadsIdsFromState(stateContent: string): string[] {
 
 /**
  * Read beads tasks for an issue from the live Dolt database via `bd list`.
- * Falls back to `.beads/issues.jsonl` in workspacePath, then projectRoot.
+ * Retries against the project root only when the workspace canonical read is empty.
  */
 export async function readBeadsTasks(
   workspacePath: string,

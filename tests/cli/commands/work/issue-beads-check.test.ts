@@ -61,7 +61,7 @@ describe('hasBeadsTasks', () => {
     expect(hasBeadsTasks(tmpDir, 'PAN-1094')).toBe(false);
   });
 
-  it('returns true when issues.jsonl contains a bead labeled for the issue', async () => {
+  it('does not treat issues.jsonl as canonical bead authority', async () => {
     const { hasBeadsTasks } = await import('../../../../src/cli/commands/start.js');
     mkdirSync(join(tmpDir, '.beads'), { recursive: true });
     writeFileSync(join(tmpDir, '.beads', 'issues.jsonl'), JSON.stringify({
@@ -70,7 +70,7 @@ describe('hasBeadsTasks', () => {
       labels: ['pan-1094'],
     }) + '\n');
 
-    expect(hasBeadsTasks(tmpDir, 'PAN-1094')).toBe(true);
+    expect(hasBeadsTasks(tmpDir, 'PAN-1094')).toBe(false);
   });
 
   it('returns true when bd reports a matching issue bead', async () => {
@@ -93,12 +93,12 @@ describe('hasBeadsTasks', () => {
 
     expect(countBeadsTasksDetailed(tmpDir, 'PAN-1094')).toMatchObject({
       count: 0,
-      source: 'jsonl-fallback',
+      source: 'stale',
       transientFailure: expect.anything(),
     });
   });
 
-  it('keeps known jsonl beads when a live bd read has transient lock contention', async () => {
+  it('does not substitute a derived export during live lock contention', async () => {
     childProcessMocks.execFileSync.mockImplementation(() => {
       throw { stderr: 'database is locked' };
     });
@@ -111,11 +111,11 @@ describe('hasBeadsTasks', () => {
     const { countBeadsTasksDetailed, hasBeadsTasks } = await import('../../../../src/cli/commands/start.js');
 
     expect(countBeadsTasksDetailed(tmpDir, 'PAN-1094')).toMatchObject({
-      count: 1,
-      source: 'jsonl-fallback',
+      count: 0,
+      source: 'stale',
       transientFailure: expect.anything(),
     });
-    expect(hasBeadsTasks(tmpDir, 'PAN-1094')).toBe(true);
+    expect(hasBeadsTasks(tmpDir, 'PAN-1094')).toBe(false);
   });
 
   it('retries the live start gate query before falling back to jsonl', async () => {
@@ -242,8 +242,9 @@ describe('hasBeadsTasks', () => {
 
     expect(validateBeadsMatchPlan(workspace, 'PAN-1094')).toEqual({
       valid: false,
-      beadCount: 1,
+      beadCount: 0,
       planItemCount: 2,
+      transientFailure: expect.anything(),
     });
   });
 });

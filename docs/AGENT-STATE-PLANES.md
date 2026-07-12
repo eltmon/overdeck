@@ -15,7 +15,9 @@ Durable portable state is committed through domain writers to the orphan
   verdicts, ownership, and close-out.
 - `review/`, `test/`, and `feedback/` — durable specialist artifacts.
 - `backlog/` and `notes/` — sequencing and preserved operator notes.
-- `.beads/` — the shared beads database/export surface.
+- `.beads/` — derived beads recovery exports and cutover metadata only. The
+  canonical beads database is Dolt history transported separately on
+  `refs/dolt/data`; no Dolt database bytes live on `overdeck-state`.
 
 The per-issue record under `records/` is also the permanent home for swarm
 durable state: `slotCompletions`, `finalizedAt`, `failedMergeBlock`,
@@ -42,6 +44,11 @@ Project context is reviewed with code on `main` at
 Workspace-local runtime files use `<workspace>/.overdeck/` and are gitignored.
 Workspace beads resolve the permanent database through an actively maintained
 `.beads/redirect`.
+
+The one physical local Dolt home is
+`${OVERDECK_HOME}/state/<project>/.beads/`. It is a disposable working copy of
+`refs/dolt/data`, synchronized through the beads read/write doors. Agents mutate
+through `pan beads …`; `issues.jsonl` is derived-only.
 
 ## Runtime plane — local SQLite
 
