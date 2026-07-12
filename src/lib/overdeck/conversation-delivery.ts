@@ -14,6 +14,7 @@ import {
 } from './conversations.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
+import { loadConfigSync } from '../config-yaml.js';
 import {
   writeConversationControlCommand,
   type ControlCommand,
@@ -224,6 +225,7 @@ export function pickDeliverAs(bodyDeliverAs: unknown): ConversationControlDelive
 export function resolveConversationDeliveryMethod(conv: Pick<Conversation, 'harness' | 'deliveryMethod'>): 'auto' | 'channels' | 'tmux' {
   const harness = conv.harness ?? 'claude-code';
   if (isPiControlChannelHarness(harness)) return 'auto';
+  if (harness === 'codex' && loadConfigSync().config.codex?.transport !== 'tui') return 'auto';
   return conv.deliveryMethod ?? (getHarnessBehavior(harness).deliveryKind === 'rpc-fifo' ? 'tmux' : 'auto');
 }
 
