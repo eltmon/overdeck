@@ -21,33 +21,54 @@
       "reason": "feedback",
       "note": "[2026-07-12T21:06Z] review-agent → FAILED — seq 1",
       "timestamp": "2026-07-12T21:06:59.714Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "failed",
-      "timestamp": "2026-07-12T21:06:59Z",
-      "markdownBody": "# Review FAILED for PAN-1232\n\nReview role spawn failed:\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1232 -m \"Fixed review issues\"`"
+      "timestamp": "2026-07-12T21:14:42.699Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T21:14:47.053Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T21:14:50.571Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T21:14:50.580Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T21:14:50.581Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T21:14:50.583Z"
     }
   ],
+  "feedback": [],
   "created": "2026-07-12T20:45:31.659Z",
-  "updated": "2026-07-12T21:13:34.371Z",
+  "updated": "2026-07-12T21:14:53.734Z",
   "pipeline": {
     "issueId": "PAN-1232",
-    "reviewStatus": "failed",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-12T21:06:50.865Z",
+    "updatedAt": "2026-07-12T21:14:53.563Z",
     "reviewNotes": "Review role spawn failed: ",
-    "verificationNotes": "Verification FAILED at lint (63550ms):\n\n rolldown-plugin-dts:generate (56%)\n  - tsdown:deps (40%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\ncomm: file 1 is not in sorted order\ncomm: input is not in sorted order\ncomm: file 1 is not in sorted order\ncomm: input is not in sorted order\n✖ new circular dependencies found — these must be removed, not baselined:\n    src/dashboard/frontend/src/components/chat/ConversationPanel.tsx > src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/dividers.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts\n    src/dashboard/frontend/src/components/conversations/SessionDetail.tsx > src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx\n    src/lib/agents/tier-table.ts > src/lib/pan-dir/record.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts\n✖ stale baseline entries — run: bash scripts/lint-circular-deps.sh --update\n    src/dashboard/frontend/src/components/chat/ConversationPanel.tsx > src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/dividers.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts\n    src/dashboard/frontend/src/components/conversations/SessionDetail.tsx > src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx\n    src/lib/agents/tier-table.ts > src/lib/pan-dir/record.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts\n\ncircular-dependency guard failed. Break the cycle, or manually edit the baseline in an issue-referenced commit to accept audited growth.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2604",
-    "reviewRequestedAt": "2026-07-12T21:06:36.586Z",
-    "reviewSpawnedAt": "2026-07-12T21:06:49.009Z"
+    "reviewRequestedAt": "2026-07-12T21:14:42.700Z",
+    "reviewSpawnedAt": "2026-07-12T21:14:45.623Z"
   },
   "closeOut": {
     "usage": {
@@ -60,9 +81,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 1164296,
-            "output": 6989,
-            "cacheRead": 906112,
+            "input": 1480582,
+            "output": 8111,
+            "cacheRead": 1212672,
             "cacheWrite": 0
           }
         }
@@ -75,15 +96,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 1164296,
-          "output": 6989,
-          "cacheRead": 906112,
+          "input": 1480582,
+          "output": 8111,
+          "cacheRead": 1212672,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 1.9995880000000001,
-        "pricingAsOf": "2026-07-12T21:06:50.907Z"
+        "usd": 2.189216,
+        "pricingAsOf": "2026-07-12T21:14:53.733Z"
       }
     },
     "merges": [
