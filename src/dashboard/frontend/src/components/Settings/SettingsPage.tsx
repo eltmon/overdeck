@@ -56,9 +56,22 @@ async function fetchOpenRouterCatalog(): Promise<OpenRouterCatalogResponse | nul
 }
 
 // API Functions
+
+// A failed gate fetch bricks the whole Settings page, so include the HTTP
+// status and the server's own error message — a bare "Failed to fetch
+// settings" gives the user (and us) nothing to diagnose with.
+async function fetchError(label: string, res: Response): Promise<Error> {
+  const detail = await res.json().then(
+    (body: unknown) => (body && typeof body === 'object' && typeof (body as { error?: unknown }).error === 'string'
+      ? (body as { error: string }).error
+      : null),
+  ).catch(() => null);
+  return new Error(`${label} (HTTP ${res.status})${detail ? `: ${detail}` : ''}`);
+}
+
 async function fetchSettings(): Promise<SettingsConfig> {
   const res = await fetch('/api/settings');
-  if (!res.ok) throw new Error('Failed to fetch settings');
+  if (!res.ok) throw await fetchError('Failed to fetch settings', res);
   return res.json();
 }
 
@@ -153,13 +166,13 @@ async function saveSettings(settings: SettingsConfig): Promise<SaveSettingsRespo
 
 async function fetchCloisterConfig(): Promise<CloisterConfig> {
   const res = await fetch('/api/cloister/config', { credentials: 'include' });
-  if (!res.ok) throw new Error('Failed to fetch Cloister config');
+  if (!res.ok) throw await fetchError('Failed to fetch Cloister config', res);
   return res.json();
 }
 
 async function fetchVoiceSettings(): Promise<VoiceSettings> {
   const res = await fetch('/api/voice/settings');
-  if (!res.ok) throw new Error('Failed to fetch voice settings');
+  if (!res.ok) throw await fetchError('Failed to fetch voice settings', res);
   return normalizeVoiceSettings(await res.json() as Partial<VoiceSettings>);
 }
 
