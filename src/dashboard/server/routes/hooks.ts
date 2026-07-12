@@ -41,6 +41,8 @@ import type { NormalizedDocsConfig } from '../../../lib/config-yaml.js';
 import { loadConfigSync } from '../../../lib/config-yaml/load.js';
 import type { DocsPathOverrides } from '../../../lib/paths.js';
 
+const MEMORY_INJECT_FAST_RESPONSE_TIMEOUT_MS = 750;
+
 const CLEAR_ON = new Set([
   'PostToolUse',
   'PostToolUseFailure',
@@ -225,6 +227,7 @@ export interface HandleMemoryInjectBodyOptions {
 }
 
 export interface HandleMemoryInjectFastPathOptions extends HandleMemoryInjectBodyOptions {
+  timeoutMs?: number;
 }
 
 export async function handleMemoryInjectBody(
@@ -279,7 +282,7 @@ export async function handleMemoryInjectFastPathBody(
   body: Record<string, unknown>,
   options: HandleMemoryInjectFastPathOptions = {},
 ): Promise<{ ok: true; context: string }> {
-  const result = await handleMemoryInjectBody(body, {
+  const resultPromise = handleMemoryInjectBody(body, {
     resolveAgentIdBySessionId: options.resolveAgentIdBySessionId,
     resolveComplianceWarning: options.resolveComplianceWarning,
     injectMemory: options.injectMemory,
@@ -289,7 +292,31 @@ export async function handleMemoryInjectFastPathBody(
     buildDocsInjectionContext: options.buildDocsInjectionContext,
     now: options.now,
   });
-  return { ok: true, context: 'error' in result ? '' : result.context };
+  const result = await resolveWithTimeout(
+    resultPromise,
+    options.timeoutMs ?? MEMORY_INJECT_FAST_RESPONSE_TIMEOUT_MS,
+  ).catch(() => ({ timedOut: true as const }));
+  if (result.timedOut) return { ok: true, context: '' };
+  if ('error' in result.value) return { ok: true, context: '' };
+  return { ok: true, context: result.value.context };
+}
+
+async function resolveWithTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+): Promise<{ timedOut: false; value: T } | { timedOut: true }> {
+  if (timeoutMs <= 0) return { timedOut: true };
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      promise.then((value) => ({ timedOut: false as const, value })),
+      new Promise<{ timedOut: true }>((resolveTimeout) => {
+        timeout = setTimeout(() => resolveTimeout({ timedOut: true }), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
 }
 
 const postMemoryInjectRoute = HttpRouter.add(
@@ -309,14 +336,11 @@ const postMemoryInjectRoute = HttpRouter.add(
 
     const readModel = yield* ReadModelService;
     const resolveAgentIdBySessionId = async (sessionId: string) => Effect.runPromise(readModel.getAgentIdBySessionId(sessionId));
-    const result = yield* Effect.promise(() => handleMemoryInjectBody(body, {
+    const result = yield* Effect.promise(() => handleMemoryInjectFastPathBody(body, {
       resolveAgentIdBySessionId,
       docsConfig: loadConfigSync().config.docs,
     }));
-    return jsonResponse({
-      ok: true,
-      context: 'error' in result ? '' : result.context,
-    }, { status: 202 });
+    return jsonResponse(result, { status: 202 });
   })),
 );
 

@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { dirname, join } from 'path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MemoryIdentity } from '@overdeck/contracts';
 
 import { getDefaultDocsConfig, type NormalizedDocsConfig } from '../../../../lib/config-yaml.js';
@@ -115,6 +115,7 @@ describe('POST /api/memory/inject docs context fast path', { timeout: 30_000 }, 
   });
 
   afterEach(async () => {
+    vi.useRealTimers();
     await rm(rootDir, { recursive: true, force: true });
   });
 
@@ -167,5 +168,32 @@ describe('POST /api/memory/inject docs context fast path', { timeout: 30_000 }, 
     const state = await readDocsBudgetState(paths);
     expect(state.records['session:missing-index'].injections).toEqual([]);
     await expect(readFile(paths.telemetryPath!, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('returns a bounded fast response when prompt-time memory is slow', async () => {
+    vi.useFakeTimers();
+    const buildDocsInjectionContext = vi.fn(async () => ({ injected: true, context: '<overdeck-docs>slow docs</overdeck-docs>' }));
+
+    const resultPromise = handleMemoryInjectFastPathBody(body('pan harness docs'), {
+      docsConfig: docsConfig(),
+      docsPaths: paths,
+      timeoutMs: 25,
+      resolveComplianceWarning: async () => 'compliance warning',
+      injectMemory: async () => new Promise((resolve) => {
+        setTimeout(() => resolve({
+          status: 'injected' as const,
+          context: 'slow memory context',
+          decision: {} as never,
+        }), 100);
+      }),
+      injectBriefing: async (input) => ({ context: input.context, injected: false, briefingMtimeMs: null }),
+      buildDocsInjectionContext,
+    });
+
+    await vi.advanceTimersByTimeAsync(25);
+    await expect(resultPromise).resolves.toEqual({ ok: true, context: '' });
+    expect(buildDocsInjectionContext).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(100);
   });
 });
