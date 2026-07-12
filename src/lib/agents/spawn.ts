@@ -77,6 +77,7 @@ import {
   writeChannelsBridgeMcpConfig,
 } from './supervisor-channels.js';
 import { stopAgent } from './termination.js';
+import { resolveBdAgentShimPath } from '../beads/bd-shim.js';
 
 const execAsync = promisify(exec);
 
@@ -732,6 +733,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
 
   clearReadySignal(agentId);
 
+  const bdShimPath = role === 'work' ? await resolveBdAgentShimPath(getAgentDir(agentId)) : undefined;
   await Effect.runPromise(createSession(agentId, options.workspace, claudeCmd, {
     env: {
       ...BLANKED_PROVIDER_ENV, // Blank stale provider vars inherited by tmux server
@@ -741,6 +743,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
       OVERDECK_SESSION_TYPE: role,
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false', // Disable suggested prompts for autonomous agents (PAN-251)
       GIT_SEQUENCE_EDITOR: 'false', // Block interactive rebase / squash (agents forbidden from rewriting history)
+      ...(bdShimPath ? { PATH: bdShimPath } : {}),
       ...flywheelEnv,
       ...providerEnv, // Set correct provider env vars (BASE_URL, AUTH_TOKEN, etc.)
     }

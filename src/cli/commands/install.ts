@@ -18,6 +18,7 @@ import {
 } from '../../lib/paths.js';
 import { getDefaultConfigSync, saveConfigSync, loadConfigSync } from '../../lib/config.js';
 import { Effect } from 'effect';
+import { MINIMUM_BD_VERSION, isSupportedBdVersion, readInstalledBdVersionSync } from '../../lib/beads/version.js';
 import { detectPlatform } from '../../lib/platform.js';
 import { detectDnsSyncMethod, ensureBaseDomain, syncDnsToWindows } from '../../lib/dns.js';
 import { generateOverdeckTraefikConfigSync, cleanupTemplateFilesSync, ensureProjectCertsSync, generateTlsConfigSync } from '../../lib/traefik.js';
@@ -149,19 +150,14 @@ function checkPrerequisites(): { results: PrereqResult[]; allPassed: boolean } {
   });
 
   // Beads CLI (optional - will be auto-installed)
-  const hasBeads = checkCommand('bd');
-  let beadsVersion = '';
-  if (hasBeads) {
-    try {
-      const output = execSync('bd --version', { encoding: 'utf-8' }).trim();
-      const match = output.match(/(\d+\.\d+\.\d+)/);
-      beadsVersion = match ? match[1] : 'unknown';
-    } catch {}
-  }
+  const beadsVersion = readInstalledBdVersionSync();
+  const hasBeads = beadsVersion !== null;
   results.push({
     name: 'Beads CLI (bd)',
-    passed: hasBeads,
-    message: hasBeads ? `v${beadsVersion}` : 'not found (will auto-install)',
+    passed: hasBeads && isSupportedBdVersion(beadsVersion),
+    message: hasBeads
+      ? isSupportedBdVersion(beadsVersion) ? `v${beadsVersion}` : `v${beadsVersion} is below required v${MINIMUM_BD_VERSION}`
+      : 'not found (will auto-install)',
     fix: 'curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash',
   });
 
@@ -453,14 +449,10 @@ async function installCommand(options: InstallOptions): Promise<void> {
   } else {
     // Check if upgrade is needed
     try {
-      const output = execSync('bd --version', { encoding: 'utf-8' }).trim();
-      const match = output.match(/(\d+)\.(\d+)\.(\d+)/);
-      if (match) {
-        const [, major, minor, patch] = match.map(Number);
-        const currentVersion = major * 10000 + minor * 100 + patch;
-        const recommendedVersion = 1 * 10000 + 0 * 100 + 4; // v1.0.4 required for ping, doctor, prune
-        if (currentVersion < recommendedVersion) {
-          spinner.start(`Upgrading beads from v${major}.${minor}.${patch} to v1.0.4+...`);
+      const currentVersion = readInstalledBdVersionSync();
+      if (currentVersion) {
+        if (!isSupportedBdVersion(currentVersion)) {
+          spinner.start(`Upgrading beads from v${currentVersion} to v${MINIMUM_BD_VERSION}+...`);
           const plat = await Effect.runPromise(detectPlatform());
           if (plat === 'darwin') {
             execSync('brew upgrade gastownhall/beads/bd', { stdio: 'pipe', timeout: 120000 });
@@ -472,7 +464,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
           }
           spinner.succeed('beads upgraded');
         } else {
-          spinner.info(`beads v${major}.${minor}.${patch} installed`);
+          spinner.info(`beads v${currentVersion} installed`);
         }
       } else {
         spinner.info('beads already installed');
@@ -695,8 +687,8 @@ async function installCommand(options: InstallOptions): Promise<void> {
   }
 
   console.log(`  4. In each project root, initialize beads task tracking:`);
-  console.log(`     ${chalk.cyan('cd /path/to/your-project && bd init --prefix <project-name>')}`);
-  console.log(`     ${chalk.dim('e.g. bd init --prefix overdeck  (enables agent task tracking for this project)')}`);
+  console.log(`     ${chalk.cyan('cd /path/to/your-project && pan sync')}`);
+  console.log(`     ${chalk.dim('pan sync bootstraps the registered project canonical beads home')}`);
   console.log(`  5. Create a workspace with ${chalk.cyan('pan workspace create <issue-id>')}`);
   console.log('');
 }

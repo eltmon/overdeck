@@ -10,12 +10,15 @@ export function SettingsLayout({ sidebar, children, header }: SettingsLayoutProp
   return (
     <div className="flex flex-col h-full">
       {header}
-      <div className="flex-1 flex overflow-hidden">
-        <aside className="w-48 shrink-0 border-r border-border overflow-y-auto py-4 px-2 hidden md:block">
+      {/* Container queries (not viewport breakpoints): the settings column is
+          squeezed by the app sidebar + activity feed, so layout must respond
+          to the width actually available, not the window width. */}
+      <div className="flex-1 flex overflow-hidden @container/shell">
+        <aside className="w-48 shrink-0 border-r border-border overflow-y-auto py-4 px-2 hidden @3xl/shell:block">
           {sidebar}
         </aside>
         <main className="flex-1 overflow-y-auto">
-          <div className="max-w-[800px] mx-auto px-6 md:px-10 py-6">
+          <div className="max-w-[800px] mx-auto px-6 @2xl/shell:px-10 py-6 @container">
             {children}
           </div>
         </main>

@@ -44,6 +44,15 @@ type OverdeckAgentRow = {
   review_deadline_at: number | null;
   review_monitor_signaled: string | null;
   review_retry_attempt: number | null;
+  // PAN-2585: PAN-1862 discovery-fork state. These were state.json-only, which made
+  // them write-only under the PAN-1908 DB-first reader — the discovery-ready signal
+  // and the deacon's stalled-discovery backstop could never see them.
+  review_discovery_pending: number | null;
+  review_context_manifest_path: string | null;
+  review_discovery_ready_at: number | null;
+  review_convoy_forked_at: number | null;
+  review_fork_cache_checked: number | null;
+  review_forked_from_parent: number | null;
   updated_at: number;
 };
 
@@ -90,6 +99,12 @@ export const AGENT_COLUMNS_FOR_DB = [
   'review_deadline_at',
   'review_monitor_signaled',
   'review_retry_attempt',
+  'review_discovery_pending',
+  'review_context_manifest_path',
+  'review_discovery_ready_at',
+  'review_convoy_forked_at',
+  'review_fork_cache_checked',
+  'review_forked_from_parent',
   'updated_at',
 ] as const;
 
@@ -163,6 +178,12 @@ function overdeckRowToAgentState(row: OverdeckAgentRow): AgentState {
     reviewDeadlineAt: isoFromMillis(row.review_deadline_at),
     reviewMonitorSignaled: (row.review_monitor_signaled ?? undefined) as AgentState['reviewMonitorSignaled'],
     reviewRetryAttempt: row.review_retry_attempt ?? undefined,
+    reviewDiscoveryPending: boolFromInteger(row.review_discovery_pending),
+    reviewContextManifestPath: row.review_context_manifest_path ?? undefined,
+    reviewDiscoveryReadyAt: isoFromMillis(row.review_discovery_ready_at) ?? undefined,
+    reviewConvoyForkedAt: isoFromMillis(row.review_convoy_forked_at) ?? undefined,
+    reviewForkCacheChecked: boolFromInteger(row.review_fork_cache_checked),
+    reviewForkedFromParent: boolFromInteger(row.review_forked_from_parent),
   };
 }
 
@@ -211,6 +232,12 @@ export function stateToOverdeckParamsForDb(state: AgentState, updatedAt: number)
     millisFromIso(state.reviewDeadlineAt),
     state.reviewMonitorSignaled ?? null,
     state.reviewRetryAttempt ?? null,
+    state.reviewDiscoveryPending == null ? null : (state.reviewDiscoveryPending ? 1 : 0),
+    state.reviewContextManifestPath ?? null,
+    millisFromIso(state.reviewDiscoveryReadyAt),
+    millisFromIso(state.reviewConvoyForkedAt),
+    state.reviewForkCacheChecked == null ? null : (state.reviewForkCacheChecked ? 1 : 0),
+    state.reviewForkedFromParent == null ? null : (state.reviewForkedFromParent ? 1 : 0),
     updatedAt,
   ];
 }

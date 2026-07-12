@@ -555,7 +555,7 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
         ``,
         `If you don't already have your full brief for ${state.issueId} in context (work-agent role instructions, the vBRIEF plan, recorded decisions & hazards), re-read it now — it is on disk at ${briefPath}, plus .pan/continue.json and .pan/spec.vbrief.json in your workspace. Startup kickoff delivery can silently fail on large briefs, so do not assume you received it.`,
         ``,
-        `Continue the per-bead workflow without asking — claim it (\`bd update <bead-id> --claim\`), implement, commit, close. ` +
+        `Continue the per-bead workflow without asking — claim it (\`pan beads claim <bead-id>\`), implement, commit, close through \`pan beads close\`. ` +
         `Inspection is conditional on metadata.requiresInspection (default false; check the plan item before deciding to call \`pan inspect\`). ` +
         `Do NOT end your turn with a multi-paragraph summary; just advance to the next bead.`,
       ].join('\n');

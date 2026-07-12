@@ -119,16 +119,13 @@ describe('bd process lock', () => {
     expect(existsSync(path)).toBe(false);
   });
 
-  it('allows same-process reentrant acquisition and keeps the lock until the outermost release', async () => {
-    const first = await acquireBdProcessLock('first caller', { workspacePath });
-
-    const second = await acquireBdProcessLock('second caller', { workspacePath, acquisitionTimeoutMs: 0 });
-    expect(await readBdProcessLockHolder({ workspacePath })).toMatchObject({ caller: 'first caller' });
-
-    await second.release();
-    expect(existsSync(await lockPath())).toBe(true);
-
-    await first.release();
+  it('allows execution-context reentrant acquisition and keeps the lock until the outer operation exits', async () => {
+    await withBdProcessLock('first caller', async () => {
+      const second = await acquireBdProcessLock('second caller', { workspacePath, acquisitionTimeoutMs: 0 });
+      expect(await readBdProcessLockHolder({ workspacePath })).toMatchObject({ caller: 'first caller' });
+      await second.release();
+      expect(existsSync(await lockPath())).toBe(true);
+    }, { workspacePath });
     expect(existsSync(await lockPath())).toBe(false);
   });
 

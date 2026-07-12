@@ -1,7 +1,19 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { Effect } from 'effect';
 import { mkdirSync, writeFileSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+
+vi.mock('../../beads-query.js', () => ({
+  queryBeadsForIssue: (root: string, issueId: string) => Effect.sync(() => {
+    try {
+      const raw = readFileSync(join(root, '.beads', 'issues.jsonl'), 'utf8');
+      const beads = raw.split('\n').filter(Boolean).map((line) => JSON.parse(line)).filter((bead) =>
+        bead.labels?.some((label: string) => label.toLowerCase() === issueId.toLowerCase() || label.toLowerCase() === `workspace:${issueId.toLowerCase()}`));
+      return { beads };
+    } catch { return { beads: [] }; }
+  }),
+}));
 import { readBeadsTasks } from '../work-agent-prompt.js';
 
 let TEST_DIR: string;

@@ -850,7 +850,7 @@ models:
       expect(model).toBe('claude-haiku-4-5');
     });
 
-    it('throws a clear error when no default conversation model is configured', () => {
+    it('returns undefined when no default conversation model is configured (PAN-2589: Settings must still render)', () => {
       vi.mocked(loadConfigSync).mockReturnValueOnce({
         config: {
           preset: 'balanced',
@@ -866,7 +866,7 @@ models:
         } as any,
         migration: null,
       });
-      expect(() => getDefaultConversationModelApi()).toThrow('No default model configured — set models.default_conversation_model');
+      expect(getDefaultConversationModelApi()).toBeUndefined();
     });
   });
 });

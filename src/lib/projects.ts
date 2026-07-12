@@ -98,6 +98,20 @@ export interface SwarmConfig {
   hotspots?: string[];
 }
 
+export interface ReleaseComponentConfig {
+  provider?: string;
+  trigger: 'auto' | 'manual' | 'skip';
+  depends_on?: string[];
+  health_url?: string;
+  version_check?: string;
+  smoke_test?: string;
+  rollback?: string;
+}
+
+export interface ReleaseConfig {
+  components: Record<string, ReleaseComponentConfig>;
+}
+
 /**
  * Project configuration
  */
@@ -148,6 +162,19 @@ export interface ProjectConfig {
   auto_merge_default?: 'auto' | 'hold';
   /** Quality gates run by merge-agent before pushing (lint, typecheck, prod build, etc.) */
   quality_gates?: Record<string, QualityGateConfig>;
+  /** Release components and rollout checks for coordinated post-merge release. */
+  release?: ReleaseConfig;
+  /**
+   * PAN-2555: publish/release pipeline visibility on the Command Deck.
+   * `npm_packages` lists published package names (inferred from the project
+   * root package.json name when unset and not private); `release_workflow`
+   * names the tag-triggered workflow file (inferred as release.yml when the
+   * file exists in the checkout).
+   */
+  publish?: {
+    npm_packages?: string[];
+    release_workflow?: string;
+  };
   /** Package manager for dependency installation in workspaces (bun, npm, pnpm) */
   package_manager?: 'bun' | 'npm' | 'pnpm';
   /** Local workspace packages that need building before quality gates (e.g., @overdeck/contracts) */

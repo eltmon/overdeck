@@ -553,10 +553,11 @@ export interface YamlConfig {
   /**
    * Claude Code spawn behavior.
    *
-   * `permissionMode: 'auto'` (default) emits `--permission-mode auto`; the classifier
-   * blocks destructive ops while still running fully autonomously. `'bypass'` emits
-   * `--permission-mode bypassPermissions` (the standalone `--dangerously-skip-permissions`
-   * flag was removed). Override per-invocation with `--yolo` / `--no-yolo` / `PAN_YOLO`.
+   * `permissionMode: 'bypass'` (default) emits `--permission-mode bypassPermissions`
+   * (the standalone `--dangerously-skip-permissions` flag was removed). `'auto'`
+   * emits `--permission-mode default` and relies on the machine having the
+   * PermissionRequest/PreToolUse auto-approve hooks installed — opt in when the
+   * hooks are present. Override per-invocation with `--yolo` / `--no-yolo` / `PAN_YOLO`.
    */
   claude?: {
     permissionMode?: 'auto' | 'bypass';

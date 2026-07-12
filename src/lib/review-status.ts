@@ -27,7 +27,7 @@ function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', iss
 }
 
 export interface StatusHistoryEntry {
-  type: 'review' | 'test' | 'merge' | 'inspect' | 'uat';
+  type: 'review' | 'test' | 'merge' | 'inspect' | 'uat' | 'release';
   status: string;
   timestamp: string;
   notes?: string;
@@ -45,6 +45,7 @@ export interface ReviewStatus {
   reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked' | 'skipped';
   testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
   mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
+  releaseStatus?: 'pending' | 'releasing' | 'passed' | 'failed' | 'partial' | 'rolled_back' | 'skipped';
   inspectStatus?: 'pending' | 'inspecting' | 'passed' | 'failed' | 'error';
   inspectNotes?: string;
   inspectStartedAt?: string;
@@ -58,6 +59,7 @@ export interface ReviewStatus {
   reviewNotes?: string;
   testNotes?: string;
   mergeNotes?: string;
+  releaseNotes?: string;
   updatedAt: string;
   readyForMerge: boolean;
   /**
@@ -378,6 +380,9 @@ export function setReviewStatusSync(
   }
   if (update.mergeStatus && update.mergeStatus !== status.mergeStatus) {
     history.push({ type: 'merge', status: update.mergeStatus, timestamp: now });
+  }
+  if (update.releaseStatus && update.releaseStatus !== status.releaseStatus) {
+    history.push({ type: 'release', status: update.releaseStatus, timestamp: now, notes: update.releaseNotes });
   }
   while (history.length > 10) history.shift();
 
@@ -715,7 +720,13 @@ async function dispatchReviewHostSide(issueId: string, prUrl?: string): Promise<
     const { spawnReviewRoleForIssue } = await import('./cloister/review-agent.js');
     const result = await Effect.runPromise(spawnReviewRoleForIssue({ issueId, workspace, branch, ...(prUrl ? { prUrl } : {}) }));
     if (result.success) {
-      console.log(`[review-status] auto-dispatched review for ${issueId} from durable journal intent (host-side)`);
+      // PAN-2584: a guard-skip resolves success WITHOUT spawning — logging it as
+      // "auto-dispatched" made an idempotency no-op loop read as forward progress.
+      if (result.message?.startsWith('Review already in progress')) {
+        console.log(`[review-status] review dispatch for ${issueId}: already in progress — no-op (host-side)`);
+      } else {
+        console.log(`[review-status] auto-dispatched review for ${issueId} from durable journal intent (host-side)`);
+      }
     }
   } catch (err) {
     console.warn(`[review-status] host-side review auto-dispatch for ${issueId} did not complete (non-fatal): ${err instanceof Error ? err.message : String(err)}`);

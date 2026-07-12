@@ -32,11 +32,46 @@ function issueIdForAgent(agent: AgentState): string {
   return agent.issueId || agent.id.replace(/^agent-/, '').toUpperCase();
 }
 
-function shouldSkipReviewStatus(status: ReviewStatus | null): boolean {
+export function shouldSkipReviewStatus(status: ReviewStatus | null): boolean {
   if (!status) return false;
   if (status.stuck || status.deaconIgnored || status.mergeStatus === 'merged' || status.readyForMerge) return true;
   if (status.reviewStatus === 'blocked' || status.reviewStatus === 'failed') return true;
-  return status.verificationStatus === 'failed' || status.testStatus === 'failed';
+  if (status.verificationStatus === 'failed' || status.testStatus === 'failed') return true;
+  // PAN-2581: the pipeline OWNS the issue while review/test advance it — review in
+  // flight, a passed review awaiting test, or an un-serviced durable review request
+  // (`pan done` already ran; dispatch owns the next step). Warm-idle is the work
+  // agent's intended state here (PAN-2579). Poking it told it to re-run `pan done`,
+  // which re-armed review and clobbered landed verdicts (PAN-399 burned $63 on this).
+  if (status.reviewStatus === 'reviewing' || status.reviewStatus === 'passed') return true;
+  return status.reviewStatus === 'pending' && !!status.reviewRequestedAt;
+}
+
+/**
+ * PAN-2581 (FR-2, residual): phase gate for the health-check poke loop
+ * (service.ts pokeAgent → pokeAgentWithEscalation → idle-alive pause), the
+ * SECOND independent idleness consumer besides stuck-remediation. A warm-idle
+ * work agent on a pipeline-owned issue — and a warm-idle review/test agent
+ * after its verdict — must never be poked ("are you stuck?") or idle-alive
+ * paused: the poke spends tokens re-explaining the wait, and the pause
+ * manufactures the paused-delivery-target deadlock PAN-2461 exists to undo.
+ * A genuinely stalled mid-review parent is covered by the PAN-2584 liveness
+ * deadline, not pokes. Owed-rework agents (review blocked/failed, tests
+ * failed) are ALSO skipped here by design: shouldSkipReviewStatus returns
+ * true for those because the PAN-2519 wedged-rework path owns their
+ * escalation — the health-check poke loop must not double-drive them.
+ * Roles outside work/review/test (plan, strike, flywheel, sequencer) keep
+ * their existing idleness semantics.
+ */
+export function shouldSkipIdlePokeForAgent(
+  agent: Pick<AgentState, 'id' | 'issueId' | 'role'> | null,
+  readStatus: (issueId: string) => ReviewStatus | null = getReviewStatusSync,
+): boolean {
+  if (!agent) return false;
+  if (agent.role !== 'work' && agent.role !== 'review' && agent.role !== 'test') return false;
+  const issueId = (agent.issueId
+    || agent.id.replace(/^agent-/, '').replace(/-(review|test|ship)(-.*)?$/, '').replace(/-slot-\d+$/, '')
+  ).toUpperCase();
+  return shouldSkipReviewStatus(readStatus(issueId));
 }
 
 // PAN-2519: the rework subset of shouldSkipReviewStatus — a work agent that OWES

@@ -714,7 +714,10 @@ const OVERDECK_AGENT_COLUMNS = [
   'phase', 'role_run_head', 'flywheel_run_id', 'cost_so_far',
   'review_sub_role', 'review_run_id', 'review_synthesis_agent_id',
   'review_output_path', 'review_deadline_at', 'review_monitor_signaled',
-  'review_retry_attempt', 'updated_at',
+  'review_retry_attempt',
+  'review_discovery_pending', 'review_context_manifest_path', 'review_discovery_ready_at',
+  'review_convoy_forked_at', 'review_fork_cache_checked', 'review_forked_from_parent',
+  'updated_at',
 ] as const;
 
 /** Convert an ISO timestamp string or null → Unix ms INTEGER or null. */
@@ -773,6 +776,12 @@ function agentStateToOverdeckRow(state: AgentState): unknown[] {
     toMs(state.reviewDeadlineAt),
     state.reviewMonitorSignaled ?? null,
     state.reviewRetryAttempt ?? null,
+    toBit(state.reviewDiscoveryPending),
+    state.reviewContextManifestPath ?? null,
+    toMs(state.reviewDiscoveryReadyAt),
+    toMs(state.reviewConvoyForkedAt),
+    toBit(state.reviewForkCacheChecked),
+    toBit(state.reviewForkedFromParent),
     Date.now(),
   ];
 }

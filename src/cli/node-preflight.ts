@@ -13,7 +13,13 @@ import { existsSync, readdirSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 
+// Minimum is 22.16, not merely major 22: the bundled node:sqlite driver
+// (src/lib/database/driver.ts) requires Node 22.16+ or 24+ — older 22.x builds
+// need --experimental-sqlite and are unsupported. Relaunching onto a 22.5-22.15
+// would only defer the failure, so we treat those as incompatible here too.
 const MIN_MAJOR = 22;
+const MIN_MINOR = 16;
+const MIN_LABEL = `${MIN_MAJOR}.${MIN_MINOR}`;
 const RELAUNCH_ENV = 'OVERDECK_NODE_RELAUNCHED';
 
 export interface NodeCandidate {
@@ -29,8 +35,9 @@ export function parseNodeVersion(raw: string): { major: number; minor: number } 
   return { major: Number(match[1]), minor: Number(match[2]) };
 }
 
-export function meetsMinimum(version: { major: number }): boolean {
-  return version.major >= MIN_MAJOR;
+export function meetsMinimum(version: { major: number; minor: number }): boolean {
+  if (version.major > MIN_MAJOR) return true;
+  return version.major === MIN_MAJOR && version.minor >= MIN_MINOR;
 }
 
 type ProbeFn = (path: string) => NodeCandidate | null;
@@ -125,9 +132,9 @@ function describeSource(path: string): string {
 
 function failNoCompatibleNode(): never {
   process.stderr.write(
-    `\nOverdeck requires Node.js ${MIN_MAJOR} or later. You are running Node.js ${process.versions.node}.\n`,
+    `\nOverdeck requires Node.js ${MIN_LABEL} or later. You are running Node.js ${process.versions.node}.\n`,
   );
-  process.stderr.write('No compatible Node was found on this system. Install Node 22+ with:\n\n');
+  process.stderr.write(`No compatible Node was found on this system. Install Node ${MIN_LABEL}+ with:\n\n`);
   process.stderr.write(`  ${detectVersionManagerHint()}\n\n`);
   process.stderr.write('then re-run your command.\n');
   process.exit(1);

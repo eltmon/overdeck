@@ -18,6 +18,9 @@ import { readPlanSync, readWorkspacePlanSync, updateItemStatus, updateSubItemSta
 import { extractACFromDocument } from './acceptance-criteria.js';
 import type { AcceptanceCriterion } from './acceptance-criteria.js';
 import { subItemsOf, type VBriefDocument, type VBriefEdge, type VBriefInspectionPolicy, type VBriefItem, type VBriefItemStatus } from './types.js';
+import { createBeadsResolver } from '../beads/resolver.js';
+import { runMutationBatch, type BdMutationClient } from '../beads/writer.js';
+import { resolveCanonicalBeadsHome } from '../beads/home.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -137,19 +140,9 @@ async function listBeadsForIssue(
   issueLabel: string,
   options: ClearBeadsOptions = {},
 ): Promise<any[]> {
-  const { timeoutMs = BD_TIMEOUT_FLOOR_MS, ...retryOptions } = normalizeClearBeadsOptions(options);
-  return runBdWithRetry(
-    `list beads for ${issueLabel}`,
-    async () => {
-      const { stdout } = await execFileAsync(
-        'bd',
-        ['list', '--json', '-l', issueLabel, '--status', 'all', '--limit', '0'],
-        { encoding: 'utf-8', cwd: workspacePath, timeout: timeoutMs },
-      );
-      return parseBdList(stdout);
-    },
-    { ...retryOptions, workspacePath },
-  );
+  const result = await createBeadsResolver(workspacePath, { retry: normalizeClearBeadsOptions(options) }).getBeadsForIssue(issueLabel);
+  if (!result.ok) throw result.error;
+  return result.value;
 }
 
 /**
@@ -236,6 +229,7 @@ export async function retryBd<T>(fn: () => Promise<T>, options: RetryBdOptions =
  * a corrupt DAG.
  */
 async function verifyAndRepairDependencyEdges(
+  client: BdMutationClient,
   workspacePath: string,
   planEdges: VBriefEdge[],
   beadIds: Map<string, string>,
@@ -251,11 +245,9 @@ async function verifyAndRepairDependencyEdges(
 
   let actualDeps: any[];
   try {
-    const { stdout } = await runBdWithRetry(
+    const stdout = await runBdWithRetry(
       `dep list for ${createdBeadIds.length} beads`,
-      () => execFileAsync('bd', ['dep', 'list', ...createdBeadIds, '--json'], {
-        encoding: 'utf-8', cwd: workspacePath, timeout: timeoutMs,
-      }),
+      () => client.run(['dep', 'list', ...createdBeadIds, '--json']),
       { ...retryOptions, workspacePath },
     );
     actualDeps = parseBdList(stdout);
@@ -291,9 +283,7 @@ async function verifyAndRepairDependencyEdges(
     try {
       await runBdWithRetry(
         `dep add ${repair.beadTo} ${repair.beadFrom}`,
-        () => execFileAsync('bd', ['dep', 'add', repair.beadTo, repair.beadFrom], {
-          encoding: 'utf-8', cwd: workspacePath, timeout: timeoutMs,
-        }),
+        () => client.mutate(['dep', 'add', repair.beadTo, repair.beadFrom]),
         { ...retryOptions, workspacePath },
       );
       actualDepSet.add(`${repair.beadTo}|${repair.beadFrom}`);
@@ -321,13 +311,9 @@ async function verifyAndRepairDependencyEdges(
  * a delete can time out client-side while committing server-side; a retry then
  * sees the bead as already gone. Catching that case makes deletion idempotent.
  */
-async function deleteBead(workspacePath: string, id: string, timeoutMs: number): Promise<void> {
+async function deleteBead(client: BdMutationClient, id: string): Promise<void> {
   try {
-    await execFileAsync('bd', ['delete', id, '--force'], {
-      encoding: 'utf-8',
-      cwd: workspacePath,
-      timeout: timeoutMs,
-    });
+    await client.mutate(['delete', id, '--force']);
   } catch (error: any) {
     const message = execFileErrorMessage(error).toLowerCase();
     if (message.includes('not found')) {
@@ -343,7 +329,19 @@ export async function clearBeadsForIssue(
   timeoutMsOrOptions: number | ClearBeadsOptions = {},
 ): Promise<ClearBeadsResult> {
   const options = normalizeClearBeadsOptions(timeoutMsOrOptions);
-  const { timeoutMs = BD_TIMEOUT_FLOOR_MS } = options;
+  const batch = await runMutationBatch(
+    { project: { workspacePath }, reason: `clear beads for ${issueLabel}`, lockOptions: options },
+    (client) => clearBeadsForIssueWithClient(client, workspacePath, issueLabel, options),
+  );
+  return batch.ok ? batch.value : { cleared: 0, errors: [batch.message] };
+}
+
+async function clearBeadsForIssueWithClient(
+  client: BdMutationClient,
+  workspacePath: string,
+  issueLabel: string,
+  options: ClearBeadsOptions,
+): Promise<ClearBeadsResult> {
 
   let existingBeads: any[];
   try {
@@ -362,7 +360,7 @@ export async function clearBeadsForIssue(
     try {
       await runBdWithRetry(
         `delete bead ${id} for ${issueLabel}`,
-        () => deleteBead(workspacePath, id, timeoutMs),
+        () => deleteBead(client, id),
         { ...options, workspacePath },
       );
       cleared++;
@@ -423,50 +421,25 @@ async function createBeadsFromVBriefPromise(
   options: CreateBeadsOptions = {},
 ): Promise<CreateBeadsResult> {
   const { planPath, lockOptions, ...retryOptions } = options;
-  return withBdProcessLock(
-    'create beads from vBRIEF',
-    async () => withBdMutexPromise(async () => {
+  const batch = await runMutationBatch(
+    { project: { workspacePath }, reason: 'create beads from vBRIEF', lockOptions },
+    async (bd) => withBdMutexPromise(async () => {
   const created: string[] = [];
   const errors: string[] = [];
   const beadIds = new Map<string, string>();
 
-  // Verify bd CLI is available
   try {
     await execFileAsync('which', ['bd'], { encoding: 'utf-8', timeout: 5000 });
   } catch {
     return { success: false, created: [], errors: ['bd (beads) CLI not found in PATH'], beadIds };
   }
 
-  // Ensure beads is reachable from this workspace.
-  // Workspaces are git worktrees: only committed .beads files (issues.jsonl) are present.
-  // The .beads/redirect file — which points bd at the main repo's shared Dolt database —
-  // is gitignored and must be created explicitly if missing.
   const beadsDir = join(workspacePath, '.beads');
   const redirectPath = join(beadsDir, 'redirect');
   if (!existsSync(redirectPath)) {
-    // Worktrees live at <projectRoot>/workspaces/feature-<id>/ — two levels up
-    const projectRoot = resolve(workspacePath, '..', '..');
-    const mainBeadsDir = join(projectRoot, '.beads');
-    if (existsSync(mainBeadsDir)) {
-      mkdirSync(beadsDir, { recursive: true });
-      chmodSync(beadsDir, 0o700);
-      writeFileSync(redirectPath, '../../.beads', 'utf-8');
-      console.log(`[beads] Created redirect to main repo .beads/ in ${workspacePath}`);
-    } else if (!existsSync(beadsDir)) {
-      // No main .beads/ and no local .beads/ — fall back to bd init
-      const prefix = deriveProjectPrefix(workspacePath);
-      try {
-        await execFileAsync('bd', ['init', '--prefix', prefix], { encoding: 'utf-8', cwd: workspacePath, timeout: BD_TIMEOUT_FLOOR_MS });
-        await execFileAsync('git', ['config', 'beads.role', 'contributor'], { cwd: workspacePath }).catch(() => {});
-        // Disable beads' auto-export git-add to prevent "git add failed" warnings in worktrees
-        await execFileAsync('bd', ['config', 'set', 'export.git-add', 'false'], {
-          encoding: 'utf-8', cwd: workspacePath, timeout: BD_TIMEOUT_FLOOR_MS,
-        }).catch(() => {});
-        console.log(`[beads] Initialized beads database in ${workspacePath} (prefix: ${prefix})`);
-      } catch (initErr: any) {
-        return { success: false, created: [], errors: [`Failed to initialize beads: ${initErr.message}`], beadIds };
-      }
-    }
+    mkdirSync(beadsDir, { recursive: true });
+    chmodSync(beadsDir, 0o700);
+    writeFileSync(redirectPath, resolveCanonicalBeadsHome(workspacePath) ?? '../../.beads', 'utf8');
   }
 
   // Read the vBRIEF plan — must be spec-compliant format
@@ -484,66 +457,24 @@ async function createBeadsFromVBriefPromise(
   const bdTimeoutMs = await resolveBdTimeout(workspacePath);
 
   const issueLabel = plan.id.toLowerCase();
-  const redirectExists = existsSync(redirectPath);
   try {
     await retryBd(() => execFileAsync('bd', ['ping', '--json'], {
       encoding: 'utf-8', cwd: workspacePath, timeout: bdTimeoutMs,
     }), { sleep: retryOptions.sleep });
-  } catch (connectErr: any) {
-    const connectErrMsg = String(connectErr?.message ?? connectErr?.stderr ?? '');
-    const firstLine = connectErrMsg.split('\n')[0] || 'unknown connectivity error';
-    const projectRoot = resolve(workspacePath, '..', '..');
-    const mainBeadsDir = join(projectRoot, '.beads');
-
-    // beads v1.0.3 auto-recovers corrupt Dolt manifests, and v1.0.4 repairs
-    // .beads permissions. Let `bd doctor --fix` own recovery instead of
-    // duplicating stale-artifact heuristics in Overdeck.
-    console.warn(`[beads] bd ping failed (${firstLine}); running bd doctor --fix before retry`);
+  } catch (connectError: any) {
     try {
-      await execFileAsync('bd', ['doctor', '--fix'], {
-        encoding: 'utf-8', cwd: workspacePath, timeout: bdTimeoutMs,
-      });
-    } catch (doctorErr: any) {
-      const doctorErrMsg = String(doctorErr?.message ?? doctorErr?.stderr ?? '');
-      const doctorFirstLine = doctorErrMsg.split('\n')[0] || 'unknown doctor error';
-      console.warn(`[beads] bd doctor --fix failed: ${doctorFirstLine}`);
-    }
-
-    try {
+      await execFileAsync('bd', ['doctor', '--fix'], { encoding: 'utf-8', cwd: workspacePath, timeout: bdTimeoutMs });
       await retryBd(() => execFileAsync('bd', ['ping', '--json'], {
         encoding: 'utf-8', cwd: workspacePath, timeout: bdTimeoutMs,
       }), { sleep: retryOptions.sleep });
-    } catch (retryErr: any) {
-      if (!redirectExists && !existsSync(mainBeadsDir)) {
-        const prefix = deriveProjectPrefix(workspacePath);
-        console.log(`[beads] No redirect and no main beads — bd init --prefix ${prefix}`);
-        try {
-          await execFileAsync('bd', ['init', '--prefix', prefix], {
-            encoding: 'utf-8', cwd: workspacePath, timeout: bdTimeoutMs,
-          });
-          await execFileAsync('git', ['config', 'beads.role', 'contributor'], { cwd: workspacePath }).catch(() => {});
-          await execFileAsync('bd', ['config', 'set', 'export.git-add', 'false'], {
-            encoding: 'utf-8', cwd: workspacePath, timeout: bdTimeoutMs,
-          }).catch(() => {});
-          console.log(`[beads] bd init succeeded for prefix ${prefix}`);
-        } catch (initErr: any) {
-          const initErrMsg = String(initErr?.message ?? initErr?.stderr ?? '');
-          const detail = `database init failed: ${initErrMsg.split('\n')[0]}`;
-          console.warn(`[beads] ${detail}`);
-          return { success: false, created: [], errors: [detail], beadIds };
-        }
-      } else {
-        const retryErrMsg = String(retryErr?.message ?? retryErr?.stderr ?? '');
-        const retryFirstLine = retryErrMsg.split('\n')[0] || 'unknown connectivity error';
-        const detail = `beads probe failed after recovery (${retryFirstLine})`;
-        console.warn(`[beads] ${detail}`);
-        return { success: false, created: [], errors: [detail], beadIds };
-      }
+    } catch (retryError: any) {
+      const detail = execFileErrorMessage(retryError ?? connectError);
+      return { success: false, created: [], errors: [`beads probe failed after recovery (${detail.split('\n')[0]})`], beadIds };
     }
   }
 
   // Idempotency: clear any existing beads for this issue before creating new ones.
-  const clearResult = await clearBeadsForIssue(workspacePath, issueLabel, {
+  const clearResult = await clearBeadsForIssueWithClient(bd, workspacePath, issueLabel, {
     ...retryOptions,
     timeoutMs: bdTimeoutMs,
   });
@@ -668,11 +599,7 @@ async function createBeadsFromVBriefPromise(
     let createFailureMessage: string | null = null;
 
     try {
-      const { stdout } = await execFileAsync('bd', args, {
-        encoding: 'utf-8',
-        cwd: workspacePath,
-        timeout: bdTimeoutMs,
-      });
+      const stdout = await bd.mutate(args);
       capturedBeadId = stdout.trim() || null;
       if (!capturedBeadId) {
         createFailureMessage = `Created "${item.title}" but could not capture bead ID`;
@@ -710,6 +637,7 @@ async function createBeadsFromVBriefPromise(
   // recovered, or contention that dropped the --deps argument, can leave the DAG
   // incomplete. Repair any missing edges before declaring success.
   const edgeVerification = await verifyAndRepairDependencyEdges(
+    bd,
     workspacePath,
     planEdges,
     beadIds,
@@ -719,7 +647,11 @@ async function createBeadsFromVBriefPromise(
   errors.push(...edgeVerification.errors);
 
   return { success: errors.length === 0, created, errors, beadIds };
-  }), { workspacePath, ...lockOptions });
+  }),
+  );
+  return batch.ok
+    ? batch.value
+    : { success: false, created: [], errors: [batch.message], beadIds: new Map() };
 }
 
 /**
@@ -727,26 +659,11 @@ async function createBeadsFromVBriefPromise(
  * Returns the vBRIEF item ID that was updated, or null if no match was found.
  * Callers must provide knownTitle (from bd list/show output).
  */
-/** Read a bead title from .beads/issues.jsonl by bead ID. */
-async function readBeadTitleFromJsonl(beadId: string, workspacePath: string): Promise<string | null> {
-  try {
-    const jsonlPath = join(workspacePath, '.beads', 'issues.jsonl');
-    if (!existsSync(jsonlPath)) return null;
-    const raw = await readFile(jsonlPath, 'utf-8');
-    for (const line of raw.split('\n')) {
-      if (!line.trim()) continue;
-      try {
-        const entry = JSON.parse(line);
-        if (entry.id === beadId && typeof entry.title === 'string') {
-          return entry.title;
-        }
-      } catch { /* skip malformed lines */ }
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}async function syncBeadStatusToVBriefPromise(
+async function readBeadTitle(beadId: string, workspacePath: string): Promise<string | null> {
+  const result = await createBeadsResolver(workspacePath).getBeadById(beadId);
+  return result.ok ? result.value?.title ?? null : null;
+}
+async function syncBeadStatusToVBriefPromise(
   beadId: string,
   workspacePath: string,
   status: VBriefItemStatus = 'completed',
@@ -758,7 +675,7 @@ async function readBeadTitleFromJsonl(beadId: string, workspacePath: string): Pr
 
     let beadTitle: string | null = knownTitle ?? null;
     if (!beadTitle) {
-      beadTitle = await readBeadTitleFromJsonl(beadId, workspacePath);
+      beadTitle = await readBeadTitle(beadId, workspacePath);
     }
 
     if (!beadTitle) return null;

@@ -30,7 +30,7 @@ import { isStartingWithinGrace } from './agent-grace.js';
 import { recordDeaconNudge } from './deacon-nudge-log.js';
 import { checkInspectAgentTimeouts } from './deacon-inspect.js';
 import { checkApiErrorAgents } from './deacon-api-recovery.js';
-import { checkOrphanedReviewStatuses, recoverStalledReviewConvoys, checkMissingReviewStatuses, checkStuckReviewing, checkCompletedButUnsignaledReviews, monitorReviewConvoySignals, cleanupOrphanedReviewSessions, checkStalledReviewDiscovery, checkReviewForkCacheMisses } from './deacon-review.js';
+import { checkOrphanedReviewStatuses, recoverStalledReviewConvoys, checkMissingReviewStatuses, checkStuckReviewing, checkCompletedButUnsignaledReviews, monitorReviewConvoySignals, cleanupOrphanedReviewSessions, checkStalledReviewDiscovery, checkStalledReviewParents, checkReviewForkCacheMisses } from './deacon-review.js';
 import { getAutoCloseOutCanonicalState } from './deacon-canonical-state.js';
 import { checkReadyForMergeStuck as checkReadyForMergeStuckWithDeps, reconcileStaleMergeStatus, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
 import { reconcileTraefikNetworks } from '../workspace/traefik-connect.js';
@@ -3047,6 +3047,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   const stalledDiscoveryActions = await checkStalledReviewDiscovery();
   actions.push(...stalledDiscoveryActions);
   for (const a of stalledDiscoveryActions) addLog('action', a, state.patrolCycle);
+  // PAN-2584: a review PARENT past its deadline with no terminal verdict is wedged —
+  // kill it so the durable review-request intent can respawn it warm.
+  const stalledParentActions = await checkStalledReviewParents();
+  actions.push(...stalledParentActions);
+  for (const a of stalledParentActions) addLog('action', a, state.patrolCycle);
   const forkCacheActions = await checkReviewForkCacheMisses();
   actions.push(...forkCacheActions);
   for (const a of forkCacheActions) addLog('action', a, state.patrolCycle);

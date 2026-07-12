@@ -83,8 +83,79 @@ projects:
 | `workspace_command` | No | Custom workspace creation script |
 | `workspace_remove_command` | No | Custom workspace cleanup script |
 | `workspace` | No | Polyrepo/progressive workspace configuration |
+| `release` | No | Coordinated post-merge release configuration |
 
 *Not required if `issue_prefixes` or `issue_pattern` is specified.
+
+## Release Configuration
+
+The optional `release:` section tells Overdeck how to coordinate a project's post-merge rollout across multiple components. Overdeck resolves a release plan, waits for each component to become healthy, runs verification commands, halts the plan on failure, and runs a rollback hook when one is configured.
+
+```yaml
+projects:
+  myn:
+    name: "Mind Your Now"
+    path: /home/user/projects/myn
+    issue_prefix: MIN
+    release:
+      components:
+        api:
+          provider: kubernetes
+          trigger: auto
+          health_url: https://api.myn.example.com/health
+          version_check: scripts/check-version.sh api
+          smoke_test: scripts/smoke.sh api
+          rollback: scripts/rollback.sh api
+        frontend:
+          provider: vercel
+          trigger: auto
+          depends_on: [api]
+          health_url: https://myn.example.com/health
+          smoke_test: scripts/smoke.sh frontend
+        docs:
+          provider: vercel
+          trigger: skip
+```
+
+### Component fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `provider` | No | Informational label for the deployment target (e.g. `kubernetes`, `vercel`) |
+| `trigger` | Yes | `auto` — wait for external deploy and verify; `manual` — pause for operator release; `skip` — exclude from the plan |
+| `depends_on` | No | Array of other component keys that must release before this one |
+| `health_url` | No | URL Overdeck polls until it returns a successful response |
+| `version_check` | No | Shell command that must exit 0 after the component is healthy |
+| `smoke_test` | No | Shell command that must exit 0 to consider the component released |
+| `rollback` | No | Shell command to run when this component fails; success marks the issue `rolled_back` |
+
+### Release semantics
+
+- `trigger: auto` means Overdeck **waits and verifies** an external deploy; it does not invoke the provider deploy itself.
+- Components are released in `depends_on` order using a topological sort. A component is only started after its dependencies pass.
+- If any check fails, Overdeck stops all later components and records the final issue-level status.
+- Projects without a `release:` section are **skipped cleanly** — no failure is recorded.
+
+### Release status lifecycle
+
+Issue-level `releaseStatus` moves through the following values:
+
+`pending` → `releasing` → `passed`  
+`pending` → `releasing` → `failed`  
+`pending` → `releasing` → `partial`  
+`pending` → `releasing` → `rolled_back`  
+`pending` → `skipped`
+
+The seven possible values are: `pending`, `releasing`, `passed`, `failed`, `partial`, `rolled_back`, and `skipped`.
+
+Inspect or retry a release from the CLI with `pan rollout`:
+
+```bash
+pan rollout status <issue-id>
+pan rollout retry <issue-id>
+```
+
+`pan rollout` is distinct from `pan release`, which publishes npm stable/canary packages.
 
 ## Label-Based Routing
 

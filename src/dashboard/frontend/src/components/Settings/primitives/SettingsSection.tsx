@@ -51,7 +51,7 @@ export function SettingsSection({
             </h2>
           )}
           {description && (
-            <span className="text-muted-foreground text-sm hidden sm:inline">
+            <span className="text-muted-foreground text-sm hidden @lg:inline truncate">
               — {description}
             </span>
           )}

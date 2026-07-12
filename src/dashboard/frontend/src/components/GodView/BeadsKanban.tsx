@@ -15,7 +15,7 @@ export function BeadsKanban({ agentId }: BeadsKanbanProps) {
   const { data } = useQuery({
     queryKey: ['beads', agentId],
     queryFn: async () => {
-      // Beads tasks are stored in .beads/issues.jsonl in the workspace
+      // Beads tasks come from the canonical Dolt-backed dashboard API.
       // We'll fetch via agent timeline as a proxy
       const res = await fetch(`/api/agents/${agentId}/activity?limit=50`);
       if (!res.ok) return null;

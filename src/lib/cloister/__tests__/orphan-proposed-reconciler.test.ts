@@ -50,6 +50,25 @@ vi.mock('../../tracker-utils.js', () => ({
   resolveGitHubIssueSync: trackerUtilsMocks.resolveGitHubIssueSync,
 }));
 
+vi.mock('../../beads/resolver.js', () => ({
+  createBeadsResolver: (workspacePath: string) => ({
+    countBeadsForIssue: async (issueId: string) => {
+      try {
+        const fs = await import('node:fs/promises');
+        let beadsPath = join(workspacePath, '.beads', 'issues.jsonl');
+        if (!existsSync(beadsPath)) {
+          const redirect = (await fs.readFile(join(workspacePath, '.beads', 'redirect'), 'utf8')).trim();
+          beadsPath = join(workspacePath, redirect, 'issues.jsonl');
+        }
+        const raw = await fs.readFile(beadsPath, 'utf8');
+        const value = raw.split('\n').filter(Boolean).map((line) => JSON.parse(line)).filter((bead) =>
+          bead.labels?.some((label: string) => label.toLowerCase() === issueId.toLowerCase())).length;
+        return { ok: true, value };
+      } catch { return { ok: true, value: 0 }; }
+    },
+  }),
+}));
+
 import {
   clearOrphanProposedAttemptCooldowns,
   findOrphanProposedSpecsForReconciler,

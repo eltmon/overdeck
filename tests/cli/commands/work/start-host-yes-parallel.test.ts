@@ -28,6 +28,16 @@ vi.mock('child_process', () => ({
   execFile: mocks.execFile,
   execFileSync: mocks.execFileSync,
 }));
+vi.mock('../../../../src/lib/beads/writer.js', () => ({
+  runMutationBatch: vi.fn(async (context, mutate) => {
+    const call = (args: string[]) => new Promise<string>((resolve, reject) => mocks.execFile('bd', args, { cwd: context.project.workspacePath }, (error: Error | null, result: { stdout?: string } | string) => {
+      if (error) reject(error);
+      else resolve(typeof result === 'string' ? result : result?.stdout ?? '');
+    }));
+    try { return { ok: true, value: await mutate({ run: call, mutate: call }), localHead: null }; }
+    catch (cause) { return { ok: false, message: String(cause), cause, localHead: null, needsOperatorRecovery: true }; }
+  }),
+}));
 
 vi.mock('ora', () => ({
   default: vi.fn(() => ({
@@ -210,6 +220,8 @@ describe('pan start --host --yes parallel spawn regression (PAN-1629)', () => {
 
     const beads: Bead[] = [];
     let nextBeadId = 1;
+    mocks.execFileSync.mockImplementation((file: string, args: string[]) =>
+      file === 'bd' && args[0] === 'list' ? JSON.stringify(beads) : 'feature/pan-1629\n');
     mocks.execFile.mockImplementation((file: string, args: string[], _options: unknown, callback: Function) => {
       if (file === 'which') {
         callback(null, { stdout: '/usr/bin/bd', stderr: '' }, '');

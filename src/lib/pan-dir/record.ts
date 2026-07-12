@@ -139,6 +139,7 @@ export interface PanIssuePipelineRecord {
   verificationStatus?: string;
   inspectStatus?: string;
   mergeStatus?: string;
+  releaseStatus?: string;
   readyForMerge: boolean;
   reviewNotes?: string;
   testNotes?: string;
@@ -153,6 +154,9 @@ export interface PanIssuePipelineRecord {
   lastVerifiedCommit?: string;
   /** PAN-1988 auto-heal: durable "the work agent finished and wants review" intent (set by `pan done`). */
   reviewRequestedAt?: string;
+  /** PAN-2587: dispatch anchor — journaled so a journal overlay cannot revert the
+   * status to pre-dispatch while the request timestamp survives (dispatch-loop fuel). */
+  reviewSpawnedAt?: string;
   /** PAN-1762: advisory files_scope drift recorded at pan done. */
   scopeDrift?: ScopeDriftRecord;
   autoMerge?: boolean;

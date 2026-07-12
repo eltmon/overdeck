@@ -27787,6 +27787,7 @@ const DEFAULT_DOCS_TRIGGER_REGEXES = [
 const DEFAULT_CONFIG = {
 	tmux: { configMode: "managed" },
 	enabledProviders: new Set(["anthropic"]),
+	defaultConversationModel: "claude-sonnet-5",
 	apiKeys: {},
 	providerAuth: {},
 	providerPlan: {},
@@ -27943,7 +27944,7 @@ const DEFAULT_CONFIG = {
 		streamdownRenderer: false,
 		showHarnessModelPermutations: false
 	},
-	claude: { permissionMode: "auto" },
+	claude: { permissionMode: "bypass" },
 	codex: { permissionMode: "auto-review" }
 };
 /**
@@ -31214,9 +31215,34 @@ function ensureRuntimeIndexesSync(db) {
 	try {
 		db.exec("UPDATE `discovered_sessions` SET `harness` = 'claude-code' WHERE `harness` IS NULL");
 	} catch {}
+	try {
+		db.exec("ALTER TABLE `review_status` ADD COLUMN `release_status` text");
+	} catch {}
+	try {
+		db.exec("ALTER TABLE `review_status` ADD COLUMN `release_notes` text");
+	} catch {}
+	ensureReleaseSetTablesSync(db);
 	db.exec("CREATE INDEX IF NOT EXISTS `cost_session_id_idx` ON `cost_events` (`session_id`)");
 	try {
 		db.exec("ALTER TABLE `agents` ADD COLUMN `yielded_by_scheduler` integer");
+	} catch {}
+	try {
+		db.exec("ALTER TABLE `agents` ADD COLUMN `review_discovery_pending` integer");
+	} catch {}
+	try {
+		db.exec("ALTER TABLE `agents` ADD COLUMN `review_context_manifest_path` text");
+	} catch {}
+	try {
+		db.exec("ALTER TABLE `agents` ADD COLUMN `review_discovery_ready_at` integer");
+	} catch {}
+	try {
+		db.exec("ALTER TABLE `agents` ADD COLUMN `review_convoy_forked_at` integer");
+	} catch {}
+	try {
+		db.exec("ALTER TABLE `agents` ADD COLUMN `review_fork_cache_checked` integer");
+	} catch {}
+	try {
+		db.exec("ALTER TABLE `agents` ADD COLUMN `review_forked_from_parent` integer");
 	} catch {}
 	try {
 		db.exec("ALTER TABLE `agents` ADD COLUMN `yielded_at` integer");
@@ -31224,6 +31250,46 @@ function ensureRuntimeIndexesSync(db) {
 	try {
 		db.exec("ALTER TABLE `agents` ADD COLUMN `last_yield_resume_at` integer");
 	} catch {}
+}
+/**
+* Idempotent schema top-up for release set tables (PAN-399). Existing overdeck.db
+* files created before the release-set feature need these tables added without
+* requiring a full migration reset.
+*/
+function ensureReleaseSetTablesSync(db) {
+	db.exec(`
+    CREATE TABLE IF NOT EXISTS \`release_sets\` (
+      \`issue_id\` text PRIMARY KEY NOT NULL,
+      \`project_key\` text NOT NULL,
+      \`project_path\` text NOT NULL,
+      \`workspace_type\` text NOT NULL,
+      \`status\` text DEFAULT 'pending' NOT NULL,
+      \`created_at\` integer NOT NULL,
+      \`updated_at\` integer NOT NULL,
+      FOREIGN KEY (\`issue_id\`) REFERENCES \`issues\`(\`id\`) ON UPDATE no action ON DELETE no action
+    )
+  `);
+	db.exec("CREATE INDEX IF NOT EXISTS `release_sets_project_idx` ON `release_sets` (`project_key`,`updated_at`)");
+	db.exec(`
+    CREATE TABLE IF NOT EXISTS \`release_set_components\` (
+      \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+      \`issue_id\` text NOT NULL,
+      \`component_key\` text NOT NULL,
+      \`provider\` text,
+      \`trigger\` text NOT NULL,
+      \`release_order\` integer DEFAULT 0 NOT NULL,
+      \`required\` integer DEFAULT true NOT NULL,
+      \`status\` text DEFAULT 'pending' NOT NULL,
+      \`health_status\` text,
+      \`version_status\` text,
+      \`smoke_status\` text,
+      \`rollback_status\` text,
+      \`notes\` text,
+      FOREIGN KEY (\`issue_id\`) REFERENCES \`release_sets\`(\`issue_id\`) ON UPDATE no action ON DELETE cascade
+    )
+  `);
+	db.exec("CREATE UNIQUE INDEX IF NOT EXISTS `release_set_components_issue_component_idx` ON `release_set_components` (`issue_id`,`component_key`)");
+	db.exec("CREATE INDEX IF NOT EXISTS `release_set_components_issue_order_idx` ON `release_set_components` (`issue_id`,`release_order`,`component_key`)");
 }
 function getOverdeckDatabaseSync(dbPath = getOverdeckDatabasePath()) {
 	if (overdeckDbSync?.path === dbPath) return overdeckDbSync.db;

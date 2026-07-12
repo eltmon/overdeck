@@ -11,6 +11,7 @@ import { getAgentDir, spawnRun, stopAgent } from '../agents.js';
 import { parseSequenceMd } from '../backlog/sequence-io.js';
 import { computePredictedConflictSignals, declaredIssueFootprint, pickFromSequence, type IssueFileFootprint } from '../flywheel-merge-order.js';
 import { findProjectByPathSync, getProjectSwarmHotspots } from '../projects.js';
+import { createBeadsResolver } from '../beads/resolver.js';
 import type { VBriefDocument } from '../vbrief/types.js';
 import {
   getFlywheelActiveRunId,
@@ -166,8 +167,8 @@ async function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions
           const isReadyOrHasPrd = (issueId: string): boolean => {
             const id = issueId.toUpperCase();
             // ready = spec AND beads exist in the workspace
-            if (issuesWithSpecs.has(id) &&
-                existsSync(join(workspacesDir, `feature-${id.toLowerCase()}`, '.beads', 'issues.jsonl'))) {
+            const beads = createBeadsResolver(join(workspacesDir, `feature-${id.toLowerCase()}`)).getBeadsForIssueSync(id);
+            if (issuesWithSpecs.has(id) && beads.ok && beads.value.length > 0) {
               return true;
             }
             return existsSync(join(projectRoot, '.pan', 'drafts', `${id}.md`));

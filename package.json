@@ -1,6 +1,6 @@
 {
   "name": "@overdeck/core",
-  "version": "0.45.7",
+  "version": "0.45.13",
   "description": "Multi-agent orchestration for AI coding assistants (Claude Code, Codex, Cursor, Gemini CLI)",
   "publishConfig": {
     "access": "public"
@@ -28,6 +28,9 @@
     "url": "https://github.com/eltmon/overdeck/issues"
   },
   "type": "module",
+  "trustedDependencies": [
+    "@homebridge/node-pty-prebuilt-multiarch"
+  ],
   "workspaces": {
     "packages": [
       "packages/contracts",
@@ -66,7 +69,7 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=22.5.0"
+    "node": ">=22.16.0"
   },
   "overrides": {
     "@effect/platform-node-shared": "4.0.0-beta.73",
@@ -97,7 +100,8 @@
     "typecheck": "tsc --noEmit && npm run typecheck:hooks && npm run typecheck:evals",
     "typecheck:hooks": "tsc --noEmit -p tsconfig.hooks.json",
     "typecheck:evals": "tsc --noEmit -p tsconfig.evals.json",
-    "lint": "eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:overdeck-boundaries && npm run lint:skills && npm run lint:prompts && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit",
+    "lint": "eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:beads-access && npm run lint:overdeck-boundaries && npm run lint:skills && npm run lint:prompts && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit",
+    "lint:beads-access": "bash scripts/lint-beads-access.sh",
     "lint:circular": "bash scripts/lint-circular-deps.sh",
     "lint:quarantine-audit": "bash scripts/lint-quarantine-audit.sh",
     "lint:effect": "node scripts/check-effect-versions.mjs",

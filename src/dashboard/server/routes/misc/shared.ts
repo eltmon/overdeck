@@ -20,7 +20,11 @@ export async function readPackageVersion(): Promise<string> {
   for (let i = 0; i < 8; i++) {
     const candidate = join(dir, 'package.json');
     try {
-      return JSON.parse(await readFile(candidate, 'utf-8')).version;
+      // A manifest without a version (e.g. a dependency stub) is a miss, not
+      // an answer — its undefined would render as an empty version in the UI
+      // instead of the visible 0.0.0 fallback (PAN-2591).
+      const version: unknown = JSON.parse(await readFile(candidate, 'utf-8')).version;
+      if (typeof version === 'string' && version) return version;
     } catch { /* try parent */ }
     const parent = dirname(dir);
     if (parent === dir) break;

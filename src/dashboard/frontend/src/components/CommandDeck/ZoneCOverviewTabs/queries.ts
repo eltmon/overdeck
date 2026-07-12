@@ -213,6 +213,8 @@ export interface ReviewStatusData {
   reviewNotes?: string;
   mergeNotes?: string;
   mergeRetryCount?: number;
+  releaseStatus?: 'pending' | 'releasing' | 'passed' | 'failed' | 'partial' | 'rolled_back' | 'skipped';
+  releaseNotes?: string;
   readyForMerge: boolean;
   updatedAt: string;
   /** PAN-905: GitHub-native merge blocker reasons */
@@ -221,8 +223,53 @@ export interface ReviewStatusData {
   queuePosition?: number | null;
   /** PAN-366: Which specialist is active or will handle this issue */
   activeSpecialist?: 'review' | 'test' | 'merge' | null;
-  /** Chronological review/test/merge/verify status transitions (S3 History tab). */
+  /** Chronological review/test/merge/verify/release status transitions (S3 History tab). */
   history?: StatusHistoryEntry[];
+}
+
+export interface ReleaseComponentState {
+  componentKey: string;
+  provider?: string;
+  trigger: 'auto' | 'manual' | 'skip';
+  releaseOrder: number;
+  required: boolean;
+  status: 'pending' | 'releasing' | 'passed' | 'failed' | 'skipped' | 'blocked' | 'rolled_back';
+  healthStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
+  versionStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
+  smokeStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
+  rollbackStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped' | 'rolled_back';
+  notes?: string;
+}
+
+export interface ReleaseSetData {
+  issueId: string;
+  projectKey: string;
+  projectPath: string;
+  workspaceType: 'monorepo' | 'polyrepo';
+  status: 'pending' | 'releasing' | 'passed' | 'failed' | 'partial' | 'rolled_back' | 'skipped';
+  createdAt: string;
+  updatedAt: string;
+  components: ReleaseComponentState[];
+}
+
+export function useReleaseSetQuery(
+  issueId: string,
+  options?: Omit<UseQueryOptions<ReleaseSetData | null>, 'queryKey' | 'queryFn'>,
+): UseQueryResult<ReleaseSetData | null> {
+  return useQuery({
+    queryKey: ['release-set', issueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}/release`);
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} — /api/workspaces/${issueId}/release`);
+      return res.json() as Promise<ReleaseSetData>;
+    },
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === 'releasing' ? 5_000 : 30_000;
+    },
+    ...options,
+  });
 }
 
 export interface BlockerReason {

@@ -699,9 +699,9 @@ describe('workflows', () => {
       expect(clearStep).toBeDefined();
       expect(clearStep!.success).toBe(true);
 
-      // PAN-100 should be gone, PAN-200 preserved
+      // The derived export is never edited directly; the writer owns its refresh.
       const content = readFileSync(join(beadsDir, 'issues.jsonl'), 'utf-8');
-      expect(content).not.toContain('PAN-100');
+      expect(content).toContain('PAN-100');
       expect(content).toContain('PAN-200');
     });
   });

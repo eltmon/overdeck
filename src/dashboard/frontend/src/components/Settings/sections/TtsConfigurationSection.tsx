@@ -412,7 +412,7 @@ export function TtsConfigurationSection({ formData, onSettingsChange }: TtsConfi
 
           <div>
             <h4 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Muted Sources</h4>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-2 grid gap-2 @lg:grid-cols-2 @2xl:grid-cols-4">
               {ACTIVITY_SOURCE_OPTIONS.map((source) => (
                 <label key={source} className="flex items-center gap-2 rounded-lg border border-border bg-background/60 px-3 py-2 text-xs text-foreground">
                   <input
@@ -449,7 +449,7 @@ export function TtsConfigurationSection({ formData, onSettingsChange }: TtsConfi
                 </p>
               )}
               {ttsTemplateEntries.map(([eventKey, template]) => (
-                <div key={eventKey} className="grid gap-2 rounded-lg border border-border bg-background/60 p-2 md:grid-cols-[minmax(12rem,16rem)_minmax(0,1fr)_auto]">
+                <div key={eventKey} className="grid gap-2 rounded-lg border border-border bg-background/60 p-2 @2xl:grid-cols-[minmax(12rem,16rem)_minmax(0,1fr)_auto]">
                   <select
                     value={eventKey}
                     onChange={(e) => handleTtsTemplateKeyChange(eventKey, e.target.value)}

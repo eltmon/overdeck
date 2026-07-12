@@ -43,7 +43,10 @@ export function registerAdminCommands(program: Command): void {
   // pan admin db — database seeding
   registerDbCommands(admin);
 
-  // pan admin beads — beads CLI management
+  // pan beads — canonical beads mutation door (top level: the work-agent
+  // prompts instruct `pan beads close|claim|...`; PAN-2564 FR-9/WI-13).
+  // Also kept under pan admin beads for the reconcile/migration-gate docs.
+  registerBeadsCommands(program);
   registerBeadsCommands(admin);
 
   // pan admin config — configuration management

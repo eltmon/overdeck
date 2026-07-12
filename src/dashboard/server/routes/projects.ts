@@ -612,6 +612,27 @@ const readProjectJsonBody = Effect.gen(function* () {
   try { return text ? JSON.parse(text) : {}; } catch { return {}; }
 });
 
+// ─── Route: GET /api/projects/:projectKey/release-status ─────────────────────
+// PAN-2555: release/publish pipeline visibility — npm dist-tags, release
+// workflow runs with job-level detail (partial failures), latest GitHub
+// Release. Accepts the deck's name-or-key identifiers; read-only.
+const getProjectReleaseStatusRoute = HttpRouter.add(
+  'GET',
+  '/api/projects/:projectKey/release-status',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const projectKey = params['projectKey'] ?? '';
+    const result = yield* Effect.tryPromise({
+      try: async () => {
+        const { fetchProjectReleaseStatus } = await import('../../../lib/overdeck/project-pipelines.js');
+        return fetchProjectReleaseStatus(projectKey);
+      },
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+    return jsonResponse(result);
+  })),
+);
+
 // ─── Route: GET /api/projects/:projectKey/auto-merge-default ─────────────────
 const getProjectAutoMergeDefaultRoute = HttpRouter.add(
   'GET',
@@ -816,6 +837,7 @@ const postProjectsRoute = HttpRouter.add(
 export const projectsRouteLayer = Layer.mergeAll(
   getProjectSessionTreeRoute,
   getAllSessionTreesRoute,
+  getProjectReleaseStatusRoute,
   getProjectAutoMergeDefaultRoute,
   postProjectAutoMergeDefaultRoute,
   postProjectsRoute,

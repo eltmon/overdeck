@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { formatRelativeTime } from '../../../lib/formatRelativeTime'
 import styles from './beadsRail.module.css'
 
@@ -33,6 +33,10 @@ interface BeadsResponse {
   issueId: string
   workspacePath: string
   tasks: BeadTask[]
+  lastSyncedAt: string | null
+  freshnessAgeMs: number | null
+  stale: boolean
+  syncError: string | null
 }
 
 const DIFFICULTIES = ['trivial', 'simple', 'medium', 'complex', 'expert']
@@ -67,6 +71,7 @@ function BlockedNote({ blockedBy }: { blockedBy: string[] }) {
 }
 
 export function BeadsRail({ issueId, onOpenFull }: { issueId: string; onOpenFull: () => void }) {
+  const queryClient = useQueryClient()
   const [showAllCompleted, setShowAllCompleted] = useState(false)
   const { data, isLoading, refetch, isRefetching } = useQuery<BeadsResponse>({
     queryKey: ['beads', issueId],
@@ -77,6 +82,11 @@ export function BeadsRail({ issueId, onOpenFull }: { issueId: string; onOpenFull
     },
     refetchInterval: 10_000,
   })
+  useEffect(() => {
+    const invalidate = () => { void queryClient.invalidateQueries({ queryKey: ['beads', issueId] }) }
+    window.addEventListener('overdeck:beads-freshness', invalidate)
+    return () => window.removeEventListener('overdeck:beads-freshness', invalidate)
+  }, [issueId, queryClient])
 
   const tasks = data?.tasks ?? []
   const done = tasks.filter((t) => t.status === 'closed')
@@ -94,6 +104,13 @@ export function BeadsRail({ issueId, onOpenFull }: { issueId: string; onOpenFull
     <aside className={styles.rail} aria-label="Beads progress">
       <div className={styles.header}>
         <span className={styles.title}>Beads</span>
+        <span className={data?.stale ? styles.stale : styles.freshness} title={data?.syncError ?? undefined}>
+          {data?.stale
+            ? 'stale'
+            : data?.lastSyncedAt
+              ? `synced ${formatRelativeTime(data.lastSyncedAt, now)}`
+              : 'not synced'}
+        </span>
         <div className={styles.counts}>
           {total > 0 ? (
             <>
