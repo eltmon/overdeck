@@ -410,18 +410,19 @@
     "recordedAt": "2026-07-12T07:06:16.522Z"
   },
   "created": "2026-07-11T09:28:34.266Z",
-  "updated": "2026-07-12T07:56:47.429Z",
+  "updated": "2026-07-12T08:05:51.035Z",
   "pipeline": {
     "issueId": "PAN-399",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-12T07:56:37.224Z",
-    "updatedAt": "2026-07-12T07:56:47.386Z",
+    "updatedAt": "2026-07-12T08:05:50.975Z",
     "reviewNotes": "Review role spawn failed: Harness codex (provider default for gpt-5.5) has no installed codex binary at spawn — refusing to silently fall back to claude-code. Install codex (check its PATH) and retry.",
+    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - scripts/file-size-baseline.txt",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2577",
     "reviewedAtCommit": "a2edef4778231d558c49b0e76d6bb33ba3dee46f",
     "lastVerifiedCommit": "15104601297cfbf9bd6c5a8b1bbd22ce0c848989",
@@ -630,9 +631,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 6785939,
-            "output": 386763,
-            "cacheRead": 228286720,
+            "input": 6955121,
+            "output": 391635,
+            "cacheRead": 232830208,
             "cacheWrite": 0
           }
         }
@@ -681,15 +682,15 @@
           "cacheWrite": 77989
         },
         "custom/kimi-k2.7-code": {
-          "input": 6785939,
-          "output": 386763,
-          "cacheRead": 228286720,
+          "input": 6955121,
+          "output": 391635,
+          "cacheRead": 232830208,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 162.084753,
-        "pricingAsOf": "2026-07-12T07:56:47.425Z"
+        "usd": 163.128227,
+        "pricingAsOf": "2026-07-12T08:05:51.029Z"
       }
     },
     "merges": [
