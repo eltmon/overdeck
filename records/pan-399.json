@@ -191,6 +191,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-12T00:17:19.960Z"
+    },
+    {
+      "timestamp": "2026-07-12T01:24:06.715Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
@@ -315,23 +320,23 @@
       "tests/unit/lib/release-set.test.ts",
       "tests/unit/lib/review-status-release.test.ts"
     ],
-    "recordedAt": "2026-07-11T23:47:28.889Z"
+    "recordedAt": "2026-07-12T01:24:02.241Z"
   },
   "created": "2026-07-11T09:28:34.266Z",
-  "updated": "2026-07-12T00:17:24.652Z",
+  "updated": "2026-07-12T01:32:11.702Z",
   "pipeline": {
     "issueId": "PAN-399",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-12T00:17:24.537Z",
+    "updatedAt": "2026-07-12T01:32:11.675Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2577",
     "lastVerifiedCommit": "a2edef4778231d558c49b0e76d6bb33ba3dee46f",
-    "reviewRequestedAt": "2026-07-11T23:47:39.863Z",
+    "reviewRequestedAt": "2026-07-12T01:32:07.847Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "drizzle/overdeck/0000_overdeck_init.sql",
@@ -453,8 +458,9 @@
         "tests/unit/lib/release-set.test.ts",
         "tests/unit/lib/review-status-release.test.ts"
       ],
-      "recordedAt": "2026-07-11T23:47:28.889Z"
-    }
+      "recordedAt": "2026-07-12T01:24:02.241Z"
+    },
+    "panDoneRecoveredAt": "2026-07-12T01:32:07.847Z"
   },
   "closeOut": {
     "usage": {
@@ -467,9 +473,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 61696665,
-            "output": 156556,
-            "cacheRead": 57971968,
+            "input": 62896134,
+            "output": 159147,
+            "cacheRead": 59096064,
             "cacheWrite": 0
           },
           "unknown": {
@@ -533,9 +539,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 5295456,
-            "output": 335783,
-            "cacheRead": 191495680,
+            "input": 5722632,
+            "output": 337661,
+            "cacheRead": 193925888,
             "cacheWrite": 0
           }
         }
@@ -548,9 +554,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 62397025,
-          "output": 185585,
-          "cacheRead": 63663872,
+          "input": 63596494,
+          "output": 188176,
+          "cacheRead": 64787968,
           "cacheWrite": 0
         },
         "unknown": {
@@ -584,15 +590,15 @@
           "cacheWrite": 77989
         },
         "custom/kimi-k2.7-code": {
-          "input": 5295456,
-          "output": 335783,
-          "cacheRead": 191495680,
+          "input": 5722632,
+          "output": 337661,
+          "cacheRead": 193925888,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 147.152176,
-        "pricingAsOf": "2026-07-12T00:17:24.629Z"
+        "usd": 149.043887,
+        "pricingAsOf": "2026-07-12T01:32:11.700Z"
       }
     },
     "merges": [
@@ -600,8 +606,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "release-engine-tests": "completed",
     "release-engine-tests.ac1": "completed",
