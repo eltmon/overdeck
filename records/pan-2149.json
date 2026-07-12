@@ -136,7 +136,7 @@
     "recordedAt": "2026-07-11T17:03:50.585Z"
   },
   "created": "2026-07-10T23:44:51.626Z",
-  "updated": "2026-07-11T17:07:22.164Z",
+  "updated": "2026-07-12T06:46:34.728Z",
   "pipeline": {
     "issueId": "PAN-2149",
     "reviewStatus": "reviewing",
@@ -145,11 +145,12 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-11T17:07:21.903Z",
+    "updatedAt": "2026-07-12T06:46:33.591Z",
+    "reviewNotes": "Review reset by deacon: no active review session after 821min",
     "inspectNotes": "Bead health-seam ack: duplicate delivery of already-reviewed commit 74dc13c0, re-confirmed - all 5 functions verbatim (this.->host. only), delegates <=5 lines with no visibility change, file-size baseline lowered 1684->1476, typecheck/lint/vitest all exit 0 (9237 passed, 0 failed).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2573",
     "lastVerifiedCommit": "6bf20f9406587c4becd8707f7a0b485bb875d2bf",
-    "reviewRequestedAt": "2026-07-11T17:03:54.020Z",
+    "reviewRequestedAt": "2026-07-12T06:46:23.330Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [
@@ -204,9 +205,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 1842233,
-            "output": 4367,
-            "cacheRead": 1705984,
+            "input": 2275845,
+            "output": 5047,
+            "cacheRead": 2054912,
             "cacheWrite": 0
           }
         },
@@ -241,9 +242,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 1842233,
-          "output": 4367,
-          "cacheRead": 1705984,
+          "input": 2275845,
+          "output": 5047,
+          "cacheRead": 2054912,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -260,8 +261,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 35.278966000000004,
-        "pricingAsOf": "2026-07-11T17:07:22.122Z"
+        "usd": 35.89725,
+        "pricingAsOf": "2026-07-12T06:46:34.202Z"
       }
     },
     "merges": [
