@@ -48,3 +48,38 @@ describe('shouldSkipReviewStatus phase gate (PAN-2581)', () => {
     expect(shouldSkipReviewStatus(null)).toBe(false);
   });
 });
+
+// ── PAN-2581 FR-2 (residual): the health-check poke loop's phase gate ─────────
+import { shouldSkipIdlePokeForAgent } from '../../../../src/lib/cloister/stuck-remediation.js';
+
+describe('shouldSkipIdlePokeForAgent — health-check poke phase gate (PAN-2581 FR-2)', () => {
+  it('skips a work agent while its issue is in review', () => {
+    expect(shouldSkipIdlePokeForAgent('work', status({ reviewStatus: 'reviewing' }))).toBe(true);
+  });
+
+  it('skips a warm-idle review agent after its verdict (passed)', () => {
+    expect(shouldSkipIdlePokeForAgent('review', status({ reviewStatus: 'passed' }))).toBe(true);
+  });
+
+  it('skips a work agent with an un-serviced durable review request', () => {
+    expect(shouldSkipIdlePokeForAgent('work', status({ reviewStatus: 'pending', reviewRequestedAt: '2026-07-12T00:01:00.000Z' }))).toBe(true);
+  });
+
+  it('skips owed-rework agents too — the PAN-2519 wedge path owns their escalation', () => {
+    expect(shouldSkipIdlePokeForAgent('work', status({ reviewStatus: 'blocked' }))).toBe(true);
+  });
+
+  it('does NOT skip a work agent mid-build (no review activity yet)', () => {
+    expect(shouldSkipIdlePokeForAgent('work', status({}))).toBe(false);
+  });
+
+  it('does NOT skip a work agent with no review record at all', () => {
+    expect(shouldSkipIdlePokeForAgent('work', null)).toBe(false);
+  });
+
+  it('never gates roles outside work/review/test', () => {
+    expect(shouldSkipIdlePokeForAgent('plan', status({ reviewStatus: 'reviewing' }))).toBe(false);
+    expect(shouldSkipIdlePokeForAgent('flywheel', status({ reviewStatus: 'reviewing' }))).toBe(false);
+    expect(shouldSkipIdlePokeForAgent(undefined, status({ reviewStatus: 'reviewing' }))).toBe(false);
+  });
+});
