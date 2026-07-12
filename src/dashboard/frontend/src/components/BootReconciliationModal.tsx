@@ -328,6 +328,14 @@ export function BootReconciliationModal() {
 
   const agentSet = Array.isArray(data.set) ? data.set : [];
   const resumableCount = agentSet.filter((agent) => !agent.readOnly).length;
+
+  // Nothing to reconcile — don't block the dashboard with an empty dialog.
+  // The server keeps the grace window `pending` on purpose (PAN-2510: crashed
+  // agents can materialize as candidates after deacon liveness reconciliation),
+  // and the pending-state poll above re-renders this modal if any resumable
+  // candidate appears before the window closes.
+  if (resumableCount === 0) return null;
+
   const pending = decisionMutation.isPending || freezeMutation.isPending;
 
   const submitReview = () => {
