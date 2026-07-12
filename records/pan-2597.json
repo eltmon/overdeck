@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-12T17:33:45.507Z",
+  "updated": "2026-07-12T18:12:11.645Z",
   "pipeline": {
     "issueId": "PAN-2597",
     "reviewStatus": "pending",
@@ -26,23 +26,29 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-12T17:33:45.310Z",
-    "inspectNotes": "Bead protocol-schema-spike ack: wire-envelope claims now cite exact t3code source lines (codexAppServerManager.ts:1215 for the integer id counter, :1246 for newline-delimited writeMessage framing), and the doc correctly notes the schema itself only validates the RequestId type, not the framing — resolves the prior BLOCKED finding; AC-1/2/3 satisfied."
+    "updatedAt": "2026-07-12T18:12:11.021Z",
+    "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 482045,
-            "output": 1309,
-            "cacheRead": 416256,
+            "input": 2642506,
+            "output": 4552,
+            "cacheRead": 2354688,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 5019372,
-            "output": 15193,
-            "cacheRead": 4898688,
+            "input": 10315664,
+            "output": 24610,
+            "cacheRead": 9875456,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 2230449,
+            "output": 9556,
+            "cacheRead": 2138112,
             "cacheWrite": 0
           }
         },
@@ -56,24 +62,30 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 14209,
-            "output": 405,
-            "cacheRead": 27672,
-            "cacheWrite": 67641
+            "input": 14213,
+            "output": 4348,
+            "cacheRead": 634564,
+            "cacheWrite": 488464
           }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 482045,
-          "output": 1309,
-          "cacheRead": 416256,
+          "input": 2642506,
+          "output": 4552,
+          "cacheRead": 2354688,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 5019372,
-          "output": 15193,
-          "cacheRead": 4898688,
+          "input": 10315664,
+          "output": 24610,
+          "cacheRead": 9875456,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 2230449,
+          "output": 9556,
+          "cacheRead": 2138112,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -83,15 +95,15 @@
           "cacheWrite": 297819
         },
         "anthropic/claude-sonnet-5": {
-          "input": 14209,
-          "output": 405,
-          "cacheRead": 27672,
-          "cacheWrite": 67641
+          "input": 14213,
+          "output": 4348,
+          "cacheRead": 634564,
+          "cacheWrite": 488464
         }
       },
       "costAtCloseOut": {
-        "usd": 15.196091000000001,
-        "pricingAsOf": "2026-07-12T17:33:45.482Z"
+        "usd": 22.5949,
+        "pricingAsOf": "2026-07-12T18:12:11.302Z"
       }
     },
     "merges": [],
