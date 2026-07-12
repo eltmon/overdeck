@@ -526,11 +526,12 @@ export async function spawnConversationSession(
   } | undefined;
   let codexFields: {
     harness: 'codex';
-    codexMode: 'tui';
+    codexMode: 'app-server' | 'tui';
     codexHome: string;
     codexSessionDir: string;
     resumeSessionId?: string;
   } | undefined;
+  let codexTransport: 'app-server' | 'tui' | undefined;
   if (model) {
     if (!SAFE_MODEL_PATTERN.test(model)) {
       throw new Error('Invalid model name');
@@ -568,7 +569,9 @@ export async function spawnConversationSession(
       };
     } else if (behavior.usesCodexHome) {
       const codexHome = join(getOverdeckHome(), 'agents', tmuxSession, 'codex-home');
-      const codexPermMode = loadConfigSync().config.codex?.permissionMode ?? 'workspace';
+      const codexConfig = loadConfigSync().config.codex;
+      const codexPermMode = codexConfig?.permissionMode ?? 'workspace';
+      codexTransport = codexConfig?.transport ?? 'app-server';
       const codexApprovalPolicy = codexPermMode === 'full-access' ? 'never' : 'on-request';
       const codexSandboxMode =
         codexPermMode === 'full-access' ? 'danger-full-access'
@@ -588,7 +591,7 @@ export async function spawnConversationSession(
         : undefined;
       codexFields = {
         harness: 'codex',
-        codexMode: 'tui',
+        codexMode: codexTransport,
         codexHome,
         codexSessionDir: join(codexHome, 'sessions'),
         resumeSessionId,
@@ -603,7 +606,7 @@ export async function spawnConversationSession(
   if (effort && !SAFE_EFFORT_PATTERN.test(effort)) {
     throw new Error('Invalid effort level');
   }
-  const useSupervisor = shouldUseSupervisorForConversation(harness);
+  const useSupervisor = shouldUseSupervisorForConversation(harness, { codexTransport });
   let supervisorScriptPath: string | undefined;
   if (useSupervisor) {
     supervisorScriptPath = resolvePtySupervisorScriptPath();
@@ -689,7 +692,7 @@ export async function spawnConversationSession(
   if (useSupervisor) {
     await waitForPtySupervisorSocket(tmuxSession);
   }
-  if (behavior.usesCodexHome && codexFields?.codexHome) {
+  if (behavior.usesCodexHome && codexFields?.codexHome && codexTransport === 'tui') {
     const codexHomeDir = codexFields.codexHome;
     void (async () => {
       try {

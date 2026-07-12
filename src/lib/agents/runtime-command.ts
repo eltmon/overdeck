@@ -177,12 +177,13 @@ export async function getOhmypiLauncherFields(agentId: string, model: string): P
 
 export function getCodexLauncherFields(agentId: string, model: string, workspacePath?: string): {
   harness: 'codex';
-  codexMode: 'work-tui';
+  codexMode: 'app-server' | 'work-tui';
   codexHome: string;
   codexSessionDir: string;
   model: string;
 } {
   const codexHome = join(homedir(), '.overdeck', 'agents', agentId, 'codex-home');
+  const codexConfig = loadYamlConfig().config.codex;
   // PAN-1803: codex work agents must inherit the user's configured codex
   // permission level (Settings → Permissions → Codex) and pre-trust the
   // workspace, EXACTLY like the conversation path
@@ -190,7 +191,7 @@ export function getCodexLauncherFields(agentId: string, model: string, workspace
   // folder-trust / "load project-local config?" wizard and blocks the pane.
   // Without the permission mapping, work agents ignore the Settings choice
   // and run hardcoded never+workspace-write.
-  const codexPermMode = loadYamlConfig().config.codex?.permissionMode ?? 'workspace';
+  const codexPermMode = codexConfig?.permissionMode ?? 'workspace';
   const approvalPolicy = codexPermMode === 'full-access' ? 'never' : 'on-request';
   const sandboxMode =
     codexPermMode === 'full-access' ? 'danger-full-access'
@@ -205,7 +206,7 @@ export function getCodexLauncherFields(agentId: string, model: string, workspace
   });
   return {
     harness: 'codex',
-    codexMode: 'work-tui',
+    codexMode: codexConfig?.transport === 'tui' ? 'work-tui' : 'app-server',
     codexHome,
     codexSessionDir: join(codexHome, 'sessions'),
     model,
@@ -395,6 +396,10 @@ export async function waitForCodexAppServerReady(
 }
 
 export async function waitForPromptReady(agentId: string, harness: RuntimeName | undefined, timeoutSec = 30): Promise<boolean> {
+  if (harness === 'codex' && loadYamlConfig().config.codex?.transport !== 'tui') {
+    await waitForCodexAppServerReady(agentId, timeoutSec);
+    return true;
+  }
   const readinessKind = getHarnessBehavior(harness).readinessKind;
   if (readinessKind === 'codex-app-server-ready') {
     await waitForCodexAppServerReady(agentId, timeoutSec);

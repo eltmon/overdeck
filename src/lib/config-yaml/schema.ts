@@ -577,6 +577,7 @@ export interface YamlConfig {
    */
   codex?: {
     permissionMode?: 'read-only' | 'workspace' | 'auto-review' | 'full-access';
+    transport?: 'app-server' | 'tui';
   };
 
   /** Remote work-agent provisioning settings (dashboard-editable subset). */
@@ -869,9 +870,10 @@ export interface NormalizedConfig {
     permissionMode: 'auto' | 'bypass';
   };
 
-  /** Permission-mode for Codex TUI conversation sessions. Always defined; defaults to 'workspace'. */
+  /** Permission-mode and transport for Codex sessions. Always defined. */
   codex: {
     permissionMode: 'read-only' | 'workspace' | 'auto-review' | 'full-access';
+    transport: 'app-server' | 'tui';
   };
 
   /** Remote work-agent provisioning settings surfaced by the dashboard. */

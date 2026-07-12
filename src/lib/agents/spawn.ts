@@ -10,7 +10,7 @@ import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.j
 import { assertIssueHasBeads, BeadsMissingError } from '../beads-query.js';
 import { BdTransientFailure } from '../bd-process-lock.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
-import { isTldrEnabledSync } from '../config-yaml.js';
+import { isTldrEnabledSync, loadConfigSync } from '../config-yaml.js';
 import { createConversation, getConversationByName, reactivateConversationForSpawn } from '../overdeck/conversations.js';
 import { startWorkSync } from '../cv.js';
 import { generateFixedPointPromptSync, checkHookSync, initHookSync } from '../hooks.js';
@@ -806,7 +806,11 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // (PAN-1805). Non-blocking — codex writes its rollout only after the kickoff
   // prompt lands, so a blocking wait here would stall spawn. The latest-rollout
   // fallback covers sessions whose first turn lands after this window.
-  if (resolvedHarness === 'codex' && getHarnessBehavior(resolvedHarness).readinessKind === 'codex-tui-prompt') {
+  if (
+    resolvedHarness === 'codex'
+    && loadConfigSync().config.codex?.transport === 'tui'
+    && getHarnessBehavior(resolvedHarness).readinessKind === 'codex-tui-prompt'
+  ) {
     const codexHomeForAgent = join(homedir(), '.overdeck', 'agents', agentId, 'codex-home');
     void (async () => {
       try {

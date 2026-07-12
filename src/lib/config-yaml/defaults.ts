@@ -229,6 +229,7 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   },
   codex: {
     permissionMode: 'auto-review',
+    transport: 'app-server',
   },
 };
 

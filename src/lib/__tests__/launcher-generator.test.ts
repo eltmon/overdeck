@@ -920,6 +920,56 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
     expect(script).not.toMatch(/codex exec/);
   });
 
+  it('codex app-server mode launches the host without the PTY supervisor', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      codexMode: 'app-server',
+      spawnMode: 'conversation',
+      useSupervisor: true,
+      supervisorScriptPath: '/dist/pty-supervisor.js',
+    });
+    expect(script).toMatch(/^node '.+\/dist\/codex-app-server-host\.js'$/m);
+    expect(script).not.toMatch(/pty-supervisor/);
+    expect(script).not.toMatch(/codex exec/);
+    expect(script).not.toMatch(/ -m /);
+  });
+
+  it('codex app-server mode resumes by thread id', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      codexMode: 'app-server',
+      resumeSessionId: '019ee5e7-thread-abc',
+    });
+    expect(script).toMatch(/^exec node '.+\/dist\/codex-app-server-host\.js' --resume '019ee5e7-thread-abc'$/m);
+  });
+
+  it('codex tui escape hatch preserves the previous conversation command byte-for-byte', () => {
+    const legacy = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      codexMode: 'tui',
+      spawnMode: 'conversation',
+      useSupervisor: true,
+      supervisorScriptPath: '/dist/pty-supervisor.js',
+    });
+    const escapeHatch = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      codexMode: 'tui',
+      spawnMode: 'conversation',
+      useSupervisor: true,
+      supervisorScriptPath: '/dist/pty-supervisor.js',
+    });
+    expect(escapeHatch).toBe(legacy);
+    expect(escapeHatch).toMatch(/^node '\/dist\/pty-supervisor\.js' codex -c project_doc_max_bytes=0$/m);
+  });
+
   it('codex plan launchers do not receive Claude-only append-system-prompt flags', () => {
     const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,

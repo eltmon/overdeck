@@ -203,6 +203,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     },
     codex: {
       permissionMode: DEFAULT_CONFIG.codex.permissionMode,
+      transport: DEFAULT_CONFIG.codex.transport,
     },
   };
 
@@ -695,6 +696,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
     if (config.codex && (config.codex.permissionMode === 'read-only' || config.codex.permissionMode === 'workspace' || config.codex.permissionMode === 'auto-review' || config.codex.permissionMode === 'full-access')) {
       result.codex.permissionMode = config.codex.permissionMode;
+    }
+    if (config.codex && (config.codex.transport === 'app-server' || config.codex.transport === 'tui')) {
+      result.codex.transport = config.codex.transport;
     }
 
     // Merge remote work-agent provisioning settings
