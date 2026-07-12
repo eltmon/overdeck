@@ -10,12 +10,14 @@
  *   1. PAN_YOLO env var ("1"/"true"/"yes" → bypass, "0"/"false"/"no" → auto)
  *   2. ClaudePermissionMode argument (callers that have already resolved CLI/env)
  *   3. config.claude.permissionMode in ~/.overdeck/config.yaml
- *   4. 'auto' (default — emits `--permission-mode default`, relying on the
- *      PermissionRequest/PreToolUse auto-approve hooks rather than full bypass)
+ *   4. 'bypass' (default — emits `--permission-mode bypassPermissions`). 'auto'
+ *      (--permission-mode default + the PermissionRequest/PreToolUse
+ *      auto-approve hooks) is opt-in: it only works on machines where the
+ *      hooks are installed, so it must never be the fallback.
  *
  * Note: 'auto' is Overdeck's internal mode name, not a Claude Code flag value —
- * it resolves to `--permission-mode default`. Switch to 'bypass' explicitly
- * (config or `--yolo`) when you need fully unmoderated execution.
+ * it resolves to `--permission-mode default`. Switch to 'auto' explicitly
+ * (config or `--no-yolo`) when you want hook-moderated execution.
  */
 
 import { Effect } from 'effect';
@@ -70,7 +72,7 @@ export function resolvePermissionModeSync(explicit?: ClaudePermissionMode): Clau
   try {
     return loadYamlConfig().config.claude.permissionMode;
   } catch {
-    return 'auto';
+    return 'bypass';
   }
 }
 
