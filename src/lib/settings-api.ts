@@ -274,12 +274,12 @@ export interface ApiSettingsConfig {
  *
  * Also detects deprecated model IDs in current overrides and returns warnings.
  */
-export function getDefaultConversationModelApi(): ModelId {
+export function getDefaultConversationModelApi(): ModelId | undefined {
   const { config } = loadConfigSync();
 
   if (config.defaultConversationModel) return resolveModelIdSync(config.defaultConversationModel);
-
-  throw new Error('No default model configured — set models.default_conversation_model');
+  // Unset is legal (fresh install) — Settings must still render so the operator can set it (PAN-2589).
+  return undefined;
 }
 
 const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer', 'knowledge'];

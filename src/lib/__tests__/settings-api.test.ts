@@ -165,7 +165,7 @@ describe('getDefaultConversationModelApi', () => {
     expect(mockResolveModelId).toHaveBeenCalledWith('claude-haiku-4-5');
   });
 
-  it('fails loudly when default_conversation_model is unset', async () => {
+  it('returns undefined when default_conversation_model is unset (PAN-2589: Settings must still render)', async () => {
     mockLoadConfig.mockReturnValue(baseConfig({
       enabledProviders: new Set(['anthropic', 'openai']),
       defaultConversationModel: undefined,
@@ -173,7 +173,7 @@ describe('getDefaultConversationModelApi', () => {
 
     const { getDefaultConversationModelApi } = await import('../settings-api.js');
 
-    expect(() => getDefaultConversationModelApi()).toThrow('No default model configured — set models.default_conversation_model');
+    expect(getDefaultConversationModelApi()).toBeUndefined();
     expect(mockResolveModelId).not.toHaveBeenCalled();
   });
 });
