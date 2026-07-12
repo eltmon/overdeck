@@ -543,4 +543,29 @@ describe('styleguide rendered surface conformance', () => {
 
     await context.close();
   }, 45_000);
+
+  it('enforces visual contracts from the style guide (grid, badge tokens, drawer title font)', async () => {
+    const { context, page } = await openRoute('/pipeline');
+    const row = page.locator('[data-component="issue-row"][data-issue-id="PAN-1148"]');
+    await expect.poll(() => row.count(), renderPoll).toBe(1);
+    const grid = await row.evaluate((node) => window.getComputedStyle(node).gridTemplateColumns);
+    expect(grid).toBe('14px 78px 14px 1fr 220px 84px 26px');
+
+    const badges = page.locator('[data-component="verb-badge"]');
+    await expect.poll(() => badges.count(), renderPoll).toBeGreaterThan(0);
+    const badgeClass = await badges.first().getAttribute('class');
+    expect(badgeClass).toMatch(/\bbadge-bg-/);
+    expect(badgeClass).toMatch(/\bbadge-border-/);
+    await context.close();
+
+    const drawer = await openRoute('/pipeline?issue=PAN-1148&tab=overview');
+    const drawerTitle = drawer.page.locator('[data-testid="issue-drawer"] h2');
+    await expect.poll(() => drawerTitle.count(), renderPoll).toBe(1);
+    const drawerTitleClass = await drawerTitle.getAttribute('class');
+    expect(drawerTitleClass).toContain('font-display');
+    // PAN-1234: a computed font-family assertion is aspirational here because
+    // the styleguide-empty-index-css plugin strips Tailwind-generated CSS; the
+    // class-name assertion above proves the token contract is wired.
+    await drawer.context.close();
+  }, 45_000);
 });
