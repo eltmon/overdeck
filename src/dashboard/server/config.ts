@@ -12,7 +12,12 @@
 import { homedir } from 'node:os';
 import { Effect, Layer, Context } from 'effect';
 import { loadOverdeckEnvSync } from '../../lib/env-loader.js';
-import { getDashboardIdentity, readHostDashboardApiPort, shouldRefuseHostDashboardPort } from './identity.js';
+import {
+  getDashboardIdentity,
+  isWorkspaceRepoRoot,
+  readHostDashboardApiPort,
+  shouldRefuseHostDashboardPort,
+} from './identity.js';
 
 // ─── Config shape ──────────────────────────────────────────────────────────────
 
@@ -73,34 +78,41 @@ export const ServerConfigLayer = Layer.effect(
     // A host-side peer dashboard or workspace checkout must never bind the host
     // dashboard API port. Workspace-container peers use an isolated network
     // namespace, so the identity guard allows their canonical compose port.
+    //
+    // The override is an operator-only escape hatch for a deliberately-stopped
+    // canonical dashboard. It must never let a workspace checkout seize the host
+    // port (PAN-2322: UAT agents used it to hijack :3011 on 2026-07-03 and 2026-07-07).
+    // The refusal message deliberately does not name the env var — agents read it.
     const identity = getDashboardIdentity();
     const hostDashboardApiPort = readHostDashboardApiPort();
-    const overrideAllowed = process.env['OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY'] === '1';
+    const overrideRequested = process.env['OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY'] === '1';
     const agentId = process.env['OVERDECK_AGENT_ID'];
     const nonConversationUsingOverride =
-      overrideAllowed && agentId !== undefined && !agentId.startsWith('conv-');
+      overrideRequested && agentId !== undefined && !agentId.startsWith('conv-');
     if (nonConversationUsingOverride) {
       const msg = (
-        `Refusing OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY=1 for pipeline-role identity ` +
+        `Refusing host dashboard port override for pipeline-role identity ` +
         `OVERDECK_AGENT_ID=${agentId}. Work, planning, review, and flywheel agents must never bind ` +
         `the host dashboard port; use the workspace container endpoint instead. Only an operator-supervised ` +
         `conversation (conv-*) or a process with no agent identity may use this emergency override.`
       );
       console.error(`[overdeck] ${msg}`);
-      throw new ServerConfigError('OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY', msg);
+      throw new ServerConfigError('API_PORT', msg);
     }
-    if (shouldRefuseHostDashboardPort({
-      repoRoot: identity.repoRoot,
-      mode: identity.mode,
-      port,
-      hostDashboardApiPort,
-    }) && !overrideAllowed) {
-      const msg = (
+    const overrideAllowed = overrideRequested && !isWorkspaceRepoRoot(identity.repoRoot);
+    if (
+      shouldRefuseHostDashboardPort({
+        repoRoot: identity.repoRoot,
+        mode: identity.mode,
+        port,
+        hostDashboardApiPort,
+      }) &&
+      !overrideAllowed
+    ) {
+      const msg =
         `Refusing to bind host dashboard port ${port} from repoRoot=${identity.repoRoot} ` +
         `mode=${identity.mode}. Peer/workspace dashboards must set PORT or API_PORT ` +
-        `to a non-host port. To override (e.g. when the canonical dashboard is deliberately stopped), set ` +
-        `OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY=1.`
-      );
+        `to a non-host port.`;
       console.error(`[overdeck] ${msg}`);
       throw new ServerConfigError('API_PORT', msg);
     }
