@@ -12,6 +12,7 @@ import { join } from 'path';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { platform } from 'os';
+import { registerBeadsReconcileCommand } from './admin/beads-reconcile.js';
 
 const execAsync = promisify(exec);
 
@@ -220,6 +221,7 @@ async function statsCommand(): Promise<void> {
 
 export function registerBeadsCommands(program: Command): void {
   const beads = program.command('beads').description('Beads issue tracker management');
+  registerBeadsReconcileCommand(beads);
 
   beads
     .command('compact')
