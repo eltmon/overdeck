@@ -542,6 +542,8 @@ interface IssueCardProps {
   cost?: IssueCost;
   costsLoading?: boolean;
   isSelected: boolean;
+  /** PAN-1234: keyboard navigation focus indicator. */
+  isFocused?: boolean;
   onSelect: () => void;
   onPlan: (autoStart?: boolean) => void; // Lifted to parent to survive re-renders
   onViewTasks?: (issue: Issue) => void;
@@ -552,7 +554,7 @@ interface IssueCardProps {
   workspace?: WorkspaceData;
 }
 
-export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, isSelected, onSelect, isBulkSelected, onBulkToggle, planningState, workspace: workspaceProp }: IssueCardProps) {
+export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, isSelected, isFocused = false, onSelect, isBulkSelected, onBulkToggle, planningState, workspace: workspaceProp }: IssueCardProps) {
   const [showCostModal, setShowCostModal] = useState(false);
   const [actionOpenSignal, setActionOpenSignal] = useState(0);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -562,10 +564,10 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const hasEnabledIssueAction = issueActions.all.some((view) => view.enabled);
 
   useEffect(() => {
-    if (isSelected && cardRef.current) {
+    if ((isSelected || isFocused) && cardRef.current) {
       cardRef.current.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
     }
-  }, [isSelected]);
+  }, [isSelected, isFocused]);
 
   const reviewStatus = useDashboardStore(selectReviewStatus(issue.identifier || ''));
   const isMerged = reviewStatus?.mergeStatus === 'merged' || issue.mergeStatus === 'merged' || issue.labels?.some(l => l.toLowerCase() === 'merged');
@@ -652,6 +654,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
       issueId={issue.identifier}
       priority={issue.priority}
       selected={isSelected}
+      focused={isFocused}
       bulkSelected={isBulkSelected}
       stuckCard={isStackUnhealthy || isPipelineStuck}
       pausedCard={!!pausedAgent}
