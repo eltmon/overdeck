@@ -1,6 +1,6 @@
 {
   "name": "@overdeck/desktop",
-  "version": "0.45.12",
+  "version": "0.45.13",
   "description": "Overdeck Command Deck — AI agent monitoring desktop app",
   "publishConfig": {
     "access": "public"
@@ -19,7 +19,8 @@
     "dist-electron",
     "server",
     "resources",
-    "drizzle"
+    "drizzle",
+    "sync-sources"
   ],
   "engines": {
     "node": ">=22.0.0"
@@ -70,6 +71,10 @@
       {
         "from": "drizzle",
         "to": "drizzle"
+      },
+      {
+        "from": "sync-sources",
+        "to": "sync-sources"
       },
       {
         "from": "server",

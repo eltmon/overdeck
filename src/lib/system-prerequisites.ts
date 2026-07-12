@@ -95,6 +95,18 @@ export const PREREQUISITES: readonly PrerequisiteDefinition[] = [
     },
   },
   {
+    id: 'jq',
+    name: 'jq',
+    required: false,
+    purpose: "Powers Overdeck's Claude Code hooks (auto-approve, live status, cost tracking)",
+    versionArgs: ['--version'],
+    install: {
+      linux: 'sudo apt install jq',
+      mac: 'brew install jq',
+      win: 'winget install jqlang.jq',
+    },
+  },
+  {
     id: 'gh',
     name: 'GitHub CLI',
     required: false,

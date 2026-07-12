@@ -227,6 +227,7 @@ export class CloisterService {
       get lastCheck() { return service.lastCheck; },
       set lastCheck(value: Date | null) { service.lastCheck = value; },
       get lastPokeTimestamps() { return service.lastPokeTimestamps; },
+      get pokeProgress() { return service.pokeProgress; },
       get previousStates() { return service.previousStates; },
       handleAgentCrash: (agentId: string) => service.handleAgentCrash(agentId),
       checkCompletionMarkers: () => service.checkCompletionMarkers(),

@@ -41,6 +41,7 @@ export interface HealthHost {
   healthCheckCount: number;
   lastCheck: Date | null;
   lastPokeTimestamps: Map<string, number>;
+  pokeProgress: Map<string, { fingerprint: string; ineffective: number }>;
   previousStates: Map<string, HealthState>;
   handleAgentCrash(agentId: string): Promise<void>;
   checkCompletionMarkers(): Promise<void>;
@@ -118,7 +119,15 @@ export async function performHealthCheck(host: HealthHost): Promise<void> {
         // state, not a stall. Never poke or kill it (it was spamming itself with
         // "are you stuck?" nudges every cooldown). Health is still recorded above;
         // only the attention/poke/kill action is skipped.
-        if (getAgentStateSync(health.agentId)?.role === 'sequencer') continue;
+        const idleAgentState = getAgentStateSync(health.agentId);
+        if (idleAgentState?.role === 'sequencer') continue;
+
+        // Warm-idle on a pipeline-owned issue is expected, not a stall.
+        const { shouldSkipIdlePokeForAgent } = await import('./stuck-remediation.js');
+        if (shouldSkipIdlePokeForAgent(idleAgentState)) {
+          host.pokeProgress.delete(health.agentId);
+          continue;
+        }
 
         const lastPoke = host.lastPokeTimestamps.get(health.agentId) ?? 0;
         const cooledDown = (now - lastPoke) >= pokeCooldownMs;

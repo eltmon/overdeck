@@ -38,6 +38,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -94,6 +95,17 @@ const drizzleDest = join(desktopDir, "drizzle");
 rmSync(drizzleDest, { recursive: true, force: true });
 cpSync(join(repoRoot, "drizzle"), drizzleDest, { recursive: true });
 console.log("[prepare-server] Copied migration SQL → drizzle/");
+
+// ─── Stage the Claude Code hook bundle (PAN-2595) ─────────────────────────────
+// Desktop installs never run `pan install`, so the dashboard server provisions
+// the hooks at boot (src/lib/claude-hooks-provision.ts). It resolves them from
+// SYNC_SOURCES.hooks = <packageRoot>/sync-sources/hooks — resources/ in the
+// packaged app (extraResources maps sync-sources → sync-sources), the package
+// root in the npx flavor (`files` includes sync-sources).
+const hooksStageDir = join(desktopDir, "sync-sources");
+rmSync(hooksStageDir, { recursive: true, force: true });
+cpSync(join(repoRoot, "sync-sources", "hooks"), join(hooksStageDir, "hooks"), { recursive: true });
+console.log("[prepare-server] Staged Claude hook bundle → sync-sources/hooks/");
 
 // ─── Bare-specifier scan helpers (shared by supervisor + server staging) ──────
 
@@ -191,10 +203,14 @@ console.log(
     cpSync(join(supervisorDir, name), join(smokeDir, name));
   }
   cpSync(join(supervisorDir, "vendor"), join(smokeDir, "node_modules"), { recursive: true });
+  // realpath the entry: on macOS tmpdir is /var/folders → /private/var, and
+  // the supervisor's run-as-main guard compares import.meta.url (canonical)
+  // against argv[1] (as given) — a symlinked path exits 0 without running.
+  const smokeEntry = realpathSync(join(smokeDir, "pty-supervisor.js"));
   let smokeStatus = 0;
   let smokeOutput = "";
   try {
-    execSync(`node ${JSON.stringify(join(smokeDir, "pty-supervisor.js"))}`, { stdio: "pipe" });
+    execSync(`node ${JSON.stringify(smokeEntry)}`, { stdio: "pipe" });
   } catch (error) {
     smokeStatus = error?.status ?? -1;
     smokeOutput = String(error?.stderr ?? error);
