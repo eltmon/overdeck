@@ -363,7 +363,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
               title="Go to Home"
             >
               <OverdeckMark className="w-5 h-5 text-primary shrink-0" />
-              {/* PAN-698: Space Grotesk is reserved for the sidebar wordmark only */}
+              {/* PAN-698: Space Grotesk is used for the sidebar wordmark, drawer title, and Command Deck tree head */}
               <span className="text-base font-semibold text-foreground font-display truncate">
                 Overdeck
               </span>
