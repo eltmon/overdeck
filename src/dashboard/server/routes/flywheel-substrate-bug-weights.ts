@@ -4,14 +4,13 @@ import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { listSubstrateBugWeights } from '../../../lib/overdeck/substrate-bug-weights-service.js';
 
-const VALID_WINDOWS = ['7d', '30d', '90d', '365d'] as const;
 const DEFAULT_WINDOW = '30d';
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 
-function clampWindow(value: string | null | undefined): typeof VALID_WINDOWS[number] {
-  if (value && (VALID_WINDOWS as readonly string[]).includes(value)) return value as typeof VALID_WINDOWS[number];
-  return DEFAULT_WINDOW;
+function parseWindow(value: string | null | undefined): string {
+  if (!value) return DEFAULT_WINDOW;
+  return /^\d+(ms|s|m|h|d)$/.test(value) ? value : DEFAULT_WINDOW;
 }
 
 function parseLimit(value: string | null | undefined): number {
@@ -34,7 +33,7 @@ export const getSubstrateBugWeightsRoute = HttpRouter.add(
       onNone: () => ({} as URLSearchParams),
       onSome: (url) => url.searchParams,
     }));
-    const window = clampWindow(params.get('window'));
+    const window = parseWindow(params.get('window'));
     const limit = parseLimit(params.get('limit'));
     const offset = parseOffset(params.get('offset'));
     const rows = yield* Effect.promise(() => listSubstrateBugWeights(window, { limit, offset }));

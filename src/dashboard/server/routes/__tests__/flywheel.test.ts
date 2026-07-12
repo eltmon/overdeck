@@ -339,19 +339,37 @@ describe('GET /api/flywheel/substrate-bug-weights', () => {
     expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenCalledWith('30d', expect.objectContaining({ limit: 50, offset: 0 }));
   });
 
-  it('passes an explicit window query param to the service', async () => {
+  it('passes any valid duration window to the service', async () => {
     substrateBugWeightsMocks.listSubstrateBugWeights.mockResolvedValue([]);
 
-    const result = await requestFlywheelRoute('/api/flywheel/substrate-bug-weights?window=7d');
+    const seven = await requestFlywheelRoute('/api/flywheel/substrate-bug-weights?window=7d');
+    expect(seven.status).toBe(200);
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenLastCalledWith('7d', expect.objectContaining({ limit: 50, offset: 0 }));
 
-    expect(result.status).toBe(200);
-    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenCalledWith('7d', expect.objectContaining({ limit: 50, offset: 0 }));
+    const custom = await requestFlywheelRoute('/api/flywheel/substrate-bug-weights?window=14d');
+    expect(custom.status).toBe(200);
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenLastCalledWith('14d', expect.objectContaining({ limit: 50, offset: 0 }));
+
+    const hours = await requestFlywheelRoute('/api/flywheel/substrate-bug-weights?window=12h');
+    expect(hours.status).toBe(200);
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenLastCalledWith('12h', expect.objectContaining({ limit: 50, offset: 0 }));
   });
 
-  it('falls back to the default window for unsupported values', async () => {
+  it('falls back to the default window for malformed or empty values', async () => {
+    substrateBugWeightsMocks.listSubstrateBugWeights.mockResolvedValue([]);
+    const malformed = await requestFlywheelRoute('/api/flywheel/substrate-bug-weights?window=abc');
+    expect(malformed.status).toBe(200);
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenLastCalledWith('30d', expect.objectContaining({ limit: 50, offset: 0 }));
+
+    const empty = await requestFlywheelRoute('/api/flywheel/substrate-bug-weights?window=');
+    expect(empty.status).toBe(200);
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenLastCalledWith('30d', expect.objectContaining({ limit: 50, offset: 0 }));
+  });
+
+  it('uses the default window when no window param is provided', async () => {
     substrateBugWeightsMocks.listSubstrateBugWeights.mockResolvedValue([]);
 
-    const result = await requestFlywheelRoute('/api/flywheel/substrate-bug-weights?window=999d');
+    const result = await requestFlywheelRoute('/api/flywheel/substrate-bug-weights');
 
     expect(result.status).toBe(200);
     expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenCalledWith('30d', expect.objectContaining({ limit: 50, offset: 0 }));

@@ -150,7 +150,7 @@ export function markFixed(issueId: string, commitSha: string, mergedAt: string):
 
   const row = db.prepare(`
     SELECT issue_id, filed_at, run_id, filed_by, discovered_in_issue_id,
-           severity, status, fix_merged_at, fix_commit_sha, updated_at
+           severity, affected_criteria, status, fix_merged_at, fix_commit_sha, updated_at
     FROM flywheel_substrate_bugs WHERE issue_id = ?
   `).get(issueId) as Row | undefined;
   return row ? mapRow(row) : null;
@@ -163,7 +163,7 @@ export function getByIssueId(issueId: string): FlywheelSubstrateBug | null {
   const db = ensureTable();
   const row = db.prepare(`
     SELECT issue_id, filed_at, run_id, filed_by, discovered_in_issue_id,
-           severity, status, fix_merged_at, fix_commit_sha, updated_at
+           severity, affected_criteria, status, fix_merged_at, fix_commit_sha, updated_at
     FROM flywheel_substrate_bugs WHERE issue_id = ?
   `).get(issueId) as Row | undefined;
   return row ? mapRow(row) : null;
