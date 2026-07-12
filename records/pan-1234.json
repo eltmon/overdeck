@@ -28,7 +28,7 @@
     }
   ],
   "created": "2026-07-12T20:43:21.494Z",
-  "updated": "2026-07-12T21:49:55.444Z",
+  "updated": "2026-07-12T22:07:17.926Z",
   "pipeline": {
     "issueId": "PAN-1234",
     "reviewStatus": "failed",
@@ -37,7 +37,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-12T21:48:51.037Z",
+    "updatedAt": "2026-07-12T22:06:11.592Z",
     "reviewNotes": "Verification failed at frontend-typecheck",
     "verificationNotes": "Verification FAILED at frontend-typecheck (17379ms):\n\nsrc/components/KanbanBoard.tsx(1,53): error TS6133: 'useRef' is declared but its value is never read.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2606",
@@ -49,38 +49,38 @@
       "byStage": {
         "codex": {
           "openai/gpt-5.5": {
-            "input": 483906,
-            "output": 2220,
-            "cacheRead": 392576,
+            "input": 4308334,
+            "output": 25205,
+            "cacheRead": 3791872,
             "cacheWrite": 0
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 853876,
-            "output": 175249,
-            "cacheRead": 93772800,
+            "input": 1015276,
+            "output": 186671,
+            "cacheRead": 101779200,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 483906,
-          "output": 2220,
-          "cacheRead": 392576,
+          "input": 4308334,
+          "output": 25205,
+          "cacheRead": 3791872,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 853876,
-          "output": 175249,
-          "cacheRead": 93772800,
+          "input": 1015276,
+          "output": 186671,
+          "cacheRead": 101779200,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 20.048558,
-        "pricingAsOf": "2026-07-12T21:48:51.089Z"
+        "usd": 26.283646,
+        "pricingAsOf": "2026-07-12T22:06:11.630Z"
       }
     },
     "merges": [
@@ -88,8 +88,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "conformance-test-strengthen": "completed",
     "conformance-test-strengthen.ac1": "completed",
