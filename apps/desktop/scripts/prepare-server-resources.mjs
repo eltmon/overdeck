@@ -169,6 +169,12 @@ console.log(
 
 // ─── Install externals; rebuild node-pty for the Electron ABI ─────────────────
 
+const rootPkg = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"));
+if (typeof rootPkg.version !== "string" || !rootPkg.version) {
+  console.error("[prepare-server] Repo-root package.json has no version — cannot stamp the server stub");
+  process.exit(1);
+}
+
 const desktopPkg = JSON.parse(readFileSync(join(desktopDir, "package.json"), "utf8"));
 // electron lives in devDependencies normally, but build-for-publish.mjs
 // promotes it to dependencies for the npm package — and npm publish re-runs
@@ -185,6 +191,10 @@ writeFileSync(
   `${JSON.stringify(
     {
       name: "@overdeck/desktop-server",
+      // The dashboard's readPackageVersion() resolves the app version from the
+      // nearest package.json above the bundle — this stub is that file in both
+      // the packaged and npx layouts, so it must carry the version (PAN-2591).
+      version: rootPkg.version,
       private: true,
       type: "module",
       dependencies,
