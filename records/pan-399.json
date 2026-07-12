@@ -256,6 +256,11 @@
       "reason": "feedback",
       "note": "[2026-07-12T06:27Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-12T06:27:11.093Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T06:49:16.329Z"
     }
   ],
   "feedback": [],
@@ -383,21 +388,22 @@
     "recordedAt": "2026-07-12T01:24:02.241Z"
   },
   "created": "2026-07-11T09:28:34.266Z",
-  "updated": "2026-07-12T06:27:27.121Z",
+  "updated": "2026-07-12T06:52:46.629Z",
   "pipeline": {
     "issueId": "PAN-399",
     "reviewStatus": "reviewing",
     "testStatus": "passed",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-12T06:27:26.780Z",
+    "updatedAt": "2026-07-12T06:52:46.548Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - scripts/file-size-baseline.txt",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2577",
     "reviewedAtCommit": "a2edef4778231d558c49b0e76d6bb33ba3dee46f",
     "lastVerifiedCommit": "a2edef4778231d558c49b0e76d6bb33ba3dee46f",
-    "reviewRequestedAt": "2026-07-12T01:32:07.847Z",
+    "reviewRequestedAt": "2026-07-12T06:49:05.042Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "drizzle/overdeck/0000_overdeck_init.sql",
@@ -533,9 +539,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 63520966,
-            "output": 163660,
-            "cacheRead": 59633920,
+            "input": 65475106,
+            "output": 171870,
+            "cacheRead": 61363968,
             "cacheWrite": 0
           },
           "unknown": {
@@ -599,9 +605,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 6579678,
-            "output": 343143,
-            "cacheRead": 201811712,
+            "input": 6766069,
+            "output": 381717,
+            "cacheRead": 222776064,
             "cacheWrite": 0
           }
         }
@@ -614,9 +620,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 64221326,
-          "output": 192689,
-          "cacheRead": 65325824,
+          "input": 66175466,
+          "output": 200899,
+          "cacheRead": 67055872,
           "cacheWrite": 0
         },
         "unknown": {
@@ -650,15 +656,15 @@
           "cacheWrite": 77989
         },
         "custom/kimi-k2.7-code": {
-          "input": 6579678,
-          "output": 343143,
-          "cacheRead": 201811712,
+          "input": 6766069,
+          "output": 381717,
+          "cacheRead": 222776064,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 152.21751700000002,
-        "pricingAsOf": "2026-07-12T06:27:26.975Z"
+        "usd": 158.763889,
+        "pricingAsOf": "2026-07-12T06:52:46.610Z"
       }
     },
     "merges": [
