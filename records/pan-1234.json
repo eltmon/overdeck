@@ -56,64 +56,115 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-12T22:40:56.946Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:44:37.564Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:44:44.009Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:44:44.010Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:44:44.021Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:44:44.269Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:54:00.464Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:54:05.908Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:54:05.909Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:54:05.910Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:54:05.924Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-12T20:43:21.494Z",
-  "updated": "2026-07-12T22:41:20.241Z",
+  "updated": "2026-07-12T22:54:12.600Z",
   "pipeline": {
     "issueId": "PAN-1234",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-12T22:39:37.230Z",
-    "updatedAt": "2026-07-12T22:41:19.854Z",
-    "reviewNotes": "Verification failed at frontend-typecheck",
+    "updatedAt": "2026-07-12T22:54:12.521Z",
+    "reviewNotes": "Agent re-review request (2/25): frontend-typecheck fixed",
     "verificationNotes": "Verification FAILED at frontend-typecheck (22665ms):\n\nsrc/components/KanbanBoard.tsx(1,53): error TS6133: 'useRef' is declared but its value is never read.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2606",
+    "lastVerifiedCommit": "2ea5a6da1a3429ae071245846092cbb1eaa1b795",
     "reviewRequestedAt": "2026-07-12T22:39:37.230Z",
-    "reviewSpawnedAt": "2026-07-12T22:40:25.278Z"
+    "reviewSpawnedAt": "2026-07-12T22:53:59.093Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/gpt-5.5": {
-            "input": 5154288,
-            "output": 26497,
-            "cacheRead": 4412928,
+            "input": 11978266,
+            "output": 50872,
+            "cacheRead": 10986752,
             "cacheWrite": 0
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1556576,
-            "output": 218397,
-            "cacheRead": 122106112,
+            "input": 1573612,
+            "output": 223331,
+            "cacheRead": 127210752,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 5154288,
-          "output": 26497,
-          "cacheRead": 4412928,
+          "input": 11978266,
+          "output": 50872,
+          "cacheRead": 10986752,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 1556576,
-          "output": 218397,
-          "cacheRead": 122106112,
+          "input": 1573612,
+          "output": 223331,
+          "cacheRead": 127210752,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 32.26068,
-        "pricingAsOf": "2026-07-12T22:41:20.217Z"
+        "usd": 38.535414,
+        "pricingAsOf": "2026-07-12T22:54:12.599Z"
       }
     },
     "merges": [
