@@ -68,6 +68,7 @@ pan-reopen
 pan-resources
 pan-restart
 pan-review
+pan-rollout
 pan-show
 pan-skill-creator
 pan-start

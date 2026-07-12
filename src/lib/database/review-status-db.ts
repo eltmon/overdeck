@@ -42,7 +42,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         inspect_status, inspect_notes, inspect_started_at, inspect_bead_id,
         verification_status, verification_notes,
         verification_cycle_count, verification_max_cycles,
-        review_notes, test_notes, merge_notes,
+        review_notes, test_notes, merge_notes, release_status, release_notes,
         updated_at, ready_for_merge, auto_requeue_count, merge_retry_count, pr_url,
         pr_head_sha, pr_number,
         stuck, stuck_reason, stuck_at, stuck_details,
@@ -60,7 +60,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         merge_step,
         auto_merge
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(issue_id) DO UPDATE SET
         review_status         = excluded.review_status,
@@ -77,6 +77,8 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         review_notes          = excluded.review_notes,
         test_notes            = excluded.test_notes,
         merge_notes           = excluded.merge_notes,
+        release_status        = excluded.release_status,
+        release_notes         = excluded.release_notes,
         updated_at            = excluded.updated_at,
         ready_for_merge       = excluded.ready_for_merge,
         auto_requeue_count    = excluded.auto_requeue_count,
@@ -117,6 +119,8 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       s.reviewNotes ?? null,
       s.testNotes ?? null,
       s.mergeNotes ?? null,
+      s.releaseStatus ?? null,
+      s.releaseNotes ?? null,
       s.updatedAt,
       s.readyForMerge ? 1 : 0,
       s.autoRequeueCount ?? null,
@@ -401,6 +405,8 @@ interface DbReviewStatusRow {
   review_notes: string | null;
   test_notes: string | null;
   merge_notes: string | null;
+  release_status: string | null;
+  release_notes: string | null;
   updated_at: string;
   ready_for_merge: number;
   auto_requeue_count: number | null;
@@ -457,6 +463,8 @@ function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]
     reviewNotes: row.review_notes ?? undefined,
     testNotes: row.test_notes ?? undefined,
     mergeNotes: row.merge_notes ?? undefined,
+    releaseStatus: row.release_status as ReviewStatus['releaseStatus'] ?? undefined,
+    releaseNotes: row.release_notes ?? undefined,
     updatedAt: row.updated_at,
     readyForMerge: row.ready_for_merge === 1,
     autoRequeueCount: row.auto_requeue_count ?? undefined,

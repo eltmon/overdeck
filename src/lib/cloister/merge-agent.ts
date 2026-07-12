@@ -136,7 +136,7 @@ import { runQualityGates } from './validation.js';
 import { loadProjectsConfigSync } from '../projects.js';
 import { cleanupStaleLocks } from '../git-utils.js';
 import { gitPush, MainDivergedError } from '../git/operations.js';
-import { markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
+import { getReviewStatusSync, markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
 import { appendGitOperationSync, type GitOperationType } from '../git-activity.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
 import { verifyMergedBeforeLifecycle, type PostMergeLifecycleOptions } from './merge-verification.js';
@@ -428,6 +428,12 @@ export async function postMergeLifecycle(
       throw err;
     }
 
+    // Release verification runs asynchronously so post-merge cleanup is not
+    // delayed by a slow external deploy. Status is still reported via review-status.
+    triggerPostMergeReleaseIfConfigured(issueId, projectPath).catch((err) => {
+      console.warn(`[merge-agent] Async post-merge release trigger failed for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
+    });
+
     // 2. Compact old beads (via lifecycle module)
     try {
       const { compactBeads } = await import('../lifecycle/compact-beads.js');
@@ -557,6 +563,45 @@ export async function postMergeLifecycle(
   });
   _postMergeInFlight.set(issueId, run);
   return run;
+}
+
+export async function triggerPostMergeReleaseIfConfigured(issueId: string, projectPath: string): Promise<void> {
+  const currentStatus = getReviewStatusSync(issueId)?.releaseStatus;
+  if (currentStatus && currentStatus !== 'pending') {
+    console.log(`[merge-agent] Release already started or completed for ${issueId} (${currentStatus}), skipping`);
+    return;
+  }
+
+  const { resolveProjectFromIssueSync, getProjectSync } = await import('../projects.js');
+  const resolved = resolveProjectFromIssueSync(issueId);
+  const project = resolved ? getProjectSync(resolved.projectKey) : null;
+
+  if (!project?.release) {
+    setReviewStatusSync(issueId, {
+      releaseStatus: 'skipped',
+      releaseNotes: 'No release config found for project.',
+    });
+    console.log(`[merge-agent] No release config for ${issueId}; marked release skipped`);
+    return;
+  }
+
+  const { runRelease } = await import('../release/release-engine.js');
+  try {
+    await runRelease(issueId, projectPath);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`[merge-agent] Post-merge release trigger failed for ${issueId}: ${message}`);
+    try {
+      setReviewStatusSync(issueId, {
+        releaseStatus: 'failed',
+        releaseNotes: `Post-merge release trigger failed: ${message}`,
+      });
+    } catch (statusErr: any) {
+      console.warn(`[merge-agent] Could not persist release trigger failure: ${statusErr?.message ?? statusErr}`);
+    }
+    // Release failures are surfaced through release status; the merge itself
+    // has already completed and must not be marked failed (review feedback).
+  }
 }
 
 async function transitionIssueToVerifyingOnMain(issueId: string, projectPath: string): Promise<void> {
