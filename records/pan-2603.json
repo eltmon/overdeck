@@ -165,18 +165,17 @@
     "recordedAt": "2026-07-12T21:40:42.752Z"
   },
   "created": "2026-07-12T20:44:53.021Z",
-  "updated": "2026-07-12T22:39:27.445Z",
+  "updated": "2026-07-12T22:45:29.157Z",
   "pipeline": {
     "issueId": "PAN-2603",
     "reviewStatus": "passed",
     "testStatus": "testing",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-12T21:41:23.108Z",
-    "updatedAt": "2026-07-12T22:39:27.291Z",
+    "updatedAt": "2026-07-12T22:45:29.157Z",
     "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
     "verificationNotes": "Verification FAILED at lint (73852ms):\n\n tsdown:deps (66%)\n  - rolldown-plugin-dts:generate (27%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\ncomm: file 1 is not in sorted order\ncomm: input is not in sorted order\ncomm: file 1 is not in sorted order\ncomm: input is not in sorted order\n✖ new circular dependencies found — these must be removed, not baselined:\n    src/dashboard/frontend/src/components/chat/ConversationPanel.tsx > src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/dividers.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts\n    src/dashboard/frontend/src/components/conversations/SessionDetail.tsx > src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx\n    src/lib/agents/tier-table.ts > src/lib/pan-dir/record.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts\n✖ stale baseline entries — run: bash scripts/lint-circular-deps.sh --update\n    src/dashboard/frontend/src/components/chat/ConversationPanel.tsx > src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/dividers.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts\n    src/dashboard/frontend/src/components/conversations/SessionDetail.tsx > src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx\n    src/lib/agents/tier-table.ts > src/lib/pan-dir/record.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts\n\ncircular-dependency guard failed. Break the cycle, or manually edit the baseline in an issue-referenced commit to accept audited growth.\n",
     "inspectNotes": "Bead docs-injection-service ack: buildDocsInjectionContext gates via evaluateDocsPromptGate before any write, only advances budget/records telemetry once on a real hit (zero-result and missing-index paths short-circuit before recordDocsInjection), and swallows errors without throwing per AC1-5; covered by injection.test.ts.",
@@ -212,7 +211,9 @@
         "src/lib/docs/injection.ts"
       ],
       "recordedAt": "2026-07-12T21:40:42.752Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-12T22:45:29.157Z"
   },
   "closeOut": {
     "usage": {
@@ -306,8 +307,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "ops-doc": "completed",
     "ops-doc.ac1": "completed",
