@@ -136,27 +136,65 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-12T22:03:02.303Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:08:03.378Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:08:07.753Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:08:07.758Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:08:07.759Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:08:07.759Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-12T22:12Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-12T22:12:56.991Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-12T22:12:56Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1232\n\n# Review Synthesis — PAN-1232 — 2026-07-12T18:11:36-04:00\n\n## Verdict: CHANGES REQUESTED — Files tab still does not reliably render the required branch-vs-main diff\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/.pan/review/agent-pan-1232-review-f89b2082/context.json\n- Branch: feature/pan-1232\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1232\n- HEAD reviewed: f89b20828ec84d547be5f1553889098ace324600\n- Cycle number: 5\n- Prior cycle SHA: 63ca56ef19fe0c3530a5a1b1f9ebb0f05fff5c6a (last completed synthesis; immediately prior review directory had no synthesis report)\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/.pan/review/agent-pan-1232-review-f89b2082/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/.pan/review/agent-pan-1232-review-f89b2082/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/.pan/review/agent-pan-1232-review-f89b2082/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/.pan/review/agent-pan-1232-review-f89b2082/requirements.md | 1 |\n\n## Blocking Findings\n\n### [correctness] Files tab defaults to checkpoint diffs instead of branch-vs-main — `src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx:208`\nInline `DiffPanel` now renders without `?diff=1`, but `DrawerFilesPanel` mounts it without selecting `vs-main`. With no URL `diffTurnId`, `DiffPanel` keeps `selectedTurnId === null` and selects `/api/agents/:id/diffs/full` instead of `/api/agents/:id/diffs/vs-main`. That means opening the drawer Files tab can show checkpoint/full-thread files instead of the current branch diff, or show \"No completed turns yet\" when there are no checkpoint summaries even though the workspace has branch changes. The Files tab needs to initialize `DiffPanel` in branch-vs-main mode and preserve that path when summaries are empty.\n\n### [requirements] Files tab does not render `DiffPanel` for a workspace branch unless an agent id is also present — `src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx:197`\nScope: in_pr_scope. AC-34 requires `drawer.tab === 'files'` plus an existing workspace branch to render `DiffPanel` scoped to `feature/<issue-id>` vs `main`. `DrawerFilesPanel` still requires `agentId` in addition to `workspace.exists`; when the workspace exists but no agent id is available, it renders \"No agent session for this workspace yet.\" instead of the required `DiffPanel`.\n\n## Non-blocking Findings\n\n### [performance] Avoid deriving the full activity list twice for the Activity tab — `src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx:44`\n`DrawerActivityPanel()` calls `useDrawerData()` for `activityFull` while `IssueDrawer()` already calls `useDrawerData()` for the same issue. This repeats the uncapped activity filtering/mapping/sorting on the Activity tab. The performance reviewer classified it as acceptable to proceed, with a recommendation to pass `activityFull` from the parent drawer instead.\n\n### [requirements] Changed low-risk support files have no mapped requirement\nThe requirements reviewer noted that `scripts/lint-circular-deps.sh` and `src/dashboard/frontend/src/index.css` are in the changed-file set, but no acceptance criterion, trace item, non-goal, or stub finding in the manifest maps to their behavior.\n\n### [advisory] CodeRabbit nitpick\nCodeRabbit suggested reusing the shared `isActiveAgent` helper in `IssueDrawer.tsx` instead of duplicating the active-agent predicate. This was advisory and non-gating in the review context.\n\n## Scope Note\nThe immediately previous review directory, `agent-pan-1232-review-3f5fd283`, has no `synthesis.md`, so this synthesis uses the last completed review (`63ca56ef19fe0c3530a5a1b1f9ebb0f05fff5c6a`) as the durable prior cycle for convergence. Both blocking Files-tab findings are on frontend drawer/diff code changed since that completed synthesis.\n\n## Clean Sub-roles\n- security\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/.pan/review/agent-pan-1232-review-f89b2082/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1232 -m \"Fixed review issues\"`"
+    }
+  ],
   "created": "2026-07-12T20:45:31.659Z",
-  "updated": "2026-07-12T22:03:02.303Z",
+  "updated": "2026-07-12T22:12:56.991Z",
   "pipeline": {
     "issueId": "PAN-1232",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-12T22:02:39.443Z",
-    "updatedAt": "2026-07-12T22:02:55.352Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed build",
+    "updatedAt": "2026-07-12T22:08:12.894Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed sync-target-branch",
     "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/dashboard/server/routes/backlog.ts",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2604",
-    "lastVerifiedCommit": "63ca56ef19fe0c3530a5a1b1f9ebb0f05fff5c6a",
+    "lastVerifiedCommit": "f89b20828ec84d547be5f1553889098ace324600",
     "reviewRequestedAt": "2026-07-12T22:02:39.443Z",
-    "reviewSpawnedAt": "2026-07-12T22:02:55.351Z"
+    "reviewSpawnedAt": "2026-07-12T22:08:01.957Z"
   },
   "closeOut": {
     "usage": {
@@ -169,9 +207,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 6001595,
-            "output": 43045,
-            "cacheRead": 5268992,
+            "input": 10482023,
+            "output": 59541,
+            "cacheRead": 9384192,
             "cacheWrite": 0
           }
         }
@@ -184,15 +222,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 6001595,
-          "output": 43045,
-          "cacheRead": 5268992,
+          "input": 10482023,
+          "output": 59541,
+          "cacheRead": 9384192,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 7.5888610000000005,
-        "pricingAsOf": "2026-07-12T22:02:55.449Z"
+        "usd": 11.967481,
+        "pricingAsOf": "2026-07-12T22:08:12.939Z"
       }
     },
     "merges": [
