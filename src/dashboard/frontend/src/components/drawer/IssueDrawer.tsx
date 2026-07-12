@@ -189,23 +189,27 @@ function DrawerFilesPanel({ issueId, agentId }: { issueId: string; agentId: stri
   });
 
   // AC-34: the Files tab renders the branch-vs-main DiffPanel whenever a
-  // workspace branch exists — the absence of a branch is the only empty state.
-  // The diff route is agent-scoped (/api/agents/:id/diffs/vs-main resolves the
-  // agent's workspace, which is the feature/<issue-id> branch), and a workspace
-  // branch always has the agent that created it in the drawer's agents list
-  // (pickDefaultDrawerAgent includes ended agents), so `agentId` is non-null
-  // for any real workspace. The `?? ''` is a defensive fallback for the
-  // inconsistent-data edge case; DiffPanel surfaces the resulting fetch
-  // failure through its own error state instead of a misleading custom message.
+  // workspace branch exists. The diff route is agent-scoped —
+  // /api/agents/:id/diffs/vs-main resolves the agent's workspace, which IS the
+  // feature/<issue-id> branch — so the panel must mount with a real agent id.
+  // A workspace branch always has its creating agent in the drawer agents list
+  // (pickDefaultDrawerAgent includes ended agents), so agentId is a proven
+  // invariant whenever hasWorkspace; the inconsistent no-agent case has no
+  // branch-diff source and is left unrendered rather than faked with an empty
+  // agent id that would request /api/agents//diffs/vs-main.
   if (!hasWorkspace) {
     return <p className="text-[12px] text-muted-foreground">No workspace branch yet.</p>;
+  }
+  if (!agentId) {
+    return null;
   }
 
   return (
     <DiffWorkerPoolProvider>
       <DiffPanel
         mode="inline"
-        agentId={agentId ?? ''}
+        agentId={agentId}
+        isolateSelection
         defaultView="vs-main"
         turnDiffSummaries={diffData?.summaries ?? []}
       />
