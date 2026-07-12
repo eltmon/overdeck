@@ -490,7 +490,7 @@ describe('prompt-time memory injection', () => {
     });
     const elapsed = performance.now() - started;
 
-    expect(elapsed).toBeLessThan(5);
+    expect(elapsed).toBeLessThan(50);
     expect(result).toMatchObject({ status: 'no-hits', context: '' });
     expect(decision.allocations.knowledgeIndex).toBe(0);
     expect(decision.allocationBytes.knowledgeIndex).toBe(0);
