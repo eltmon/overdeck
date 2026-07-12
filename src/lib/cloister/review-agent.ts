@@ -37,6 +37,7 @@
  */
 
 import { exec } from 'child_process';
+import { existsSync } from 'fs';
 import { mkdir, readFile, rm, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { promisify } from 'util';
@@ -64,6 +65,11 @@ import type { RuntimeName } from '../runtimes/types.js';
 
 const execAsync = promisify(exec);
 // PAN-1531: review-temp stash helpers removed.
+
+// PAN-2584: liveness budget for the review PARENT (discovery + convoy + synthesis).
+// Sub-reviewers get their own 20-minute deadlines in review-convoy.ts; the parent
+// needs headroom for all three phases. Enforced by checkStalledReviewParents.
+export const PARENT_REVIEW_TIMEOUT_MS = 45 * 60 * 1000;
 // Review now runs against the committed diff only. The dirty-worktree gate
 // at pan done time (and the same gate added to /api/review/:id/request)
 // guarantees the worktree is clean before specialists see the diff.
@@ -338,6 +344,7 @@ async function spawnReviewRoleForIssuePromise(
       // session whose runId matches the *current* HEAD is genuinely the
       // review-in-progress we should defer to.
       let staleRunId = false;
+      let currentRunId: string | undefined;
       if (!paneDead && !opts.force) {
         try {
           const { stdout } = await execAsync('git rev-parse --short=8 HEAD', {
@@ -345,7 +352,7 @@ async function spawnReviewRoleForIssuePromise(
             encoding: 'utf-8',
             timeout: 10_000,
           });
-          const currentRunId = `agent-${opts.issueId.toLowerCase()}-review-${stdout.trim()}`;
+          currentRunId = `agent-${opts.issueId.toLowerCase()}-review-${stdout.trim()}`;
           const synthReviewRunId = getAgentStateSync(reviewSessionName)?.reviewRunId;
           // A missing identity cannot prove that the live pane covers the
           // current obligation, so legacy/unknown sessions are stale too.
@@ -384,7 +391,18 @@ async function spawnReviewRoleForIssuePromise(
           // verdict alone rather than re-entering 'reviewing'.
           const newerRequest = !!status?.reviewRequestedAt
             && (!status.reviewSpawnedAt || status.reviewRequestedAt > status.reviewSpawnedAt);
-          finishedIdle = terminal && newerRequest;
+          // PAN-2584: a lost verdict leaves the status non-terminal while the
+          // reviewer already wrote its report for this exact HEAD — that session
+          // is finished, not reviewing. Report-on-disk for the current runId is
+          // terminal evidence too; without it a newer request deadlocks behind
+          // the guard forever.
+          let reportWritten = false;
+          if (currentRunId) {
+            try {
+              reportWritten = existsSync(join(opts.workspace, PAN_DIRNAME, 'review', currentRunId, 'review.md'));
+            } catch { /* probe failure — fall back to verdict-only evidence */ }
+          }
+          finishedIdle = (terminal || reportWritten) && newerRequest;
           if (finishedIdle) {
             console.log(
               `[review-agent] ${reviewSessionName} is finished-idle (verdict ${status?.reviewStatus}, newer request pending) — warm-reusing for the new review cycle`,
@@ -618,7 +636,12 @@ async function spawnReviewRoleForIssuePromise(
         try {
           // Keep the idempotency guard's HEAD-staleness detection honest for the resumed run.
           const resumed = getAgentStateSync(reviewAgentId);
-          if (resumed) { resumed.reviewRunId = runId; await Effect.runPromise(saveAgentState(resumed)); }
+          if (resumed) {
+            resumed.reviewRunId = runId;
+            // PAN-2584: arm the parent's liveness deadline for this cycle.
+            resumed.reviewDeadlineAt = new Date(Date.now() + PARENT_REVIEW_TIMEOUT_MS).toISOString();
+            await Effect.runPromise(saveAgentState(resumed));
+          }
         } catch { /* non-fatal */ }
         if (fullReview) {
           await spawnConvoyReviewers(reviewAgentId);
@@ -646,6 +669,8 @@ async function spawnReviewRoleForIssuePromise(
     // HEAD) from a finished-but-idle leftover (runId from an older HEAD) — see
     // PAN-1131. Sub-reviewers already persist this; the synthesis agent did not.
     run.reviewRunId = runId;
+    // PAN-2584: arm the parent's liveness deadline for this cycle.
+    run.reviewDeadlineAt = new Date(Date.now() + PARENT_REVIEW_TIMEOUT_MS).toISOString();
     try {
       await Effect.runPromise(saveAgentState(run));
     } catch (saveErr) {

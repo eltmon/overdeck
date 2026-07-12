@@ -591,6 +591,65 @@ export async function checkStalledReviewDiscovery(): Promise<string[]> {
 }
 
 /**
+ * PAN-2584: liveness for the review PARENT (synthesis/self-review). Deadlines
+ * were armed only on convoy sub-reviewers, so a wedged or dead parent blocked
+ * re-dispatch behind the idempotency guard forever (the PAN-399 wedge). A
+ * running parent past its deadline whose issue has no terminal review verdict
+ * is killed and its row marked stopped; the durable review-request intent then
+ * respawns it (warm resume keeps its context). The deadline is explicit
+ * (`reviewDeadlineAt`, armed at spawn/resume) with an implicit fallback from
+ * the last (re)start for parents predating the arming code.
+ */
+export async function checkStalledReviewParents(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    const { listAgentStates, markAgentStoppedState } = await import('../agents.js');
+    const { PARENT_REVIEW_TIMEOUT_MS } = await import('./review-agent.js');
+    const states = listAgentStates();
+    const now = Date.now();
+    for (const state of states) {
+      if (state.role !== 'review' || state.reviewSubRole || !state.issueId) continue;
+      if (state.status !== 'running') continue;
+      const armedMs = state.reviewDeadlineAt ? Date.parse(state.reviewDeadlineAt) : Number.NaN;
+      const startedMs = Date.parse(state.lastResumeAt ?? state.startedAt);
+      const deadlineMs = Number.isFinite(armedMs)
+        ? armedMs
+        : Number.isFinite(startedMs)
+          ? startedMs + PARENT_REVIEW_TIMEOUT_MS
+          : Number.NaN;
+      if (!Number.isFinite(deadlineMs) || now < deadlineMs) continue;
+      // A terminal verdict means the parent is warm-idle by design — the
+      // dispatch guard's finished-idle path owns reuse, not this check.
+      const reviewStatus = getReviewStatusSync(state.issueId)?.reviewStatus;
+      if (reviewStatus === 'passed' || reviewStatus === 'blocked' || reviewStatus === 'failed') continue;
+      try {
+        await Effect.runPromise(killSession(state.id));
+      } catch { /* session may already be gone — still mark the row stopped */ }
+      try {
+        saveAgentStateSync(markAgentStoppedState(state));
+      } catch (stopErr) {
+        console.warn(`[deacon] checkStalledReviewParents: could not mark ${state.id} stopped:`, stopErr);
+      }
+      const message = `checkStalledReviewParents: killed ${state.id} — past review deadline with no terminal verdict for ${state.issueId}; redispatch will respawn it warm (PAN-2584)`;
+      actions.push(message);
+      logDeaconEventSync(message);
+      try {
+        const { emitActivityEntrySync } = await import('../activity-logger.js');
+        emitActivityEntrySync({
+          source: 'review',
+          level: 'warn',
+          message: `Review parent for ${state.issueId} exceeded its deadline with no verdict — killed for warm respawn`,
+          issueId: state.issueId,
+        });
+      } catch { /* activity logging is advisory */ }
+    }
+  } catch (error: unknown) {
+    console.error('[deacon] Error checking stalled review parents:', error instanceof Error ? error.message : String(error));
+  }
+  return actions;
+}
+
+/**
  * PAN-1862 (FR-11/FR-12): detect a fork cache MISS — a forked reviewer's first
  * request reporting cacheRead == 0 when a warm hit was expected (TTL expired,
  * model mismatch, prefix drift). Purely observability: reviews are already

@@ -32,11 +32,18 @@ function issueIdForAgent(agent: AgentState): string {
   return agent.issueId || agent.id.replace(/^agent-/, '').toUpperCase();
 }
 
-function shouldSkipReviewStatus(status: ReviewStatus | null): boolean {
+export function shouldSkipReviewStatus(status: ReviewStatus | null): boolean {
   if (!status) return false;
   if (status.stuck || status.deaconIgnored || status.mergeStatus === 'merged' || status.readyForMerge) return true;
   if (status.reviewStatus === 'blocked' || status.reviewStatus === 'failed') return true;
-  return status.verificationStatus === 'failed' || status.testStatus === 'failed';
+  if (status.verificationStatus === 'failed' || status.testStatus === 'failed') return true;
+  // PAN-2581: the pipeline OWNS the issue while review/test advance it — review in
+  // flight, a passed review awaiting test, or an un-serviced durable review request
+  // (`pan done` already ran; dispatch owns the next step). Warm-idle is the work
+  // agent's intended state here (PAN-2579). Poking it told it to re-run `pan done`,
+  // which re-armed review and clobbered landed verdicts (PAN-399 burned $63 on this).
+  if (status.reviewStatus === 'reviewing' || status.reviewStatus === 'passed') return true;
+  return status.reviewStatus === 'pending' && !!status.reviewRequestedAt;
 }
 
 // PAN-2519: the rework subset of shouldSkipReviewStatus — a work agent that OWES

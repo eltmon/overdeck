@@ -265,6 +265,22 @@ export {
 } from './record.js';
 
 /**
+ * PAN-2587: never regress the pipeline block during a whole-record rebuild. A
+ * concurrent writer (e.g. a reviewer's verdict landing between the rebuild's
+ * `existing` snapshot and its write) may have put a NEWER pipeline on disk than
+ * the status the rebuild projects — observed clobbering PAN-399's passed
+ * verdict back to a pre-verdict snapshot. Same newer-wins rule (ISO `updatedAt`
+ * comparison) the journal readers use.
+ */
+export function pickNewerPipeline(
+  rebuilt: PanIssuePipelineRecord,
+  fresh: PanIssuePipelineRecord | undefined,
+): PanIssuePipelineRecord {
+  if (!fresh?.updatedAt || !rebuilt?.updatedAt) return rebuilt;
+  return rebuilt.updatedAt < fresh.updatedAt ? fresh : rebuilt;
+}
+
+/**
  * PAN-1908 / PAN-1919: rebuild and queue the per-issue permanent record for a
  * given issue. Fire-and-forget: failures are logged, never thrown, so
  * review-status writes stay synchronous and fast.
@@ -298,6 +314,7 @@ export async function updateIssueRecordForIssue(
       if (fresh?.statusOverrides && Object.keys(fresh.statusOverrides).length > 0) {
         record.statusOverrides = { ...record.statusOverrides, ...fresh.statusOverrides };
       }
+      record.pipeline = pickNewerPipeline(record.pipeline, fresh?.pipeline);
       const recordPath = writeIssueRecordSync(project, issueId, record);
       queueIssueRecordCommit(project, issueId, recordPath);
     });
