@@ -34,7 +34,7 @@ describe('queryBeadsForIssuePromise', () => {
     rmSync(testRoot, { recursive: true, force: true });
   });
 
-  it('retries transient bd lock failures before jsonl fallback', async () => {
+  it('retries transient bd lock failures before returning canonical data', async () => {
     vi.useFakeTimers();
     childProcessMocks.execFile.mockImplementationOnce((_file: string, _args: string[], _options: unknown, callback: Function) => {
       callback(new Error('database is locked'), '', 'database is locked');
@@ -56,7 +56,7 @@ describe('queryBeadsForIssuePromise', () => {
     expect(childProcessMocks.execFile).toHaveBeenCalledTimes(2);
   });
 
-  it('falls back to jsonl after exhausted transient bd failures', async () => {
+  it('marks the read stale after exhausted transient bd failures', async () => {
     vi.useFakeTimers();
     childProcessMocks.execFile.mockImplementation((_file: string, _args: string[], _options: unknown, callback: Function) => {
       callback(new Error('database is locked'), '', 'database is locked');
@@ -74,7 +74,9 @@ describe('queryBeadsForIssuePromise', () => {
       random: () => 0,
       sleep: (ms) => vi.advanceTimersByTimeAsync(ms),
     });
-    expect(result.beads).toEqual([expect.objectContaining(fallback)]);
+    expect(result.beads).toEqual([]);
+    expect(result.stale).toBe(true);
+    expect(result.reason).toMatch(/stale, not empty/);
     expect(result.transientFailure).toBeInstanceOf(BdTransientFailure);
     expect(childProcessMocks.execFile).toHaveBeenCalledTimes(2);
   });
@@ -110,7 +112,7 @@ describe('queryBeadsForIssuePromise', () => {
     );
   });
 
-  it('falls back to jsonl for ready beads after exhausted transient bd failures', async () => {
+  it('marks ready beads stale after exhausted transient bd failures', async () => {
     vi.useFakeTimers();
     childProcessMocks.execFile.mockImplementation((_file: string, _args: string[], _options: unknown, callback: Function) => {
       callback(new Error('database is locked'), '', 'database is locked');
@@ -130,14 +132,14 @@ describe('queryBeadsForIssuePromise', () => {
       sleep: (ms) => vi.advanceTimersByTimeAsync(ms),
     });
 
-    expect(result.byIssue['pan-1094']).toEqual([
-      expect.objectContaining({ id: 'jsonl-1', title: 'PAN-1094: ready' }),
-    ]);
+    expect(result.byIssue['pan-1094']).toEqual([]);
+    expect(result.stale).toBe(true);
     expect(result.transientFailure).toBeInstanceOf(BdTransientFailure);
     expect(childProcessMocks.execFile).toHaveBeenCalledTimes(2);
   });
 
-  it('does not queue ready-bead patrol reads behind an existing bd lock', async () => {
+  it('fails a patrol read stale within its bounded lock budget', async () => {
+    vi.useFakeTimers();
     const { bdProcessLockPath } = await import('../../../src/lib/bd-process-lock.js');
     const { queryReadyBeadsByIssueLabelsPromise } = await import('../../../src/lib/beads-query.js');
     const path = await bdProcessLockPath(workspacePath);
@@ -148,11 +150,17 @@ describe('queryBeadsForIssuePromise', () => {
       JSON.stringify({ id: 'jsonl-2', title: 'PAN-1094: blocked', status: 'open', labels: ['pan-1094'], dependency_count: 1 }),
     ].join('\n') + '\n');
 
-    const result = await queryReadyBeadsByIssueLabelsPromise(workspacePath, ['PAN-1094']);
+    const resultPromise = queryReadyBeadsByIssueLabelsPromise(workspacePath, ['PAN-1094'], {
+      acquisitionTimeoutMs: 50,
+      pollIntervalMs: 10,
+      sleep: (ms) => vi.advanceTimersByTimeAsync(ms),
+      maxAttempts: 1,
+    });
+    await vi.runAllTimersAsync();
+    const result = await resultPromise;
 
-    expect(result.byIssue['pan-1094']).toEqual([
-      expect.objectContaining({ id: 'jsonl-1', title: 'PAN-1094: ready' }),
-    ]);
+    expect(result.byIssue['pan-1094']).toEqual([]);
+    expect(result.stale).toBe(true);
     expect(childProcessMocks.execFile).not.toHaveBeenCalled();
   });
 
