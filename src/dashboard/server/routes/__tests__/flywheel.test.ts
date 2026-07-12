@@ -336,7 +336,7 @@ describe('GET /api/flywheel/substrate-bug-weights', () => {
         weightReason: 'Criterion 3 is green',
       },
     ]);
-    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenCalledWith('30d');
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenCalledWith('30d', expect.objectContaining({ limit: 50, offset: 0 }));
   });
 
   it('passes an explicit window query param to the service', async () => {
@@ -345,7 +345,25 @@ describe('GET /api/flywheel/substrate-bug-weights', () => {
     const result = await requestFlywheelRoute('/api/flywheel/substrate-bug-weights?window=7d');
 
     expect(result.status).toBe(200);
-    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenCalledWith('7d');
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenCalledWith('7d', expect.objectContaining({ limit: 50, offset: 0 }));
+  });
+
+  it('falls back to the default window for unsupported values', async () => {
+    substrateBugWeightsMocks.listSubstrateBugWeights.mockResolvedValue([]);
+
+    const result = await requestFlywheelRoute('/api/flywheel/substrate-bug-weights?window=999d');
+
+    expect(result.status).toBe(200);
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenCalledWith('30d', expect.objectContaining({ limit: 50, offset: 0 }));
+  });
+
+  it('clamps limit between 1 and the maximum and parses offset', async () => {
+    substrateBugWeightsMocks.listSubstrateBugWeights.mockResolvedValue([]);
+
+    const result = await requestFlywheelRoute('/api/flywheel/substrate-bug-weights?limit=500&offset=10');
+
+    expect(result.status).toBe(200);
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenCalledWith('30d', expect.objectContaining({ limit: 100, offset: 10 }));
   });
 });
 

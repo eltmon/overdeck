@@ -63,7 +63,7 @@ function makeStats(overrides: Partial<FlywheelStats['criteria']> = {}): Flywheel
   };
 }
 
-function makeBug(overrides: Partial<WeightedSubstrateBug> & { body?: string | null; labels?: readonly string[] } = {}): {
+function makeBug(overrides: Partial<WeightedSubstrateBug> & { affectedCriteria?: number[] } = {}): {
   issueId: string;
   filedAt: string;
   runId: string | null;
@@ -71,11 +71,10 @@ function makeBug(overrides: Partial<WeightedSubstrateBug> & { body?: string | nu
   discoveredInIssueId: string | null;
   severity: string;
   status: 'open' | 'fixed';
+  affectedCriteria: number[];
   fixMergedAt: string | null;
   fixCommitSha: string | null;
   updatedAt: string;
-  body?: string | null;
-  labels?: readonly string[];
 } {
   return {
     issueId: 'PAN-1',
@@ -85,6 +84,7 @@ function makeBug(overrides: Partial<WeightedSubstrateBug> & { body?: string | nu
     discoveredInIssueId: null,
     severity: 'P1',
     status: 'open',
+    affectedCriteria: [],
     fixMergedAt: null,
     fixCommitSha: null,
     updatedAt: '2026-07-01T00:00:00.000Z',
@@ -113,12 +113,12 @@ describe('listSubstrateBugWeights', () => {
       makeBug({
         issueId: 'PAN-HEAVY',
         filedAt: '2026-07-02T00:00:00.000Z',
-        body: 'Flywheel-Affects-Criterion: 1',
+        affectedCriteria: [1],
       }),
       makeBug({
         issueId: 'PAN-LIGHT',
         filedAt: '2026-07-01T00:00:00.000Z',
-        body: 'Flywheel-Affects-Criterion: 3',
+        affectedCriteria: [3],
       }),
     ];
 
@@ -140,8 +140,7 @@ describe('listSubstrateBugWeights', () => {
         issueId: 'PAN-1',
         severity: 'P0',
         filedBy: 'operator',
-        body: 'Flywheel-Affects-Criterion: 2\n',
-        labels: ['affects-criterion-3'],
+        affectedCriteria: [2, 3],
       }),
     ];
 

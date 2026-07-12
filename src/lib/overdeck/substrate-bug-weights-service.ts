@@ -4,7 +4,6 @@ import {
   parseFlywheelStatsWindow,
 } from '../../dashboard/server/services/flywheel-telemetry.js';
 import { derivePipelineRunStatsInputs } from '../../dashboard/server/services/pipeline-run-metrics.js';
-import { parseAffectedCriteria } from './affected-criteria.js';
 import { computeSubstrateBugWeight } from './substrate-bug-weight.js';
 import { listInWindow, type FlywheelSubstrateBug } from './flywheel-substrate-bugs.js';
 
@@ -17,17 +16,14 @@ export interface WeightedSubstrateBug {
   weightReason: string;
 }
 
-interface SubstrateBugInput extends FlywheelSubstrateBug {
-  body?: string | null;
-  labels?: readonly string[];
-}
-
 export interface ListSubstrateBugWeightsDeps {
   stats?: FlywheelStats;
   completedPipelineRuns?: number;
   computeStats?: typeof computeFlywheelStats;
   deriveInputs?: typeof derivePipelineRunStatsInputs;
-  listBugs?: (since: string, until: string) => SubstrateBugInput[] | Promise<SubstrateBugInput[]>;
+  listBugs?: (since: string, until: string) => FlywheelSubstrateBug[] | Promise<FlywheelSubstrateBug[]>;
+  limit?: number;
+  offset?: number;
   now?: () => Date;
 }
 
@@ -55,12 +51,12 @@ export async function listSubstrateBugWeights(
     });
   }
 
-  const listBugs = deps.listBugs ?? (listInWindow as (since: string, until: string) => SubstrateBugInput[] | Promise<SubstrateBugInput[]>);
+  const listBugs = deps.listBugs ?? listInWindow;
   const bugs = await listBugs(since, until);
   const insufficientTelemetry = completedPipelineRuns < 3;
 
   const rows = bugs.map((bug) => {
-    const affectedCriteria = parseAffectedCriteria(bug.body, bug.labels);
+    const affectedCriteria = bug.affectedCriteria;
 
     if (insufficientTelemetry) {
       return {
@@ -84,8 +80,14 @@ export async function listSubstrateBugWeights(
     };
   });
 
-  return rows.sort((a, b) => {
+  const sorted = rows.sort((a, b) => {
     if (b.weight !== a.weight) return b.weight - a.weight;
     return a.issueId.localeCompare(b.issueId);
   });
+
+  const offset = Math.max(0, deps.offset ?? 0);
+  if (deps.limit !== undefined) {
+    return sorted.slice(offset, offset + deps.limit);
+  }
+  return offset > 0 ? sorted.slice(offset) : sorted;
 }

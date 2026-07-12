@@ -65,6 +65,23 @@ function numericSubfield(value: FlywheelStatsCriterionValue, field: string | und
   return typeof fieldValue === 'number' && Number.isFinite(fieldValue) ? fieldValue : undefined;
 }
 
+function maxBucketRatio(value: FlywheelStatsCriterionValue): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined;
+
+  let max: number | undefined;
+  for (const bucket of ['simple', 'medium', 'complex']) {
+    const bucketValue = (value as Record<string, unknown>)[bucket];
+    if (bucketValue && typeof bucketValue === 'object' && !Array.isArray(bucketValue)) {
+      const ratio = (bucketValue as Record<string, unknown>).ratio;
+      if (typeof ratio === 'number' && Number.isFinite(ratio) && (max === undefined || ratio > max)) {
+        max = ratio;
+      }
+    }
+  }
+  return max;
+}
+
 function normalizedDistance(
   direction: Direction,
   value: number | undefined,
@@ -110,8 +127,8 @@ export function computeSubstrateBugWeight(criteria: number[], stats: FlywheelSta
 
     const meta: CriterionMeta = CRITERION_META[criterion];
     const stat = stats.criteria[meta.key];
-    const value = numericSubfield(stat.value, meta.valueField);
-    const target = numericSubfield(stat.target, meta.valueField);
+    const value = criterion === 6 ? maxBucketRatio(stat.value) : numericSubfield(stat.value, meta.valueField);
+    const target = criterion === 6 ? numericSubfield(stat.target, 'maxRatio') : numericSubfield(stat.target, meta.valueField);
     const distance = normalizedDistance(meta.direction, value, target);
     const contribution = STATUS_MULT[stat.status] * (STATUS_FLOOR[stat.status] + distance);
 

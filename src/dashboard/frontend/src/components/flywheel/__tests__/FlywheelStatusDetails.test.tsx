@@ -152,6 +152,7 @@ describe('FlywheelStatusDetails', () => {
     const rows = screen.getAllByTestId('flywheel-suggestion');
     expect(rows).toHaveLength(2);
     expect(within(rows[0]).getByTestId('suggestion-weight-badge')).toHaveTextContent('weight 4.8');
+    expect(within(rows[0]).getByTestId('suggestion-weight-badge')).toHaveClass('bg-info/15', 'text-info-foreground', 'border-info/30', 'font-mono');
     expect(within(rows[0]).getByTestId('suggestion-weight-reason')).toHaveTextContent('Criterion 1 is red');
     expect(within(rows[1]).queryByTestId('suggestion-weight-badge')).not.toBeInTheDocument();
     expect(within(rows[1]).queryByTestId('suggestion-weight-reason')).not.toBeInTheDocument();

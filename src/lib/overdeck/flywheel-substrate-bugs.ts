@@ -26,6 +26,7 @@ export interface FlywheelSubstrateBug {
   filedBy: FlywheelSubstrateBugFiledBy;
   discoveredInIssueId: string | null;
   severity: string;
+  affectedCriteria: number[];
   status: FlywheelSubstrateBugStatus;
   fixMergedAt: string | null;
   fixCommitSha: string | null;
@@ -39,6 +40,7 @@ export interface UpsertFlywheelSubstrateBugInput {
   filedBy: FlywheelSubstrateBugFiledBy;
   discoveredInIssueId?: string | null;
   severity?: string;
+  affectedCriteria?: readonly number[];
   status?: FlywheelSubstrateBugStatus;
   fixMergedAt?: string | null;
   fixCommitSha?: string | null;
@@ -54,10 +56,21 @@ interface Row {
   filed_by: string;
   discovered_in_issue_id: string | null;
   severity: string;
+  affected_criteria: string | null;
   status: string;
   fix_merged_at: number | null;
   fix_commit_sha: string | null;
   updated_at: number;
+}
+
+function parseAffectedCriteriaColumn(value: string | null): number[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((n): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= 7) : [];
+  } catch {
+    return [];
+  }
 }
 
 function mapRow(row: Row): FlywheelSubstrateBug {
@@ -68,6 +81,7 @@ function mapRow(row: Row): FlywheelSubstrateBug {
     filedBy: row.filed_by as FlywheelSubstrateBugFiledBy,
     discoveredInIssueId: row.discovered_in_issue_id,
     severity: row.severity,
+    affectedCriteria: parseAffectedCriteriaColumn(row.affected_criteria),
     status: row.status as FlywheelSubstrateBugStatus,
     fixMergedAt: row.fix_merged_at == null ? null : new Date(row.fix_merged_at).toISOString(),
     fixCommitSha: row.fix_commit_sha,
@@ -87,14 +101,15 @@ export function upsert(input: UpsertFlywheelSubstrateBugInput): FlywheelSubstrat
   db.prepare(`
     INSERT INTO flywheel_substrate_bugs (
       issue_id, filed_at, run_id, filed_by, discovered_in_issue_id,
-      severity, status, fix_merged_at, fix_commit_sha, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      severity, affected_criteria, status, fix_merged_at, fix_commit_sha, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(issue_id) DO UPDATE SET
       filed_at = excluded.filed_at,
       run_id = excluded.run_id,
       filed_by = excluded.filed_by,
       discovered_in_issue_id = excluded.discovered_in_issue_id,
       severity = excluded.severity,
+      affected_criteria = excluded.affected_criteria,
       status = CASE WHEN ? = 1 THEN excluded.status ELSE flywheel_substrate_bugs.status END,
       fix_merged_at = CASE WHEN ? = 1 THEN excluded.fix_merged_at ELSE flywheel_substrate_bugs.fix_merged_at END,
       fix_commit_sha = CASE WHEN ? = 1 THEN excluded.fix_commit_sha ELSE flywheel_substrate_bugs.fix_commit_sha END,
@@ -106,6 +121,7 @@ export function upsert(input: UpsertFlywheelSubstrateBugInput): FlywheelSubstrat
     input.filedBy,
     input.discoveredInIssueId ?? null,
     input.severity ?? 'P2',
+    input.affectedCriteria && input.affectedCriteria.length > 0 ? JSON.stringify([...input.affectedCriteria]) : null,
     input.status ?? 'open',
     input.fixMergedAt == null ? null : new Date(input.fixMergedAt).getTime(),
     input.fixCommitSha ?? null,
@@ -117,7 +133,7 @@ export function upsert(input: UpsertFlywheelSubstrateBugInput): FlywheelSubstrat
 
   const row = db.prepare(`
     SELECT issue_id, filed_at, run_id, filed_by, discovered_in_issue_id,
-           severity, status, fix_merged_at, fix_commit_sha, updated_at
+           severity, affected_criteria, status, fix_merged_at, fix_commit_sha, updated_at
     FROM flywheel_substrate_bugs WHERE issue_id = ?
   `).get(input.issueId) as Row;
   return mapRow(row);
@@ -158,7 +174,7 @@ export function listInWindow(since: string, until = new Date().toISOString()): F
   const db = ensureTable();
   const rows = db.prepare(`
     SELECT issue_id, filed_at, run_id, filed_by, discovered_in_issue_id,
-           severity, status, fix_merged_at, fix_commit_sha, updated_at
+           severity, affected_criteria, status, fix_merged_at, fix_commit_sha, updated_at
     FROM flywheel_substrate_bugs
     WHERE filed_at >= ? AND filed_at <= ?
     ORDER BY filed_at ASC, issue_id ASC

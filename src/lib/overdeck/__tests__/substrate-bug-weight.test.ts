@@ -133,7 +133,36 @@ describe('computeSubstrateBugWeight', () => {
     expect(absentField.weight).toBe(3);
   });
 
-  it('returns zero and an insufficient telemetry reason when every affected criterion has insufficient data', () => {
+  it('normalizes criterion 6 from the highest bucket ratio vs target.maxRatio', () => {
+    const red = computeSubstrateBugWeight([6], stats({
+      c6_timeConsistency: criterion({
+        label: 'Time-in-pipeline consistency',
+        value: {
+          simple: { medianMs: 10, p95Ms: 20, ratio: 2 },
+          medium: { medianMs: 10, p95Ms: 35, ratio: 3.5 },
+          complex: { medianMs: 10, p95Ms: 18, ratio: 1.8 },
+        },
+        target: { maxRatio: 2 },
+        status: 'red',
+      }),
+    }));
+    const green = computeSubstrateBugWeight([6], stats({
+      c6_timeConsistency: criterion({
+        label: 'Time-in-pipeline consistency',
+        value: {
+          simple: { medianMs: 10, p95Ms: 20, ratio: 1.5 },
+          medium: { medianMs: 10, p95Ms: 15, ratio: 1.4 },
+          complex: { medianMs: 10, p95Ms: 18, ratio: 1.6 },
+        },
+        target: { maxRatio: 2 },
+        status: 'green',
+      }),
+    }));
+
+    expect(red.weight).toBeGreaterThan(green.weight);
+    expect(red.weight).toBe(5.25);
+  });
+  it('returns zero when affected criteria have insufficient data', () => {
     const result = computeSubstrateBugWeight([1, 3], stats({
       c1_bugRate: criterion({
         label: 'Substrate-bug discovery rate',

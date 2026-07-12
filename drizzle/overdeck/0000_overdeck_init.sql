@@ -518,6 +518,7 @@ CREATE TABLE `flywheel_substrate_bugs` (
 	`filed_by` text NOT NULL,
 	`discovered_in_issue_id` text,
 	`severity` text NOT NULL DEFAULT 'P2',
+	`affected_criteria` text,
 	`status` text NOT NULL DEFAULT 'open',
 	`fix_merged_at` integer,
 	`fix_commit_sha` text,

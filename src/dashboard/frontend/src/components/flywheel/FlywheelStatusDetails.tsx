@@ -103,7 +103,10 @@ function SuggestionPriorityBadge({ priority }: { priority: FlywheelSuggestion['p
 function WeightBadge({ weight }: { weight: number }) {
   return (
     <span
-      className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+      className={cn(
+        'inline-flex rounded border px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide',
+        'bg-info/15 text-info-foreground border-info/30',
+      )}
       title="Substrate-bug weight by affected v1.0 criterion"
       data-testid="suggestion-weight-badge"
     >
