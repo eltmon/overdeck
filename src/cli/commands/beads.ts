@@ -15,6 +15,7 @@ import { platform } from 'os';
 import { registerBeadsReconcileCommand } from './admin/beads-reconcile.js';
 import { standardizeBeadsConfig } from '../../lib/beads/config-standardize.js';
 import { runMutationBatch, type BdMutationClient } from '../../lib/beads/writer.js';
+import { assertSupportedBdVersion, readInstalledBdVersion } from '../../lib/beads/version.js';
 
 const execAsync = promisify(exec);
 
@@ -334,13 +335,7 @@ async function upgradeCommand(checkOnly: boolean = false): Promise<void> {
 
   // Get current version
   let currentVersion = 'not installed';
-  try {
-    const { stdout } = await execAsync('bd --version', { encoding: 'utf-8' });
-    const match = stdout.match(/(\d+\.\d+\.\d+)/);
-    if (match) {
-      currentVersion = match[1];
-    }
-  } catch {}
+  currentVersion = await readInstalledBdVersion() ?? currentVersion;
 
   // Get latest version from GitHub
   let latestVersion = 'unknown';
@@ -404,10 +399,11 @@ async function upgradeCommand(checkOnly: boolean = false): Promise<void> {
 
     // Verify new version
     try {
-      const { stdout } = await execAsync('bd --version', { encoding: 'utf-8' });
-      const match = stdout.match(/(\d+\.\d+\.\d+)/);
-      if (match) {
-        console.log(chalk.green(`\n✓ Now running beads v${match[1]}`));
+      const installed = await readInstalledBdVersion();
+      if (installed) {
+        assertSupportedBdVersion(installed);
+        console.log(chalk.green(`\n✓ Now running beads v${installed}`));
+        console.log(chalk.dim('Schema adoption is a separate operator cutover: one designated migrator runs migrate and push; every other clone runs bd bootstrap.'));
       }
     } catch {}
   } catch (error: any) {

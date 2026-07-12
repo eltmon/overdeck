@@ -6,6 +6,10 @@ history is Dolt at `refs/dolt/data` on the project's git remote. The
 reconciliation reports, and the cutover marker; it never stores Dolt database
 directories or runtime files.
 
+Supported `bd` releases follow a minimum-compatible-version policy, currently
+`bd >= 1.1.0`; this is not an exact version pin. The migration-fork guard and
+cascade-repair pull behavior are required by the canonical Dolt design.
+
 ## Local topology
 
 `bd` normally runs in embedded mode: an in-process Dolt engine stores its local
