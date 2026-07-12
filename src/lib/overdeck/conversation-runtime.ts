@@ -58,7 +58,8 @@ import { piFifoPaths } from '../runtimes/pi-fifo.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { workspaceContextFile, piGlobalContextFile } from '../context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
-import { sessionFilePath, packageRoot, getOverdeckHome, resolveOhmypiExtensionPath } from '../paths.js';
+import { sessionFilePath, getOverdeckHome, resolveOhmypiExtensionPath } from '../paths.js';
+import { resolvePtySupervisorScriptPath } from '../channels/pty-supervisor-locate.js';
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { getEventStore } from '../../dashboard/server/event-store.js';
 import { markRespawnPending } from '../../dashboard/server/services/pending-respawn.js';
@@ -373,9 +374,6 @@ export async function handleConversationSwitchModel(
     sessionAlive: false,
   });
 }
-function resolvePtySupervisorScriptPath(): string {
-  return join(packageRoot, 'dist', 'pty-supervisor.js');
-}
 function getPtySupervisorSocketPath(agentId: string): string {
   return join(getOverdeckHome(), 'sockets', `pty-${agentId}.sock`);
 }
@@ -601,20 +599,11 @@ export async function spawnConversationSession(
   if (effort && !SAFE_EFFORT_PATTERN.test(effort)) {
     throw new Error('Invalid effort level');
   }
-  let useSupervisor = shouldUseSupervisorForConversation(harness);
+  const useSupervisor = shouldUseSupervisorForConversation(harness);
   let supervisorScriptPath: string | undefined;
   if (useSupervisor) {
-    const candidate = resolvePtySupervisorScriptPath();
-    if (existsSync(candidate)) {
-      supervisorScriptPath = candidate;
-      await writePtyToken(tmuxSession);
-    } else {
-      // Packaged installs (desktop AppImage/dmg, npx) do not ship the
-      // supervisor artifact yet (PAN-2592). The supervisor is delivery tier 1
-      // of 3 — spawn without it and let delivery fall back to channels/tmux.
-      useSupervisor = false;
-      console.warn(`[conversations] pty-supervisor artifact missing at ${candidate} — spawning ${tmuxSession} without supervisor (PAN-2592)`);
-    }
+    supervisorScriptPath = resolvePtySupervisorScriptPath();
+    await writePtyToken(tmuxSession);
   }
   let channelsBridgeMcpConfig: string | undefined;
   if (

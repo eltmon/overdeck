@@ -538,26 +538,19 @@ describe('spawnAgent PTY supervisor wiring', () => {
     }
   });
 
-  it('launches without the supervisor when the artifact is missing (packaged installs, PAN-2592)', async () => {
+  it('fails before launcher or tmux creation when the supervisor artifact is missing', async () => {
     const { spawnAgent } = await import('../agents.js');
 
-    const state = await spawnAgent({
+    await expect(spawnAgent({
       issueId: 'PAN-1405',
       workspace,
       role: 'work',
       model: 'claude-sonnet-4-6',
-    });
+    })).rejects.toThrow('pty-supervisor build artifact missing — run `npm run build`.');
 
     const agentDir = join(tmpHome, 'agents', 'agent-pan-1405');
-    const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
-    expect(state.supervisorEnabled).toBeUndefined();
-    expect(launcher).not.toContain('pty-supervisor.js');
+    expect(createSessionMock).not.toHaveBeenCalled();
+    expect(existsSync(join(agentDir, 'launcher.sh'))).toBe(false);
     expect(existsSync(join(agentDir, 'pty-token'))).toBe(false);
-    expect(createSessionMock).toHaveBeenCalledWith(
-      'agent-pan-1405',
-      workspace,
-      `bash ${join(agentDir, 'launcher.sh')}`,
-      expect.any(Object),
-    );
   });
 });

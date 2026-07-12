@@ -1,4 +1,3 @@
-import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { homedir } from 'os';
 import { dirname, join } from 'path';
@@ -8,7 +7,7 @@ import { isClaudeCodeChannelsMcpEnabled } from '../config-yaml.js';
 import type { ModelId } from '../settings.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
-import { packageRoot } from '../paths.js';
+import { resolvePtySupervisorScriptPath } from '../channels/pty-supervisor-locate.js';
 import { getProviderForModelSync } from '../providers.js';
 import { writePtyToken } from '../pty-token.js';
 import { capturePane, sendRawKeystroke } from '../tmux.js';
@@ -137,14 +136,6 @@ export async function prepareSupervisorForFreshLaunch(
   }
 
   const supervisorScriptPath = resolvePtySupervisorScriptPath();
-  if (!existsSync(supervisorScriptPath)) {
-    // Packaged installs (desktop AppImage/dmg, npx) do not ship the supervisor
-    // artifact yet (PAN-2592). The supervisor is delivery tier 1 of 3 — launch
-    // without it and let delivery fall back to channels/tmux.
-    console.warn(`[${agentId}] pty-supervisor artifact missing at ${supervisorScriptPath} — launching without supervisor (PAN-2592)`);
-    delete state.supervisorEnabled;
-    return { useSupervisor: false };
-  }
   await writePtyToken(agentId);
   state.supervisorEnabled = true;
   return { useSupervisor: true, supervisorScriptPath };
@@ -175,19 +166,9 @@ export async function prepareSupervisorForRelaunch(
   }
 
   const supervisorScriptPath = resolvePtySupervisorScriptPath();
-  if (!existsSync(supervisorScriptPath)) {
-    // Same degradation as the fresh-launch path (PAN-2592).
-    console.warn(`[${agentId}] pty-supervisor artifact missing at ${supervisorScriptPath} — relaunching without supervisor (PAN-2592)`);
-    delete state.supervisorEnabled;
-    return { useSupervisor: false };
-  }
   await writePtyToken(agentId);
   state.supervisorEnabled = true;
   return { useSupervisor: true, supervisorScriptPath };
-}
-
-function resolvePtySupervisorScriptPath(): string {
-  return join(packageRoot, 'dist', 'pty-supervisor.js');
 }
 
 /**
