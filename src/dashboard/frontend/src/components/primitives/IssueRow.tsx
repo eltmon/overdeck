@@ -43,6 +43,8 @@ export type IssueRowProps = {
   ledger?: IssueRowLedger;
   assignee?: IssueRowAssignee;
   variant?: IssueRowVariant;
+  /** PAN-1234: keyboard navigation focus indicator. */
+  focused?: boolean;
   onOpen?: (issueId: string) => void;
   onContextMenu?: () => void;
   actionMenu?: ReactNode;
@@ -105,6 +107,7 @@ export default function IssueRow({
   ledger,
   assignee,
   variant = 'pipeline',
+  focused = false,
   onOpen,
   onContextMenu,
   actionMenu,
@@ -136,6 +139,7 @@ export default function IssueRow({
         'group relative grid w-full items-center border-b border-border text-left transition-colors duration-200 last:border-b-0 hover:bg-accent before:absolute before:bottom-[8px] before:left-[10px] before:top-[8px] before:w-[2px] before:rounded-[2px]',
         ROW_CLASSES[variant],
         PRIORITY_BORDER_CLASSES[priority],
+        focused && 'ring-2 ring-primary z-10',
         className,
       )}
       style={{ gridTemplateColumns }}

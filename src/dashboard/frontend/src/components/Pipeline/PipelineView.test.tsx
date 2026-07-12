@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -341,5 +341,46 @@ describe('PipelineView', () => {
     expect(container.querySelector('[data-component="top-bar"]')).toBeInTheDocument();
     expect(container.querySelector('[data-component="metric-strip"]')).toBeInTheDocument();
     expect(container.querySelector('[data-component="pipeline-filter-row"]')).toBeInTheDocument();
+  });
+
+  it('moves j/k through rows and Enter opens the selected issue', async () => {
+    const { container } = renderPipelineView();
+
+    const firstId = container.querySelector('[data-component="issue-row"]')?.getAttribute('data-issue-id');
+    expect(firstId).toBeTruthy();
+
+    // j selects the first row.
+    fireEvent.keyDown(document, { key: 'j' });
+    const firstRow = container.querySelector(`[data-component="issue-row"][data-issue-id="${firstId}"]`) as HTMLElement;
+    await waitFor(() => expect(firstRow.className).toContain('ring-primary'));
+
+    // j moves to the next row.
+    fireEvent.keyDown(document, { key: 'j' });
+    const rows = Array.from(container.querySelectorAll('[data-component="issue-row"]'));
+    const selectedIndex = rows.findIndex((row) => row.className.includes('ring-primary'));
+    expect(selectedIndex).toBe(1);
+
+    // k wraps back to the first row.
+    fireEvent.keyDown(document, { key: 'k' });
+    await waitFor(() => expect(firstRow.className).toContain('ring-primary'));
+
+    // Enter opens the focused row.
+    fireEvent.keyDown(document, { key: 'Enter' });
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: firstId, tab: 'overview' });
+  });
+
+  it('does not move row focus when typing inside an input', () => {
+    const { container } = renderPipelineView();
+
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.focus();
+
+    fireEvent.keyDown(input, { key: 'j' });
+
+    const rows = Array.from(container.querySelectorAll('[data-component="issue-row"]'));
+    expect(rows.some((row) => row.className.includes('ring-primary'))).toBe(false);
+
+    document.body.removeChild(input);
   });
 });
