@@ -1,5 +1,5 @@
 import type { FlywheelStats, FlywheelStatsCriterion } from '@overdeck/contracts';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { listSubstrateBugWeights, type WeightedSubstrateBug } from '../substrate-bug-weights-service.js';
 
 function criterion(overrides: Partial<FlywheelStatsCriterion> = {}): FlywheelStatsCriterion {
@@ -206,5 +206,22 @@ describe('listSubstrateBugWeights', () => {
     });
 
     expect(rows.map((r) => r.issueId)).toEqual(['PAN-EARLIER', 'PAN-LATER']);
+  });
+
+  it('clamps oversized windows to 365 days at the service layer', async () => {
+    const stats = makeStats();
+    const listBugs = vi.fn().mockReturnValue([]);
+
+    await listSubstrateBugWeights('366d', {
+      stats,
+      completedPipelineRuns: 10,
+      listBugs,
+      now: () => new Date('2026-07-07T00:00:00.000Z'),
+    });
+
+    expect(listBugs).toHaveBeenCalledWith(
+      new Date('2025-07-07T00:00:00.000Z').toISOString(),
+      new Date('2026-07-07T00:00:00.000Z').toISOString(),
+    );
   });
 });

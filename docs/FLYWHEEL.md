@@ -114,7 +114,7 @@ The result is a single number (`weight`) and a human-readable `weightReason` suc
 
 `pan flywheel weights [--window <dur>] [--issue <id>] [--json]` is the sandbox-safe CLI surface for the same data the dashboard uses. Without `--json` it prints a table; with `--json` it emits the full weighted rows. The dashboard renders the weight as a badge on each substrate-bug suggestion in the Status panel, alongside the `weightReason`, and sorts by priority then weight.
 
-The dashboard HTTP endpoint `GET /api/flywheel/substrate-bug-weights` accepts the same `?window=<dur>` duration grammar as the CLI, but caps the effective window at **365 days** to keep request-path work bounded. Omitted, malformed, non-positive, or oversized values fall back to `30d`.
+The dashboard HTTP endpoint `GET /api/flywheel/substrate-bug-weights` accepts the same `?window=<dur>` duration grammar as the CLI and passes all shared-parser-valid durations through to the service. Omitted, malformed, or non-positive values fall back to `30d`. The service caps the effective window at **365 days** to keep request-path work bounded.
 
 ## Lifecycle
 

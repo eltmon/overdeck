@@ -7,6 +7,8 @@ import { derivePipelineRunStatsInputs } from '../../dashboard/server/services/pi
 import { computeSubstrateBugWeight } from './substrate-bug-weight.js';
 import { listInWindow, type FlywheelSubstrateBug } from './flywheel-substrate-bugs.js';
 
+const MAX_WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
+
 export interface WeightedSubstrateBug {
   issueId: string;
   severity: string;
@@ -32,7 +34,11 @@ export async function listSubstrateBugWeights(
   deps: ListSubstrateBugWeightsDeps = {},
 ): Promise<WeightedSubstrateBug[]> {
   const now = (deps.now ?? (() => new Date()))();
-  const parsedWindow = parseFlywheelStatsWindow(window);
+  let parsedWindow = parseFlywheelStatsWindow(window);
+  if (parsedWindow.ms > MAX_WINDOW_MS) {
+    window = '365d';
+    parsedWindow = parseFlywheelStatsWindow(window);
+  }
   const since = new Date(now.getTime() - parsedWindow.ms).toISOString();
   const until = now.toISOString();
 

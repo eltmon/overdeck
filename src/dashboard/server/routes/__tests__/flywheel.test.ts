@@ -355,16 +355,16 @@ describe('GET /api/flywheel/substrate-bug-weights', () => {
     expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenLastCalledWith('12h', expect.objectContaining({ limit: 50, offset: 0 }));
   });
 
-  it('clamps windows to a documented maximum of 365 days', async () => {
+  it('passes through all shared-parser-valid durations unchanged', async () => {
     substrateBugWeightsMocks.listSubstrateBugWeights.mockResolvedValue([]);
 
     const huge = await requestFlywheelRoute('/api/flywheel/substrate-bug-weights?window=999999d');
     expect(huge.status).toBe(200);
-    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenLastCalledWith('365d', expect.objectContaining({ limit: 50, offset: 0 }));
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenLastCalledWith('999999d', expect.objectContaining({ limit: 50, offset: 0 }));
 
     const overMax = await requestFlywheelRoute('/api/flywheel/substrate-bug-weights?window=366d');
     expect(overMax.status).toBe(200);
-    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenLastCalledWith('365d', expect.objectContaining({ limit: 50, offset: 0 }));
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenLastCalledWith('366d', expect.objectContaining({ limit: 50, offset: 0 }));
 
     const atMax = await requestFlywheelRoute('/api/flywheel/substrate-bug-weights?window=365d');
     expect(atMax.status).toBe(200);
