@@ -186,17 +186,14 @@
       "reason": "feedback",
       "note": "[2026-07-11T23:49Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-11T23:49:03.470Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-11T23:49:03Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-399\n\nrelease engine starts dependents even when dependencies are blocked\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-399 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T00:17:19.960Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -321,19 +318,19 @@
     "recordedAt": "2026-07-11T23:47:28.889Z"
   },
   "created": "2026-07-11T09:28:34.266Z",
-  "updated": "2026-07-11T23:51:36.711Z",
+  "updated": "2026-07-12T00:17:24.652Z",
   "pipeline": {
     "issueId": "PAN-399",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-11T23:51:36.626Z",
-    "reviewNotes": "CHANGES REQUESTED: release lookup/retry paths are case-sensitive after accepting lowercase issue IDs — GET /api/workspaces/:issueId/release and pan rollout status/retry pass the raw param to getReleaseSetSync/runRelease while storage queries are case-sensitive, so lowercase pan-399 misses sets stored as PAN-399. Canonicalize once after parsing + add lowercase coverage. Full findings: .pan/review/agent-pan-399-review-3d1876c4/review.md",
+    "updatedAt": "2026-07-12T00:17:24.537Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2577",
-    "lastVerifiedCommit": "50e6261801c2e934d4ed221f2186ea5e6ae69c5d",
+    "lastVerifiedCommit": "a2edef4778231d558c49b0e76d6bb33ba3dee46f",
     "reviewRequestedAt": "2026-07-11T23:47:39.863Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -536,9 +533,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 5156288,
-            "output": 323825,
-            "cacheRead": 183202560,
+            "input": 5295456,
+            "output": 335783,
+            "cacheRead": 191495680,
             "cacheWrite": 0
           }
         }
@@ -587,15 +584,15 @@
           "cacheWrite": 77989
         },
         "custom/kimi-k2.7-code": {
-          "input": 5156288,
-          "output": 323825,
-          "cacheRead": 183202560,
+          "input": 5295456,
+          "output": 335783,
+          "cacheRead": 191495680,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 145.396445,
-        "pricingAsOf": "2026-07-11T23:51:36.702Z"
+        "usd": 147.152176,
+        "pricingAsOf": "2026-07-12T00:17:24.629Z"
       }
     },
     "merges": [
