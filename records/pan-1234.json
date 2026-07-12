@@ -16,6 +16,11 @@
       "reason": "feedback",
       "note": "[2026-07-12T21:48Z] verification-gate → FAILED — seq 1",
       "timestamp": "2026-07-12T21:48:50.967Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-12T22:22:18.805Z"
     }
   ],
   "feedback": [
@@ -28,7 +33,7 @@
     }
   ],
   "created": "2026-07-12T20:43:21.494Z",
-  "updated": "2026-07-12T22:07:17.926Z",
+  "updated": "2026-07-12T22:22:18.807Z",
   "pipeline": {
     "issueId": "PAN-1234",
     "reviewStatus": "failed",
@@ -88,8 +93,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "conformance-test-strengthen": "completed",
     "conformance-test-strengthen.ac1": "completed",
