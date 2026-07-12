@@ -201,7 +201,6 @@ describe('IssueDrawer', () => {
       workspace: '/tmp/pan-1',
     };
     useDashboardStore.setState({ agentsById: { [workAgent.id]: workAgent } });
-
     const fetchSpy = mockFetch();
     vi.stubGlobal('fetch', fetchSpy);
 
