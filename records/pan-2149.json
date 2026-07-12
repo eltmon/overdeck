@@ -31,6 +31,11 @@
       "id": "D-test-waived",
       "summary": "Test gate waived: Refactor-only seam extraction; no behavior change required new tests. Existing coverage was exercised by scoped Cloister suites and the full Vitest suite.",
       "recordedAt": "2026-07-11T17:03:44.340Z"
+    },
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: Refactor-only seam extraction; no behavior change required new tests. Existing coverage was exercised by scoped Cloister suites and the full Vitest suite.",
+      "recordedAt": "2026-07-12T09:29:22.029Z"
     }
   ],
   "sessionHistory": [
@@ -96,9 +101,37 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-11T17:03:58.677Z"
+    },
+    {
+      "timestamp": "2026-07-12T09:29:33.595Z",
+      "reason": "end",
+      "note": "Test gate waived: Refactor-only seam extraction; no behavior change required new tests. Existing coverage was exercised by scoped Cloister suites and the full Vitest suite."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T09:29:35.692Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T09:29:41.496Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-12T09:34Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-12T09:34:23.009Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-12T09:34:22Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2149\n\n# Review Synthesis — PAN-2149 — 2026-07-12T05:33:52-04:00\n\n## Verdict: CHANGES REQUESTED — reviewer infrastructure failures for security, performance, and requirements\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2149/.pan/review/agent-pan-2149-review-555776b7/context.json\n- Branch: feature/pan-2149\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2149\n- HEAD reviewed: 555776b7545a8092779381ee66b45a66e2206f41\n- Cycle number: 5\n- Prior cycle SHA: 6bf20f9406587c4becd8707f7a0b485bb875d2bf\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | failed | — | infrastructure failure |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2149/.pan/review/agent-pan-2149-review-555776b7/correctness.md | 0 |\n| performance | failed | — | infrastructure failure |\n| requirements | failed | — | infrastructure failure |\n\n## Blocking Findings\n\n### [security] Reviewer failed before producing a usable report\nSignal reason: `Role run agent-pan-2149-review-security already running. Use 'pan tell' to message it.`\n\nThe review role requires all four sub-role reports to be readable before approval. A failed reviewer is a blocking infrastructure failure.\n\n### [performance] Reviewer failed before producing a usable report\nSignal reason: `Role run agent-pan-2149-review-performance already running. Use 'pan tell' to message it.`\n\nThe review role requires all four sub-role reports to be readable before approval. A failed reviewer is a blocking infrastructure failure.\n\n### [requirements] Reviewer failed before producing a usable report\nSignal reason: `Role run agent-pan-2149-review-requirements already running. Use 'pan tell' to message it.`\n\nThe review role requires all four sub-role reports to be readable before approval. A failed reviewer is a blocking infrastructure failure.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\n- correctness\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2149/.pan/review/agent-pan-2149-review-555776b7/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2149 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [
@@ -133,10 +166,10 @@
       "src/lib/cloister/service-status.ts",
       "src/lib/cloister/service.ts"
     ],
-    "recordedAt": "2026-07-11T17:03:50.585Z"
+    "recordedAt": "2026-07-12T09:29:28.722Z"
   },
   "created": "2026-07-10T23:44:51.626Z",
-  "updated": "2026-07-12T06:46:34.728Z",
+  "updated": "2026-07-12T09:34:23.009Z",
   "pipeline": {
     "issueId": "PAN-2149",
     "reviewStatus": "reviewing",
@@ -145,12 +178,13 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-12T06:46:33.591Z",
+    "updatedAt": "2026-07-12T09:32:53.932Z",
     "reviewNotes": "Review reset by deacon: no active review session after 821min",
     "inspectNotes": "Bead health-seam ack: duplicate delivery of already-reviewed commit 74dc13c0, re-confirmed - all 5 functions verbatim (this.->host. only), delegates <=5 lines with no visibility change, file-size baseline lowered 1684->1476, typecheck/lint/vitest all exit 0 (9237 passed, 0 failed).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2573",
-    "lastVerifiedCommit": "6bf20f9406587c4becd8707f7a0b485bb875d2bf",
-    "reviewRequestedAt": "2026-07-12T06:46:23.330Z",
+    "lastVerifiedCommit": "555776b7545a8092779381ee66b45a66e2206f41",
+    "reviewRequestedAt": "2026-07-12T09:29:33.599Z",
+    "reviewSpawnedAt": "2026-07-12T09:29:34.252Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [
@@ -185,7 +219,7 @@
         "src/lib/cloister/service-status.ts",
         "src/lib/cloister/service.ts"
       ],
-      "recordedAt": "2026-07-11T17:03:50.585Z"
+      "recordedAt": "2026-07-12T09:29:28.722Z"
     }
   },
   "closeOut": {
@@ -193,21 +227,21 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 8578047,
-            "output": 6760,
-            "cacheRead": 8133632,
+            "input": 8685399,
+            "output": 7489,
+            "cacheRead": 8219648,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 32784992,
-            "output": 88909,
-            "cacheRead": 31612544,
+            "input": 38126997,
+            "output": 115215,
+            "cacheRead": 36329216,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 2275845,
-            "output": 5047,
-            "cacheRead": 2054912,
+            "input": 3005581,
+            "output": 6314,
+            "cacheRead": 2771712,
             "cacheWrite": 0
           }
         },
@@ -230,21 +264,21 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 8578047,
-          "output": 6760,
-          "cacheRead": 8133632,
+          "input": 8685399,
+          "output": 7489,
+          "cacheRead": 8219648,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 32784992,
-          "output": 88909,
-          "cacheRead": 31612544,
+          "input": 38126997,
+          "output": 115215,
+          "cacheRead": 36329216,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 2275845,
-          "output": 5047,
-          "cacheRead": 2054912,
+          "input": 3005581,
+          "output": 6314,
+          "cacheRead": 2771712,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -261,8 +295,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 35.89725,
-        "pricingAsOf": "2026-07-12T06:46:34.202Z"
+        "usd": 42.632521000000004,
+        "pricingAsOf": "2026-07-12T09:32:54.036Z"
       }
     },
     "merges": [
