@@ -289,7 +289,11 @@ export async function waitForTmuxSession(sessionName: string, timeoutMs = 30000)
   }
   throw new Error(`Timed out waiting for tmux session ${sessionName}`);
 }
-function shouldUseSupervisorForConversation(harness: RuntimeName): boolean {
+export function shouldUseSupervisorForConversation(
+  harness: RuntimeName,
+  options: { codexTransport?: 'app-server' | 'tui' } = {},
+): boolean {
+  if (harness === 'codex' && options.codexTransport === 'app-server') return false;
   return getHarnessBehavior(harness).supportsPtySupervisor && process.env.OVERDECK_DOCKER_WORKSPACE !== '1' && process.env.PAN_DOCKER !== '1';
 }
 export async function waitForConversationRuntimeReady(tmuxSession: string, harness: RuntimeName, mode: 'spawn' | 'respawn'): Promise<void> {

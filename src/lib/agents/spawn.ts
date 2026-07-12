@@ -20,6 +20,7 @@ import { resetPipelineVerdictsForWorkStartSync } from '../review-status.js';
 import { resolveHarness } from '../harness-resolve.js';
 import type { ModelId } from '../settings.js';
 import type { RuntimeName } from '../runtimes/types.js';
+import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { writeBridgeTokenSync } from '../bridge-token.js';
 import { createSession, exactPaneTarget, sessionExists, setOption } from '../tmux.js';
 import { createActiveSlice } from '../vbrief/dag.js';
@@ -805,7 +806,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // (PAN-1805). Non-blocking — codex writes its rollout only after the kickoff
   // prompt lands, so a blocking wait here would stall spawn. The latest-rollout
   // fallback covers sessions whose first turn lands after this window.
-  if (resolvedHarness === 'codex') {
+  if (resolvedHarness === 'codex' && getHarnessBehavior(resolvedHarness).readinessKind === 'codex-tui-prompt') {
     const codexHomeForAgent = join(homedir(), '.overdeck', 'agents', agentId, 'codex-home');
     void (async () => {
       try {
