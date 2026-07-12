@@ -63,7 +63,7 @@ describe('open-beads check follows .beads/redirect (PAN-2195)', () => {
     }
   });
 
-  it('reports the local open bead when there is no redirect (contrast)', async () => {
+  it('does not treat a local derived export as an open canonical bead', async () => {
     vi.mocked(runTestRequirementCheck).mockReturnValue(Effect.succeed([]));
     const base = mkdtempSync(join(tmpdir(), 'preflight-noredir-'));
     try {
@@ -72,7 +72,7 @@ describe('open-beads check follows .beads/redirect (PAN-2195)', () => {
       writeFileSync(join(ws, '.beads', 'issues.jsonl'), makeBead('open'));
 
       const failures = await Effect.runPromise(runPreflightChecks(ws, 'PAN-9999'));
-      expect(failures.some((f) => f.includes('Open beads'))).toBe(true);
+      expect(failures.some((f) => f.includes('Open beads'))).toBe(false);
     } finally {
       rmSync(base, { recursive: true, force: true });
     }

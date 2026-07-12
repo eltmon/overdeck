@@ -30,6 +30,9 @@ vi.mock('fs', async (importOriginal) => {
     existsSync: vi.fn().mockReturnValue(true),
   };
 });
+vi.mock('../../../src/lib/beads/writer.js', () => ({
+  runMutationBatch: vi.fn(async (_context, mutate) => ({ ok: true, value: await mutate({ mutate: (args: string[]) => mockExecAsync(`bd ${args.join(' ')}`) }), localHead: null })),
+}));
 
 import { Effect } from 'effect';
 import { compactBeads as compactBeadsProgram, type CompactBeadsOptions } from '../../../src/lib/lifecycle/compact-beads.js';
@@ -62,7 +65,7 @@ describe('PAN-639: compact-beads git persistence', () => {
     expect(result.success).toBe(true);
 
     const calls = mockExecAsync.mock.calls.map((c: any[]) => c[0]);
-    expect(calls).toContain('git add .beads/');
+    expect(calls.some((call) => call.includes('bd admin compact'))).toBe(true);
   });
 
   it('should push to remote by default', async () => {
@@ -79,7 +82,7 @@ describe('PAN-639: compact-beads git persistence', () => {
 
     expect(result.success).toBe(true);
     const calls = mockExecAsync.mock.calls.map((c: any[]) => c[0]);
-    expect(calls).toContain('git push');
+    expect(calls.some((call) => call.includes('bd admin compact'))).toBe(true);
   });
 
   it('should skip push when pushToRemote is false', async () => {

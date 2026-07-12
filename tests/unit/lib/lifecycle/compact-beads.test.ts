@@ -15,6 +15,9 @@ vi.mock('util', async (importOriginal) => {
     promisify: () => mockExecAsync,
   };
 });
+vi.mock('../../../../src/lib/beads/writer.js', () => ({
+  runMutationBatch: vi.fn(async (_context, mutate) => ({ ok: true, value: await mutate({ mutate: (args: string[]) => mockExecAsync(`bd ${args.join(' ')}`) }), localHead: null })),
+}));
 
 import { Effect } from 'effect';
 import { compactBeads as compactBeadsProgram } from '../../../../src/lib/lifecycle/compact-beads.js';

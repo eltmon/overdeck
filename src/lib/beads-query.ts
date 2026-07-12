@@ -1,12 +1,7 @@
-import { execFile } from 'child_process';
-import { existsSync } from 'fs';
-import { readFile } from 'node:fs/promises';
-import { basename, dirname, join } from 'path';
-import { promisify } from 'util';
+import { basename, dirname } from 'path';
 import { Data, Effect } from 'effect';
-import { BdTransientFailure, readBdProcessLockHolder, runBdWithRetry, type RunBdWithRetryOptions } from './bd-process-lock.js';
-
-const execFileAsync = promisify(execFile);
+import { type RunBdWithRetryOptions } from './bd-process-lock.js';
+import { createBeadsResolver } from './beads/resolver.js';
 
 export interface BeadEntry {
   id: string;
@@ -28,6 +23,7 @@ export class BeadsMissingError extends Data.TaggedError('BeadsMissingError')<{
   readonly issueId: string;
   readonly workspacePath: string;
   readonly transientFailure?: unknown;
+  readonly staleReason?: string;
 }> {}
 
 function normalizeIssueLabel(issueId: string): string {
@@ -87,39 +83,18 @@ function groupReadyBeadsByIssue(beads: BeadEntry[], issueLabels: string[]): Read
   return result;
 }
 
-async function readAllBeadsFromJsonl(workspacePath: string): Promise<BeadEntry[]> {
-  try {
-    const jsonlPath = join(workspacePath, '.beads', 'issues.jsonl');
-    if (!existsSync(jsonlPath)) return [];
-    const raw = await readFile(jsonlPath, 'utf-8');
-    const beads: BeadEntry[] = [];
-    for (const line of raw.split('\n')) {
-      if (!line.trim()) continue;
-      try {
-        const entry = JSON.parse(line) as Record<string, unknown>;
-        beads.push(toBeadEntry(entry, beadLabels(entry)));
-      } catch { /* skip malformed lines */ }
-    }
-    return beads;
-  } catch {
-    return [];
-  }
-}
-
-async function readBeadsFromJsonl(workspacePath: string, issueId: string): Promise<BeadEntry[]> {
-  const issueLabel = normalizeIssueLabel(issueId);
-  return (await readAllBeadsFromJsonl(workspacePath))
-    .filter((bead) => labelMatchesIssue(bead.labels, issueLabel));
-}
-
 export interface BeadsQueryResult {
   readonly beads: BeadEntry[];
   readonly transientFailure?: unknown;
+  readonly stale?: boolean;
+  readonly reason?: string;
 }
 
 export interface ReadyBeadsQueryResult {
   readonly byIssue: ReadyBeadsByIssue;
   readonly transientFailure?: unknown;
+  readonly stale?: boolean;
+  readonly reason?: string;
 }
 
 export async function queryBeadsForIssuePromise(
@@ -127,25 +102,10 @@ export async function queryBeadsForIssuePromise(
   issueId: string,
   retryOptions: Omit<RunBdWithRetryOptions, 'workspacePath'> = {},
 ): Promise<BeadsQueryResult> {
-  try {
-    const { stdout } = await runBdWithRetry(
-      `query beads for ${issueId}`,
-      () => execFileAsync(
-        'bd',
-        ['list', '--json', '-l', issueId.toLowerCase(), '--status', 'all', '--limit', '0'],
-        { encoding: 'utf-8', cwd: workspacePath, timeout: 10000 },
-      ),
-      { ...retryOptions, workspacePath },
-    );
-    const parsed = JSON.parse(stdout || '[]');
-    return { beads: Array.isArray(parsed) ? parsed : [] };
-  } catch (error) {
-    const beads = await readBeadsFromJsonl(workspacePath, issueId);
-    return {
-      beads,
-      transientFailure: error instanceof BdTransientFailure ? error : undefined,
-    };
-  }
+  const result = await createBeadsResolver(workspacePath, { retry: retryOptions }).getBeadsForIssue(issueId);
+  return result.ok
+    ? { beads: result.value.map((entry) => toBeadEntry(entry, beadLabels(entry))) }
+    : { beads: [], stale: true, reason: result.reason, transientFailure: result.transient ? result.error : undefined };
 }
 
 export async function queryReadyBeadsByIssueLabelsPromise(
@@ -156,34 +116,17 @@ export async function queryReadyBeadsByIssueLabelsPromise(
   const issueLabels = Array.from(new Set(issueIds.map(normalizeIssueLabel)));
   if (issueLabels.length === 0) return { byIssue: {} };
 
-  try {
-    const holder = await readBdProcessLockHolder({ workspacePath });
-    if (holder) {
-      const beads = await readAllBeadsFromJsonl(workspacePath);
-      return { byIssue: groupReadyBeadsByIssue(beads, issueLabels) };
-    }
-
-    const { stdout } = await runBdWithRetry(
-      `query ready beads for ${issueLabels.join(',')}`,
-      () => execFileAsync(
-        'bd',
-        ['list', '--json', '--status', 'all', '--limit', '0'],
-        { encoding: 'utf-8', cwd: workspacePath, timeout: 10000 },
-      ),
-      { ...retryOptions, workspacePath },
-    );
-    const parsed = JSON.parse(stdout || '[]');
-    const beads = Array.isArray(parsed)
-      ? parsed.map((entry: Record<string, unknown>) => toBeadEntry(entry, beadLabels(entry)))
-      : [];
+  const result = await createBeadsResolver(workspacePath, { retry: retryOptions }).getAllBeads();
+  if (result.ok) {
+    const beads = result.value.map((entry) => toBeadEntry(entry, beadLabels(entry)));
     return { byIssue: groupReadyBeadsByIssue(beads, issueLabels) };
-  } catch (error) {
-    const beads = await readAllBeadsFromJsonl(workspacePath);
-    return {
-      byIssue: groupReadyBeadsByIssue(beads, issueLabels),
-      transientFailure: error instanceof BdTransientFailure ? error : undefined,
-    };
   }
+  return {
+    byIssue: Object.fromEntries(issueLabels.map((label) => [label, []])),
+    stale: true,
+    reason: result.reason,
+    transientFailure: result.transient ? result.error : undefined,
+  };
 }
 
 export async function assertIssueHasBeadsPromise(
@@ -197,6 +140,7 @@ export async function assertIssueHasBeadsPromise(
       issueId,
       workspacePath,
       transientFailure: result.transientFailure,
+      staleReason: result.reason,
     });
   }
 }
@@ -205,29 +149,19 @@ async function queryBeadByIdPromise(
   workspacePath: string,
   beadId: string,
 ): Promise<BeadEntry | null> {
-  try {
-    const { stdout } = await execFileAsync(
-      'bd',
-      ['show', beadId, '--json'],
-      { encoding: 'utf-8', cwd: workspacePath, timeout: 10000 },
-    );
-    const parsed = JSON.parse(stdout || '[]');
-    const arr = Array.isArray(parsed) ? parsed : [parsed];
-    return arr[0] ?? null;
-  } catch {
-    return null;
-  }
+  const result = await createBeadsResolver(workspacePath).getBeadById(beadId);
+  return result.ok ? result.value : null;
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
 /**
- * Query beads for an issue. Effect-native. Never fails: falls back to the
- * workspace JSONL bead store when bd is unavailable or transiently locked.
+ * Query beads for an issue. Effect-native. A failed canonical read is marked
+ * stale and is never replaced with a derived JSONL snapshot.
  *
  * @param retryOptions - Optional lock/retry tuning. Dashboard callers should
  *   pass a short `acquisitionTimeoutMs` (e.g. 500) so HTTP requests fail fast
- *   to JSONL instead of blocking behind CLI processes that hold the lock.
+ *   quickly instead of blocking behind CLI processes that hold the lock.
  */
 export const queryBeadsForIssue = (
   workspacePath: string,
@@ -237,8 +171,7 @@ export const queryBeadsForIssue = (
   Effect.promise(() => queryBeadsForIssuePromise(workspacePath, issueId, retryOptions));
 
 /**
- * Query ready/open beads for multiple issue labels from one bd snapshot.
- * Effect-native. Never fails: falls back to the workspace JSONL bead export.
+ * Query ready/open beads for multiple issue labels from one canonical snapshot.
  */
 export const queryReadyBeadsByIssueLabels = (
   workspacePath: string,
@@ -264,6 +197,7 @@ export const assertIssueHasBeads = (
         issueId,
         workspacePath,
         transientFailure: result.transientFailure,
+        staleReason: result.reason,
       }));
     }
   });

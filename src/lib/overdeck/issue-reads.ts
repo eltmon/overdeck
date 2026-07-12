@@ -1,9 +1,7 @@
-import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { promisify } from 'node:util';
 
 import { Effect } from 'effect';
 
@@ -21,9 +19,8 @@ import { resolveProjectFromIssueSync } from '../projects.js';
 import { loadRemoteAgentState } from '../remote/remote-agents.js';
 import { loadWorkspaceMetadataSync as loadWorkspaceMetadataStatic } from '../remote/workspace-metadata.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
-import { withBdMutex } from '../bd-mutex.js';
-
-const execFileAsync = promisify(execFile);
+import { createBeadsResolver } from '../beads/resolver.js';
+import { getBeadsHealth } from '../beads/telemetry.js';
 
 function isGitHubIssue(issueId: string): {
   isGitHub: boolean;
@@ -181,7 +178,8 @@ export function analyzeIssue(id: string) {
 export function getIssueBeads(id: string) {
   return Effect.gen(function* () {
     const issueLower = id.toLowerCase();
-    const projectPath = resolveIssueProjectPathSync(id);
+    const resolvedProject = resolveProjectFromIssueSync(id);
+    const projectPath = resolvedProject?.projectPath ?? resolveIssueProjectPathSync(id);
     const workspacePath = projectPath ? join(projectPath, 'workspaces', `feature-${issueLower}`) : '';
 
     // Check for remote workspace (reads non-fatal state files)
@@ -209,19 +207,12 @@ export function getIssueBeads(id: string) {
     });
 
     // Try local beads query (non-fatal on bd error)
-    const { beads, querySource } = yield* Effect.promise(async (): Promise<{ beads: any[]; querySource: string }> => {
-      try {
-        const bdSearchDir = (workspacePath && existsSync(workspacePath)) ? workspacePath : (projectPath || homedir());
-        const { stdout } = await Effect.runPromise(withBdMutex(() => Effect.promise(() => execFileAsync('bd', ['list', '--json', '-l', id.toLowerCase(), '--status', 'all', '--limit', '0'], {
-          cwd: bdSearchDir,
-          encoding: 'utf-8',
-          timeout: 10000,
-        }))));
-        return { beads: JSON.parse(stdout || '[]'), querySource: 'local' };
-      } catch (bdError: any) {
-        console.error('bd search failed:', bdError.message);
-        return { beads: [], querySource: 'local' };
-      }
+    const { beads, querySource, staleReason } = yield* Effect.promise(async (): Promise<{ beads: any[]; querySource: string; staleReason?: string }> => {
+      const bdSearchDir = (workspacePath && existsSync(workspacePath)) ? workspacePath : (projectPath || homedir());
+      const result = await createBeadsResolver(bdSearchDir, { retry: { acquisitionTimeoutMs: 500 } }).getBeadsForIssue(id);
+      return result.ok
+        ? { beads: result.value, querySource: 'canonical-dolt' }
+        : { beads: [], querySource: 'canonical-dolt', staleReason: result.reason };
     });
 
     const tasks = beads.map((bead: any) => ({
@@ -246,12 +237,18 @@ export function getIssueBeads(id: string) {
     // Suppress unused variable warning — remoteVmName available for callers if needed
     void remoteVmName;
 
+    const freshness = yield* Effect.promise(() => getBeadsHealth(resolvedProject?.projectKey ?? '', (workspacePath && existsSync(workspacePath)) ? workspacePath : (projectPath || homedir())));
     return jsonResponse({
       tasks,
       workspacePath,
       count: tasks.length,
       source: querySource,
       isRemote: isRemoteWorkspace,
+      lastSyncedAt: freshness.lastSuccessfulPullAt,
+      freshnessAgeMs: freshness.freshnessAgeMs,
+      stale: Boolean(staleReason || freshness.lastSyncError),
+      syncError: staleReason ?? freshness.lastSyncError,
+      health: freshness,
     });
   });
 }

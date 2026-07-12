@@ -1,11 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Issue } from '../../tracker/interface.js';
 
 vi.mock('../../review-status.js', () => ({
   getReviewStatusSync: vi.fn().mockReturnValue(null),
+}));
+
+vi.mock('../../beads/resolver.js', () => ({
+  createBeadsResolver: (workspacePath: string) => ({
+    issueHasBeads: async () => ({ ok: true, value: existsSync(join(workspacePath, '.beads', 'issues.jsonl')) }),
+  }),
 }));
 
 import { collectOpenBacklog } from '../backlog-input.js';

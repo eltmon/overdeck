@@ -400,7 +400,7 @@ ensure the project key (uppercased, hyphens removed) matches the issue prefix yo
 ## Beads Enforcement
 
 Work agents cannot start without beads tasks in the workspace. The start-agent endpoint
-returns 422 if `.beads/issues.jsonl` does not exist. Planning must create beads via
+returns 422 if the canonical Dolt resolver reports no issue beads. Planning must create beads via
 `bd create` before handing off to implementation.
 
 ## postMergeLifecycle Idempotency (enforced by a test, not by this note)

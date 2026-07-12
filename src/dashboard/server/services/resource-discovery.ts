@@ -10,6 +10,7 @@ import {
   PAN_DIRNAME,
 } from '../../../lib/pan-dir/index.js';
 import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
+import { createBeadsResolver } from '../../../lib/beads/resolver.js';
 import { listProjectsSync, resolveProjectFromIssueSync, type ResolvedProject } from '../../../lib/projects.js';
 import { listSessionNames } from '../../../lib/tmux.js';
 import { loadReadyForMergeFlags } from '../review-status.js';
@@ -395,15 +396,13 @@ async function scanWorkspace(workspacesDir: string, workspaceName: string): Prom
   const panEntries = workspaceEntries.has(PAN_DIRNAME)
     ? new Set(await readdir(join(workspacePath, PAN_DIRNAME)).catch(() => [] as string[]))
     : new Set<string>();
-  const beadsEntries = workspaceEntries.has('.beads')
-    ? new Set(await readdir(join(workspacePath, '.beads')).catch(() => [] as string[]))
-    : new Set<string>();
   const issueMatch = workspaceName.match(/^feature-([a-z]+-\d+)$/i);
   const issueId = issueMatch ? issueMatch[1].toUpperCase() : null;
   const specEntry = issueId
     ? await Effect.runPromise(findSpecByIssue(projectRoot, issueId)).catch(() => null)
     : null;
   const vbriefPath = specEntry ? specEntry.path : null;
+  const beadsResult = issueId ? await createBeadsResolver(workspacePath).issueHasBeads(issueId) : null;
 
   return {
     workspacePath,
@@ -412,7 +411,7 @@ async function scanWorkspace(workspacesDir: string, workspaceName: string): Prom
     hasState: panEntries.has(PAN_CONTINUE_FILENAME),
     hasVbrief: vbriefPath !== null,
     vbriefPath,
-    hasBeads: beadsEntries.has('issues.jsonl') || beadsEntries.has('redirect'),
+    hasBeads: beadsResult?.ok === true && beadsResult.value,
   };
 }
 
