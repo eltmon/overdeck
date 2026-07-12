@@ -51,24 +51,54 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-12T21:14:50.583Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T21:16:32.981Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T21:16:34.489Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T21:16:34.497Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T21:16:34.498Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T21:16:34.498Z"
+    },
+    {
+      "timestamp": "2026-07-12T21:24:42.998Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
   "created": "2026-07-12T20:45:31.659Z",
-  "updated": "2026-07-12T21:14:53.734Z",
+  "updated": "2026-07-12T21:24:44.991Z",
   "pipeline": {
     "issueId": "PAN-1232",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-12T21:14:53.563Z",
-    "reviewNotes": "Review role spawn failed: ",
+    "updatedAt": "2026-07-12T21:24:44.841Z",
+    "reviewNotes": "Verification failed at lint",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2604",
-    "reviewRequestedAt": "2026-07-12T21:14:42.700Z",
-    "reviewSpawnedAt": "2026-07-12T21:14:45.623Z"
+    "reviewRequestedAt": "2026-07-12T21:24:43.006Z",
+    "reviewSpawnedAt": "2026-07-12T21:24:44.841Z"
   },
   "closeOut": {
     "usage": {
@@ -104,7 +134,7 @@
       },
       "costAtCloseOut": {
         "usd": 2.189216,
-        "pricingAsOf": "2026-07-12T21:14:53.733Z"
+        "pricingAsOf": "2026-07-12T21:24:44.970Z"
       }
     },
     "merges": [
@@ -112,8 +142,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "glm-5.2",
   "statusOverrides": {
     "tab-files": "completed",
     "tab-files.ac1": "completed",
