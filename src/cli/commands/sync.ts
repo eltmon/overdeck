@@ -34,6 +34,7 @@ import { runMultiToolSyncSync, resolveAlsoSyncToolsSync } from '../../lib/multi-
 import { ensurePlaywrightIsolationSync, ensureExcalidrawMcpSync } from '../../lib/claude-mcp.js';
 import { resolveProjectContextFile } from '../../lib/context-layers/layers.js';
 import { resolveStateReadHomeSync } from '../../lib/state-read-home.js';
+import { ensureProjectBeadsBootstrap } from '../../lib/beads/bootstrap.js';
 
 // Bundled git hooks distributed to registered projects (PAN-1201: sync-sources/).
 const BUNDLED_GIT_HOOKS_DIR = SYNC_SOURCES.gitHooks;
@@ -367,27 +368,17 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   // create the Dolt database. Without it, workspace beads creation silently fails.
   const projects = listProjectsSync();
   if (projects.length > 0 && checkCommand('bd')) {
-    for (const { key, config } of projects) {
+    for (const { config } of projects) {
       if (!existsSync(config.path)) continue;
       const mainBeadsDir = join(config.path, '.beads');
       if (!existsSync(mainBeadsDir)) continue; // Project hasn't used beads yet — skip
       const bdRoot = resolveStateReadHomeSync(config).root;
-      // Test connectivity. If the database is missing, auto-init.
+      const beadsSpinner = ora(`Synchronizing beads database for ${config.name}...`).start();
       try {
-        execSync(`bd -C ${JSON.stringify(bdRoot)} list --json --limit 0 2>&1`, { cwd: config.path, stdio: 'pipe', timeout: 8000 });
-      } catch (e: any) {
-        const msg = String(e?.stdout ?? e?.stderr ?? e?.message ?? '');
-        if (msg.includes('database') && (msg.includes('not found') || msg.includes('not exist') || msg.includes('defaulting'))) {
-          const beadsSpinner = ora(`Initializing beads database for ${config.name}...`).start();
-          try {
-            const prefix = (key || config.name).toLowerCase().replace(/[^a-z0-9-]/g, '-');
-            execSync(`bd -C ${JSON.stringify(bdRoot)} init --prefix ${prefix}`, { cwd: config.path, stdio: 'pipe', timeout: 20000 });
-            try { execSync('git config beads.role contributor', { cwd: config.path, stdio: 'pipe' }); } catch { /* non-fatal */ }
-            beadsSpinner.succeed(`Beads database initialized for ${config.name} (prefix: ${prefix})`);
-          } catch {
-            beadsSpinner.warn(`Could not auto-initialize beads for ${config.name} — run: cd ${config.path} && bd init`);
-          }
-        }
+        await ensureProjectBeadsBootstrap(config.path, bdRoot);
+        beadsSpinner.succeed(`Beads database synchronized for ${config.name}`);
+      } catch (error) {
+        beadsSpinner.warn(`Beads synchronization is unavailable for ${config.name}: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
   }
@@ -565,26 +556,17 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   // bd install puts the binary in PATH, but bd init must be run once per project to
   // create the Dolt database. Without it, workspace beads creation silently fails.
   if (projects.length > 0 && checkCommand('bd')) {
-    for (const { key, config } of projects) {
+    for (const { config } of projects) {
       if (!existsSync(config.path)) continue;
       const mainBeadsDir = join(config.path, '.beads');
       if (!existsSync(mainBeadsDir)) continue; // Project hasn't used beads yet — skip
       const bdRoot = resolveStateReadHomeSync(config).root;
-      // Test connectivity. If the database is missing, auto-init.
+      const beadsSpinner = ora(`Synchronizing beads database for ${config.name}...`).start();
       try {
-        execSync(`bd -C ${JSON.stringify(bdRoot)} list --json --limit 0 2>&1`, { cwd: config.path, stdio: 'pipe', timeout: 8000 });
-      } catch (e: any) {
-        const msg = String(e?.stdout ?? e?.stderr ?? e?.message ?? '');
-        if (msg.includes('database') && (msg.includes('not found') || msg.includes('not exist') || msg.includes('defaulting'))) {
-          const beadsSpinner = ora(`Initializing beads database for ${config.name}...`).start();
-          try {
-            const prefix = (key || config.name).toLowerCase().replace(/[^a-z0-9-]/g, '-');
-            execSync(`bd -C ${JSON.stringify(bdRoot)} init --prefix ${prefix}`, { cwd: config.path, stdio: 'pipe', timeout: 20000 });
-            beadsSpinner.succeed(`Beads database initialized for ${config.name} (prefix: ${prefix})`);
-          } catch {
-            beadsSpinner.warn(`Could not auto-initialize beads for ${config.name} — run: cd ${config.path} && bd init`);
-          }
-        }
+        await ensureProjectBeadsBootstrap(config.path, bdRoot);
+        beadsSpinner.succeed(`Beads database synchronized for ${config.name}`);
+      } catch (error) {
+        beadsSpinner.warn(`Beads synchronization is unavailable for ${config.name}: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
   }
