@@ -1,0 +1,110 @@
+{
+  "issueId": "PAN-1234",
+  "schemaVersion": 2,
+  "feedback": [],
+  "created": "2026-07-12T20:43:21.494Z",
+  "updated": "2026-07-12T21:35:20.840Z",
+  "pipeline": {
+    "issueId": "PAN-1234",
+    "reviewStatus": "failed",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-12T21:35:20.783Z",
+    "reviewNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-1234-review -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-1234 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://127.0.0.1:8317 -e ANTHROPIC_AUTH_TOKEN=overdeck-local-cliproxy-key -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-1234-review -e OVERDECK_ISSUE_ID=PAN-1234 -e OVERDECK_SESSION_TYPE=review -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-62 -e OVERDECK_FLYWHEEL_AGENT_ROLE=review bash /home/eltmon/.overdeck/agents/agent-pan-1234-review/launcher.sh\nduplicate session: agent-pan-1234-review\n",
+    "reviewRequestedAt": "2026-07-12T21:34:49.573Z",
+    "reviewSpawnedAt": "2026-07-12T21:34:50.292Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "work": {
+          "custom/kimi-k2.7-code": {
+            "input": 815826,
+            "output": 162905,
+            "cacheRead": 89228800,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "custom/kimi-k2.7-code": {
+          "input": 815826,
+          "output": 162905,
+          "cacheRead": 89228800,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 18.380136,
+        "pricingAsOf": "2026-07-12T21:35:20.840Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "conformance-test-strengthen": "completed",
+    "conformance-test-strengthen.ac1": "completed",
+    "conformance-test-strengthen.ac2": "completed",
+    "conformance-test-strengthen.ac3": "completed",
+    "conformance-test-strengthen.ac4": "completed",
+    "conformance-test-strengthen.ac5": "completed",
+    "conformance-test-strengthen.ac6": "completed",
+    "kbd-global-chords": "completed",
+    "kbd-global-chords.ac1": "completed",
+    "kbd-global-chords.ac2": "completed",
+    "kbd-global-chords.ac3": "completed",
+    "kbd-global-chords.ac4": "completed",
+    "kbd-global-chords.ac5": "completed",
+    "kbd-global-chords.ac6": "completed",
+    "kbd-global-chords.ac7": "completed",
+    "kbd-global-chords.ac8": "completed",
+    "kbd-board-rows": "completed",
+    "kbd-board-rows.ac1": "completed",
+    "kbd-board-rows.ac2": "completed",
+    "kbd-board-rows.ac3": "completed",
+    "kbd-board-rows.ac4": "completed",
+    "kbd-board-rows.ac5": "completed",
+    "kbd-board-rows.ac6": "completed",
+    "kbd-pipeline-rows": "completed",
+    "kbd-pipeline-rows.ac1": "completed",
+    "kbd-pipeline-rows.ac2": "completed",
+    "kbd-pipeline-rows.ac3": "completed",
+    "kbd-pipeline-rows.ac4": "completed",
+    "kbd-pipeline-rows.ac5": "completed",
+    "kbd-pipeline-rows.ac6": "completed",
+    "route-issues-id": "completed",
+    "route-issues-id.ac1": "completed",
+    "route-issues-id.ac2": "completed",
+    "route-issues-id.ac3": "completed",
+    "route-issues-id.ac4": "completed",
+    "route-issues-id.ac5": "completed",
+    "route-issues-id.ac6": "completed",
+    "badge-input-nonplan": "completed",
+    "badge-input-nonplan.ac1": "completed",
+    "badge-input-nonplan.ac2": "completed",
+    "badge-input-nonplan.ac3": "completed",
+    "badge-input-nonplan.ac4": "completed",
+    "badge-input-nonplan.ac5": "completed",
+    "keyframe-pulse-rename": "completed",
+    "keyframe-pulse-rename.ac1": "completed",
+    "keyframe-pulse-rename.ac2": "completed",
+    "keyframe-pulse-rename.ac3": "completed",
+    "keyframe-pulse-rename.ac4": "completed",
+    "keyframe-pulse-rename.ac5": "completed",
+    "keyframe-pulse-rename.ac6": "completed",
+    "keyframe-pulse-rename.ac7": "completed",
+    "font-grotesk-apply": "completed",
+    "font-grotesk-apply.ac1": "completed",
+    "font-grotesk-apply.ac2": "completed",
+    "font-grotesk-apply.ac3": "completed",
+    "font-grotesk-apply.ac4": "completed",
+    "font-grotesk-apply.ac5": "completed",
+    "font-grotesk-apply.ac6": "completed"
+  }
+}
