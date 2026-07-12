@@ -97,7 +97,7 @@ export function ConversationSearchSection({
           </button>
         </div>
 
-        <div className="mt-3 grid gap-3 md:grid-cols-3">
+        <div className="mt-3 grid gap-3 @xl:grid-cols-3">
           <label className="text-xs text-muted-foreground">
             Provider
             <select

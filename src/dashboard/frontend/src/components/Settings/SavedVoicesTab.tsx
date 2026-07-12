@@ -141,7 +141,7 @@ export function SavedVoicesTab() {
           No voices saved yet
         </div>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 @lg:grid-cols-2 @2xl:grid-cols-3">
           {voices.map((voice) => (
             <article key={voice.id} className="rounded-lg border border-border bg-background/60 p-3" data-testid={`tts-voice-card-${voice.id}`}>
               <div className="mb-3 flex items-start justify-between gap-3">

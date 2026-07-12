@@ -183,7 +183,7 @@ export function WorkhorsePanel() {
           Loading workhorse models…
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 @xl:grid-cols-3">
           {WORKHORSE_SLOTS.map((slot) => {
             const value = workhorses[slot.id];
             const warning = providerWarning(

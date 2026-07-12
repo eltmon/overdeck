@@ -50,7 +50,7 @@ export function SmartSelectionExplainer() {
             <span className="material-symbols-outlined text-muted-foreground">lightbulb</span>
             Smart Selection Examples
           </h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-1 @xl:grid-cols-2 gap-4 text-sm">
             <div className="bg-card rounded-lg p-3 border border-border">
               <div className="flex items-center gap-2 mb-1">
                 <span className="material-symbols-outlined text-warning text-base">architecture</span>
