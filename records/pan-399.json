@@ -311,17 +311,19 @@
       "reason": "feedback",
       "note": "[2026-07-12T08:42Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-12T08:42:49.845Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-12T08:42:49Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-399\n\nPackaged PTY supervisor runtime cache is keyed only by entry file and can stay stale after upgrade\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-399 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T09:11:38.387Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T09:16:54.543Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -448,22 +450,22 @@
     "recordedAt": "2026-07-12T08:40:28.078Z"
   },
   "created": "2026-07-11T09:28:34.266Z",
-  "updated": "2026-07-12T09:03:29.115Z",
+  "updated": "2026-07-12T09:16:54.543Z",
   "pipeline": {
     "issueId": "PAN-399",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-12T09:03:28.923Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed install",
+    "panDoneRecoveredAt": "2026-07-12T09:16:46.873Z",
+    "updatedAt": "2026-07-12T09:16:52.168Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed PTY supervisor runtime cache keying",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2577",
-    "reviewedAtCommit": "a2edef4778231d558c49b0e76d6bb33ba3dee46f",
-    "lastVerifiedCommit": "431693d7cd062776655bf596ad2817a029adb5cd",
-    "reviewRequestedAt": "2026-07-12T08:40:35.542Z",
-    "reviewSpawnedAt": "2026-07-12T08:40:37.904Z",
+    "lastVerifiedCommit": "eccf5b1b56c7ed057f43967e19f2fe1079f058df",
+    "reviewRequestedAt": "2026-07-12T09:16:46.873Z",
+    "reviewSpawnedAt": "2026-07-12T09:16:52.168Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "drizzle/overdeck/0000_overdeck_init.sql",
@@ -595,15 +597,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 9185766,
-            "output": 8924,
-            "cacheRead": 8573696,
+            "input": 9214707,
+            "output": 9070,
+            "cacheRead": 8576768,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 70030737,
-            "output": 187099,
-            "cacheRead": 65474432,
+            "input": 71564590,
+            "output": 190386,
+            "cacheRead": 66934400,
             "cacheWrite": 0
           },
           "unknown": {
@@ -667,24 +669,24 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 7415248,
-            "output": 436420,
-            "cacheRead": 260626432,
+            "input": 7493966,
+            "output": 446442,
+            "cacheRead": 270324736,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 9185766,
-          "output": 8924,
-          "cacheRead": 8573696,
+          "input": 9214707,
+          "output": 9070,
+          "cacheRead": 8576768,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 70731097,
-          "output": 216128,
-          "cacheRead": 71166336,
+          "input": 72264950,
+          "output": 219415,
+          "cacheRead": 72626304,
           "cacheWrite": 0
         },
         "unknown": {
@@ -718,15 +720,15 @@
           "cacheWrite": 77989
         },
         "custom/kimi-k2.7-code": {
-          "input": 7415248,
-          "output": 436420,
-          "cacheRead": 260626432,
+          "input": 7493966,
+          "output": 446442,
+          "cacheRead": 270324736,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 180.086322,
-        "pricingAsOf": "2026-07-12T09:03:29.063Z"
+        "usd": 183.241885,
+        "pricingAsOf": "2026-07-12T09:16:52.277Z"
       }
     },
     "merges": [
@@ -734,8 +736,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "release-engine-tests": "completed",
     "release-engine-tests.ac1": "completed",
