@@ -320,7 +320,7 @@ describe('teardown-workspace', () => {
     expect(content).toContain('PAN-100');
   });
 
-  it('should clear beads when clearBeads is true (wipe scenario)', async () => {
+  it('does not treat a derived JSONL snapshot as a writable authority during wipe', async () => {
     const wsPath = join(testDir, 'workspaces', 'pan-100');
     const beadsDir = join(testDir, '.beads');
     mkdirSync(wsPath, { recursive: true });
@@ -338,12 +338,12 @@ describe('teardown-workspace', () => {
 
     const clearResult = results.find(r => r.step === 'teardown:clear-beads');
     expect(clearResult).toBeDefined();
-    expect(clearResult!.success).toBe(true);
+    expect(clearResult!.success).toBe(false);
 
-    // PAN-100 bead should be removed, PAN-200 preserved
+    // A canonical-read failure preserves the derived snapshot unchanged.
     const { readFileSync } = await import('fs');
     const content = readFileSync(join(beadsDir, 'issues.jsonl'), 'utf-8');
-    expect(content).not.toContain('PAN-100');
+    expect(content).toContain('PAN-100');
     expect(content).toContain('PAN-200');
   });
 });

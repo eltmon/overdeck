@@ -11,7 +11,7 @@
  */
 
 import { existsSync } from 'fs';
-import { appendFile, readFile, rm, writeFile } from 'fs/promises';
+import { readFile, rm } from 'fs/promises';
 import { join, basename, dirname } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
@@ -24,6 +24,9 @@ import { stepOk, stepSkipped, stepFailed } from './types.js';
 import { findAllWorkspacePaths, findWorkspacePath } from './archive-planning.js';
 import { getContainersReferencingWorkspacePath } from '../workspace-manager.js';
 import { DEVCONTAINER_DIRNAME } from '../workspace/devcontainer-renderer.js';
+import { exportBeadsJsonl } from '../beads/export.js';
+import { createBeadsResolver } from '../beads/resolver.js';
+import { runMutationBatch } from '../beads/writer.js';
 
 const execAsync = promisify(exec);
 
@@ -256,7 +259,7 @@ function syncWorkspaceBeads(
 }
 
 async function syncWorkspaceBeadsImpl(
-  projectPath: string,
+  _projectPath: string,
   workspacePath: string,
   issueLower: string,
 ): Promise<StepResult> {
@@ -268,46 +271,8 @@ async function syncWorkspaceBeadsImpl(
   }
 
   try {
-    // Export workspace beads to JSONL
-    // 120s: bd export cold-starts a dolt server per workspace .beads and can
-    // block on the global bd lock; a timeout kill bypasses `|| true` and
-    // aborts the whole close-out ceremony (observed at 15s, 14/32 closes).
-    await execAsync(
-      'bd export --output .beads/issues-export.jsonl 2>&1 || true',
-      { cwd: workspacePath, encoding: 'utf-8', timeout: 120000 }
-    );
-
-    const exportPath = join(workspacePath, '.beads', 'issues-export.jsonl');
-    if (!existsSync(exportPath)) {
-      await execAsync('bd export --output .beads/issues.jsonl 2>&1 || true', { cwd: workspacePath, encoding: 'utf-8', timeout: 120000 });
-    }
-
-    // Import workspace beads into project-root database
-    // Use bd import if available, otherwise copy JSONL entries
-    try {
-      await execAsync(
-        `bd import "${join(workspacePath, '.beads', 'issues.jsonl')}" 2>&1 || true`,
-        { cwd: projectPath, encoding: 'utf-8', timeout: 120000 }
-      );
-      return stepOk(step, [`Synced workspace beads to project root for ${issueLower}`]);
-    } catch {
-      // bd import may not exist — try manual JSONL merge
-      const wsJsonl = join(workspacePath, '.beads', 'issues.jsonl');
-      const projJsonl = join(projectPath, '.beads', 'issues.jsonl');
-
-      if (existsSync(wsJsonl) && existsSync(projJsonl)) {
-        const wsContent = await readFile(wsJsonl, 'utf-8');
-        const issuePattern = issueLower.replace('-', '[-_]');
-        const relevantLines = wsContent.split('\n').filter(
-          line => line.trim() && new RegExp(issuePattern, 'i').test(line)
-        );
-        if (relevantLines.length > 0) {
-          await appendFile(projJsonl, '\n' + relevantLines.join('\n'));
-          return stepOk(step, [`Appended ${relevantLines.length} beads entries for ${issueLower} to project JSONL`]);
-        }
-      }
-      return stepSkipped(step, ['No beads to sync or import not available']);
-    }
+    const result = await exportBeadsJsonl(workspacePath);
+    return stepOk(step, [`Validated ${result.state.recordCount} canonical beads records for ${issueLower}`]);
   } catch (err) {
     return stepFailed(step, `Failed to sync workspace beads: ${(err as Error).message}`);
   }
@@ -335,35 +300,20 @@ async function clearProjectBeadsImpl(
   issueLower: string,
 ): Promise<StepResult> {
   const step = 'teardown:clear-beads';
-  const projJsonl = join(projectPath, '.beads', 'issues.jsonl');
-
-  if (!existsSync(projJsonl)) {
-    return stepSkipped(step, ['No .beads/issues.jsonl in project root']);
-  }
-
   try {
-    const content = await readFile(projJsonl, 'utf-8');
-    const lines = content.split('\n');
-    const issueUpper = issueLower.toUpperCase();
-    const before = lines.length;
-    // Remove lines that reference this issue (by ID in the title or issue field)
-    const filtered = lines.filter(line => {
-      if (!line.trim()) return true; // keep blank lines
-      try {
-        const entry = JSON.parse(line);
-        const title = (entry.title || '').toUpperCase();
-        const issue = (entry.issue || '').toUpperCase();
-        return !title.includes(issueUpper) && issue !== issueUpper;
-      } catch {
-        return true; // keep unparseable lines
-      }
-    });
-    const removed = before - filtered.length;
-    if (removed > 0) {
-      await writeFile(projJsonl, filtered.join('\n'));
-      return stepOk(step, [`Removed ${removed} beads entries for ${issueLower} from project JSONL`]);
-    }
-    return stepSkipped(step, [`No beads entries found for ${issueLower}`]);
+    const read = await createBeadsResolver(projectPath).getBeadsForIssue(issueLower);
+    if (!read.ok) return stepFailed(step, read.reason);
+    if (read.value.length === 0) return stepSkipped(step, [`No canonical beads found for ${issueLower}`]);
+    const result = await runMutationBatch(
+      { project: { workspacePath: projectPath }, reason: `clear beads for ${issueLower}` },
+      async (bd) => {
+        for (const bead of read.value) await bd.mutate(['delete', bead.id, '--yes']);
+        return read.value.length;
+      },
+    );
+    return result.ok
+      ? stepOk(step, [`Deleted ${result.value} canonical beads for ${issueLower}`])
+      : stepFailed(step, result.message);
   } catch (err) {
     return stepFailed(step, `Failed to clear beads: ${(err as Error).message}`);
   }

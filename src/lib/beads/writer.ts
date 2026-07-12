@@ -1,9 +1,8 @@
 import { execFile } from 'node:child_process';
-import { rename, rm } from 'node:fs/promises';
-import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 import { withBdProcessLock, type BdProcessLockOptions } from '../bd-process-lock.js';
+import { exportBeadsJsonl } from './export.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -54,14 +53,7 @@ async function defaultExecute(args: readonly string[], cwd: string): Promise<str
 }
 
 async function defaultExportSnapshot(client: BdMutationClient, cwd: string): Promise<void> {
-  const target = join(cwd, '.beads', 'issues.jsonl');
-  const temporary = `${target}.tmp-${process.pid}-${Date.now()}`;
-  try {
-    await client.run(['export', '--all', '-o', temporary]);
-    await rename(temporary, target);
-  } finally {
-    await rm(temporary, { force: true });
-  }
+  await exportBeadsJsonl(cwd, { execute: (args) => client.run(args) });
 }
 
 async function readHead(client: BdMutationClient): Promise<string | null> {
