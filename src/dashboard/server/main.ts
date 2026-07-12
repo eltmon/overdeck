@@ -168,6 +168,28 @@ console.log('[overdeck] AgentOutputService started');
 startMergeBlockerReconcileService();
 console.log('[overdeck] MergeBlockerReconcileService started');
 
+// Desktop installs never run `pan install`, so provision the Claude Code hook
+// bundle (auto-approve, heartbeat, cost, lifecycle) at boot (PAN-2595).
+// Idempotent + delta-only; skips (with a logged reason) rather than failing
+// the boot, and never overwrites an unparseable settings.json (PAN-1137).
+if (process.env.OVERDECK_MODE === 'desktop') {
+  void (async () => {
+    try {
+      const { provisionClaudeHooks } = await import('../../lib/claude-hooks-provision.js');
+      const result = await provisionClaudeHooks();
+      if (!result.ok) {
+        console.warn(`[overdeck] Claude hook provisioning skipped: ${result.reason}`);
+      } else if (result.changed) {
+        console.log(`[overdeck] Claude hooks provisioned: ${result.binariesSynced} scripts, registered ${result.registered.length} hook(s)${result.pruned.length ? `, pruned ${result.pruned.length} stale` : ''}`);
+      } else {
+        console.log('[overdeck] Claude hooks already provisioned (no settings change)');
+      }
+    } catch (err) {
+      console.warn('[overdeck] Claude hook provisioning failed:', err instanceof Error ? err.message : String(err));
+    }
+  })();
+}
+
 // Wire up pipeline notifier → domain events.
 // Library code (review-status.ts) calls notifyPipeline() on every status change.
 // This handler converts those into domain events so the frontend Zustand store updates.

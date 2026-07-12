@@ -19,7 +19,8 @@
     "dist-electron",
     "server",
     "resources",
-    "drizzle"
+    "drizzle",
+    "sync-sources"
   ],
   "engines": {
     "node": ">=22.0.0"
@@ -70,6 +71,10 @@
       {
         "from": "drizzle",
         "to": "drizzle"
+      },
+      {
+        "from": "sync-sources",
+        "to": "sync-sources"
       },
       {
         "from": "server",
