@@ -328,6 +328,25 @@ async function postAppServerStatus(agentId: string): Promise<CodexAppServerStatu
   const payload = JSON.stringify({ op: 'status' });
 
   return new Promise((resolveStatus, reject) => {
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      req.destroy(new Error(`app-server status op timed out after 2000ms`));
+      reject(new Error(`app-server status op timed out after 2000ms`));
+    }, 2_000);
+    const finishErr = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      reject(error);
+    };
+    const finishOk = (status: CodexAppServerStatus) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      resolveStatus(status);
+    };
     const req = httpRequest(
       {
         socketPath,
@@ -347,18 +366,18 @@ async function postAppServerStatus(agentId: string): Promise<CodexAppServerStatu
         res.on('end', () => {
           const status = res.statusCode ?? 0;
           if (status < 200 || status >= 300) {
-            reject(new Error(`app-server status op returned HTTP ${status}`));
+            finishErr(new Error(`app-server status op returned HTTP ${status}`));
             return;
           }
           try {
-            resolveStatus(JSON.parse(body) as CodexAppServerStatus);
+            finishOk(JSON.parse(body) as CodexAppServerStatus);
           } catch (error) {
-            reject(new Error(`app-server status op returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`));
+            finishErr(new Error(`app-server status op returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`));
           }
         });
       },
     );
-    req.on('error', reject);
+    req.on('error', finishErr);
     req.write(payload);
     req.end();
   });
@@ -396,11 +415,10 @@ export async function waitForCodexAppServerReady(
 }
 
 export async function waitForPromptReady(agentId: string, harness: RuntimeName | undefined, timeoutSec = 30): Promise<boolean> {
-  if (harness === 'codex' && loadYamlConfig().config.codex?.transport !== 'tui') {
-    await waitForCodexAppServerReady(agentId, timeoutSec);
-    return true;
-  }
-  const readinessKind = getHarnessBehavior(harness).readinessKind;
+  const readinessKind =
+    harness === 'codex' && loadYamlConfig().config.codex?.transport !== 'tui'
+      ? 'codex-app-server-ready'
+      : getHarnessBehavior(harness).readinessKind;
   if (readinessKind === 'codex-app-server-ready') {
     await waitForCodexAppServerReady(agentId, timeoutSec);
     return true;

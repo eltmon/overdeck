@@ -26,15 +26,13 @@ notifications, responses, or errors. Do not send `jsonrpc: "2.0"`.
 
 `RequestId` accepts either a string or an integer. The schema verifies that
 integer IDs are valid, not that they are mandatory. Overdeck uses a monotonic
-integer counter because the t3code reference reads `context.nextRequestId`,
-increments it, and writes that value as `id`
-(`/home/eltmon/Projects/t3code/apps/server/src/codexAppServerManager.ts:1215`).
+integer counter because the t3code reference manager reads `context.nextRequestId`,
+increments it, and writes that value as `id`.
 
 The generated schema describes one JSON-RPC message object at a time; it does
 not encode stream framing. The newline-delimited stdio framing is verified from
-the t3code reference, whose `writeMessage` serializes one message and writes
-`${encoded}\n` to the Codex child stdin
-(`/home/eltmon/Projects/t3code/apps/server/src/codexAppServerManager.ts:1246`).
+the t3code reference manager, whose `writeMessage` serializes one message and
+writes `${encoded}\n` to the Codex child stdin.
 
 ## Client Requests
 
@@ -102,14 +100,14 @@ t3code matches this shape by converting provider answers into
 ## Transcript And Cost Continuity
 
 Checkpoint C1 was verified with a live `codex-cli 0.144.1 app-server` session
-using an isolated `CODEX_HOME` at `/tmp/pan-2597-codex-live-yIYlP5`.
+using an isolated temporary `CODEX_HOME`.
 `thread/start` returned a planned rollout path immediately, but Codex did not
 create the JSONL until the first `turn/start` completed.
 
 After a minimal prompt (`Reply with exactly OK.`), Codex wrote:
 
 ```text
-/tmp/pan-2597-codex-live-yIYlP5/sessions/2026/07/12/rollout-2026-07-12T14-28-38-019f5796-a6eb-7ec0-91e6-ac452b37e193.jsonl
+<isolated-CODEX_HOME>/sessions/2026/07/12/rollout-2026-07-12T14-28-38-019f5796-a6eb-7ec0-91e6-ac452b37e193.jsonl
 ```
 
 The existing rollout path helpers worked unchanged:
@@ -135,8 +133,8 @@ and cost source remains the Codex rollout JSONL under the per-agent
 
 ## Per-Turn Model Checkpoint
 
-Checkpoint C3 was verified with `codex-cli 0.144.1` using isolated
-`CODEX_HOME=/tmp/pan-2597-c3-4M1kZ8`. A thread was started with model
+Checkpoint C3 was verified with `codex-cli 0.144.1` using an isolated
+temporary `CODEX_HOME`. A thread was started with model
 `gpt-5.6-sol`, then a later `turn/start` in the same thread included an explicit
 `model: "gpt-5.6-sol"` field. The app-server accepted the request without a
 protocol error, so Overdeck uses the native per-turn `model` field for

@@ -758,6 +758,9 @@ function computeCodexCommandTokens(config: LauncherConfig, useExec: boolean): st
   if (codexMode === 'app-server') {
     const hostPath = join(packageRoot, 'dist', 'codex-app-server-host.js');
     const tokens: string[] = ['node', shellQuote(hostPath)];
+    if (config.model) {
+      tokens.push('--model', shellQuoteModelIdSync(config.model));
+    }
     if (config.resumeSessionId) {
       tokens.push('--resume', shellQuote(config.resumeSessionId));
     }

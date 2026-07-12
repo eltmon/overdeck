@@ -128,6 +128,7 @@ describe('app-server delivery tier', () => {
       expect(JSON.parse(capture.lastBody!)).toEqual({
         op: 'message',
         content: 'hello',
+        model: 'gpt-5.6-sol',
         meta: { caller: 'test-caller' },
       });
       expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();

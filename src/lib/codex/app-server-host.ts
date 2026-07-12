@@ -195,6 +195,9 @@ export class CodexAppServerHost {
     if (requestId === undefined || !decision) {
       return { status: 400, body: { error: 'approval requires requestId and decision' } };
     }
+    if (!this.pendingRequests.has(String(requestId))) {
+      return { status: 409, body: { error: `approval request ${String(requestId)} is not pending` } };
+    }
     this.manager.answerApproval(requestId, decision);
     this.pendingRequests.delete(String(requestId));
     this.writePaneLine(`[approval #${requestId}] ${decision}`);

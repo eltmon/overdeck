@@ -191,7 +191,7 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     );
 
     const launcher = launcherFor(session);
-    expect(launcher).toContain(`/dist/codex-app-server-host.js' --resume '${threadId}'`);
+    expect(launcher).toContain(`/dist/codex-app-server-host.js' --model 'gpt-5.5' --resume '${threadId}'`);
     expect(launcher).not.toContain('pty-supervisor.js');
     expect(launcher).not.toContain('codex exec resume');
   });

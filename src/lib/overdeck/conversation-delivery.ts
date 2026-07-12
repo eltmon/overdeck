@@ -143,6 +143,7 @@ export async function handleConversationCodexApproval(
 ): Promise<ReturnType<typeof jsonResponse>> {
   try {
     const optionNumber = Number((body as { optionNumber?: unknown }).optionNumber);
+    const requestedToolUseId = typeof body.toolUseId === 'string' ? body.toolUseId : undefined;
     if (!Number.isInteger(optionNumber) || optionNumber < 1 || optionNumber > 9) {
       return jsonResponse({ error: 'optionNumber must be an integer 1-9' }, { status: 400 });
     }
@@ -163,6 +164,13 @@ export async function handleConversationCodexApproval(
       const pending = await readFirstAppServerApproval(conv.tmuxSession);
       if (!pending) {
         return jsonResponse({ error: 'No Codex approval prompt is currently pending' }, { status: 409 });
+      }
+      const expectedToolUseId = `${CODEX_APPROVAL_TOOL_PREFIX}${conv.tmuxSession}:${pending.id}`;
+      if (!requestedToolUseId) {
+        return jsonResponse({ error: 'Codex approval request id is required' }, { status: 400 });
+      }
+      if (requestedToolUseId !== expectedToolUseId) {
+        return jsonResponse({ error: 'Codex approval request changed; refresh pending input before responding' }, { status: 409 });
       }
       const decision = codexAppServerDecisionForOption(optionNumber);
       if (!decision) {
@@ -457,6 +465,25 @@ async function postCodexAppServerOp<T = Record<string, unknown>>(tmuxSession: st
   if (!token) throw new Error(`app-server token missing for ${tmuxSession}`);
   const payload = JSON.stringify(body);
   return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      req.destroy(new Error(`app-server op timed out after 2000ms`));
+      reject(new Error(`app-server op timed out after 2000ms`));
+    }, 2_000);
+    const finishErr = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      reject(error);
+    };
+    const finishOk = (value: T) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      resolve(value);
+    };
     const req = httpRequest(
       {
         socketPath,
@@ -476,18 +503,18 @@ async function postCodexAppServerOp<T = Record<string, unknown>>(tmuxSession: st
         res.on('end', () => {
           const status = res.statusCode ?? 0;
           if (status < 200 || status >= 300) {
-            reject(new Error(`app-server op returned HTTP ${status}`));
+            finishErr(new Error(`app-server op returned HTTP ${status}`));
             return;
           }
           try {
-            resolve(JSON.parse(responseBody) as T);
+            finishOk(JSON.parse(responseBody) as T);
           } catch (error) {
-            reject(new Error(`app-server op returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`));
+            finishErr(new Error(`app-server op returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`));
           }
         });
       },
     );
-    req.on('error', reject);
+    req.on('error', finishErr);
     req.write(payload);
     req.end();
   });

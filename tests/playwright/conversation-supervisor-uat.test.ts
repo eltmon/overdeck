@@ -502,7 +502,7 @@ describe('conversation supervisor Playwright UAT', () => {
     await expect.poll(() => tmuxSessionExists(conversation.tmuxSession), { timeout: 30_000 }).toBe(true);
 
     const launcher = launcherFor(conversation.tmuxSession);
-    expect(launcher).toContain(`/dist/codex-app-server-host.js' --resume '${threadId}'`);
+    expect(launcher).toContain(`/dist/codex-app-server-host.js' --model 'gpt-5.5' --resume '${threadId}'`);
     expect(launcher).not.toContain('pty-supervisor.js');
     expect(launcher).not.toContain('codex exec resume');
 

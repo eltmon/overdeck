@@ -9,7 +9,7 @@ import { getGlobalRegistry, getRuntime, setGlobalRegistry, RuntimeRegistry } fro
 import { createClaudeCodeRuntimeSync } from '../claude-code.js'
 import { createOhmypiFifo } from '../ohmypi-fifo.js'
 import { OhmypiNotReady } from '../ohmypi-fifo.js'
-import { tmuxSessionExists } from '../tmux-cli.js'
+import { sessionExists } from '../../tmux.js'
 
 const FIXTURE_LINEAR = join(__dirname, '..', '..', 'cost-parsers', '__tests__', 'fixtures', 'pi', 'linear.jsonl')
 
@@ -172,7 +172,6 @@ describe('OhmypiRuntime.getSessionCost (AC5)', () => {
 })
 
 const execMock = vi.hoisted(() => vi.fn((_cmd: string, _options?: unknown) => ''))
-const tmuxSessionExistsMock = vi.hoisted(() => vi.fn(async (_agentId: string) => false))
 vi.mock('child_process', async () => {
   const actual = await vi.importActual<typeof import('child_process')>('child_process')
   const kCustom = Symbol.for('nodejs.util.promisify.custom')
@@ -212,12 +211,6 @@ vi.mock('../../tmux.js', async () => {
     killSession: vi.fn(() => Effect.succeed(undefined)),
   }
 })
-
-vi.mock('../tmux-cli.js', () => ({
-  tmuxCreateSession: vi.fn(async () => undefined),
-  tmuxKillSession: vi.fn(async () => undefined),
-  tmuxSessionExists: tmuxSessionExistsMock,
-}))
 
 describe('OhmypiRuntime.spawnAgent resume via session.id (PAN-636 / PAN-1989)', () => {
   let h: ReturnType<typeof withFakeHome>
@@ -377,7 +370,7 @@ describe('OhmypiRuntime.killAgent escalation ladder + cleanup (PAN-1989)', () =>
 
 describe('OhmypiRuntime.killAgent PAN-1798 server-kill guard', () => {
   let h: ReturnType<typeof withFakeHome>
-  const mockedSessionExists = vi.mocked(tmuxSessionExists)
+  const mockedSessionExists = vi.mocked(sessionExists)
 
   beforeEach(() => {
     h = withFakeHome()
@@ -390,7 +383,7 @@ describe('OhmypiRuntime.killAgent PAN-1798 server-kill guard', () => {
     const sessionAliveStart = Date.now()
     mockedSessionExists.mockImplementation(() => {
       const alive = Date.now() - sessionAliveStart < 2_500
-      return Promise.resolve(alive) as ReturnType<typeof tmuxSessionExists>
+      return Effect.succeed(alive) as ReturnType<typeof sessionExists>
     })
 
     execMock.mockImplementation((cmd: string) => {

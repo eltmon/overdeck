@@ -251,6 +251,19 @@ describe('CodexAppServerHost', () => {
     expect(host.status().pendingRequests).toHaveLength(0);
   });
 
+  it('rejects approval responses for requests that are no longer pending', async () => {
+    const manager = new FakeManager();
+    const host = makeHost(manager);
+    manager.emit('request', { id: 72, method: 'item/commandExecution/requestApproval', params: { command: 'git status' } });
+
+    expect(await host.handleOp({ op: 'approval', requestId: 71, decision: 'accept' })).toEqual({
+      status: 409,
+      body: { error: 'approval request 71 is not pending' },
+    });
+    expect(manager.approvals).toEqual([]);
+    expect(host.status().pendingRequests).toHaveLength(1);
+  });
+
   it('forwards interrupt ops to the manager', async () => {
     const manager = new FakeManager();
     const host = makeHost(manager);

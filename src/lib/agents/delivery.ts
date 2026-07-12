@@ -196,8 +196,9 @@ export async function deliverAgentMessage(
 
   let channelsEnabled = false;
   let resolvedMethod = deliveryMethod;
+  let state: AgentState | null = null;
   try {
-    const state = await Effect.runPromise(getAgentState(normalizedId));
+    state = await Effect.runPromise(getAgentState(normalizedId));
     channelsEnabled = Boolean(state?.channelsEnabled);
     resolvedMethod ??= state?.deliveryMethod ?? 'auto';
   } catch {
@@ -219,9 +220,11 @@ export async function deliverAgentMessage(
         appServerFailure = 'appserver-token-missing';
       } else {
         try {
+          const appServerBody: Record<string, unknown> = { op: 'message', content: message, meta: { caller } };
+          if (state?.model) appServerBody.model = state.model;
           await postUnixSocketJson(
             appServerSocketPath,
-            { op: 'message', content: message, meta: { caller } },
+            appServerBody,
             8_000,
             appServerToken,
           );

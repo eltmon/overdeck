@@ -84,6 +84,25 @@ async function postAppServerInterrupt(agentId: string): Promise<void> {
   if (!existsSync(socketPath) || !token) return
   const payload = JSON.stringify({ op: 'interrupt' })
   await new Promise<void>((resolve, reject) => {
+    let settled = false
+    const timeout = setTimeout(() => {
+      if (settled) return
+      settled = true
+      req.destroy(new Error(`app-server interrupt timed out after 2000ms`))
+      reject(new Error(`app-server interrupt timed out after 2000ms`))
+    }, 2_000)
+    const finishErr = (error: Error) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      reject(error)
+    }
+    const finishOk = () => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      resolve()
+    }
     const req = httpRequest(
       {
         socketPath,
@@ -100,12 +119,12 @@ async function postAppServerInterrupt(agentId: string): Promise<void> {
         res.resume()
         res.on('end', () => {
           const status = res.statusCode ?? 0
-          if (status >= 200 && status < 300) resolve()
-          else reject(new Error(`app-server interrupt returned HTTP ${status}`))
+          if (status >= 200 && status < 300) finishOk()
+          else finishErr(new Error(`app-server interrupt returned HTTP ${status}`))
         })
       },
     )
-    req.on('error', reject)
+    req.on('error', finishErr)
     req.write(payload)
     req.end()
   })

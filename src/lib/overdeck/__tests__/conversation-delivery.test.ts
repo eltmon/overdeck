@@ -132,12 +132,35 @@ describe('conversation codex approvals', () => {
       { ok: true },
     );
 
-    await handleConversationCodexApproval('conv-test', { optionNumber: 1 });
+    await handleConversationCodexApproval('conv-test', {
+      optionNumber: 1,
+      toolUseId: 'codex-approval:conv-test:71',
+    });
 
     expect(httpBodies).toEqual([
       { op: 'status' },
       { op: 'approval', requestId: 71, decision: 'accept' },
     ]);
+    expect(sendRawKeystroke).not.toHaveBeenCalled();
+  });
+
+  it('rejects app-server approval decisions for stale request ids', async () => {
+    seedAppServerFiles();
+    nextResponses.push({
+      pendingRequests: [{
+        id: 72,
+        method: 'item/commandExecution/requestApproval',
+        params: { command: 'git status' },
+      }],
+    });
+
+    const response = await handleConversationCodexApproval('conv-test', {
+      optionNumber: 1,
+      toolUseId: 'codex-approval:conv-test:71',
+    });
+
+    expect(response.status).toBe(409);
+    expect(httpBodies).toEqual([{ op: 'status' }]);
     expect(sendRawKeystroke).not.toHaveBeenCalled();
   });
 
