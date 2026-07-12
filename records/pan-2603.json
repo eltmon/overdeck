@@ -37,6 +37,16 @@
       "reason": "feedback",
       "note": "[2026-07-12T21:49Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-12T21:49:26.092Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-12T21:56Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-07-12T21:56:33.206Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T21:56:33.295Z"
     }
   ],
   "feedback": [
@@ -53,6 +63,13 @@
       "outcome": "changes-requested",
       "timestamp": "2026-07-12T21:49:26Z",
       "markdownBody": "# Review CHANGES REQUESTED for PAN-2603\n\n# Review Synthesis — PAN-2603 — 2026-07-12T17:58:00-04:00\n\n## Verdict: CHANGES REQUESTED — `/api/memory/inject` drops existing prompt-time memory context and adds unsafe/expensive docs injection on the hot path\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2603/.pan/review/agent-pan-2603-review-1394ae0c/context.json\n- Branch: feature/pan-2603\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2603\n- HEAD reviewed: 1394ae0ce5f8c40b335c434e46c233c6044206e5\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2603/.pan/review/agent-pan-2603-review-1394ae0c/security.md | 1 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2603/.pan/review/agent-pan-2603-review-1394ae0c/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2603/.pan/review/agent-pan-2603-review-1394ae0c/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2603/.pan/review/agent-pan-2603-review-1394ae0c/requirements.md | 0 |\n\n## Blocking Findings\n\n### [security] Raw docs snippets are injected as trusted Claude instructions — `src/lib/docs/injection.ts:69`\n`buildDocsInjectionContext` returns `formatDocsQueryMarkdown(result)` and `handleMemoryInjectFastPathBody` appends the resulting docs block directly into the hook response. The snippets come from the indexed corpus and are not framed as untrusted reference material; only the closing `</overdeck-docs>` tag is escaped. A malicious or compromised corpus entry can therefore present ordinary model-visible commands inside prompt-time context. The fix should add explicit non-authoritative framing/fencing and a regression test with adversarial corpus text.\n\n### [correctness] `/api/memory/inject` no longer returns prompt-time memory context — `src/dashboard/server/routes/hooks.ts:333`\nThe route now returns `fastResult`, while the original `handleMemoryInjectBody` call runs fire-and-forget and its context is never included in the JSON returned to the Claude Code hook. The fast path stubs `injectMemory` with an empty context, so the installed `UserPromptSubmit` hook no longer receives existing `<overdeck-memory>` context on the main prompt-injection path. Preserve the endpoint response contract or explicitly restructure the hook/server composition so expected memory context is still emitted.\n\n### [performance] Prompt-time docs injection synchronously scans the full docs embedding index — `src/dashboard/server/routes/hooks.ts:333`\nThe latency-sensitive `/api/memory/inject` route awaits `handleMemoryInjectFastPathBody`, which awaits `buildDocsInjectionContext` and `queryDocsIndex`. That query path uses synchronous SQLite work on the Node dashboard event loop and, after FTS hits, scans/materializes/sorts the full `docs_embeddings` table before slicing to `maxVectorRows`. This makes prompt submit latency scale with corpus size and blocks unrelated dashboard HTTP/WebSocket work. Keep docs retrieval off the hot response path or make the query strategy bounded and non-blocking before approval.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2603/.pan/review/agent-pan-2603-review-1394ae0c/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2603 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 3,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-07-12T21:56:33Z",
+      "markdownBody": "VERIFICATION STUCK for PAN-2603 (attempt 3/3):\n\nFailed check: lint\n\nVerification FAILED at lint (73852ms):\n\n tsdown:deps (66%)\n  - rolldown-plugin-dts:generate (27%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\ncomm: file 1 is not in sorted order\ncomm: input is not in sorted order\ncomm: file 1 is not in sorted order\ncomm: input is not in sorted order\n✖ new circular dependencies found — these must be removed, not baselined:\n    src/dashboard/frontend/src/components/chat/ConversationPanel.tsx > src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/dividers.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts\n    src/dashboard/frontend/src/components/conversations/SessionDetail.tsx > src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx\n    src/lib/agents/tier-table.ts > src/lib/pan-dir/record.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts\n✖ stale baseline entries — run: bash scripts/lint-circular-deps.sh --update\n    src/dashboard/frontend/src/components/chat/ConversationPanel.tsx > src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/dividers.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts\n    src/dashboard/frontend/src/components/conversations/SessionDetail.tsx > src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx\n    src/lib/agents/tier-table.ts > src/lib/pan-dir/record.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts\n\ncircular-dependency guard failed. Break the cycle, or manually edit the baseline in an issue-referenced commit to accept audited growth.\n\n\n## NEEDS-YOU: Verification stuck\n\nThis was the final allowed verification attempt. The work agent is paused so it does not keep spending cycles on the same failing gate.\n\nAn operator needs to inspect PAN-2603, decide whether to fix-forward manually, restart the agent with new instructions, or move the issue through the normal pipeline. Do not re-request review automatically."
     }
   ],
   "scopeDrift": {
@@ -85,10 +102,10 @@
     "recordedAt": "2026-07-12T21:40:42.752Z"
   },
   "created": "2026-07-12T20:44:53.021Z",
-  "updated": "2026-07-12T21:49:26.092Z",
+  "updated": "2026-07-12T21:56:33.296Z",
   "pipeline": {
     "issueId": "PAN-2603",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
@@ -96,9 +113,9 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-12T21:41:23.108Z",
-    "updatedAt": "2026-07-12T21:49:25.357Z",
+    "updatedAt": "2026-07-12T21:56:32.424Z",
     "reviewNotes": "/api/memory/inject drops memory context and docs injection needs trust-boundary/performance fixes",
-    "verificationNotes": "Verification FAILED at lint (66854ms):\n\n rolldown-plugin-dts:generate (59%)\n  - tsdown:deps (37%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\ncomm: file 1 is not in sorted order\ncomm: input is not in sorted order\ncomm: file 1 is not in sorted order\ncomm: input is not in sorted order\n✖ new circular dependencies found — these must be removed, not baselined:\n    src/dashboard/frontend/src/components/chat/ConversationPanel.tsx > src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/dividers.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts\n    src/dashboard/frontend/src/components/conversations/SessionDetail.tsx > src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx\n    src/lib/agents/tier-table.ts > src/lib/pan-dir/record.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts\n✖ stale baseline entries — run: bash scripts/lint-circular-deps.sh --update\n    src/dashboard/frontend/src/components/chat/ConversationPanel.tsx > src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/dividers.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts\n    src/dashboard/frontend/src/components/conversations/SessionDetail.tsx > src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx\n    src/lib/agents/tier-table.ts > src/lib/pan-dir/record.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts\n\ncircular-dependency guard failed. Break the cycle, or manually edit the baseline in an issue-referenced commit to accept audited growth.\n",
+    "verificationNotes": "Verification FAILED at lint (73852ms):\n\n tsdown:deps (66%)\n  - rolldown-plugin-dts:generate (27%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\ncomm: file 1 is not in sorted order\ncomm: input is not in sorted order\ncomm: file 1 is not in sorted order\ncomm: input is not in sorted order\n✖ new circular dependencies found — these must be removed, not baselined:\n    src/dashboard/frontend/src/components/chat/ConversationPanel.tsx > src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/dividers.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts\n    src/dashboard/frontend/src/components/conversations/SessionDetail.tsx > src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx\n    src/lib/agents/tier-table.ts > src/lib/pan-dir/record.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts\n✖ stale baseline entries — run: bash scripts/lint-circular-deps.sh --update\n    src/dashboard/frontend/src/components/chat/ConversationPanel.tsx > src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/dividers.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts\n    src/dashboard/frontend/src/components/conversations/SessionDetail.tsx > src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx\n    src/lib/agents/tier-table.ts > src/lib/pan-dir/record.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts\n\ncircular-dependency guard failed. Break the cycle, or manually edit the baseline in an issue-referenced commit to accept audited growth.\n",
     "inspectNotes": "Bead docs-injection-service ack: buildDocsInjectionContext gates via evaluateDocsPromptGate before any write, only advances budget/records telemetry once on a real hit (zero-result and missing-index paths short-circuit before recordDocsInjection), and swallows errors without throwing per AC1-5; covered by injection.test.ts.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2605",
     "reviewRequestedAt": "2026-07-12T21:41:23.108Z",
@@ -131,24 +148,6 @@
         "src/lib/docs/injection.ts"
       ],
       "recordedAt": "2026-07-12T21:40:42.752Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "blocked",
-        "atCommit": "1394ae0ce5f8c40b335c434e46c233c6044206e5"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "1394ae0ce5f8c40b335c434e46c233c6044206e5"
-      },
-      "performance": {
-        "status": "blocked",
-        "atCommit": "1394ae0ce5f8c40b335c434e46c233c6044206e5"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "1394ae0ce5f8c40b335c434e46c233c6044206e5"
-      }
     }
   },
   "closeOut": {
@@ -156,15 +155,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 3539862,
-            "output": 4117,
-            "cacheRead": 3365376,
+            "input": 3671618,
+            "output": 5121,
+            "cacheRead": 3448832,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 19179203,
-            "output": 55766,
-            "cacheRead": 18434048,
+            "input": 21922780,
+            "output": 64756,
+            "cacheRead": 21120640,
             "cacheWrite": 0
           }
         },
@@ -187,15 +186,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 3539862,
-          "output": 4117,
-          "cacheRead": 3365376,
+          "input": 3671618,
+          "output": 5121,
+          "cacheRead": 3448832,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 19179203,
-          "output": 55766,
-          "cacheRead": 18434048,
+          "input": 21922780,
+          "output": 64756,
+          "cacheRead": 21120640,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -212,8 +211,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 26.069154,
-        "pricingAsOf": "2026-07-12T21:49:25.408Z"
+        "usd": 27.967075,
+        "pricingAsOf": "2026-07-12T21:56:32.507Z"
       }
     },
     "merges": [
