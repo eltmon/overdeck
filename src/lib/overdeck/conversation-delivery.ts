@@ -1,4 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { request as httpRequest } from 'node:http';
+import { join } from 'node:path';
 
 import { Effect } from 'effect';
 
@@ -24,6 +27,8 @@ import { sendRawKeystroke, sendKeysAsync } from '../tmux.js';
 import { deliverAgentMessage } from '../agents.js';
 import { tmuxSessionExists } from './conversation-runtime.js';
 import type { PendingAskUserQuestionSnapshot, PendingInputKind } from '../agent-enrichment.js';
+import { getOverdeckHome } from '../paths.js';
+import { BRIDGE_TOKEN_HEADER } from '../bridge-token.js';
 
 export const CONTROL_ACK_TIMEOUT_MS = 10_000;
 
@@ -46,6 +51,16 @@ const PLAN_ACTION_KEYSTROKES: Record<string, string> = {
   'approve-manual': '2',
   'reject-ultraplan': '3',
 };
+
+interface CodexAppServerPendingRequest {
+  id: string | number;
+  method: string;
+  params?: unknown;
+}
+
+interface CodexAppServerStatus {
+  pendingRequests?: CodexAppServerPendingRequest[];
+}
 
 export function registerConversationControlAck(
   commandId: string,
@@ -143,6 +158,18 @@ export async function handleConversationCodexApproval(
     }
     if (!(await tmuxSessionExists(conv.tmuxSession))) {
       return jsonResponse({ error: 'Conversation session is not running' }, { status: 409 });
+    }
+    if (codexUsesAppServerTransport()) {
+      const pending = await readFirstAppServerApproval(conv.tmuxSession);
+      if (!pending) {
+        return jsonResponse({ error: 'No Codex approval prompt is currently pending' }, { status: 409 });
+      }
+      const decision = codexAppServerDecisionForOption(optionNumber);
+      if (!decision) {
+        return jsonResponse({ error: 'optionNumber out of range (1-2)' }, { status: 400 });
+      }
+      await postCodexAppServerOp(conv.tmuxSession, { op: 'approval', requestId: pending.id, decision });
+      return jsonResponse({ ok: true, optionNumber, decision });
     }
     // Re-detect uncached so we only send keystrokes when the menu is still
     // up, and so we can bound optionNumber to the options actually shown.
@@ -343,6 +370,26 @@ export async function codexConversationPendingInput(
 ): Promise<{ kinds: PendingInputKind[]; approval?: PendingAskUserQuestionSnapshot }> {
   if (!sessionAlive || getHarnessBehavior(conv.harness).transcriptKind !== 'codex-rollout-jsonl') return { kinds: [] };
   try {
+    if (codexUsesAppServerTransport()) {
+      const pending = await readFirstAppServerApproval(conv.tmuxSession);
+      if (!pending) return { kinds: [] };
+      return {
+        kinds: ['permissionRequest'],
+        approval: {
+          toolUseId: `${CODEX_APPROVAL_TOOL_PREFIX}${conv.tmuxSession}:${pending.id}`,
+          askedAt,
+          questions: [{
+            question: formatAppServerApprovalQuestion(pending),
+            header: 'Codex approval',
+            multiSelect: false,
+            options: [
+              { label: '1. accept' },
+              { label: '2. reject' },
+            ],
+          }],
+        },
+      };
+    }
     const detection = await Effect.runPromise(detectAwaitingInputForAgent(conv.tmuxSession, { isPlanning: false }));
     if (!detection) return { kinds: [] };
     if (detection.reason === 'session_resume') return { kinds: ['sessionResume'] };
@@ -375,4 +422,77 @@ export async function deliverCodexApprovalChoice(tmuxSession: string, optionNumb
     await new Promise((r) => setTimeout(r, 60));
   }
   await Effect.runPromise(sendRawKeystroke(tmuxSession, 'Enter', 'codex-approval'));
+}
+
+function codexUsesAppServerTransport(): boolean {
+  return loadConfigSync().config.codex?.transport !== 'tui';
+}
+
+function codexAppServerDecisionForOption(optionNumber: number): 'accept' | 'reject' | null {
+  if (optionNumber === 1) return 'accept';
+  if (optionNumber === 2) return 'reject';
+  return null;
+}
+
+async function readFirstAppServerApproval(tmuxSession: string): Promise<CodexAppServerPendingRequest | null> {
+  const status = await postCodexAppServerOp<CodexAppServerStatus>(tmuxSession, { op: 'status' });
+  return status.pendingRequests?.find(request => /requestApproval/i.test(request.method)) ?? null;
+}
+
+function formatAppServerApprovalQuestion(request: CodexAppServerPendingRequest): string {
+  const params = asRecord(request.params);
+  const command = typeof params.command === 'string' ? params.command : undefined;
+  const path = typeof params.path === 'string' ? params.path : undefined;
+  if (command) return `Codex requests approval to run:\n\n${command}`;
+  if (path) return `Codex requests approval for:\n\n${path}`;
+  return `Codex requests approval for ${request.method}`;
+}
+
+async function postCodexAppServerOp<T = Record<string, unknown>>(tmuxSession: string, body: Record<string, unknown>): Promise<T> {
+  const socketPath = join(getOverdeckHome(), 'sockets', `appserver-${tmuxSession}.sock`);
+  const tokenPath = join(getOverdeckHome(), 'agents', tmuxSession, 'appserver-token');
+  if (!existsSync(socketPath)) throw new Error(`app-server socket missing for ${tmuxSession}`);
+  if (!existsSync(tokenPath)) throw new Error(`app-server token missing for ${tmuxSession}`);
+  const token = readFileSync(tokenPath, 'utf-8').trim();
+  if (!token) throw new Error(`app-server token missing for ${tmuxSession}`);
+  const payload = JSON.stringify(body);
+  return new Promise<T>((resolve, reject) => {
+    const req = httpRequest(
+      {
+        socketPath,
+        path: '/',
+        method: 'POST',
+        agent: false,
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+          [BRIDGE_TOKEN_HEADER]: token,
+        },
+      },
+      (res) => {
+        let responseBody = '';
+        res.setEncoding('utf-8');
+        res.on('data', chunk => { responseBody += chunk; });
+        res.on('end', () => {
+          const status = res.statusCode ?? 0;
+          if (status < 200 || status >= 300) {
+            reject(new Error(`app-server op returned HTTP ${status}`));
+            return;
+          }
+          try {
+            resolve(JSON.parse(responseBody) as T);
+          } catch (error) {
+            reject(new Error(`app-server op returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`));
+          }
+        });
+      },
+    );
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
