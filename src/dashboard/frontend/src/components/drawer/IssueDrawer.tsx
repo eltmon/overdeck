@@ -7,7 +7,7 @@ import { cn } from '../../lib/utils';
 import { trackerIssueUrl } from '../../lib/issueLinks';
 import { toast } from 'sonner';
 import DrawerActionBar from './DrawerActionBar';
-import DrawerActiveAgent from './DrawerActiveAgent';
+import DrawerActiveAgent, { formatSpend } from './DrawerActiveAgent';
 import { DrawerAgentSession, pickDefaultDrawerAgent } from './DrawerAgentSession';
 import DrawerActivityRail from './DrawerActivityRail';
 import DrawerArtifactsPanel from './DrawerArtifactsPanel';
@@ -166,6 +166,24 @@ export function IssueDrawer() {
   const syncDrawerFromUrl = useDashboardStore((state) => state.syncDrawerFromUrl);
   const { issue, agents } = useDrawerData();
 
+  // Active agent drives the header meta row (branch chip + cost figure). Mirrors
+  // the DrawerActiveAgent definition of "active": any agent that is not in a
+  // terminal state (dead/failed has no recoverable session). PRD §4.7.8.
+  const activeAgent =
+    agents.find((agent) => agent.status !== 'dead' && agent.status !== 'failed') ?? null;
+  const branchLabel = activeAgent?.git?.branch ?? '—';
+  const costLabel = activeAgent ? formatSpend(activeAgent.costSoFar) : '—';
+
+  // PRD §4.7.8 priority bar color: 1=destructive, 2=warning, 3=muted, 4=transparent.
+  const priorityBarClass =
+    issue?.priority === 1
+      ? 'bg-destructive'
+      : issue?.priority === 2
+        ? 'bg-warning'
+        : issue?.priority === 3
+          ? 'bg-muted-foreground'
+          : 'bg-transparent';
+
   // Selected agent for the Conversation/Terminal tabs. Owned here so the choice
   // survives a Conversation ⇄ Terminal tab switch; falls back to the default
   // pick whenever the selection is cleared or no longer matches an agent.
@@ -245,14 +263,27 @@ export function IssueDrawer() {
         className="flex h-screen w-[min(980px,calc(100vw-48px))] max-w-[calc(100vw-48px)] origin-right scale-100 flex-col overflow-hidden border-l border-border bg-background opacity-100 shadow-[-24px_0_64px_rgb(0_0_0_/_40%)] animate-[issue-drawer-slide-in_200ms_ease-in-out]"
         onClick={(event) => event.stopPropagation()}
       >
-        <header className="flex h-[52px] items-center gap-[12px] border-b border-border px-[22px]">
+        <header className="flex items-start gap-[12px] border-b border-border pt-[16px] px-[22px] pb-0">
+          <div
+            data-testid="drawer-header-priority-bar"
+            aria-hidden="true"
+            className={cn('mt-[2px] h-[28px] w-[4px] shrink-0 rounded-full', priorityBarClass)}
+          />
           <div className="min-w-0 flex-1">
-            <div className="truncate font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+            <div className="truncate font-mono text-[13px] text-muted-foreground">
               {drawer.issueId}
             </div>
             <h2 className="truncate font-display text-[22px] font-semibold leading-none tracking-[-0.01em] text-foreground">
               {issue?.title ?? 'Issue details'}
             </h2>
+            <div data-testid="drawer-header-meta" className="mt-[8px] flex items-center gap-[8px]">
+              <span className="rounded-md bg-accent px-[8px] py-[2px] text-[12px] text-muted-foreground">
+                {branchLabel}
+              </span>
+              <span className="text-[12px] text-[var(--signal-cost-foreground)]">
+                {costLabel}
+              </span>
+            </div>
           </div>
           {(() => {
             // PAN-1610: one-click jump to the full issue on its tracker.
