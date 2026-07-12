@@ -4,6 +4,7 @@ import { join } from 'path';
 import { promisify } from 'util';
 import { findProjectByPathSync, type ProjectConfig } from '../../lib/projects.js';
 import { ensureStateWorktree, resolveStateHome } from '../../lib/state-home.js';
+import { runMutationBatch } from '../../lib/beads/writer.js';
 
 const execAsync = promisify(exec);
 const REDIRECT_MANAGED_BEADS_VERSION = 1 * 10000 + 0 * 100 + 4;
@@ -80,10 +81,12 @@ export async function initializeWorkspaceBeads(workspacePath: string, issueId: s
       const issueLabel = issueId.toLowerCase();
       const title = `${issueId.toUpperCase()}: Implementation`;
 
-      const { stdout } = await execAsync(
-        `bd create --title "${title}" --priority 1 --type task --labels "${issueLabel}" 2>&1`,
-        { cwd: workspacePath, encoding: 'utf-8' }
+      const batch = await runMutationBatch(
+        { project: { workspacePath }, reason: `create implementation bead for ${issueId.toUpperCase()}` },
+        (bd) => bd.mutate(['create', '--title', title, '--priority', '1', '--type', 'task', '--labels', issueLabel]),
       );
+      if (!batch.ok) return { success: false, error: batch.message };
+      const stdout = batch.value;
 
       // Parse the created bead ID
       const match = stdout.match(/([a-z]+-[a-z0-9]+)/);
@@ -103,10 +106,12 @@ export async function initializeWorkspaceBeads(workspacePath: string, issueId: s
       await execAsync('bd config set export.git-add false', { cwd: workspacePath, encoding: 'utf-8' }).catch(() => {});
 
       const title = `${issueId.toUpperCase()}: Implementation`;
-      const { stdout } = await execAsync(
-        `bd create --title "${title}" --priority 1 --type task --json`,
-        { cwd: workspacePath, encoding: 'utf-8' }
+      const batch = await runMutationBatch(
+        { project: { workspacePath }, reason: `create implementation bead for ${issueId.toUpperCase()}` },
+        (bd) => bd.mutate(['create', '--title', title, '--priority', '1', '--type', 'task', '--json']),
       );
+      if (!batch.ok) return { success: false, error: batch.message };
+      const stdout = batch.value;
 
       try {
         const result = JSON.parse(stdout);
