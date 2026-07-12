@@ -31226,24 +31226,6 @@ function ensureRuntimeIndexesSync(db) {
 		db.exec("ALTER TABLE `agents` ADD COLUMN `yielded_by_scheduler` integer");
 	} catch {}
 	try {
-		db.exec("ALTER TABLE `agents` ADD COLUMN `review_discovery_pending` integer");
-	} catch {}
-	try {
-		db.exec("ALTER TABLE `agents` ADD COLUMN `review_context_manifest_path` text");
-	} catch {}
-	try {
-		db.exec("ALTER TABLE `agents` ADD COLUMN `review_discovery_ready_at` integer");
-	} catch {}
-	try {
-		db.exec("ALTER TABLE `agents` ADD COLUMN `review_convoy_forked_at` integer");
-	} catch {}
-	try {
-		db.exec("ALTER TABLE `agents` ADD COLUMN `review_fork_cache_checked` integer");
-	} catch {}
-	try {
-		db.exec("ALTER TABLE `agents` ADD COLUMN `review_forked_from_parent` integer");
-	} catch {}
-	try {
 		db.exec("ALTER TABLE `agents` ADD COLUMN `yielded_at` integer");
 	} catch {}
 	try {
