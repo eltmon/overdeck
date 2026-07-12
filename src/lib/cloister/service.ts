@@ -1129,23 +1129,13 @@ export class CloisterService {
         const idleAgentState = getAgentStateSync(health.agentId);
         if (idleAgentState?.role === 'sequencer') continue;
 
-        // PAN-2581 (residual): phase gate — a warm-idle work/review/test agent on a
-        // pipeline-owned issue (review in flight, passed review awaiting test, an
-        // un-serviced durable review request, or a terminal verdict the PAN-2519
-        // wedge path owns) is the INTENDED state under the warm lifecycle
-        // (PAN-2579), not a stall. Poking it re-runs `pan done` and clobbers
-        // verdicts ($63 on PAN-399); five "ineffective" pokes idle-alive PAUSE it,
-        // manufacturing the PAN-2461 paused-delivery-target deadlock. Health is
-        // still recorded above; only the poke/pause action is skipped.
-        if (idleAgentState) {
-          const issueId = idleAgentState.issueId
-            || idleAgentState.id.replace(/^agent-/, '').replace(/-(review|test|ship)(-.*)?$/, '').replace(/-slot-\d+$/, '').toUpperCase();
-          const { shouldSkipIdlePokeForAgent } = await import('./stuck-remediation.js');
-          const { getReviewStatusSync } = await import('../review-status.js');
-          if (shouldSkipIdlePokeForAgent(idleAgentState.role, getReviewStatusSync(issueId))) {
-            this.pokeProgress.delete(health.agentId);
-            continue;
-          }
+        // PAN-2581: warm-idle on a pipeline-owned issue is the intended state, not
+        // a stall — rationale on shouldSkipIdlePokeForAgent. Health stays recorded
+        // above; only the poke/idle-alive-pause action is skipped.
+        const { shouldSkipIdlePokeForAgent } = await import('./stuck-remediation.js');
+        if (shouldSkipIdlePokeForAgent(idleAgentState)) {
+          this.pokeProgress.delete(health.agentId);
+          continue;
         }
 
         const lastPoke = this.lastPokeTimestamps.get(health.agentId) ?? 0;

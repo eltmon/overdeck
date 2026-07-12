@@ -63,11 +63,15 @@ export function shouldSkipReviewStatus(status: ReviewStatus | null): boolean {
  * their existing idleness semantics.
  */
 export function shouldSkipIdlePokeForAgent(
-  role: string | undefined,
-  status: ReviewStatus | null,
+  agent: Pick<AgentState, 'id' | 'issueId' | 'role'> | null,
+  readStatus: (issueId: string) => ReviewStatus | null = getReviewStatusSync,
 ): boolean {
-  if (role !== 'work' && role !== 'review' && role !== 'test') return false;
-  return shouldSkipReviewStatus(status);
+  if (!agent) return false;
+  if (agent.role !== 'work' && agent.role !== 'review' && agent.role !== 'test') return false;
+  const issueId = (agent.issueId
+    || agent.id.replace(/^agent-/, '').replace(/-(review|test|ship)(-.*)?$/, '').replace(/-slot-\d+$/, '')
+  ).toUpperCase();
+  return shouldSkipReviewStatus(readStatus(issueId));
 }
 
 // PAN-2519: the rework subset of shouldSkipReviewStatus — a work agent that OWES
