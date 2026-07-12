@@ -13,6 +13,7 @@ import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { platform } from 'os';
 import { registerBeadsReconcileCommand } from './admin/beads-reconcile.js';
+import { standardizeBeadsConfig } from '../../lib/beads/config-standardize.js';
 
 const execAsync = promisify(exec);
 
@@ -364,12 +365,16 @@ async function doctorCommand(dryRun: boolean = false): Promise<void> {
   try {
     if (dryRun) {
       const { stdout } = await execAsync('bd doctor', { encoding: 'utf-8' });
+      const standardized = await standardizeBeadsConfig(process.cwd(), true);
       spinner.succeed('Beads doctor check complete');
       console.log(stdout);
+      if (!standardized.remoteMatches) console.log(chalk.yellow(`sync.remote does not match ${standardized.expectedRemote}; writes are blocked until reconciled.`));
       return;
     }
 
     const { stdout } = await execAsync('bd doctor --fix', { encoding: 'utf-8' });
+    const standardized = await standardizeBeadsConfig(process.cwd());
+    if (!standardized.remoteMatches) throw new Error(`sync.remote does not match ${standardized.expectedRemote}; writes are blocked until reconciled.`);
     spinner.succeed('Beads doctor fix complete');
     console.log(stdout);
   } catch (error: any) {
