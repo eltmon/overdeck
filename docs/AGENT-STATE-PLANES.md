@@ -57,6 +57,12 @@ Lifecycle events project status, while the Deacon keeps a thin patrol as a
 dropped-event safety net. A global Deacon pause gates every patrol and recovery
 path.
 
+Codex app-server sessions keep the same liveness oracle. The tmux pane hosts
+Overdeck's Codex app-server host process, which owns the `codex app-server`
+child over stdio and renders a readable event feed into the pane. Deacon still
+patrols the tmux session; it does not treat the Codex child process as a
+separate liveness source.
+
 ## Resume classifier and intent policy
 
 `getAgentResumeGateBlockReason()` is the only classifier for `paused`, `troubled`,
