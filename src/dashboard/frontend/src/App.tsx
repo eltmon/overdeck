@@ -38,7 +38,10 @@ import {
   getCockpitRouteFromPath,
   getCommandDeckProjectRouteFromPath,
   getConversationRouteState,
+  getIssueIdFromPath,
+  getLastTab,
   getSessionKeyFromSearch,
+  LAST_TAB_STORAGE_KEY,
   normalizeCurrentRoute,
   TAB_PATHS,
   type ConversationViewModeMap,
@@ -379,6 +382,35 @@ export default function App() {
     }
   }, [activeTab, experimentalFeaturesEnabled, experimentalFeaturesKnown, setActiveTab]);
 
+  // PAN-1234: remember the last active surface so /issues/:id can land there.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(LAST_TAB_STORAGE_KEY, activeTab);
+    } catch {
+      // ignore
+    }
+  }, [activeTab]);
+
+  // PAN-1234: /issues/:id opens the drawer without rewriting the URL.
+  const applyIssueRoute = useCallback(() => {
+    const issueId = getIssueIdFromPath();
+    if (!issueId) return;
+    // Ensure the parent surface is active (initial load may resolve it from
+    // getTabFromPath, but popstate can arrive with any tab).
+    const targetTab = getLastTab() ?? 'pipeline';
+    if (activeTab !== targetTab) {
+      setActiveTabState(targetTab);
+    }
+    useDashboardStore.setState({ drawer: { issueId, tab: 'overview' } });
+  }, [activeTab]);
+
+  // PAN-1234: handle direct navigation to /issues/:id on initial load and on
+  // browser back/forward. Keep the URL unchanged (no ?issue= rewrite).
+  useEffect(() => {
+    applyIssueRoute();
+  }, [applyIssueRoute]);
+
   // Sync the URL to the active issue cockpit (PAN-2005). replaceState (like the
   // conversation route) keeps history clean; reload/bookmark restores the tab.
   // issueId=null reverts to the project home when a project is active.
@@ -486,10 +518,13 @@ export default function App() {
         setSelectedProjectKey(null);
       }
       syncDrawerFromUrl();
+      // PAN-1234: /issues/:id must open the drawer even though the URL carries no
+      // ?issue= query param. This runs after syncDrawerFromUrl so it wins.
+      applyIssueRoute();
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, [syncDrawerFromUrl]);
+  }, [syncDrawerFromUrl, applyIssueRoute]);
 
   // Agents from Zustand store (event-sourced — no polling)
   // Cast to Agent[] since AgentSnapshot is a compatible subset for the fields used here
