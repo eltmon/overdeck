@@ -157,82 +157,122 @@ export async function teardownWorkspaceDockerByNamePromise(
   issueIdLower: string,
 ): Promise<WorkspaceDockerTeardownResult> {
   const featureFolder = `feature-${issueIdLower}`;
-  const composeProjectName = `overdeck-${featureFolder}`;
-  const networkName = `${composeProjectName}_devnet`;
   const result: WorkspaceDockerTeardownResult = {
     networkRemoved: false,
     steps: [],
   };
 
-  // 1. Stop and remove containers/volumes for the named compose project.
+  // Compose project names are `<projectPrefix>-feature-<issue>` where the
+  // prefix varies per project ("overdeck", "myn", ...). Discover live stacks
+  // from Docker itself instead of hardcoding a prefix, so teardown works for
+  // every configured project. `overdeck-` stays as a fallback candidate for
+  // stacks whose containers and network are already gone.
+  const composeProjectNames = new Set<string>([`overdeck-${featureFolder}`]);
   try {
-    await execAsync(
-      `docker compose -p "${composeProjectName}" down -v --remove-orphans`,
-      { timeout: 60000 },
-    );
-    result.steps.push(`Stopped Docker stack for project ${composeProjectName}`);
-  } catch (error: any) {
-    result.steps.push(
-      `Docker stack down attempted (${error.message?.split('\n')[0] || 'stack may not exist'})`,
-    );
-  }
-
-  // 2. If containers are still attached to the network (compose files missing,
-  //    project label mismatch, etc.), remove them by force so the network can
-  //    be freed. This is the durable close-out fallback.
-  try {
-    const { stdout: containerStdout } = await execAsync(
-      `docker ps -a --filter network="${networkName}" --format '{{.ID}}'`,
+    const { stdout } = await execAsync(
+      `docker network ls --format '{{.Name}}'`,
       { encoding: 'utf-8', timeout: 30000 },
     );
-    const containerIds = containerStdout.trim().split('\n').filter(Boolean);
-    if (containerIds.length > 0) {
-      try {
-        await execAsync(`docker rm -f ${containerIds.map((id) => `"${id}"`).join(' ')}`, {
-          timeout: 30000,
-        });
+    for (const name of stdout.trim().split('\n')) {
+      if (name.endsWith(`-${featureFolder}_devnet`) || name === `${featureFolder}_devnet`) {
+        composeProjectNames.add(name.slice(0, -'_devnet'.length));
+      }
+    }
+  } catch {
+    // Network discovery is best-effort; the fallback candidate still runs.
+  }
+  try {
+    const { stdout } = await execAsync(
+      `docker ps -a --format '{{.Names}}'`,
+      { encoding: 'utf-8', timeout: 30000 },
+    );
+    const containerPattern = new RegExp(`^(.+-${escapeForRegex(featureFolder)})-[a-z0-9-]+-\\d+$`);
+    for (const name of stdout.trim().split('\n')) {
+      const match = name.match(containerPattern);
+      if (match) composeProjectNames.add(match[1]);
+    }
+  } catch {
+    // Container discovery is best-effort.
+  }
+
+  for (const composeProjectName of composeProjectNames) {
+    const networkName = `${composeProjectName}_devnet`;
+
+    // 1. Stop and remove containers/volumes for the named compose project.
+    try {
+      await execAsync(
+        `docker compose -p "${composeProjectName}" down -v --remove-orphans`,
+        { timeout: 60000 },
+      );
+      result.steps.push(`Stopped Docker stack for project ${composeProjectName}`);
+    } catch (error: any) {
+      result.steps.push(
+        `Docker stack down attempted (${error.message?.split('\n')[0] || 'stack may not exist'})`,
+      );
+    }
+
+    // 2. If containers are still attached to the network (compose files missing,
+    //    project label mismatch, etc.), remove them by force so the network can
+    //    be freed. This is the durable close-out fallback.
+    try {
+      const { stdout: containerStdout } = await execAsync(
+        `docker ps -a --filter network="${networkName}" --format '{{.ID}}'`,
+        { encoding: 'utf-8', timeout: 30000 },
+      );
+      const containerIds = containerStdout.trim().split('\n').filter(Boolean);
+      if (containerIds.length > 0) {
+        try {
+          await execAsync(`docker rm -f ${containerIds.map((id) => `"${id}"`).join(' ')}`, {
+            timeout: 30000,
+          });
+          result.steps.push(
+            `Removed ${containerIds.length} container(s) attached to ${networkName}`,
+          );
+        } catch (rmError: any) {
+          result.steps.push(
+            `Container removal attempted (${rmError.message?.split('\n')[0] || 'containers may be in use'})`,
+          );
+        }
+      }
+    } catch (error: any) {
+      result.steps.push(
+        `Container discovery attempted (${error.message?.split('\n')[0] || 'could not list containers'})`,
+      );
+    }
+
+    // 3. Remove the bridge network; treat already-absent as success.
+    try {
+      await execAsync(`docker network rm "${networkName}"`, { timeout: 30000 });
+      result.steps.push(`Removed Docker network ${networkName}`);
+    } catch (error: any) {
+      const message = (error.message || '').toLowerCase();
+      if (message.includes('not found') || message.includes('no such network')) {
+        result.steps.push(`Docker network ${networkName} already absent`);
+      } else {
         result.steps.push(
-          `Removed ${containerIds.length} container(s) attached to ${networkName}`,
-        );
-      } catch (rmError: any) {
-        result.steps.push(
-          `Container removal attempted (${rmError.message?.split('\n')[0] || 'containers may be in use'})`,
+          `Docker network rm attempted (${error.message?.split('\n')[0] || 'network may be in use'})`,
         );
       }
     }
-  } catch (error: any) {
-    result.steps.push(
-      `Container discovery attempted (${error.message?.split('\n')[0] || 'could not list containers'})`,
-    );
   }
 
-  // 3. Remove the bridge network; treat already-absent as success.
-  try {
-    await execAsync(`docker network rm "${networkName}"`, { timeout: 30000 });
-    result.steps.push(`Removed Docker network ${networkName}`);
-  } catch (error: any) {
-    const message = (error.message || '').toLowerCase();
-    if (message.includes('not found') || message.includes('no such network')) {
-      result.steps.push(`Docker network ${networkName} already absent`);
-    } else {
-      result.steps.push(
-        `Docker network rm attempted (${error.message?.split('\n')[0] || 'network may be in use'})`,
-      );
-    }
-  }
-
-  // 3. Verify the network is actually gone.
+  // 4. Verify every matching network is actually gone.
   try {
     const { stdout } = await execAsync(
       `docker network ls --format '{{.Name}}'`,
       { encoding: 'utf-8', timeout: 30000 },
     );
     const networks = stdout.trim().split('\n').filter(Boolean);
-    result.networkRemoved = !networks.includes(networkName);
+    const remaining = networks.filter(
+      (name) =>
+        [...composeProjectNames].some((project) => name === `${project}_devnet`) ||
+        name.endsWith(`-${featureFolder}_devnet`),
+    );
+    result.networkRemoved = remaining.length === 0;
     result.steps.push(
       result.networkRemoved
-        ? `Verified network ${networkName} is absent`
-        : `Network ${networkName} still present after teardown`,
+        ? `Verified networks for ${featureFolder} are absent`
+        : `Network(s) still present after teardown: ${remaining.join(', ')}`,
     );
   } catch (error: any) {
     result.steps.push(
@@ -241,4 +281,8 @@ export async function teardownWorkspaceDockerByNamePromise(
   }
 
   return result;
+}
+
+function escapeForRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

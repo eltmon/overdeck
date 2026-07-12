@@ -6,6 +6,7 @@ import { join } from 'node:path';
 
 const mocks = vi.hoisted(() => ({
   emitActivityEntrySync: vi.fn(),
+  exec: vi.fn(),
   isIssueClosed: vi.fn(),
   listRunningAgents: vi.fn(),
   listProjectsSync: vi.fn(),
@@ -14,6 +15,14 @@ const mocks = vi.hoisted(() => ({
   resolveProjectForIssue: vi.fn(),
   stopAgent: vi.fn(),
 }));
+
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  return {
+    ...actual,
+    exec: mocks.exec,
+  };
+});
 
 vi.mock('../../agents.js', () => ({
   listRunningAgents: mocks.listRunningAgents,
@@ -67,6 +76,11 @@ describe('reconcileClosedIssueAgents', () => {
     mocks.resolveProjectForIssue.mockReturnValue(null);
     mocks.stopAgent.mockReturnValue(Effect.succeed(undefined));
     mocks.isIssueClosed.mockResolvedValue(false);
+    mocks.exec.mockImplementation((_command: string, opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
+      const cb = typeof opts === 'function' ? opts : callback;
+      cb?.(null, { stdout: '', stderr: '' });
+      return { on: vi.fn() };
+    });
   });
 
   afterEach(() => {
@@ -219,6 +233,30 @@ describe('reconcileClosedIssueAgents', () => {
 
     expect(mocks.reapIssueResidue).toHaveBeenCalledTimes(1);
     expect(mocks.reapIssueResidue).toHaveBeenCalledWith(projectPath, 'PAN-5556');
+    rmSync(projectPath, { recursive: true, force: true });
+  });
+
+  it('reaps closed-issue residue discovered from leaked _devnet networks', async () => {
+    const projectPath = mkdtempSync(join(tmpdir(), 'closed-project-'));
+    mocks.exec.mockImplementation((command: string, opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
+      const cb = typeof opts === 'function' ? opts : callback;
+      const stdout = String(command).includes('docker network ls')
+        ? 'myn-feature-min-729_devnet\noverdeck-feature-pan-5558_devnet\nbridge\n'
+        : '';
+      cb?.(null, { stdout, stderr: '' });
+      return { on: vi.fn() };
+    });
+    mocks.resolveProjectForIssue.mockImplementation((issueId: string) =>
+      issueId === 'PAN-5558' ? { name: 'Overdeck', path: projectPath } : null,
+    );
+    mocks.isIssueClosed.mockImplementation(async (issueId: string) => issueId === 'PAN-5558');
+    mocks.reapIssueResidue.mockResolvedValue(['removed network residue PAN-5558']);
+
+    await expect(reconcileClosedIssueAgents()).resolves.toEqual(['removed network residue PAN-5558']);
+
+    expect(mocks.isIssueClosed).toHaveBeenCalledWith('MIN-729');
+    expect(mocks.reapIssueResidue).toHaveBeenCalledTimes(1);
+    expect(mocks.reapIssueResidue).toHaveBeenCalledWith(projectPath, 'PAN-5558');
     rmSync(projectPath, { recursive: true, force: true });
   });
 

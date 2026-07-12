@@ -129,7 +129,7 @@ describe('reapIssueResidue', () => {
     const second = await reapIssueResidue(projectPath, 'PAN-2054');
 
     expect(first).toEqual(second);
-    expect(first).toContain('removed Docker stack overdeck-feature-pan-2054');
+    expect(first).toContain('removed Docker stack for feature-pan-2054');
   });
 
   it('invokes name-based Docker teardown for a merged issue', async () => {
@@ -138,7 +138,7 @@ describe('reapIssueResidue', () => {
     const actions = await reapIssueResidue(projectPath, 'PAN-2054');
 
     expect(mocks.teardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith('pan-2054');
-    expect(actions.some((action) => action.includes('removed Docker stack overdeck-feature-pan-2054'))).toBe(true);
+    expect(actions.some((action) => action.includes('removed Docker stack for feature-pan-2054'))).toBe(true);
   });
 
   it('records a warning when the Docker network is still present', async () => {
@@ -150,16 +150,20 @@ describe('reapIssueResidue', () => {
 
     const actions = await reapIssueResidue(projectPath, 'PAN-2054');
 
-    expect(actions.some((action) => action.includes('Docker network overdeck-feature-pan-2054_devnet still present'))).toBe(true);
+    expect(actions.some((action) => action.includes('Docker network for feature-pan-2054 still present'))).toBe(true);
   });
 
-  it('does not invoke Docker teardown when the branch is unmerged', async () => {
+  it('invokes Docker teardown even when the branch is unmerged', async () => {
+    // Docker stacks/networks are disposable runtime state — teardown for a
+    // closed issue destroys no work, so it must not hide behind the merged
+    // gate that protects workspace and branch deletion.
     mocks.isBranchMerged.mockResolvedValue({ status: 'unmerged', message: 'not merged' });
 
     const actions = await reapIssueResidue(projectPath, 'PAN-2054');
 
-    expect(mocks.teardownWorkspaceDockerByNamePromise).not.toHaveBeenCalled();
-    expect(actions.some((action) => action.includes('unmerged'))).toBe(true);
+    expect(mocks.teardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith('pan-2054');
+    expect(actions.some((action) => action.includes('removed Docker stack for feature-pan-2054'))).toBe(true);
+    expect(actions.some((action) => action.includes('skipped disk reap') && action.includes('unmerged'))).toBe(true);
   });
 
   it('does not use execSync', () => {
