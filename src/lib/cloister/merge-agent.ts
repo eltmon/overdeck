@@ -428,7 +428,11 @@ export async function postMergeLifecycle(
       throw err;
     }
 
-    await triggerPostMergeReleaseIfConfigured(issueId, projectPath);
+    // Release verification runs asynchronously so post-merge cleanup is not
+    // delayed by a slow external deploy. Status is still reported via review-status.
+    triggerPostMergeReleaseIfConfigured(issueId, projectPath).catch((err) => {
+      console.warn(`[merge-agent] Async post-merge release trigger failed for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
+    });
 
     // 2. Compact old beads (via lifecycle module)
     try {
