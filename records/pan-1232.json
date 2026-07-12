@@ -196,19 +196,36 @@
       "reason": "feedback",
       "note": "[2026-07-12T22:38Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-12T22:38:34.207Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-12T22:38:34Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1232\n\n# Review Synthesis — PAN-1232 — 2026-07-12T18:37:47-04:00\n\n## Verdict: CHANGES REQUESTED — Files tab can still show stale/non-branch diff state and the no-agent workspace path is not issue-scoped\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/.pan/review/agent-pan-1232-review-01bbff78/context.json\n- Branch: feature/pan-1232\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1232\n- HEAD reviewed: 01bbff78d81a9c92e94596303a6e905a76feb2bc\n- Cycle number: 6\n- Prior cycle SHA: f89b20828ec84d547be5f1553889098ace324600\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/.pan/review/agent-pan-1232-review-01bbff78/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/.pan/review/agent-pan-1232-review-01bbff78/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/.pan/review/agent-pan-1232-review-01bbff78/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/.pan/review/agent-pan-1232-review-01bbff78/requirements.md | 1 |\n\n## Blocking Findings\n\n### [correctness] Files tab can inherit stale diff URL state instead of opening vs-main — `src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx:198`\n`DrawerFilesPanel` now mounts `<DiffPanel mode=\"inline\" agentId={agentId ?? ''} defaultView=\"vs-main\" ... />`, but `defaultView=\"vs-main\"` is ignored whenever `?diff=1` already exists in the URL. Drawer tab switching preserves existing `diff`, `diffTurnId`, and `diffFilePath` query params, so switching into the Files tab after another embedded diff interaction can reuse an old turn/all-turns/file selection instead of the required branch-vs-main diff. The Files tab needs isolated diff state or must clear the stale diff URL params when entering the tab so the vs-main default is actually honored.\n\n### [requirements] Files tab no-agent workspace path is not scoped to `feature/<issue-id>` vs `main` — `src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx:198`\nScope: in_pr_scope. AC-34 requires a workspace branch to render `DiffPanel` scoped to `feature/<issue-id>` vs `main`. The no-agent workspace path passes `agentId={agentId ?? ''}` into `DiffPanel`; `DiffPanel` builds its fetch base from the agent id, so this path requests `/api/agents//diffs/vs-main` rather than a real issue/workspace-scoped branch diff. The new test proves a `/diffs/vs-main` suffix is requested but not that the endpoint is scoped to the actual agent or issue branch.\n\n## Non-blocking Findings\n\n### [performance] Avoid deriving the full activity list twice for the Activity tab — `src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx:44`\n`DrawerActivityPanel()` calls `useDrawerData()` for `activityFull` while `IssueDrawer()` already calls `useDrawerData()` for the same issue. This repeats uncapped activity filtering, mapping, and sorting on the Activity tab. The performance reviewer classified this as non-blocking and recommended passing `activityFull` from the parent drawer.\n\n### [requirements] Changed support files have no mapped requirement\nThe requirements reviewer noted that `scripts/lint-circular-deps.sh` and `src/dashboard/frontend/src/index.css` are in the changed-file set, but no acceptance criterion, trace item, non-goal, or stub finding in the manifest maps to their behavior.\n\n### [advisory] CodeRabbit nitpick\nCodeRabbit suggested reusing the shared `isActiveAgent` helper in `IssueDrawer.tsx` instead of duplicating the active-agent predicate. This was advisory and non-gating in the review context.\n\n## Clean Sub-roles\n- security\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/.pan/review/agent-pan-1232-review-01bbff78/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1232 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:51:30.565Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:51:34.978Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:51:34.979Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:51:34.992Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:51:34.994Z"
     }
   ],
+  "feedback": [],
   "created": "2026-07-12T20:45:31.659Z",
-  "updated": "2026-07-12T22:38:34.207Z",
+  "updated": "2026-07-12T22:51:40.466Z",
   "pipeline": {
     "issueId": "PAN-1232",
     "reviewStatus": "reviewing",
@@ -218,13 +235,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-12T22:02:39.443Z",
-    "updatedAt": "2026-07-12T22:32:06.040Z",
-    "reviewNotes": "Agent re-review request (3/25): Fixed cycle-5 review findings: Files tab now opens DiffPanel in branch-vs-main mode (new DiffPanel defaultView prop) and renders on workspace existence alone (AC-34), no longer gating on agentId or defaulting to /diffs/full. Added AC-34 regression test.",
+    "updatedAt": "2026-07-12T22:51:40.384Z",
+    "reviewNotes": "Agent re-review request (4/25): Fixed cycle-6 findings: (1) Files-tab DiffPanel now uses isolateSelection (component-local state) so it neither inherits stale ?diff URL state from other surfaces nor defaults away from vs-main; (2) dropped agentId ?? '' — passes the real agentId (proven invariant when a workspace exists), so the fetch is scoped to /api/agents/<real-agent>/diffs/vs-main. Added a stale-URL-isolation test and tightened AC-34 test to assert real agent scope.",
     "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/dashboard/server/routes/backlog.ts",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2604",
-    "lastVerifiedCommit": "01bbff78d81a9c92e94596303a6e905a76feb2bc",
+    "lastVerifiedCommit": "4543e2d6ac37fdb5419e89a0ea168639c636cd44",
     "reviewRequestedAt": "2026-07-12T22:02:39.443Z",
-    "reviewSpawnedAt": "2026-07-12T22:32:06.039Z"
+    "reviewSpawnedAt": "2026-07-12T22:51:29.404Z"
   },
   "closeOut": {
     "usage": {
@@ -237,9 +254,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 15339457,
-            "output": 75011,
-            "cacheRead": 13739520,
+            "input": 22860399,
+            "output": 93709,
+            "cacheRead": 20601088,
             "cacheWrite": 0
           }
         }
@@ -252,15 +269,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 15339457,
-          "output": 75011,
-          "cacheRead": 13739520,
+          "input": 22860399,
+          "output": 93709,
+          "cacheRead": 20601088,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 17.119775,
-        "pricingAsOf": "2026-07-12T22:32:06.107Z"
+        "usd": 24.408369,
+        "pricingAsOf": "2026-07-12T22:51:40.460Z"
       }
     },
     "merges": [
