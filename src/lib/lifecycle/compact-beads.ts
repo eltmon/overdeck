@@ -76,10 +76,12 @@ async function compactBeadsImpl(
   }
 
   // Run compaction
-  await execAsync(`bd admin compact --days ${days}`, {
-    cwd: operationRoot,
-    encoding: 'utf-8',
-  });
+  const { runMutationBatch } = await import('../beads/writer.js');
+  const compacted = await runMutationBatch(
+    { project: { workspacePath: operationRoot }, reason: `compact beads older than ${days} days` },
+    (bd) => bd.mutate(['admin', 'compact', '--days', String(days)]),
+  );
+  if (!compacted.ok) return stepFailed(step, compacted.message);
 
   if (stateHome.migrated) {
     const { flushAutoCommits, queueBeadsAutoCommit } = await import('../pan-dir/auto-commit.js');

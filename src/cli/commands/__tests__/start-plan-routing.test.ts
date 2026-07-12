@@ -93,6 +93,12 @@ vi.mock('../../../lib/cloister/concurrency.js', () => concurrencyMocks);
 vi.mock('../../../lib/vbrief/auto-synthesize.js', () => autoSynthesizeMocks);
 
 vi.mock('../../../lib/vbrief/beads.js', () => beadsMocks);
+vi.mock('../../../lib/beads/resolver.js', () => ({
+  createBeadsResolver: () => ({
+    getBeadsForIssueSync: () => ({ ok: true, value: [{ id: 'bead-1', title: 'Implement issue', status: 'open', labels: [] }] }),
+    getBeadsForIssue: async () => ({ ok: true, value: [{ id: 'bead-1', title: 'Implement issue', status: 'open', labels: [] }] }),
+  }),
+}));
 
 vi.mock('../../../lib/vbrief/lifecycle-io.js', () => vbriefLifecycleMocks);
 

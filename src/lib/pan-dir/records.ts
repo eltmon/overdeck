@@ -96,9 +96,14 @@ function projectPipeline(
     verificationStatus: status?.verificationStatus,
     inspectStatus: status?.inspectStatus,
     mergeStatus: status?.mergeStatus,
+    releaseStatus: status?.releaseStatus ?? 'pending',
     readyForMerge: status?.readyForMerge ?? false,
     closedOut: existing?.closedOut,
     closedOutAt: existing?.closedOutAt,
+    // PAN-2587: the tombstone lives only in the record — a rebuild that projects
+    // from ReviewStatus (which has no such field) must not erase it, or the
+    // orphaned-completions patrol re-arms the same issue forever (36x on PAN-399).
+    panDoneRecoveredAt: existing?.panDoneRecoveredAt,
     updatedAt: status?.updatedAt ?? new Date().toISOString(),
   };
 
@@ -118,6 +123,7 @@ function projectPipeline(
     reviewedAtCommit: status.reviewedAtCommit,
     lastVerifiedCommit: status.lastVerifiedCommit,
     reviewRequestedAt: status.reviewRequestedAt,
+    reviewSpawnedAt: status.reviewSpawnedAt,
     scopeDrift: status.scopeDrift,
     autoMerge: status.autoMerge,
     deaconIgnored: status.deaconIgnored,
@@ -265,19 +271,40 @@ export {
 } from './record.js';
 
 /**
+ * PAN-2587: never regress the pipeline block during a whole-record rebuild. A
+ * concurrent writer (e.g. a reviewer's verdict landing between the rebuild's
+ * `existing` snapshot and its write) may have put a NEWER pipeline on disk than
+ * the status the rebuild projects — observed clobbering PAN-399's passed
+ * verdict back to a pre-verdict snapshot. Same newer-wins rule (ISO `updatedAt`
+ * comparison) the journal readers use.
+ */
+export function pickNewerPipeline(
+  rebuilt: PanIssuePipelineRecord,
+  fresh: PanIssuePipelineRecord | undefined,
+): PanIssuePipelineRecord {
+  if (!fresh?.updatedAt || !rebuilt?.updatedAt) return rebuilt;
+  return rebuilt.updatedAt < fresh.updatedAt ? fresh : rebuilt;
+}
+
+/**
  * PAN-1908 / PAN-1919: rebuild and queue the per-issue permanent record for a
  * given issue. Fire-and-forget: failures are logged, never thrown, so
  * review-status writes stay synchronous and fast.
+ *
+ * PAN-2583: returns whether the durable write actually landed, so the caller
+ * can fall back to a sandbox-writable verdict drop when it did not (a sandboxed
+ * reviewer cannot write ${OVERDECK_HOME}/state, and swallowing that here was
+ * how blocked review verdicts silently vanished).
  */
 export async function updateIssueRecordForIssue(
   issueId: string,
   reviewStatus?: ReviewStatus | null,
-): Promise<void> {
+): Promise<boolean> {
   try {
     const resolved = resolveProjectFromIssueSync(issueId);
-    if (!resolved) return;
+    if (!resolved) return false;
     const project = getProjectSync(resolved.projectKey);
-    if (!project) return;
+    if (!project) return false;
 
     await withIssueRecordLock(issueId, async () => {
       const record = await buildIssueRecord(project, issueId, { reviewStatus });
@@ -293,10 +320,13 @@ export async function updateIssueRecordForIssue(
       if (fresh?.statusOverrides && Object.keys(fresh.statusOverrides).length > 0) {
         record.statusOverrides = { ...record.statusOverrides, ...fresh.statusOverrides };
       }
+      record.pipeline = pickNewerPipeline(record.pipeline, fresh?.pipeline);
       const recordPath = writeIssueRecordSync(project, issueId, record);
       queueIssueRecordCommit(project, issueId, recordPath);
     });
+    return true;
   } catch (err) {
     console.warn(`[pan-dir/records] Failed to update record for ${issueId}: ${(err as Error).message}`);
+    return false;
   }
 }

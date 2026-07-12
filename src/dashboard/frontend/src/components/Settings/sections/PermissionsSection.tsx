@@ -38,21 +38,21 @@ export function PermissionsSection({
         <div className="space-y-2">
           {([
             {
-              value: 'auto' as const,
-              title: 'Auto (recommended)',
-              flag: '--permission-mode default',
-              description:
-                "Launches with --permission-mode default; Overdeck's PermissionRequest/PreToolUse auto-approve hooks approve safe tool calls and block destructive ones (force pushes, exfiltration, rm -rf, writes outside workspace) without full bypass.",
-            },
-            {
               value: 'bypass' as const,
-              title: 'Bypass (yolo)',
+              title: 'Bypass (yolo, recommended)',
               flag: '--permission-mode bypassPermissions',
               description:
-                'Every tool call auto-approved with no classifier — fastest, but the agent can do anything its file/network access allows. Use when the classifier interferes with intentionally destructive automation.',
+                'Every tool call auto-approved — fastest, works on any machine with no extra setup. The agent can do anything its file/network access allows.',
+            },
+            {
+              value: 'auto' as const,
+              title: 'Auto',
+              flag: '--permission-mode default',
+              description:
+                "Launches with --permission-mode default; Overdeck's PermissionRequest/PreToolUse auto-approve hooks approve safe tool calls and block destructive ones (force pushes, exfiltration, rm -rf, writes outside workspace). Requires the Overdeck hooks (installed by pan install / pan sync) — without them every tool call prompts.",
             },
           ]).map((opt) => {
-            const selected = (formData.claude?.permissionMode ?? 'auto') === opt.value;
+            const selected = (formData.claude?.permissionMode ?? 'bypass') === opt.value;
             return (
               <button
                 key={opt.value}

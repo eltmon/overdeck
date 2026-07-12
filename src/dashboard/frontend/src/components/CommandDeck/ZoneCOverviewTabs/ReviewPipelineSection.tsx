@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import type { ReviewStatus } from '../../../lib/workspace-types';
 import { formatRelativeTime, isStale } from '../../../lib/dashboard-utils';
 import { StatusHistory } from './StatusHistory';
-import { usePrQuery } from './queries';
+import { usePrQuery, useReleaseSetQuery } from './queries';
 import { statusColor } from './PrDiffTab';
 
 const DEFAULT_VERIFICATION_MAX_CYCLES = 10;
@@ -39,6 +39,13 @@ export function ReviewPipelineSection({ reviewStatus, issueId, onViewLog }: Revi
     mergeStatus === 'failed';
   const prQuery = usePrQuery(issueId ?? '', {
     enabled: isMergeActive && !!issueId,
+  });
+  const showRelease =
+    reviewStatus.releaseStatus !== undefined &&
+    reviewStatus.releaseStatus !== 'pending' &&
+    reviewStatus.releaseStatus !== 'skipped';
+  const releaseQuery = useReleaseSetQuery(issueId ?? '', {
+    enabled: showRelease && !!issueId,
   });
   const verificationMaxCycles = reviewStatus.verificationMaxCycles ?? DEFAULT_VERIFICATION_MAX_CYCLES;
   const autoRequeueCount = reviewStatus.autoRequeueCount ?? 0;
@@ -228,6 +235,22 @@ export function ReviewPipelineSection({ reviewStatus, issueId, onViewLog }: Revi
             <span>View live specialist log</span>
           </button>
         )}
+
+        {/* Release indicator */}
+        {showRelease && (
+          <div className="mt-2 flex items-start gap-2 rounded-md bg-card/50 px-2 py-1.5" data-testid="release-indicator">
+            <ReleaseStatusIcon status={reviewStatus.releaseStatus} />
+            <div className="flex flex-col min-w-0">
+              <span className="text-[10px] text-muted-foreground leading-tight">Release</span>
+              <span className={`text-[11px] font-medium leading-tight ${releaseStatusTextColor(reviewStatus.releaseStatus)}`}>
+                {releaseStatusLabel(reviewStatus.releaseStatus)}
+              </span>
+              {(reviewStatus.releaseStatus === 'failed' || reviewStatus.releaseStatus === 'partial' || reviewStatus.releaseStatus === 'rolled_back') && (
+                <ReleaseFailureDetails releaseSet={releaseQuery.data ?? null} releaseNotes={reviewStatus.releaseNotes} />
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Collapsible details */}
@@ -267,6 +290,65 @@ export function ReviewPipelineSection({ reviewStatus, issueId, onViewLog }: Revi
         </div>
       )}
     </div>
+  );
+}
+
+function ReleaseStatusIcon({ status }: { status?: 'pending' | 'releasing' | 'passed' | 'failed' | 'partial' | 'rolled_back' | 'skipped' }) {
+  switch (status) {
+    case 'passed':
+      return <CheckCircle className="w-4 h-4 text-success shrink-0" />;
+    case 'failed':
+    case 'rolled_back':
+      return <XCircle className="w-4 h-4 text-destructive shrink-0" />;
+    case 'partial':
+      return <AlertTriangle className="w-4 h-4 text-warning shrink-0" />;
+    case 'releasing':
+      return <Loader2 className="w-4 h-4 text-warning shrink-0 animate-spin" />;
+    default:
+      return <span className="w-4 h-4 rounded-full border border-muted-foreground/40 shrink-0" />;
+  }
+}
+
+function releaseStatusLabel(status?: 'pending' | 'releasing' | 'passed' | 'failed' | 'partial' | 'rolled_back' | 'skipped'): string {
+  switch (status) {
+    case 'releasing': return 'Releasing...';
+    case 'passed': return 'Passed';
+    case 'failed': return 'Failed';
+    case 'partial': return 'Partial';
+    case 'rolled_back': return 'Rolled back';
+    default: return 'Pending';
+  }
+}
+
+function releaseStatusTextColor(status?: 'pending' | 'releasing' | 'passed' | 'failed' | 'partial' | 'rolled_back' | 'skipped'): string {
+  switch (status) {
+    case 'passed': return 'text-success';
+    case 'failed':
+    case 'rolled_back': return 'text-destructive';
+    case 'partial': return 'text-warning';
+    case 'releasing': return 'text-warning';
+    default: return 'text-muted-foreground';
+  }
+}
+
+function ReleaseFailureDetails({
+  releaseSet,
+  releaseNotes,
+}: {
+  releaseSet: { components: Array<{ componentKey: string; status: string; notes?: string }> } | null;
+  releaseNotes?: string;
+}) {
+  const failingComponent = releaseSet?.components.find(
+    component => component.status === 'failed' || component.status === 'rolled_back',
+  );
+  const text = failingComponent
+    ? `${failingComponent.componentKey}: ${failingComponent.notes || releaseNotes || ''}`.trim()
+    : releaseNotes;
+  if (!text) return null;
+  return (
+    <span className="text-[10px] text-muted-foreground leading-tight truncate" title={text} data-testid="release-failure-details">
+      {text}
+    </span>
   );
 }
 

@@ -520,7 +520,7 @@ export function RolesPanel() {
 
             return (
               <div key={role.id} data-testid="role-card" className="rounded-lg border border-border bg-background/40 p-3">
-                <div className="flex flex-col gap-3 md:flex-row md:items-start">
+                <div className="flex flex-col gap-3 @2xl:flex-row @2xl:items-start">
                   <div className="flex min-w-0 flex-1 gap-3">
                     <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                       <role.icon className="w-5 h-5 text-primary" aria-hidden="true" />
@@ -555,7 +555,7 @@ export function RolesPanel() {
                       )}
                     </div>
                   </div>
-                  <div className="md:w-80">
+                  <div className="@2xl:w-80 @2xl:shrink-0">
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-medium text-foreground">Model</span>
@@ -669,7 +669,7 @@ export function RolesPanel() {
 
                 {flywheelConfig && (
                   <div className="mt-4 border-t border-border pt-3">
-                    <div className="grid gap-3 md:grid-cols-3">
+                    <div className="grid gap-3 @xl:grid-cols-3">
                       <label className="space-y-1.5">
                         <span className="text-xs font-medium text-foreground">Flywheel effort</span>
                         <select
@@ -735,7 +735,7 @@ export function RolesPanel() {
                   const uniform = new Set(resolvedReviewModels.map((r) => r.resolved)).size <= 1;
                   return (
                     <div className="mt-4 border-t border-border pt-3">
-                      <div className="grid gap-3 md:grid-cols-2">
+                      <div className="grid gap-3 @xl:grid-cols-2">
                         <label className="block">
                           <span className="mb-1 block text-[11px] font-medium text-muted-foreground">Review mode</span>
                           <select
@@ -783,7 +783,7 @@ export function RolesPanel() {
 
                 {canExpand && isExpanded && (
                   <div id={`${role.id}-subroles`} className="mt-4 border-t border-border pt-3">
-                    <div className="grid gap-3 md:grid-cols-2">
+                    <div className="grid gap-3 @xl:grid-cols-2">
                       {role.subRoles?.map((subRole) => {
                         const subModel = getSubRoleModel(settings, role, subRole);
                         const subTooltip = modelRefTooltip(subModel, workhorses, parentModelRefForSubRoles);

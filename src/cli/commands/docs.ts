@@ -9,6 +9,7 @@
  */
 
 import { Command } from 'commander';
+import { existsSync } from 'fs';
 import {
   queryDocsIndex,
   formatDocsQueryMarkdown,
@@ -16,6 +17,13 @@ import {
   type DocsQueryResult,
 } from '../../lib/docs/query.js';
 import { setDocsDisabled, type DocsDisableScope } from '../../lib/docs/state.js';
+import {
+  buildDocsIndex,
+  DEFAULT_DOCS_INDEX_MAX_BYTES,
+  type BuildDocsIndexOptions,
+  type BuildDocsIndexResult,
+} from '../../lib/docs/index-builder.js';
+import { getDocsIndexPath, packageRoot, type DocsPathOverrides } from '../../lib/paths.js';
 
 export interface DocsQueryOptions {
   top?: string;
@@ -24,7 +32,37 @@ export interface DocsQueryOptions {
   kind?: 'docs' | 'skill' | 'rule' | 'claude-md' | 'prd';
 }
 
-export function createDocsCommand(): Command {
+export interface DocsReindexOptions {
+  docsDir?: DocsPathOverrides['docsDir'];
+  indexPath?: DocsPathOverrides['indexPath'];
+  rootDir?: BuildDocsIndexOptions['rootDir'];
+  syncSourcesRoot?: BuildDocsIndexOptions['syncSourcesRoot'];
+  config?: BuildDocsIndexOptions['config'];
+  embeddingFn?: BuildDocsIndexOptions['embeddingFn'];
+  maxIndexBytes?: BuildDocsIndexOptions['maxIndexBytes'];
+}
+
+export async function runDocsReindex(options: DocsReindexOptions = {}): Promise<BuildDocsIndexResult> {
+  const result = await buildDocsIndex({
+    outputPath: getDocsIndexPath({ docsDir: options.docsDir, indexPath: options.indexPath }),
+    rootDir: options.rootDir ?? packageRoot,
+    syncSourcesRoot: options.syncSourcesRoot,
+    config: options.config,
+    embeddingFn: options.embeddingFn,
+    maxIndexBytes: options.maxIndexBytes ?? DEFAULT_DOCS_INDEX_MAX_BYTES,
+  });
+
+  console.log(`Docs index rebuilt at ${result.outputPath}`);
+  console.log(`Chunks: ${result.chunkCount}`);
+  console.log(`Size: ${result.sizeBytes} bytes`);
+  return result;
+}
+
+export interface CreateDocsCommandOptions {
+  reindex?: DocsReindexOptions;
+}
+
+export function createDocsCommand(commandOptions: CreateDocsCommandOptions = {}): Command {
   const docs = new Command('docs').description('Overdeck documentation RAG (PAN-1203)');
 
   docs
@@ -40,10 +78,14 @@ export function createDocsCommand(): Command {
         console.error(`Invalid --top value: ${options.top}`);
         process.exit(1);
       }
+      const indexPath = options.indexPath ?? getDocsIndexPath();
+      if (!existsSync(indexPath)) {
+        console.error(`No docs index found at ${indexPath}. Run 'pan docs reindex' to build it.`);
+      }
       const result = queryDocsIndex({
         query: text,
         top,
-        indexPath: options.indexPath,
+        indexPath,
         kind: options.kind,
       });
       printDocsQueryResult(result, options.format ?? 'markdown');
@@ -53,12 +95,7 @@ export function createDocsCommand(): Command {
     .command('reindex')
     .description('Regenerate the docs index from current docs/, skills/, etc.')
     .action(async () => {
-      const { spawn } = await import('child_process');
-      const child = spawn('node', ['scripts/build-docs-index.mjs'], {
-        stdio: 'inherit',
-        env: process.env,
-      });
-      child.on('exit', (code) => process.exit(code ?? 1));
+      await runDocsReindex(commandOptions.reindex);
     });
 
   docs

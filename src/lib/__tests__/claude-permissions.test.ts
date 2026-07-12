@@ -139,5 +139,13 @@ describe('claude-permissions', () => {
     it('falls back to the explicit argument when env is unset', () => {
       expect(resolvePermissionModeSync('bypass')).toBe('bypass');
     });
+
+    it("defaults to 'bypass' when env, argument, and config are all unset (operator decision, 2026-07-12)", async () => {
+      // 'auto' depends on the auto-approve hooks being installed on the
+      // machine — on a fresh install it prompts for every tool call, so the
+      // unset default must be bypass.
+      const { DEFAULT_CONFIG } = await import('../config-yaml/defaults.js');
+      expect(DEFAULT_CONFIG.claude.permissionMode).toBe('bypass');
+    });
   });
 });

@@ -1126,7 +1126,17 @@ export class CloisterService {
         // state, not a stall. Never poke or kill it (it was spamming itself with
         // "are you stuck?" nudges every cooldown). Health is still recorded above;
         // only the attention/poke/kill action is skipped.
-        if (getAgentStateSync(health.agentId)?.role === 'sequencer') continue;
+        const idleAgentState = getAgentStateSync(health.agentId);
+        if (idleAgentState?.role === 'sequencer') continue;
+
+        // PAN-2581: warm-idle on a pipeline-owned issue is the intended state, not
+        // a stall — rationale on shouldSkipIdlePokeForAgent. Health stays recorded
+        // above; only the poke/idle-alive-pause action is skipped.
+        const { shouldSkipIdlePokeForAgent } = await import('./stuck-remediation.js');
+        if (shouldSkipIdlePokeForAgent(idleAgentState)) {
+          this.pokeProgress.delete(health.agentId);
+          continue;
+        }
 
         const lastPoke = this.lastPokeTimestamps.get(health.agentId) ?? 0;
         const cooledDown = (now - lastPoke) >= pokeCooldownMs;

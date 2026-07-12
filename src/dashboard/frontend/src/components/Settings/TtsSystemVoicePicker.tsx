@@ -141,7 +141,7 @@ function VoiceChoiceSection({
         <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{title}</h4>
         <p className="mt-1 text-xs text-muted-foreground">{description}</p>
       </div>
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-3 @lg:grid-cols-2 @2xl:grid-cols-3">
         {voices.map((voice) => {
           const isSelected = selectedVoiceId === voice.id;
           return (

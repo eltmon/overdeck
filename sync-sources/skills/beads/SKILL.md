@@ -37,7 +37,7 @@ Graph-based issue tracker that survives conversation compaction. Provides persis
 | **GitHub Issues** | `PREFIX-number` | `PAN-84`, `PAN-73` |
 | **Linear Issues** | `PREFIX-number` | `MIN-123`, `HH-456` |
 
-**CRITICAL**: Commands like `bd dep add`, `--parent`, and `--deps` expect **beads IDs** (e.g., `overdeck-abc1`), NOT external tracker IDs (e.g., `PAN-5`).
+**CRITICAL**: Commands like `pan beads dep add`, `--parent`, and `--deps` expect **beads IDs** (e.g., `overdeck-abc1`), NOT external tracker IDs (e.g., `PAN-5`).
 
 ### Linking to External Trackers
 
@@ -45,10 +45,10 @@ To link a beads issue to a GitHub or Linear issue, use `--external-ref` when cre
 
 ```bash
 # Link beads issue to GitHub issue PAN-84
-bd create "Fix auth bug" --external-ref PAN-84 --json
+pan beads create "Fix auth bug" --external-ref PAN-84 --json
 
 # Link to Linear issue
-bd create "Add feature" --external-ref MIN-123 --json
+pan beads create "Add feature" --external-ref MIN-123 --json
 ```
 
 **Current limitation**: No `bd list --external-ref PAN-84` filter exists. Use labels or title conventions as workaround until upstream feature is available.
@@ -74,14 +74,14 @@ bd --version  # Requires v1.0.4+
 
 - **bd CLI** installed and in PATH
 - **Git repository** (bd requires git for sync)
-- **Initialization**: `bd init` run once (humans do this, not agents)
+- **Initialization**: `pan sync` bootstraps the canonical home (humans do this, not agents)
 
 ## CLI Reference
 
 **Run `bd prime`** for AI-optimized workflow context (auto-loaded by hooks).
 **Run `bd <command> --help`** for specific command usage.
 
-Essential commands: `bd ready`, `bd create`, `bd show`, `bd update`, `bd close`, `bd dolt commit`
+Essential commands: `bd ready`, `pan beads create`, `bd show`, `pan beads update`, `pan beads close`
 
 ## Health and Recovery
 
@@ -95,21 +95,21 @@ bd doctor --fix             # Repair fixable local database/setup issues
 bd doctor --agent --json    # Rich diagnostics for AI agents
 bd prune --older-than 30d   # Preview closed regular beads older than 30 days
 bd prune --older-than 30d --force  # Delete matching closed regular beads
-bd dolt push --remote origin       # Push Dolt commits to a named remote
+pan beads update <id> --notes "progress" # Writer commits and pushes the batch
 ```
 
 `bd prune` permanently deletes closed non-ephemeral beads and their comments, labels, dependencies, and events. It requires `--older-than` or `--pattern`; without `--force` it previews instead of deleting.
 
-`bd dolt push --remote <name>` pushes local Dolt commits to a configured named remote. The remote must already exist, and hosted Dolt remotes require `DOLT_REMOTE_USER` and `DOLT_REMOTE_PASSWORD`.
+The canonical writer pushes local Dolt commits to the configured remote. Hosted Dolt remotes require `DOLT_REMOTE_USER` and `DOLT_REMOTE_PASSWORD`.
 
 ## Session Protocol
 
 1. `bd ready` — Find unblocked work
 2. `bd show <id>` — Get full context
-3. `bd update <id> --status in_progress` — Start work
+3. `pan beads update <id> --status in_progress` — Start work
 4. Add notes as you work (critical for compaction survival)
-5. `bd close <id> --reason "..."` — Complete task
-6. `bd dolt commit -m "session update"` — Persist pending Dolt changes at session end
+5. `pan beads close <id> --reason "..."` — Complete task
+6. Use `pan beads update` for progress — the writer persists the batch durably
 
 ## Invalid Commands (NEVER use these)
 
@@ -117,10 +117,10 @@ The following commands do NOT exist. Agents frequently hallucinate them:
 
 | Invalid Command | Correct Replacement |
 |-----------------|---------------------|
-| `bd claim <id>` | `bd update <id> --claim` |
-| `bd start <id>` | `bd update <id> --status in_progress` |
-| `bd move <id>` | `bd update <id>` (with relevant flags) |
-| `bd refile <id>` | `bd update <id>` (with relevant flags) |
+| `bd claim <id>` | `pan beads claim <id>` |
+| `bd start <id>` | `pan beads update <id> --status in_progress` |
+| `bd move <id>` | `pan beads update <id>` (with relevant flags) |
+| `bd refile <id>` | `pan beads update <id>` (with relevant flags) |
 | `bd gate create` | `bd gate` (no `create` subcommand) |
 
 **If you are tempted to use a command not listed in this skill, run `bd --help` first.**
@@ -142,18 +142,18 @@ bd prime                         # AI-optimized workflow context
 
 ### Create Issues
 ```bash
-bd create "Title" -t bug|feature|task -p 0-4 -d "Description" --json
-bd create "Title" -t task -p 2 -l label1,label2 --json  # with labels
-bd create "Title" --deps blocks:pan-1 --json            # with dependency
+pan beads create "Title" -t bug|feature|task -p 0-4 -d "Description" --json
+pan beads create "Title" -t task -p 2 -l label1,label2 --json  # with labels
+pan beads create "Title" --deps blocks:pan-1 --json            # with dependency
 ```
 
 ### Dependencies (Blocked-By)
 ```bash
 # Make issue-A blocked by issue-B (A cannot start until B is done)
-bd dep add <blocked-issue> <blocker-issue> --type blocks
+pan beads dep add <blocked-issue> <blocker-issue> --type blocks
 
 # Example: overdeck-abc1 is blocked by overdeck-def2
-bd dep add overdeck-abc1 overdeck-def2 --type blocks
+pan beads dep add overdeck-abc1 overdeck-def2 --type blocks
 
 # View dependency tree
 bd dep tree <id>
@@ -161,23 +161,23 @@ bd dep tree <id>
 
 ### Related Issues (No Blocking)
 ```bash
-bd dep add <issue-a> <issue-b> --type related
+pan beads dep add <issue-a> <issue-b> --type related
 ```
 
 ### Update Issues
 ```bash
-bd update <id> --status in_progress|open|closed --json
-bd update <id> --priority 0-4 --json
-bd update <id> --assignee "name" --json
-bd update <id> --notes "Progress notes here" --json
-bd update <id> --design "Design decisions" --json
-bd update <id> --due "+2d" --json                # Due in 2 days
-bd update <id> --claim --json                    # Claim issue (atomic)
+pan beads update <id> --status in_progress|open|closed --json
+pan beads update <id> --priority 0-4 --json
+pan beads update <id> --assignee "name" --json
+pan beads update <id> --notes "Progress notes here" --json
+pan beads update <id> --design "Design decisions" --json
+pan beads update <id> --due "+2d" --json                # Due in 2 days
+pan beads claim <id> --json                    # Claim issue (atomic)
 
-# NOTE: No --blocked-by flag exists! Use 'bd dep add' instead
+# NOTE: No --blocked-by flag exists! Use 'pan beads dep add' instead
 ```
 
-**CRITICAL: `bd claim` does NOT exist.** Always use `bd update <id> --claim`.
+**CRITICAL: `bd claim` does NOT exist.** Always use `pan beads claim <id>`.
 Agents frequently waste tokens on `bd claim` — it has never been a standalone command.
 
 ### Comments (For Progress Notes)
@@ -190,8 +190,8 @@ bd comments add <id> "Comment text" --json       # Add comment
 ```bash
 bd label add <id> <label> --json
 bd label remove <id> <label> --json
-bd update <id> --add-label urgent --json         # Alternative
-bd update <id> --remove-label wip --json
+pan beads update <id> --add-label urgent --json         # Alternative
+pan beads update <id> --remove-label wip --json
 ```
 
 ### View & Search
@@ -206,7 +206,7 @@ bd count --status open --json    # Count issues
 
 ### Close & Reopen
 ```bash
-bd close <id> --reason "Completed" --json
+pan beads close <id> --reason "Completed" --json
 bd reopen <id> --reason "Need more work" --json
 ```
 
@@ -218,8 +218,7 @@ bd dep tree <id>        # See what's blocking this issue
 
 ### Persist (End of Session)
 ```bash
-bd dolt commit -m "session update"     # Commit pending local Dolt changes
-bd dolt push --remote origin            # Push to a configured Dolt remote when one exists
+pan beads update <id> --notes "session update" # Commit and push through the writer
 ```
 
 ## Advanced Features
@@ -230,7 +229,7 @@ bd dolt push --remote origin            # Push to a configured Dolt remote when 
 | Chemistry (pour/wisp) | `bd pour`, `bd wisp` | [CHEMISTRY_PATTERNS.md](resources/CHEMISTRY_PATTERNS.md) |
 | Agent beads | `bd agent --help` | [AGENTS.md](resources/AGENTS.md) |
 | Async gates | `bd gate --help` | [ASYNC_GATES.md](resources/ASYNC_GATES.md) |
-| Batch operations | `bd batch --help` | [BATCH.md](resources/BATCH.md) |
+| Batch operations | `pan beads --help` | [BATCH.md](resources/BATCH.md) |
 | Rules audit | `bd rules --help` | [RULES.md](resources/RULES.md) |
 | Worktrees | `bd worktree --help` | [WORKTREES.md](resources/WORKTREES.md) |
 

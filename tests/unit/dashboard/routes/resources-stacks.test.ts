@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockSpawn = vi.hoisted(() => vi.fn());
 
@@ -28,6 +28,12 @@ afterEach(() => {
   resetResourceStackReviewStatusReaderForTests();
   resetSpawnGateHealthSnapshotReaderForTests();
   vi.restoreAllMocks();
+});
+
+beforeEach(() => {
+  // Default to a non-DB reader so tests that do not explicitly configure
+  // review status do not fail when the SQLite schema is not initialized.
+  setResourceStackReviewStatusReaderForTests(() => null);
 });
 
 describe('resources stack payload', () => {

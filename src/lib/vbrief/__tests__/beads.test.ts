@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { syncBeadStatusToVBrief, getVBriefACStatusSync } from '../beads.js';
+import { syncBeadStatusToVBrief as syncBeadStatusDoor, getVBriefACStatusSync } from '../beads.js';
 import { readWorkspacePlanSync } from '../io.js';
 import type { VBriefDocument } from '../types.js';
 
@@ -11,6 +11,10 @@ let PROJECT_ROOT: string;
 let WORKSPACE_PATH: string;
 const ISSUE_ID = 'PAN-388';
 const SPEC_FILENAME = '2026-01-01-PAN-388-test-plan.vbrief.json';
+const beadTitles = new Map<string, string>();
+
+const syncBeadStatusToVBrief = (beadId: string, workspacePath: string, status?: any) =>
+  syncBeadStatusDoor(beadId, workspacePath, status, beadTitles.get(beadId));
 
 function writePlan(doc: VBriefDocument): void {
   const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
@@ -22,6 +26,7 @@ function writeBeadsFile(workspacePath: string, beads: Array<{ id: string; title:
   const beadsDir = join(workspacePath, '.beads');
   mkdirSync(beadsDir, { recursive: true });
   const lines = beads.map(b => JSON.stringify({ id: b.id, title: b.title, status: 'open' }));
+  for (const bead of beads) beadTitles.set(bead.id, bead.title);
   writeFileSync(join(beadsDir, 'issues.jsonl'), lines.join('\n') + '\n');
 }
 
@@ -39,6 +44,7 @@ function makePlanDoc(items: Array<{ id: string; title: string; status?: string }
 }
 
 beforeEach(() => {
+  beadTitles.clear();
   PROJECT_ROOT = join(tmpdir(), `beads-sync-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   WORKSPACE_PATH = join(PROJECT_ROOT, 'workspaces', `feature-${ISSUE_ID.toLowerCase()}`);
   mkdirSync(WORKSPACE_PATH, { recursive: true });
@@ -133,6 +139,7 @@ describe('syncBeadStatusToVBrief', () => {
       'not json\n' +
       JSON.stringify({ id: 'bead-1', title: 'PAN-388: Good task', status: 'open' }) + '\n',
     );
+    beadTitles.set('bead-1', 'PAN-388: Good task');
 
     const result = await Effect.runPromise(syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH));
     expect(result).toBe('item-1');

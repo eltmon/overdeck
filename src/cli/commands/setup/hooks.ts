@@ -46,34 +46,29 @@ const RTK_ASSETS: Record<string, RtkReleaseAsset> = {
   },
 };
 
-export interface HookConfig {
-  matcher: string;  // Regex pattern, e.g. ".*" for all tools or "Bash" for specific
-  hooks: Array<{
-    type: string;
-    command: string;
-  }>;
-}
+// Hook registration types + delta-install machinery moved to
+// src/lib/claude-hooks-registration.ts (PAN-2595) so the desktop boot
+// provisioner and this CLI installer share one source of truth. Re-exported
+// here for existing importers/tests.
+import {
+  applyOverdeckHookRegistrations,
+  HOOK_SCRIPT_NAMES,
+  type ClaudeSettings,
+} from '../../../lib/claude-hooks-registration.js';
+export {
+  addOverdeckHookIfMissing,
+  applyOverdeckHookRegistrations,
+  pruneLegacyPanopticonHook,
+  HOOK_SCRIPT_NAMES,
+  OVERDECK_HOOK_REGISTRATIONS,
+  type ClaudeSettings,
+  type HookConfig,
+} from '../../../lib/claude-hooks-registration.js';
 
 interface McpServer {
   command: string;
   args?: string[];
   env?: Record<string, string>;
-}
-
-export interface ClaudeSettings {
-  hooks?: {
-    PreToolUse?: HookConfig[];
-    PostToolUse?: HookConfig[];
-    Stop?: HookConfig[];
-    SessionStart?: HookConfig[];
-    Notification?: HookConfig[];
-    PreCompact?: HookConfig[];
-    PostCompact?: HookConfig[];
-    UserPromptSubmit?: HookConfig[];
-    PermissionRequest?: HookConfig[];
-  };
-  mcpServers?: Record<string, McpServer>;
-  [key: string]: any;
 }
 
 /**
@@ -208,96 +203,8 @@ async function installRtk(binDir: string): Promise<boolean> {
   }
 }
 
-/**
- * Per-hook-type detection of whether a Overdeck hook is already registered.
- * PAN-800: rewritten from an all-or-nothing short-circuit to a delta-install
- * check so users with older installs still get SessionStart/Notification/etc.
- * added without having to wipe their settings.
- */
-function isHookConfigured(
-  settings: ClaudeSettings,
-  hookType: keyof NonNullable<ClaudeSettings['hooks']>,
-  binDir: string,
-  scriptName: string,
-): boolean {
-  const hooks = settings?.hooks?.[hookType] || [];
-  return hooks.some((hookConfig: HookConfig) =>
-    hookConfig.hooks?.some((hook: { type: string; command: string }) =>
-      (hook.command?.includes(join(binDir, scriptName)) ?? false) ||
-      (hook.command?.includes(`overdeck/bin/${scriptName}`) ?? false)
-    )
-  );
-}
 
-/**
- * PAN-2530: Remove stale pre-rebrand hook entries that point at the old
- * `~/.panopticon/bin/<scriptName>` path.
- *
- * Before the PAN-1952 rebrand, hooks were installed under `panopticon/bin/`.
- * `isHookConfigured()` only recognizes the current `overdeck/bin/` path, so a
- * re-sync after the rename added the new hook *alongside* the legacy one,
- * leaving both registered and both firing (e.g. ask-user-question-hook fired
- * twice, one copy still branded "Panopticon"). Prune any legacy entry for this
- * script so exactly one hook survives after install.
- *
- * Mutates `settings` in place. Returns true if anything was removed.
- */
-export function pruneLegacyPanopticonHook(
-  settings: ClaudeSettings,
-  hookType: keyof NonNullable<ClaudeSettings['hooks']>,
-  scriptName: string,
-): boolean {
-  const list = settings?.hooks?.[hookType];
-  if (!list) return false;
 
-  const isLegacy = (command: string | undefined): boolean =>
-    command?.includes(`panopticon/bin/${scriptName}`) ?? false;
-
-  let removed = false;
-  const next: HookConfig[] = [];
-  for (const hookConfig of list) {
-    const originalHooks = hookConfig.hooks ?? [];
-    const keptHooks = originalHooks.filter((hook) => {
-      if (isLegacy(hook.command)) {
-        removed = true;
-        return false;
-      }
-      return true;
-    });
-    // Drop a config only if it *had* hooks and they were all legacy; otherwise
-    // preserve it (including genuinely-empty configs) unchanged.
-    if (keptHooks.length > 0 || originalHooks.length === 0) {
-      next.push(keptHooks.length === originalHooks.length ? hookConfig : { ...hookConfig, hooks: keptHooks });
-    }
-  }
-
-  if (removed) {
-    settings.hooks![hookType] = next;
-  }
-  return removed;
-}
-
-export function addOverdeckHookIfMissing(
-  settings: ClaudeSettings,
-  hookType: keyof NonNullable<ClaudeSettings['hooks']>,
-  binDir: string,
-  scriptName: string,
-  matcher: string = '.*',
-): boolean {
-  if (!settings.hooks) {
-    settings.hooks = {};
-  }
-  // PAN-2530: drop any stale panopticon/bin/<scriptName> twin so the rebrand
-  // never leaves two copies of this hook registered and firing together.
-  pruneLegacyPanopticonHook(settings, hookType, scriptName);
-  if (isHookConfigured(settings, hookType, binDir, scriptName)) return false;
-  const list = (settings.hooks[hookType] ??= []);
-  list.push({
-    matcher,
-    hooks: [{ type: 'command', command: join(binDir, scriptName) }],
-  });
-  return true;
-}
 
 
 export type HookHarness = 'claude-code' | 'pi' | 'codex' | 'both';
@@ -412,31 +319,9 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
     console.log(chalk.green('✓ Created ~/.overdeck/heartbeats/'));
   }
 
-  // 3. Copy hook scripts to ~/.overdeck/bin/
-  const hookScripts = [
-    'pan-hook-lib.sh',        // PAN-800: shared library sourced by all hooks
-    'pre-tool-hook',
-    'ask-user-question-hook',
-    'auto-approve-hook',
-    'heartbeat-hook',
-    'stop-hook',
-    'notification-hook',      // PAN-800: Notification — emits agent.waiting_started
-    'specialist-stop-hook',
-    'work-agent-stop-hook',   // PAN-800: chained from stop-hook; emits agent.resolution_changed
-    'session-start-hook',          // PAN-800: SessionStart — emits agent.activity_changed(idle) + agent.model_set
-    'user-prompt-submit-hook',     // UserPromptSubmit — clears waiting state, records message_received, restarts spinner
-    'pre-compact-hook',            // PreCompact — emits activity=working/compact so dashboard shows compacting indicator
-    'post-compact-hook',           // PostCompact — emits activity=idle to clear compacting state
-    'record-cost-event.js',
-    'gh-issue-trailer-hook',
-    'gh-issue-trailer-hook.js',
-    'tldr-read-enforcer',
-    'tldr-post-edit',
-    'rtk-bash-filter',
-    'permission-event-hook',   // PermissionRequest — emits conversation.permission_changed(waiting)
-    'tmux-send-keys-guard',    // PAN-1084: blocks work agents from driving other agents' tmux sessions
-  ];
-  for (const scriptName of hookScripts) {
+  // 3. Copy hook scripts to ~/.overdeck/bin/ (canonical list shared with the
+  // desktop boot provisioner — src/lib/claude-hooks-registration.ts, PAN-2595)
+  for (const scriptName of HOOK_SCRIPT_NAMES) {
     // Hook scripts ship under sync-sources/hooks/ (PAN-1201). SYNC_SOURCES.hooks
     // resolves correctly from both a checkout and an installed package.
     const sourcePath = join(SYNC_SOURCES.hooks, scriptName);
@@ -517,62 +402,11 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
 
   // 7. Delta-register missing hooks. Existing registrations are left alone so
   // users can hand-customize matchers without the installer clobbering them.
-  if (!settings.hooks) {
-    settings.hooks = {};
-  }
-
-  const added: string[] = [];
-  const removed: string[] = [];
-  const addHookIfMissing = (
-    hookType: keyof NonNullable<ClaudeSettings['hooks']>,
-    scriptName: string,
-    matcher: string = '.*',
-  ): void => {
-    // PAN-2530: remove any stale panopticon/bin twin before (re)installing.
-    if (pruneLegacyPanopticonHook(settings, hookType, scriptName)) {
-      removed.push(`${hookType}:${scriptName}`);
-    }
-    if (addOverdeckHookIfMissing(settings, hookType, binDir, scriptName, matcher)) {
-      added.push(`${hookType}:${scriptName}`);
-    }
-  };
-
-  // PAN-1402: Tool-event hooks briefly lived in per-agent frontmatter during
-  // PAN-982, but Claude Code did not honor them when Overdeck invoked agents
-  // with path-form `--agent roles/<role>.md`, so these registrations are global.
-  // PAN-2087: path-form `--agent` is gone entirely (Claude Code 2.1.195 dropped
-  // file support; roles are now injected via --append-system-prompt-file), so
-  // global registration here is the ONLY hook delivery path — keep it.
-  addHookIfMissing('PreToolUse', 'pre-tool-hook');
-  // Auto-approve tool calls for Overdeck agents (self-scoped via
-  // OVERDECK_AGENT_ID inside the hook) — replaces launching agents with
-  // --dangerously-skip-permissions so headless agents never hang on Claude
-  // Code's "Do you want to proceed?" prompt (PAN-1024). A frontmatter PreToolUse
-  // hook's permissionDecision is NOT honored, so this must be registered here in
-  // settings.json. AskUserQuestion is skipped by the hook so ask-user-question-hook's
-  // deny still wins.
-  addHookIfMissing('PreToolUse', 'auto-approve-hook');
-  addHookIfMissing('PreToolUse', 'gh-issue-trailer-hook', 'Bash');
-  // PAN-1084: mechanically prevent work agents from self-approving permission
-  // prompts in another agent's tmux session via tmux send-keys/paste-buffer.
-  addHookIfMissing('PreToolUse', 'tmux-send-keys-guard', 'Bash');
-  // PAN-1520: block AskUserQuestion to prevent upstream silent-corruption
-  // (option #1 fabricated as answer under --dangerously-skip-permissions).
-  addHookIfMissing('PreToolUse', 'ask-user-question-hook', 'AskUserQuestion');
-  addHookIfMissing('PostToolUse', 'heartbeat-hook');
-  addHookIfMissing('PostToolUse', 'permission-event-hook');
-  addHookIfMissing('Stop', 'stop-hook');
-  addHookIfMissing('Stop', 'permission-event-hook');
-  addHookIfMissing('SessionStart', 'session-start-hook');
-  addHookIfMissing('Notification', 'notification-hook');
-  addHookIfMissing('UserPromptSubmit', 'user-prompt-submit-hook');
-  addHookIfMissing('PreCompact', 'pre-compact-hook');
-  addHookIfMissing('PostCompact', 'post-compact-hook');
-  addHookIfMissing('PermissionRequest', 'permission-event-hook');
-  if (python3Available) {
-    addHookIfMissing('PreToolUse', 'tldr-read-enforcer', 'Read');
-    addHookIfMissing('PostToolUse', 'tldr-post-edit', 'Edit|Write');
-  }
+  // The registration table lives in src/lib/claude-hooks-registration.ts,
+  // shared with the desktop boot provisioner (PAN-2595). Per-entry rationale
+  // (PAN-1402/PAN-2087 global registration, PAN-1024 auto-approve, PAN-1084
+  // send-keys guard, PAN-1520 AskUserQuestion block) is documented there.
+  const { added, removed } = applyOverdeckHookRegistrations(settings, binDir, { python3Available });
 
   if (removed.length > 0) {
     console.log(chalk.yellow(`\n✓ Removed ${removed.length} stale panopticon/bin hook(s):`));

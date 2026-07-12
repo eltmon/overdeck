@@ -73,6 +73,19 @@ const getVersionRoute = HttpRouter.add(
   }),
 );
 
+// ─── Route: GET /api/prerequisites ────────────────────────────────────────────
+// Host-tool setup checklist (PAN-774): which required/optional utilities the
+// server can see on PATH — exactly what spawned agent sessions will see.
+
+const getPrerequisitesRoute = HttpRouter.add(
+  'GET',
+  '/api/prerequisites',
+  Effect.promise(async () => {
+    const { checkSystemPrerequisites } = await import('../../../../lib/system-prerequisites.js');
+    return jsonResponse(await checkSystemPrerequisites());
+  }),
+);
+
 // ─── Route: GET /api/registered-projects ─────────────────────────────────────
 
 const getRegisteredProjectsRoute = HttpRouter.add(
@@ -493,6 +506,7 @@ const postRestartDashboardRoute = HttpRouter.add(
 
 export const metaRouteLayer = Layer.mergeAll(
   getVersionRoute,
+  getPrerequisitesRoute,
   getRegisteredProjectsRoute,
   getConfirmationsRoute,
   postConfirmationRespondRoute,

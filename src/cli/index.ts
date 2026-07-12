@@ -114,6 +114,7 @@ import { planFinalizeCommand } from './commands/plan-finalize.js';
 import { planDoneCommand } from './commands/plan-done.js';
 import { registerCavemanCommands } from './commands/caveman.js';
 import { registerReleaseCommands } from './commands/release.js';
+import { registerRolloutCommands } from './commands/rollout.js';
 import { isNoResumeCliOptionEnabled } from '../lib/cloister/no-resume-mode.js';
 import { applyBootGateEnv, formatBootGateState, resolveBootGates } from '../lib/boot-gates.js';
 import { resourcesCommand } from './commands/resources.js';
@@ -599,6 +600,7 @@ registerTtsCommands(program);
 
 // Register release commands (pan release check/stable/canary/notes)
 registerReleaseCommands(program);
+registerRolloutCommands(program);
 
 program.addCommand(createMemoryCommand());
 program.addCommand(createBriefingCommand());

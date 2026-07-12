@@ -12,6 +12,10 @@ import { join } from 'path';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { platform } from 'os';
+import { registerBeadsReconcileCommand } from './admin/beads-reconcile.js';
+import { standardizeBeadsConfig } from '../../lib/beads/config-standardize.js';
+import { runMutationBatch, type BdMutationClient } from '../../lib/beads/writer.js';
+import { assertSupportedBdVersion, readInstalledBdVersion } from '../../lib/beads/version.js';
 
 const execAsync = promisify(exec);
 
@@ -84,7 +88,7 @@ async function compactCommand(options: CompactOptions): Promise<void> {
   const beadsDir = join(cwd, '.beads');
   if (!existsSync(beadsDir)) {
     console.error(chalk.red('Error: No .beads directory found in current directory'));
-    console.log(chalk.dim('Run bd init to initialize beads'));
+    console.log(chalk.dim('Run pan sync to bootstrap the canonical beads home'));
     process.exit(1);
   }
 
@@ -121,7 +125,11 @@ async function compactCommand(options: CompactOptions): Promise<void> {
 
     // Run compaction
     spinner.text = 'Running compaction...';
-    await execAsync(`bd admin compact --days ${days}`, { cwd, encoding: 'utf-8' });
+    const compacted = await runMutationBatch(
+      { project: { workspacePath: cwd }, reason: `compact beads older than ${days} days` },
+      (bd) => bd.mutate(['admin', 'compact', '--days', String(days)]),
+    );
+    if (!compacted.ok) throw new Error(compacted.message);
 
     spinner.succeed(`Compacted ${count} beads older than ${days} days`);
 
@@ -220,6 +228,77 @@ async function statsCommand(): Promise<void> {
 
 export function registerBeadsCommands(program: Command): void {
   const beads = program.command('beads').description('Beads issue tracker management');
+  registerBeadsReconcileCommand(beads);
+
+  const mutate = async <T>(reason: string, fn: (bd: BdMutationClient) => Promise<T>): Promise<T> => {
+    const result = await runMutationBatch({ project: { workspacePath: process.cwd() }, reason }, fn);
+    if (!result.ok) throw new Error(result.message);
+    return result.value;
+  };
+
+  beads.command('claim <ids...>')
+    .description('Atomically claim one or more beads through the canonical writer')
+    .action((ids: string[]) => mutate(`claim ${ids.join(', ')}`, async (bd) => {
+      for (const id of ids) await bd.mutate(['update', id, '--claim']);
+    }));
+
+  beads.command('update <id>')
+    .description('Update a bead through the canonical writer')
+    .option('--status <status>')
+    .option('--title <title>')
+    .option('--priority <priority>')
+    .option('--notes <notes>')
+    .option('--description <description>')
+    .option('--assignee <assignee>')
+    .option('--add-label <label>')
+    .option('--remove-label <label>')
+    .action(async (id: string, options: Record<string, string | undefined>) => { await mutate(`update ${id}`, (bd) => {
+      const args = ['update', id];
+      for (const [key, value] of Object.entries(options)) if (value !== undefined) args.push(`--${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`, value);
+      return bd.mutate(args);
+    }); });
+
+  beads.command('close <ids...>')
+    .description('Close beads and publish their Dolt commit durably')
+    .option('--reason <reason>', 'Completion reason', 'completed')
+    .action((ids: string[], options: { reason: string }) => mutate(`close ${ids.join(', ')}`, async (bd) => {
+      for (const id of ids) await bd.mutate(['close', id, '--reason', options.reason]);
+    }));
+
+  beads.command('create [title]')
+    .option('--title <title>')
+    .option('--type <type>', 'Record type', 'task')
+    .option('--priority <priority>', 'Priority', '2')
+    .option('--labels <labels>')
+    .option('--parent <parent>')
+    .option('--description <description>')
+    .option('--deps <dependencies>')
+    .action((title: string | undefined, options: { title?: string; type: string; priority: string; labels?: string; parent?: string; description?: string; deps?: string }) => {
+      const resolvedTitle = options.title ?? title;
+      if (!resolvedTitle) throw new Error('pan beads create requires a title');
+      return mutate(`create ${resolvedTitle}`, (bd) => {
+      const args = ['create', '--title', resolvedTitle, '--type', options.type, '--priority', options.priority, '--json'];
+      if (options.labels) args.push('--labels', options.labels);
+      if (options.parent) args.push('--parent', options.parent);
+      if (options.description) args.push('--description', options.description);
+      if (options.deps) args.push('--deps', options.deps);
+      return bd.mutate(args);
+      }).then((output) => console.log(output));
+    });
+
+  const dep = beads.command('dep').description('Mutate bead dependencies through the canonical writer');
+  for (const verb of ['add', 'remove'] as const) {
+    dep.command(`${verb} <issue> <dependency>`)
+      .option('--type <type>', 'Dependency type', 'blocks')
+      .action(async (issue: string, dependency: string, options: { type: string }) => { await mutate(`dependency ${verb}`, (bd) => bd.mutate(['dep', verb, issue, dependency, '--type', options.type])); });
+  }
+
+  beads.command('delete <ids...>')
+    .description('Delete beads through the canonical writer')
+    .requiredOption('--yes', 'Confirm deletion')
+    .action((ids: string[]) => mutate(`delete ${ids.join(', ')}`, async (bd) => {
+      for (const id of ids) await bd.mutate(['delete', id, '--yes']);
+    }));
 
   beads
     .command('compact')
@@ -267,13 +346,7 @@ async function upgradeCommand(checkOnly: boolean = false): Promise<void> {
 
   // Get current version
   let currentVersion = 'not installed';
-  try {
-    const { stdout } = await execAsync('bd --version', { encoding: 'utf-8' });
-    const match = stdout.match(/(\d+\.\d+\.\d+)/);
-    if (match) {
-      currentVersion = match[1];
-    }
-  } catch {}
+  currentVersion = await readInstalledBdVersion() ?? currentVersion;
 
   // Get latest version from GitHub
   let latestVersion = 'unknown';
@@ -337,10 +410,11 @@ async function upgradeCommand(checkOnly: boolean = false): Promise<void> {
 
     // Verify new version
     try {
-      const { stdout } = await execAsync('bd --version', { encoding: 'utf-8' });
-      const match = stdout.match(/(\d+\.\d+\.\d+)/);
-      if (match) {
-        console.log(chalk.green(`\n✓ Now running beads v${match[1]}`));
+      const installed = await readInstalledBdVersion();
+      if (installed) {
+        assertSupportedBdVersion(installed);
+        console.log(chalk.green(`\n✓ Now running beads v${installed}`));
+        console.log(chalk.dim('Schema adoption is a separate operator cutover: one designated migrator runs migrate and push; every other clone runs bd bootstrap.'));
       }
     } catch {}
   } catch (error: any) {
@@ -362,12 +436,16 @@ async function doctorCommand(dryRun: boolean = false): Promise<void> {
   try {
     if (dryRun) {
       const { stdout } = await execAsync('bd doctor', { encoding: 'utf-8' });
+      const standardized = await standardizeBeadsConfig(process.cwd(), true);
       spinner.succeed('Beads doctor check complete');
       console.log(stdout);
+      if (!standardized.remoteMatches) console.log(chalk.yellow(`sync.remote does not match ${standardized.expectedRemote}; writes are blocked until reconciled.`));
       return;
     }
 
     const { stdout } = await execAsync('bd doctor --fix', { encoding: 'utf-8' });
+    const standardized = await standardizeBeadsConfig(process.cwd());
+    if (!standardized.remoteMatches) throw new Error(`sync.remote does not match ${standardized.expectedRemote}; writes are blocked until reconciled.`);
     spinner.succeed('Beads doctor fix complete');
     console.log(stdout);
   } catch (error: any) {

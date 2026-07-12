@@ -1,6 +1,6 @@
 {
   "name": "@overdeck/desktop",
-  "version": "0.45.7",
+  "version": "0.45.13",
   "description": "Overdeck Command Deck — AI agent monitoring desktop app",
   "publishConfig": {
     "access": "public"
@@ -19,7 +19,8 @@
     "dist-electron",
     "server",
     "resources",
-    "drizzle"
+    "drizzle",
+    "sync-sources"
   ],
   "engines": {
     "node": ">=22.0.0"
@@ -44,6 +45,7 @@
     "electron-updater": "^6.8.3"
   },
   "devDependencies": {
+    "@electron/notarize": "^2.5.0",
     "@overdeck/contracts": "workspace:*",
     "@types/node": "^22.0.0",
     "electron": "40.6.0",
@@ -69,6 +71,10 @@
       {
         "from": "drizzle",
         "to": "drizzle"
+      },
+      {
+        "from": "sync-sources",
+        "to": "sync-sources"
       },
       {
         "from": "server",
@@ -105,7 +111,12 @@
         }
       ],
       "icon": "resources/icon.png",
-      "category": "public.app-category.developer-tools"
+      "category": "public.app-category.developer-tools",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "notarize": false
     },
     "dmg": {
       "title": "Overdeck",
@@ -126,6 +137,7 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     },
-    "afterPack": "scripts/afterPack.cjs"
+    "afterPack": "scripts/afterPack.cjs",
+    "afterSign": "scripts/notarize.cjs"
   }
 }

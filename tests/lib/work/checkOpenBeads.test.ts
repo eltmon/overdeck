@@ -94,7 +94,7 @@ describe('checkOpenBeads', () => {
     expect(result[1]).toContain('untitled');
   });
 
-  it('passes the issueId lowercased as a title-contains filter', async () => {
+  it('passes the issueId lowercased as the canonical label filter', async () => {
     let capturedArgs: string[] = [];
     mockExecFileFn.mockImplementation((_file: string, args: string[], _opts: unknown, cb: Function) => {
       capturedArgs = args;
@@ -103,7 +103,7 @@ describe('checkOpenBeads', () => {
 
     const { checkOpenBeads } = await import('../../../src/lib/work/done-preflight.js');
     await Effect.runPromise(checkOpenBeads('/fake/workspace', 'PAN-714'));
-    expect(capturedArgs).toContain('--title-contains');
+    expect(capturedArgs).toContain('-l');
     expect(capturedArgs).toContain('pan-714');
   });
 

@@ -211,6 +211,12 @@ jobs:
             script: build:desktop:win
             artifact: apps/desktop/dist/*.exe
     runs-on: ${{ matrix.os }}
+    env:
+      # The `secrets` context is not allowed in step-level `if:` expressions
+      # (the workflow fails validation with zero jobs), so surface presence
+      # flags here and let the signing steps test these instead.
+      HAS_MAC_CERT: ${{ secrets.MACOS_CERTIFICATE != '' }}
+      HAS_APPLE_API_KEY: ${{ secrets.APPLE_API_KEY != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -230,11 +236,45 @@ jobs:
       - name: Build
         run: bun run build
 
+      # macOS only: decode the App Store Connect API key (.p8) from a base64
+      # secret to a file on the runner. @electron/notarize (invoked by the
+      # afterSign hook in apps/desktop/scripts/notarize.cjs) needs a file path,
+      # not the key material inline. Skipped when the secret isn't configured —
+      # the notarize hook no-ops without APPLE_API_KEY.
+      - name: Prepare Apple API key (macOS)
+        if: matrix.target == 'mac' && env.HAS_APPLE_API_KEY == 'true'
+        shell: bash
+        run: |
+          KEY_PATH="$RUNNER_TEMP/AuthKey.p8"
+          echo "${{ secrets.APPLE_API_KEY }}" | base64 --decode > "$KEY_PATH"
+          echo "APPLE_API_KEY=$KEY_PATH" >> "$GITHUB_ENV"
+
+      # macOS only: export code-signing env ONLY when the certificate secret is
+      # configured. An empty CSC_LINK is NOT ignored by electron-builder — it is
+      # treated as a certificate file path, resolves to the cwd, and fails the
+      # build with "not a file" (broke the v0.45.8 mac build). With these vars
+      # absent, electron-builder falls back to keychain auto-discovery, finds no
+      # identity on the runner, and ships the app unsigned — the pre-signing
+      # behavior.
+      - name: Enable macOS code signing (macOS, certificate configured)
+        if: matrix.target == 'mac' && env.HAS_MAC_CERT == 'true'
+        shell: bash
+        run: |
+          {
+            echo "CSC_LINK=${{ secrets.MACOS_CERTIFICATE }}"
+            echo "CSC_KEY_PASSWORD=${{ secrets.MACOS_CERTIFICATE_PWD }}"
+          } >> "$GITHUB_ENV"
+
       - name: Build desktop app (${{ matrix.target }})
         run: bun run ${{ matrix.script }}
         env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          # Code signing (CSC_LINK / CSC_KEY_PASSWORD) is exported by the
+          # "Enable macOS code signing" step above only when the certificate
+          # secret exists. Notarization (App Store Connect API key): APPLE_API_KEY
+          # (the .p8 file path) is exported by the "Prepare Apple API key" step;
+          # the notarize hook no-ops when any of these are empty.
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER_ID }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

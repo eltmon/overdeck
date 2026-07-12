@@ -179,7 +179,7 @@ export function VoiceDesignTab() {
         </p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 @xl:grid-cols-2">
         <label className="block">
           <span className="text-xs font-medium text-foreground">Voice description</span>
           <textarea

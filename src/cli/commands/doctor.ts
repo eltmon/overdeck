@@ -24,8 +24,8 @@ import { CacheService } from '../../dashboard/server/services/cache-service.js';
 import { classifyDashboardAgent } from '../../dashboard/frontend/src/lib/agent-classifier.js';
 import { getMainDivergence, type MainDivergence } from '../../lib/state-plane.js';
 import { checkStateWorktrees } from './doctor-state-worktree.js';
-// Minimum supported omp version for the ohmypi harness (PAN-1989).
-// omp uses a different version lineage from pi. Baselined at 16.1.16 (verified).
+import { checkCanonicalBeadsHomes } from './doctor-beads.js';
+// Minimum supported omp harness version (PAN-1989); its lineage differs from pi and was baselined at 16.1.16.
 export const SUPPORTED_OMP_VERSION_MIN = '16.1.0';
 
 const execAsync = promisify(exec);
@@ -865,7 +865,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   checks.push(checkOrphanProposedSpecs());
   checks.push(...await checkMainDivergence());
   checks.push(...await checkStateWorktrees());
-  // Check smee-client webhook relay
+  checks.push(...checkCanonicalBeadsHomes());
   try {
     const { isSmeeProcessRunningSync } = await import('../../lib/smee.js');
     const smeeUrlPath = join(homedir(), '.overdeck', 'github-app', 'smee-url');

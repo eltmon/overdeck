@@ -12,6 +12,7 @@ import { dispatchLauncherIntent } from './HomePane/launcherActions'
 import { readLastUsedAgent, writeLastUsedAgent } from './HomePane/launcherOrdering'
 import type { TimelineConversation } from './HomePane/timeline-utils'
 import type { StageApi } from './types'
+import { ProjectReleasePanel } from './HomePane/ProjectReleasePanel'
 import { ProjectOverview, projectTotalCost, type IssueCostBreakdown } from '../CommandDeck/ProjectOverview'
 import type { ProjectFeature } from '../CommandDeck/ProjectTree/ProjectNode'
 import styles from './stage.module.css'
@@ -161,6 +162,7 @@ export function ProjectHome({
         detail={
           <div className={styles.projectHomeColumns}>
             <div className={styles.projectHomeStages}>
+              <ProjectReleasePanel projectKey={projectKey ?? projectName} />
               <ProjectOverview
                 projectName={projectName}
                 projectKey={projectKey}

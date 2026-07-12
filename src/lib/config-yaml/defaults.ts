@@ -40,6 +40,11 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     configMode: 'managed',
   },
   enabledProviders: new Set(['anthropic']), // Only Anthropic by default
+  // Seeded conversation-model default for brand-new installs (operator
+  // decision, 2026-07-12): the new-conversation picker must never be empty.
+  // This is the explicit product default, shown and changeable in Settings —
+  // a user-set models.default_conversation_model always overrides it.
+  defaultConversationModel: 'claude-sonnet-5',
   apiKeys: {},
   providerAuth: {},
   providerPlan: {},
@@ -217,7 +222,10 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     showHarnessModelPermutations: false,
   },
   claude: {
-    permissionMode: 'auto',
+    // 'bypass' (yolo) is the recommended default (operator decision, 2026-07-12):
+    // 'auto' depends on the auto-approve hooks being installed on the machine —
+    // on a fresh install without them it prompts for every tool call.
+    permissionMode: 'bypass',
   },
   codex: {
     permissionMode: 'auto-review',

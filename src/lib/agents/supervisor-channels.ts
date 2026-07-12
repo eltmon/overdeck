@@ -1,4 +1,3 @@
-import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { homedir } from 'os';
 import { dirname, join } from 'path';
@@ -8,7 +7,7 @@ import { isClaudeCodeChannelsMcpEnabled } from '../config-yaml.js';
 import type { ModelId } from '../settings.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
-import { packageRoot } from '../paths.js';
+import { resolvePtySupervisorScriptPath } from '../channels/pty-supervisor-locate.js';
 import { getProviderForModelSync } from '../providers.js';
 import { writePtyToken } from '../pty-token.js';
 import { capturePane, sendRawKeystroke } from '../tmux.js';
@@ -137,9 +136,6 @@ export async function prepareSupervisorForFreshLaunch(
   }
 
   const supervisorScriptPath = resolvePtySupervisorScriptPath();
-  if (!existsSync(supervisorScriptPath)) {
-    throw new Error('pty-supervisor build artifact missing — run `npm run build`.');
-  }
   await writePtyToken(agentId);
   state.supervisorEnabled = true;
   return { useSupervisor: true, supervisorScriptPath };
@@ -170,16 +166,9 @@ export async function prepareSupervisorForRelaunch(
   }
 
   const supervisorScriptPath = resolvePtySupervisorScriptPath();
-  if (!existsSync(supervisorScriptPath)) {
-    throw new Error('pty-supervisor build artifact missing — run `npm run build`.');
-  }
   await writePtyToken(agentId);
   state.supervisorEnabled = true;
   return { useSupervisor: true, supervisorScriptPath };
-}
-
-function resolvePtySupervisorScriptPath(): string {
-  return join(packageRoot, 'dist', 'pty-supervisor.js');
 }
 
 /**

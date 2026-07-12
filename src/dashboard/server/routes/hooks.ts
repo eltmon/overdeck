@@ -36,6 +36,12 @@ import { registerTranscriptForPolling } from '../../../lib/memory/poller.js';
 import { areMemoryObservationsEnabled } from '../../../lib/memory/settings.js';
 import { isSubagentHookPayload } from '../../../lib/memory/subagent-filter.js';
 import { enqueueMemoryPipelineJob } from '../../../lib/memory/worker-pool.js';
+import { buildDocsInjectionContext } from '../../../lib/docs/injection.js';
+import type { NormalizedDocsConfig } from '../../../lib/config-yaml.js';
+import { loadConfigSync } from '../../../lib/config-yaml/load.js';
+import type { DocsPathOverrides } from '../../../lib/paths.js';
+
+const MEMORY_INJECT_FAST_RESPONSE_TIMEOUT_MS = 750;
 
 const CLEAR_ON = new Set([
   'PostToolUse',
@@ -214,7 +220,15 @@ export interface HandleMemoryInjectBodyOptions {
   injectBriefing?: typeof appendFreshBriefingUpdate;
   resolveComplianceWarning?: typeof resolveComplianceAdvisoryWarning;
   resolveAgentIdBySessionId?: (sessionId: string) => Promise<string | null>;
+  docsConfig?: Pick<NormalizedDocsConfig, 'enabled' | 'promptInjectionEnabled' | 'trigger' | 'budget'>;
+  docsPaths?: DocsPathOverrides;
+  buildDocsInjectionContext?: typeof buildDocsInjectionContext;
+  docsAbortSignal?: AbortSignal;
   now?: Date;
+}
+
+export interface HandleMemoryInjectFastPathOptions extends HandleMemoryInjectBodyOptions {
+  timeoutMs?: number;
 }
 
 export async function handleMemoryInjectBody(
@@ -249,11 +263,72 @@ export async function handleMemoryInjectBody(
   const briefing = await (options.injectBriefing ?? appendFreshBriefingUpdate)(
     options.now ? { sessionId, context: memoryResult.context, now: options.now } : { sessionId, context: memoryResult.context },
   );
+  const docsResult = options.docsConfig || options.docsPaths || options.buildDocsInjectionContext
+    ? await (options.buildDocsInjectionContext ?? buildDocsInjectionContext)({
+      prompt,
+      sessionId,
+      config: options.docsConfig,
+      paths: options.docsPaths,
+      now: options.now,
+      signal: options.docsAbortSignal,
+    })
+    : { context: null };
 
   return {
     ...memoryResult,
-    context: [complianceWarning, briefing.context].filter((part): part is string => !!part).join('\n\n'),
+    context: [complianceWarning, briefing.context, docsResult.context].filter((part): part is string => !!part).join('\n\n'),
   };
+}
+
+export async function handleMemoryInjectFastPathBody(
+  body: Record<string, unknown>,
+  options: HandleMemoryInjectFastPathOptions = {},
+): Promise<{ ok: true; context: string }> {
+  const docsAbortController = new AbortController();
+  const resultPromise = handleMemoryInjectBody(body, {
+    resolveAgentIdBySessionId: options.resolveAgentIdBySessionId,
+    resolveComplianceWarning: options.resolveComplianceWarning,
+    injectMemory: options.injectMemory,
+    injectBriefing: options.injectBriefing,
+    docsConfig: options.docsConfig,
+    docsPaths: options.docsPaths,
+    buildDocsInjectionContext: options.buildDocsInjectionContext,
+    docsAbortSignal: docsAbortController.signal,
+    now: options.now,
+  });
+  const result = await resolveWithTimeout(
+    resultPromise,
+    options.timeoutMs ?? MEMORY_INJECT_FAST_RESPONSE_TIMEOUT_MS,
+    () => docsAbortController.abort(),
+  ).catch(() => ({ timedOut: true as const }));
+  if (result.timedOut) return { ok: true, context: '' };
+  if ('error' in result.value) return { ok: true, context: '' };
+  return { ok: true, context: result.value.context };
+}
+
+async function resolveWithTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  onTimeout?: () => void,
+): Promise<{ timedOut: false; value: T } | { timedOut: true }> {
+  if (timeoutMs <= 0) {
+    onTimeout?.();
+    return { timedOut: true };
+  }
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      promise.then((value) => ({ timedOut: false as const, value })),
+      new Promise<{ timedOut: true }>((resolveTimeout) => {
+        timeout = setTimeout(() => {
+          onTimeout?.();
+          resolveTimeout({ timedOut: true });
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
 }
 
 const postMemoryInjectRoute = HttpRouter.add(
@@ -273,27 +348,11 @@ const postMemoryInjectRoute = HttpRouter.add(
 
     const readModel = yield* ReadModelService;
     const resolveAgentIdBySessionId = async (sessionId: string) => Effect.runPromise(readModel.getAgentIdBySessionId(sessionId));
-    const warningResult = yield* Effect.promise(() => handleMemoryInjectBody(body, {
+    const result = yield* Effect.promise(() => handleMemoryInjectFastPathBody(body, {
       resolveAgentIdBySessionId,
-      injectMemory: async () => ({
-        status: 'skipped',
-        reason: 'compliance-warning-only',
-        context: '',
-        decision: {} as never,
-      }),
-      injectBriefing: async (input) => ({ context: input.context, injected: false, briefingMtimeMs: null }),
+      docsConfig: loadConfigSync().config.docs,
     }));
-
-    // Fire-and-forget: prompt-time memory injection can exceed the 1 s client hook
-    // timeout (query expansion + FTS search). Return any fast advisory warning now.
-    void Effect.runPromise(Effect.promise(() => handleMemoryInjectBody(body, {
-      resolveAgentIdBySessionId,
-      resolveComplianceWarning: async () => null,
-    })));
-    return jsonResponse({
-      ok: true,
-      context: 'error' in warningResult ? '' : warningResult.context,
-    }, { status: 202 });
+    return jsonResponse(result, { status: 202 });
   })),
 );
 

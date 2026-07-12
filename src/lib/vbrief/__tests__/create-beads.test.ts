@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, writeFileSync, readFileSync, rmSync } from 'fs';
-import { join, basename } from 'path';
+import { join } from 'path';
 import { tmpdir } from 'os';
 import type { VBriefDocument } from '../types.js';
 
@@ -42,6 +42,18 @@ vi.mock('child_process', () => {
     execFile,
   };
 });
+
+vi.mock('../../beads/writer.js', () => ({
+  runMutationBatch: vi.fn(async (context: any, mutate: any) => {
+    const call = async (args: readonly string[]) => (await mockExecAsync('bd', [...args], { cwd: context.project.workspacePath })).stdout;
+    try {
+      const value = await mutate({ run: call, mutate: call });
+      return { ok: true, value, localHead: null };
+    } catch (cause) {
+      return { ok: false, needsOperatorRecovery: true, localHead: null, message: cause instanceof Error ? cause.message : String(cause), cause };
+    }
+  }),
+}));
 
 // Import after mocks are registered
 import { createBeadsFromVBrief, resolveBdTimeout, retryBd, clearBeadsForIssue } from '../beads.js';
@@ -442,21 +454,12 @@ describe('createBeadsFromVBrief', () => {
     rmSync(ws9.projectRoot, { recursive: true, force: true });
   });
 
-  it('runs bd init only when there is no redirect AND no main beads (true fresh install)', async () => {
+  it('creates a redirect and never initializes a second database', async () => {
     const ws3 = createWorkspace('PAN-502');
     writePlan(ws3.projectRoot, 'PAN-502', makeDoc('PAN-502', [{ id: 'item-1', title: 'Setup task' }]));
 
-    const expectedPrefix = basename(ws3.projectRoot).toLowerCase().replace(/[^a-z0-9-]/g, '-');
-
-    mockExecAsync
-      .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })   // which bd
-      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd init --prefix <expectedPrefix> (early setup)
-      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // git config beads.role contributor
-      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd config set export.git-add false
-      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd ping --json (probe — succeeds after init)
-      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })             // bd list --json -l ... (idempotency)
-      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })             // post-delete bd list verification
-      .mockResolvedValueOnce({ stdout: 'bead-002\n', stderr: '' });    // bd create
+    const state = createMockBdState();
+    mockExecAsync.mockImplementation(state.implementation);
 
     const result = await Effect.runPromise(runCreateBeads(ws3.workspacePath));
 
@@ -464,8 +467,8 @@ describe('createBeadsFromVBrief', () => {
       ([file, args]: [string, string[]]) =>
         file === 'bd' && Array.isArray(args) && args[0] === 'init' && args.includes('--prefix'),
     );
-    expect(initCall).toBeDefined();
-    expect(initCall![1]).toContain(expectedPrefix);
+    expect(initCall).toBeUndefined();
+    expect(readFileSync(join(ws3.workspacePath, '.beads', 'redirect'), 'utf8')).toBe('../../.beads');
 
     expect(result.success).toBe(true);
     expect(result.created).toContain('PAN-502: Setup task');
@@ -1302,7 +1305,7 @@ describe('createBeadsFromVBrief', () => {
     });
   });
 
-  it('passes the resolved timeout to bd create (AC4)', async () => {
+  it('routes create through the writer client (AC4)', async () => {
     delete process.env.OVERDECK_BD_TIMEOUT_MS;
     process.env.OVERDECK_BD_TIMEOUT_MS = '95000';
 
@@ -1325,7 +1328,7 @@ describe('createBeadsFromVBrief', () => {
       ([file, args]: [string, string[]]) => file === 'bd' && Array.isArray(args) && args[0] === 'create',
     );
     expect(createCall).toBeDefined();
-    expect(createCall![2]).toMatchObject({ timeout: 95000 });
+    expect(createCall![2]).toMatchObject({ cwd: ws.workspacePath });
 
     rmSync(ws.projectRoot, { recursive: true, force: true });
   });

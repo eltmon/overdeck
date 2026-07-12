@@ -17,6 +17,7 @@ import { writeRemoteFile } from './remote/remote-agents.js';
 import { saveWorkspaceMetadataSync } from './remote/workspace-metadata.js';
 import type { RemoteWorkspaceMetadata } from './remote/interface.js';
 import { extractTeamPrefix, findProjectByTeamSync, resolveProjectFromIssueSync, getIssuePrefix } from './projects.js';
+import { isStateMigrated } from './state-home.js';
 
 const execAsync = promisify(exec);
 
@@ -44,6 +45,11 @@ export interface CreateRemoteWorkspaceOptions {
   const teamPrefix = extractTeamPrefix(issueId);
   const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
   const projectRoot = projectConfig?.path || process.cwd();
+  if (projectConfig && await isStateMigrated(projectConfig)) {
+    throw new Error(
+      `Remote work is blocked for ${projectConfig.name} because this project uses Dolt-native beads authority and the remote VM does not yet have authenticated refs/dolt/data mutation routing. Running it would create a second JSONL authority.`,
+    );
+  }
 
   // Determine project identifier for VM name
   let projectId = teamPrefix?.toLowerCase();
@@ -144,6 +150,8 @@ export interface CreateRemoteWorkspaceOptions {
     console.warn('  ⚠ beads CLI (bd) install failed on VM — agent will have no bead tracking');
   }
 
+  // Legacy-unmigrated compatibility only: migrated projects were rejected by
+  // assertRemoteWorkspaceBeadsSupported above and never reach this JSONL path.
   // Step 6.5: Sync planning artifacts from the local workspace, if one exists.
   // `.pan/continue.json` is gitignored and `.beads/issues.jsonl` is created by
   // planning in the local worktree — neither arrives via the clone.
@@ -265,4 +273,3 @@ export const createRemoteWorkspace = (
         cause,
       }),
   });
-

@@ -19,6 +19,18 @@ vi.mock('../../../../lib/activity-logger.js', () => ({
   emitActivityTtsSync: mocks.emitActivityTtsSync,
 }));
 
+vi.mock('../../../../lib/beads/resolver.js', () => ({
+  createBeadsResolver: (workspacePath: string) => ({
+    countBeadsForIssue: async (issueId: string) => {
+      try {
+        const raw = readFileSync(join(workspacePath, '.beads', 'issues.jsonl'), 'utf8');
+        return { ok: true, value: raw.split('\n').filter(Boolean).map((line) => JSON.parse(line)).filter((bead) =>
+          bead.labels?.some((label: string) => label.toLowerCase() === issueId.toLowerCase())).length };
+      } catch { return { ok: true, value: 0 }; }
+    },
+  }),
+}));
+
 import { planFinalizeCommand } from '../../../../cli/commands/plan-finalize.js';
 import { reconcileOrphanProposedSpecs } from '../../../../lib/cloister/orphan-proposed-reconciler.js';
 import type { VBriefDocument } from '../../../../lib/vbrief/types.js';

@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { migrateProjectState } from '../../src/cli/commands/admin/state-migrate.js';
 import { manifestEntry, verifyStateMigrationManifest } from '../../src/lib/state-migration-manifest.js';
 import { acquireStateMigrationLock } from '../../src/lib/state-migration-lock.js';
+import { sha256File } from '../../src/lib/beads/cutover-marker.js';
 
 function git(cwd: string, ...args: string[]): string {
   return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
@@ -121,6 +122,58 @@ describe('state branch migration no-loss gate', () => {
       release();
     }
     expect(() => git(repo, 'rev-parse', 'overdeck-state')).toThrow();
+  });
+
+  it('refuses a live Dolt layout without a reviewed cutover marker before changing git state', async () => {
+    mkdirSync(join(repo, '.beads', 'embeddeddolt'), { recursive: true });
+    writeFileSync(join(repo, '.beads', 'embeddeddolt', 'LOCK'), 'live');
+    writeFileSync(join(repo, '.beads', 'dolt-server.pid'), '123');
+    const before = git(repo, 'rev-parse', 'HEAD');
+
+    await expect(migrateProjectState('fixture', {}, { name: 'Fixture', path: repo }))
+      .rejects.toThrow(/pan admin beads reconcile fixture/);
+    expect(git(repo, 'rev-parse', 'HEAD')).toBe(before);
+    expect(() => git(repo, 'rev-parse', 'overdeck-state')).toThrow();
+    expect(existsSync(join(repo, '.beads', 'embeddeddolt', 'LOCK'))).toBe(true);
+  });
+
+  it('accepts a valid cutover marker and stages no Dolt runtime bytes', async () => {
+    mkdirSync(join(repo, '.beads', 'embeddeddolt'), { recursive: true });
+    writeFileSync(join(repo, '.beads', 'embeddeddolt', 'LOCK'), 'live');
+    writeFileSync(join(repo, '.beads', 'dolt-server.pid'), '123');
+    const dataHead = git(repo, 'rev-parse', 'HEAD');
+    git(repo, 'push', '-q', 'origin', `${dataHead}:refs/dolt/data`);
+
+    const stateRoot = join(process.env.OVERDECK_HOME!, 'state', 'fixture');
+    git(repo, 'switch', '--orphan', 'overdeck-state');
+    mkdirSync(join(repo, 'notes'), { recursive: true });
+    mkdirSync(join(repo, '.beads'), { recursive: true });
+    writeFileSync(join(repo, 'notes', 'beads-reconcile.md'), '# reviewed\n');
+    writeFileSync(join(repo, '.beads', 'issues.jsonl'), '{"id":"pan-1"}\n');
+    writeFileSync(join(repo, 'beads-cutover.json'), `${JSON.stringify({
+      remoteUrl: remote,
+      remoteDoltHead: dataHead,
+      localReconciledHead: dataHead,
+      reconcileReport: {
+        path: 'notes/beads-reconcile.md',
+        sha256: sha256File(join(repo, 'notes', 'beads-reconcile.md')),
+      },
+      completedAt: new Date().toISOString(),
+    }, null, 2)}\n`);
+    git(repo, 'add', 'notes/beads-reconcile.md', '.beads/issues.jsonl', 'beads-cutover.json');
+    git(repo, 'commit', '-q', '-m', 'reviewed cutover');
+    git(repo, 'push', '-q', '-u', 'origin', 'overdeck-state');
+    git(repo, 'switch', 'main');
+    mkdirSync(join(repo, '.beads', 'embeddeddolt'), { recursive: true });
+    writeFileSync(join(repo, '.beads', 'embeddeddolt', 'LOCK'), 'live');
+    writeFileSync(join(repo, '.beads', 'dolt-server.pid'), '123');
+    mkdirSync(join(stateRoot, '..'), { recursive: true });
+    git(repo, 'worktree', 'add', '-q', stateRoot, 'overdeck-state');
+
+    await migrateProjectState('fixture', {}, { name: 'Fixture', path: repo });
+    const stateTree = git(repo, 'ls-tree', '-r', '--name-only', 'origin/overdeck-state');
+    expect(stateTree).toContain('.beads/issues.jsonl');
+    expect(stateTree).not.toMatch(/embeddeddolt|dolt-server|\.dolt/);
   });
 
   it('verifies mode, size, and hash before source removal', () => {

@@ -469,7 +469,7 @@ export function TieredExecutionSection({
               YAML reference
             </a>
           </div>
-          <div className="grid gap-2 sm:grid-cols-5">
+          <div className="grid gap-2 grid-cols-2 @xl:grid-cols-5">
             {DIFFICULTIES.map((difficulty) => (
               <div key={difficulty} className="rounded-md bg-muted/20 px-3 py-2">
                 <div className="text-xs font-medium text-foreground">{difficulty}</div>
@@ -497,7 +497,7 @@ export function TieredExecutionSection({
           </div>
           {tiers.length > 0 ? tiers.map(([name, tier]) => (
             <div key={name} className="px-4 py-3 rounded-lg border border-border/70">
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+              <div className="grid gap-3 @xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
                 <TierNameInput name={name} tierNames={tierNames} onRename={handleRenameTier} />
                 {!tier.distribution && (<>
                 <label className="space-y-1.5">
@@ -563,7 +563,7 @@ export function TieredExecutionSection({
                     </span>
                   </div>
                   {tier.distribution.map((entry, index) => (
-                    <div key={index} className="grid gap-2 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_90px_70px] items-center">
+                    <div key={index} className="grid gap-2 @2xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_90px_70px] items-center">
                       <select
                         value={entry.model}
                         onChange={(event) => handleDistributionPatch(name, index, { model: event.target.value })}
@@ -645,7 +645,7 @@ export function TieredExecutionSection({
 
         <div className="px-4 py-3 rounded-lg border border-border/70">
           <span className="text-sm font-medium text-foreground">Supervisor</span>
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <div className="mt-3 grid gap-3 @xl:grid-cols-2">
             <label className="space-y-1.5">
               <span className="text-xs font-medium text-foreground">Model</span>
               <select
@@ -705,7 +705,7 @@ export function TieredExecutionSection({
 
         <div className="px-4 py-3 rounded-lg border border-border/70">
           <span className="text-sm font-medium text-foreground">Kind overrides</span>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+          <div className="mt-3 grid gap-3 @lg:grid-cols-2 @2xl:grid-cols-3">
             {ITEM_KINDS.map((kind) => (
               <label key={kind} className="space-y-1.5">
                 <span className="text-xs font-medium text-foreground">{kind}</span>
@@ -723,7 +723,7 @@ export function TieredExecutionSection({
           {byKindError && <p className="mt-3 text-xs text-destructive">{byKindError}</p>}
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 @xl:grid-cols-2">
           <div className="px-4 py-3 rounded-lg border border-border/70">
             <span className="text-sm font-medium text-foreground">Feed</span>
             <div className="mt-3 space-y-3">
@@ -789,7 +789,7 @@ export function TieredExecutionSection({
                   }`} />
                 </button>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 grid-cols-2">
                 <label className="space-y-1.5">
                   <span className="text-xs font-medium text-foreground">Retries at tier</span>
                   <input
@@ -811,7 +811,7 @@ export function TieredExecutionSection({
                   />
                 </label>
               </div>
-              <div className="grid gap-2 sm:grid-cols-5">
+              <div className="grid gap-2 grid-cols-2 @2xl:grid-cols-5">
                 {DIFFICULTIES.map((difficulty) => (
                   <label key={difficulty} className="space-y-1.5">
                     <span className="text-xs font-medium text-foreground">{difficulty}</span>

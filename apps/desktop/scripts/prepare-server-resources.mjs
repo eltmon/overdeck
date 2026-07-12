@@ -38,6 +38,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -95,6 +96,134 @@ rmSync(drizzleDest, { recursive: true, force: true });
 cpSync(join(repoRoot, "drizzle"), drizzleDest, { recursive: true });
 console.log("[prepare-server] Copied migration SQL → drizzle/");
 
+// ─── Stage the Claude Code hook bundle (PAN-2595) ─────────────────────────────
+// Desktop installs never run `pan install`, so the dashboard server provisions
+// the hooks at boot (src/lib/claude-hooks-provision.ts). It resolves them from
+// SYNC_SOURCES.hooks = <packageRoot>/sync-sources/hooks — resources/ in the
+// packaged app (extraResources maps sync-sources → sync-sources), the package
+// root in the npx flavor (`files` includes sync-sources).
+const hooksStageDir = join(desktopDir, "sync-sources");
+rmSync(hooksStageDir, { recursive: true, force: true });
+cpSync(join(repoRoot, "sync-sources", "hooks"), join(hooksStageDir, "hooks"), { recursive: true });
+console.log("[prepare-server] Staged Claude hook bundle → sync-sources/hooks/");
+
+// ─── Bare-specifier scan helpers (shared by supervisor + server staging) ──────
+
+const builtins = new Set(Module.builtinModules);
+const packageNameOf = (specifier) => {
+  const parts = specifier.split("/");
+  return specifier.startsWith("@") ? parts.slice(0, 2).join("/") : parts[0];
+};
+const VALID_PACKAGE = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/;
+
+// ─── Stage the PTY supervisor (PAN-2592) ──────────────────────────────────────
+// Conversations and work agents wrap Claude in dist/pty-supervisor.js — a
+// root-build artifact the server locates via resolvePtySupervisorScriptPath()
+// (src/lib/channels/pty-supervisor-locate.ts). In the packaged layouts that
+// resolver materializes server/supervisor/ into ${OVERDECK_HOME}/runtime/ and
+// runs it under the HOST node (the tmux session outlives the app, and the
+// AppImage mount is transient), so the vendored node-pty must keep its
+// stock-Node multiarch prebuilds — do NOT reuse the Electron-ABI rebuild the
+// dashboard server gets below, and do NOT name the vendor dir node_modules
+// (npm pack strips nested node_modules from the npx flavor).
+if (!existsSync(join(repoRoot, "dist/pty-supervisor.js"))) {
+  console.error("[prepare-server] dist/pty-supervisor.js not found — run 'npm run build' at the repo root first.");
+  process.exit(1);
+}
+const supervisorDir = join(serverDir, "supervisor");
+mkdirSync(supervisorDir, { recursive: true });
+
+// Walk the supervisor's relative-import closure over repo dist/ (the root
+// build is code-split; shipping the entry alone cannot boot).
+const supervisorSeen = new Set();
+const supervisorQueue = ["pty-supervisor.js"];
+const supervisorExternals = new Set();
+while (supervisorQueue.length > 0) {
+  const file = supervisorQueue.pop();
+  if (supervisorSeen.has(file) || !existsSync(join(repoRoot, "dist", file))) continue;
+  supervisorSeen.add(file);
+  const source = readFileSync(join(repoRoot, "dist", file), "utf8");
+  const specifiers = [
+    ...source.matchAll(/from\s*["']([^"'\n]+)["']/g),
+    ...source.matchAll(/import\(\s*["']([^"'\n]+)["']\s*\)/g),
+    ...source.matchAll(/require\(\s*["']([^"'\n]+)["']\s*\)/g),
+  ].map((match) => match[1]);
+  for (const specifier of specifiers) {
+    if (specifier.startsWith("./") || specifier.startsWith("../")) {
+      const target = specifier.replace(/^\.\//, "");
+      if (target.endsWith(".js") && !target.includes("/")) supervisorQueue.push(target);
+      continue;
+    }
+    if (specifier.startsWith("node:")) continue;
+    const packageName = packageNameOf(specifier);
+    if (!VALID_PACKAGE.test(packageName)) continue;
+    if (builtins.has(packageName)) continue;
+    supervisorExternals.add(packageName);
+  }
+}
+for (const file of supervisorSeen) {
+  cpSync(join(repoRoot, "dist", file), join(supervisorDir, file));
+}
+
+// Guard: the supervisor must stay runnable from the vendored tree alone. A
+// build change that adds a new external would ship a supervisor that cannot
+// boot on user machines — fail the build instead of shipping it.
+const SUPERVISOR_ALLOWED_EXTERNALS = new Set(["@homebridge/node-pty-prebuilt-multiarch"]);
+const unexpectedExternals = [...supervisorExternals].filter((name) => !SUPERVISOR_ALLOWED_EXTERNALS.has(name));
+if (unexpectedExternals.length > 0) {
+  console.error(`[prepare-server] pty-supervisor gained unvendored externals: ${unexpectedExternals.join(", ")}`);
+  console.error("  Vendor them in supervisor staging (and pty-supervisor-locate.ts) or bundle them into the artifact.");
+  process.exit(1);
+}
+for (const packageName of supervisorExternals) {
+  const packageDir = join(repoRoot, "node_modules", packageName);
+  if (!existsSync(packageDir)) {
+    console.error(`[prepare-server] Supervisor external '${packageName}' is not installed at the repo root.`);
+    process.exit(1);
+  }
+  cpSync(packageDir, join(supervisorDir, "vendor", packageName), { recursive: true, dereference: true });
+}
+console.log(
+  `[prepare-server] Staged pty-supervisor (${supervisorSeen.size} chunks, vendored: ${[...supervisorExternals].join(", ") || "none"}) → server/supervisor/`,
+);
+
+// Smoke-run the supervisor in its MATERIALIZED form (vendor/ → node_modules/,
+// isolated from the repo's node_modules so resolution can't silently fall back
+// to it): a bare invocation must reach the usage error (exit 2), proving the
+// chunk graph is complete and the vendored node-pty native import loads under
+// the build host's node. Anything else means the packaged supervisor cannot
+// boot on user machines — fail the build. Mirrors
+// materializePtySupervisorRuntime() in src/lib/channels/pty-supervisor-locate.ts.
+{
+  const smokeDir = join(OS.tmpdir(), `overdeck-supervisor-smoke-${process.pid}`);
+  rmSync(smokeDir, { recursive: true, force: true });
+  mkdirSync(smokeDir, { recursive: true });
+  for (const name of readdirSync(supervisorDir)) {
+    if (name === "vendor") continue;
+    cpSync(join(supervisorDir, name), join(smokeDir, name));
+  }
+  cpSync(join(supervisorDir, "vendor"), join(smokeDir, "node_modules"), { recursive: true });
+  // realpath the entry: on macOS tmpdir is /var/folders → /private/var, and
+  // the supervisor's run-as-main guard compares import.meta.url (canonical)
+  // against argv[1] (as given) — a symlinked path exits 0 without running.
+  const smokeEntry = realpathSync(join(smokeDir, "pty-supervisor.js"));
+  let smokeStatus = 0;
+  let smokeOutput = "";
+  try {
+    execSync(`node ${JSON.stringify(smokeEntry)}`, { stdio: "pipe" });
+  } catch (error) {
+    smokeStatus = error?.status ?? -1;
+    smokeOutput = String(error?.stderr ?? error);
+  }
+  rmSync(smokeDir, { recursive: true, force: true });
+  if (smokeStatus !== 2) {
+    console.error(`[prepare-server] Materialized pty-supervisor smoke run returned exit ${String(smokeStatus)} — expected the usage error (2).`);
+    if (smokeOutput) console.error(smokeOutput);
+    process.exit(1);
+  }
+  console.log("[prepare-server] Verified: materialized pty-supervisor boots to its usage error under host node");
+}
+
 // ─── Discover externalized runtime deps ───────────────────────────────────────
 // Walk the chunk graph reachable from the build's entry points and collect
 // bare import specifiers. dist/dashboard may contain stale chunks from prior
@@ -113,16 +242,9 @@ const SKIP_PACKAGES = new Set([
   "playwright-core",
 ]);
 
-const builtins = new Set(Module.builtinModules);
 const seen = new Set();
 const queue = ENTRY_POINTS.filter((entry) => existsSync(join(serverDir, entry)));
 const packages = new Set();
-
-const packageNameOf = (specifier) => {
-  const parts = specifier.split("/");
-  return specifier.startsWith("@") ? parts.slice(0, 2).join("/") : parts[0];
-};
-const VALID_PACKAGE = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/;
 
 while (queue.length > 0) {
   const file = queue.pop();
@@ -169,6 +291,12 @@ console.log(
 
 // ─── Install externals; rebuild node-pty for the Electron ABI ─────────────────
 
+const rootPkg = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"));
+if (typeof rootPkg.version !== "string" || !rootPkg.version) {
+  console.error("[prepare-server] Repo-root package.json has no version — cannot stamp the server stub");
+  process.exit(1);
+}
+
 const desktopPkg = JSON.parse(readFileSync(join(desktopDir, "package.json"), "utf8"));
 // electron lives in devDependencies normally, but build-for-publish.mjs
 // promotes it to dependencies for the npm package — and npm publish re-runs
@@ -185,6 +313,10 @@ writeFileSync(
   `${JSON.stringify(
     {
       name: "@overdeck/desktop-server",
+      // The dashboard's readPackageVersion() resolves the app version from the
+      // nearest package.json above the bundle — this stub is that file in both
+      // the packaged and npx layouts, so it must carry the version (PAN-2591).
+      version: rootPkg.version,
       private: true,
       type: "module",
       dependencies,

@@ -315,6 +315,8 @@ export function toReviewStatusSnapshot(status: ReviewStatusSnapshotInput): Revie
     uatStatus: toUatStatus(status.uatStatus),
     uatNotes: status.uatNotes || undefined,
     mergeStatus: toMergeStatus(status.mergeStatus),
+    releaseStatus: status.releaseStatus ?? undefined,
+    releaseNotes: status.releaseNotes || undefined,
     verificationStatus: toVerificationStatus(status.verificationStatus),
     verificationNotes: status.verificationNotes || undefined,
     verificationCycleCount: typeof status.verificationCycleCount === 'number' ? status.verificationCycleCount : undefined,

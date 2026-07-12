@@ -10,7 +10,6 @@ import {
   syncAuthCommand,
 } from './workspace-remote.js';
 
-export { __testInternals } from './workspace-beads.js';
 export { destroyCommand } from './workspace-list.js';
 
 export function registerWorkspaceCommands(program: Command): void {

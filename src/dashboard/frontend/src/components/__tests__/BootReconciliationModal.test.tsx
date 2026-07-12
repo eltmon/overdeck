@@ -121,6 +121,26 @@ describe('BootReconciliationModal', () => {
     expect(within(readOnlyRow).getByText('Not resumable here')).toBeInTheDocument();
   });
 
+  it('does not render the pending dialog when the reconciliation set is empty', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ ...pendingState, set: [] }));
+    renderModal(fetchMock);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(screen.queryByTestId('boot-reconciliation-modal')).not.toBeInTheDocument();
+  });
+
+  it('does not render the pending dialog when every agent in the set is read-only', async () => {
+    const readOnlyOnly = {
+      ...pendingState,
+      set: pendingState.set.filter((agent) => agent.readOnly),
+    };
+    const fetchMock = vi.fn(async () => jsonResponse(readOnlyOnly));
+    renderModal(fetchMock);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(screen.queryByTestId('boot-reconciliation-modal')).not.toBeInTheDocument();
+  });
+
   it('sends resume all, hold all, per-agent review, and freeze actions', async () => {
     let decisionResponses = 0;
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {

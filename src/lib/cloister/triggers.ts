@@ -8,34 +8,15 @@
  * 4. Task completion - Implementation done, ready for specialist testing
  */
 
-import { existsSync, statSync } from 'fs';
+import { existsSync } from 'fs';
 import { join } from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { Effect } from 'effect';
 import type { AgentHealth } from './health.js';
 import type { CloisterConfig } from './config.js';
 import { loadCloisterConfigSync } from './config.js';
-import { withBdMutex } from '../bd-mutex.js';
+import { createBeadsResolver } from '../beads/resolver.js';
 
-const execAsync = promisify(exec);
-
-/**
- * Cache for checkTaskCompletion keyed by `${workspace}::${issueId}`.
- * Invalidated by mtime of `.beads/issues.jsonl` — same trick as
- * computePlanningState (PAN-1024 hotfix). The handoff-suggestion endpoint
- * is polled every 30s per agent panel; without this cache, every poll
- * fires two `bd list --json` invocations which each take ~1.87s wall-clock
- * and 1+ MB of disk I/O, causing sustained disk thrashing across N agents.
- *
- * Single-flight via a Promise map prevents stampedes when the page first
- * loads multiple agent panels concurrently.
- */
-interface TaskCompletionCacheEntry {
-  mtimeMs: number;
-  result: TriggerDetection;
-}
-const taskCompletionCache = new Map<string, TaskCompletionCacheEntry>();
+/** Single-flight prevents concurrent dashboard polls from duplicating the canonical read. */
 const taskCompletionInflight = new Map<string, Promise<TriggerDetection>>();
 
 /**
@@ -262,27 +243,9 @@ function detectTestFailure(workspace: string): {
     };
   }
 
-  // mtime-based cache
   const cacheKey = `${workspace ?? ''}::${issueId.toLowerCase()}`;
-  let mtimeMs = 0;
-  if (workspace) {
-    const beadsFile = join(workspace, '.beads', 'issues.jsonl');
-    try {
-      mtimeMs = statSync(beadsFile).mtimeMs;
-    } catch {
-      // No beads file — fall through to compute (cheap when JSONL absent).
-    }
-    if (mtimeMs > 0) {
-      const cached = taskCompletionCache.get(cacheKey);
-      if (cached && cached.mtimeMs === mtimeMs) {
-        return cached.result;
-      }
-      // Single-flight: if another request is computing this same key, await
-      // its result instead of firing another pair of `bd list` invocations.
-      const inflight = taskCompletionInflight.get(cacheKey);
-      if (inflight) return inflight;
-    }
-  }
+  const inflight = taskCompletionInflight.get(cacheKey);
+  if (inflight) return inflight;
 
   const computePromise = (async (): Promise<TriggerDetection> => {
     // PAN-1812: the workspace beads DB must be queried from the agent's own
@@ -297,23 +260,17 @@ function detectTestFailure(workspace: string): {
       };
     }
 
-    const bdOptions = { encoding: 'utf-8' as const, cwd: workspace };
-    const issueLower = issueId.toLowerCase();
-
     try {
-      const { stdout: output } = await Effect.runPromise(withBdMutex(() => Effect.tryPromise({
-        try: () => execAsync(`bd list --json --title-contains ${issueLower} --status closed`, bdOptions),
-        catch: (cause) => cause,
-      })));
-      const tasks = JSON.parse(output);
+      const result = await createBeadsResolver(workspace).getBeadsForIssue(issueId);
+      if (!result.ok) throw result.error;
+      const tasks = result.value.filter((task) => task.status === 'closed');
       const implementTask = tasks.find((t: any) =>
         t.title.toLowerCase().includes('implement') ||
         t.labels?.includes('implementation')
       );
 
       if (implementTask) {
-        const { stdout: openOutput } = await execAsync(`bd list --json --title-contains ${issueLower} --status open`, bdOptions);
-        const openTasks = JSON.parse(openOutput);
+        const openTasks = result.value.filter((task) => task.status === 'open');
 
         if (openTasks.length === 0) {
           return {
@@ -343,17 +300,12 @@ function detectTestFailure(workspace: string): {
     };
   })();
 
-  if (workspace && mtimeMs > 0) {
-    taskCompletionInflight.set(cacheKey, computePromise);
-    try {
-      const result = await computePromise;
-      taskCompletionCache.set(cacheKey, { mtimeMs, result });
-      return result;
-    } finally {
-      taskCompletionInflight.delete(cacheKey);
-    }
+  taskCompletionInflight.set(cacheKey, computePromise);
+  try {
+    return await computePromise;
+  } finally {
+    taskCompletionInflight.delete(cacheKey);
   }
-  return computePromise;
 }async function checkAllTriggersPromise(
   agentId: string,
   workspace: string,
