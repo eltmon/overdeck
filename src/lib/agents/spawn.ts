@@ -983,9 +983,6 @@ function checkAndSetupHooks(): void {
   }
 }
 
-/**
- * Write task cache for heartbeat hook to use
- */
 function writeTaskCache(agentId: string, issueId: string): void {
   const cacheDir = join(getAgentDir(agentId));
   mkdirSync(cacheDir, { recursive: true });
