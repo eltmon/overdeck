@@ -13,6 +13,7 @@ export interface DocsInjectionOptions extends DocsHookPayload {
   config?: Pick<NormalizedDocsConfig, 'enabled' | 'promptInjectionEnabled' | 'trigger' | 'budget'>;
   paths?: DocsPathOverrides;
   now?: Date;
+  signal?: AbortSignal;
 }
 
 export interface DocsInjectionResult {
@@ -23,6 +24,7 @@ export interface DocsInjectionResult {
 
 export async function buildDocsInjectionContext(options: DocsInjectionOptions): Promise<DocsInjectionResult> {
   try {
+    if (options.signal?.aborted) return { injected: false, context: null };
     const gate = await evaluateDocsPromptGate({
       payload: {
         prompt: options.prompt,
@@ -37,6 +39,7 @@ export async function buildDocsInjectionContext(options: DocsInjectionOptions): 
     if (!gate.shouldInject) {
       return { injected: false, context: null, reason: gate.reason };
     }
+    if (options.signal?.aborted) return { injected: false, context: null };
 
     const result = queryDocsIndex({
       query: options.prompt,
@@ -47,6 +50,7 @@ export async function buildDocsInjectionContext(options: DocsInjectionOptions): 
     if (result.results.length === 0) {
       return { injected: false, context: null };
     }
+    if (options.signal?.aborted) return { injected: false, context: null };
 
     const injectedTokens = result.results.reduce((total, item) => total + item.tokenCount, 0);
     await recordDocsInjection({

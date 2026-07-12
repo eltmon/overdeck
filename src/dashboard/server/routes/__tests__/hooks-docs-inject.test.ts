@@ -171,8 +171,8 @@ describe('POST /api/memory/inject docs context fast path', { timeout: 30_000 }, 
   });
 
   it('returns a bounded fast response when prompt-time memory is slow', async () => {
+    await buildFixtureIndex();
     vi.useFakeTimers();
-    const buildDocsInjectionContext = vi.fn(async () => ({ injected: true, context: '<overdeck-docs>slow docs</overdeck-docs>' }));
 
     const resultPromise = handleMemoryInjectFastPathBody(body('pan harness docs'), {
       docsConfig: docsConfig(),
@@ -187,13 +187,14 @@ describe('POST /api/memory/inject docs context fast path', { timeout: 30_000 }, 
         }), 100);
       }),
       injectBriefing: async (input) => ({ context: input.context, injected: false, briefingMtimeMs: null }),
-      buildDocsInjectionContext,
     });
 
     await vi.advanceTimersByTimeAsync(25);
     await expect(resultPromise).resolves.toEqual({ ok: true, context: '' });
-    expect(buildDocsInjectionContext).not.toHaveBeenCalled();
 
     await vi.advanceTimersByTimeAsync(100);
+    await Promise.resolve();
+    const state = await readDocsBudgetState(paths);
+    expect(state.records['session:session-docs']).toBeUndefined();
   });
 });

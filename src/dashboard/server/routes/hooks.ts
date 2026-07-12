@@ -223,6 +223,7 @@ export interface HandleMemoryInjectBodyOptions {
   docsConfig?: Pick<NormalizedDocsConfig, 'enabled' | 'promptInjectionEnabled' | 'trigger' | 'budget'>;
   docsPaths?: DocsPathOverrides;
   buildDocsInjectionContext?: typeof buildDocsInjectionContext;
+  docsAbortSignal?: AbortSignal;
   now?: Date;
 }
 
@@ -269,6 +270,7 @@ export async function handleMemoryInjectBody(
       config: options.docsConfig,
       paths: options.docsPaths,
       now: options.now,
+      signal: options.docsAbortSignal,
     })
     : { context: null };
 
@@ -282,6 +284,7 @@ export async function handleMemoryInjectFastPathBody(
   body: Record<string, unknown>,
   options: HandleMemoryInjectFastPathOptions = {},
 ): Promise<{ ok: true; context: string }> {
+  const docsAbortController = new AbortController();
   const resultPromise = handleMemoryInjectBody(body, {
     resolveAgentIdBySessionId: options.resolveAgentIdBySessionId,
     resolveComplianceWarning: options.resolveComplianceWarning,
@@ -290,11 +293,13 @@ export async function handleMemoryInjectFastPathBody(
     docsConfig: options.docsConfig,
     docsPaths: options.docsPaths,
     buildDocsInjectionContext: options.buildDocsInjectionContext,
+    docsAbortSignal: docsAbortController.signal,
     now: options.now,
   });
   const result = await resolveWithTimeout(
     resultPromise,
     options.timeoutMs ?? MEMORY_INJECT_FAST_RESPONSE_TIMEOUT_MS,
+    () => docsAbortController.abort(),
   ).catch(() => ({ timedOut: true as const }));
   if (result.timedOut) return { ok: true, context: '' };
   if ('error' in result.value) return { ok: true, context: '' };
@@ -304,14 +309,21 @@ export async function handleMemoryInjectFastPathBody(
 async function resolveWithTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
+  onTimeout?: () => void,
 ): Promise<{ timedOut: false; value: T } | { timedOut: true }> {
-  if (timeoutMs <= 0) return { timedOut: true };
+  if (timeoutMs <= 0) {
+    onTimeout?.();
+    return { timedOut: true };
+  }
   let timeout: ReturnType<typeof setTimeout> | null = null;
   try {
     return await Promise.race([
       promise.then((value) => ({ timedOut: false as const, value })),
       new Promise<{ timedOut: true }>((resolveTimeout) => {
-        timeout = setTimeout(() => resolveTimeout({ timedOut: true }), timeoutMs);
+        timeout = setTimeout(() => {
+          onTimeout?.();
+          resolveTimeout({ timedOut: true });
+        }, timeoutMs);
       }),
     ]);
   } finally {
