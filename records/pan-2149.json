@@ -311,6 +311,11 @@
       "timestamp": "2026-07-12T14:25:47.120Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T14:41:18.553Z"
     }
   ],
   "feedback": [],
@@ -356,10 +361,10 @@
     "recordedAt": "2026-07-12T14:25:42.588Z"
   },
   "created": "2026-07-10T23:44:51.626Z",
-  "updated": "2026-07-12T14:31:33.265Z",
+  "updated": "2026-07-12T14:41:18.554Z",
   "pipeline": {
     "issueId": "PAN-2149",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -367,13 +372,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-12T14:26:28.091Z",
-    "updatedAt": "2026-07-12T14:31:33.204Z",
+    "updatedAt": "2026-07-12T14:41:17.123Z",
     "reviewNotes": "Agent re-review request (4/25): Fixed review issues",
     "inspectNotes": "Bead health-seam ack: duplicate delivery of already-reviewed commit 74dc13c0, re-confirmed - all 5 functions verbatim (this.->host. only), delegates <=5 lines with no visibility change, file-size baseline lowered 1684->1476, typecheck/lint/vitest all exit 0 (9237 passed, 0 failed).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2573",
     "lastVerifiedCommit": "a7e786b284148eb2d5754ec953670110038d6195",
     "reviewRequestedAt": "2026-07-12T14:26:28.091Z",
-    "reviewSpawnedAt": "2026-07-12T13:55:43.298Z",
+    "reviewSpawnedAt": "2026-07-12T14:41:17.122Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/lib/database/__tests__/release-set-db.test.ts",
@@ -490,7 +495,7 @@
       },
       "costAtCloseOut": {
         "usd": 92.217991,
-        "pricingAsOf": "2026-07-12T14:31:33.257Z"
+        "pricingAsOf": "2026-07-12T14:41:17.159Z"
       }
     },
     "merges": [
