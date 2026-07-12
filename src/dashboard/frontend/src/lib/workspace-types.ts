@@ -1,7 +1,7 @@
 import type { GitStatus } from '../types';
 
 export interface StatusHistoryEntry {
-  type: 'review' | 'test' | 'merge' | 'inspect' | 'uat' | 'verification';
+  type: 'review' | 'test' | 'merge' | 'inspect' | 'uat' | 'verification' | 'release';
   status: string;
   timestamp: string;
   notes?: string;
@@ -26,6 +26,8 @@ export interface ReviewStatus {
   testNotes?: string;
   mergeNotes?: string;
   mergeRetryCount?: number;
+  releaseStatus?: 'pending' | 'releasing' | 'passed' | 'failed' | 'partial' | 'rolled_back' | 'skipped';
+  releaseNotes?: string;
   updatedAt: string;
   /** Timestamp when the current/last review fan-out was dispatched. */
   reviewSpawnedAt?: string;

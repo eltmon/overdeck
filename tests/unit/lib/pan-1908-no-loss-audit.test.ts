@@ -44,7 +44,7 @@ const REVIEW_STATUS_DURABLE_COLUMNS = new Set([
   'issue_id', 'review_status', 'test_status', 'verification_status',
   'inspect_status', 'merge_status', 'ready_for_merge', 'review_notes',
   'test_notes', 'verification_notes', 'inspect_notes', 'merge_notes',
-  'blocker_reasons', 'pr_url', 'pr_number', 'pr_head_sha',
+  'release_status', 'release_notes', 'blocker_reasons', 'pr_url', 'pr_number', 'pr_head_sha',
   'reviewed_at_commit', 'last_verified_commit', 'auto_merge',
   'deacon_ignored', 'deacon_ignored_at', 'deacon_ignored_reason',
   'reviewer_verdicts',
@@ -73,7 +73,7 @@ function allAgentStateFields(): string[] {
 }
 
 function allReviewStatusColumns(): string[] {
-  // 39 persisted columns per the PRD (23 durable + 16 ephemeral + 0 delete here).
+  // 41 persisted columns per the PRD (25 durable + 16 ephemeral + 0 delete here).
   return [
     ...REVIEW_STATUS_DURABLE_COLUMNS,
     ...REVIEW_STATUS_EPHEMERAL_COLUMNS,
@@ -152,16 +152,16 @@ describe('PAN-1908 no-loss audit', () => {
     expect(missingFromManifest).toEqual([]);
   });
 
-  it('classifies every review_status column (39 total)', () => {
+  it('classifies every review_status column (41 total)', () => {
     const columns = allReviewStatusColumns();
-    expect(columns.length).toBe(39);
+    expect(columns.length).toBe(41);
 
     const unclassified = columns.filter((c) => classifyReviewStatusColumn(c) === 'unclassified');
     expect(unclassified).toEqual([]);
   });
 
-  it('splits review_status into 23 durable and 16 ephemeral columns', () => {
-    expect(REVIEW_STATUS_DURABLE_COLUMNS.size).toBe(23);
+  it('splits review_status into 25 durable and 16 ephemeral columns', () => {
+    expect(REVIEW_STATUS_DURABLE_COLUMNS.size).toBe(25);
     expect(REVIEW_STATUS_EPHEMERAL_COLUMNS.size).toBe(16);
   });
 

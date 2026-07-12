@@ -20,7 +20,8 @@
  *      root's own node_modules).
  *   2. <bundleDir>/supervisor/pty-supervisor.js — desktop layouts; the staged
  *      tree is materialized to ${OVERDECK_HOME}/runtime/pty-supervisor/<hash>/
- *      (content-hash keyed, so an app upgrade refreshes it) and the vendored
+ *      (content-hash keyed over the whole staged tree, so an app upgrade
+ *      refreshes it even when only non-entry files changed) and the vendored
  *      packages land under node_modules/ there for normal Node resolution.
  *
  * Missing everywhere is a build/packaging defect and throws — never silently
@@ -29,7 +30,7 @@
 
 import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { getOverdeckHome, packageRoot } from '../paths.js';
@@ -51,16 +52,40 @@ export function resolvePtySupervisorScriptPath(): string {
 }
 
 /**
+ * Hash the contents and relative paths of every file under the staged tree.
+ * This detects changes to any copied file, not just the entry point.
+ */
+function hashStagedTree(stagedDir: string): string {
+  const hash = createHash('sha256');
+  const walk = (dir: string) => {
+    const entries = readdirSync(dir, { withFileTypes: true });
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+    for (const entry of entries) {
+      const full = join(dir, entry.name);
+      const rel = relative(stagedDir, full);
+      if (entry.isDirectory()) {
+        hash.update(`${rel}/\n`);
+        walk(full);
+      } else if (entry.isFile()) {
+        hash.update(`${rel}\n`);
+        hash.update(readFileSync(full));
+      }
+    }
+  };
+  walk(stagedDir);
+  return hash.digest('hex').slice(0, 16);
+}
+
+/**
  * Copy the staged supervisor tree to durable disk and return the entry path.
  * Idempotent and race-safe: the copy lands in a temp dir and is renamed into
- * place; the target is keyed by the entry file's content hash.
+ * place; the target is keyed by a content hash of the entire staged tree.
  */
 export function materializePtySupervisorRuntime(
   stagedDir: string,
   overdeckHome: string = getOverdeckHome(),
 ): string {
-  const stagedEntry = join(stagedDir, 'pty-supervisor.js');
-  const key = createHash('sha256').update(readFileSync(stagedEntry)).digest('hex').slice(0, 16);
+  const key = hashStagedTree(stagedDir);
   const targetDir = join(overdeckHome, 'runtime', 'pty-supervisor', key);
   const entry = join(targetDir, 'pty-supervisor.js');
   if (existsSync(entry)) return entry;

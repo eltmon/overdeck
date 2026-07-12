@@ -220,6 +220,37 @@ CREATE TABLE `merge_sets` (
 );
 --> statement-breakpoint
 CREATE INDEX `merge_sets_project_idx` ON `merge_sets` (`project_key`,`updated_at`);--> statement-breakpoint
+CREATE TABLE `release_sets` (
+	`issue_id` text PRIMARY KEY NOT NULL,
+	`project_key` text NOT NULL,
+	`project_path` text NOT NULL,
+	`workspace_type` text NOT NULL,
+	`status` text DEFAULT 'pending' NOT NULL,
+	`created_at` integer NOT NULL,
+	`updated_at` integer NOT NULL,
+	FOREIGN KEY (`issue_id`) REFERENCES `issues`(`id`) ON UPDATE no action ON DELETE no action
+);
+--> statement-breakpoint
+CREATE INDEX `release_sets_project_idx` ON `release_sets` (`project_key`,`updated_at`);--> statement-breakpoint
+CREATE TABLE `release_set_components` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`issue_id` text NOT NULL,
+	`component_key` text NOT NULL,
+	`provider` text,
+	`trigger` text NOT NULL,
+	`release_order` integer DEFAULT 0 NOT NULL,
+	`required` integer DEFAULT true NOT NULL,
+	`status` text DEFAULT 'pending' NOT NULL,
+	`health_status` text,
+	`version_status` text,
+	`smoke_status` text,
+	`rollback_status` text,
+	`notes` text,
+	FOREIGN KEY (`issue_id`) REFERENCES `release_sets`(`issue_id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `release_set_components_issue_component_idx` ON `release_set_components` (`issue_id`,`component_key`);--> statement-breakpoint
+CREATE INDEX `release_set_components_issue_order_idx` ON `release_set_components` (`issue_id`,`release_order`,`component_key`);--> statement-breakpoint
 CREATE TABLE `pending_auto_merges` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`issue_id` text NOT NULL,
@@ -285,6 +316,8 @@ CREATE TABLE `review_status` (
 	`review_notes` text,
 	`test_notes` text,
 	`merge_notes` text,
+	`release_status` text,
+	`release_notes` text,
 	`updated_at` integer NOT NULL,
 	`ready_for_merge` integer DEFAULT 0 NOT NULL,
 	`auto_requeue_count` integer DEFAULT 0,
