@@ -261,6 +261,21 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-12T06:49:16.329Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T07:02:48.212Z"
+    },
+    {
+      "timestamp": "2026-07-12T07:06:21.874Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T07:06:24.789Z"
     }
   ],
   "feedback": [],
@@ -286,6 +301,7 @@
       "tests/fixtures/synced-skills.txt",
       "tests/unit/dashboard/routes/resources-stacks.test.ts",
       "tests/unit/lib/cloister/postmerge-auto-retro.test.ts",
+      "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts",
       "tests/unit/lib/cloister/postmerge-release-isolation.test.ts",
       "tests/unit/lib/database/release-set-schema.test.ts",
       "tests/unit/lib/merge-set.test.ts",
@@ -375,6 +391,7 @@
       "tests/fixtures/synced-skills.txt",
       "tests/unit/dashboard/routes/resources-stacks.test.ts",
       "tests/unit/lib/cloister/postmerge-auto-retro.test.ts",
+      "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts",
       "tests/unit/lib/cloister/postmerge-release-isolation.test.ts",
       "tests/unit/lib/database/release-set-schema.test.ts",
       "tests/unit/lib/merge-set.test.ts",
@@ -385,25 +402,24 @@
       "tests/unit/lib/release-set.test.ts",
       "tests/unit/lib/review-status-release.test.ts"
     ],
-    "recordedAt": "2026-07-12T01:24:02.241Z"
+    "recordedAt": "2026-07-12T07:06:16.522Z"
   },
   "created": "2026-07-11T09:28:34.266Z",
-  "updated": "2026-07-12T06:57:59.962Z",
+  "updated": "2026-07-12T07:06:26.233Z",
   "pipeline": {
     "issueId": "PAN-399",
     "reviewStatus": "reviewing",
-    "testStatus": "passed",
+    "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-12T06:57:58.583Z",
+    "updatedAt": "2026-07-12T07:06:26.159Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
-    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - scripts/file-size-baseline.txt",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2577",
     "reviewedAtCommit": "a2edef4778231d558c49b0e76d6bb33ba3dee46f",
-    "lastVerifiedCommit": "a2edef4778231d558c49b0e76d6bb33ba3dee46f",
-    "reviewRequestedAt": "2026-07-12T06:49:05.042Z",
+    "lastVerifiedCommit": "5cdae1d467921782f0096873f8253837ee4bb7ac",
+    "reviewRequestedAt": "2026-07-12T07:06:21.876Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "drizzle/overdeck/0000_overdeck_init.sql",
@@ -426,6 +442,7 @@
         "tests/fixtures/synced-skills.txt",
         "tests/unit/dashboard/routes/resources-stacks.test.ts",
         "tests/unit/lib/cloister/postmerge-auto-retro.test.ts",
+        "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts",
         "tests/unit/lib/cloister/postmerge-release-isolation.test.ts",
         "tests/unit/lib/database/release-set-schema.test.ts",
         "tests/unit/lib/merge-set.test.ts",
@@ -515,6 +532,7 @@
         "tests/fixtures/synced-skills.txt",
         "tests/unit/dashboard/routes/resources-stacks.test.ts",
         "tests/unit/lib/cloister/postmerge-auto-retro.test.ts",
+        "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts",
         "tests/unit/lib/cloister/postmerge-release-isolation.test.ts",
         "tests/unit/lib/database/release-set-schema.test.ts",
         "tests/unit/lib/merge-set.test.ts",
@@ -525,7 +543,7 @@
         "tests/unit/lib/release-set.test.ts",
         "tests/unit/lib/review-status-release.test.ts"
       ],
-      "recordedAt": "2026-07-12T01:24:02.241Z"
+      "recordedAt": "2026-07-12T07:06:16.522Z"
     }
   },
   "closeOut": {
@@ -539,9 +557,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 65475106,
-            "output": 171870,
-            "cacheRead": 61363968,
+            "input": 66434926,
+            "output": 173975,
+            "cacheRead": 62259200,
             "cacheWrite": 0
           },
           "unknown": {
@@ -605,9 +623,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 6768271,
-            "output": 382193,
-            "cacheRead": 223803648,
+            "input": 6782449,
+            "output": 385927,
+            "cacheRead": 226941184,
             "cacheWrite": 0
           }
         }
@@ -620,9 +638,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 66175466,
-          "output": 200899,
-          "cacheRead": 67055872,
+          "input": 67135286,
+          "output": 203004,
+          "cacheRead": 67951104,
           "cacheWrite": 0
         },
         "unknown": {
@@ -656,15 +674,15 @@
           "cacheWrite": 77989
         },
         "custom/kimi-k2.7-code": {
-          "input": 6768271,
-          "output": 382193,
-          "cacheRead": 223803648,
+          "input": 6782449,
+          "output": 385927,
+          "cacheRead": 226941184,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 158.96312700000001,
-        "pricingAsOf": "2026-07-12T06:57:59.409Z"
+        "usd": 160.421369,
+        "pricingAsOf": "2026-07-12T07:06:26.232Z"
       }
     },
     "merges": [
