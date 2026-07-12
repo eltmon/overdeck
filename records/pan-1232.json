@@ -81,20 +81,35 @@
       "timestamp": "2026-07-12T21:24:42.998Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T21:24:57.317Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T21:24:57.318Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T21:24:57.319Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-12T20:45:31.659Z",
-  "updated": "2026-07-12T21:24:44.991Z",
+  "updated": "2026-07-12T21:25:51.320Z",
   "pipeline": {
     "issueId": "PAN-1232",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-12T21:24:44.841Z",
+    "updatedAt": "2026-07-12T21:24:47.226Z",
     "reviewNotes": "Verification failed at lint",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2604",
     "reviewRequestedAt": "2026-07-12T21:24:43.006Z",
@@ -134,7 +149,7 @@
       },
       "costAtCloseOut": {
         "usd": 2.189216,
-        "pricingAsOf": "2026-07-12T21:24:44.970Z"
+        "pricingAsOf": "2026-07-12T21:24:47.349Z"
       }
     },
     "merges": [
