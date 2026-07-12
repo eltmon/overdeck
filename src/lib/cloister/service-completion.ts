@@ -94,10 +94,10 @@ export async function checkCompletionMarkers(host: CompletionHost): Promise<void
             } catch {
               return { success: false, error: `Invalid response (HTTP ${res.status})` };
             }
-          } catch (e: any) {
+          } catch (e: unknown) {
             clearTimeout(timer);
-            if (e?.name === 'AbortError') return { success: false, error: 'Timeout (5s)' };
-            return { success: false, error: e?.message || String(e) };
+            if (e instanceof Error && e.name === 'AbortError') return { success: false, error: 'Timeout (5s)' };
+            return { success: false, error: e instanceof Error ? e.message : String(e) };
           }
         })();
 
@@ -115,9 +115,10 @@ export async function checkCompletionMarkers(host: CompletionHost): Promise<void
           host.processedCompletions.set(dir.name, retryCount + 1);
           console.log(`  ⚠ Review trigger failed for ${issueId}: ${result.error || 'unknown'} (will retry, ${2 - retryCount} attempts left)`);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         host.processedCompletions.set(dir.name, retryCount + 1);
-        console.error(`  ✗ Failed to trigger review for ${issueId}: ${err.message} (will retry, ${2 - retryCount} attempts left)`);
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`  ✗ Failed to trigger review for ${issueId}: ${message} (will retry, ${2 - retryCount} attempts left)`);
       }
     }
   } catch (error) {

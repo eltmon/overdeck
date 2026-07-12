@@ -1,17 +1,19 @@
 /** Cloister crash recovery and poke escalation seam. */
 import { createHash } from 'crypto';
-import { exec } from 'node:child_process';
+import { exec, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { DomainEvent } from '@overdeck/contracts';
 import { isContextOverflowTail, CONTEXT_OVERFLOW_TAIL_LINES } from '../context-overflow.js';
 import { getAgentRuntimeStateSync, getAgentStateSync } from '../agents.js';
 import { setCloisterSpawnsPausedSync } from '../overdeck/control-settings.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
+import { exactPaneTarget } from '../tmux.js';
 import { isRoleTerminal, type AdvancingRole } from './reap-terminal-sessions.js';
 import type { AgentHealth } from './health.js';
 import type { CloisterConfig } from './config.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 /**
  * Agent crash tracker for auto-restart
@@ -111,8 +113,9 @@ export async function progressFingerprint(_host: CrashHost, agentId: string): Pr
   }
   let pane = '';
   try {
-    const { stdout } = await execAsync(
-      `tmux -L overdeck capture-pane -t ${JSON.stringify(agentId)} -p -S -${CONTEXT_OVERFLOW_TAIL_LINES}`,
+    const { stdout } = await execFileAsync(
+      'tmux',
+      ['-L', 'overdeck', 'capture-pane', '-t', exactPaneTarget(agentId), '-p', '-S', `-${CONTEXT_OVERFLOW_TAIL_LINES}`],
       { encoding: 'utf-8' },
     );
     pane = stdout;
@@ -153,8 +156,9 @@ export async function pokeAgentWithEscalation(host: CrashHost, agentId: string):
   if (ineffective >= 2) {
     let tail = '';
     try {
-      const { stdout } = await execAsync(
-        `tmux -L overdeck capture-pane -t ${JSON.stringify(agentId)} -p -S -${CONTEXT_OVERFLOW_TAIL_LINES}`,
+      const { stdout } = await execFileAsync(
+        'tmux',
+        ['-L', 'overdeck', 'capture-pane', '-t', exactPaneTarget(agentId), '-p', '-S', `-${CONTEXT_OVERFLOW_TAIL_LINES}`],
         { encoding: 'utf-8' },
       );
       tail = stdout;
