@@ -16,20 +16,36 @@
   ],
   "feedback": [],
   "created": "2026-07-12T20:44:53.021Z",
-  "updated": "2026-07-12T21:00:46.532Z",
+  "updated": "2026-07-12T21:15:47.057Z",
   "pipeline": {
     "issueId": "PAN-2603",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-12T21:00:46.495Z"
+    "updatedAt": "2026-07-12T21:15:46.382Z",
+    "inspectNotes": "Bead docs-injection-service ack: buildDocsInjectionContext gates via evaluateDocsPromptGate before any write, only advances budget/records telemetry once on a real hit (zero-result and missing-index paths short-circuit before recordDocsInjection), and swallows errors without throwing per AC1-5; covered by injection.test.ts."
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 989026,
+            "output": 1715,
+            "cacheRead": 901632,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.5": {
+            "input": 6437929,
+            "output": 17940,
+            "cacheRead": 6268800,
+            "cacheWrite": 0
+          }
+        },
         "plan": {
           "anthropic/claude-fable-5": {
             "input": 14260,
@@ -40,6 +56,18 @@
         }
       },
       "totals": {
+        "openai/codex-auto-review": {
+          "input": 989026,
+          "output": 1715,
+          "cacheRead": 901632,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.5": {
+          "input": 6437929,
+          "output": 17940,
+          "cacheRead": 6268800,
+          "cacheWrite": 0
+        },
         "anthropic/claude-fable-5": {
           "input": 14260,
           "output": 54208,
@@ -48,13 +76,13 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 11.161437,
-        "pricingAsOf": "2026-07-12T21:00:46.530Z"
+        "usd": 15.679682,
+        "pricingAsOf": "2026-07-12T21:15:46.875Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5"
+  "harness": "claude-code",
+  "model": "claude-sonnet-5"
 }
