@@ -345,7 +345,12 @@ export class CodexAppServerHost {
 
   private async appendEvent(type: string, data: JsonRecord): Promise<void> {
     const line = JSON.stringify({ ts: new Date().toISOString(), type, ...data });
-    await appendFile(join(this.agentDir(), 'appserver-events.jsonl'), `${line}\n`, 'utf-8');
+    try {
+      await mkdir(this.agentDir(), { recursive: true });
+      await appendFile(join(this.agentDir(), 'appserver-events.jsonl'), `${line}\n`, 'utf-8');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
   }
 
   private agentDir(): string {

@@ -203,6 +203,35 @@ async function createSupervisorBackedTmuxSession(agentId: string): Promise<void>
   await startFakeSupervisor(agentId, fifoPath);
 }
 
+async function createPlainTmuxSession(agentId: string): Promise<void> {
+  if (!actualTmux) throw new Error('tmux module not initialized');
+  const script = [
+    `for i in $(seq 1 160); do printf 'scrollback-line-%03d\\n' "$i"; done`,
+    `printf 'Codex app-server ready\\n'`,
+    `while true; do sleep 60; done`,
+  ].join('; ');
+  await Effect.runPromise(actualTmux.createSession(agentId, workspace, `bash -lc ${shellQuote(script)}`, {
+    env: { TERM: 'xterm-256color' },
+    width: 80,
+    height: 24,
+  }));
+  tmuxSessions.add(agentId);
+}
+
+async function killFakeTmuxSession(session: string): Promise<void> {
+  if (actualTmux) {
+    try {
+      await Effect.runPromise(actualTmux.killSession(session));
+    } catch {
+      // cleanup is idempotent when the session is already gone
+    }
+  }
+  const existing = sessions.get(session);
+  if (existing) await closeBridge(existing.bridge);
+  sessions.delete(session);
+  tmuxSessions.delete(session);
+}
+
 async function startFakeSupervisor(agentId: string, fifoPath: string): Promise<void> {
   const tokenPath = join(tmpHome, 'agents', agentId, 'pty-token');
   const expectedToken = readFileSync(tokenPath, 'utf8').trim();
@@ -378,23 +407,31 @@ beforeEach(async () => {
       ...actual,
       createSessionSync: vi.fn(),
       createSession: vi.fn((session: string) => Effect.promise(async () => {
-        await createSupervisorBackedTmuxSession(session);
+        if (existsSync(join(tmpHome, 'agents', session, 'pty-token'))) {
+          await createSupervisorBackedTmuxSession(session);
+        } else {
+          await createPlainTmuxSession(session);
+        }
       })),
       killSessionSync: vi.fn(),
       killSession: vi.fn((session: string) => Effect.promise(async () => {
-        try {
-          await Effect.runPromise(actual.killSession(session));
-        } catch {
-          // cleanup is idempotent when the session is already gone
-        }
-        const existing = sessions.get(session);
-        if (existing) await closeBridge(existing.bridge);
-        sessions.delete(session);
-        tmuxSessions.delete(session);
+        await killFakeTmuxSession(session);
       })),
       waitForClaudePrompt: vi.fn(() => Effect.succeed(Promise.resolve(true))),
     };
   });
+
+  vi.doMock('../../src/lib/runtimes/tmux-cli.js', () => ({
+    tmuxCreateSession: vi.fn(async (session: string) => {
+      await createPlainTmuxSession(session);
+    }),
+    tmuxKillSession: vi.fn(async (session: string) => {
+      await killFakeTmuxSession(session);
+    }),
+    tmuxSessionExists: vi.fn(async (session: string) => {
+      return tmuxSessionExists(session);
+    }),
+  }));
 
   const { resetDatabase } = await import('../../src/lib/database/index.js');
   resetDatabase();
@@ -434,10 +471,11 @@ afterEach(async () => {
   vi.doUnmock('../../src/lib/agents.js');
   vi.doUnmock('../../src/lib/harness-resolve.js');
   vi.doUnmock('../../src/lib/tmux.js');
+  vi.doUnmock('../../src/lib/runtimes/tmux-cli.js');
 });
 
 describe('conversation supervisor Playwright UAT', () => {
-  it('resumes Codex conversations through the real route with codex resume', async () => {
+  it('resumes Codex app-server conversations through the real route', async () => {
     const response = await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error('page.goto returned ' + response?.status() + ' for ' + baseUrl);
     const conversation = await page.evaluate(async () => {
@@ -447,7 +485,7 @@ describe('conversation supervisor Playwright UAT', () => {
         body: JSON.stringify({ model: 'gpt-5.5', harness: 'codex' }),
       }) as { name: string; tmuxSession: string };
     });
-    await expectSupervisorBackedSession(conversation.tmuxSession);
+    await expect.poll(() => tmuxSessionExists(conversation.tmuxSession), { timeout: 30_000 }).toBe(true);
 
     const threadId = '019eaaec-4dfa-7ab1-90ba-9104d16534d1';
     writeCodexRollout(conversation.tmuxSession, threadId);
@@ -461,11 +499,12 @@ describe('conversation supervisor Playwright UAT', () => {
     await page.evaluate(async (conv) => {
       await (window as any).api('/api/conversations/' + conv.name + '/resume', { method: 'POST' });
     }, conversation);
-    await expectSupervisorBackedSession(conversation.tmuxSession);
+    await expect.poll(() => tmuxSessionExists(conversation.tmuxSession), { timeout: 30_000 }).toBe(true);
 
     const launcher = launcherFor(conversation.tmuxSession);
-    expect(launcher).toContain(`codex resume -c project_doc_max_bytes=0 '${threadId}'`);
-    expect(launcher).not.toContain('codex -c project_doc_max_bytes=0\n');
+    expect(launcher).toContain(`/dist/codex-app-server-host.js' --resume '${threadId}'`);
+    expect(launcher).not.toContain('pty-supervisor.js');
+    expect(launcher).not.toContain('codex exec resume');
 
     await cleanupConversationThroughApi(conversation);
   }, 45_000);
