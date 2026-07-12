@@ -218,13 +218,13 @@ export interface HandleMemoryInjectBodyOptions {
   injectBriefing?: typeof appendFreshBriefingUpdate;
   resolveComplianceWarning?: typeof resolveComplianceAdvisoryWarning;
   resolveAgentIdBySessionId?: (sessionId: string) => Promise<string | null>;
+  docsConfig?: Pick<NormalizedDocsConfig, 'enabled' | 'promptInjectionEnabled' | 'trigger' | 'budget'>;
+  docsPaths?: DocsPathOverrides;
+  buildDocsInjectionContext?: typeof buildDocsInjectionContext;
   now?: Date;
 }
 
 export interface HandleMemoryInjectFastPathOptions extends HandleMemoryInjectBodyOptions {
-  docsConfig?: Pick<NormalizedDocsConfig, 'enabled' | 'promptInjectionEnabled' | 'trigger' | 'budget'>;
-  docsPaths?: DocsPathOverrides;
-  buildDocsInjectionContext?: typeof buildDocsInjectionContext;
 }
 
 export async function handleMemoryInjectBody(
@@ -259,10 +259,19 @@ export async function handleMemoryInjectBody(
   const briefing = await (options.injectBriefing ?? appendFreshBriefingUpdate)(
     options.now ? { sessionId, context: memoryResult.context, now: options.now } : { sessionId, context: memoryResult.context },
   );
+  const docsResult = options.docsConfig || options.docsPaths || options.buildDocsInjectionContext
+    ? await (options.buildDocsInjectionContext ?? buildDocsInjectionContext)({
+      prompt,
+      sessionId,
+      config: options.docsConfig,
+      paths: options.docsPaths,
+      now: options.now,
+    })
+    : { context: null };
 
   return {
     ...memoryResult,
-    context: [complianceWarning, briefing.context].filter((part): part is string => !!part).join('\n\n'),
+    context: [complianceWarning, briefing.context, docsResult.context].filter((part): part is string => !!part).join('\n\n'),
   };
 }
 
@@ -270,47 +279,17 @@ export async function handleMemoryInjectFastPathBody(
   body: Record<string, unknown>,
   options: HandleMemoryInjectFastPathOptions = {},
 ): Promise<{ ok: true; context: string }> {
-  const warningResult = await handleMemoryInjectBody(body, {
+  const result = await handleMemoryInjectBody(body, {
     resolveAgentIdBySessionId: options.resolveAgentIdBySessionId,
     resolveComplianceWarning: options.resolveComplianceWarning,
-    injectMemory: options.injectMemory ?? (async () => ({
-      status: 'skipped',
-      reason: 'compliance-warning-only',
-      context: '',
-      decision: {} as never,
-    })),
-    injectBriefing: options.injectBriefing ?? (async (input) => ({
-      context: input.context,
-      injected: false,
-      briefingMtimeMs: null,
-    })),
+    injectMemory: options.injectMemory,
+    injectBriefing: options.injectBriefing,
+    docsConfig: options.docsConfig,
+    docsPaths: options.docsPaths,
+    buildDocsInjectionContext: options.buildDocsInjectionContext,
     now: options.now,
   });
-  if ('error' in warningResult) return { ok: true, context: '' };
-
-  const prompt = typeof body.prompt === 'string'
-    ? body.prompt
-    : typeof body.userPrompt === 'string'
-      ? body.userPrompt
-      : '';
-  const sessionId = typeof body.sessionId === 'string'
-    ? body.sessionId
-    : typeof body.session_id === 'string'
-      ? body.session_id
-      : '';
-
-  const docsResult = await (options.buildDocsInjectionContext ?? buildDocsInjectionContext)({
-    prompt,
-    sessionId,
-    config: options.docsConfig ?? loadConfigSync().config.docs,
-    paths: options.docsPaths,
-    now: options.now,
-  });
-
-  return {
-    ok: true,
-    context: [warningResult.context, docsResult.context].filter((part): part is string => !!part).join('\n\n'),
-  };
+  return { ok: true, context: 'error' in result ? '' : result.context };
 }
 
 const postMemoryInjectRoute = HttpRouter.add(
@@ -330,18 +309,14 @@ const postMemoryInjectRoute = HttpRouter.add(
 
     const readModel = yield* ReadModelService;
     const resolveAgentIdBySessionId = async (sessionId: string) => Effect.runPromise(readModel.getAgentIdBySessionId(sessionId));
-    const fastResult = yield* Effect.promise(() => handleMemoryInjectFastPathBody(body, {
+    const result = yield* Effect.promise(() => handleMemoryInjectBody(body, {
       resolveAgentIdBySessionId,
       docsConfig: loadConfigSync().config.docs,
     }));
-
-    // Fire-and-forget: prompt-time memory injection can exceed the 1 s client hook
-    // timeout (query expansion + FTS search). Return any fast advisory warning now.
-    void Effect.runPromise(Effect.promise(() => handleMemoryInjectBody(body, {
-      resolveAgentIdBySessionId,
-      resolveComplianceWarning: async () => null,
-    })));
-    return jsonResponse(fastResult, { status: 202 });
+    return jsonResponse({
+      ok: true,
+      context: 'error' in result ? '' : result.context,
+    }, { status: 202 });
   })),
 );
 

@@ -93,6 +93,12 @@ async function fastPath(prompt: string, config = docsConfig(), sessionId = 'sess
     docsConfig: config,
     docsPaths: paths,
     resolveComplianceWarning: async () => 'compliance warning',
+    injectMemory: async () => ({
+      status: 'injected',
+      context: 'prompt-time memory context',
+      decision: {} as never,
+    }),
+    injectBriefing: async (input) => ({ context: input.context, injected: false, briefingMtimeMs: null }),
   });
 }
 
@@ -120,6 +126,7 @@ describe('POST /api/memory/inject docs context fast path', { timeout: 30_000 }, 
 
     expect(result.ok).toBe(true);
     expect(result.context).toContain('compliance warning');
+    expect(result.context).toContain('prompt-time memory context');
     expect(result.context).toContain('<overdeck-docs>');
     expect(result.context).toContain('docs/guide.md');
 
@@ -142,7 +149,7 @@ describe('POST /api/memory/inject docs context fast path', { timeout: 30_000 }, 
 
     const result = await fastPath('pan harness docs', docsConfig({ promptInjectionEnabled: false }));
 
-    expect(result).toEqual({ ok: true, context: 'compliance warning' });
+    expect(result).toEqual({ ok: true, context: 'compliance warning\n\nprompt-time memory context' });
   });
 
   it('preserves compliance context without docs for a non-trigger prompt', async () => {
@@ -150,13 +157,13 @@ describe('POST /api/memory/inject docs context fast path', { timeout: 30_000 }, 
 
     const result = await fastPath('ordinary prompt', docsConfig({ trigger: { regexes: ['pan'] } }));
 
-    expect(result).toEqual({ ok: true, context: 'compliance warning' });
+    expect(result).toEqual({ ok: true, context: 'compliance warning\n\nprompt-time memory context' });
   });
 
   it('preserves compliance context without docs when the index is missing', async () => {
     const result = await fastPath('pan harness docs', docsConfig(), 'missing-index');
 
-    expect(result).toEqual({ ok: true, context: 'compliance warning' });
+    expect(result).toEqual({ ok: true, context: 'compliance warning\n\nprompt-time memory context' });
     const state = await readDocsBudgetState(paths);
     expect(state.records['session:missing-index'].injections).toEqual([]);
     await expect(readFile(paths.telemetryPath!, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
