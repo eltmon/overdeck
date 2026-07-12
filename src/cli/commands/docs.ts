@@ -9,6 +9,7 @@
  */
 
 import { Command } from 'commander';
+import { existsSync } from 'fs';
 import {
   queryDocsIndex,
   formatDocsQueryMarkdown,
@@ -77,10 +78,14 @@ export function createDocsCommand(commandOptions: CreateDocsCommandOptions = {})
         console.error(`Invalid --top value: ${options.top}`);
         process.exit(1);
       }
+      const indexPath = options.indexPath ?? getDocsIndexPath();
+      if (!existsSync(indexPath)) {
+        console.error(`No docs index found at ${indexPath}. Run 'pan docs reindex' to build it.`);
+      }
       const result = queryDocsIndex({
         query: text,
         top,
-        indexPath: options.indexPath,
+        indexPath,
         kind: options.kind,
       });
       printDocsQueryResult(result, options.format ?? 'markdown');

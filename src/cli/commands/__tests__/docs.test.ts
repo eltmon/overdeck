@@ -55,6 +55,7 @@ describe('docs command', { timeout: 30_000 }, () => {
     docsDir = join(rootDir, 'overdeck-home', 'docs');
     syncSourcesRoot = join(rootDir, 'sync-sources');
     vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(async () => {
@@ -116,5 +117,14 @@ describe('docs command', { timeout: 30_000 }, () => {
       size: expect.any(Number),
     });
     expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it('prints a stderr hint when query uses a missing index path', async () => {
+    const indexPath = join(docsDir, 'missing.sqlite');
+
+    await parseDocsCommand(['docs', 'query', 'harness', '--index-path', indexPath]);
+
+    expect(console.error).toHaveBeenCalledWith(`No docs index found at ${indexPath}. Run 'pan docs reindex' to build it.`);
+    expect(console.log).toHaveBeenCalledWith('');
   });
 });
