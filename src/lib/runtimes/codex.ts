@@ -18,6 +18,7 @@ import { join, basename } from 'node:path'
 import { homedir } from 'node:os'
 import { promisify } from 'node:util'
 import { exec } from 'node:child_process'
+import { request as httpRequest } from 'node:http'
 import { Effect } from 'effect'
 import type {
   AgentRuntime,
@@ -35,6 +36,7 @@ import { CODEX_BEHAVIOR } from './behavior.js'
 import { sessionExists, killSession, listSessionsSync, createSession } from '../tmux.js'
 import { TmuxError, ProcessSpawnError, ProcessTimeoutError } from '../errors.js'
 import { parseCodexSessionSync } from '../cost-parsers/codex-parser.js'
+import { loadConfigSync } from '../config-yaml.js'
 
 const execAsync = promisify(exec)
 
@@ -54,8 +56,63 @@ function agentDirFor(agentId: string): string {
   return join(agentsDir(), agentId)
 }
 
+function appServerSocketPathFor(agentId: string): string {
+  return join(overdeckDir(), 'sockets', `appserver-${agentId}.sock`)
+}
+
+function appServerTokenPathFor(agentId: string): string {
+  return join(agentDirFor(agentId), 'appserver-token')
+}
+
 function threadIdPathFor(agentId: string): string {
   return join(agentDirFor(agentId), 'codex-thread-id')
+}
+
+function readAppServerToken(agentId: string): string | null {
+  const tokenPath = appServerTokenPathFor(agentId)
+  if (!existsSync(tokenPath)) return null
+  try {
+    return readFileSync(tokenPath, 'utf-8').trim() || null
+  } catch {
+    return null
+  }
+}
+
+async function postAppServerInterrupt(agentId: string): Promise<void> {
+  const socketPath = appServerSocketPathFor(agentId)
+  const token = readAppServerToken(agentId)
+  if (!existsSync(socketPath) || !token) return
+  const payload = JSON.stringify({ op: 'interrupt' })
+  await new Promise<void>((resolve, reject) => {
+    const req = httpRequest(
+      {
+        socketPath,
+        path: '/',
+        method: 'POST',
+        agent: false,
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+          'X-Overdeck-Bridge-Token': token,
+        },
+      },
+      (res) => {
+        res.resume()
+        res.on('end', () => {
+          const status = res.statusCode ?? 0
+          if (status >= 200 && status < 300) resolve()
+          else reject(new Error(`app-server interrupt returned HTTP ${status}`))
+        })
+      },
+    )
+    req.on('error', reject)
+    req.write(payload)
+    req.end()
+  })
+}
+
+function codexTransport(): 'app-server' | 'tui' {
+  return loadConfigSync().config.codex?.transport === 'tui' ? 'tui' : 'app-server'
 }
 
 /** Resolve $CODEX_HOME: env var → ~/.codex fallback. */
@@ -506,7 +563,8 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
   /**
    * Kill a Codex agent via a SIGTERM→SIGKILL escalation ladder.
    *
-   *   1. Send Ctrl-C to the tmux pane (interrupt running task).
+   *   1. App-server transport: POST interrupt to the host socket. TUI transport:
+   *      send Ctrl-C to the tmux pane.
    *   2. Wait up to 2s for the session to disappear.
    *   3. SIGTERM the codex process group via pkill.
    *   4. Wait up to 5s for the session to disappear.
@@ -516,11 +574,20 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
    * JSONL-is-sacred rule.
    */
   async killAgent(agentId: string): Promise<void> {
-    // Step 1: interrupt the running task.
-    try {
-      await execAsync(`tmux -L overdeck send-keys -t ${shellQuote(agentId)} C-c 2>/dev/null || true`)
-    } catch {
-      // ignore
+    // Step 1: interrupt the running task. App-server has a structured
+    // interrupt op; the C-c keystroke is only for the legacy TUI escape hatch.
+    if (codexTransport() === 'app-server') {
+      try {
+        await postAppServerInterrupt(agentId)
+      } catch {
+        // Best effort: the SIGTERM ladder below still tears down the session.
+      }
+    } else {
+      try {
+        await execAsync(`tmux -L overdeck send-keys -t ${shellQuote(agentId)} C-c 2>/dev/null || true`)
+      } catch {
+        // ignore
+      }
     }
 
     // Step 2: poll up to 2s.
