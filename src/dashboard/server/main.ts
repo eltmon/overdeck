@@ -15,6 +15,7 @@ import { startSharedIssueService, getSharedIssueService } from './services/issue
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 import { startMergeBlockerReconcileService } from './services/merge-blocker-reconcile-service.js';
 import { startAgentOutputService, stopAgentOutputService } from './services/agent-output-service.js';
+import { createBeadsSyncService } from './services/beads-sync-service.js';
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
 import { startRestartAnnouncer, stopRestartAnnouncer } from './services/restart-announcer.js';
 import { startSubstrateBugPoller, stopSubstrateBugPoller } from './services/substrate-bug-poller.js';
@@ -485,6 +486,11 @@ console.log(conversationSearchWatcher
 
 void (async () => {
   const store = await initEventStore();
+  const beadsSync = createBeadsSyncService({
+    emit: (event) => { void store.appendAsync(event as any); },
+  });
+  void beadsSync.run().catch((err) => console.warn('[beads-sync] service stopped:', err?.message ?? err));
+  console.log('[overdeck] BeadsSyncService started');
   store.subscribe((event) => {
     if (event.type === 'agent.stopped' || event.type === 'agent.heartbeat_dead') {
       const agentId = typeof (event.payload as { agentId?: unknown }).agentId === 'string'
