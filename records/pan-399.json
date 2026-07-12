@@ -460,18 +460,22 @@
     "recordedAt": "2026-07-12T08:40:28.078Z"
   },
   "created": "2026-07-11T09:28:34.266Z",
-  "updated": "2026-07-12T09:41:08.182Z",
+  "updated": "2026-07-12T09:50:26.507Z",
   "pipeline": {
     "issueId": "PAN-399",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "verifying",
+    "mergeStatus": "merged",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-12T09:16:46.873Z",
-    "updatedAt": "2026-07-12T09:41:08.108Z",
+    "updatedAt": "2026-07-12T09:50:24.717Z",
+    "reviewNotes": "Review APPROVED by agent-pan-399-review-076c4cf4; all blocking findings resolved",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2577",
+    "reviewedAtCommit": "9ccdd0f9eda22eb7b357d43bc7b86823b732ce80",
     "lastVerifiedCommit": "9ccdd0f9eda22eb7b357d43bc7b86823b732ce80",
     "reviewRequestedAt": "2026-07-12T09:16:46.873Z",
     "reviewSpawnedAt": "2026-07-12T09:38:32.553Z",
@@ -678,9 +682,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 7684027,
-            "output": 473999,
-            "cacheRead": 290385408,
+            "input": 7753022,
+            "output": 490123,
+            "cacheRead": 316998912,
             "cacheWrite": 0
           }
         }
@@ -729,15 +733,15 @@
           "cacheWrite": 77989
         },
         "custom/kimi-k2.7-code": {
-          "input": 7684027,
-          "output": 473999,
-          "cacheRead": 290385408,
+          "input": 7753022,
+          "output": 490123,
+          "cacheRead": 316998912,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 190.939736,
-        "pricingAsOf": "2026-07-12T09:41:08.165Z"
+        "usd": 196.126343,
+        "pricingAsOf": "2026-07-12T09:50:24.868Z"
       }
     },
     "merges": [
@@ -745,8 +749,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-opus-4-8",
   "statusOverrides": {
     "release-engine-tests": "completed",
     "release-engine-tests.ac1": "completed",
