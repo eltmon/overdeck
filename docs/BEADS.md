@@ -47,6 +47,13 @@ result with `bd dolt push`. Other machines adopt the remote schema with
 `bd bootstrap`; they never migrate independent clones. This operational step is
 operator-run and is not part of application installation or tests.
 
+### Scratch multi-clone proof
+
+`tests/integration/beads-cross-machine.test.ts` creates a temporary bare git
+remote and three disposable clones. It proves A→B bootstrap, five B→C closures,
+push rejection for a divergent writer, and convergence after `bd dolt pull`.
+The test never points at a registered project or the production state home.
+
 ## Derived export
 
 `.beads/issues.jsonl` is recovery/interoperability output, not a read or write
