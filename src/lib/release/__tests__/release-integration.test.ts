@@ -260,6 +260,45 @@ describe('runRelease integration with fake timers', () => {
     });
   });
 
+  it('blocks auto dependents when their manual dependency has not passed', async () => {
+    seedMergeAndProject({
+      components: {
+        worker: { trigger: 'manual' },
+        frontend: {
+          trigger: 'auto',
+          depends_on: ['worker'],
+          smoke_test: 'npm run smoke:frontend',
+        },
+      },
+    });
+
+    const commands: string[] = [];
+    const resultPromise = runRelease('PAN-399', '/repo/overdeck', {
+      runCommand: vi.fn(async (command) => {
+        commands.push(command);
+      }),
+    });
+
+    const result = await resultPromise;
+
+    expect(result?.status).toBe('partial');
+    expect(result?.components.map((c) => [c.componentKey, c.status])).toEqual([
+      ['worker', 'blocked'],
+      ['frontend', 'blocked'],
+    ]);
+    expect(commands).toEqual([]);
+    expect(result?.components.find((c) => c.componentKey === 'frontend')?.notes).toContain(
+      'Blocked: dependencies not passed: worker.',
+    );
+    expect(mocks.reviewUpdates.at(-1)).toMatchObject({
+      issueId: 'PAN-399',
+      update: {
+        releaseStatus: 'partial',
+        releaseNotes: 'Release awaiting manual step(s): worker, frontend.',
+      },
+    });
+  });
+
   it('skips cleanly and returns null when the project has no release config', async () => {
     seedMergeAndProject(undefined);
 

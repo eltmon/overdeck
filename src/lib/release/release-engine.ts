@@ -71,6 +71,19 @@ export async function runRelease(
       continue;
     }
 
+    const unmetDependencies = entry.dependsOn.filter((dependencyKey) => {
+      const dependency = releaseSet.components.find((component) => component.componentKey === dependencyKey);
+      return !dependency || dependency.status !== 'passed';
+    });
+    if (unmetDependencies.length > 0) {
+      const dependencyNames = unmetDependencies.join(', ');
+      releaseSet = persistComponentPatch(releaseSet, entry.component, {
+        status: 'blocked',
+        notes: `Blocked: dependencies not passed: ${dependencyNames}.`,
+      });
+      continue;
+    }
+
     releaseSet = persistComponentPatch(releaseSet, entry.component, {
       status: 'releasing',
       notes: entry.notes.join(' ') || undefined,
