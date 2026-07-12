@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { existsSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { copyFile, mkdir } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const projectRoot = resolve(import.meta.dirname, '..');
@@ -16,7 +17,12 @@ if (!existsSync(libraryEntry)) {
   process.exit(1);
 }
 
-const { buildDocsIndex, DEFAULT_DOCS_INDEX_PATH, DEFAULT_DOCS_INDEX_MAX_BYTES } = await import(pathToFileURL(libraryEntry).href);
+const {
+  buildDocsIndex,
+  DEFAULT_DOCS_INDEX_PATH,
+  DEFAULT_DOCS_INDEX_MAX_BYTES,
+  getDocsIndexPath,
+} = await import(pathToFileURL(libraryEntry).href);
 
 try {
   const result = await buildDocsIndex({
@@ -25,6 +31,12 @@ try {
     maxIndexBytes: DEFAULT_DOCS_INDEX_MAX_BYTES,
   });
   console.log(`Built docs index at ${result.outputPath} (${result.chunkCount} chunks, ${result.sizeBytes} bytes)`);
+  const liveIndexPath = getDocsIndexPath();
+  if (liveIndexPath !== result.outputPath) {
+    await mkdir(dirname(liveIndexPath), { recursive: true });
+    await copyFile(result.outputPath, liveIndexPath);
+    console.log(`Copied docs index to ${liveIndexPath}`);
+  }
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);
