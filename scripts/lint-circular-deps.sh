@@ -51,6 +51,7 @@ current=$(mktemp)
   --exclude '\/(__tests__|__mocks__)\/|\.(test|spec)\.(ts|tsx)$|\.d\.ts$' \
   src/ 2>/dev/null > "$current_raw" || true
 node "$CANON" < "$current_raw" > "$current"
+sort -o "$current" "$current"
 rm -f "$current_raw"
 
 # Regen mode: rewrite the baseline from the current cycle list.
