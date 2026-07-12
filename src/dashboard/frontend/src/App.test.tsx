@@ -14,6 +14,7 @@ import App, {
   parseConversationViewModes,
   serializeConversationViewModes,
 } from './App';
+import { useDashboardStore } from './lib/store';
 
 const {
   mockDashboardState,
@@ -35,6 +36,7 @@ const {
       agentsWithPendingAskUserQuestion: [],
       drawer: { issueId: null, tab: 'overview' },
       openIssue: mockOpenIssue,
+      syncDrawerFromUrl: vi.fn(),
     },
     mockRefreshDashboardState: vi.fn().mockResolvedValue(undefined),
     mockToastError: vi.fn(),
@@ -109,12 +111,15 @@ vi.mock('sonner', () => ({
   },
 }));
 vi.mock('./lib/store', () => ({
-  useDashboardStore: vi.fn((selector?: unknown) => {
-    if (typeof selector === 'function') {
-      return selector(mockDashboardState);
-    }
-    return [];
-  }),
+  useDashboardStore: Object.assign(
+    vi.fn((selector?: unknown) => {
+      if (typeof selector === 'function') {
+        return selector(mockDashboardState);
+      }
+      return [];
+    }),
+    { setState: vi.fn() },
+  ),
   selectAgents: (state: { agents: unknown[] }) => state.agents,
   selectChannelPermissionRequests: (state: { channelPermissionRequestsById?: Record<string, unknown> }) =>
     Object.values(state.channelPermissionRequestsById ?? {}),
@@ -182,12 +187,15 @@ beforeEach(() => {
   mockDashboardState.agentsWithPendingAskUserQuestion = []
   mockDashboardState.drawer = { issueId: null, tab: 'overview' }
   mockDashboardState.openIssue = mockOpenIssue
+  mockDashboardState.syncDrawerFromUrl.mockClear()
   mockOpenIssue.mockClear()
   mockRefreshDashboardState.mockClear()
   mockToastError.mockClear()
   mockToastInfo.mockClear()
   mockToastSuccess.mockClear()
+  useDashboardStore.setState.mockClear()
   window.localStorage.removeItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY)
+  window.localStorage.removeItem('overdeck:last-tab')
 })
 
 describe('conversation route helpers', () => {
@@ -407,6 +415,50 @@ describe('App primary routing', () => {
     window.history.replaceState(null, '', '/context');
     renderApp();
     expect(screen.getByTestId('context-page')).toBeInTheDocument();
+  });
+
+  it('opens the issue drawer on /issues/:id without rewriting the URL', async () => {
+    window.history.replaceState(null, '', '/issues/PAN-1234');
+    renderApp();
+
+    expect(window.location.pathname).toBe('/issues/PAN-1234');
+    expect(window.location.search).toBe('');
+    await waitFor(() =>
+      expect(useDashboardStore.setState).toHaveBeenCalledWith({
+        drawer: { issueId: 'PAN-1234', tab: 'overview' },
+      }),
+    );
+  });
+
+  it('defaults /issues/:id to Pipeline when no last tab is stored', () => {
+    window.history.replaceState(null, '', '/issues/PAN-1234');
+    renderApp();
+
+    expect(screen.getByTestId('pipeline-view')).toBeInTheDocument();
+  });
+
+  it('restores the last surface on /issues/:id', () => {
+    window.localStorage.setItem('overdeck:last-tab', 'kanban');
+    window.history.replaceState(null, '', '/issues/PAN-1234');
+    renderApp();
+
+    expect(screen.getByText('Open issue')).toBeInTheDocument();
+  });
+
+  it('handles browser back/forward to /issues/:id', async () => {
+    window.history.replaceState(null, '', '/pipeline');
+    renderApp();
+    useDashboardStore.setState.mockClear();
+
+    window.history.pushState(null, '', '/issues/PAN-999');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+
+    expect(window.location.pathname).toBe('/issues/PAN-999');
+    await waitFor(() =>
+      expect(useDashboardStore.setState).toHaveBeenCalledWith({
+        drawer: { issueId: 'PAN-999', tab: 'overview' },
+      }),
+    );
   });
 
   it('redirects direct experimental routes to Home when experimental features are off', async () => {
