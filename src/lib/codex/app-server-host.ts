@@ -4,6 +4,8 @@ import { appendFile, chmod, mkdir, rm, writeFile } from 'node:fs/promises';
 import { createServer, type Server, type ServerResponse } from 'node:http';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
+import { createInterface, type Interface } from 'node:readline';
+import type { Readable, Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { EventEmitter } from 'node:events';
 import {
@@ -45,6 +47,8 @@ export interface CodexAppServerHostOptions {
   overdeckHome?: string;
   codexHome?: string;
   manager?: AppServerHostManager;
+  stdin?: Readable;
+  stdout?: Writable;
 }
 
 interface HostOpResult {
@@ -57,6 +61,7 @@ export class CodexAppServerHost {
   private readonly manager: AppServerHostManager;
   private readonly pendingRequests = new Map<string, PendingAppServerRequest>();
   private server: Server | undefined;
+  private input: Interface | undefined;
   private token: string | undefined;
   private threadModel: string | undefined;
   private state: 'starting' | 'ready' | 'closed' = 'starting';
@@ -78,11 +83,14 @@ export class CodexAppServerHost {
     await writeFile(this.tokenPath(), `${this.token}\n`, { mode: 0o600 });
     await this.manager.start();
     await this.listen();
+    this.startPaneInput();
     this.state = 'ready';
   }
 
   async stop(): Promise<void> {
     this.state = 'closed';
+    this.input?.close();
+    this.input = undefined;
     this.manager.stop();
     if (!this.server) return;
     const server = this.server;
@@ -146,6 +154,7 @@ export class CodexAppServerHost {
       effort: requestedEffort,
       hasExistingThread: Boolean(state.threadId),
     });
+    this.writePaneLine(`[user] ${content}`);
     await this.manager.startTurn(content, {
       ...(requestedModel ? { model: requestedModel } : {}),
       ...(requestedEffort ? { effort: requestedEffort } : {}),
@@ -167,6 +176,7 @@ export class CodexAppServerHost {
     }
     this.manager.answerApproval(requestId, decision);
     this.pendingRequests.delete(String(requestId));
+    this.writePaneLine(`[approval #${requestId}] ${decision}`);
     void this.appendEvent('op/approval', { requestId, decision });
     return { status: 200, body: { ok: true } };
   }
@@ -179,6 +189,7 @@ export class CodexAppServerHost {
     }
     this.manager.answerUserInput(requestId, answers);
     this.pendingRequests.delete(String(requestId));
+    this.writePaneLine(`[input #${requestId}] answered`);
     void this.appendEvent('op/user-input', { requestId });
     return { status: 200, body: { ok: true } };
   }
@@ -187,23 +198,91 @@ export class CodexAppServerHost {
     this.manager.on('notification', (message: AppServerMessage) => {
       const threadId = extractThreadId(message);
       if (message.method === 'thread/started' && threadId) writeThreadId(this.options.agentId, threadId);
+      this.renderNotification(message);
       void this.appendEvent('notification', message as JsonRecord);
     });
     this.manager.on('request', (message: AppServerMessage) => {
       if (message.id === undefined || !message.method) return;
       this.pendingRequests.set(String(message.id), { id: message.id, method: message.method, params: message.params });
+      this.renderRequest(message);
       void this.appendEvent('request', message as JsonRecord);
     });
     this.manager.on('warning', (warning: unknown) => {
+      this.writePaneLine(`[warning] ${String(warning)}`);
       void this.appendEvent('warning', { message: String(warning) });
     });
     this.manager.on('stderr', (stderr: unknown) => {
+      this.writePaneLine(`[stderr] ${String(stderr)}`);
       void this.appendEvent('stderr', { message: String(stderr) });
     });
     this.manager.on('exit', (exit: unknown) => {
       this.state = 'closed';
+      this.writePaneLine('[exit] codex app-server stopped');
       void this.appendEvent('exit', asRecord(exit));
     });
+  }
+
+  startPaneInput(): void {
+    if (!this.options.stdin || this.input) return;
+    this.input = createInterface({ input: this.options.stdin, crlfDelay: Infinity });
+    this.input.on('line', (line) => {
+      void this.handlePaneLine(line);
+    });
+  }
+
+  private async handlePaneLine(line: string): Promise<void> {
+    const trimmed = line.trim();
+    const approval = this.firstPendingApproval();
+    if (approval && isApprovalShortcut(trimmed)) {
+      const decision = approvalDecision(trimmed);
+      this.manager.answerApproval(approval.id, decision);
+      this.pendingRequests.delete(String(approval.id));
+      this.writePaneLine(`[approval #${approval.id}] ${decision}`);
+      await this.appendEvent('stdin/approval', { requestId: approval.id, decision });
+      return;
+    }
+    if (!trimmed) return;
+    const result = await this.handleMessageOp({ op: 'message', content: line });
+    if (result.status >= 400) this.writePaneLine(`[error] ${String(result.body.error ?? 'message failed')}`);
+  }
+
+  private firstPendingApproval(): PendingAppServerRequest | undefined {
+    return [...this.pendingRequests.values()].find(request => /requestApproval/i.test(request.method));
+  }
+
+  private renderNotification(message: AppServerMessage): void {
+    const params = asRecord(message.params);
+    if (message.method === 'turn/started') {
+      this.writePaneLine('[turn] started');
+      return;
+    }
+    if (message.method === 'turn/completed') {
+      this.writePaneLine('[turn] completed');
+      return;
+    }
+    if (message.method === 'error') {
+      this.writePaneLine(`[error] ${formatPaneValue(params.error ?? params.message ?? message.params)}`);
+      return;
+    }
+    const text = typeof params.text === 'string' ? params.text : undefined;
+    if (text) this.writePaneLine(`[assistant] ${text}`);
+  }
+
+  private renderRequest(message: AppServerMessage): void {
+    if (!message.method || message.id === undefined) return;
+    const params = asRecord(message.params);
+    if (/requestApproval/i.test(message.method)) {
+      const command = formatPaneValue(params.command ?? params.path ?? params);
+      this.writePaneLine(`[approval #${message.id}] command: ${command} - reply via dashboard or type y/n`);
+      return;
+    }
+    if (/requestUserInput|elicitation/i.test(message.method)) {
+      this.writePaneLine(`[input #${message.id}] reply via dashboard`);
+    }
+  }
+
+  private writePaneLine(line: string): void {
+    this.options.stdout?.write(`${stripControl(line)}\n`);
   }
 
   private async listen(): Promise<void> {
@@ -318,10 +397,36 @@ async function main(): Promise<void> {
     model: args.model,
     resumeThreadId: args.resumeThreadId,
     codexHome: process.env.CODEX_HOME,
+    stdin: process.stdin,
+    stdout: process.stdout,
   });
   process.once('SIGTERM', () => void host.stop().finally(() => process.exit(0)));
   process.once('SIGINT', () => void host.stop().finally(() => process.exit(130)));
   await host.start();
+}
+
+function formatPaneValue(value: unknown): string {
+  if (typeof value === 'string') return value;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function stripControl(value: string): string {
+  return value
+    .replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '')
+    .replace(/\x1B\][^\x07]*(?:\x07|\x1B\\)/g, '')
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+}
+
+function isApprovalShortcut(value: string): boolean {
+  return /^(?:y|yes|1|n|no|0)$/i.test(value);
+}
+
+function approvalDecision(value: string): string {
+  return /^(?:y|yes|1)$/i.test(value) ? 'accept' : 'reject';
 }
 
 if (basename(fileURLToPath(import.meta.url)) === basename(process.argv[1] ?? '')) {

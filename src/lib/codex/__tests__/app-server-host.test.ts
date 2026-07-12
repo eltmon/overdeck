@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { PassThrough, Writable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CodexAppServerHost } from '../app-server-host.js';
 import type { CodexAppServerState, ThreadOptions, TurnOptions } from '../app-server-manager.js';
@@ -69,6 +70,24 @@ function makeHost(manager: FakeManager, opts: Partial<ConstructorParameters<type
     manager,
     ...opts,
   });
+}
+
+function captureStdout(): { stdout: Writable; lines: string[] } {
+  const lines: string[] = [];
+  let buffer = '';
+  const stdout = new Writable({
+    write(chunk, _encoding, callback) {
+      buffer += String(chunk);
+      for (;;) {
+        const newline = buffer.indexOf('\n');
+        if (newline < 0) break;
+        lines.push(buffer.slice(0, newline));
+        buffer = buffer.slice(newline + 1);
+      }
+      callback();
+    },
+  });
+  return { stdout, lines };
 }
 
 function readEventLog(): Array<Record<string, unknown>> {
@@ -174,5 +193,53 @@ describe('CodexAppServerHost', () => {
 
     expect(await host.handleOp({ op: 'interrupt' })).toEqual({ status: 200, body: { ok: true, state: { state: 'ready' } } });
     expect(manager.interruptCalls).toBe(1);
+  });
+
+  it('renders user turns and assistant text to stdout as sanitized plain text lines', async () => {
+    const manager = new FakeManager();
+    const { stdout, lines } = captureStdout();
+    const host = makeHost(manager, { stdout });
+
+    await host.handleOp({ op: 'message', content: 'hello\u001b[31m', model: 'gpt-5.6-sol' });
+    await vi.waitFor(() => expect(lines).toEqual(expect.arrayContaining([
+      '[user] hello',
+      '[assistant] assistant delta',
+    ])));
+
+    expect(lines.join('\n')).not.toMatch(/\x1B\[/);
+  });
+
+  it('renders approval prompts with the command and y/n affordance', () => {
+    const manager = new FakeManager();
+    const { stdout, lines } = captureStdout();
+    makeHost(manager, { stdout });
+
+    manager.emit('request', { id: 71, method: 'item/commandExecution/requestApproval', params: { command: 'git status' } });
+
+    expect(lines).toContain('[approval #71] command: git status - reply via dashboard or type y/n');
+  });
+
+  it('starts a turn from a non-approval stdin line', async () => {
+    const manager = new FakeManager();
+    const stdin = new PassThrough();
+    const host = makeHost(manager, { stdin, model: 'gpt-5.6-sol' });
+    host.startPaneInput();
+
+    stdin.write('typed turn\n');
+
+    await vi.waitFor(() => expect(manager.startTurnCalls.at(-1)).toEqual({ text: 'typed turn', options: {} }));
+  });
+
+  it('resolves a pending approval from y on stdin without starting a turn', async () => {
+    const manager = new FakeManager();
+    const stdin = new PassThrough();
+    const host = makeHost(manager, { stdin, model: 'gpt-5.6-sol' });
+    manager.emit('request', { id: 71, method: 'item/commandExecution/requestApproval', params: { command: 'git status' } });
+    host.startPaneInput();
+
+    stdin.write('y\n');
+
+    await vi.waitFor(() => expect(manager.approvals).toEqual([{ id: 71, decision: 'accept' }]));
+    expect(manager.startTurnCalls).toHaveLength(0);
   });
 });
