@@ -707,7 +707,7 @@ describe('KanbanBoard j/k card navigation', () => {
     await waitFor(() => expect(onSelectIssue).toHaveBeenCalledWith('PAN-2'));
   });
 
-  it('does not move focus when typing inside an input', async () => {
+  it('does not move focus when keyboardShortcutsDisabled is true', async () => {
     useDashboardStore.setState({
       drawer: { issueId: null, tab: 'overview' },
       issuesRaw: [createBoardIssue({ identifier: 'PAN-1' })],
@@ -715,18 +715,12 @@ describe('KanbanBoard j/k card navigation', () => {
       reviewStatusByIssueId: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
 
-    renderBoard({ selectedIssue: null, onSelectIssue: vi.fn() });
+    renderBoard({ selectedIssue: null, onSelectIssue: vi.fn(), keyboardShortcutsDisabled: true });
 
-    const input = document.createElement('input');
-    document.body.appendChild(input);
-    input.focus();
-
-    fireEvent.keyDown(input, { key: 'j' });
+    fireEvent.keyDown(document, { key: 'j' });
 
     const card = await screen.findByTestId('issue-card-PAN-1');
     expect(card.className).not.toContain('ring-primary');
-
-    document.body.removeChild(input);
   });
 });
 
@@ -895,18 +889,15 @@ describe('IssueCard', () => {
     expect(screen.queryByTestId('card-untroubled-TEST-123')).toBeNull();
   });
 
-  it('surfaces an INPUT verb badge when a non-plan agent has a pending AskUserQuestion', () => {
+  it('surfaces an INPUT verb badge when an agent has an actual pending question (count > 0)', () => {
     renderIssueCard({
       issue: createMockIssue({ status: 'In Progress', state: 'in_progress', hasPlan: true, hasBeads: true }),
       workAgent: createMockAgent({
         id: 'agent-test-123',
         role: 'work',
         status: 'running',
-        pendingAskUserQuestion: {
-          toolUseId: 'tu-1',
-          askedAt: new Date().toISOString(),
-          questions: [{ question: 'Which approach?', options: [] }],
-        },
+        hasPendingQuestion: true,
+        pendingQuestionCount: 1,
       }),
     });
 
@@ -915,18 +906,33 @@ describe('IssueCard', () => {
     expect(badge).toHaveAttribute('data-variant', 'INPUT');
   });
 
-  it('does not surface INPUT from a plan agent waiting on plan approval', () => {
+  it('surfaces an INPUT verb badge when an agent has an actual pending question (prompt)', () => {
     renderIssueCard({
       issue: createMockIssue({ status: 'In Progress', state: 'in_progress', hasPlan: true, hasBeads: true }),
-      planningAgent: createMockAgent({
-        id: 'plan-test-123',
-        role: 'plan',
+      workAgent: createMockAgent({
+        id: 'agent-test-123',
+        role: 'work',
         status: 'running',
-        pendingAskUserQuestion: {
-          toolUseId: 'tu-1',
-          askedAt: new Date().toISOString(),
-          questions: [{ question: 'Approve plan?', options: [] }],
-        },
+        hasPendingQuestion: true,
+        pendingQuestionCount: 0,
+        pendingQuestionPrompt: 'Which approach?',
+      }),
+    });
+
+    const card = screen.getByTestId('issue-card-TEST-123');
+    const badge = card.querySelector('[data-component="verb-badge"]') as HTMLElement;
+    expect(badge).toHaveAttribute('data-variant', 'INPUT');
+  });
+
+  it('does not surface INPUT when hasPendingQuestion is true but count is zero and prompt is empty', () => {
+    renderIssueCard({
+      issue: createMockIssue({ status: 'In Progress', state: 'in_progress', hasPlan: true, hasBeads: true }),
+      workAgent: createMockAgent({
+        id: 'agent-test-123',
+        role: 'work',
+        status: 'running',
+        hasPendingQuestion: true,
+        pendingQuestionCount: 0,
       }),
     });
 

@@ -6,7 +6,7 @@ import { useDashboardStore, selectReviewStatus } from '../../../lib/store';
 import { Issue, Agent, STATUS_LABELS } from '../../../types';
 import { getFriendlyModelName } from '../../../lib/dashboard-utils';
 import { deriveIssueActionPhase, type PipelinePhase } from '../../../lib/issueActions';
-import { hasPendingAskUserQuestion } from '../../../lib/pendingInput';
+import { hasActualPendingQuestion } from '../../../lib/pipeline-state';
 import { cn } from '../../../lib/utils';
 import { getIssueWorkAgentMap, isAgentSessionAttachable } from '../../../lib/workAgents';
 import { IssueActionMenu, useIssueActions } from '../../IssueActionMenu';
@@ -577,9 +577,9 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const issueWorkAgents = workAgents.length > 0 ? workAgents : (workAgent ? [workAgent] : []);
   const activeAgent = issueWorkAgents.find(isAgentSessionAttachable) ?? issueWorkAgents[0] ?? planningAgent;
   const isRunning = issueWorkAgents.some(isAgentSessionAttachable);
-  // PAN-1234: an issue is in INPUT phase when any non-plan agent assigned to it
-  // has an outstanding AskUserQuestion.
-  const hasPendingInput = [...issueWorkAgents, ...specialists].some(hasPendingAskUserQuestion);
+  // PAN-1234: an issue is in INPUT phase when any assigned agent has an actual
+  // pending operator question (count or prompt).
+  const hasPendingInput = [...issueWorkAgents, ...specialists].some(hasActualPendingQuestion);
   const canonical = issue.state ?? STATUS_LABELS[issue.status] ?? 'backlog';
   const issueActionPhase = deriveIssueActionPhase({
     reviewStatus,

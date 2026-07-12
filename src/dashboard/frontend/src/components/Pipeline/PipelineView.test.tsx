@@ -7,7 +7,7 @@ import type { Issue } from '../../types';
 import { DialogProvider } from '../DialogProvider';
 import { PipelineView } from './PipelineView';
 
-function renderPipelineView() {
+function renderPipelineView(props: Partial<Parameters<typeof PipelineView>[0]> = {}) {
   const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false, staleTime: Infinity },
@@ -17,7 +17,7 @@ function renderPipelineView() {
   return render(
     <QueryClientProvider client={client}>
       <DialogProvider>
-        <PipelineView />
+        <PipelineView {...props} />
       </DialogProvider>
     </QueryClientProvider>,
   );
@@ -384,7 +384,7 @@ describe('PipelineView', () => {
     document.body.removeChild(input);
   });
 
-  it('surfaces an INPUT verb badge when a non-plan agent has a pending AskUserQuestion', () => {
+  it('surfaces an INPUT verb badge when an agent has an actual pending question (count > 0)', () => {
     useDashboardStore.setState({
       issuesRaw: [
         issue({ identifier: 'PAN-8', title: 'Needs input', status: 'In Progress', state: 'in_progress', project: { id: 'ops', name: 'Operations', color: '#fff' } }),
@@ -400,11 +400,8 @@ describe('PipelineView', () => {
           startedAt: '2026-05-18T01:00:00.000Z',
           consecutiveFailures: 0,
           killCount: 0,
-          pendingAskUserQuestion: {
-            toolUseId: 'tu-1',
-            askedAt: '2026-05-18T01:00:00.000Z',
-            questions: [{ question: 'Which path?', options: [] }],
-          },
+          hasPendingQuestion: true,
+          pendingQuestionCount: 1,
         },
       },
       reviewStatusByIssueId: {},
@@ -416,27 +413,54 @@ describe('PipelineView', () => {
     expect(badge).toHaveAttribute('data-variant', 'INPUT');
   });
 
-  it('does not surface INPUT from a plan agent waiting on plan approval', () => {
+  it('surfaces an INPUT verb badge when an agent has an actual pending question (prompt)', () => {
     useDashboardStore.setState({
       issuesRaw: [
-        issue({ identifier: 'PAN-9', title: 'Plan approval', status: 'In Progress', state: 'in_progress', project: { id: 'ops', name: 'Operations', color: '#fff' } }),
+        issue({ identifier: 'PAN-8b', title: 'Needs input', status: 'In Progress', state: 'in_progress', project: { id: 'ops', name: 'Operations', color: '#fff' } }),
       ],
       agentsById: {
-        'plan-pan-9': {
-          id: 'plan-pan-9',
-          issueId: 'PAN-9',
-          role: 'plan',
+        'agent-pan-8b': {
+          id: 'agent-pan-8b',
+          issueId: 'PAN-8b',
+          role: 'work',
           status: 'running',
           model: 'opus',
           runtime: 'claude-code',
           startedAt: '2026-05-18T01:00:00.000Z',
           consecutiveFailures: 0,
           killCount: 0,
-          pendingAskUserQuestion: {
-            toolUseId: 'tu-1',
-            askedAt: '2026-05-18T01:00:00.000Z',
-            questions: [{ question: 'Approve plan?', options: [] }],
-          },
+          hasPendingQuestion: true,
+          pendingQuestionCount: 0,
+          pendingQuestionPrompt: 'Which path?',
+        },
+      },
+      reviewStatusByIssueId: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    const { container } = renderPipelineView();
+    const row = container.querySelector('[data-component="issue-row"][data-issue-id="PAN-8b"]') as HTMLElement;
+    const badge = row.querySelector('[data-component="verb-badge"]') as HTMLElement;
+    expect(badge).toHaveAttribute('data-variant', 'INPUT');
+  });
+
+  it('does not surface INPUT when hasPendingQuestion is true but count is zero and prompt is empty', () => {
+    useDashboardStore.setState({
+      issuesRaw: [
+        issue({ identifier: 'PAN-9', title: 'Stale flag', status: 'In Progress', state: 'in_progress', project: { id: 'ops', name: 'Operations', color: '#fff' } }),
+      ],
+      agentsById: {
+        'agent-pan-9': {
+          id: 'agent-pan-9',
+          issueId: 'PAN-9',
+          role: 'work',
+          status: 'running',
+          model: 'opus',
+          runtime: 'claude-code',
+          startedAt: '2026-05-18T01:00:00.000Z',
+          consecutiveFailures: 0,
+          killCount: 0,
+          hasPendingQuestion: true,
+          pendingQuestionCount: 0,
         },
       },
       reviewStatusByIssueId: {},
@@ -446,5 +470,14 @@ describe('PipelineView', () => {
     const row = container.querySelector('[data-component="issue-row"][data-issue-id="PAN-9"]') as HTMLElement;
     const badge = row.querySelector('[data-component="verb-badge"]') as HTMLElement;
     expect(badge).not.toHaveAttribute('data-variant', 'INPUT');
+  });
+
+  it('does not move row focus when keyboardShortcutsDisabled is true', () => {
+    const { container } = renderPipelineView({ keyboardShortcutsDisabled: true });
+
+    fireEvent.keyDown(document, { key: 'j' });
+
+    const rows = Array.from(container.querySelectorAll('[data-component="issue-row"]'));
+    expect(rows.some((row) => row.className.includes('ring-primary'))).toBe(false);
   });
 });
