@@ -17,6 +17,36 @@
       "timestamp": "2026-07-12T19:53:22.911Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-12T20:08Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-07-12T20:08:19.144Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T20:08:19.210Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T20:09:41.983Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T20:09:41.984Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T20:09:41.990Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T20:09:41.993Z"
     }
   ],
   "feedback": [],
@@ -110,23 +140,24 @@
     "recordedAt": "2026-07-12T19:53:15.419Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-12T19:55:02.844Z",
+  "updated": "2026-07-12T20:09:41.993Z",
   "pipeline": {
     "issueId": "PAN-2597",
-    "reviewStatus": "failed",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-12T19:55:02.795Z",
+    "panDoneRecoveredAt": "2026-07-12T20:09:29.387Z",
+    "updatedAt": "2026-07-12T20:09:35.803Z",
     "reviewNotes": "Verification failed at lint",
-    "verificationNotes": "Verification FAILED at lint (51120ms):\n\nersations/SessionDetail.tsx > src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx\n    src/lib/agents.ts > src/lib/agents/activity.ts > src/lib/runtimes/codex.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts > src/lib/config-yaml/roles.ts\n    src/lib/agents.ts > src/lib/agents/activity.ts > src/lib/runtimes/codex.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts > src/lib/config-yaml/roles.ts > src/lib/config-yaml/percent.ts > src/lib/config-yaml/schema.ts\n    src/lib/agents/tier-table.ts > src/lib/pan-dir/record.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts\n✖ stale baseline entries — run: bash scripts/lint-circular-deps.sh --update\n    src/dashboard/frontend/src/components/chat/ConversationPanel.tsx > src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/dividers.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts\n    src/dashboard/frontend/src/components/conversations/SessionDetail.tsx > src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx\n    src/lib/agents/tier-table.ts > src/lib/pan-dir/record.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts\n    src/lib/agents.ts > src/lib/agents/activity.ts > src/lib/runtimes/codex.ts > src/lib/tmux.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts > src/lib/config-yaml/roles.ts\n    src/lib/agents.ts > src/lib/agents/activity.ts > src/lib/runtimes/codex.ts > src/lib/tmux.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts > src/lib/config-yaml/roles.ts > src/lib/config-yaml/percent.ts > src/lib/config-yaml/schema.ts\n\ncircular-dependency guard failed. Break the cycle, or manually edit the baseline in an issue-referenced commit to accept audited growth.\n",
+    "verificationNotes": "Verification FAILED at lint (55072ms):\n\n tsdown:deps (67%)\n  - rolldown-plugin-dts:generate (26%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\ncomm: file 1 is not in sorted order\ncomm: input is not in sorted order\ncomm: file 1 is not in sorted order\ncomm: input is not in sorted order\n✖ new circular dependencies found — these must be removed, not baselined:\n    src/dashboard/frontend/src/components/chat/ConversationPanel.tsx > src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/dividers.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts\n    src/dashboard/frontend/src/components/conversations/SessionDetail.tsx > src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx\n    src/lib/agents/tier-table.ts > src/lib/pan-dir/record.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts\n✖ stale baseline entries — run: bash scripts/lint-circular-deps.sh --update\n    src/dashboard/frontend/src/components/chat/ConversationPanel.tsx > src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/dividers.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts\n    src/dashboard/frontend/src/components/conversations/SessionDetail.tsx > src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx\n    src/lib/agents/tier-table.ts > src/lib/pan-dir/record.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts\n\ncircular-dependency guard failed. Break the cycle, or manually edit the baseline in an issue-referenced commit to accept audited growth.\n",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
-    "reviewRequestedAt": "2026-07-12T19:53:22.913Z",
-    "reviewSpawnedAt": "2026-07-12T19:53:23.506Z",
+    "reviewRequestedAt": "2026-07-12T20:09:29.387Z",
+    "reviewSpawnedAt": "2026-07-12T20:09:35.802Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/server/services/codex-conversation-parser.ts",
@@ -222,15 +253,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 15217212,
-            "output": 10235,
-            "cacheRead": 14572032,
+            "input": 15844091,
+            "output": 10770,
+            "cacheRead": 15162880,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 47247040,
-            "output": 118181,
-            "cacheRead": 46096768,
+            "input": 62607879,
+            "output": 158980,
+            "cacheRead": 60877056,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
@@ -259,15 +290,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 15217212,
-          "output": 10235,
-          "cacheRead": 14572032,
+          "input": 15844091,
+          "output": 10770,
+          "cacheRead": 15162880,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 47247040,
-          "output": 118181,
-          "cacheRead": 46096768,
+          "input": 62607879,
+          "output": 158980,
+          "cacheRead": 60877056,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
@@ -290,8 +321,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 48.233004,
-        "pricingAsOf": "2026-07-12T19:55:02.837Z"
+        "usd": 59.749873,
+        "pricingAsOf": "2026-07-12T20:09:35.890Z"
       }
     },
     "merges": [
