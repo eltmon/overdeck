@@ -211,6 +211,12 @@ jobs:
             script: build:desktop:win
             artifact: apps/desktop/dist/*.exe
     runs-on: ${{ matrix.os }}
+    env:
+      # The `secrets` context is not allowed in step-level `if:` expressions
+      # (the workflow fails validation with zero jobs), so surface presence
+      # flags here and let the signing steps test these instead.
+      HAS_MAC_CERT: ${{ secrets.MACOS_CERTIFICATE != '' }}
+      HAS_APPLE_API_KEY: ${{ secrets.APPLE_API_KEY != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -236,7 +242,7 @@ jobs:
       # not the key material inline. Skipped when the secret isn't configured —
       # the notarize hook no-ops without APPLE_API_KEY.
       - name: Prepare Apple API key (macOS)
-        if: matrix.target == 'mac' && secrets.APPLE_API_KEY != ''
+        if: matrix.target == 'mac' && env.HAS_APPLE_API_KEY == 'true'
         shell: bash
         run: |
           KEY_PATH="$RUNNER_TEMP/AuthKey.p8"
@@ -251,7 +257,7 @@ jobs:
       # identity on the runner, and ships the app unsigned — the pre-signing
       # behavior.
       - name: Enable macOS code signing (macOS, certificate configured)
-        if: matrix.target == 'mac' && secrets.MACOS_CERTIFICATE != ''
+        if: matrix.target == 'mac' && env.HAS_MAC_CERT == 'true'
         shell: bash
         run: |
           {
