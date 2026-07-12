@@ -17,6 +17,19 @@ function harness(failOn?: string) {
   return { calls, execute, exportSnapshot, withLock };
 }
 
+function missingStoreHarness() {
+  const h = harness('context --json');
+  h.execute.mockImplementation(async (args: readonly string[]) => {
+    const command = args.join(' ');
+    h.calls.push(command);
+    if (command === 'context --json') throw new Error('no beads store');
+    if (command === 'vc status') return 'Branch: main\nCommit: abcdef1234567890abcdef1234567890abcdef12\n';
+    if (command.includes('remote show')) return JSON.stringify({ head: '1234567890123456789012345678901234567890' });
+    return '';
+  });
+  return h;
+}
+
 describe('runMutationBatch', () => {
   it('locks, pulls, performs multiple operations, commits, exports, and pushes once', async () => {
     const h = harness();
@@ -33,7 +46,7 @@ describe('runMutationBatch', () => {
     expect(h.withLock).toHaveBeenCalledOnce();
     expect(h.calls).toEqual([
       'lock',
-      'bootstrap --yes --json',
+      'context --json',
       'dolt pull',
       'vc status',
       'dolt remote show origin --json',
@@ -43,6 +56,24 @@ describe('runMutationBatch', () => {
       'export-snapshot',
       'dolt push',
       'vc status',
+    ]);
+    expect(h.calls).not.toContain('bootstrap --yes --json');
+  });
+
+  it('bootstraps only when the existing-store probe fails', async () => {
+    const h = missingStoreHarness();
+    const result = await runMutationBatch(
+      { project: { workspacePath: '/tmp/project' }, reason: 'create planned beads' },
+      (bd) => bd.mutate(['create', 'one']),
+      h,
+    );
+
+    expect(result).toMatchObject({ ok: true });
+    expect(h.calls.slice(0, 4)).toEqual([
+      'lock',
+      'context --json',
+      'bootstrap --yes --json',
+      'dolt pull',
     ]);
   });
 

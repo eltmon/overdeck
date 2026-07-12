@@ -76,10 +76,18 @@ async function readRemoteHead(client: BdMutationClient): Promise<string | null> 
   }
 }
 
+async function ensureStoreReady(client: BdMutationClient): Promise<void> {
+  try {
+    await client.run(['context', '--json']);
+  } catch {
+    await client.run(['bootstrap', '--yes', '--json']);
+  }
+}
+
 /**
  * The only canonical beads mutation transaction boundary.
  *
- * A batch owns one project lock and one bootstrap/pull/commit/export/push
+ * A batch owns one project lock and one store-ready/pull/commit/export/push
  * cycle. A failed callback is deliberately left unpushed for operator
  * recovery because bd does not expose a universally safe embedded-mode
  * rollback primitive.
@@ -102,7 +110,7 @@ export async function runMutationBatch<T>(
   return withLock(`beads mutation: ${context.reason}`, async () => {
     let value: T;
     try {
-      await client.run(['bootstrap', '--yes', '--json']);
+      await ensureStoreReady(client);
       await client.run(['dolt', 'pull']);
       recordBeadsPull(telemetryKey, await readHead(client), await readRemoteHead(client));
       value = await mutate(client);
