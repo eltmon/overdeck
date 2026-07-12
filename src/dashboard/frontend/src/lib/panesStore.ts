@@ -183,6 +183,40 @@ function schedulePersist(workspaceId: WorkspaceId, panes: WorkspacePane[], activ
   if (persistTimer == null) persistTimer = setTimeout(flushPending, 0)
 }
 
+/**
+ * Close every agent pane bound to a conversation, across ALL workspaces —
+ * used when a conversation is archived so its tab does not linger (or
+ * resurrect from persistence when another deck is opened later). Hydrated
+ * workspaces go through closePane; workspaces not hydrated this session are
+ * swept directly in localStorage under the same key convention.
+ */
+export function closeConversationPanes(conversationId: string): void {
+  const store = usePanesStore.getState()
+  const hydrated = new Set<string>()
+  for (const [workspaceId, panes] of Object.entries(store.panesByWorkspace)) {
+    hydrated.add(workspaceId)
+    for (const pane of panes) {
+      if (pane.paneType === 'agent' && pane.conversationId === conversationId) {
+        store.closePane(workspaceId, pane.paneId)
+      }
+    }
+  }
+  try {
+    const prefix = 'pan-panes:'
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (!key || !key.startsWith(prefix) || hydrated.has(key.slice(prefix.length))) continue
+      const parsed: unknown = JSON.parse(localStorage.getItem(key) ?? 'null')
+      if (!Array.isArray(parsed)) continue
+      const panes = parsed.filter(isValidPane)
+      const kept = panes.filter((p) => !(p.paneType === 'agent' && p.conversationId === conversationId))
+      if (kept.length !== panes.length) localStorage.setItem(key, JSON.stringify(kept))
+    }
+  } catch {
+    /* ignore — persistence is best-effort */
+  }
+}
+
 /** Synchronously flush any pending persistence (used by tests and unload). */
 export function flushPanesPersistence(): void {
   if (persistTimer != null) {

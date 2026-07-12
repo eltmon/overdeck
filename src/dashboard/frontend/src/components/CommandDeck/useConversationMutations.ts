@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { Conversation } from './ConversationList';
 import { updateConversationTitle } from './ConversationList';
+import { closeConversationPanes } from '../../lib/panesStore';
 
 async function archiveConversation(name: string): Promise<void> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/archive`, { method: 'POST' });
@@ -91,6 +92,8 @@ export function useConversationMutations(
     mutationFn: archiveConversation,
     onSuccess: (_data, name) => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      // An archived conversation leaves the list — close its deck tab(s) too.
+      closeConversationPanes(name);
       if (selectedConversation === name) {
         onSelectConversation(null);
       }

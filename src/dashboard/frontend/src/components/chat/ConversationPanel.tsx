@@ -31,6 +31,7 @@ import { parseDiffRouteSearch } from '../../lib/diffRouteSearch';
 import { useConfirm } from '../DialogProvider';
 import { useConversationMutations } from '../CommandDeck/useConversationMutations';
 import { ForkModal } from '../CommandDeck/ForkModal';
+import { closeConversationPanes } from '../../lib/panesStore';
 import { conversationMessagesQueryKey, useConversationMessagesStream } from './useConversationMessagesStream';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
@@ -504,6 +505,8 @@ export function ConversationPanel({
     try {
       await fetch(`/api/conversations/${encodeURIComponent(conversation.name)}/archive`, { method: 'POST' });
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      // An archived conversation leaves the list — close its deck tab(s) too.
+      closeConversationPanes(conversation.name);
       onArchived?.();
     } catch (err) {
       console.error('[ConversationPanel] Archive failed:', err);
