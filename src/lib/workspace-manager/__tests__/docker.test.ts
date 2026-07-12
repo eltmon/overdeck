@@ -153,7 +153,7 @@ describe('teardownWorkspaceDockerByNamePromise', () => {
         throw new Error('no configuration file provided: not found');
       }
       if (command.includes('docker ps -a --filter network')) {
-        return { stdout: 'abc123\ndef456\n', stderr: '' };
+        return { stdout: 'abc123\toverdeck-feature-pan-9999\ndef456\toverdeck-feature-pan-9999\n', stderr: '' };
       }
       if (command.includes('docker network ls')) {
         return { stdout: 'bridge\nhost\n', stderr: '' };
@@ -169,6 +169,31 @@ describe('teardownWorkspaceDockerByNamePromise', () => {
     expect(commands).toContain('docker rm -f "abc123" "def456"');
     expect(result.steps.some((s) => s.includes('Removed 2 container(s)'))).toBe(true);
     expect(result.networkRemoved).toBe(true);
+  });
+
+  it('disconnects foreign containers (shared traefik) instead of removing them', async () => {
+    const teardown = await loadTeardown();
+    mockExecAsync.mockImplementation(async (command: string) => {
+      if (command.includes('docker ps -a --filter network')) {
+        // One container from this stack, plus traefik (different compose project).
+        return { stdout: 'abc123\toverdeck-feature-pan-9999\ntrf999\toverdeck-infra\n', stderr: '' };
+      }
+      if (command.includes('docker network ls')) {
+        return { stdout: 'bridge\nhost\n', stderr: '' };
+      }
+      return { stdout: '', stderr: '' };
+    });
+
+    await teardown('pan-9999');
+
+    const commands = mockExecAsync.mock.calls.map(([call]) =>
+      typeof call === 'string' ? call : call.cmd,
+    );
+    expect(commands).toContain('docker rm -f "abc123"');
+    expect(commands).toContain(
+      'docker network disconnect -f "overdeck-feature-pan-9999_devnet" "trf999"',
+    );
+    expect(commands.some((c) => c.includes('rm -f') && c.includes('trf999'))).toBe(false);
   });
 
   it('does not run docker rm when no containers are attached to the network', async () => {

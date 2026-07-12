@@ -212,25 +212,49 @@ export async function teardownWorkspaceDockerByNamePromise(
     }
 
     // 2. If containers are still attached to the network (compose files missing,
-    //    project label mismatch, etc.), remove them by force so the network can
-    //    be freed. This is the durable close-out fallback.
+    //    project label mismatch, etc.), free the network. Containers belonging
+    //    to THIS compose project are force-removed; any other container (shared
+    //    infra like overdeck-traefik attaches to every workspace devnet for
+    //    routing) is only DISCONNECTED — removing it would take down services
+    //    unrelated to this workspace.
     try {
       const { stdout: containerStdout } = await execAsync(
-        `docker ps -a --filter network="${networkName}" --format '{{.ID}}'`,
+        `docker ps -a --filter network="${networkName}" --format '{{.ID}}\t{{.Label "com.docker.compose.project"}}'`,
         { encoding: 'utf-8', timeout: 30000 },
       );
-      const containerIds = containerStdout.trim().split('\n').filter(Boolean);
-      if (containerIds.length > 0) {
+      const attached = containerStdout
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => {
+          const [id, project = ''] = line.split('\t');
+          return { id, project };
+        });
+      const own = attached.filter((c) => c.project === composeProjectName);
+      const foreign = attached.filter((c) => c.project !== composeProjectName);
+      if (own.length > 0) {
         try {
-          await execAsync(`docker rm -f ${containerIds.map((id) => `"${id}"`).join(' ')}`, {
+          await execAsync(`docker rm -f ${own.map((c) => `"${c.id}"`).join(' ')}`, {
             timeout: 30000,
           });
           result.steps.push(
-            `Removed ${containerIds.length} container(s) attached to ${networkName}`,
+            `Removed ${own.length} container(s) attached to ${networkName}`,
           );
         } catch (rmError: any) {
           result.steps.push(
             `Container removal attempted (${rmError.message?.split('\n')[0] || 'containers may be in use'})`,
+          );
+        }
+      }
+      for (const container of foreign) {
+        try {
+          await execAsync(`docker network disconnect -f "${networkName}" "${container.id}"`, {
+            timeout: 30000,
+          });
+          result.steps.push(`Disconnected foreign container ${container.id} from ${networkName}`);
+        } catch (disconnectError: any) {
+          result.steps.push(
+            `Container disconnect attempted (${disconnectError.message?.split('\n')[0] || 'may already be detached'})`,
           );
         }
       }
