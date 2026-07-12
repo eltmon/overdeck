@@ -1,0 +1,644 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-11T17:47:17Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2568: Summary fork delivery race: large summary lands in codex composer but is never submitted; conversation looks dead",
+    "updated": "2026-07-11T17:52:04.667Z"
+  },
+  "plan": {
+    "id": "pan-2568",
+    "title": "Summary fork delivery race: large summary lands in codex composer but is never submitted; conversation looks dead",
+    "status": "proposed",
+    "uid": "7e38ccd3-aec3-4a2d-ba87-d60bcafe642c",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-11T17:47:17Z",
+    "updated": "2026-07-11T17:52:04.667Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2568",
+        "label": "PAN-2568",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-2568.md",
+        "label": "PRD drafts/pan-2568.md",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "pty-supervisor",
+      "delivery",
+      "conversation-forks",
+      "codex",
+      "race-condition"
+    ],
+    "narratives": {
+      "Problem": "A summary fork into a codex conversation delivered a multi-KB summary that was never submitted: the delivery client's fixed 8s socket timeout (src/lib/agents/delivery.ts:216-219) abandoned the POST while the PTY supervisor was still echo-confirming the large paste, the tmux fallback pasted a second copy concurrently (duplicate-writer race, PAN-1769 regression), the supervisor's 8,192-char purge cap (pty-supervisor.ts:40) left a remnant in the composer, every Enter arrived inside the paste burst and became a newline, and injectForkSummary treated the unconfirmed outcome as success — leaving a healthy-looking conversation with an empty transcript and the whole summary stranded unsent in the composer.",
+      "Proposal": "Make abandonment structurally impossible: one exported leaf module (src/lib/channels/injection-budget.ts) computes payload-size-aware echo/settle/purge timings and the supervisor's worst-case injection budget; the supervisor's internal waits and the delivery client's socket timeout both derive from it, client strictly greater. Raise the purge cap to 262,144 chars (reject larger payloads with 400) so purge always erases the full write. In the fork pipeline, add a pane-verified standalone-Enter recovery (up to 2 nudges via sendKeysAsync) when the runtime mirror stays silent and the delivered tail is still visible; on final failure set forkStatus='failed' with an actionable forkError instead of silently completing. PRD drafts/pan-2568.md is decision-complete; all snippets and line references verified against sha b31f1cf07e.",
+      "NonGoals": "- No generic post-delivery Enter-nudge for every deliverAgentMessage caller (e.g. conversation-message); the nudge is scoped to the fork pipeline. If stranded conversation messages recur after this lands, file a follow-up to lift the helper into delivery.ts.\n- No persisting generated fork summaries to disk for replay (separate follow-up if wanted).\n- No codex-side changes; paste-burst classification is upstream harness behavior we adapt to.\n- No in-supervisor watchdog timer; every internal wait is already bounded by the budget functions.\n- No new dependencies; supervisor remains Node-22-only.\n- Do not route stranded forks through handleForkPipelineFailure / markConversationEnded — the session is alive and recoverable."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Adopted the PRD's work-item structure and exact timing formulas verbatim (floors 2.5s/300ms/150ms, caps 15s/2s/1s, purge cap 262,144, client margin 2s, overhead 3s).",
+        "rationale": "The PRD is decision-complete with before/after snippets and named tests; every cited file:line was re-verified against the workspace at sha b31f1cf07e and found accurate. Re-deciding would only introduce drift."
+      },
+      {
+        "summary": "Split PRD WI-4 into two beads: a tmux helper/export refactor and the fork enter-nudge recovery.",
+        "rationale": "The helper extraction is a pure no-behavior-change refactor reviewable in isolation; the nudge loop is the behavioral change. Smaller independently mergeable diffs."
+      },
+      {
+        "summary": "Export the currently module-private capturePaneText from src/lib/tmux.ts:694 for the fork recovery, instead of using the Effect-based capturePane wrapper.",
+        "rationale": "injectForkSummary is plain async/await and the PRD snippets call capturePaneText directly; adding the export keyword is the smallest change. Verified capturePaneText is not currently exported."
+      },
+      {
+        "summary": "parsePayload rejects content longer than INPUT_PURGE_MAX_CHARS with a 400 rather than truncating.",
+        "rationale": "PRD states this explicitly: 'accepted' must always imply 'purgeable'; no caller sends megabyte messages today, so rejecting is correct and silent truncation is not."
+      },
+      {
+        "summary": "Documentation targets are CLAUDE.md (PTY supervisor section), src/lib/channels/SMOKE_TEST.md, and module headers only — no Mintlify page.",
+        "rationale": "The PRD states this judgment deliberately: delivery internals are developer docs with no user-facing configuration surface."
+      }
+    ],
+    "items": [
+      {
+        "id": "injection-budget",
+        "title": "Shared payload-size-aware injection-budget module wired into supervisor and delivery client",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-11T17:47:17Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2568",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "size-scaled-waits",
+            "full-length-purge",
+            "delivery-race-test"
+          ],
+          "files_scope": [
+            "src/lib/channels/injection-budget.ts",
+            "src/lib/channels/pty-supervisor.ts",
+            "src/lib/agents/delivery.ts",
+            "src/lib/channels/__tests__/injection-budget.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/channels/__tests__/injection-budget.test.ts",
+            "git grep -n \"8_000\" src/lib/agents/delivery.ts || true",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "injection-budget.test.ts passes (monotonicity, floors, caps, client-exceeds-budget property)",
+            "git grep for 8_000 in delivery.ts prints nothing",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/channels/injection-budget.ts as a leaf module (imports nothing from src/lib) exporting INPUT_ECHO_CONFIRM_INTERVAL_MS=50, INPUT_ECHO_CONFIRM_ATTEMPTS=2, INPUT_ECHO_CONFIRM_PREFIX_CHARS=40, INPUT_PURGE_MAX_CHARS=262_144, SUPERVISOR_CLIENT_MARGIN_MS=2_000, and the functions echoConfirmTimeoutMs(len)=min(2_500+ceil(len/1024)*100, 15_000), inputSettleMs(len)=min(300+ceil(len/1024)*50, 2_000), purgeSettleMs(erased)=min(150+ceil(erased/1024)*25, 1_000), supervisorInjectionBudgetMs(len)=ATTEMPTS*echoConfirmTimeoutMs(len)+ATTEMPTS*purgeSettleMs(min(len,INPUT_PURGE_MAX_CHARS))+inputSettleMs(len)+3_000 (INJECTION_OVERHEAD_MS, module-private). Exact code is in PRD WI-1. In src/lib/agents/delivery.ts replace the hardcoded 8_000 socket POST timeout (currently :216-219) with supervisorInjectionBudgetMs(message.length)+SUPERVISOR_CLIENT_MARGIN_MS and update the comment per the PRD. In src/lib/channels/pty-supervisor.ts import the shared constants/functions and delete the local INPUT_ECHO_CONFIRM_TIMEOUT_MS, INPUT_SETTLE_MS, INPUT_PURGE_SETTLE_MS, and INPUT_PURGE_MAX_CHARS=8_192 (:35-41); any log line that interpolated a deleted constant name interpolates the computed value instead. No in-supervisor watchdog timer. Write src/lib/channels/__tests__/injection-budget.test.ts per PRD WI-1's named assertions."
+        },
+        "items": [
+          {
+            "id": "injection-budget.ac1",
+            "title": "src/lib/channels/injection-budget.ts exports the four functions and four constants above and imports nothing from src/lib (leaf module; dashboard build produces no new circular-ESM error)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "injection-budget.ac2",
+            "title": "delivery.ts passes supervisorInjectionBudgetMs(message.length)+SUPERVISOR_CLIENT_MARGIN_MS to postUnixSocketJson, and git grep \"8_000\" src/lib/agents/delivery.ts returns nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "injection-budget.ac3",
+            "title": "injection-budget.test.ts passes, proving the budget is monotonic in length, floors hold (echoConfirmTimeoutMs(1024)===2_600, supervisorInjectionBudgetMs(0)===2*2_500+2*150+300+3_000), caps hold at 10 MB, and for sizes 0, 8 KB, 30 KB, 1 MB the client timeout strictly exceeds the supervisor's internal wait sum",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "injection-budget.ac4",
+            "title": "pty-supervisor.ts contains no local definitions of INPUT_ECHO_CONFIRM_TIMEOUT_MS, INPUT_SETTLE_MS, INPUT_PURGE_SETTLE_MS, or INPUT_PURGE_MAX_CHARS=8_192, and imports the shared module instead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "size-scaled-waits",
+        "title": "injectPtyMessage echo-confirm timeout and pre-Enter settle scale with payload size",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-11T17:47:17Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2568",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/channels/pty-supervisor.ts",
+            "src/lib/channels/__tests__/pty-supervisor.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/channels/__tests__/pty-supervisor.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pty-supervisor.test.ts passes including the new 30 KB slow-echo and 0.5 KB floor cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/channels/pty-supervisor.ts: waitForPtyEcho (:246) gains a timeoutMs parameter used as its deadline; injectPtyMessage (:271) passes echoConfirmTimeoutMs(trimmed.length). The pre-Enter `await sleep(INPUT_SETTLE_MS)` (near :320) becomes `await sleep(inputSettleMs(trimmed.length))`. The echo-not-confirmed warn (:302-305) interpolates the computed timeout value, not a constant name. Before/after snippets in PRD WI-2. Extend src/lib/channels/__tests__/pty-supervisor.test.ts with fake-timer cases (vi.useFakeTimers + vi.advanceTimersByTimeAsync, never real waits)."
+        },
+        "items": [
+          {
+            "id": "size-scaled-waits.ac1",
+            "title": "Given a 30 KB payload whose echo appears at t=6s under fake timers, injectPtyMessage confirms on attempt 1 without purging (previously it purged and retried at 2.5s)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "size-scaled-waits.ac2",
+            "title": "Given a 0.5 KB payload with no echo, waitForPtyEcho still times out at 2.5s (small-message behavior preserved, FR-6)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "size-scaled-waits.ac3",
+            "title": "The pre-Enter settle sleeps inputSettleMs(trimmed.length) and the echo-timeout warn log emits the computed millisecond value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "full-length-purge",
+        "title": "purgePtyInput erases the full written length; supervisor rejects payloads above the purge cap",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-11T17:47:17Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2568",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/channels/pty-supervisor.ts",
+            "src/lib/channels/__tests__/pty-supervisor.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/channels/__tests__/pty-supervisor.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pty-supervisor.test.ts passes including the 30,008-DEL purge assertion and the >262,144-char rejection",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/channels/pty-supervisor.ts: purgePtyInput (:265) keeps `Math.min(charCount, INPUT_PURGE_MAX_CHARS) + 8` but the cap is now the shared 262,144 from injection-budget, and the fixed `sleep(INPUT_PURGE_SETTLE_MS)` becomes `sleep(purgeSettleMs(count))`. parsePayload (:108) rejects content longer than INPUT_PURGE_MAX_CHARS so the injection endpoint responds 400 — 'accepted' always implies 'purgeable'; do NOT silently truncate. Update the doc comment above purgePtyInput: the PAN-1769 invariant (retries never stack duplicate copies) now explicitly holds for payloads up to INPUT_PURGE_MAX_CHARS. Note MAX_REQUEST_BYTES=1 MiB (:34) already bounds the HTTP body above the new cap; leave it unchanged."
+        },
+        "items": [
+          {
+            "id": "full-length-purge.ac1",
+            "title": "Given a 30,000-char unconfirmed payload, purgePtyInput emits 30,008 backspace (\\x7f) bytes to the PTY (observed via a child.write spy), not 8,200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "full-length-purge.ac2",
+            "title": "parsePayload returns null for content longer than 262,144 chars and the injection endpoint responds 400 for such payloads",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "full-length-purge.ac3",
+            "title": "The post-purge settle applies purgeSettleMs(count), scaling with erased length under fake timers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tmux-verify-helpers",
+        "title": "Export deliveryVerifyLine helper and capturePaneText from src/lib/tmux.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-11T17:47:17Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-2568",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/tmux.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__ --silent"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "existing suites pass with no behavior change"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/tmux.ts: (1) extract the verify-line computation currently inlined in sendKeys at :1146 into an exported pure helper `export function deliveryVerifyLine(content: string): string` (exact body in PRD WI-4 step 1) and make sendKeys call it — identical result, no behavior change; (2) add the `export` keyword to the module-private `async function capturePaneText` (:694) so the fork recovery can import it (verified currently unexported; only capturePaneSync and the Effect-based capturePane are exported). No other changes."
+        },
+        "items": [
+          {
+            "id": "tmux-verify-helpers.ac1",
+            "title": "tmux.ts exports deliveryVerifyLine, which returns the last line with ≥3 trimmed chars (falling back to the final line, then empty string), and sendKeys' inline computation at :1146 is replaced by a call to it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tmux-verify-helpers.ac2",
+            "title": "capturePaneText gains the export keyword so an import from conversation-forks.ts resolves, and typecheck passes with existing callers unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tmux-verify-helpers.ac3",
+            "title": "sendKeys produces the same verify line as before for multi-line and whitespace-tail content (no behavior change)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-enter-nudge",
+        "title": "Pane-verified standalone-Enter recovery in injectForkSummary",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-11T17:47:17Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2568",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-forks.ts",
+            "src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "nudge cases (a)-(c) from PRD WI-4 pass under fake timers",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "readinessReason": "Touches only conversation-forks.ts plus its own new test file; its imports land in the blocking tmux-verify-helpers bead, and no other wave-parallel item touches these files (fork-stranded-status is serialized behind it via a blocks edge).",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/overdeck/conversation-forks.ts, change injectForkSummary (:320) to return Promise<'submitted' | 'stranded'> (today Promise<void>; the ohmypi early-return branch near :324-328 returns 'submitted'). After each deliverAgentMessage + confirmForkPromptAccepted cycle that does not return 'accepted' (i.e. on BOTH 'still-idle' and 'unknown' — the incident case was 'unknown', so the current unknown→return branch near :338-341 is replaced by this recovery): compute verify = deliveryVerifyLine(summary).slice(0,40); loop up to 2 nudges: capture the pane via capturePaneText(conv.tmuxSession, 40); if verify (length ≥3) is NOT in the pane, break (composer empty — fall through to the existing attempt-2 re-delivery loop); otherwise warn and send a lone C-m via sendKeysAsync(conv.tmuxSession, 'C-m', `${caller}:enter-nudge`), then confirmForkPromptAccepted(conv.tmuxSession, 8000) — 'accepted' returns 'submitted'; also re-capture and if the verify line is gone return 'submitted' (composer cleared; codex mirror may lag). A nudge cycle that finds the composer still full and fails both Enters returns 'stranded' WITHOUT re-delivering (re-pasting onto a full composer is exactly how duplicates happen); the existing 'could not confirm brief delivery after 2 attempts' path also returns 'stranded'. Exact snippet in PRD WI-4 step 2. New test file src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts with fake timers, mocking capturePaneText, sendKeysAsync, and forkPipelineRuntimeOverrides.getAgentRuntimeStateSync. Only async tmux primitives."
+        },
+        "items": [
+          {
+            "id": "fork-enter-nudge.ac1",
+            "title": "Given the composer still shows the verify line and the runtime mirror is idle, injectForkSummary sends exactly one standalone C-m and returns 'submitted' when confirmForkPromptAccepted then reports 'accepted'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-enter-nudge.ac2",
+            "title": "Given the pane no longer contains the verify line but the mirror stays silent, injectForkSummary returns 'submitted' without sending a second nudge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-enter-nudge.ac3",
+            "title": "Given both nudges fail with the composer still full, injectForkSummary returns 'stranded' and never re-delivers the summary (deliverAgentMessage not called again after the nudge loop)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-enter-nudge.ac4",
+            "title": "The recovery emits at most 2 standalone C-m keystrokes per injection attempt, all via sendKeysAsync (no sync sendKeys, no execSync)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-stranded-status",
+        "title": "Stranded forks set forkStatus='failed' with an actionable error instead of silently completing",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-11T17:47:17Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2568",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-forks.ts",
+            "src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "stranded/submitted forkStatus assertions pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In runForkPipeline (src/lib/overdeck/conversation-forks.ts:357; injection call currently `await self.injectForkSummary(...)` at :491 followed by unconditional `updateForkStatus(convName, null)` at :493): capture the injection result; if 'stranded', call updateForkStatus(convName, 'failed', 'Summary was delivered to the terminal but never submitted. Open the Terminal tab and press Enter to submit it; the session is alive.') and return; otherwise clear forkStatus to null as today. Do NOT route the stranded case through handleForkPipelineFailure (:350) — it calls markConversationEnded, which is wrong because the successor session is alive and one keystroke recovers it. Exact snippet in PRD WI-5. Extend the enter-nudge test file with the forkStatus assertions."
+        },
+        "items": [
+          {
+            "id": "fork-stranded-status.ac1",
+            "title": "A stranded injection updates forkStatus to 'failed' with a forkError telling the operator to open the Terminal tab and press Enter, and never updates forkStatus to null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-stranded-status.ac2",
+            "title": "A stranded injection preserves the live successor session: markConversationEnded is never invoked (observed via spy)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-stranded-status.ac3",
+            "title": "A submitted injection updates forkStatus to null exactly as before (no regression)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delivery-race-test",
+        "title": "Regression tests: delivery-client timeout scales with payload and large payloads stay on the supervisor tier",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-11T17:47:17Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-2568",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/__tests__/deliver-agent-message.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/deliver-agent-message.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "deliver-agent-message.test.ts passes including the two new race cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend src/lib/__tests__/deliver-agent-message.test.ts (supervisor-tier tests already live here around :597-668): (a) assert the timeout passed to the socket POST grows with message size — for a 30 KB message the timeout is ≥ supervisorInjectionBudgetMs(30_720) + SUPERVISOR_CLIENT_MARGIN_MS; (b) with fake timers and a supervisor stub that responds just under its budget for a 30 KB payload, deliverAgentMessage resolves { path: 'supervisor' } and the tmux tier is never invoked (this exact scenario fell through to tmux before the fix). Fake timers only — never real waits."
+        },
+        "items": [
+          {
+            "id": "delivery-race-test.ac1",
+            "title": "The socket POST for a 30 KB message receives a timeout ≥ supervisorInjectionBudgetMs(30_720) + SUPERVISOR_CLIENT_MARGIN_MS (asserted via the postUnixSocketJson mock)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delivery-race-test.ac2",
+            "title": "With a supervisor stub responding just under budget for a 30 KB payload under fake timers, delivery resolves path 'supervisor' and the tmux fallback is never invoked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-update",
+        "title": "Document the injection budget, purge invariant, and stranded-fork surfacing",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-11T17:47:17Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2568",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "CLAUDE.md",
+            "src/lib/channels/SMOKE_TEST.md",
+            "src/lib/channels/injection-budget.ts",
+            "src/lib/channels/pty-supervisor.ts",
+            "src/lib/overdeck/conversation-forks.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -n \"8_000\" src/lib/agents/delivery.ts || true",
+            "grep -c \"injection-budget\" CLAUDE.md src/lib/channels/SMOKE_TEST.md"
+          ],
+          "expected_outputs": [
+            "git grep for 8_000 in delivery.ts prints nothing",
+            "both docs mention the injection budget"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Update three documentation surfaces (no Mintlify page — delivery internals are developer docs, a judgment the PRD states deliberately): (1) CLAUDE.md section 'PTY supervisor for orchestrator delivery' — document the size-aware injection budget (injection-budget.ts as the single source of truth for both supervisor waits and client timeout), the raised purge cap + payload-size 400, and the fork pipeline's standalone-Enter recovery / forkStatus='failed' stranded surfacing; (2) src/lib/channels/SMOKE_TEST.md — refresh any figures quoting the old 8s client timeout or fixed 2.5s echo window, and add a smoke case 'fork a large (>8 KB) summary into a codex conversation and confirm the first turn submits'; (3) module headers — injection-budget.ts (why one module owns both sides' timing), pty-supervisor.ts (purge invariant now full-length), conversation-forks.ts (injectForkSummary return contract)."
+        },
+        "items": [
+          {
+            "id": "docs-update.ac1",
+            "title": "CLAUDE.md's PTY supervisor section contains the size-aware injection budget (injection-budget.ts as single timing source), the 262,144-char purge cap with 400 rejection, and the stranded-fork forkStatus='failed' surfacing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-update.ac2",
+            "title": "SMOKE_TEST.md contains no stale 8s-client-timeout or fixed-2.5s-echo figures and adds the >8 KB codex-fork smoke case",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-update.ac3",
+            "title": "Each module header contains its new contract: injection-budget.ts the shared-timing rationale, pty-supervisor.ts the full-length purge invariant, conversation-forks.ts injectForkSummary's 'submitted'|'stranded' return contract",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "injection-budget",
+        "to": "size-scaled-waits",
+        "type": "blocks"
+      },
+      {
+        "from": "injection-budget",
+        "to": "full-length-purge",
+        "type": "blocks"
+      },
+      {
+        "from": "injection-budget",
+        "to": "delivery-race-test",
+        "type": "blocks"
+      },
+      {
+        "from": "tmux-verify-helpers",
+        "to": "fork-enter-nudge",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-enter-nudge",
+        "to": "fork-stranded-status",
+        "type": "blocks"
+      },
+      {
+        "from": "injection-budget",
+        "to": "fork-enter-nudge",
+        "type": "informs"
+      },
+      {
+        "from": "size-scaled-waits",
+        "to": "full-length-purge",
+        "type": "blocks"
+      },
+      {
+        "from": "injection-budget",
+        "to": "docs-update",
+        "type": "blocks"
+      },
+      {
+        "from": "size-scaled-waits",
+        "to": "docs-update",
+        "type": "blocks"
+      },
+      {
+        "from": "full-length-purge",
+        "to": "docs-update",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-enter-nudge",
+        "to": "docs-update",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-stranded-status",
+        "to": "docs-update",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-11-PAN-2568-summary-fork-delivery-race-large-summary-lands-in-codex-composer-but-is-never-submitted-conversation-looks-dead.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
