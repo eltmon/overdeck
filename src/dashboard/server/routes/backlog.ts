@@ -50,6 +50,21 @@ const getBacklogSequenceRoute = HttpRouter.add(
   'GET',
   '/api/backlog/sequence',
   httpHandler(Effect.gen(function* () {
+    // Beads presence is async (canonical resolver) — compute it in generator
+    // scope; `yield*` cannot appear inside the sync Effect.try callback below.
+    const wsDir = join(process.cwd(), 'workspaces');
+    const issuesWithBeads = new Set<string>();
+    if (existsSync(wsDir)) {
+      const candidates = readdirSync(wsDir)
+        .map((dir) => ({ dir, match: /^feature-([a-z]+-\d+)$/i.exec(dir) }))
+        .filter((c): c is { dir: string; match: RegExpExecArray } => c.match !== null);
+      const results = yield* Effect.promise(() => Promise.all(candidates.map(async ({ dir, match }) => {
+        const issueId = match[1]!.toUpperCase();
+        const result = await createBeadsResolver(join(wsDir, dir)).issueHasBeads(issueId);
+        return { issueId, has: result.ok && result.value };
+      })));
+      for (const r of results) if (r.has) issuesWithBeads.add(r.issueId);
+    }
     return yield* Effect.try({
       try: () => {
         const projectRoot = process.cwd();
@@ -78,18 +93,7 @@ const getBacklogSequenceRoute = HttpRouter.add(
           }
         }
 
-        const workspacesDir = join(projectRoot, 'workspaces');
-        const issuesWithBeads = new Set<string>();
-        if (existsSync(workspacesDir)) {
-          for (const dir of readdirSync(workspacesDir)) {
-            const match = /^feature-([a-z]+-\d+)$/i.exec(dir);
-            if (match) {
-              const issueId = match[1]!.toUpperCase();
-              const result = yield* Effect.promise(() => createBeadsResolver(join(workspacesDir, dir)).issueHasBeads(issueId));
-              if (result.ok && result.value) issuesWithBeads.add(issueId);
-            }
-          }
-        }
+        // issuesWithBeads precomputed above in generator scope.
 
         // Join issue titles from the in-memory read-model issue service so the
         // detail panel can show the title (the sequence cache stores only the id).

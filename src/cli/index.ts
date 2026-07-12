@@ -92,6 +92,7 @@ import { registerTestCommands } from './commands/test.js';
 import { registerTtsCommands } from './commands/tts.js';
 import { registerInstallCommand } from './commands/install.js';
 import { registerAdminCommands } from './commands/admin/index.js';
+import { registerBeadsCommands } from './commands/beads.js';
 import { registerConversationsCommands } from './commands/conversations/index.js';
 import { registerOhmypiAuthCommands } from './commands/ohmypi-auth.js';
 import { projectAddCommand, projectListCommand, projectRemoveCommand, projectInitCommand, projectShowCommand } from './commands/project.js';
@@ -597,6 +598,7 @@ registerSwarmCommands(program);
 registerWorkspaceCommands(program);
 registerTestCommands(program);
 registerTtsCommands(program);
+registerBeadsCommands(program);
 
 // Register release commands (pan release check/stable/canary/notes)
 registerReleaseCommands(program);
