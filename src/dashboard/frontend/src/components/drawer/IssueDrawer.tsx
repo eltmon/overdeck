@@ -262,7 +262,6 @@ export function IssueDrawer() {
   // Independent of the Conversation/Terminal selection (effectiveAgentId) so the
   // Files tab always reflects the issue's work, not a user-picked peer session.
   const filesAgentId = pickDefaultDrawerAgent(agents)?.id ?? null;
-
   // Selected agent for the Conversation/Terminal tabs. Owned here so the choice
   // survives a Conversation ⇄ Terminal tab switch; falls back to the default
   // pick whenever the selection is cleared or no longer matches an agent.
