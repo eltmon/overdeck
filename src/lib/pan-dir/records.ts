@@ -99,6 +99,10 @@ function projectPipeline(
     readyForMerge: status?.readyForMerge ?? false,
     closedOut: existing?.closedOut,
     closedOutAt: existing?.closedOutAt,
+    // PAN-2587: the tombstone lives only in the record — a rebuild that projects
+    // from ReviewStatus (which has no such field) must not erase it, or the
+    // orphaned-completions patrol re-arms the same issue forever (36x on PAN-399).
+    panDoneRecoveredAt: existing?.panDoneRecoveredAt,
     updatedAt: status?.updatedAt ?? new Date().toISOString(),
   };
 
@@ -118,6 +122,7 @@ function projectPipeline(
     reviewedAtCommit: status.reviewedAtCommit,
     lastVerifiedCommit: status.lastVerifiedCommit,
     reviewRequestedAt: status.reviewRequestedAt,
+    reviewSpawnedAt: status.reviewSpawnedAt,
     scopeDrift: status.scopeDrift,
     autoMerge: status.autoMerge,
     deaconIgnored: status.deaconIgnored,

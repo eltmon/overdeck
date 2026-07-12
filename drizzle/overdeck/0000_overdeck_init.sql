@@ -40,6 +40,12 @@ CREATE TABLE `agents` (
 	`review_deadline_at` integer,
 	`review_monitor_signaled` text,
 	`review_retry_attempt` integer,
+	`review_discovery_pending` integer,
+	`review_context_manifest_path` text,
+	`review_discovery_ready_at` integer,
+	`review_convoy_forked_at` integer,
+	`review_fork_cache_checked` integer,
+	`review_forked_from_parent` integer,
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`issue_id`) REFERENCES `issues`(`id`) ON UPDATE no action ON DELETE no action
 );

@@ -73,6 +73,14 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   // migration only runs on a fresh DB, so existing overdeck.db files need these
   // columns added idempotently here.
   try { db.exec('ALTER TABLE `agents` ADD COLUMN `yielded_by_scheduler` integer'); } catch { /* already exists or table absent */ }
+  // PAN-2585: PAN-1862 discovery-fork state — was state.json-only (write-only under
+  // the DB-first reader), which blinded the discovery-ready signal and its backstop.
+  try { db.exec('ALTER TABLE `agents` ADD COLUMN `review_discovery_pending` integer'); } catch { /* already exists or table absent */ }
+  try { db.exec('ALTER TABLE `agents` ADD COLUMN `review_context_manifest_path` text'); } catch { /* already exists or table absent */ }
+  try { db.exec('ALTER TABLE `agents` ADD COLUMN `review_discovery_ready_at` integer'); } catch { /* already exists or table absent */ }
+  try { db.exec('ALTER TABLE `agents` ADD COLUMN `review_convoy_forked_at` integer'); } catch { /* already exists or table absent */ }
+  try { db.exec('ALTER TABLE `agents` ADD COLUMN `review_fork_cache_checked` integer'); } catch { /* already exists or table absent */ }
+  try { db.exec('ALTER TABLE `agents` ADD COLUMN `review_forked_from_parent` integer'); } catch { /* already exists or table absent */ }
   try { db.exec('ALTER TABLE `agents` ADD COLUMN `yielded_at` integer'); } catch { /* already exists or table absent */ }
   try { db.exec('ALTER TABLE `agents` ADD COLUMN `last_yield_resume_at` integer'); } catch { /* already exists or table absent */ }
 }

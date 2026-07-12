@@ -24,11 +24,11 @@
 1194 src/lib/conversations/smart-compaction.ts
 1660 src/lib/database/schema.ts
 1364 src/lib/model-capabilities.ts
-1104 src/lib/overdeck/agents.ts
+1113 src/lib/overdeck/agents.ts
 1539 src/lib/overdeck/conversations.ts
 1050 src/lib/overdeck/memory.ts
 1002 src/lib/overdeck/merge.ts
-1153 src/lib/review-status.ts
+1159 src/lib/review-status.ts
 1486 src/lib/settings-api.ts
 1205 src/lib/sync.ts
 1268 src/lib/tmux.ts

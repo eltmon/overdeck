@@ -85,6 +85,7 @@ function durableSubset(p: PanIssuePipelineRecord): DurableStatusFields {
     reviewedAtCommit: p.reviewedAtCommit,
     lastVerifiedCommit: p.lastVerifiedCommit,
     reviewRequestedAt: p.reviewRequestedAt,
+    reviewSpawnedAt: p.reviewSpawnedAt,
     reviewerVerdicts: p.reviewerVerdicts as ReviewStatus['reviewerVerdicts'],
     autoMerge: p.autoMerge,
     deaconIgnored: p.deaconIgnored,
