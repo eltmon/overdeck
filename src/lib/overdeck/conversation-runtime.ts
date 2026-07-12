@@ -601,14 +601,20 @@ export async function spawnConversationSession(
   if (effort && !SAFE_EFFORT_PATTERN.test(effort)) {
     throw new Error('Invalid effort level');
   }
-  const useSupervisor = shouldUseSupervisorForConversation(harness);
+  let useSupervisor = shouldUseSupervisorForConversation(harness);
   let supervisorScriptPath: string | undefined;
   if (useSupervisor) {
-    supervisorScriptPath = resolvePtySupervisorScriptPath();
-    if (!existsSync(supervisorScriptPath)) {
-      throw new Error('pty-supervisor build artifact missing — run `npm run build`.');
+    const candidate = resolvePtySupervisorScriptPath();
+    if (existsSync(candidate)) {
+      supervisorScriptPath = candidate;
+      await writePtyToken(tmuxSession);
+    } else {
+      // Packaged installs (desktop AppImage/dmg, npx) do not ship the
+      // supervisor artifact yet (PAN-2592). The supervisor is delivery tier 1
+      // of 3 — spawn without it and let delivery fall back to channels/tmux.
+      useSupervisor = false;
+      console.warn(`[conversations] pty-supervisor artifact missing at ${candidate} — spawning ${tmuxSession} without supervisor (PAN-2592)`);
     }
-    await writePtyToken(tmuxSession);
   }
   let channelsBridgeMcpConfig: string | undefined;
   if (

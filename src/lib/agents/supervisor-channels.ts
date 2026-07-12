@@ -138,7 +138,12 @@ export async function prepareSupervisorForFreshLaunch(
 
   const supervisorScriptPath = resolvePtySupervisorScriptPath();
   if (!existsSync(supervisorScriptPath)) {
-    throw new Error('pty-supervisor build artifact missing — run `npm run build`.');
+    // Packaged installs (desktop AppImage/dmg, npx) do not ship the supervisor
+    // artifact yet (PAN-2592). The supervisor is delivery tier 1 of 3 — launch
+    // without it and let delivery fall back to channels/tmux.
+    console.warn(`[${agentId}] pty-supervisor artifact missing at ${supervisorScriptPath} — launching without supervisor (PAN-2592)`);
+    delete state.supervisorEnabled;
+    return { useSupervisor: false };
   }
   await writePtyToken(agentId);
   state.supervisorEnabled = true;
@@ -171,7 +176,10 @@ export async function prepareSupervisorForRelaunch(
 
   const supervisorScriptPath = resolvePtySupervisorScriptPath();
   if (!existsSync(supervisorScriptPath)) {
-    throw new Error('pty-supervisor build artifact missing — run `npm run build`.');
+    // Same degradation as the fresh-launch path (PAN-2592).
+    console.warn(`[${agentId}] pty-supervisor artifact missing at ${supervisorScriptPath} — relaunching without supervisor (PAN-2592)`);
+    delete state.supervisorEnabled;
+    return { useSupervisor: false };
   }
   await writePtyToken(agentId);
   state.supervisorEnabled = true;
