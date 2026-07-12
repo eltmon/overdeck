@@ -24,10 +24,17 @@ and optional `params`; it has no `id`. `JSONRPCResponse` has required `id` and
 The generated schemas do not define a `jsonrpc` property on requests,
 notifications, responses, or errors. Do not send `jsonrpc: "2.0"`.
 
-`RequestId` accepts either a string or an integer. Overdeck uses a monotonic
-integer counter because integers are schema-valid and this matches the t3code
-reference implementation. t3code writes each JSON message followed by `\n`, so
-Overdeck should use newline-delimited JSON over the child stdio stream.
+`RequestId` accepts either a string or an integer. The schema verifies that
+integer IDs are valid, not that they are mandatory. Overdeck uses a monotonic
+integer counter because the t3code reference reads `context.nextRequestId`,
+increments it, and writes that value as `id`
+(`/home/eltmon/Projects/t3code/apps/server/src/codexAppServerManager.ts:1215`).
+
+The generated schema describes one JSON-RPC message object at a time; it does
+not encode stream framing. The newline-delimited stdio framing is verified from
+the t3code reference, whose `writeMessage` serializes one message and writes
+`${encoded}\n` to the Codex child stdin
+(`/home/eltmon/Projects/t3code/apps/server/src/codexAppServerManager.ts:1246`).
 
 ## Client Requests
 
