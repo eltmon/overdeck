@@ -54,9 +54,9 @@ describe('materializePtySupervisorRuntime', () => {
     expect(readFileSync(join(second, '..', 'marker.txt'), 'utf-8')).toBe('kept');
   });
 
-  it('materializes to a fresh directory when the staged entry content changes (app upgrade)', () => {
+  it('materializes to a fresh directory when a non-entry staged file changes (app upgrade)', () => {
     const first = materializePtySupervisorRuntime(stagedDir, home);
-    writeFileSync(join(stagedDir, 'pty-supervisor.js'), '#!/usr/bin/env node\nconsole.log("supervisor v2");\n');
+    writeFileSync(join(stagedDir, 'paths-abc123.js'), 'export const x = 2;\n');
     const second = materializePtySupervisorRuntime(stagedDir, home);
 
     expect(second).not.toBe(first);
