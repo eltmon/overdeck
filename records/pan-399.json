@@ -196,6 +196,66 @@
       "timestamp": "2026-07-12T01:24:06.715Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T06:23:47.028Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T06:23:50.543Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T06:24:18.425Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T06:24:38.458Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T06:24:57.006Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T06:25:27.458Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T06:25:50.455Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T06:25:58.100Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T06:26:28.044Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T06:26:52.817Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T06:27:00.002Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-12T06:27Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-12T06:27:11.093Z"
     }
   ],
   "feedback": [],
@@ -323,18 +383,19 @@
     "recordedAt": "2026-07-12T01:24:02.241Z"
   },
   "created": "2026-07-11T09:28:34.266Z",
-  "updated": "2026-07-12T02:35:48.838Z",
+  "updated": "2026-07-12T06:27:27.121Z",
   "pipeline": {
     "issueId": "PAN-399",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
+    "reviewStatus": "reviewing",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-12T01:32:11.675Z",
+    "updatedAt": "2026-07-12T06:27:26.780Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2577",
+    "reviewedAtCommit": "a2edef4778231d558c49b0e76d6bb33ba3dee46f",
     "lastVerifiedCommit": "a2edef4778231d558c49b0e76d6bb33ba3dee46f",
     "reviewRequestedAt": "2026-07-12T01:32:07.847Z",
     "scopeDrift": {
@@ -459,8 +520,7 @@
         "tests/unit/lib/review-status-release.test.ts"
       ],
       "recordedAt": "2026-07-12T01:24:02.241Z"
-    },
-    "panDoneRecoveredAt": "2026-07-12T01:32:07.847Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -473,9 +533,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 62896134,
-            "output": 159147,
-            "cacheRead": 59096064,
+            "input": 63520966,
+            "output": 163660,
+            "cacheRead": 59633920,
             "cacheWrite": 0
           },
           "unknown": {
@@ -539,9 +599,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 5722632,
-            "output": 337661,
-            "cacheRead": 193925888,
+            "input": 6579678,
+            "output": 343143,
+            "cacheRead": 201811712,
             "cacheWrite": 0
           }
         }
@@ -554,9 +614,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 63596494,
-          "output": 188176,
-          "cacheRead": 64787968,
+          "input": 64221326,
+          "output": 192689,
+          "cacheRead": 65325824,
           "cacheWrite": 0
         },
         "unknown": {
@@ -590,15 +650,15 @@
           "cacheWrite": 77989
         },
         "custom/kimi-k2.7-code": {
-          "input": 5722632,
-          "output": 337661,
-          "cacheRead": 193925888,
+          "input": 6579678,
+          "output": 343143,
+          "cacheRead": 201811712,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 149.043887,
-        "pricingAsOf": "2026-07-12T01:32:11.700Z"
+        "usd": 152.21751700000002,
+        "pricingAsOf": "2026-07-12T06:27:26.975Z"
       }
     },
     "merges": [
