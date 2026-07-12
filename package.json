@@ -28,6 +28,9 @@
     "url": "https://github.com/eltmon/overdeck/issues"
   },
   "type": "module",
+  "trustedDependencies": [
+    "@homebridge/node-pty-prebuilt-multiarch"
+  ],
   "workspaces": {
     "packages": [
       "packages/contracts",
