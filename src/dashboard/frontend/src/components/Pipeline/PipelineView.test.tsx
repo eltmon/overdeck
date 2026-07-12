@@ -383,4 +383,68 @@ describe('PipelineView', () => {
 
     document.body.removeChild(input);
   });
+
+  it('surfaces an INPUT verb badge when a non-plan agent has a pending AskUserQuestion', () => {
+    useDashboardStore.setState({
+      issuesRaw: [
+        issue({ identifier: 'PAN-8', title: 'Needs input', status: 'In Progress', state: 'in_progress', project: { id: 'ops', name: 'Operations', color: '#fff' } }),
+      ],
+      agentsById: {
+        'agent-pan-8': {
+          id: 'agent-pan-8',
+          issueId: 'PAN-8',
+          role: 'work',
+          status: 'running',
+          model: 'opus',
+          runtime: 'claude-code',
+          startedAt: '2026-05-18T01:00:00.000Z',
+          consecutiveFailures: 0,
+          killCount: 0,
+          pendingAskUserQuestion: {
+            toolUseId: 'tu-1',
+            askedAt: '2026-05-18T01:00:00.000Z',
+            questions: [{ question: 'Which path?', options: [] }],
+          },
+        },
+      },
+      reviewStatusByIssueId: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    const { container } = renderPipelineView();
+    const row = container.querySelector('[data-component="issue-row"][data-issue-id="PAN-8"]') as HTMLElement;
+    const badge = row.querySelector('[data-component="verb-badge"]') as HTMLElement;
+    expect(badge).toHaveAttribute('data-variant', 'INPUT');
+  });
+
+  it('does not surface INPUT from a plan agent waiting on plan approval', () => {
+    useDashboardStore.setState({
+      issuesRaw: [
+        issue({ identifier: 'PAN-9', title: 'Plan approval', status: 'In Progress', state: 'in_progress', project: { id: 'ops', name: 'Operations', color: '#fff' } }),
+      ],
+      agentsById: {
+        'plan-pan-9': {
+          id: 'plan-pan-9',
+          issueId: 'PAN-9',
+          role: 'plan',
+          status: 'running',
+          model: 'opus',
+          runtime: 'claude-code',
+          startedAt: '2026-05-18T01:00:00.000Z',
+          consecutiveFailures: 0,
+          killCount: 0,
+          pendingAskUserQuestion: {
+            toolUseId: 'tu-1',
+            askedAt: '2026-05-18T01:00:00.000Z',
+            questions: [{ question: 'Approve plan?', options: [] }],
+          },
+        },
+      },
+      reviewStatusByIssueId: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    const { container } = renderPipelineView();
+    const row = container.querySelector('[data-component="issue-row"][data-issue-id="PAN-9"]') as HTMLElement;
+    const badge = row.querySelector('[data-component="verb-badge"]') as HTMLElement;
+    expect(badge).not.toHaveAttribute('data-variant', 'INPUT');
+  });
 });

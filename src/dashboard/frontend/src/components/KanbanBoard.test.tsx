@@ -895,6 +895,46 @@ describe('IssueCard', () => {
     expect(screen.queryByTestId('card-untroubled-TEST-123')).toBeNull();
   });
 
+  it('surfaces an INPUT verb badge when a non-plan agent has a pending AskUserQuestion', () => {
+    renderIssueCard({
+      issue: createMockIssue({ status: 'In Progress', state: 'in_progress', hasPlan: true, hasBeads: true }),
+      workAgent: createMockAgent({
+        id: 'agent-test-123',
+        role: 'work',
+        status: 'running',
+        pendingAskUserQuestion: {
+          toolUseId: 'tu-1',
+          askedAt: new Date().toISOString(),
+          questions: [{ question: 'Which approach?', options: [] }],
+        },
+      }),
+    });
+
+    const card = screen.getByTestId('issue-card-TEST-123');
+    const badge = card.querySelector('[data-component="verb-badge"]') as HTMLElement;
+    expect(badge).toHaveAttribute('data-variant', 'INPUT');
+  });
+
+  it('does not surface INPUT from a plan agent waiting on plan approval', () => {
+    renderIssueCard({
+      issue: createMockIssue({ status: 'In Progress', state: 'in_progress', hasPlan: true, hasBeads: true }),
+      planningAgent: createMockAgent({
+        id: 'plan-test-123',
+        role: 'plan',
+        status: 'running',
+        pendingAskUserQuestion: {
+          toolUseId: 'tu-1',
+          askedAt: new Date().toISOString(),
+          questions: [{ question: 'Approve plan?', options: [] }],
+        },
+      }),
+    });
+
+    const card = screen.getByTestId('issue-card-TEST-123');
+    const badge = card.querySelector('[data-component="verb-badge"]') as HTMLElement;
+    expect(badge).not.toHaveAttribute('data-variant', 'INPUT');
+  });
+
   it('opens the hybrid Board action overflow menu on right-click', async () => {
     renderIssueCard({
       issue: createMockIssue({ status: 'Todo' }),

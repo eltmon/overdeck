@@ -4,6 +4,7 @@ import type { ReviewStatusSnapshot } from '@overdeck/contracts';
 import { useCostStream, type CostEvent } from '../../hooks/useCostStream';
 import { useDashboardStore, selectAgents, selectIssues } from '../../lib/store';
 import { getPipelineIssuePhase, isAgentRunningStatus, type PipelineIssuePhase } from '../../lib/pipeline-state';
+import { hasPendingAskUserQuestion } from '../../lib/pendingInput';
 import { useSharedTick } from '../../lib/useSharedTick';
 import { cn } from '../../lib/utils';
 import type { Agent, Issue } from '../../types';
@@ -213,6 +214,9 @@ function PipelineIssueRow({ issue, phase, agent, costEvents, now, onOpen, focuse
       : undefined,
     cost: costSum > 0 ? formatCost(costSum) : undefined,
   };
+  // PAN-1234: override the phase verb with INPUT when a non-plan agent is
+  // blocked on an outstanding AskUserQuestion.
+  const verbBadge = hasPendingAskUserQuestion(agent) ? <VerbBadge variant="INPUT" /> : verbBadgeForPhase(phase);
 
   return (
     <IssueRow
@@ -222,7 +226,7 @@ function PipelineIssueRow({ issue, phase, agent, costEvents, now, onOpen, focuse
       title={issue.title}
       project={issue.project ? { name: issue.project.name } : undefined}
       labels={issue.labels.slice(0, 3)}
-      verbBadge={verbBadgeForPhase(phase)}
+      verbBadge={verbBadge}
       agent={agent ? { name: agent.id, sub: agentSub(agent) } : undefined}
       ledger={ledger}
       assignee={issue.assignee ? { name: issue.assignee.name } : undefined}
