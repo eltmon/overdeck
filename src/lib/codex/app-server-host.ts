@@ -92,6 +92,27 @@ export class CodexAppServerHost {
     this.input?.close();
     this.input = undefined;
     this.manager.stop();
+    await this.closeServer();
+  }
+
+  async shutdownForSignal(signal: 'SIGTERM' | 'SIGINT', graceMs = 5_000): Promise<void> {
+    await this.appendEvent('lifecycle/signal', { signal });
+    const state = this.manager.getState();
+    if (state.threadId && state.activeTurnId) {
+      await this.appendEvent('op/interrupt', { reason: signal });
+      await this.manager.interruptTurn();
+    }
+    await this.appendEvent('lifecycle/child-sigterm', { signal });
+    this.manager.stop();
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, graceMs);
+      timer.unref?.();
+    });
+    await this.closeServer();
+    this.state = 'closed';
+  }
+
+  private async closeServer(): Promise<void> {
     if (!this.server) return;
     const server = this.server;
     this.server = undefined;
@@ -101,7 +122,7 @@ export class CodexAppServerHost {
   status(): JsonRecord {
     const managerState = this.manager.getState();
     return {
-      state: this.state === 'ready' ? 'ready' : this.state,
+      state: this.publicState(managerState),
       managerState: managerState.state,
       threadId: managerState.threadId,
       activeTurnId: managerState.activeTurnId,
@@ -219,6 +240,7 @@ export class CodexAppServerHost {
       this.state = 'closed';
       this.writePaneLine('[exit] codex app-server stopped');
       void this.appendEvent('exit', asRecord(exit));
+      void this.closeServer();
     });
   }
 
@@ -294,7 +316,7 @@ export class CodexAppServerHost {
         return;
       }
       if (req.headers[BRIDGE_TOKEN_HEADER] !== this.token) {
-        sendJson(res, 401, { error: 'unauthorized' });
+        sendJson(res, 403, { error: 'forbidden' });
         return;
       }
       const chunks: Buffer[] = [];
@@ -340,6 +362,15 @@ export class CodexAppServerHost {
 
   private tokenPath(): string {
     return join(this.agentDir(), 'appserver-token');
+  }
+
+  private publicState(managerState: Readonly<CodexAppServerState>): string {
+    if (this.state === 'closed') return 'closed';
+    if (this.pendingRequests.size > 0) return 'awaiting-approval';
+    if (managerState.activeTurnId || managerState.state === 'running') return 'running';
+    if (managerState.state === 'error') return 'error';
+    if (this.state === 'starting') return 'starting';
+    return 'ready';
   }
 }
 
@@ -400,8 +431,8 @@ async function main(): Promise<void> {
     stdin: process.stdin,
     stdout: process.stdout,
   });
-  process.once('SIGTERM', () => void host.stop().finally(() => process.exit(0)));
-  process.once('SIGINT', () => void host.stop().finally(() => process.exit(130)));
+  process.once('SIGTERM', () => void host.shutdownForSignal('SIGTERM').finally(() => process.exit(0)));
+  process.once('SIGINT', () => void host.shutdownForSignal('SIGINT', 0).finally(() => process.exit(130)));
   await host.start();
 }
 

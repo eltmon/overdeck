@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { request as httpRequest } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough, Writable } from 'node:stream';
@@ -14,11 +15,13 @@ class FakeManager extends EventEmitter {
   readonly approvals: Array<{ id: string | number; decision: string }> = [];
   readonly userInputs: Array<{ id: string | number; answers: Record<string, string[]> }> = [];
   interruptCalls = 0;
+  stopCalls = 0;
   private state: CodexAppServerState = { state: 'ready' };
 
   async start(): Promise<void> {}
 
   stop(): void {
+    this.stopCalls += 1;
     this.state = { ...this.state, state: 'closed' };
   }
 
@@ -49,6 +52,10 @@ class FakeManager extends EventEmitter {
     this.interruptCalls += 1;
   }
 
+  setState(state: CodexAppServerState): void {
+    this.state = state;
+  }
+
   answerApproval(id: string | number, decision: string): void {
     this.approvals.push({ id, decision });
   }
@@ -61,6 +68,7 @@ class FakeManager extends EventEmitter {
 let tmpHome: string;
 let overdeckHome: string;
 let originalHome: string | undefined;
+let startedHosts: CodexAppServerHost[] = [];
 
 function makeHost(manager: FakeManager, opts: Partial<ConstructorParameters<typeof CodexAppServerHost>[0]> = {}): CodexAppServerHost {
   return new CodexAppServerHost({
@@ -98,6 +106,34 @@ function readEventLog(): Array<Record<string, unknown>> {
     .map((line) => JSON.parse(line) as Record<string, unknown>);
 }
 
+async function postHost(agentId: string, token: string | undefined, body: unknown): Promise<{ status: number; body: string }> {
+  const payload = JSON.stringify(body);
+  return new Promise((resolve, reject) => {
+    const req = httpRequest(
+      {
+        socketPath: join(overdeckHome, 'sockets', `appserver-${agentId}.sock`),
+        path: '/',
+        method: 'POST',
+        agent: false,
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+          ...(token ? { 'x-overdeck-bridge-token': token } : {}),
+        },
+      },
+      (res) => {
+        let responseBody = '';
+        res.setEncoding('utf-8');
+        res.on('data', chunk => { responseBody += chunk; });
+        res.on('end', () => resolve({ status: res.statusCode ?? 0, body: responseBody }));
+      },
+    );
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
+}
+
 describe('CodexAppServerHost', () => {
   beforeEach(() => {
     tmpHome = mkdtempSync(join(tmpdir(), 'pan-appserver-host-'));
@@ -105,9 +141,11 @@ describe('CodexAppServerHost', () => {
     mkdirSync(join(overdeckHome, 'agents', 'agent-host-test'), { recursive: true });
     originalHome = process.env.HOME;
     process.env.HOME = tmpHome;
+    startedHosts = [];
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await Promise.all(startedHosts.map(host => host.stop()));
     if (originalHome === undefined) delete process.env.HOME;
     else process.env.HOME = originalHome;
     rmSync(tmpHome, { recursive: true, force: true });
@@ -126,6 +164,32 @@ describe('CodexAppServerHost', () => {
     });
     expect(manager.startThreadCalls).toHaveLength(0);
     expect(manager.startTurnCalls).toHaveLength(0);
+  });
+
+  it('returns 403 for missing or wrong socket tokens without executing an op', async () => {
+    const manager = new FakeManager();
+    const host = makeHost(manager);
+    startedHosts.push(host);
+    await host.start();
+
+    expect(await postHost('agent-host-test', undefined, { op: 'interrupt' })).toMatchObject({ status: 403 });
+    expect(await postHost('agent-host-test', 'wrong-token', { op: 'interrupt' })).toMatchObject({ status: 403 });
+    expect(manager.interruptCalls).toBe(0);
+  });
+
+  it('status op reflects manager state and pending requests', async () => {
+    const manager = new FakeManager();
+    manager.setState({ state: 'running', threadId: 'thread-1', activeTurnId: 'turn-1' });
+    const host = makeHost(manager);
+    manager.emit('request', { id: 71, method: 'item/commandExecution/requestApproval', params: { command: 'git status' } });
+
+    expect(host.status()).toMatchObject({
+      state: 'awaiting-approval',
+      managerState: 'running',
+      threadId: 'thread-1',
+      activeTurnId: 'turn-1',
+      pendingRequests: [{ id: 71, method: 'item/commandExecution/requestApproval', params: { command: 'git status' } }],
+    });
   });
 
   it('starts a thread, persists threadId, starts a turn, and logs manager notifications', async () => {
@@ -193,6 +257,26 @@ describe('CodexAppServerHost', () => {
 
     expect(await host.handleOp({ op: 'interrupt' })).toEqual({ status: 200, body: { ok: true, state: { state: 'ready' } } });
     expect(manager.interruptCalls).toBe(1);
+  });
+
+  it('interrupts a running turn before stopping on SIGTERM using fake timers', async () => {
+    vi.useFakeTimers();
+    const manager = new FakeManager();
+    manager.setState({ state: 'running', threadId: 'thread-1', activeTurnId: 'turn-1' });
+    const host = makeHost(manager);
+
+    const shutdown = host.shutdownForSignal('SIGTERM');
+    await vi.waitFor(() => expect(manager.interruptCalls).toBe(1));
+    await vi.runAllTimersAsync();
+    await shutdown;
+
+    expect(manager.interruptCalls).toBe(1);
+    expect(manager.stopCalls).toBe(1);
+    expect(readEventLog().map(entry => entry.type)).toEqual([
+      'lifecycle/signal',
+      'op/interrupt',
+      'lifecycle/child-sigterm',
+    ]);
   });
 
   it('renders user turns and assistant text to stdout as sanitized plain text lines', async () => {
