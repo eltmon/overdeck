@@ -165,22 +165,23 @@
     "recordedAt": "2026-07-12T21:40:42.752Z"
   },
   "created": "2026-07-12T20:44:53.021Z",
-  "updated": "2026-07-12T22:24:02.371Z",
+  "updated": "2026-07-12T22:39:27.445Z",
   "pipeline": {
     "issueId": "PAN-2603",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
-    "verificationStatus": "skipped",
+    "reviewStatus": "passed",
+    "testStatus": "testing",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-12T21:41:23.108Z",
-    "updatedAt": "2026-07-12T22:24:02.283Z",
+    "updatedAt": "2026-07-12T22:39:27.291Z",
     "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
     "verificationNotes": "Verification FAILED at lint (73852ms):\n\n tsdown:deps (66%)\n  - rolldown-plugin-dts:generate (27%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\ncomm: file 1 is not in sorted order\ncomm: input is not in sorted order\ncomm: file 1 is not in sorted order\ncomm: input is not in sorted order\n✖ new circular dependencies found — these must be removed, not baselined:\n    src/dashboard/frontend/src/components/chat/ConversationPanel.tsx > src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/dividers.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts\n    src/dashboard/frontend/src/components/conversations/SessionDetail.tsx > src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx\n    src/lib/agents/tier-table.ts > src/lib/pan-dir/record.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts\n✖ stale baseline entries — run: bash scripts/lint-circular-deps.sh --update\n    src/dashboard/frontend/src/components/chat/ConversationPanel.tsx > src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/dividers.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts\n    src/dashboard/frontend/src/components/conversations/SessionDetail.tsx > src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx\n    src/lib/agents/tier-table.ts > src/lib/pan-dir/record.ts > src/lib/config-yaml.ts > src/lib/config-yaml/defaults.ts\n\ncircular-dependency guard failed. Break the cycle, or manually edit the baseline in an issue-referenced commit to accept audited growth.\n",
     "inspectNotes": "Bead docs-injection-service ack: buildDocsInjectionContext gates via evaluateDocsPromptGate before any write, only advances budget/records telemetry once on a real hit (zero-result and missing-index paths short-circuit before recordDocsInjection), and swallows errors without throwing per AC1-5; covered by injection.test.ts.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2605",
+    "reviewedAtCommit": "c42991e4f87b155b483fb41c7740247f85dbb74c",
     "reviewRequestedAt": "2026-07-12T21:41:23.108Z",
     "reviewSpawnedAt": "2026-07-12T22:23:51.516Z",
     "scopeDrift": {
@@ -218,16 +219,24 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 4024739,
-            "output": 6429,
-            "cacheRead": 3706368,
+            "input": 4191994,
+            "output": 6841,
+            "cacheRead": 3845632,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 36456625,
-            "output": 107848,
-            "cacheRead": 34861568,
+            "input": 41253938,
+            "output": 121378,
+            "cacheRead": 39489408,
             "cacheWrite": 0
+          }
+        },
+        "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 1099,
+            "output": 5252,
+            "cacheRead": 848191,
+            "cacheWrite": 13952
           }
         },
         "plan": {
@@ -245,37 +254,51 @@
             "cacheRead": 115828,
             "cacheWrite": 80125
           }
+        },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 522265,
+            "output": 10783,
+            "cacheRead": 1884160,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 4024739,
-          "output": 6429,
-          "cacheRead": 3706368,
+          "input": 4191994,
+          "output": 6841,
+          "cacheRead": 3845632,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 36456625,
-          "output": 107848,
-          "cacheRead": 34861568,
+          "input": 41253938,
+          "output": 121378,
+          "cacheRead": 39489408,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
-          "input": 14260,
-          "output": 54208,
-          "cacheRead": 6161502,
-          "cacheWrite": 171754
+          "input": 15359,
+          "output": 59460,
+          "cacheRead": 7009693,
+          "cacheWrite": 185706
         },
         "anthropic/claude-sonnet-5": {
           "input": 14020,
           "output": 4042,
           "cacheRead": 115828,
           "cacheWrite": 80125
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 522265,
+          "output": 10783,
+          "cacheRead": 1884160,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 40.094884,
-        "pricingAsOf": "2026-07-12T22:24:02.342Z"
+        "usd": 45.855523,
+        "pricingAsOf": "2026-07-12T22:39:27.442Z"
       }
     },
     "merges": [
@@ -283,8 +306,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "ops-doc": "completed",
     "ops-doc.ac1": "completed",
