@@ -27945,7 +27945,10 @@ const DEFAULT_CONFIG = {
 		showHarnessModelPermutations: false
 	},
 	claude: { permissionMode: "bypass" },
-	codex: { permissionMode: "auto-review" }
+	codex: {
+		permissionMode: "auto-review",
+		transport: "app-server"
+	}
 };
 /**
 * Path to global config file
@@ -28237,7 +28240,10 @@ function mergeConfigs(...configs) {
 			showHarnessModelPermutations: DEFAULT_CONFIG.experimental.showHarnessModelPermutations
 		},
 		claude: { permissionMode: DEFAULT_CONFIG.claude.permissionMode },
-		codex: { permissionMode: DEFAULT_CONFIG.codex.permissionMode }
+		codex: {
+			permissionMode: DEFAULT_CONFIG.codex.permissionMode,
+			transport: DEFAULT_CONFIG.codex.transport
+		}
 	};
 	const explicitlyDisabled = /* @__PURE__ */ new Set();
 	const validConfigs = configs.filter((c) => c !== null);
@@ -28471,6 +28477,7 @@ function mergeConfigs(...configs) {
 		}
 		if (config.claude && (config.claude.permissionMode === "auto" || config.claude.permissionMode === "bypass")) result.claude.permissionMode = config.claude.permissionMode;
 		if (config.codex && (config.codex.permissionMode === "read-only" || config.codex.permissionMode === "workspace" || config.codex.permissionMode === "auto-review" || config.codex.permissionMode === "full-access")) result.codex.permissionMode = config.codex.permissionMode;
+		if (config.codex && (config.codex.transport === "app-server" || config.codex.transport === "tui")) result.codex.transport = config.codex.transport;
 		mergeRemoteConfig(result, config);
 		if (config.conversationSearch) {
 			const cs = config.conversationSearch;

@@ -133,6 +133,16 @@ No fallback transcript adapter is required for app-server. The durable transcrip
 and cost source remains the Codex rollout JSONL under the per-agent
 `CODEX_HOME/sessions/YYYY/MM/DD/` tree.
 
+## Per-Turn Model Checkpoint
+
+Checkpoint C3 was verified with `codex-cli 0.144.1` using isolated
+`CODEX_HOME=/tmp/pan-2597-c3-4M1kZ8`. A thread was started with model
+`gpt-5.6-sol`, then a later `turn/start` in the same thread included an explicit
+`model: "gpt-5.6-sol"` field. The app-server accepted the request without a
+protocol error, so Overdeck uses the native per-turn `model` field for
+app-server model overrides on this version. No restart-and-resume fallback is
+needed for Codex CLI 0.144.x.
+
 ## Divergences
 
 1. `item/fileRead/requestApproval` appears in t3code's pending approval union and
