@@ -36,6 +36,10 @@ import { registerTranscriptForPolling } from '../../../lib/memory/poller.js';
 import { areMemoryObservationsEnabled } from '../../../lib/memory/settings.js';
 import { isSubagentHookPayload } from '../../../lib/memory/subagent-filter.js';
 import { enqueueMemoryPipelineJob } from '../../../lib/memory/worker-pool.js';
+import { buildDocsInjectionContext } from '../../../lib/docs/injection.js';
+import type { NormalizedDocsConfig } from '../../../lib/config-yaml.js';
+import { loadConfigSync } from '../../../lib/config-yaml/load.js';
+import type { DocsPathOverrides } from '../../../lib/paths.js';
 
 const CLEAR_ON = new Set([
   'PostToolUse',
@@ -217,6 +221,12 @@ export interface HandleMemoryInjectBodyOptions {
   now?: Date;
 }
 
+export interface HandleMemoryInjectFastPathOptions extends HandleMemoryInjectBodyOptions {
+  docsConfig?: Pick<NormalizedDocsConfig, 'enabled' | 'promptInjectionEnabled' | 'trigger' | 'budget'>;
+  docsPaths?: DocsPathOverrides;
+  buildDocsInjectionContext?: typeof buildDocsInjectionContext;
+}
+
 export async function handleMemoryInjectBody(
   body: Record<string, unknown>,
   options: HandleMemoryInjectBodyOptions = {},
@@ -256,6 +266,53 @@ export async function handleMemoryInjectBody(
   };
 }
 
+export async function handleMemoryInjectFastPathBody(
+  body: Record<string, unknown>,
+  options: HandleMemoryInjectFastPathOptions = {},
+): Promise<{ ok: true; context: string }> {
+  const warningResult = await handleMemoryInjectBody(body, {
+    resolveAgentIdBySessionId: options.resolveAgentIdBySessionId,
+    resolveComplianceWarning: options.resolveComplianceWarning,
+    injectMemory: options.injectMemory ?? (async () => ({
+      status: 'skipped',
+      reason: 'compliance-warning-only',
+      context: '',
+      decision: {} as never,
+    })),
+    injectBriefing: options.injectBriefing ?? (async (input) => ({
+      context: input.context,
+      injected: false,
+      briefingMtimeMs: null,
+    })),
+    now: options.now,
+  });
+  if ('error' in warningResult) return { ok: true, context: '' };
+
+  const prompt = typeof body.prompt === 'string'
+    ? body.prompt
+    : typeof body.userPrompt === 'string'
+      ? body.userPrompt
+      : '';
+  const sessionId = typeof body.sessionId === 'string'
+    ? body.sessionId
+    : typeof body.session_id === 'string'
+      ? body.session_id
+      : '';
+
+  const docsResult = await (options.buildDocsInjectionContext ?? buildDocsInjectionContext)({
+    prompt,
+    sessionId,
+    config: options.docsConfig ?? loadConfigSync().config.docs,
+    paths: options.docsPaths,
+    now: options.now,
+  });
+
+  return {
+    ok: true,
+    context: [warningResult.context, docsResult.context].filter((part): part is string => !!part).join('\n\n'),
+  };
+}
+
 const postMemoryInjectRoute = HttpRouter.add(
   'POST',
   '/api/memory/inject',
@@ -273,15 +330,9 @@ const postMemoryInjectRoute = HttpRouter.add(
 
     const readModel = yield* ReadModelService;
     const resolveAgentIdBySessionId = async (sessionId: string) => Effect.runPromise(readModel.getAgentIdBySessionId(sessionId));
-    const warningResult = yield* Effect.promise(() => handleMemoryInjectBody(body, {
+    const fastResult = yield* Effect.promise(() => handleMemoryInjectFastPathBody(body, {
       resolveAgentIdBySessionId,
-      injectMemory: async () => ({
-        status: 'skipped',
-        reason: 'compliance-warning-only',
-        context: '',
-        decision: {} as never,
-      }),
-      injectBriefing: async (input) => ({ context: input.context, injected: false, briefingMtimeMs: null }),
+      docsConfig: loadConfigSync().config.docs,
     }));
 
     // Fire-and-forget: prompt-time memory injection can exceed the 1 s client hook
@@ -290,10 +341,7 @@ const postMemoryInjectRoute = HttpRouter.add(
       resolveAgentIdBySessionId,
       resolveComplianceWarning: async () => null,
     })));
-    return jsonResponse({
-      ok: true,
-      context: 'error' in warningResult ? '' : warningResult.context,
-    }, { status: 202 });
+    return jsonResponse(fastResult, { status: 202 });
   })),
 );
 
