@@ -1,6 +1,6 @@
 {
   "name": "@overdeck/core",
-  "version": "0.45.8",
+  "version": "0.45.9",
   "description": "Multi-agent orchestration for AI coding assistants (Claude Code, Codex, Cursor, Gemini CLI)",
   "publishConfig": {
     "access": "public"
