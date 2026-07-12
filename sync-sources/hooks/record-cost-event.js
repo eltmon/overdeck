@@ -27787,6 +27787,7 @@ const DEFAULT_DOCS_TRIGGER_REGEXES = [
 const DEFAULT_CONFIG = {
 	tmux: { configMode: "managed" },
 	enabledProviders: new Set(["anthropic"]),
+	defaultConversationModel: "claude-sonnet-5",
 	apiKeys: {},
 	providerAuth: {},
 	providerPlan: {},
@@ -27943,7 +27944,7 @@ const DEFAULT_CONFIG = {
 		streamdownRenderer: false,
 		showHarnessModelPermutations: false
 	},
-	claude: { permissionMode: "auto" },
+	claude: { permissionMode: "bypass" },
 	codex: { permissionMode: "auto-review" }
 };
 /**
