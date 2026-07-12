@@ -14,12 +14,13 @@
  */
 
 import { existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync, copyFileSync, chmodSync, openSync, readSync, closeSync } from 'node:fs'
-import { join, basename } from 'node:path'
+import { dirname, join, basename } from 'node:path'
 import { homedir } from 'node:os'
 import { promisify } from 'node:util'
 import { exec } from 'node:child_process'
 import { request as httpRequest } from 'node:http'
 import { Effect } from 'effect'
+import yaml from 'js-yaml'
 import type {
   AgentRuntime,
   AgentRuntimeSync,
@@ -33,10 +34,9 @@ import type {
   Agent,
 } from './types.js'
 import { CODEX_BEHAVIOR } from './behavior.js'
-import { sessionExists, killSession, listSessionsSync, createSession } from '../tmux.js'
+import { tmuxCreateSession, tmuxKillSession, tmuxSessionExists } from './tmux-cli.js'
 import { TmuxError, ProcessSpawnError, ProcessTimeoutError } from '../errors.js'
 import { parseCodexSessionSync } from '../cost-parsers/codex-parser.js'
-import { loadConfigSync } from '../config-yaml.js'
 
 const execAsync = promisify(exec)
 
@@ -112,7 +112,41 @@ async function postAppServerInterrupt(agentId: string): Promise<void> {
 }
 
 function codexTransport(): 'app-server' | 'tui' {
-  return loadConfigSync().config.codex?.transport === 'tui' ? 'tui' : 'app-server'
+  return readCodexTransportFromConfig() === 'tui' ? 'tui' : 'app-server'
+}
+
+function readCodexTransportFromConfig(): unknown {
+  const configs = [
+    join(homedir(), '.overdeck', 'config.yaml'),
+    ...projectConfigPaths(),
+  ]
+  for (let index = configs.length - 1; index >= 0; index -= 1) {
+    const transport = readCodexTransportFromYaml(configs[index]!)
+    if (transport === 'app-server' || transport === 'tui') return transport
+  }
+  return undefined
+}
+
+function projectConfigPaths(): string[] {
+  let currentDir = process.cwd()
+  while (true) {
+    if (existsSync(join(currentDir, '.git'))) {
+      return [join(currentDir, '.overdeck.yaml'), join(currentDir, '.pan.yaml')]
+    }
+    const parent = dirname(currentDir)
+    if (parent === currentDir) return []
+    currentDir = parent
+  }
+}
+
+function readCodexTransportFromYaml(filePath: string): unknown {
+  if (!existsSync(filePath)) return undefined
+  try {
+    const parsed = yaml.load(readFileSync(filePath, 'utf-8')) as { codex?: { transport?: unknown } } | null
+    return parsed?.codex?.transport
+  } catch {
+    return undefined
+  }
 }
 
 /** Resolve $CODEX_HOME: env var → ~/.codex fallback. */
@@ -505,20 +539,6 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
       }
     }
 
-    // Tier 3: tmux session creation time.
-    try {
-      const sess = listSessionsSync().find(s => s.name === agentId)
-      if (sess) {
-        return {
-          timestamp: sess.created,
-          agentId,
-          source: 'tmux',
-          confidence: 'low',
-        }
-      }
-    } catch {
-      // ignore
-    }
     return null
   }
 
@@ -611,8 +631,8 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
     if (await pollUntilSessionGone(agentId, 5_000)) return
 
     // Step 5: SIGKILL via kill-session.
-    if (await Effect.runPromise(sessionExists(agentId))) {
-      await Effect.runPromise(killSession(agentId))
+    if (await tmuxSessionExists(agentId)) {
+      await tmuxKillSession(agentId)
     }
   }
 
@@ -637,12 +657,10 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
     const fullCmd = `CODEX_HOME=${shellQuote(codexHomeDir)} ${tokens.join(' ')}`
 
     // 3. Launch the tmux session on the overdeck socket.
-    await Effect.runPromise(createSession(agentId, config.workspace, fullCmd, {
-      env: {
-        OVERDECK_AGENT_ID: agentId,
-        CODEX_HOME: codexHomeDir,
-      },
-    }))
+    await tmuxCreateSession(agentId, config.workspace, fullCmd, {
+      OVERDECK_AGENT_ID: agentId,
+      CODEX_HOME: codexHomeDir,
+    })
 
     // 4. Wait for the rollout JSONL to appear (readiness signal).
     const rolloutPath = await waitForCodexRollout(codexHomeDir, SPAWN_READY_TIMEOUT_MS)
@@ -675,14 +693,14 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
   }
 
   async isRunning(agentId: string): Promise<boolean> {
-    return await Effect.runPromise(sessionExists(agentId))
+    return await tmuxSessionExists(agentId)
   }
 }
 
 async function pollUntilSessionGone(agentId: string, timeoutMs: number): Promise<boolean> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
-    if (!(await Effect.runPromise(sessionExists(agentId)))) return true
+    if (!(await tmuxSessionExists(agentId))) return true
     await new Promise(r => setTimeout(r, 100))
   }
   return false

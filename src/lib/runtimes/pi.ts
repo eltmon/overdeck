@@ -43,7 +43,7 @@ import type {
   Agent,
 } from './types.js'
 import { OHMYPI_BEHAVIOR } from './behavior.js'
-import { sessionExists, killSession, createSession, listSessionsSync } from '../tmux.js'
+import { tmuxCreateSession, tmuxKillSession, tmuxSessionExists } from './tmux-cli.js'
 import { parsePiSessionSync } from '../cost-parsers/pi-parser.js'
 import { generateLauncherScriptSync } from '../launcher-generator.js'
 import { createPiFifo, destroyPiFifoSync, writePiCommandSync, piFifoPaths, PiNotReady } from './pi-fifo.js'
@@ -209,20 +209,6 @@ export class PiRuntimeSync {
       }
     }
 
-    // 3. tmux session creation time (best-effort).
-    try {
-      const sess = listSessionsSync().find(s => s.name === agentId)
-      if (sess) {
-        return {
-          timestamp: sess.created,
-          agentId,
-          source: 'tmux',
-          confidence: 'low',
-        }
-      }
-    } catch {
-      // ignore
-    }
     return null
   }
 
@@ -320,8 +306,8 @@ export class PiRuntimeSync {
 
     // Step 5: SIGKILL fallback via tmux kill-session.
     try {
-      if (await Effect.runPromise(sessionExists(agentId))) {
-        await Effect.runPromise(killSession(agentId))
+      if (await tmuxSessionExists(agentId)) {
+        await tmuxKillSession(agentId)
       }
     } finally {
       cleanupPiTransientFiles(agentId)
@@ -385,9 +371,7 @@ export class PiRuntimeSync {
     writeFileSync(launcherPath, launcherScript)
     chmodSync(launcherPath, 0o755)
 
-    await Effect.runPromise(createSession(agentId, config.workspace, `bash ${launcherPath}`, {
-      env: { OVERDECK_AGENT_ID: agentId },
-    }))
+    await tmuxCreateSession(agentId, config.workspace, `bash ${launcherPath}`, { OVERDECK_AGENT_ID: agentId })
 
     await waitForReady(agentId, SPAWN_READY_TIMEOUT_MS)
 
@@ -429,7 +413,7 @@ export class PiRuntimeSync {
   }
 
   async isRunning(agentId: string): Promise<boolean> {
-    return await Effect.runPromise(sessionExists(agentId))
+    return await tmuxSessionExists(agentId)
   }
 }
 
@@ -542,7 +526,7 @@ export function createPiRuntime(): PiRuntime {
 async function pollUntilSessionGone(agentId: string, timeoutMs: number): Promise<boolean> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
-    if (!(await Effect.runPromise(sessionExists(agentId)))) return true
+    if (!(await tmuxSessionExists(agentId))) return true
     await new Promise(r => setTimeout(r, 100))
   }
   return false

@@ -1,5 +1,4 @@
 import type { ModelId } from '../settings.js';
-import type { Role } from '../agents.js';
 import { getModelEffortLevelsSync, resolveModelIdSync } from '../model-capabilities.js';
 import { derivePercentPick, pickPercentModelRef, representativeModelRef } from './percent.js';
 import {
@@ -8,6 +7,7 @@ import {
   WORKHORSE_SLOTS,
   type ModelRef,
   type NormalizedConfig,
+  type Role,
   type RoleConfig,
   type RolesConfig,
   type WorkhorseSlot,

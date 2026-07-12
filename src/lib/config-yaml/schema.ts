@@ -2,7 +2,6 @@ import type { ModelId } from '../settings.js';
 import type { ModelProvider } from '../model-fallback.js';
 import type { EffortLevel } from '../model-capabilities.js';
 import type { SubscriptionPlan, AuthMode } from '../subscription-types.js';
-import type { Role } from '../agents.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { BackgroundAiFeature } from '../background-ai/registry.js';
 import type { TieredExecutionConfig, ValidatedTieredExecutionConfig } from '../agents/tier-table.js';
@@ -342,6 +341,7 @@ export interface WeightedModelRef {
 
 /** Top-level role model: either a scalar model string or a weighted distribution list. */
 export type RoleModelRef = ModelRef | WeightedModelRef[];
+export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer' | 'knowledge';
 
 
 /**
