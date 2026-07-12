@@ -6,6 +6,7 @@ import { SystemMenu } from '../components/SystemMenu';
 import { StoppedAgentsBanner } from '../components/StoppedAgentsBanner';
 import { OrphanTestAgentsSurface } from '../components/OrphanTestAgentsSurface';
 import { CodexAuthBanner } from '../components/CodexAuthBanner';
+import { SetupChecklistBanner } from '../components/SetupChecklistBanner';
 import { SystemHealthPill } from '../components/SystemHealthPill';
 import { triggerEmergencyStop, EMERGENCY_STOP_HOTKEY_LABEL } from '../components/EmergencyStopOverlay';
 import type { Tab } from '../components/Header';
@@ -65,6 +66,10 @@ export function AppChrome({
       {/* Deacon-frozen state and stopped-agents are now compact pills in the
           app bar (PAN-1591), not persistent full-width banners. */}
       <OrphanTestAgentsSurface />
+
+      {/* Setup checklist — shown while a required host tool (tmux, git, node,
+          claude) is missing from the server's PATH (PAN-774) */}
+      <SetupChecklistBanner />
 
       {/* Codex Auth Banner — shown when Codex OAuth tokens are expired/burned */}
       <CodexAuthBanner />
