@@ -809,6 +809,7 @@ export default function App() {
             onPlanDialogChange={setPlanDialogIssueId}
             onSelectAgent={setSelectedAgent}
             onBacklogIssueAction={handleBacklogIssueAction}
+            keyboardShortcutsDisabled={isSearchOpen || isPaletteOpen}
           />
         </main>
         {/* PAN-1591: in the Command Deck the merged Awareness rail already covers

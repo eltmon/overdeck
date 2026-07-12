@@ -3,8 +3,7 @@ import type { ReviewStatusSnapshot } from '@overdeck/contracts';
 
 import { useCostStream, type CostEvent } from '../../hooks/useCostStream';
 import { useDashboardStore, selectAgents, selectIssues } from '../../lib/store';
-import { getPipelineIssuePhase, isAgentRunningStatus, type PipelineIssuePhase } from '../../lib/pipeline-state';
-import { hasPendingAskUserQuestion } from '../../lib/pendingInput';
+import { getPipelineIssuePhase, hasActualPendingQuestion, isAgentRunningStatus, type PipelineIssuePhase } from '../../lib/pipeline-state';
 import { useSharedTick } from '../../lib/useSharedTick';
 import { cn } from '../../lib/utils';
 import type { Agent, Issue } from '../../types';
@@ -188,6 +187,8 @@ function verbBadgeForPhase(phase: PipelineIssuePhase) {
 type PipelineViewProps = {
   onSearchOpen?: () => void;
   onTabChange?: (tab: string) => void;
+  /** PAN-1234: suppress j/k/Enter shortcuts while search/command palette is open. */
+  keyboardShortcutsDisabled?: boolean;
 };
 
 type PipelineIssueRowProps = {
@@ -214,9 +215,9 @@ function PipelineIssueRow({ issue, phase, agent, costEvents, now, onOpen, focuse
       : undefined,
     cost: costSum > 0 ? formatCost(costSum) : undefined,
   };
-  // PAN-1234: override the phase verb with INPUT when a non-plan agent is
-  // blocked on an outstanding AskUserQuestion.
-  const verbBadge = hasPendingAskUserQuestion(agent) ? <VerbBadge variant="INPUT" /> : verbBadgeForPhase(phase);
+  // PAN-1234: override the phase verb with INPUT when the agent has an actual
+  // pending operator question (hasActualPendingQuestion covers count/prompt).
+  const verbBadge = hasActualPendingQuestion(agent) ? <VerbBadge variant="INPUT" /> : verbBadgeForPhase(phase);
 
   return (
     <IssueRow
@@ -239,7 +240,7 @@ function PipelineIssueRow({ issue, phase, agent, costEvents, now, onOpen, focuse
   );
 }
 
-export function PipelineView({ onSearchOpen, onTabChange }: PipelineViewProps = {}) {
+export function PipelineView({ onSearchOpen, onTabChange, keyboardShortcutsDisabled = false }: PipelineViewProps = {}) {
   const issues = useDashboardStore(selectIssues) as Issue[];
   const reviewStatusByIssueId = useDashboardStore((state) => state.reviewStatusByIssueId);
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
@@ -370,6 +371,7 @@ export function PipelineView({ onSearchOpen, onTabChange }: PipelineViewProps = 
   // PAN-1234: j/k row navigation; Enter opens the selected row.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (keyboardShortcutsDisabled) return;
       const target = e.target as HTMLElement;
       const inInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
       if (inInput || e.defaultPrevented) return;
@@ -407,7 +409,7 @@ export function PipelineView({ onSearchOpen, onTabChange }: PipelineViewProps = 
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [openIssue, pipelineIssueIds, selectedIssueId]);
+  }, [keyboardShortcutsDisabled, openIssue, pipelineIssueIds, selectedIssueId]);
 
   const metricTiles = useMemo(() => {
     const activeIssues = issues.filter((issue) => {

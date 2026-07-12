@@ -95,8 +95,8 @@ interface KanbanBoardProps {
   onBulkToggle?: (issueId: string) => void;
   onBulkSelectAll?: (issueIds: string[]) => void;
   onBulkDeselectAll?: (issueIds: string[]) => void;
+  keyboardShortcutsDisabled?: boolean; // PAN-1234: suppress j/k/Enter while palette/search is open
 }
-
 // Undo history entry
 interface UndoEntry {
   issueId: string;
@@ -105,7 +105,7 @@ interface UndoEntry {
   timestamp: number;
 }
 
-export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssue: externalOnSelectIssue, onPlanDialogChange, bulkSelectedIds, onBulkToggle, onBulkSelectAll, onBulkDeselectAll }: KanbanBoardProps) {
+export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssue: externalOnSelectIssue, onPlanDialogChange, bulkSelectedIds, onBulkToggle, onBulkSelectAll, onBulkDeselectAll, keyboardShortcutsDisabled = false }: KanbanBoardProps) {
   const queryClient = useQueryClient();
   const [internalSelectedIssue, setInternalSelectedIssue] = useState<string | null>(null);
   // PAN-1234: keyboard navigation focus target on the Board lens.
@@ -611,6 +611,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     if (!isBoardView) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (keyboardShortcutsDisabled) return;
       const target = e.target as HTMLElement;
       const inInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
       if (inInput || e.defaultPrevented) return;
@@ -680,7 +681,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isBoardView, boardColumns, boardFlatIds, focusedIssueId, externalOnSelectIssue]);
+  }, [isBoardView, boardColumns, boardFlatIds, focusedIssueId, externalOnSelectIssue, keyboardShortcutsDisabled]);
 
   return (
     <div className="space-y-4">
