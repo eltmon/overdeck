@@ -55,10 +55,17 @@
     flex-direction: row;
     align-items: flex-start;
   }
+  /* The meta cluster's max-content (stats + review selects + Merge + Actions) can
+   * exceed the pane, and a 0% flex-basis title shrinks to nothing against it —
+   * one-character-per-line title (2026-07-12). Floor the title and let the meta
+   * cluster shrink; its flex-wrap folds the controls onto extra lines instead. */
   .headerTitle {
     flex: 1 1 0%;
+    min-width: 280px;
   }
   .headerMeta {
+    flex: 0 1 auto;
+    min-width: 0;
     justify-content: flex-end;
   }
 }
