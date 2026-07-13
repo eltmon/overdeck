@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-1520",
   "schemaVersion": 2,
-  "created": "2026-07-13T05:58:03.983Z",
-  "updated": "2026-07-13T05:58:04.594Z",
-  "pipeline": {
-    "issueId": "PAN-1520",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-13T05:58:03.983Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -26,6 +9,76 @@
       "timestamp": "2026-07-13T05:58:03.982Z"
     }
   ],
-  "harness": "claude-code",
-  "model": "claude-fable-5"
+  "feedback": [],
+  "created": "2026-07-13T05:58:03.983Z",
+  "updated": "2026-07-13T06:34:21.828Z",
+  "pipeline": {
+    "issueId": "PAN-1520",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-13T06:25:38.317Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "implementation": {
+          "anthropic/claude-opus-4-7": {
+            "input": 23,
+            "output": 13385,
+            "cacheRead": 1116838,
+            "cacheWrite": 116766
+          }
+        },
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 23440,
+            "output": 54941,
+            "cacheRead": 6749269,
+            "cacheWrite": 185548
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-opus-4-7": {
+          "input": 23,
+          "output": 13385,
+          "cacheRead": 1116838,
+          "cacheWrite": 116766
+        },
+        "anthropic/claude-fable-5": {
+          "input": 23440,
+          "output": 54941,
+          "cacheRead": 6749269,
+          "cacheWrite": 185548
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 13.673026,
+        "pricingAsOf": "2026-07-13T06:25:38.354Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "plan-payload-enrichment": "running",
+    "plan-feed-conversations": "running"
+  },
+  "swarm": {
+    "slotAssignments": [
+      {
+        "slotIndex": 2,
+        "itemId": "plan-feed-conversations",
+        "agentId": "agent-pan-1520-slot-2",
+        "branch": "feature/pan-1520-slot-2",
+        "assignedAt": "2026-07-13T06:34:21.071Z"
+      }
+    ]
+  }
 }
