@@ -345,7 +345,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T20:45:31.659Z",
-  "updated": "2026-07-13T15:43:09.170Z",
+  "updated": "2026-07-13T15:43:21.416Z",
   "pipeline": {
     "issueId": "PAN-1232",
     "reviewStatus": "reviewing",
@@ -474,5 +474,8 @@
     "drawer-header-priority-bar.ac6": "completed",
     "drawer-header-priority-bar.ac7": "completed",
     "drawer-header-priority-bar.ac8": "completed"
+  },
+  "swarm": {
+    "finalizedAt": "2026-07-13T15:43:21.416Z"
   }
 }
