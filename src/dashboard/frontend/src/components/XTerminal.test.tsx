@@ -396,6 +396,10 @@ describe('XTerminal', () => {
   });
 
   it('lets plain Ctrl+V fall through to the native browser paste on non-Mac', async () => {
+    // Earlier tests stub getItem with a persistent return value; pin the
+    // "nothing stored" default explicitly.
+    vi.mocked(localStorageMock.getItem).mockReturnValue(null);
+
     render(<XTerminal sessionName="test-session" />);
 
     await waitFor(() => {
@@ -420,6 +424,49 @@ describe('XTerminal', () => {
     // keyup for the same combo must not be swallowed either.
     const ctrlVUp = new KeyboardEvent('keyup', { key: 'v', ctrlKey: true });
     expect(term.keyEventHandler!(ctrlVUp)).toBe(true);
+  });
+
+  it('sends Ctrl+V to the terminal when the Ctrl+V-pastes setting is off', async () => {
+    // Stored 'false' → vim-friendly mode: xterm keeps its default handling
+    // (literal ^V to the pty) and paste falls back to Ctrl+Shift+V.
+    vi.mocked(localStorageMock.getItem).mockReturnValue('false');
+
+    render(<XTerminal sessionName="test-session" />);
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
+
+    const term = (Terminal as unknown as { instances: Array<{ keyEventHandler: ((event: KeyboardEvent) => boolean) | null }> }).instances[0];
+    expect(term.keyEventHandler).toBeTruthy();
+
+    const ctrlV = new KeyboardEvent('keydown', { key: 'v', ctrlKey: true });
+    expect(term.keyEventHandler!(ctrlV)).toBe(true);
+  });
+
+  it('toggling the Ctrl+V-pastes setting takes effect without recreating the terminal', async () => {
+    const user = userEvent.setup();
+    vi.mocked(localStorageMock.getItem).mockReturnValue(null);
+
+    render(<XTerminal sessionName="test-session" />);
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
+
+    const term = (Terminal as unknown as { instances: Array<{ keyEventHandler: ((event: KeyboardEvent) => boolean) | null }> }).instances[0];
+    const ctrlV = new KeyboardEvent('keydown', { key: 'v', ctrlKey: true });
+    expect(term.keyEventHandler!(ctrlV)).toBe(false);
+
+    await user.click(screen.getByTitle('Terminal settings'));
+    await user.click(screen.getByLabelText('Ctrl+V pastes clipboard'));
+
+    expect(localStorageMock.setItem).toHaveBeenCalledWith(
+      'overdeck.terminal.ctrlVPaste',
+      'false'
+    );
+    // Same handler instance (terminal not recreated) now lets Ctrl+V through.
+    expect(term.keyEventHandler!(ctrlV)).toBe(true);
   });
 });
 

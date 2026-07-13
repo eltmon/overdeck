@@ -97,6 +97,7 @@ interface ContextMenuState {
 
 // Storage key for auto-copy preference
 const AUTOCOPY_STORAGE_KEY = 'overdeck.terminal.autoCopyOnSelect';
+const CTRLV_PASTE_STORAGE_KEY = 'overdeck.terminal.ctrlVPaste';
 
 // Check if platform is Mac
 const isMac = navigator.platform.toLowerCase().includes('mac');
@@ -147,6 +148,19 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     return stored === null ? true : stored === 'true';
   });
 
+  // Ctrl+V-pastes state from localStorage (non-Mac only; Mac pastes with Cmd+V).
+  // Default ON: plain Ctrl+V triggers the browser's native paste. Turned off,
+  // Ctrl+V reaches the pty as a literal ^V (e.g. vim visual-block) and paste
+  // falls back to Ctrl+Shift+V / the context menu.
+  const [ctrlVPaste, setCtrlVPaste] = useState(() => {
+    const stored = localStorage.getItem(CTRLV_PASTE_STORAGE_KEY);
+    return stored == null ? true : stored === 'true';
+  });
+  // Read through a ref inside the custom key handler so toggling the setting
+  // takes effect immediately without tearing down and recreating the terminal.
+  const ctrlVPasteRef = useRef(ctrlVPaste);
+  ctrlVPasteRef.current = ctrlVPaste;
+
   // Context menu state
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     visible: false,
@@ -170,6 +184,15 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       console.error('Failed to save auto-copy setting:', err);
     }
   }, [autoCopyOnSelect]);
+
+  // Persist Ctrl+V-pastes setting to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(CTRLV_PASTE_STORAGE_KEY, String(ctrlVPaste));
+    } catch (err) {
+      console.error('Failed to save Ctrl+V paste setting:', err);
+    }
+  }, [ctrlVPaste]);
 
   // Calculate exponential backoff delay: 1s, 2s, 4s, 8s, max 30s
   const getReconnectDelay = (attempt: number): number => {
@@ -477,12 +500,15 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       // skip the event WITHOUT preventDefault, so the browser delivers its
       // trusted `paste` event to xterm's helper textarea and the native paste
       // path handles it (no clipboard-read permission needed — PAN-2529).
-      // Trade-off: the pty app can no longer receive a literal ^V (e.g. vim
-      // visual-block). macOS is left alone — Cmd+V is the paste gesture there
-      // and Ctrl+V keeps its terminal meaning.
+      // Trade-off: the pty app then never receives a literal ^V (e.g. vim
+      // visual-block), so the "Ctrl+V pastes clipboard" terminal setting
+      // (default on, read via ctrlVPasteRef) lets users restore the raw
+      // keystroke. macOS is left alone — Cmd+V is the paste gesture there and
+      // Ctrl+V keeps its terminal meaning.
       if (!isMac) {
         term.attachCustomKeyEventHandler((e) =>
-          !(e.type === 'keydown' && e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey
+          !(ctrlVPasteRef.current
+            && e.type === 'keydown' && e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey
             && e.key.toLowerCase() === 'v')
         );
       }
@@ -832,6 +858,23 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
           <p className="text-xs text-muted-foreground mt-2">
             Automatically copy selected text to clipboard
           </p>
+          {!isMac && (
+            <>
+              <label className="flex items-center gap-2 cursor-pointer mt-3">
+                <input
+                  type="checkbox"
+                  checked={ctrlVPaste}
+                  onChange={(e) => setCtrlVPaste(e.target.checked)}
+                  className="w-4 h-4 rounded border-border bg-input text-primary focus:ring-primary"
+                />
+                <span className="text-sm text-muted-foreground">Ctrl+V pastes clipboard</span>
+              </label>
+              <p className="text-xs text-muted-foreground mt-2">
+                Uncheck to send Ctrl+V to the terminal instead (e.g. vim visual-block).
+                Ctrl+Shift+V and right-click always paste.
+              </p>
+            </>
+          )}
         </div>
       )}
 
