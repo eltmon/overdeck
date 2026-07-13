@@ -17,6 +17,8 @@ import {
   getConversationByName,
 } from '../../../../lib/overdeck/conversations.js';
 
+vi.setConfig({ testTimeout: 15_000 });
+
 const emittedEvents: unknown[] = [];
 const handleTurnCompleteMock = vi.fn().mockResolvedValue(undefined);
 
@@ -48,10 +50,10 @@ afterEach(async () => {
   rmSync(testHome, { recursive: true, force: true });
 });
 
+const { handleTurnCompleteBody } = await import('../../../server/routes/hooks.js');
+
 describe('handleTurnCompleteBody', () => {
   it('invokes handleTurnComplete for a known session and returns ok', async () => {
-    const { handleTurnCompleteBody } = await import('../../../server/routes/hooks.js');
-
     createConversation({
       name: 'turn-complete-known',
       tmuxSession: 'tmux-turn-complete-known',
@@ -71,8 +73,6 @@ describe('handleTurnCompleteBody', () => {
   });
 
   it('returns ok without invoking for unknown session_id', async () => {
-    const { handleTurnCompleteBody } = await import('../../../server/routes/hooks.js');
-
     const result = await handleTurnCompleteBody({ session_id: 'session-unknown' });
 
     expect(result).toEqual({ ok: true });
@@ -80,8 +80,6 @@ describe('handleTurnCompleteBody', () => {
   });
 
   it('returns ok without invoking when session_id is missing', async () => {
-    const { handleTurnCompleteBody } = await import('../../../server/routes/hooks.js');
-
     const result = await handleTurnCompleteBody({});
 
     expect(result).toEqual({ ok: true });

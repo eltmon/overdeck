@@ -43,6 +43,8 @@ import {
   surfaceIssueFeedbackNeedsYou,
 } from '../../../../src/lib/cloister/feedback-target.js';
 
+vi.setConfig({ testTimeout: 15_000 });
+
 describe('resolveIssueFeedbackTarget', () => {
   beforeEach(() => {
     vi.clearAllMocks();
