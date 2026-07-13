@@ -165,10 +165,10 @@
     "recordedAt": "2026-07-13T15:33:26.736Z"
   },
   "created": "2026-07-10T21:05:49.847Z",
-  "updated": "2026-07-13T16:13:33.289Z",
+  "updated": "2026-07-13T16:32:26.915Z",
   "pipeline": {
     "issueId": "PAN-2229",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -176,7 +176,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T15:40:07.948Z",
-    "updatedAt": "2026-07-13T16:12:55.289Z",
+    "updatedAt": "2026-07-13T16:32:26.859Z",
+    "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2638",
     "reviewRequestedAt": "2026-07-13T15:40:07.948Z",
     "reviewSpawnedAt": "2026-07-13T16:12:55.288Z",
@@ -244,6 +245,28 @@
         "vitest.config.ts"
       ],
       "recordedAt": "2026-07-13T15:33:26.736Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2229/.pan/review/agent-pan-2229-review-e4571696/security.md",
+        "atCommit": "e4571696bfe06bbf66869b58ae7c53658f28e504"
+      },
+      "correctness": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2229/.pan/review/agent-pan-2229-review-e4571696/correctness.md",
+        "atCommit": "e4571696bfe06bbf66869b58ae7c53658f28e504"
+      },
+      "performance": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2229/.pan/review/agent-pan-2229-review-e4571696/performance.md",
+        "atCommit": "e4571696bfe06bbf66869b58ae7c53658f28e504"
+      },
+      "requirements": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2229/.pan/review/agent-pan-2229-review-e4571696/requirements.md",
+        "atCommit": "e4571696bfe06bbf66869b58ae7c53658f28e504"
+      }
     }
   },
   "closeOut": {
@@ -257,9 +280,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 5643909,
-            "output": 27911,
-            "cacheRead": 4804096,
+            "input": 8482288,
+            "output": 41102,
+            "cacheRead": 7273344,
             "cacheWrite": 0
           }
         },
@@ -310,9 +333,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 5643909,
-          "output": 27911,
-          "cacheRead": 4804096,
+          "input": 8482288,
+          "output": 41102,
+          "cacheRead": 7273344,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -341,8 +364,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 54.648657,
-        "pricingAsOf": "2026-07-13T16:12:55.372Z"
+        "usd": 58.124666,
+        "pricingAsOf": "2026-07-13T16:32:26.902Z"
       }
     },
     "merges": [
