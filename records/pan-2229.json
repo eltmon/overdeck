@@ -106,20 +106,18 @@
     "recordedAt": "2026-07-13T14:19:02.691Z"
   },
   "created": "2026-07-10T21:05:49.847Z",
-  "updated": "2026-07-13T14:35:49.185Z",
+  "updated": "2026-07-13T15:09:56.222Z",
   "pipeline": {
     "issueId": "PAN-2229",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T14:20:36.574Z",
-    "updatedAt": "2026-07-13T14:35:39.796Z",
-    "reviewNotes": "Verification failed at test",
-    "verificationNotes": "Verification FAILED at test (211967ms):\n\nywheel-orchestrator commit: orchestrators dispatch work; they do not author repo artifacts.\nOffending staged paths:\n  src/foo.ts\n\nAllowed flywheel-orchestrator commit paths are:\n  docs/FLYWHEEL-STATE.md\n  .pan/records/\n  .pan/continues/\n  .pan/backlog/\n  .beads/\n✗ direct state-plane write construction outside the approved doors:\nsrc/feature/bad.ts:1:writeFileSync(join(projectRoot, '.pan/records/x.json'), '{}')\nRoute the mutation through a domain writer or review scripts/state-write-allowlist.txt.\nguard-agent-main-push.sh invoked\n⚠ ratchet audit: no base for refs/heads/feature — skipping\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n(node:1227636) ExperimentalWarning: Some other experimental feature\n(Use `node --trace-warnings ...` to show where the warning was created)\n✖ quarantine audit: the following entries lack an issue reference\n  tests/foo.test.ts\nEach quarantine entry must reference an issue — add e.g. # PAN-XXXX.\n- Spawning knowledge agent for PAN-2468...\n✔ Knowledge agent spawned: agent-pan-2468-knowledge\n- Spawning knowledge agent for PAN-2468...\n✖ Knowledge agent for PAN-2468 failed: No OKF bundle is configured for Overdeck. Run `/okf init` in this workspace to create or connect a knowledge bundle, then retry `pan knowledge PAN-2468`.\n- Spawning knowledge agent for PAN-2468...\n⚠ mnemos unavailable; spawning knowledge agent with built-in OKF search: release fetch failed\n- Spawning knowledge agent for PAN-2468...\n✔ Knowledge agent spawned: agent-pan-2468-knowledge\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n",
+    "updatedAt": "2026-07-13T15:09:56.178Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2638",
     "reviewRequestedAt": "2026-07-13T14:20:36.574Z",
     "reviewSpawnedAt": "2026-07-13T14:28:17.521Z",
@@ -281,7 +279,7 @@
       },
       "costAtCloseOut": {
         "usd": 49.283437,
-        "pricingAsOf": "2026-07-13T14:35:39.830Z"
+        "pricingAsOf": "2026-07-13T15:09:56.221Z"
       }
     },
     "merges": [
@@ -303,8 +301,8 @@
       }
     }
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "recoveryTrips": [
     {
       "issue": "PAN-2229",
