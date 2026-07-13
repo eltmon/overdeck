@@ -725,20 +725,12 @@ program
     // server from even spawning, and the dashboard does not depend on synced
     // content to boot. Deferring it shaves that ~22s off time-to-available.
 
-    // Ensure tmux is installed — required for all agent/conversation sessions
+    // Ensure host tools every agent/conversation session needs are installed:
+    // tmux (fatal if missing) and beads/bd (best-effort — only the work
+    // pipeline needs it). See ensureHostTools in the prereq registry.
     {
-      const { isToolInstalled, installTool } = await import('../lib/prereqs/registry.js');
-      if (!(await isToolInstalled('tmux'))) {
-        console.log(chalk.yellow('  tmux is required but not found. Installing...'));
-        const result = await installTool('tmux');
-        if (result.success) {
-          console.log(chalk.green(`  ✓ ${result.message}`));
-        } else {
-          console.error(chalk.red(`  ✗ Failed to install tmux: ${result.message}`));
-          console.error(chalk.dim('  Install manually: brew install tmux (macOS) or sudo apt-get install tmux (Linux)'));
-          process.exit(1);
-        }
-      }
+      const { ensureHostTools } = await import('../lib/prereqs/registry.js');
+      await ensureHostTools();
     }
 
     // Flush stale provider env vars from the tmux server's global environment.

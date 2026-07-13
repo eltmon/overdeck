@@ -10,6 +10,7 @@ import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import chalk from "chalk";
 import { Effect } from "effect";
 import { detectPlatform } from "../platform.js";
 
@@ -106,6 +107,46 @@ export async function installTool(tool: PrereqTool): Promise<InstallResult> {
       success: false,
       message: error instanceof Error ? error.message : String(error),
     };
+  }
+}
+
+/**
+ * Boot-time host-tool guarantee for `pan up`. tmux is fatal — no agent or
+ * conversation session runs without it, so a failed install exits the process.
+ * bd (beads) is best-effort — only the work pipeline needs it, so a failed
+ * install warns and boot continues. Already-present tools are silent no-ops.
+ */
+export async function ensureHostTools(): Promise<void> {
+  const tools: Array<{ tool: PrereqTool; label: string; fatal: boolean; manual: string }> = [
+    {
+      tool: "tmux",
+      label: "tmux",
+      fatal: true,
+      manual: "brew install tmux (macOS) or sudo apt-get install tmux (Linux)",
+    },
+    {
+      tool: "bd",
+      label: "beads (bd)",
+      fatal: false,
+      manual:
+        "brew install gastownhall/beads/bd (macOS) or run the beads install script (Linux) — the work pipeline needs it.",
+    },
+  ];
+  for (const { tool, label, fatal, manual } of tools) {
+    if (await isToolInstalled(tool)) continue;
+    console.log(chalk.yellow(`  ${label} not found. Installing...`));
+    const result = await installTool(tool);
+    if (result.success) {
+      console.log(chalk.green(`  ✓ ${result.message}`));
+      continue;
+    }
+    console.error(
+      fatal
+        ? chalk.red(`  ✗ Failed to install ${label}: ${result.message}`)
+        : chalk.yellow(`  ⚠ Failed to install ${label}: ${result.message}`),
+    );
+    console.error(chalk.dim(`  Install manually: ${manual}`));
+    if (fatal) process.exit(1);
   }
 }
 
