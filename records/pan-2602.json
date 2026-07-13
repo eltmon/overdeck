@@ -16,18 +16,18 @@
   ],
   "feedback": [],
   "created": "2026-07-12T22:33:37.108Z",
-  "updated": "2026-07-13T06:33:48.378Z",
+  "updated": "2026-07-13T06:52:15.295Z",
   "pipeline": {
     "issueId": "PAN-2602",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "failed",
+    "inspectStatus": "error",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T06:33:48.289Z",
-    "inspectNotes": "Bead beads-rollup-service BLOCKED: src/dashboard/server/services/beads-rollup-service.ts:44-46 extractIssueLabels() uses a generic regex /^[a-z]+-\\d+$/ to auto-discover \"issue-like\" labels, treating ANY word-hyphen-number label as an issue id. This diverges from the canonical labelMatchesIssue (src/lib/beads-query.ts:47-52), which only matches a label against a KNOWN target issueLabel (exact or workspace:-prefixed) and never pattern-guesses. Concretely, src/lib/vbrief/beads.ts:574 attaches a `phase-${phase}` label (e.g. phase-1, phase-2) to every bead that has a vBRIEF phase set — standard planning output, not an edge case. A bead labeled [\"pan-9001\", \"phase-1\"] will be counted correctly under pan-9001 AND also spuriously grouped under a bogus issue key phase-1 in getProjectRollups(), polluting rollup data with fake per-issue entries that do not correspond to any real tracker issue. Required fix: restrict extraction to labels that actually match a known issue identifier (reuse/extend labelMatchesIssue against the projects registry prefix list, or validate the discovered prefix against known tracker prefixes) instead of matching any generic word-number label."
+    "updatedAt": "2026-07-13T06:52:15.256Z",
+    "inspectNotes": "Inspection error for bead beads-rollup-service: tmux session inspect-pan-2602-beads-rollup-service exited before producing a verdict. No verdict was produced."
   },
   "closeOut": {
     "usage": {
@@ -50,17 +50,17 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 16439,
-            "output": 6989,
-            "cacheRead": 1258955,
-            "cacheWrite": 105639
+            "input": 17572,
+            "output": 14782,
+            "cacheRead": 2384051,
+            "cacheWrite": 120513
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 372522,
-            "output": 75349,
-            "cacheRead": 25261824,
+            "input": 445548,
+            "output": 94317,
+            "cacheRead": 31571968,
             "cacheWrite": 0
           }
         }
@@ -79,21 +79,21 @@
           "cacheWrite": 683275
         },
         "anthropic/claude-sonnet-5": {
-          "input": 16439,
-          "output": 6989,
-          "cacheRead": 1258955,
-          "cacheWrite": 105639
+          "input": 17572,
+          "output": 14782,
+          "cacheRead": 2384051,
+          "cacheWrite": 120513
         },
         "custom/kimi-k2.7-code": {
-          "input": 372522,
-          "output": 75349,
-          "cacheRead": 25261824,
+          "input": 445548,
+          "output": 94317,
+          "cacheRead": 31571968,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 56.356419,
-        "pricingAsOf": "2026-07-13T06:33:48.368Z"
+        "usd": 58.042995,
+        "pricingAsOf": "2026-07-13T06:52:15.290Z"
       }
     },
     "merges": [],
