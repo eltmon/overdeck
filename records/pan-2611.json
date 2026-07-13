@@ -105,17 +105,18 @@
     "recordedAt": "2026-07-13T05:58:56.677Z"
   },
   "created": "2026-07-13T03:16:32.338Z",
-  "updated": "2026-07-13T06:05:06.964Z",
+  "updated": "2026-07-13T06:10:42.986Z",
   "pipeline": {
     "issueId": "PAN-2611",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T06:04:57.130Z",
+    "updatedAt": "2026-07-13T06:10:42.667Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2624",
+    "lastVerifiedCommit": "2e2342fcbc2181adc94a8da1634b4a5713a2c65b",
     "reviewRequestedAt": "2026-07-13T05:59:13.358Z",
     "reviewSpawnedAt": "2026-07-13T06:04:57.128Z",
     "scopeDrift": {
@@ -149,9 +150,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 630214,
-            "output": 3197,
-            "cacheRead": 469760,
+            "input": 3171526,
+            "output": 16429,
+            "cacheRead": 2849280,
             "cacheWrite": 0
           }
         },
@@ -165,9 +166,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 349032,
-            "output": 27572,
-            "cacheRead": 14300416,
+            "input": 350814,
+            "output": 27792,
+            "cacheRead": 14555904,
             "cacheWrite": 0
           }
         }
@@ -180,9 +181,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 630214,
-          "output": 3197,
-          "cacheRead": 469760,
+          "input": 3171526,
+          "output": 16429,
+          "cacheRead": 2849280,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -192,15 +193,15 @@
           "cacheWrite": 366084
         },
         "custom/kimi-k2.7-code": {
-          "input": 349032,
-          "output": 27572,
-          "cacheRead": 14300416,
+          "input": 350814,
+          "output": 27792,
+          "cacheRead": 14555904,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 21.156169,
-        "pricingAsOf": "2026-07-13T06:04:57.319Z"
+        "usd": 23.602965,
+        "pricingAsOf": "2026-07-13T06:10:42.923Z"
       }
     },
     "merges": [
