@@ -552,7 +552,7 @@ describe('resource-discovery conversation signal', () => {
     expect(issue).toBeDefined();
     expect(issue!.resourceSources).toContain('conversation');
     expect(issue!.resourceDetails.conversations).toEqual([
-      { title: 'Conversation title', status: 'active' },
+      { id: 1, name: 'conv-pan-9003', title: 'Conversation title', status: 'active' },
     ]);
   });
 

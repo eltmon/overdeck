@@ -64,7 +64,7 @@ export interface ResourceDetails {
   /** Remote (fly.io) work agent for this issue, when one is active (PAN-1676). */
   remoteAgent: { vmName: string; status: string; model: string; startedAt: string } | null;
   /** Non-archived conversations explicitly linked to this issue. */
-  conversations: Array<{ title: string | null; status: string }>;
+  conversations: Array<{ id: number; name: string; title: string | null; status: string }>;
 }
 
 export interface ResourceDetailIdentifiers {
@@ -240,7 +240,7 @@ function summarizeResourceDetails(details: InternalResourceDetails): ResourceDet
     branchAheadOfMain: details.branchAheadOfMain,
     workspaceMissing: details.workspaceMissing,
     remoteAgent: details.remoteAgent,
-    conversations: details.conversations.map((conv) => ({ title: conv.title, status: conv.status })),
+    conversations: details.conversations.map((conv) => ({ id: conv.id, name: conv.name, title: conv.title, status: conv.status })),
   };
 }
 
@@ -945,7 +945,7 @@ export function sanitizeResourceAllocatedIssues(issues: ResourceAllocatedIssue[]
       branchAheadOfMain: issue.resourceDetails.branchAheadOfMain,
       workspaceMissing: issue.resourceDetails.workspaceMissing,
       remoteAgent: issue.resourceDetails.remoteAgent ?? null,
-      conversations: issue.resourceDetails.conversations.map((conv) => ({ title: conv.title, status: conv.status })),
+      conversations: issue.resourceDetails.conversations.map((conv) => ({ id: conv.id, name: conv.name, title: conv.title, status: conv.status })),
     },
   }));
 }
