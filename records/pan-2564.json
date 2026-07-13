@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T17:54:45.646Z",
-  "updated": "2026-07-13T05:20:15.958Z",
+  "updated": "2026-07-13T05:36:13.211Z",
   "pipeline": {
     "issueId": "PAN-2564",
     "reviewStatus": "pending",
@@ -51,11 +51,14 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "model": "claude-sonnet-5",
   "statusOverrides": {
     "migration-gate": "running",
     "beads-home": "running",
-    "config-standardize": "running"
+    "config-standardize": "completed",
+    "config-standardize.config-standardize.ac1": "completed",
+    "config-standardize.config-standardize.ac2": "completed",
+    "config-standardize.config-standardize.ac3": "completed"
   },
   "swarm": {
     "slotAssignments": [
@@ -80,6 +83,7 @@
         "branch": "feature/pan-2564-slot-3",
         "assignedAt": "2026-07-13T05:20:15.242Z"
       }
-    ]
+    ],
+    "slotCompletions": {}
   }
 }
