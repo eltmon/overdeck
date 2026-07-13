@@ -326,7 +326,11 @@ export async function spawnFlywheel(options: FlywheelLifecycleOptions = {}): Pro
       const parsed = parseSequenceMd(readFileSync(seqPath, 'utf-8'));
       if (parsed.ok) {
         const issuesWithBeads = await issuesWithBeadsBounded(workspace);
-        saveRunCohort(runId, computeCohort(parsed.doc.nodes, buildClassifyLookups(workspace, issuesWithBeads.known ? { issuesWithBeads: issuesWithBeads.set } : {}), options.maxAgents ?? 5, options.autoPickupBacklog ?? isFlywheelAutoPickupBacklog()));
+        // Always pass the bulk presence set (even when unknown/empty) so
+        // buildClassifyLookups never falls back to per-workspace sync bd reads
+        // in the flywheel path (PAN-2607 AC2). The cohort is best-effort and
+        // degrades gracefully when presence is unknown.
+        saveRunCohort(runId, computeCohort(parsed.doc.nodes, buildClassifyLookups(workspace, { issuesWithBeads: issuesWithBeads.set }), options.maxAgents ?? 5, options.autoPickupBacklog ?? isFlywheelAutoPickupBacklog()));
       }
     }
   } catch { /* cohort snapshot is best-effort */ }
