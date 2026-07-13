@@ -317,19 +317,18 @@
     "recordedAt": "2026-07-13T11:20:10.124Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T15:41:40.514Z",
+  "updated": "2026-07-13T15:52:25.077Z",
   "pipeline": {
     "issueId": "PAN-2596",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T11:21:55.959Z",
-    "updatedAt": "2026-07-13T15:41:40.429Z",
-    "reviewNotes": "Agent re-review request (1/25): Dashboard restarted with resume; please dispatch convoy reviewers.",
+    "updatedAt": "2026-07-13T15:52:25.024Z",
     "inspectNotes": "Bead server-upload-allowlist ack: validateUploadPayload correctly gates UTF-8 text extensions, PDF %PDF- magic prefix, and disallowed/extension-less types with 400s naming the mismatch, while preserving image magic-byte validation and <uuid><ext> naming; non-image files get <uuid>-<sanitized-name><ext>. All 5 ACs verified against diff + accompanying unit tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2634",
     "lastVerifiedCommit": "66452d513cbf7e447bc977d03567c84a4f807c7f",
@@ -407,10 +406,10 @@
         },
         "review": {
           "anthropic/claude-sonnet-5": {
-            "input": 22599,
-            "output": 11806,
-            "cacheRead": 3297379,
-            "cacheWrite": 455465
+            "input": 23575,
+            "output": 13017,
+            "cacheRead": 3524623,
+            "cacheWrite": 626381
           }
         },
         "review.correctness": {
@@ -455,9 +454,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 2606890,
-            "output": 234063,
-            "cacheRead": 110460672,
+            "input": 2616542,
+            "output": 237169,
+            "cacheRead": 112626944,
             "cacheWrite": 0
           }
         }
@@ -488,21 +487,21 @@
           "cacheWrite": 213933
         },
         "anthropic/claude-sonnet-5": {
-          "input": 122714,
-          "output": 64821,
-          "cacheRead": 13560273,
-          "cacheWrite": 1128558
+          "input": 123690,
+          "output": 66032,
+          "cacheRead": 13787517,
+          "cacheWrite": 1299474
         },
         "custom/kimi-k2.7-code": {
-          "input": 2606890,
-          "output": 234063,
-          "cacheRead": 110460672,
+          "input": 2616542,
+          "output": 237169,
+          "cacheRead": 112626944,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 75.232154,
-        "pricingAsOf": "2026-07-13T15:41:40.497Z"
+        "usd": 76.152141,
+        "pricingAsOf": "2026-07-13T15:52:25.075Z"
       }
     },
     "merges": [
