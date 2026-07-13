@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-2633",
   "schemaVersion": 2,
-  "created": "2026-07-13T08:48:04.494Z",
-  "updated": "2026-07-13T09:13:42.394Z",
-  "pipeline": {
-    "issueId": "PAN-2633",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-13T08:48:04.494Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -36,6 +19,61 @@
       "agentModel": "kimi-k2.7-code"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-13T08:48:04.494Z",
+  "updated": "2026-07-13T20:08:06.442Z",
+  "pipeline": {
+    "issueId": "PAN-2633",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-13T20:08:06.399Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 20986,
+            "output": 58194,
+            "cacheRead": 10456079,
+            "cacheWrite": 418542
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-fable-5": {
+          "input": 20986,
+          "output": 58194,
+          "cacheRead": 10456079,
+          "cacheWrite": 418542
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 18.807426,
+        "pricingAsOf": "2026-07-13T20:08:06.441Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
-  "model": "claude-fable-5"
+  "model": "kimi-k2.7-code",
+  "statusOverrides": {
+    "reducer-liveness-gate": "running"
+  },
+  "swarm": {
+    "slotAssignments": [
+      {
+        "slotIndex": 1,
+        "itemId": "reducer-liveness-gate",
+        "agentId": "agent-pan-2633-slot-1",
+        "branch": "feature/pan-2633-slot-1",
+        "assignedAt": "2026-07-13T20:08:05.689Z"
+      }
+    ]
+  }
 }
