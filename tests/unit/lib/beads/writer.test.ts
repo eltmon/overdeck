@@ -7,11 +7,12 @@ import { formatMutationBatchFailure, runMutationBatch } from '../../../../src/li
 
 function harness(failOn?: string) {
   const calls: string[] = [];
+  const status = '\n📊 Version Control Status\n\n  Branch: main\n  Commit: dmqijeb6\n\n';
   const execute = vi.fn(async (args: readonly string[]) => {
     const command = args.join(' ');
     calls.push(command);
     if (command === failOn) throw new Error(command.includes('push') ? 'non-fast-forward rejected' : 'operation failed');
-    if (command === 'vc status') return 'Branch: main\nCommit: dmqijeb6\n';
+    if (command === 'vc status') return status;
     if (command.includes('remote show')) return JSON.stringify({ head: '1234567890123456789012345678901234567890' });
     return '';
   });

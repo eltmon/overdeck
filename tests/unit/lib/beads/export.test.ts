@@ -7,6 +7,7 @@ import { exportBeadsJsonl } from '../../../../src/lib/beads/export.js';
 
 describe('validated beads JSONL export', () => {
   const doltHead = 'dmqijeb6';
+  const status = `\n📊 Version Control Status\n\n  Branch: main\n  Commit: ${doltHead}\n\n`;
   const roots: string[] = [];
   afterEach(() => roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true })));
 
@@ -16,7 +17,7 @@ describe('validated beads JSONL export', () => {
     const beadsDir = join(root, '.beads');
     mkdirSync(beadsDir);
     const execute = vi.fn(async (args: readonly string[]) => {
-      if (args.join(' ') === 'vc status') return `Branch: main\nCommit: ${doltHead}\n`;
+      if (args.join(' ') === 'vc status') return status;
       if (args[0] === 'export') {
         const output = String(args[args.indexOf('-o') + 1]);
         writeFileSync(output, records.map((record) => JSON.stringify(record)).join('\n') + (records.length ? '\n' : ''));
@@ -47,7 +48,7 @@ describe('validated beads JSONL export', () => {
   it('refuses an ID-set mismatch without publishing', async () => {
     const f = fixture([{ id: 'one' }]);
     f.execute.mockImplementation(async (args: readonly string[]) => {
-      if (args.join(' ') === 'vc status') return `Commit: ${doltHead}\n`;
+      if (args.join(' ') === 'vc status') return status;
       if (args[0] === 'export') { writeFileSync(String(args.at(-1)), '{"id":"different"}\n'); return ''; }
       return JSON.stringify([{ id: 'one' }]);
     });

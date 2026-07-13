@@ -53,7 +53,7 @@ function isConflict(error: unknown): boolean {
 }
 
 function parseHead(status: string): string | null {
-  return /^Commit:\s*([0-9a-v]{7,40})\s*$/im.exec(status)?.[1] ?? null;
+  return /^\s*Commit:\s*([0-9a-v]{7,40})\s*$/im.exec(status)?.[1] ?? null;
 }
 
 async function defaultExecute(args: readonly string[], cwd: string): Promise<string> {
