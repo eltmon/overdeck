@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-13T05:48:22.233Z",
+  "updated": "2026-07-13T06:01:07.037Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "pending",
@@ -51,9 +51,10 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "MiniMax-M3",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
-    "injection-budget": "running"
+    "injection-budget": "running",
+    "size-scaled-waits": "running"
   },
   "swarm": {
     "slotAssignments": [
@@ -63,6 +64,13 @@
         "agentId": "agent-pan-2568-slot-1",
         "branch": "feature/pan-2568-slot-1",
         "assignedAt": "2026-07-13T05:48:21.301Z"
+      },
+      {
+        "slotIndex": 2,
+        "itemId": "size-scaled-waits",
+        "agentId": "agent-pan-2568-slot-2",
+        "branch": "feature/pan-2568-slot-2",
+        "assignedAt": "2026-07-13T06:01:05.152Z"
       }
     ]
   }
