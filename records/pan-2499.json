@@ -11,16 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-13T17:58:50.866Z",
+  "updated": "2026-07-13T18:00:43.992Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T15:06:16.118Z"
+    "updatedAt": "2026-07-13T18:00:43.901Z",
+    "inspectNotes": "Bead no-loss-manifest ack: inventory.ts enumerates all 44 sections (Console 14 + Cockpit 16 + Rail 13 + ReviewPolicyControl) with home paths; issue-view-no-loss.test.ts hardcodes the same section list independently and asserts existsSync on every home path; npx vitest run tests/unit/dashboard/frontend/issue-view-no-loss.test.ts passes 5/5."
   },
   "closeOut": {
     "usage": {
@@ -32,6 +34,22 @@
             "cacheRead": 6213852,
             "cacheWrite": 404469
           }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 16803,
+            "output": 2199,
+            "cacheRead": 712270,
+            "cacheWrite": 97952
+          }
+        },
+        "work": {
+          "custom/kimi-k2.7-code": {
+            "input": 2430255,
+            "output": 454814,
+            "cacheRead": 151826944,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
@@ -40,11 +58,23 @@
           "output": 55437,
           "cacheRead": 6213852,
           "cacheWrite": 404469
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 16803,
+          "output": 2199,
+          "cacheRead": 712270,
+          "cacheWrite": 97952
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 2430255,
+          "output": 454814,
+          "cacheRead": 151826944,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 14.301283,
-        "pricingAsOf": "2026-07-13T15:06:16.155Z"
+        "usd": 47.719328,
+        "pricingAsOf": "2026-07-13T18:00:43.965Z"
       }
     },
     "merges": [],
