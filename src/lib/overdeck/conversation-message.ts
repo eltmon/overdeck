@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { extname, join } from 'node:path';
+import { basename, extname, join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { readFile, realpath, rename, rm, writeFile } from 'node:fs/promises';
 
@@ -70,6 +70,48 @@ const ALLOWED_UPLOAD_MIME_TYPES = new Map<string, string>([
   ['image/webp', '.webp'],
 ]);
 
+export const IMAGE_ATTACHMENT_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp'] as const;
+
+export const ALLOWED_ATTACHMENT_EXTENSIONS = [
+  '.txt',
+  '.md',
+  '.markdown',
+  '.json',
+  '.jsonl',
+  '.log',
+  '.csv',
+  '.tsv',
+  '.yaml',
+  '.yml',
+  '.toml',
+  '.xml',
+  '.html',
+  '.css',
+  '.js',
+  '.jsx',
+  '.ts',
+  '.tsx',
+  '.py',
+  '.sh',
+  '.bash',
+  '.sql',
+  '.diff',
+  '.patch',
+  '.ini',
+  '.conf',
+  '.cfg',
+  '.pdf',
+] as const;
+
+export function isImageAttachmentPath(path: string): boolean {
+  return IMAGE_ATTACHMENT_EXTENSIONS.includes(extname(path).toLowerCase() as typeof IMAGE_ATTACHMENT_EXTENSIONS[number]);
+}
+
+export interface UploadValidationError {
+  error: string;
+  status: number;
+}
+
 function validateImageMagicBytes(bytes: Buffer, mimeType: string): boolean {
   switch (mimeType) {
     case 'image/png':
@@ -89,6 +131,56 @@ function validateImageMagicBytes(bytes: Buffer, mimeType: string): boolean {
   }
 }
 
+export function validateUploadPayload(filename: string, mimeType: string, bytes: Buffer): UploadValidationError | null {
+  if (ALLOWED_UPLOAD_MIME_TYPES.has(mimeType)) {
+    if (!validateImageMagicBytes(bytes, mimeType)) {
+      return { error: 'File content does not match declared MIME type', status: 400 };
+    }
+    return null;
+  }
+
+  // Unsupported image MIME types keep the legacy error shape for backwards compatibility.
+  if (mimeType.startsWith('image/')) {
+    return { error: `Unsupported mimeType: ${mimeType}`, status: 400 };
+  }
+
+  const ext = extname(filename).toLowerCase();
+
+  if (ext === '.pdf') {
+    if (
+      bytes.length >= 5 &&
+      bytes[0] === 0x25 &&
+      bytes[1] === 0x50 &&
+      bytes[2] === 0x44 &&
+      bytes[3] === 0x46 &&
+      bytes[4] === 0x2d
+    ) {
+      return null;
+    }
+    return { error: 'File content does not match declared file type', status: 400 };
+  }
+
+  if (ALLOWED_ATTACHMENT_EXTENSIONS.includes(ext as typeof ALLOWED_ATTACHMENT_EXTENSIONS[number])) {
+    try {
+      const decoder = new TextDecoder('utf-8', { fatal: true });
+      decoder.decode(bytes);
+      if (bytes.includes(0)) {
+        return { error: 'File content does not match declared file type', status: 400 };
+      }
+      return null;
+    } catch {
+      return { error: 'File content does not match declared file type', status: 400 };
+    }
+  }
+
+  return { error: `Unsupported file type: ${ext || mimeType}`, status: 400 };
+}
+
+function sanitizeUploadBasename(name: string): string {
+  const cleaned = name.toLowerCase().replace(/[^a-z0-9._-]/g, '');
+  return cleaned.slice(0, 48) || 'file';
+}
+
 export interface ConversationMessageDependencies {
   resolveSessionFile(conv: Conversation): Promise<string | null>;
   generateAiTitle(name: string, message: string): Promise<void>;
@@ -96,9 +188,14 @@ export interface ConversationMessageDependencies {
 
 export function safeUploadExtension(filename: string, mimeType: string): string {
   const mimeExtension = ALLOWED_UPLOAD_MIME_TYPES.get(mimeType);
-  if (!mimeExtension) return '';
   const originalExtension = extname(filename).toLowerCase();
-  return originalExtension === mimeExtension ? originalExtension : mimeExtension;
+  if (mimeExtension) {
+    return originalExtension === mimeExtension ? originalExtension : mimeExtension;
+  }
+  if (ALLOWED_ATTACHMENT_EXTENSIONS.includes(originalExtension as typeof ALLOWED_ATTACHMENT_EXTENSIONS[number])) {
+    return originalExtension;
+  }
+  return '';
 }
 
 export async function handleConversationImageUpload(
@@ -116,18 +213,20 @@ export async function handleConversationImageUpload(
   if (filename.length > MAX_FILENAME_LENGTH) {
     return jsonResponse({ error: `filename exceeds maximum length of ${MAX_FILENAME_LENGTH} characters` }, { status: 400 });
   }
-  if (!ALLOWED_UPLOAD_MIME_TYPES.has(mimeType)) {
-    return jsonResponse({ error: `Unsupported mimeType: ${mimeType}` }, { status: 400 });
-  }
   if (bytes.length === 0) return jsonResponse({ error: 'Payload is empty' }, { status: 400 });
   if (bytes.length > MAX_UPLOAD_BYTES) {
     return jsonResponse({ error: `Payload exceeds maximum size of ${MAX_UPLOAD_BYTES} bytes` }, { status: 400 });
   }
-  if (!validateImageMagicBytes(bytes, mimeType)) {
-    return jsonResponse({ error: 'File content does not match declared MIME type' }, { status: 400 });
+
+  const validation = validateUploadPayload(filename, mimeType, bytes);
+  if (validation) {
+    return jsonResponse({ error: validation.error }, { status: validation.status });
   }
 
-  const extension = safeUploadExtension(filename, mimeType)!;
+  const extension = safeUploadExtension(filename, mimeType);
+  if (!extension) {
+    return jsonResponse({ error: `Unsupported file type: ${extname(filename).toLowerCase() || mimeType}` }, { status: 400 });
+  }
   if (!getConversationByName(name)) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
 
   const attachmentDir = await ensureConversationAttachmentDir(name);
@@ -144,7 +243,14 @@ export async function handleConversationImageUpload(
     return jsonResponse({ error: 'Invalid attachment path' }, { status: 500 });
   }
 
-  const fileName = `${randomUUID()}${extension}`;
+  let fileName: string;
+  if (ALLOWED_UPLOAD_MIME_TYPES.has(mimeType)) {
+    fileName = `${randomUUID()}${extension}`;
+  } else {
+    const base = basename(filename, extension);
+    const sanitized = sanitizeUploadBasename(base);
+    fileName = `${randomUUID()}-${sanitized}${extension}`;
+  }
   const path = join(resolvedDir, fileName);
   const tmpPath = `${path}.tmp`;
   try {
