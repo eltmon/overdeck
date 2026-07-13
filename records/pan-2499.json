@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-13T20:07:43.367Z",
+  "updated": "2026-07-13T20:07:44.463Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -98,13 +98,6 @@
         "agentId": "agent-pan-2499-slot-2",
         "branch": "feature/pan-2499-slot-2",
         "assignedAt": "2026-07-13T15:10:25.079Z"
-      },
-      {
-        "slotIndex": 3,
-        "itemId": "clear-gates-server",
-        "agentId": "agent-pan-2499-slot-3",
-        "branch": "feature/pan-2499-slot-3",
-        "assignedAt": "2026-07-13T19:36:49.334Z"
       }
     ],
     "slotCompletions": {
