@@ -223,7 +223,10 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
     const lifecyclePromise = postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { skipDeploy: true });
 
     // Wait for the release engine to have started but NOT resolve it yet.
-    await vi.waitFor(() => expect(releaseStarted).toBe(true));
+    // The release path begins behind several dynamic imports. Under the full
+    // parallel suite those imports can take longer than waitFor's 1s default;
+    // this assertion is about ordering, not wall-clock performance.
+    await vi.waitFor(() => expect(releaseStarted).toBe(true), { timeout: 10_000 });
 
     // Cleanup must have proceeded before release resolves.
     expect(mockCompactBeads).toHaveBeenCalled();
