@@ -2,6 +2,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { Context, Effect, Layer, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { EventStoreService } from '../../services/domain-services.js';
+import { IssueLifecycle } from '../../services/issue-lifecycle.js';
+import { ReadModelService, type ReadModelServiceShape } from '../../read-model.js';
 
 const fsMocks = vi.hoisted(() => ({
   appendFile: vi.fn(),
@@ -15,6 +17,8 @@ const agentMocks = vi.hoisted(() => ({
   saveAgentRuntimeState: vi.fn(),
   restartAgent: vi.fn(),
   messageAgent: vi.fn(),
+  clearAgentPausedSync: vi.fn(),
+  clearAgentTroubledSync: vi.fn(),
 }));
 
 const tmuxMocks = vi.hoisted(() => ({
@@ -41,6 +45,7 @@ const issueServiceMock = vi.hoisted(() => ({
   getIssueSource: vi.fn(),
   patchIssue: vi.fn(),
   invalidateTracker: vi.fn(),
+  getIssues: vi.fn(),
 }));
 
 vi.mock('node:fs/promises', async (importOriginal) => {
@@ -57,6 +62,19 @@ vi.mock('../origin-validation.js', () => ({
   _resetTrustedOriginsForTests: vi.fn(),
 }));
 
+// The spawn route resolves the closed-issue guard via getIssueDataService(),
+// whose implementation does a lazy require() of the issue-service singleton.
+// Under vitest that dynamic require can't resolve the .js→.ts source path, so
+// override the exported binding on the shared module (everything else stays
+// real via ...actual) to return the in-memory issueServiceMock.
+vi.mock('../agents/shared.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../agents/shared.js')>();
+  return {
+    ...actual,
+    getIssueDataService: () => issueServiceMock,
+  };
+});
+
 vi.mock('../../../../lib/agents.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../lib/agents.js')>();
   return {
@@ -67,6 +85,8 @@ vi.mock('../../../../lib/agents.js', async (importOriginal) => {
     saveAgentRuntimeState: agentMocks.saveAgentRuntimeState,
     restartAgent: agentMocks.restartAgent,
     messageAgent: agentMocks.messageAgent,
+    clearAgentPausedSync: agentMocks.clearAgentPausedSync,
+    clearAgentTroubledSync: agentMocks.clearAgentTroubledSync,
   };
 });
 
@@ -157,6 +177,35 @@ function eventStoreLayerFor(appendedEvents: Record<string, unknown>[]) {
   });
 }
 
+// The spawn route (POST /api/agents) pulls IssueLifecycle and ReadModelService
+// unconditionally at the top of its handler. The clearGates gate path under
+// test never calls them, but Effect resolves every yield* eagerly, so the tags
+// must be provided or the route 500s with "Service not found" before the gate.
+const issueLifecycleStub = {
+  transitionTo: vi.fn(() => Effect.void),
+  addLabel: vi.fn(() => Effect.void),
+  removeLabel: vi.fn(() => Effect.void),
+  close: vi.fn(() => Effect.void),
+};
+
+const readModelStub = {
+  getSnapshot: Effect.succeed(null),
+  getChannelPermissionRequest: vi.fn(() => Effect.succeed(null)),
+  getResolvedChannelPermissionDecision: vi.fn(() => Effect.succeed(null)),
+  getTurnDiffSummaries: vi.fn(() => Effect.succeed([])),
+  getAgentIdBySessionId: vi.fn(() => Effect.succeed(null)),
+  applyEvent: vi.fn(),
+  bootstrap: Effect.void,
+} as unknown as ReadModelServiceShape;
+
+function routeServicesLayer(appendedEvents: Record<string, unknown>[]) {
+  return Layer.mergeAll(
+    eventStoreLayerFor(appendedEvents),
+    Layer.succeed(IssueLifecycle, issueLifecycleStub),
+    Layer.succeed(ReadModelService, readModelStub),
+  );
+}
+
 async function runRoute(layer: Layer.Layer<HttpRouter.HttpRouter, never, EventStoreService>, path: string, init: RequestInit) {
   const appendedEvents: Record<string, unknown>[] = [];
   const request = HttpServerRequest.fromWeb(new Request(`http://localhost${path}`, {
@@ -169,7 +218,7 @@ async function runRoute(layer: Layer.Layer<HttpRouter.HttpRouter, never, EventSt
     Effect.scoped(
       Effect.flatMap(HttpRouter.toHttpEffect(layer), (app) =>
         Effect.provideService(app, HttpServerRequest.HttpServerRequest, request)
-      ).pipe(Effect.provide(eventStoreLayerFor(appendedEvents))),
+      ).pipe(Effect.provide(routeServicesLayer(appendedEvents))),
     ),
   );
   return { response, appendedEvents };
@@ -205,6 +254,8 @@ describe('operator.intervention dashboard routes', () => {
     agentMocks.saveAgentRuntimeState.mockResolvedValue(undefined);
     agentMocks.restartAgent.mockResolvedValue({ success: true });
     agentMocks.messageAgent.mockResolvedValue(undefined);
+    agentMocks.clearAgentPausedSync.mockReturnValue(true);
+    agentMocks.clearAgentTroubledSync.mockReturnValue(true);
     tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(false));
     tmuxMocks.killSession.mockReturnValue(Effect.succeed(undefined));
     lifecycleMocks.resetToTodo.mockReturnValue(Effect.succeed({ success: true, steps: [] }));
@@ -216,6 +267,10 @@ describe('operator.intervention dashboard routes', () => {
     issueServiceMock.getIssueSource.mockReturnValue('github');
     issueServiceMock.patchIssue.mockReturnValue(undefined);
     issueServiceMock.invalidateTracker.mockResolvedValue(undefined);
+    // The spawn route's closed-issue guard calls getIssueDataService().getIssues();
+    // returning [] means "not found among cached issues", so the guard is skipped
+    // and the request reaches the start-gate (clearGates) logic under test.
+    issueServiceMock.getIssues.mockReturnValue([]);
   });
 
   afterEach(() => {
@@ -292,5 +347,58 @@ describe('operator.intervention dashboard routes', () => {
 
     expect(response.status).toBe(400);
     expect(appendedEvents).not.toContainEqual(expect.objectContaining({ type: 'operator.intervention' }));
+  });
+
+  // ── PAN-2499 WI-9a: clearGates on POST /api/agents ─────────────────────────
+  // The spawn route must clear the troubled/paused gate through the same door
+  // functions pan untroubled / pan unpause use and emit the matching intervention
+  // event — and must refuse (not silently no-op) when clearGates is absent.
+
+  it('clears the troubled gate and emits untroubled when clearGates is set on spawn (AC1)', async () => {
+    agentMocks.getAgentState.mockReturnValue(
+      Effect.succeed({ ...agentState, troubled: true, consecutiveFailures: 2 }),
+    );
+
+    const { appendedEvents } = await requestAgents('/api/agents', {
+      body: JSON.stringify({ issueId: 'PAN-1', clearGates: true }),
+    });
+
+    expect(agentMocks.clearAgentTroubledSync).toHaveBeenCalledWith('agent-pan-1');
+    expect(agentMocks.clearAgentPausedSync).not.toHaveBeenCalled();
+    expect(appendedEvents).toContainEqual(expect.objectContaining({
+      type: 'operator.intervention',
+      payload: { issueId: 'PAN-1', kind: 'untroubled', source: 'dashboard' },
+    }));
+  });
+
+  it('clears the paused gate and emits unpause when clearGates is set on spawn (AC2)', async () => {
+    agentMocks.getAgentState.mockReturnValue(
+      Effect.succeed({ ...agentState, paused: true, pausedReason: 'operator' }),
+    );
+
+    const { appendedEvents } = await requestAgents('/api/agents', {
+      body: JSON.stringify({ issueId: 'PAN-1', clearGates: true }),
+    });
+
+    expect(agentMocks.clearAgentPausedSync).toHaveBeenCalledWith('agent-pan-1');
+    expect(agentMocks.clearAgentTroubledSync).not.toHaveBeenCalled();
+    expect(appendedEvents).toContainEqual(expect.objectContaining({
+      type: 'operator.intervention',
+      payload: { issueId: 'PAN-1', kind: 'unpause', source: 'dashboard' },
+    }));
+  });
+
+  it('refuses a gated spawn without clearGates and clears nothing (AC3)', async () => {
+    agentMocks.getAgentState.mockReturnValue(
+      Effect.succeed({ ...agentState, paused: true, pausedReason: 'operator' }),
+    );
+
+    const { response } = await requestAgents('/api/agents', {
+      body: JSON.stringify({ issueId: 'PAN-1' }),
+    });
+
+    expect(response.status).toBe(409);
+    expect(agentMocks.clearAgentPausedSync).not.toHaveBeenCalled();
+    expect(agentMocks.clearAgentTroubledSync).not.toHaveBeenCalled();
   });
 });
