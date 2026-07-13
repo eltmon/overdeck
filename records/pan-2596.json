@@ -139,17 +139,18 @@
     "recordedAt": "2026-07-13T09:57:24.734Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T11:15:48.604Z",
+  "updated": "2026-07-13T11:18:14.055Z",
   "pipeline": {
     "issueId": "PAN-2596",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T11:15:48.542Z",
+    "updatedAt": "2026-07-13T11:18:13.668Z",
+    "verificationNotes": "Verification FAILED at build (3006ms):\n\n\n> @overdeck/core@0.45.16 build\n> npm run build:contracts && npm run build:pi-extension && npm run build:ohmypi-extension && npm run build:cli && node scripts/build-post-cli.mjs\n\n\n> @overdeck/core@0.45.16 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.45.16 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-2596/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n",
     "inspectNotes": "Bead server-upload-allowlist ack: validateUploadPayload correctly gates UTF-8 text extensions, PDF %PDF- magic prefix, and disallowed/extension-less types with 400s naming the mismatch, while preserving image magic-byte validation and <uuid><ext> naming; non-image files get <uuid>-<sanitized-name><ext>. All 5 ACs verified against diff + accompanying unit tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2634",
     "lastVerifiedCommit": "991f28dcac2af9f4dd0da07e5bcd29f2c808d653",
@@ -273,7 +274,7 @@
       },
       "costAtCloseOut": {
         "usd": 51.759135,
-        "pricingAsOf": "2026-07-13T11:15:48.603Z"
+        "pricingAsOf": "2026-07-13T11:18:13.932Z"
       }
     },
     "merges": [
