@@ -145,17 +145,17 @@
     "recordedAt": "2026-07-13T11:42:15.994Z"
   },
   "created": "2026-07-12T22:33:37.108Z",
-  "updated": "2026-07-13T11:42:24.308Z",
+  "updated": "2026-07-13T11:42:30.092Z",
   "pipeline": {
     "issueId": "PAN-2602",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T11:42:22.617Z",
+    "updatedAt": "2026-07-13T11:42:28.884Z",
     "reviewNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf set-option -t agent-pan-2602-review destroy-unattached off\nno such session: agent-pan-2602-review\n",
     "inspectNotes": "Bead beads-rollup-service ack: extractIssueLabels() now gates bare word-number labels through project.issuePrefixes, preventing phase-N labels from creating spurious rollups; tests cover phase exclusion and workspace: label mapping.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2636",
@@ -383,7 +383,7 @@
       },
       "costAtCloseOut": {
         "usd": 107.611457,
-        "pricingAsOf": "2026-07-13T11:42:22.831Z"
+        "pricingAsOf": "2026-07-13T11:42:29.830Z"
       }
     },
     "merges": [
