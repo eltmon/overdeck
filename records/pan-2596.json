@@ -69,17 +69,17 @@
     "recordedAt": "2026-07-13T09:57:24.734Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T10:04:29.822Z",
+  "updated": "2026-07-13T10:14:03.586Z",
   "pipeline": {
     "issueId": "PAN-2596",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T10:04:29.082Z",
+    "updatedAt": "2026-07-13T10:14:03.512Z",
     "reviewNotes": "Unbounded attachment validation fan-out on message send",
     "verificationNotes": "Verification FAILED at test (107741ms):\n\n[2m) // element.getAttribute(\"href\") === \"https://example.com/\"\u001b[22m\n\nExpected the element to have attribute:\n\u001b[32m  href=\"https://example.com/\"\u001b[39m\nReceived:\n\u001b[31m  href=\"https://example.com\"\u001b[39m\n\nIgnored nodes: comments, script, style\n\u001b[36m<html>\u001b[39m\n  \u001b[36m<head />\u001b[39m\n  \u001b[36m<body>\u001b[39m\n    \u001b[36m<div>\u001b[39m\n      \u001b[36m<div\u001b[39m\n        \u001b[33mclass\u001b[39m=\u001b[32m\"_chatMarkdown_10de07\"\u001b[39m\n      \u001b[36m>\u001b[39m\n        \u001b[36m<div\u001b[39m\n          \u001b[33mclass\u001b[39m=\u001b[32m\"space-y-4 whitespace-normal [&>*:first-child]:mt-0 [&>*:last-child]:mb-0\"\u001b[39m\n        \u001b[36m>\u001b[39m\n          \u001b[36m<p>\u001b[39m\n            \u001b[0mVisit \u001b[0m\n            \u001b[36m<a\u001b[39m\n              \u001b[33mclass\u001b[39m=\u001b[32m\"_mdLink_10de07\"\u001b[39m\n              \u001b[33mhref\u001b[39m=\u001b[32m\"https://example.com/\"\u001b[39m\n              \u001b[33mrel\u001b[39m=\u001b[32m\"noopener noreferrer\"\u001b[39m\n              \u001b[33mtarget\u001b[39m=\u001b[32m\"_blank\"\u001b[39m\n            \u001b[36m>\u001b[39m\n              \u001b[0msite\u001b[0m\n            \u001b[36m</a>\u001b[39m\n            \u001b[0m.\u001b[0m\n          \u001b[36m</p>\u001b[39m\n        \u001b[36m</div>\u001b[39m\n      \u001b[36m</div>\u001b[39m\n    \u001b[36m</div>\u001b[39m\n  \u001b[36m</body>\u001b[39m\n\u001b[36m</html>\u001b[39m...\n ❯ src/components/chat/__tests__/ChatMarkdown.test.tsx:121:42\n    119|\n    120|     const external = await screen.findByRole('link', { name: 'site' });\n    121|     await waitFor(() => expect(external).toHaveAttribute('href', 'http…\n       |                                          ^\n    122|     expect(external).toHaveAttribute('target', '_blank');\n    123|     expect(external).toHaveAttribute('rel', 'noopener noreferrer');\n ❯ runWithExpensiveErrorDiagnosticsDisabled ../../../node_modules/.bun/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/config.js:47:12\n ❯ checkCallback ../../../node_modules/.bun/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/wait-for.js:124:77\n ❯ Timeout.checkRealTimersCallback ../../../node_modules/.bun/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/wait-for.js:118:16\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n",
     "inspectNotes": "Bead server-upload-allowlist ack: validateUploadPayload correctly gates UTF-8 text extensions, PDF %PDF- magic prefix, and disallowed/extension-less types with 400s naming the mismatch, while preserving image magic-byte validation and <uuid><ext> naming; non-image files get <uuid>-<sanitized-name><ext>. All 5 ACs verified against diff + accompanying unit tests.",
@@ -112,24 +112,6 @@
         "tests/unit/lib/overdeck/conversation-upload-validation.test.ts"
       ],
       "recordedAt": "2026-07-13T09:47:33.191Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "1eaf018bafa1e6a7a9ad71d1d35beea38f1614ed"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "1eaf018bafa1e6a7a9ad71d1d35beea38f1614ed"
-      },
-      "performance": {
-        "status": "blocked",
-        "atCommit": "1eaf018bafa1e6a7a9ad71d1d35beea38f1614ed"
-      },
-      "requirements": {
-        "status": "blocked",
-        "atCommit": "1eaf018bafa1e6a7a9ad71d1d35beea38f1614ed"
-      }
     }
   },
   "closeOut": {
@@ -137,15 +119,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 32695,
-            "output": 71,
-            "cacheRead": 7552,
+            "input": 74609,
+            "output": 138,
+            "cacheRead": 40192,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 3972213,
-            "output": 22085,
-            "cacheRead": 3501824,
+            "input": 4150859,
+            "output": 22532,
+            "cacheRead": 3678720,
             "cacheWrite": 0
           }
         },
@@ -175,24 +157,24 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1167340,
-            "output": 154406,
-            "cacheRead": 60627712,
+            "input": 1220036,
+            "output": 170069,
+            "cacheRead": 69422592,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 32695,
-          "output": 71,
-          "cacheRead": 7552,
+          "input": 74609,
+          "output": 138,
+          "cacheRead": 40192,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 3972213,
-          "output": 22085,
-          "cacheRead": 3501824,
+          "input": 4150859,
+          "output": 22532,
+          "cacheRead": 3678720,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -214,15 +196,15 @@
           "cacheWrite": 85508
         },
         "custom/kimi-k2.7-code": {
-          "input": 1167340,
-          "output": 154406,
-          "cacheRead": 60627712,
+          "input": 1220036,
+          "output": 170069,
+          "cacheRead": 69422592,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 33.365224,
-        "pricingAsOf": "2026-07-13T10:04:29.147Z"
+        "usd": 35.259568,
+        "pricingAsOf": "2026-07-13T10:14:03.584Z"
       }
     },
     "merges": [
