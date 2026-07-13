@@ -266,6 +266,48 @@ export function queueBeadsAutoCommit(projectRoot: string): void {
 }
 
 /**
+ * PAN-2516 belt-and-suspenders reconciliation for state writes that predate or
+ * bypassed the canonical writer. Patrols commit only the owned spec/record
+ * surfaces; unrelated source or operator changes are never staged.
+ */
+export function reconcileStatePlaneDrift(
+  projectRoot: string,
+): Effect.Effect<FlushResult, never> {
+  const project = findProjectByPathSync(projectRoot);
+  const stateHome = project ? resolveStateReadHomeSync(project) : null;
+  const gitRoot = stateHome?.migrated ? stateHome.root : projectRoot;
+  const ownedPaths = stateHome?.migrated
+    ? ['specs', 'records']
+    : ['.pan/specs', '.pan/records'];
+
+  return Effect.gen(function* () {
+    const status = yield* runGit(
+      ['status', '--porcelain=v1', '--untracked-files=all', '--', ...ownedPaths],
+      gitRoot,
+    ).pipe(Effect.match({
+      onSuccess: (result) => result.stdout,
+      onFailure: () => '',
+    }));
+    const paths = status
+      .split('\n')
+      .map((line) => line.trimEnd())
+      .filter(Boolean)
+      .map((line) => line.slice(3))
+      .map((path) => path.includes(' -> ') ? path.split(' -> ').at(-1)! : path)
+      .map((path) => join(gitRoot, path));
+    if (paths.length === 0) return { committed: false, reason: 'no state-plane drift' };
+
+    queueAutoCommit({
+      projectRoot,
+      repoRoot: gitRoot,
+      paths,
+      subject: `chore(state): reconcile ${paths.length} pending spec/record update(s)`,
+    });
+    return yield* flushAutoCommits(projectRoot);
+  });
+}
+
+/**
  * Force a flush of any pending commits for `projectRoot`. Returns an Effect that
  * resolves after the commit attempt (success or no-op).
  */
@@ -421,7 +463,7 @@ function doCommit(
       return { committed: true, pushed: false, reason: push.reason };
     }
 
-    return { committed: true };
+    return { committed: true, pushed: push?.pushed };
   });
 }
 
@@ -437,8 +479,14 @@ function maybePushStateCommit(
   if (process.env.OVERDECK_STATE_AUTOPUSH === '0') {
     return Effect.succeed(null);
   }
-
-  return pushStateBranch(gitRoot, branch);
+  return runGit(['remote', 'get-url', 'origin'], gitRoot).pipe(
+    Effect.matchEffect({
+      // Unit-test and local scratch repositories may intentionally have no
+      // origin. A configured origin, however, makes push part of the write.
+      onFailure: () => Effect.succeed(null),
+      onSuccess: () => pushStateBranch(gitRoot, branch),
+    }),
+  );
 }
 
 function pushStateBranch(

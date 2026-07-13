@@ -160,7 +160,7 @@ import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
 import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync } from '../projects.js';
-import { queueBeadsAutoCommit } from '../pan-dir/auto-commit.js';
+import { queueBeadsAutoCommit, reconcileStatePlaneDrift } from '../pan-dir/auto-commit.js';
 import { recreatedStateWarnings } from './state-recreation-patrol.js';
 import { withIssueRecordLock } from '../pan-dir/record-lock.js';
 import { recordMainDivergenceHealth, type ProjectMainDivergence } from './deacon-main-divergence.js';
@@ -3198,7 +3198,16 @@ export async function runPatrol(): Promise<PatrolResult> {
     for (const a of playwrightActions) addLog('action', a, state.patrolCycle);
   }
   const projectConfigs = listProjectsSync();
-  for (const { config: projectConfig } of projectConfigs) if (projectConfig.path) queueBeadsAutoCommit(projectConfig.path);
+  for (const { config: projectConfig } of projectConfigs) {
+    if (!projectConfig.path) continue;
+    queueBeadsAutoCommit(projectConfig.path);
+    const stateWrite = await Effect.runPromise(reconcileStatePlaneDrift(projectConfig.path));
+    if (stateWrite.committed) {
+      const message = `Reconciled pending spec/record state for ${projectConfig.name ?? projectConfig.path}`;
+      actions.push(message);
+      addLog(stateWrite.pushed === false ? 'warn' : 'action', message, state.patrolCycle);
+    }
+  }
   for (const warning of await recreatedStateWarnings(projectConfigs)) addLog('error', warning, state.patrolCycle);
   const divergenceWarnings = await recordMainDivergenceHealth(state, projectConfigs);
   for (const warning of divergenceWarnings) addLog('warn', warning, state.patrolCycle);
