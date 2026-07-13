@@ -103,7 +103,7 @@
     "recordedAt": "2026-07-13T08:17:44.938Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T08:18:17.299Z",
+  "updated": "2026-07-13T08:25:47.439Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "reviewing",
@@ -261,8 +261,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "activity-terminal-end-signal": "completed",
     "activity-terminal-end-signal.activity-terminal-end-signal.ac1": "completed",
