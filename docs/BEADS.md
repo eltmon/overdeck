@@ -18,6 +18,14 @@ one physical local home at `${OVERDECK_HOME}/state/<project>/.beads/`. Main,
 feature worktrees, and workspaces contain `.beads/redirect` files pointing to
 that home. Server mode (`dolt sql-server`, `.beads/dolt/`) is not used.
 
+Redirects are always one hop: `bd` refuses redirect chains and falls back to the
+redirect target's own directory, so a redirect must never point at another
+redirecting directory. Worktree creation writes the canonical home path directly
+into `.beads/redirect`; post-Dolt-cutover the project root `.beads/` is itself a
+redirect, and pointing a worktree at it would create a chain. During close-out,
+the `teardown:sync-beads` step validates and refreshes the recovery export from
+that canonical home, not from inside the workspace.
+
 All reads use the beads resolver. All writes use `runMutationBatch`, exposed to
 agents as `pan beads …`. A mutation batch acquires the project lock, bootstraps,
 pulls, applies all operations in Dolt batch mode, commits once, validates one
