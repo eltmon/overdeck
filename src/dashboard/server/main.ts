@@ -15,6 +15,7 @@ import { startSharedIssueService, getSharedIssueService } from './services/issue
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 import { startMergeBlockerReconcileService } from './services/merge-blocker-reconcile-service.js';
 import { startAgentOutputService, stopAgentOutputService } from './services/agent-output-service.js';
+import { createBeadsRollupService } from './services/beads-rollup-service.js';
 import { createBeadsSyncService } from './services/beads-sync-service.js';
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
 import { startRestartAnnouncer, stopRestartAnnouncer } from './services/restart-announcer.js';
@@ -484,6 +485,8 @@ console.log(conversationSearchWatcher
   ? '[overdeck] Conversation search watcher started'
   : '[overdeck] Conversation search watcher skipped (conversationSearch.enabled=false)');
 
+let stopBeadsRollupService: (() => void) | undefined;
+
 void (async () => {
   const store = await initEventStore();
   const beadsSync = createBeadsSyncService({
@@ -491,6 +494,14 @@ void (async () => {
   });
   void beadsSync.run().catch((err) => console.warn('[beads-sync] service stopped:', err?.message ?? err));
   console.log('[overdeck] BeadsSyncService started');
+
+  const beadsRollup = createBeadsRollupService({
+    subscribe: (listener) => store.subscribe((event) => listener(event as any)),
+  });
+  beadsRollup.start();
+  stopBeadsRollupService = beadsRollup.stop;
+  console.log('[overdeck] BeadsRollupService started');
+
   store.subscribe((event) => {
     if (event.type === 'agent.stopped' || event.type === 'agent.heartbeat_dead') {
       const agentId = typeof (event.payload as { agentId?: unknown }).agentId === 'string'
@@ -571,6 +582,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopTranscriptPoller();
   stopCostReconcileService();
   stopRestartAnnouncer();
+  stopBeadsRollupService?.();
   await stopDeaconChild().catch((err) => console.warn('[deacon-supervisor] child shutdown failed:', err));
   await Effect.runPromise(flushAllPendingAutoCommits()).catch((err) => console.warn('[pan-dir/auto-commit] shutdown flush failed:', err));
   await stopConversationSearchWatcher().catch((err) => console.warn('[conversation-search] watcher shutdown failed:', err));
