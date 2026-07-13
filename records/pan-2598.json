@@ -195,18 +195,19 @@
     "recordedAt": "2026-07-13T09:48:30.294Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T09:51:21.825Z",
+  "updated": "2026-07-13T10:00:43.356Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T09:50:50.418Z",
+    "updatedAt": "2026-07-13T10:00:42.308Z",
     "reviewNotes": "Verification failed at test",
+    "verificationNotes": "Verification FAILED at test (326411ms):\n\n it globally with \"testTimeout\".\n ❯ src/lib/overdeck/__tests__/conversation-project-cwd.test.ts:42:3\n     40|\n     41| describe('resolveProjectCwd', () => {\n     42|   it('resolves a project by its yaml key', async () => {\n       |   ^\n     43|     const { resolveProjectCwd } = await import('../conversation-runtim…\n     44|     expect(resolveProjectCwd('myapp')).toEqual({ cwd: MYAPP_PATH });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/55]⎯\n\n FAIL  |root| tests/cli/commands/work/issue-beads-check.test.ts > hasBeadsTasks > returns false when .beads directory does not exist\n FAIL  |root| tests/cli/commands/work/issue-beads-check.test.ts > hasBeadsTasks > returns false when .beads directory does not exist\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ tests/cli/commands/work/issue-beads-check.test.ts:41:3\n     39|\n     40| describe('hasBeadsTasks', () => {\n     41|   it('returns false when .beads directory does not exist', async () =>…\n       |   ^\n     42|     const { hasBeadsTasks } = await import('../../../../src/cli/comman…\n     43|     expect(hasBeadsTasks(tmpDir, 'PAN-1094')).toBe(false);\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/55]⎯\n\n FAIL  |root| tests/cli/commands/work/issue-beads-check.test.ts > hasBeadsTasks > returns false when .beads exists without exported issues\n FAIL  |root| tests/cli/commands/work/issue-beads-check.test.ts > hasBeadsTasks > returns false when .beads exists without exported issues\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ tests/cli/commands/work/issue-beads-check.test.ts:46:3\n     44|   });\n     45|\n     46|   it('returns false when .beads exists without exported issues', async…\n       |   ^\n     47|     const { hasBeadsTasks } = await import('../../../../src/cli/comman…\n     48|     mkdirSync(join(tmpDir, '.beads'));\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/55]⎯\n\n",
     "inspectNotes": "Bead phase-banner-work-signal ack: workRunning now derives from activity.data.sections.some(type===work && status===running) (IssueMissionControl.tsx:828), verified via deriveNarrative precedence in StatusNarrative.tsx and existing+new tests covering all 3 ACs (planning-only session, live work session, beads-driven regression path); change is additive per NFR-1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2631",
     "reviewRequestedAt": "2026-07-13T09:48:47.258Z",
@@ -357,7 +358,7 @@
       },
       "costAtCloseOut": {
         "usd": 64.17916,
-        "pricingAsOf": "2026-07-13T09:50:50.727Z"
+        "pricingAsOf": "2026-07-13T10:00:42.861Z"
       }
     },
     "merges": [
