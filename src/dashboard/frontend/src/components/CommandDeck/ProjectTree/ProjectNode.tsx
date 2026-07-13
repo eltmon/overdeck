@@ -25,6 +25,8 @@ export interface ProjectFeatureResourceDetails {
   actualBranch?: string | null;
   /** PAN-1523: true when workspace HEAD differs from expected feature/<id> branch. */
   branchDrifted?: boolean;
+  /** PAN-2602: true when a feature/* or bypass/* branch for the issue has unmerged commits not on main. */
+  branchAheadOfMain?: boolean;
   /** PAN-1523: true when workspace path is configured but missing on disk. */
   workspaceMissing?: boolean;
   /** PAN-1676: remote (fly.io) work agent for this issue, when one is active. */
@@ -69,6 +71,8 @@ export interface ProjectFeature {
   sessions?: readonly SessionNode[];
   resourceSources?: ResourceSource[];
   resourceDetails?: ProjectFeatureResourceDetails;
+  /** PAN-2602: per-issue bead rollup totals from the cached bulk rollup. */
+  beadTotals?: { total: number; closed: number; inProgress: number; lastUpdated: string | null } | null;
 }
 
 interface ProjectNodeProps {
