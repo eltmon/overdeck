@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-2611",
   "schemaVersion": 2,
-  "created": "2026-07-13T03:16:32.338Z",
-  "updated": "2026-07-13T04:42:00.219Z",
-  "pipeline": {
-    "issueId": "PAN-2611",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-13T03:16:32.338Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -39,8 +22,189 @@
       "timestamp": "2026-07-13T04:42:00.218Z",
       "reason": "start",
       "agentModel": "glm-5.2"
+    },
+    {
+      "timestamp": "2026-07-13T05:53:49.019Z",
+      "reason": "end",
+      "note": "No deviations. Fixed the post-Dolt-cutover pan close sync-beads failure by routing the recovery export to the canonical beads home, updated createWorktree to write a one-hop redirect to the canonical home, added unit tests for both paths, and documented the one-hop invariant in docs/BEADS.md. Full test suite passes (1014 files, 9449 tests + frontend 32 tests)."
+    },
+    {
+      "timestamp": "2026-07-13T05:59:13.347Z",
+      "reason": "end",
+      "note": "Re-triggering review after rebuilding dist bundle (auto-trigger failed on a missing chunk due to stale build)."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T05:59:34.622Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T06:00:01.798Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T06:00:01.799Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T06:00:01.801Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T06:00:01.897Z"
     }
   ],
+  "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/BEADS.md",
+      "src/lib/lifecycle/teardown-workspace.ts",
+      "src/lib/workspace-manager/worktree-ops.ts",
+      "tests/unit/lib/lifecycle/teardown-workspace.test.ts",
+      "tests/unit/lib/workspace-manager/worktree-ops.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/BEADS.md",
+      "src/lib/lifecycle/teardown-workspace.ts",
+      "src/lib/workspace-manager/worktree-ops.ts",
+      "tests/unit/lib/lifecycle/teardown-workspace.test.ts",
+      "tests/unit/lib/workspace-manager/worktree-ops.test.ts"
+    ],
+    "recordedAt": "2026-07-13T05:58:56.677Z"
+  },
+  "created": "2026-07-13T03:16:32.338Z",
+  "updated": "2026-07-13T06:02:42.222Z",
+  "pipeline": {
+    "issueId": "PAN-2611",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "running",
+    "mergeStatus": "pending",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-13T06:01:45.491Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2624",
+    "reviewRequestedAt": "2026-07-13T05:59:13.358Z",
+    "reviewSpawnedAt": "2026-07-13T05:59:24.690Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/BEADS.md",
+        "src/lib/lifecycle/teardown-workspace.ts",
+        "src/lib/workspace-manager/worktree-ops.ts",
+        "tests/unit/lib/lifecycle/teardown-workspace.test.ts",
+        "tests/unit/lib/workspace-manager/worktree-ops.test.ts"
+      ],
+      "actualChangedFiles": [
+        "docs/BEADS.md",
+        "src/lib/lifecycle/teardown-workspace.ts",
+        "src/lib/workspace-manager/worktree-ops.ts",
+        "tests/unit/lib/lifecycle/teardown-workspace.test.ts",
+        "tests/unit/lib/workspace-manager/worktree-ops.test.ts"
+      ],
+      "recordedAt": "2026-07-13T05:58:56.677Z"
+    }
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 21366,
+            "output": 88,
+            "cacheRead": 3072,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.5": {
+            "input": 630214,
+            "output": 3197,
+            "cacheRead": 469760,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 16056,
+            "output": 58391,
+            "cacheRead": 9207988,
+            "cacheWrite": 366084
+          }
+        },
+        "work": {
+          "custom/kimi-k2.7-code": {
+            "input": 346758,
+            "output": 27386,
+            "cacheRead": 13791488,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/codex-auto-review": {
+          "input": 21366,
+          "output": 88,
+          "cacheRead": 3072,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.5": {
+          "input": 630214,
+          "output": 3197,
+          "cacheRead": 469760,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 16056,
+          "output": 58391,
+          "cacheRead": 9207988,
+          "cacheWrite": 366084
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 346758,
+          "output": 27386,
+          "cacheRead": 13791488,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 21.056569,
+        "pricingAsOf": "2026-07-13T06:01:47.983Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2624"
+    ],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
-  "model": "claude-fable-5"
+  "model": "kimi-k2.7-code",
+  "statusOverrides": {
+    "test-worktree-redirect": "completed",
+    "test-worktree-redirect.ac1": "completed",
+    "test-worktree-redirect.ac2": "completed",
+    "test-worktree-redirect.ac3": "completed",
+    "test-sync-beads-routing": "completed",
+    "test-sync-beads-routing.ac1": "completed",
+    "test-sync-beads-routing.ac2": "completed",
+    "test-sync-beads-routing.ac3": "completed",
+    "docs-beads-one-hop": "completed",
+    "docs-beads-one-hop.ac1": "completed",
+    "docs-beads-one-hop.ac2": "completed",
+    "fix-worktree-redirect-canonical": "completed",
+    "fix-worktree-redirect-canonical.ac1": "completed",
+    "fix-worktree-redirect-canonical.ac2": "completed",
+    "fix-worktree-redirect-canonical.ac3": "completed",
+    "fix-sync-beads-canonical-home": "completed",
+    "fix-sync-beads-canonical-home.ac1": "completed",
+    "fix-sync-beads-canonical-home.ac2": "completed",
+    "fix-sync-beads-canonical-home.ac3": "completed",
+    "fix-sync-beads-canonical-home.ac4": "completed"
+  }
 }
