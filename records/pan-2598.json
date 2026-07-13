@@ -17,26 +17,42 @@
       "reason": "resume",
       "agentModel": "kimi-k2.7-code",
       "timestamp": "2026-07-13T05:41:52.596Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T07:59:54.033Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T07:42:29.290Z",
+  "updated": "2026-07-13T08:06:21.147Z",
   "pipeline": {
     "issueId": "PAN-2598",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T07:39:10.889Z",
-    "inspectNotes": "Bead activity-terminal-end-signal ack: cc670d98 is a no-conflict merge; the actual implementation (ba17147d0b) and the AC4 duration-regression test commit (db866ee897) are both ancestors. command-deck.ts and projects.ts now compute sessionEnded from rtState.suspended / presence ended / (stoppedAt && !tmuxAlive), set endedAt only then (AC1/AC2 verified live-alive->undefined, stoppedAt+no-tmux->ISO stoppedAt), planningComplete derives from isPlanningCompleteSync (PLANNING_FINISHED_STATUSES, false when no spec) only on planning sections (AC3), and duration computation is untouched with explicit typeof/Number.isFinite regression assertions in both command-deck.test.ts and projects.test.ts (AC4). All 4 ACs satisfied."
+    "updatedAt": "2026-07-13T08:03:51.798Z",
+    "reviewNotes": "Review role spawn failed: Role run agent-pan-2598-review already running. Use 'pan tell' to message it.",
+    "inspectNotes": "Bead phase-banner-work-signal ack: workRunning now derives from activity.data.sections.some(type===work && status===running) (IssueMissionControl.tsx:828), verified via deriveNarrative precedence in StatusNarrative.tsx and existing+new tests covering all 3 ACs (planning-only session, live work session, beads-driven regression path); change is additive per NFR-1.",
+    "reviewRequestedAt": "2026-07-13T07:59:52.293Z",
+    "reviewSpawnedAt": "2026-07-13T07:59:53.031Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "codex": {
+          "openai/gpt-5.5": {
+            "input": 3574432,
+            "output": 16431,
+            "cacheRead": 3199744,
+            "cacheWrite": 0
+          }
+        },
         "implementation": {
           "anthropic/claude-fable-5": {
             "input": 145,
@@ -63,22 +79,28 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 35776,
-            "output": 16146,
-            "cacheRead": 3695047,
-            "cacheWrite": 230501
+            "input": 52897,
+            "output": 29633,
+            "cacheRead": 7097065,
+            "cacheWrite": 343687
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1860978,
-            "output": 261113,
-            "cacheRead": 112055808,
+            "input": 2116125,
+            "output": 314190,
+            "cacheRead": 141256704,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
+        "openai/gpt-5.5": {
+          "input": 3574432,
+          "output": 16431,
+          "cacheRead": 3199744,
+          "cacheWrite": 0
+        },
         "anthropic/claude-fable-5": {
           "input": 15520,
           "output": 63672,
@@ -92,35 +114,73 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 35776,
-          "output": 16146,
-          "cacheRead": 3695047,
-          "cacheWrite": 230501
+          "input": 52897,
+          "output": 29633,
+          "cacheRead": 7097065,
+          "cacheWrite": 343687
         },
         "custom/kimi-k2.7-code": {
-          "input": 1860978,
-          "output": 261113,
-          "cacheRead": 112055808,
+          "input": 2116125,
+          "output": 314190,
+          "cacheRead": 141256704,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 39.835153,
-        "pricingAsOf": "2026-07-13T07:39:10.979Z"
+        "usd": 50.936758,
+        "pricingAsOf": "2026-07-13T08:03:52.267Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "activity-terminal-end-signal": "completed",
     "activity-terminal-end-signal.activity-terminal-end-signal.ac1": "completed",
     "activity-terminal-end-signal.activity-terminal-end-signal.ac2": "completed",
     "activity-terminal-end-signal.activity-terminal-end-signal.ac3": "completed",
     "activity-terminal-end-signal.activity-terminal-end-signal.ac4": "completed",
-    "phase-banner-work-signal": "running"
+    "phase-banner-work-signal": "completed",
+    "tmux-live-planning-synthesis": "completed",
+    "tmux-live-planning-synthesis.ac1": "completed",
+    "tmux-live-planning-synthesis.ac2": "completed",
+    "auq-hook-detector-contract-test": "completed",
+    "auq-hook-detector-contract-test.ac1": "completed",
+    "auq-hook-detector-contract-test.ac2": "completed",
+    "auq-hook-detector-contract-test.ac3": "completed",
+    "plan-run-candidate-naming": "completed",
+    "plan-run-candidate-naming.ac1": "completed",
+    "plan-run-candidate-naming.ac2": "completed",
+    "plan-run-candidate-naming.ac3": "completed",
+    "cockpit-session-fallback-merge": "completed",
+    "cockpit-session-fallback-merge.ac1": "completed",
+    "cockpit-session-fallback-merge.ac2": "completed",
+    "cockpit-session-fallback-merge.ac3": "completed",
+    "happened-feed-done-gate": "completed",
+    "happened-feed-done-gate.ac1": "completed",
+    "happened-feed-done-gate.ac2": "completed",
+    "happened-feed-done-gate.ac3": "completed",
+    "happened-feed-done-gate.ac4": "completed",
+    "docs-update": "completed",
+    "docs-update.ac1": "completed",
+    "docs-update.ac2": "completed",
+    "docs-update.ac3": "completed",
+    "auq-deny-marker-contract": "completed",
+    "auq-deny-marker-contract.ac1": "completed",
+    "auq-deny-marker-contract.ac2": "completed",
+    "auq-deny-marker-contract.ac3": "completed",
+    "session-trees-prefilter-planning": "completed",
+    "session-trees-prefilter-planning.ac1": "completed",
+    "session-trees-prefilter-planning.ac2": "completed",
+    "session-trees-prefilter-planning.ac3": "completed",
+    "phase-banner-work-signal.ac1": "completed",
+    "phase-banner-work-signal.ac2": "completed",
+    "phase-banner-work-signal.ac3": "completed",
+    "phase-banner-work-signal.phase-banner-work-signal.ac1": "completed",
+    "phase-banner-work-signal.phase-banner-work-signal.ac2": "completed",
+    "phase-banner-work-signal.phase-banner-work-signal.ac3": "completed"
   },
   "swarm": {
     "slotAssignments": [
@@ -139,6 +199,7 @@
         "assignedAt": "2026-07-13T07:37:38.386Z"
       }
     ],
-    "slotCompletions": {}
+    "slotCompletions": {},
+    "finalizedAt": "2026-07-13T07:59:57.355Z"
   }
 }
