@@ -29,6 +29,8 @@ import {
   type PanIssueRecord,
 } from './records.js';
 import { withIssueRecordLock } from './record-lock.js';
+import { flushAutoCommits } from './auto-commit.js';
+import { Effect } from 'effect';
 
 export interface BackfillRecordsResult {
   processed: number;
@@ -164,7 +166,11 @@ async function backfillIssue(
       }
 
       const recordPath = writeIssueRecordSync(project, issueId, record);
-      queueIssueRecordCommit(project, issueId, recordPath);
+      const commitRoot = queueIssueRecordCommit(project, issueId, recordPath);
+      const flushed = await Effect.runPromise(flushAutoCommits(commitRoot));
+      if (flushed.pushed === false) {
+        throw new Error(flushed.reason ?? `record for ${issueId} was committed but not pushed`);
+      }
       return { action: 'written' };
     });
   } catch (err) {

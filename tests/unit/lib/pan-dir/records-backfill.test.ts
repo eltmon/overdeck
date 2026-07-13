@@ -7,7 +7,6 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
-import { Effect } from 'effect';
 
 const mockGetMergeSetSync = vi.hoisted(() => vi.fn());
 const mockListOverdeckAgentStatesSync = vi.hoisted(() => vi.fn());
@@ -50,7 +49,6 @@ import {
   backfillIssueRecords,
   type BackfillRecordsResult,
 } from '../../../../src/lib/pan-dir/records-backfill.js';
-import { flushAutoCommits } from '../../../../src/lib/pan-dir/auto-commit.js';
 
 describe('backfillIssueRecords', () => {
   let projectRoot: string;
@@ -188,17 +186,15 @@ describe('backfillIssueRecords', () => {
     expect(existsSync(join(infraRepo, '.pan', 'records', 'pan-1909.json'))).toBe(false);
   });
 
-  it('commits queued records to the infra repo', async () => {
+  it('commits records to the infra repo before returning', async () => {
     mkdirSync(join(projectRoot, '.pan', 'continues'), { recursive: true });
     writeFileSync(
       join(projectRoot, '.pan', 'continues', 'pan-1908.vbrief.json'),
       JSON.stringify({ issueId: 'PAN-1908' }),
     );
 
-    await backfillIssueRecords();
-    const flushResult = await Effect.runPromise(flushAutoCommits(infraRepo));
-
-    expect(flushResult.committed).toBe(true);
+    const result = await backfillIssueRecords();
+    expect(result.processed).toBe(1);
     const log = execSync('git log --oneline -1', { cwd: infraRepo, encoding: 'utf-8' });
     expect(log).toContain('PAN-1908');
   });
