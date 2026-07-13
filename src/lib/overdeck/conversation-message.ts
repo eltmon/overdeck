@@ -37,6 +37,8 @@ import {
 
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const MAX_MESSAGE_LENGTH = 50_000;
+const MAX_ATTACHMENT_PATHS_PER_MESSAGE = 64;
+const ATTACHMENT_CHECK_BATCH_SIZE = 8;
 const MAX_FILENAME_LENGTH = 255;
 const UPLOAD_READ_TIMEOUT_MS = 10_000;
 const UPLOAD_RATE_LIMIT_WINDOW_MS = 60_000;
@@ -404,14 +406,29 @@ export async function handleConversationMessage(
   }
 
   const allAttachmentPaths = extractConversationAttachmentPaths(message);
-  const managedChecks = await Promise.all(
-    allAttachmentPaths.map(async (attachmentPath) => {
-      const managed = await isManagedConversationAttachmentPath(attachmentPath);
-      if (!managed) return { managed: false as const, attachmentPath };
-      const hasAttachment = await hasConversationAttachment(conv.name, attachmentPath);
-      return { managed: true as const, attachmentPath, hasAttachment };
-    }),
-  );
+  if (allAttachmentPaths.length > MAX_ATTACHMENT_PATHS_PER_MESSAGE) {
+    return jsonResponse(
+      { error: `Message contains too many attachment references (maximum ${MAX_ATTACHMENT_PATHS_PER_MESSAGE})` },
+      { status: 400 },
+    );
+  }
+
+  const managedChecks: Array<
+    | { managed: false; attachmentPath: string }
+    | { managed: true; attachmentPath: string; hasAttachment: boolean }
+  > = [];
+  for (let i = 0; i < allAttachmentPaths.length; i += ATTACHMENT_CHECK_BATCH_SIZE) {
+    const batch = allAttachmentPaths.slice(i, i + ATTACHMENT_CHECK_BATCH_SIZE);
+    const batchResults = await Promise.all(
+      batch.map(async (attachmentPath) => {
+        const managed = await isManagedConversationAttachmentPath(attachmentPath);
+        if (!managed) return { managed: false as const, attachmentPath };
+        const hasAttachment = await hasConversationAttachment(conv.name, attachmentPath);
+        return { managed: true as const, attachmentPath, hasAttachment };
+      }),
+    );
+    managedChecks.push(...batchResults);
+  }
   for (const check of managedChecks) {
     if (check.managed && !check.hasAttachment) {
       return jsonResponse({ error: 'One or more attached images are unavailable for this conversation' }, { status: 400 });

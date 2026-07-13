@@ -810,6 +810,38 @@ describe('ComposerFooter attachments', () => {
     });
   });
 
+  it('warns when dotfiles such as .env are selected', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+
+    render(<ComposerFooter conversation={conversation} />);
+
+    const file = new File(['SECRET=1'], '.env', { type: '' });
+    const input = screen.getByTestId('composer-attach-input');
+
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(mockToastWarning).toHaveBeenCalledWith('1 dotfile not supported (e.g. .env).');
+    });
+  });
+
+  it('warns when extensionless files such as Makefile are selected', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+
+    render(<ComposerFooter conversation={conversation} />);
+
+    const file = new File(['all:'], 'Makefile', { type: '' });
+    const input = screen.getByTestId('composer-attach-input');
+
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(mockToastWarning).toHaveBeenCalledWith('1 extensionless file not supported (e.g. Makefile).');
+    });
+  });
+
   it('renders file chips with name, size, and status for non-image attachments', async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockResolvedValue(

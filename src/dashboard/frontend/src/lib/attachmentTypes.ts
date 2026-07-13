@@ -89,4 +89,14 @@ export function inferAttachmentMime(file: File): string {
   return EXTENSION_TO_MIME[ext] ?? 'text/plain';
 }
 
+/** Filename starts with a dot (e.g. `.env`). File names are basename-only here. */
+export function isDotfileAttachment(filename: string): boolean {
+  return filename.startsWith('.');
+}
+
+/** No extension and not a dotfile (e.g. `Makefile`). */
+export function isExtensionlessAttachment(filename: string): boolean {
+  return !isDotfileAttachment(filename) && extname(filename) === '';
+}
+
 export const ATTACHMENT_ACCEPT = ['image/*', ...ALLOWED_ATTACHMENT_EXTENSIONS].join(',');

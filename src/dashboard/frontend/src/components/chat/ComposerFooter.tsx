@@ -34,6 +34,7 @@ import {
   sendConversationMessage,
   getAttachmentAccept,
 } from '../../lib/composerStore';
+import { isDotfileAttachment, isExtensionlessAttachment } from '../../lib/attachmentTypes';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // Pending-attachment state and its upload pump live in `lib/composerStore.ts` so they
@@ -158,7 +159,25 @@ export function ComposerFooter({
     const filesToEnqueue = modelSupportsImages(model) ? files : nonImageFiles;
     const { rejected } = enqueueAttachmentsForConversation(conversation.name, filesToEnqueue);
     if (rejected.length > 0) {
-      toast.warning(`${rejected.length} file${rejected.length === 1 ? '' : 's'} not supported.`);
+      const dotfiles = rejected.filter((file) => isDotfileAttachment(file.name));
+      const extensionless = rejected.filter((file) => isExtensionlessAttachment(file.name));
+      const other = rejected.filter(
+        (file) => !isDotfileAttachment(file.name) && !isExtensionlessAttachment(file.name),
+      );
+
+      if (dotfiles.length > 0) {
+        toast.warning(
+          `${dotfiles.length} dotfile${dotfiles.length === 1 ? '' : 's'} not supported (e.g. .env).`,
+        );
+      }
+      if (extensionless.length > 0) {
+        toast.warning(
+          `${extensionless.length} extensionless file${extensionless.length === 1 ? '' : 's'} not supported (e.g. Makefile).`,
+        );
+      }
+      if (other.length > 0) {
+        toast.warning(`${other.length} file${other.length === 1 ? '' : 's'} not supported.`);
+      }
     }
   }, [enqueueAttachmentsForConversation, conversation.name, model]);
 
