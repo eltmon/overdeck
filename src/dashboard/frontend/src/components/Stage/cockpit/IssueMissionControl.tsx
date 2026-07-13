@@ -815,9 +815,13 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
   const pr = usePrQuery(issueId)
   const checks = useIssueCheckRunsQuery(issueId)
   const costs = useIssueCostsQuery(issueId)
+  const activity = useActivityQuery(issueId)
   const headerActions = useIssueActions(issueId)
   const phase = phaseStatus(review.data)
   const cost = costs.data?.resolvedTotalCost ?? costs.data?.totalCost ?? 0
+  const workRunning = activity.data?.sections.some(
+    (s) => s.type === 'work' && s.status === 'running',
+  ) ?? false
   const selectTab = (tab: MissionTab) => {
     setActiveTab(tab)
     setTreeContext(null)
@@ -907,7 +911,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
           <StatusNarrative
             issueId={issueId}
             hasPlan={headerActions.state.hasPlan}
-            workRunning={phase === 'pending'}
+            workRunning={workRunning}
             cost={cost > 0 ? `$${cost.toFixed(2)}` : undefined}
             onStageClick={handleStageClick}
           />

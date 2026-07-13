@@ -110,6 +110,7 @@ vi.mock('./PickupGateCard', () => ({ PickupGateCard: () => <div>Pickup gate</div
 vi.mock('./ChangedFilesView', () => ({ ChangedFilesView: () => <div>Changed files</div> }))
 
 import { IssueMissionControl } from './IssueMissionControl'
+import { deriveNarrative } from './StatusNarrative'
 
 function renderMissionControl(extra?: { onOpenPane?: (pane: string) => void }) {
   const onOpenPane = extra?.onOpenPane ?? vi.fn()
@@ -243,5 +244,40 @@ describe('IssueMissionControl', () => {
 
     expect(onOpenPane).toHaveBeenCalledWith('files')
     expect(onOpenPane).toHaveBeenCalledWith('terminal')
+  })
+})
+
+describe('StatusNarrative derivation', () => {
+  it('renders planning headline when no work is running and there is no plan', () => {
+    const model = deriveNarrative({
+      hasPlan: false,
+      rs: undefined,
+      ci: undefined,
+      plan: undefined,
+      workRunning: false,
+    })
+    expect(model.headline).toBe('Planning what to build')
+  })
+
+  it('renders writing-code headline when a work session is running', () => {
+    const model = deriveNarrative({
+      hasPlan: true,
+      rs: undefined,
+      ci: undefined,
+      plan: undefined,
+      workRunning: true,
+    })
+    expect(model.headline).toBe('The crew is writing code')
+  })
+
+  it('keeps the beads-driven in-progress branch when no sessions are live', () => {
+    const model = deriveNarrative({
+      hasPlan: true,
+      rs: undefined,
+      ci: undefined,
+      plan: { done: 2, total: 5 },
+      workRunning: false,
+    })
+    expect(model.headline).toBe('The crew is writing code — 2 of 5 tasks done')
   })
 })
