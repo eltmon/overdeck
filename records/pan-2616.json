@@ -61,7 +61,7 @@
     "recordedAt": "2026-07-13T14:03:46.895Z"
   },
   "created": "2026-07-13T03:17:01.668Z",
-  "updated": "2026-07-13T14:36:22.920Z",
+  "updated": "2026-07-13T15:26:38.163Z",
   "pipeline": {
     "issueId": "PAN-2616",
     "reviewStatus": "reviewing",
@@ -148,8 +148,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "glm-5.2",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "linear-closed-tests": "completed",
     "linear-closed-tests.ac1": "completed",
