@@ -92,9 +92,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-13T11:13:03.647Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-13T11:13Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-13T11:13:58.779Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-13T11:13:58Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2596\n\n# Review Synthesis — PAN-2596 — 2026-07-13T07:13:27-04:00\n\n## Verdict: CHANGES REQUESTED — convoy reviewers failed to start for this run\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2596/.pan/review/agent-pan-2596-review-991f28dc/context.json\n- Branch: feature/pan-2596\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2596\n- HEAD reviewed: 991f28dcac2af9f4dd0da07e5bcd29f2c808d653\n- Cycle number: 4\n- Prior cycle SHA: aa5085397e4c1e61dc76f80c7ec0b3d58b8bd537\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | failed: Role run agent-pan-2596-review-security already running. Use 'pan tell' to message it. | — | infrastructure failure |\n| correctness | failed: Role run agent-pan-2596-review-correctness already running. Use 'pan tell' to message it. | — | infrastructure failure |\n| performance | failed: Role run agent-pan-2596-review-performance already running. Use 'pan tell' to message it. | — | infrastructure failure |\n| requirements | failed: Role run agent-pan-2596-review-requirements already running. Use 'pan tell' to message it. | — | infrastructure failure |\n\n## Blocking Findings\n\n### [infrastructure] Convoy reviewer runs failed to start\nAll four terminal signals for this cycle were `REVIEWER_FAILED` with the same root cause: the corresponding role run was already running. Per `roles/review.md`, any failed reviewer is blocking, and the review cannot approve without readable reports from the required sub-roles.\n\n## Non-blocking Findings\nNone.\n\n## Scope Note\nNo reviewer output files were read for this run because all four sub-roles signaled failure rather than readiness. This synthesis records the infrastructure failure only; it does not make a code-quality determination for `991f28dcac2af9f4dd0da07e5bcd29f2c808d653`.\n\n## Clean Sub-roles\nNone.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2596/.pan/review/agent-pan-2596-review-991f28dc/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2596 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/frontend/src/App.test.tsx"
@@ -126,18 +139,18 @@
     "recordedAt": "2026-07-13T09:57:24.734Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T11:13:24.706Z",
+  "updated": "2026-07-13T11:13:58.779Z",
   "pipeline": {
     "issueId": "PAN-2596",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T11:13:24.260Z",
-    "reviewNotes": "Agent re-review request (3/25): Fixed review issues: frontend image classification now mirrors server image extension allowlist; added MIME inference and tests.",
+    "updatedAt": "2026-07-13T11:13:57.916Z",
+    "reviewNotes": "Convoy reviewers failed to start: role runs already running",
     "inspectNotes": "Bead server-upload-allowlist ack: validateUploadPayload correctly gates UTF-8 text extensions, PDF %PDF- magic prefix, and disallowed/extension-less types with 400s naming the mismatch, while preserving image magic-byte validation and <uuid><ext> naming; non-image files get <uuid>-<sanitized-name><ext>. All 5 ACs verified against diff + accompanying unit tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2634",
     "lastVerifiedCommit": "991f28dcac2af9f4dd0da07e5bcd29f2c808d653",
@@ -169,6 +182,24 @@
         "tests/unit/lib/overdeck/conversation-upload-validation.test.ts"
       ],
       "recordedAt": "2026-07-13T09:47:33.191Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "blocked",
+        "atCommit": "991f28dcac2af9f4dd0da07e5bcd29f2c808d653"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "991f28dcac2af9f4dd0da07e5bcd29f2c808d653"
+      },
+      "performance": {
+        "status": "blocked",
+        "atCommit": "991f28dcac2af9f4dd0da07e5bcd29f2c808d653"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "991f28dcac2af9f4dd0da07e5bcd29f2c808d653"
+      }
     }
   },
   "closeOut": {
@@ -214,9 +245,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1539052,
-            "output": 206219,
-            "cacheRead": 90637568,
+            "input": 1540800,
+            "output": 207033,
+            "cacheRead": 91087104,
             "cacheWrite": 0
           }
         }
@@ -253,15 +284,15 @@
           "cacheWrite": 85508
         },
         "custom/kimi-k2.7-code": {
-          "input": 1539052,
-          "output": 206219,
-          "cacheRead": 90637568,
+          "input": 1540800,
+          "output": 207033,
+          "cacheRead": 91087104,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 51.26965,
-        "pricingAsOf": "2026-07-13T11:13:24.572Z"
+        "usd": 51.359978,
+        "pricingAsOf": "2026-07-13T11:13:57.970Z"
       }
     },
     "merges": [
