@@ -127,6 +127,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-13T11:20:22.336Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T11:25:12.911Z"
     }
   ],
   "feedback": [],
@@ -167,10 +172,10 @@
     "recordedAt": "2026-07-13T11:20:10.124Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T11:24:14.475Z",
+  "updated": "2026-07-13T11:25:15.620Z",
   "pipeline": {
     "issueId": "PAN-2596",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -178,12 +183,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T11:21:55.959Z",
-    "updatedAt": "2026-07-13T11:24:14.349Z",
+    "updatedAt": "2026-07-13T11:25:12.915Z",
     "inspectNotes": "Bead server-upload-allowlist ack: validateUploadPayload correctly gates UTF-8 text extensions, PDF %PDF- magic prefix, and disallowed/extension-less types with 400s naming the mismatch, while preserving image magic-byte validation and <uuid><ext> naming; non-image files get <uuid>-<sanitized-name><ext>. All 5 ACs verified against diff + accompanying unit tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2634",
     "lastVerifiedCommit": "991f28dcac2af9f4dd0da07e5bcd29f2c808d653",
     "reviewRequestedAt": "2026-07-13T11:21:55.959Z",
-    "reviewSpawnedAt": "2026-07-13T11:20:14.591Z",
+    "reviewSpawnedAt": "2026-07-13T11:25:12.914Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/frontend/src/App.test.tsx",
@@ -264,9 +269,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1581886,
-            "output": 216047,
-            "cacheRead": 96690944,
+            "input": 1583960,
+            "output": 216695,
+            "cacheRead": 97474816,
             "cacheWrite": 0
           }
         }
@@ -303,15 +308,15 @@
           "cacheWrite": 85508
         },
         "custom/kimi-k2.7-code": {
-          "input": 1581886,
-          "output": 216047,
-          "cacheRead": 96690944,
+          "input": 1583960,
+          "output": 216695,
+          "cacheRead": 97474816,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 58.251623,
-        "pricingAsOf": "2026-07-13T11:24:14.472Z"
+        "usd": 58.405121,
+        "pricingAsOf": "2026-07-13T11:25:14.122Z"
       }
     },
     "merges": [
