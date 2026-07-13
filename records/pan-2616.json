@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T03:17:01.668Z",
-  "updated": "2026-07-13T14:03:36.990Z",
+  "updated": "2026-07-13T14:03:46.896Z",
   "pipeline": {
     "issueId": "PAN-2616",
     "reviewStatus": "pending",
@@ -72,5 +72,20 @@
     "linear-closed-check.ac3": "completed",
     "linear-closed-check.ac4": "completed",
     "linear-closed-check.ac5": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/WORKSPACE-CONTAINERS.md",
+      "src/lib/cloister/__tests__/issue-closed.test.ts",
+      "src/lib/cloister/issue-closed.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/WORKSPACE-CONTAINERS.md",
+      "src/lib/cloister/__tests__/issue-closed.test.ts",
+      "src/lib/cloister/issue-closed.ts"
+    ],
+    "recordedAt": "2026-07-13T14:03:46.895Z"
   }
 }
