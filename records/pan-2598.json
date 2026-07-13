@@ -162,6 +162,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-13T10:56:02.382Z"
+    },
+    {
+      "timestamp": "2026-07-13T10:56:07.399Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
@@ -233,29 +238,30 @@
     "recordedAt": "2026-07-13T10:56:03.885Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T10:56:03.886Z",
+  "updated": "2026-07-13T10:56:07.486Z",
   "pipeline": {
     "issueId": "PAN-2598",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T10:55:39.955Z",
-    "updatedAt": "2026-07-13T10:55:59.980Z",
+    "updatedAt": "2026-07-13T10:56:07.402Z",
     "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (131890ms):\n\nr' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n- Spawning knowledge agent for PAN-2468...\n✔ Knowledge agent spawned: agent-pan-2468-knowledge\n- Spawning knowledge agent for PAN-2468...\n✖ Knowledge agent for PAN-2468 failed: No OKF bundle is configured for Overdeck. Run `/okf init` in this workspace to create or connect a knowledge bundle, then retry `pan knowledge PAN-2468`.\n- Spawning knowledge agent for PAN-2468...\n⚠ mnemos unavailable; spawning knowledge agent with built-in OKF search: release fetch failed\n- Spawning knowledge agent for PAN-2468...\n✔ Knowledge agent spawned: agent-pan-2468-knowledge\n",
     "inspectNotes": "Bead phase-banner-work-signal ack: workRunning now derives from activity.data.sections.some(type===work && status===running) (IssueMissionControl.tsx:828), verified via deriveNarrative precedence in StatusNarrative.tsx and existing+new tests covering all 3 ACs (planning-only session, live work session, beads-driven regression path); change is additive per NFR-1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2631",
-    "reviewRequestedAt": "2026-07-13T10:55:39.955Z",
+    "reviewRequestedAt": "2026-07-13T10:56:07.402Z",
     "reviewSpawnedAt": "2026-07-13T10:55:59.979Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
         "src/cli/commands/__tests__/agent-targeting.test.ts",
         "src/cli/commands/__tests__/start-plan-routing.test.ts",
+        "src/dashboard/frontend/src/App.test.tsx",
         "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
         "src/dashboard/server/routes/__tests__/hooks-turn-complete.test.ts",
         "src/dashboard/server/services/__tests__/conversation-compaction.test.ts",
@@ -293,6 +299,7 @@
         "scripts/file-size-baseline.txt",
         "src/cli/commands/__tests__/agent-targeting.test.ts",
         "src/cli/commands/__tests__/start-plan-routing.test.ts",
+        "src/dashboard/frontend/src/App.test.tsx",
         "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
         "src/dashboard/frontend/src/components/Stage/cockpit/HappenedFeed.test.tsx",
         "src/dashboard/frontend/src/components/Stage/cockpit/HappenedFeed.tsx",
@@ -314,7 +321,7 @@
         "tests/unit/dashboard/server/routes/projects.test.ts",
         "tests/unit/lib/cloister/feedback-target.test.ts"
       ],
-      "recordedAt": "2026-07-13T10:12:32.889Z"
+      "recordedAt": "2026-07-13T10:56:03.885Z"
     }
   },
   "closeOut": {
@@ -403,7 +410,7 @@
       },
       "costAtCloseOut": {
         "usd": 69.210707,
-        "pricingAsOf": "2026-07-13T10:56:00.195Z"
+        "pricingAsOf": "2026-07-13T10:56:07.486Z"
       }
     },
     "merges": [
@@ -411,8 +418,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "activity-terminal-end-signal": "completed",
     "activity-terminal-end-signal.activity-terminal-end-signal.ac1": "completed",
