@@ -46,6 +46,11 @@ function extname(filename: string): string {
 }
 
 const EXTENSION_TO_MIME: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
   '.txt': 'text/plain',
   '.md': 'text/markdown',
   '.markdown': 'text/markdown',
@@ -78,8 +83,8 @@ const EXTENSION_TO_MIME: Record<string, string> = {
 
 export function classifyAttachmentKind(file: File): AttachmentKind | null {
   if (isDotfileAttachment(file.name) || isExtensionlessAttachment(file.name)) return null;
-  if (file.type.startsWith('image/')) return 'image';
   const ext = extname(file.name);
+  if ((IMAGE_ATTACHMENT_EXTENSIONS as readonly string[]).includes(ext as typeof IMAGE_ATTACHMENT_EXTENSIONS[number])) return 'image';
   if ((ALLOWED_ATTACHMENT_EXTENSIONS as readonly string[]).includes(ext)) return 'file';
   return null;
 }
@@ -100,4 +105,4 @@ export function isExtensionlessAttachment(filename: string): boolean {
   return !isDotfileAttachment(filename) && extname(filename) === '';
 }
 
-export const ATTACHMENT_ACCEPT = ['image/*', ...ALLOWED_ATTACHMENT_EXTENSIONS].join(',');
+export const ATTACHMENT_ACCEPT = [...IMAGE_ATTACHMENT_EXTENSIONS, ...ALLOWED_ATTACHMENT_EXTENSIONS].join(',');
