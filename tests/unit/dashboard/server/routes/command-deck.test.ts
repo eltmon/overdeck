@@ -152,11 +152,13 @@ describe('fetchActivityDataWithContext', () => {
     mockRuntimeStates.set(agentId, { state: 'active' });
 
     const result = await fetchActivityDataWithContext(issueId, { tmuxSessionNames: new Set([agentId]) });
-    const section = (result as { sections: Array<{ sessionId: string; endedAt?: string }> }).sections
+    const section = (result as { sections: Array<{ sessionId: string; endedAt?: string; duration: number | null }> }).sections
       .find((s) => s.sessionId === agentId);
 
     expect(section).toBeDefined();
     expect(section?.endedAt).toBeUndefined();
+    expect(typeof section?.duration).toBe('number');
+    expect(Number.isFinite(section?.duration)).toBe(true);
   });
 
   it('populates endedAt when the session has ended', async () => {
@@ -173,11 +175,13 @@ describe('fetchActivityDataWithContext', () => {
     });
 
     const result = await fetchActivityDataWithContext(issueId, { tmuxSessionNames: new Set() });
-    const section = (result as { sections: Array<{ sessionId: string; endedAt?: string }> }).sections
+    const section = (result as { sections: Array<{ sessionId: string; endedAt?: string; duration: number | null }> }).sections
       .find((s) => s.sessionId === agentId);
 
     expect(section).toBeDefined();
     expect(section?.endedAt).toBe('2026-01-01T02:30:00Z');
+    expect(typeof section?.duration).toBe('number');
+    expect(Number.isFinite(section?.duration)).toBe(true);
   });
 
   it('sets planningComplete on planning sections only when planning is finished', async () => {
@@ -205,11 +209,15 @@ describe('fetchActivityDataWithContext', () => {
     mockIsPlanningCompleteSync.mockReturnValue(true);
 
     const result = await fetchActivityDataWithContext(issueId, { tmuxSessionNames: new Set([planningId, workId]) });
-    const sections = (result as { sections: Array<{ sessionId: string; planningComplete?: boolean }> }).sections;
+    const sections = (result as { sections: Array<{ sessionId: string; planningComplete?: boolean; duration: number | null }> }).sections;
     const planning = sections.find((s) => s.sessionId === planningId);
     const work = sections.find((s) => s.sessionId === workId);
 
     expect(planning?.planningComplete).toBe(true);
     expect(work?.planningComplete).toBeUndefined();
+    expect(typeof planning?.duration).toBe('number');
+    expect(Number.isFinite(planning?.duration)).toBe(true);
+    expect(typeof work?.duration).toBe('number');
+    expect(Number.isFinite(work?.duration)).toBe(true);
   });
 });
