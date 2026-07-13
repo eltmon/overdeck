@@ -76,7 +76,7 @@
     "recordedAt": "2026-07-13T14:19:02.691Z"
   },
   "created": "2026-07-10T21:05:49.847Z",
-  "updated": "2026-07-13T14:19:25.695Z",
+  "updated": "2026-07-13T14:19:27.255Z",
   "pipeline": {
     "issueId": "PAN-2229",
     "reviewStatus": "reviewing",
@@ -244,8 +244,8 @@
       }
     }
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "recoveryTrips": [
     {
       "issue": "PAN-2229",
