@@ -53,17 +53,18 @@
     "recordedAt": "2026-07-13T09:47:33.191Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T09:51:53.361Z",
+  "updated": "2026-07-13T09:52:00.352Z",
   "pipeline": {
     "issueId": "PAN-2596",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T09:51:53.082Z",
+    "updatedAt": "2026-07-13T09:52:00.213Z",
+    "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (45022ms):\n\nrom kanban selection\n FAIL  src/App.test.tsx > App channel permission requests > submits allow decisions for pending channel permission requests\n FAIL  src/App.test.tsx > App channel permission requests > submits deny decisions for pending channel permission requests\nError: [vitest] No \"selectAgentsWithPendingProposedPlan\" export is defined on the \"./lib/store\" mock. Did you forget to return it from \"vi.mock\"?\nIf you need to partially mock a module, you can use \"importOriginal\" helper inside:\n\nvi.mock(import(\"./lib/store\"), async (importOriginal) => {\n  const actual = await importOriginal()\n  return {\n    ...actual,\n    // your mocked methods\n  }\n})\n\n ❯ usePendingInputDialogs src/App/hooks/usePendingInputDialogs.ts:37:52\n     35|   const channelPermissionRequests = useDashboardStore(selectChannelPer…\n     36|   const agentsWithAskUserQuestion = useDashboardStore(selectAgentsWith…\n     37|   const agentsWithProposedPlan = useDashboardStore(selectAgentsWithPen…\n       |                                                    ^\n     38|   const resolvedPlanToolUseIds = useAskUserQuestionUiStore((s) => s.re…\n     39|   const dismissedPlanSubjectIds = useAskUserQuestionUiStore((s) => s.d…\n ❯ App src/App.tsx:521:7\n ❯ renderWithHooks ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:15486:18\n ❯ mountIndeterminateComponent ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:20103:13\n ❯ beginWork ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:21626:16\n ❯ beginWork$1 ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:27465:14\n ❯ performUnitOfWork ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:26599:12\n ❯ workLoopSync ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:26505:5\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/21]⎯\n\n",
     "inspectNotes": "Bead server-upload-allowlist ack: validateUploadPayload correctly gates UTF-8 text extensions, PDF %PDF- magic prefix, and disallowed/extension-less types with 400s naming the mismatch, while preserving image magic-byte validation and <uuid><ext> naming; non-image files get <uuid>-<sanitized-name><ext>. All 5 ACs verified against diff + accompanying unit tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2634",
@@ -187,7 +188,7 @@
       },
       "costAtCloseOut": {
         "usd": 31.042645,
-        "pricingAsOf": "2026-07-13T09:51:53.263Z"
+        "pricingAsOf": "2026-07-13T09:52:00.317Z"
       }
     },
     "merges": [
