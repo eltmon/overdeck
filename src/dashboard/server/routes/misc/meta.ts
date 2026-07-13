@@ -1,4 +1,4 @@
-import { exec, spawn } from 'node:child_process';
+import { exec, execFile, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { access, readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -23,6 +23,7 @@ import {
 } from './shared.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 function getIssueDataService(): IssueDataService {
   const { getSharedIssueService } = require('../../services/issue-service-singleton.js');
@@ -83,6 +84,31 @@ const getPrerequisitesRoute = HttpRouter.add(
   Effect.promise(async () => {
     const { checkSystemPrerequisites } = await import('../../../../lib/system-prerequisites.js');
     return jsonResponse(await checkSystemPrerequisites());
+  }),
+);
+
+// ─── Routes: context sync status + one-click repair ──────────────────────────
+
+const getSyncStatusRoute = HttpRouter.add(
+  'GET',
+  '/api/sync-status',
+  Effect.sync(() => {
+    const { isStartupSyncNeededSync } = require('../../../../lib/sync-startup-gate.js');
+    return jsonResponse(isStartupSyncNeededSync());
+  }),
+);
+
+const postRunSyncRoute = HttpRouter.add(
+  'POST',
+  '/api/system/sync',
+  Effect.promise(async () => {
+    try {
+      const { stdout, stderr } = await execFileAsync('pan', ['sync'], { encoding: 'utf-8', timeout: 180_000 });
+      return jsonResponse({ ok: true, output: `${stdout}${stderr}`.trim() });
+    } catch (error: any) {
+      const detail = String(error?.stderr || error?.message || error);
+      return jsonResponse({ ok: false, error: `pan sync failed: ${detail}` }, { status: 500 });
+    }
   }),
 );
 
@@ -507,6 +533,8 @@ const postRestartDashboardRoute = HttpRouter.add(
 export const metaRouteLayer = Layer.mergeAll(
   getVersionRoute,
   getPrerequisitesRoute,
+  getSyncStatusRoute,
+  postRunSyncRoute,
   getRegisteredProjectsRoute,
   getConfirmationsRoute,
   postConfirmationRespondRoute,

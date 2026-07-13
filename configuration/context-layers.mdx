@@ -95,6 +95,10 @@ content snapshots it into `~/.overdeck/backups/<timestamp>/context/` before
 writing. A project's files are touched only if its `.overdeck/context/project.md`
 exists.
 
+When an Overdeck upgrade changes context, hooks, agents, or skills after your
+last sync, the dashboard shows a **Sync now** banner. Click it to run the host's
+`pan sync`; the banner clears once the installed package and sync manifest match.
+
 ## Harness-specific blocks
 
 A layer file targets a single harness with Mustache-style blocks; text outside
