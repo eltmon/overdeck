@@ -29,15 +29,7 @@
       "timestamp": "2026-07-13T10:04:29.821Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 3,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-13T10:04:29Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2596\n\n# Review Synthesis — PAN-2596 — 2026-07-13T06:03:50-04:00\n\n## Verdict: CHANGES REQUESTED — unbounded attachment validation fan-out on message send\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2596/.pan/review/agent-pan-2596-review-a13f42ba/context.json\n- Branch: feature/pan-2596\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2596\n- HEAD reviewed: a13f42ba507501e32535d52188811f5440136770\n- Current workspace HEAD observed during synthesis: 1eaf018bafa1e6a7a9ad71d1d35beea38f1614ed\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2596/.pan/review/agent-pan-2596-review-a13f42ba/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2596/.pan/review/agent-pan-2596-review-a13f42ba/correctness.md | 0 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2596/.pan/review/agent-pan-2596-review-a13f42ba/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2596/.pan/review/agent-pan-2596-review-a13f42ba/requirements.md | 1 |\n\n## Blocking Findings\n\n### [performance] Bound attachment path validation before launching filesystem checks — `src/lib/overdeck/conversation-message.ts:407`\nThe changed message-send path extracts all `@/path` tokens from a user-controlled message and immediately runs `Promise.all` over every token. Each managed-token check can perform filesystem-backed containment/existence work through `isManagedConversationAttachmentPath` and `hasConversationAttachment`. Because `MAX_MESSAGE_LENGTH` allows 50,000 characters, one message can fan out thousands of async filesystem checks before delivery.\n\nThis is in the PR diff and blocks on hot-path performance risk for `POST /api/conversations/:name/message`. Add an attachment-token cap matching the product limit, or validate in bounded batches before calling the filesystem-backed checks.\n\n### [requirements] Extensionless/dotfile rejection toast is not named — `src/dashboard/frontend/src/components/chat/ComposerFooter.tsx:160`\nThe requirement explicitly says extensionless files and dotfiles such as `.env` / `Makefile` must remain unsupported and be rejected with a named toast. The new frontend classifier rejects those files because `extname()` returns an empty extension for dotfiles and extensionless names, but `ComposerFooter.enqueueAttachments` collapses all rejected files into the generic toast `1 file not supported.`\n\nThis is in PR scope and leaves the feature partially meeting the must-not constraint. Add explicit rejection reasons/toasts for extensionless and dotfile files, and cover `.env` / `Makefile` in composer attachment tests.\n\n## Non-blocking Findings\nNone.\n\n## Scope Note\nThe manifest reviewed `a13f42ba507501e32535d52188811f5440136770`, while the workspace branch had advanced to `1eaf018bafa1e6a7a9ad71d1d35beea38f1614ed` by synthesis time with additional unrelated files changed outside the PAN-2596 attachment diff. This synthesis is for the manifest/run SHA and the four reviewer reports for run `agent-pan-2596-review-a13f42ba`.\n\n## Clean Sub-roles\n- security\n- correctness\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2596/.pan/review/agent-pan-2596-review-a13f42ba/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2596 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/frontend/src/App.test.tsx"
@@ -69,23 +61,24 @@
     "recordedAt": "2026-07-13T09:57:24.734Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T10:14:03.586Z",
+  "updated": "2026-07-13T10:18:05.282Z",
   "pipeline": {
     "issueId": "PAN-2596",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T10:14:03.512Z",
-    "reviewNotes": "Unbounded attachment validation fan-out on message send",
+    "updatedAt": "2026-07-13T10:18:05.011Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "verificationNotes": "Verification FAILED at test (107741ms):\n\n[2m) // element.getAttribute(\"href\") === \"https://example.com/\"\u001b[22m\n\nExpected the element to have attribute:\n\u001b[32m  href=\"https://example.com/\"\u001b[39m\nReceived:\n\u001b[31m  href=\"https://example.com\"\u001b[39m\n\nIgnored nodes: comments, script, style\n\u001b[36m<html>\u001b[39m\n  \u001b[36m<head />\u001b[39m\n  \u001b[36m<body>\u001b[39m\n    \u001b[36m<div>\u001b[39m\n      \u001b[36m<div\u001b[39m\n        \u001b[33mclass\u001b[39m=\u001b[32m\"_chatMarkdown_10de07\"\u001b[39m\n      \u001b[36m>\u001b[39m\n        \u001b[36m<div\u001b[39m\n          \u001b[33mclass\u001b[39m=\u001b[32m\"space-y-4 whitespace-normal [&>*:first-child]:mt-0 [&>*:last-child]:mb-0\"\u001b[39m\n        \u001b[36m>\u001b[39m\n          \u001b[36m<p>\u001b[39m\n            \u001b[0mVisit \u001b[0m\n            \u001b[36m<a\u001b[39m\n              \u001b[33mclass\u001b[39m=\u001b[32m\"_mdLink_10de07\"\u001b[39m\n              \u001b[33mhref\u001b[39m=\u001b[32m\"https://example.com/\"\u001b[39m\n              \u001b[33mrel\u001b[39m=\u001b[32m\"noopener noreferrer\"\u001b[39m\n              \u001b[33mtarget\u001b[39m=\u001b[32m\"_blank\"\u001b[39m\n            \u001b[36m>\u001b[39m\n              \u001b[0msite\u001b[0m\n            \u001b[36m</a>\u001b[39m\n            \u001b[0m.\u001b[0m\n          \u001b[36m</p>\u001b[39m\n        \u001b[36m</div>\u001b[39m\n      \u001b[36m</div>\u001b[39m\n    \u001b[36m</div>\u001b[39m\n  \u001b[36m</body>\u001b[39m\n\u001b[36m</html>\u001b[39m...\n ❯ src/components/chat/__tests__/ChatMarkdown.test.tsx:121:42\n    119|\n    120|     const external = await screen.findByRole('link', { name: 'site' });\n    121|     await waitFor(() => expect(external).toHaveAttribute('href', 'http…\n       |                                          ^\n    122|     expect(external).toHaveAttribute('target', '_blank');\n    123|     expect(external).toHaveAttribute('rel', 'noopener noreferrer');\n ❯ runWithExpensiveErrorDiagnosticsDisabled ../../../node_modules/.bun/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/config.js:47:12\n ❯ checkCallback ../../../node_modules/.bun/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/wait-for.js:124:77\n ❯ Timeout.checkRealTimersCallback ../../../node_modules/.bun/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/wait-for.js:118:16\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n",
     "inspectNotes": "Bead server-upload-allowlist ack: validateUploadPayload correctly gates UTF-8 text extensions, PDF %PDF- magic prefix, and disallowed/extension-less types with 400s naming the mismatch, while preserving image magic-byte validation and <uuid><ext> naming; non-image files get <uuid>-<sanitized-name><ext>. All 5 ACs verified against diff + accompanying unit tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2634",
+    "lastVerifiedCommit": "6963ab31309ae138d5532a7150447e95fcc1bcaa",
     "reviewRequestedAt": "2026-07-13T09:48:06.907Z",
-    "reviewSpawnedAt": "2026-07-13T09:48:09.684Z",
+    "reviewSpawnedAt": "2026-07-13T10:18:05.010Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -157,9 +150,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1220036,
-            "output": 170069,
-            "cacheRead": 69422592,
+            "input": 1221364,
+            "output": 170225,
+            "cacheRead": 69709824,
             "cacheWrite": 0
           }
         }
@@ -196,15 +189,15 @@
           "cacheWrite": 85508
         },
         "custom/kimi-k2.7-code": {
-          "input": 1220036,
-          "output": 170069,
-          "cacheRead": 69422592,
+          "input": 1221364,
+          "output": 170225,
+          "cacheRead": 69709824,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 35.259568,
-        "pricingAsOf": "2026-07-13T10:14:03.584Z"
+        "usd": 35.316028,
+        "pricingAsOf": "2026-07-13T10:18:05.214Z"
       }
     },
     "merges": [
