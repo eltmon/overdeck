@@ -276,13 +276,20 @@ export interface AutoRestartConfig {
 }
 
 /**
- * Cost limits configuration
+ * Cost limits configuration — OPT-IN, no defaults.
+ *
+ * Cost-limit checking runs only when the operator sets `cost_limits` in
+ * config.yaml. There is deliberately no default: the original hardcoded
+ * $10/$25/$100 caps were never operator-chosen, sat permanently exceeded
+ * (real spend runs 10-30x higher), and produced pure alert noise
+ * (PAN-2319, PAN-2642). The progress-aware cost-bleed circuit breaker
+ * (PAN-1868) is the intended always-on guard, not flat dollar caps.
  */
 export interface CostLimitsConfig {
-  per_agent_usd: number;
-  per_issue_usd: number;
-  daily_total_usd: number;
-  alert_threshold: number; // Fraction (0.0-1.0) at which to start alerting
+  per_agent_usd?: number; // per-agent spend today (USD); unset or 0 = not checked
+  per_issue_usd?: number; // per-issue spend today (USD); unset or 0 = not checked
+  daily_total_usd?: number; // total spend today (USD); unset or 0 = not checked
+  alert_threshold?: number; // Fraction (0.0-1.0) at which to start warning; default 0.8
 }
 
 /**
@@ -469,12 +476,7 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
     max_retries: 3,
     backoff_seconds: [30, 60, 120], // 30s, 1m, 2m
   },
-  cost_limits: {
-    per_agent_usd: 10.0,
-    per_issue_usd: 25.0,
-    daily_total_usd: 100.0,
-    alert_threshold: 0.8, // Alert at 80%
-  },
+  // cost_limits: intentionally no default — checking is opt-in (see CostLimitsConfig).
   retention: {
     agent_state_days: 7,
     reviewer_state_days: 1,
