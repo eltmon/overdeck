@@ -36,7 +36,7 @@ import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
 import { getReviewStatusSync } from '../review-status.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
-import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/index.js';
+import { PAN_CONTINUE_FILENAME, PAN_DIRNAME, WORKSPACE_RUNTIME_DIRNAME } from '../../../lib/pan-dir/index.js';
 import { isPlanningCompleteSync } from '../../../lib/vbrief/io.js';
 import { findSpecByIssueThroughOverdeck } from '../../../lib/overdeck/specs.js';
 import { getOverdeckHome } from '../../../lib/paths.js';
@@ -552,16 +552,25 @@ export async function fetchProjectSessionTree(
     const results = await Effect.runPromise(withConcurrencyLimit(
       featureCandidates.map((c) => Effect.promise(async () => {
         const agentDir = join(getOverdeckHome(), 'agents', `agent-${c.issueLower}`);
+        const planningAgentDir = join(getOverdeckHome(), 'agents', `planning-${c.issueLower}`);
+        const planRunAgentDir = join(getOverdeckHome(), 'agents', `agent-${c.issueLower}-plan`);
         const panDir = join(workspacesDir, c.name, PAN_DIRNAME);
-        const [hasAgent, hasPlanning] = await Promise.all([
+        const overdeckDir = join(workspacesDir, c.name, WORKSPACE_RUNTIME_DIRNAME);
+        const issueTmuxPattern = new RegExp(`^(planning-${escapeRegExp(c.issueLower)}|agent-${escapeRegExp(c.issueLower)}(-plan)?|strike-${escapeRegExp(c.issueLower)})$`, 'i');
+        const hasIssueTmux = [...sharedTmuxSessionNames].some((s) => issueTmuxPattern.test(s));
+        const [hasAgent, hasPlanning, hasPlanningAgent, hasPlanRunAgent, hasOverdeck] = await Promise.all([
           pathExists(agentDir),
           pathExists(panDir),
+          pathExists(planningAgentDir),
+          pathExists(planRunAgentDir),
+          pathExists(overdeckDir),
         ]);
-        if (!hasAgent && !hasPlanning) return null;
+        const hasAnySignal = hasAgent || hasPlanning || hasPlanningAgent || hasPlanRunAgent || hasOverdeck || hasIssueTmux;
+        if (!hasAnySignal) return null;
         try {
           const workspacePath = join(workspacesDir, c.name);
           const sessions = await collectSessionTreeNodes(c.issueId, workspacePath, projectPath, effectiveSharedContext);
-          if (sessions.length === 0) return null;
+          if (sessions.length === 0 && !hasAnySignal) return null;
           const title = await resolveFeatureTitle(c.issueId, c.issueLower, issueTitles, project);
           return { issueId: c.issueId, title, sessions };
         } catch (err) {
