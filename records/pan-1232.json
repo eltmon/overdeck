@@ -280,16 +280,16 @@
   ],
   "feedback": [],
   "created": "2026-07-12T20:45:31.659Z",
-  "updated": "2026-07-13T14:43:08.654Z",
+  "updated": "2026-07-13T14:44:40.347Z",
   "pipeline": {
     "issueId": "PAN-1232",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T14:43:08.593Z",
+    "updatedAt": "2026-07-13T14:44:40.236Z",
     "blockerReasons": [
       {
         "type": "failing_checks",
@@ -328,9 +328,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 178930,
-            "output": 12119,
-            "cacheRead": 2153984,
+            "input": 179462,
+            "output": 12439,
+            "cacheRead": 2319360,
             "cacheWrite": 0
           }
         }
@@ -349,15 +349,15 @@
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 533433,
-          "output": 47075,
-          "cacheRead": 24258560,
+          "input": 533965,
+          "output": 47395,
+          "cacheRead": 24423936,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 43.883160000000004,
-        "pricingAsOf": "2026-07-13T14:43:08.653Z"
+        "usd": 43.916366000000004,
+        "pricingAsOf": "2026-07-13T14:44:40.339Z"
       }
     },
     "merges": [
