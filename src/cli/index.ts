@@ -117,7 +117,7 @@ import { registerReleaseCommands } from './commands/release.js';
 import { registerRolloutCommands } from './commands/rollout.js';
 import { isNoResumeCliOptionEnabled } from '../lib/cloister/no-resume-mode.js';
 import { applyBootGateEnv, formatBootGateState, resolveBootGates } from '../lib/boot-gates.js';
-import { resourcesCommand } from './commands/resources.js';
+import { registerResourceCommands } from './commands/resources.js';
 import { devCommand } from './commands/dev.js';
 import { registerScopeCommands } from './commands/scope.js';
 import { openCommand } from './commands/open.js';
@@ -1361,12 +1361,7 @@ program
   .option('--strict', 'Exit non-zero if any optional dependency is missing (e.g. Pi binary)')
   .action((options) => doctorCommand(options));
 
-// Resources command
-program
-  .command('resources')
-  .description('Show RAM usage by agents, conversations, and system processes')
-  .option('--json', 'Output as JSON')
-  .action(resourcesCommand);
+registerResourceCommands(program);
 
 // Update command
 program

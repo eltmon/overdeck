@@ -451,7 +451,7 @@ export function queueIssueRecordCommit(
   project: ProjectConfig,
   issueId: string,
   recordPath: string,
-): void {
+): string {
   const basePath = getIssueRecordBasePath(project, issueId);
   queueAutoCommit({
     projectRoot: basePath,
@@ -459,6 +459,7 @@ export function queueIssueRecordCommit(
     paths: [recordPath],
     subject: `chore(records): update ${issueId.toUpperCase()} per-issue record`,
   });
+  return basePath;
 }
 
 // ─── Owner-URI lease (ported from PAN-1908 records.ts) ─────────────────────────

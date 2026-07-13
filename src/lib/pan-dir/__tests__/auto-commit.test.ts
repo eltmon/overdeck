@@ -3,10 +3,10 @@ import { Effect } from 'effect';
 import { execSync } from 'child_process';
 import { chmodSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
-import { join } from 'path';
+import { dirname, join } from 'path';
 import { rmSync as unlink } from 'fs';
 import { vi } from 'vitest';
-import { deriveProjectRoot, flushAllPendingAutoCommits, flushAutoCommits, queueAutoCommit, queueBeadsAutoCommit } from '../auto-commit.js';
+import { deriveProjectRoot, flushAllPendingAutoCommits, flushAutoCommits, queueAutoCommit, queueBeadsAutoCommit, reconcileStatePlaneDrift } from '../auto-commit.js';
 
 function exec(root: string, command: string): string {
   return execSync(command, { cwd: root, encoding: 'utf-8' }).trim();
@@ -497,7 +497,7 @@ describe('auto-commit', () => {
         writeFileSync(path, '{}\n');
 
         queueAutoCommit({ projectRoot: tmp, repoRoot: stateTmp, paths: [path], subject: 'chore(state): state branch' });
-        expect(yield* flushAutoCommits(tmp)).toEqual({ committed: true });
+        expect(yield* flushAutoCommits(tmp)).toEqual({ committed: true, pushed: true });
         expect(exec(stateTmp, 'git branch --show-current')).toBe('overdeck-state');
 
         execSync('git branch -M wrong-state', { cwd: stateTmp });
@@ -549,7 +549,10 @@ describe('auto-commit', () => {
         queueAutoCommit({ projectRoot: otherTmp, paths: [secondPath], subject: 'chore(state): second root' });
 
         const results = yield* flushAllPendingAutoCommits();
-        expect(results).toEqual([{ committed: true }, { committed: true }]);
+        expect(results).toEqual([
+          { committed: true, pushed: true },
+          { committed: true, pushed: true },
+        ]);
 
         const firstLog = execSync('git log --oneline -1', { cwd: tmp, encoding: 'utf-8' });
         const secondLog = execSync('git log --oneline -1', { cwd: otherTmp, encoding: 'utf-8' });
@@ -558,6 +561,29 @@ describe('auto-commit', () => {
       } finally {
         rmSync(otherTmp, { recursive: true, force: true });
       }
+    }),
+  );
+
+  it.effect('reconciles only pending spec and record drift from the primary worktree', () =>
+    Effect.gen(function* () {
+      const spec = join(tmp, '.pan', 'specs', 'PAN-2516.vbrief.json');
+      const record = join(tmp, '.pan', 'records', 'pan-2516.json');
+      const source = join(tmp, 'src', 'operator-change.ts');
+      mkdirSync(dirname(spec), { recursive: true });
+      mkdirSync(dirname(record), { recursive: true });
+      mkdirSync(dirname(source), { recursive: true });
+      writeFileSync(spec, '{"status":"completed"}\n');
+      writeFileSync(record, '{"issueId":"PAN-2516"}\n');
+      writeFileSync(source, 'leave me alone\n');
+
+      const result = yield* reconcileStatePlaneDrift(tmp);
+      expect(result.committed).toBe(true);
+      const committed = execSync('git show --name-only --format= HEAD', { cwd: tmp, encoding: 'utf-8' });
+      expect(committed).toContain('.pan/specs/PAN-2516.vbrief.json');
+      expect(committed).toContain('.pan/records/pan-2516.json');
+      expect(committed).not.toContain('src/operator-change.ts');
+      expect(execSync('git status --short -- .pan/specs .pan/records', { cwd: tmp, encoding: 'utf-8' })).toBe('');
+      expect(execSync('git status --short -- src/operator-change.ts', { cwd: tmp, encoding: 'utf-8' })).toContain('??');
     }),
   );
 });

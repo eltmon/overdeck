@@ -7,9 +7,7 @@
  * for legacy spec files only (no continue files — those are at `.pan/continues/`).
  */
 
-import { exec, spawn } from 'child_process';
 import { basename, join } from 'path';
-import { promisify } from 'util';
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from 'fs';
 import { Effect } from 'effect';
 import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/index.js';
@@ -37,6 +35,7 @@ import {
 } from '../pan-dir/record.js';
 import type { ProjectConfig } from '../projects.js';
 import { FsError } from '../errors.js';
+import { flushAutoCommits, queueAutoCommit } from '../pan-dir/auto-commit.js';
 
 // PAN-1249: pan-dir/specs.ts migrated `findSpecByIssue`, `writeSpecForIssue`,
 // and `updateSpecStatus` to return Effects. The sync surface in this module
@@ -140,8 +139,6 @@ function findSpecByIssueSync(projectRoot: string, issueId: string): PanSpecEntry
   return null;
 }
 
-const execAsync = promisify(exec);
-
 export interface FoundVBrief {
   path: string;
   lifecycleDir: VBriefLifecycleDir;
@@ -237,7 +234,9 @@ export function updatePlanStatus(filePath: string, newStatus: string): void {
   const tmp = filePath + '.tmp';
   writeFileSync(tmp, serializeVBriefDocument(doc), 'utf-8');
   renameSync(tmp, filePath);
-}async function moveVBriefPromise(
+}
+
+async function moveVBriefPromise(
   projectRoot: string,
   issueId: string,
   targetDir: VBriefLifecycleDir,
@@ -249,26 +248,28 @@ export function updatePlanStatus(filePath: string, newStatus: string): void {
 
   ensureVBriefDirsSync(projectRoot);
   const ensured = ensurePanSpecForIssue(projectRoot, found);
-  const updatedSpec = await Effect.runPromise(updateSpecStatus(projectRoot, issueId, targetDir));
+  const updatedSpec = updateSpecStatusSync(projectRoot, issueId, targetDir);
   if (!updatedSpec) {
     throw new Error(`Failed to update pan spec status for ${issueId}`);
   }
 
   const stagePaths = [updatedSpec.path];
   if (ensured.removedLegacyPath) stagePaths.push(ensured.removedLegacyPath);
-  await runGitAdd(projectRoot, stagePaths);
+  queueAutoCommit({
+    projectRoot,
+    paths: stagePaths,
+    subject: `chore(state): move ${issueId.toUpperCase()} spec to ${targetDir}`,
+  });
+  const flushed = await Effect.runPromise(flushAutoCommits(projectRoot));
+  if (flushed.pushed === false) {
+    throw new Error(flushed.reason ?? `Spec move for ${issueId} was committed but not pushed`);
+  }
 
   invalidateVBriefIndex(projectRoot);
   return {
     from: found,
     toPath: updatedSpec.path,
   };
-}
-
-async function runGitAdd(cwd: string, paths: string[]): Promise<void> {
-  if (paths.length === 0) return;
-  const quoted = paths.map(p => `"${p.replace(/"/g, '\\"')}"`).join(' ');
-  await execAsync(`git add -A -- ${quoted}`, { cwd });
 }
 
 export function moveVBriefFilesOnly(
@@ -339,7 +340,7 @@ async function transitionVBriefOnMainPromise(
 
   let toPath = ensuredSpec.path;
   if (needsMove) {
-    const updatedSpec = await Effect.runPromise(updateSpecStatus(projectRoot, issueId, targetDir));
+    const updatedSpec = updateSpecStatusSync(projectRoot, issueId, targetDir);
     if (!updatedSpec) {
       throw new Error(`Failed to update pan spec lifecycle status for ${issueId}`);
     }
@@ -354,51 +355,13 @@ async function transitionVBriefOnMainPromise(
 
   let committed = false;
   if (changed) {
-    try {
-      const { stdout: branchStdout } = await execAsync('git rev-parse --abbrev-ref HEAD', {
-        cwd: projectRoot,
-        encoding: 'utf-8',
-      });
-      const currentBranch = branchStdout.trim();
-      if (currentBranch === 'main') {
-        const stageList: string[] = [toPath];
-        if (ensured.removedLegacyPath) stageList.push(ensured.removedLegacyPath);
-        await runGitAdd(projectRoot, stageList);
-
-        const quotedAll = stageList
-          .map(p => `"${p.replace(/"/g, '\\"')}"`)
-          .join(' ');
-        try {
-          await execAsync(`git diff --cached --quiet -- ${quotedAll}`, {
-            cwd: projectRoot,
-            encoding: 'utf-8',
-          });
-        } catch {
-          await execAsync(
-            `git commit -m ${JSON.stringify(commitMessage)} -- ${quotedAll}`,
-            { cwd: projectRoot, encoding: 'utf-8' },
-          );
-          committed = true;
-          try {
-            const { stdout: remotes } = await execAsync('git remote', {
-              cwd: projectRoot,
-              encoding: 'utf-8',
-            });
-            if (remotes.trim()) {
-              const pushChild = spawn('git', ['push'], {
-                cwd: projectRoot,
-                detached: true,
-                stdio: 'ignore',
-              });
-              pushChild.unref();
-            }
-          } catch {
-            /* push setup failed — non-fatal */
-          }
-        }
-      }
-    } catch {
-      /* leave on-disk state in place without surfacing git errors */
+    const stageList: string[] = [toPath];
+    if (ensured.removedLegacyPath) stageList.push(ensured.removedLegacyPath);
+    queueAutoCommit({ projectRoot, paths: stageList, subject: commitMessage });
+    const flushed = await Effect.runPromise(flushAutoCommits(projectRoot));
+    committed = flushed.committed;
+    if (flushed.pushed === false) {
+      throw new Error(flushed.reason ?? `Spec transition for ${issueId} was committed but not pushed`);
     }
   }
 

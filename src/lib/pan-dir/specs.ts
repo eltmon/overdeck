@@ -9,7 +9,7 @@ import { normalizeVBriefEnvelope, serializeVBriefDocument, VBriefMergeConflictEr
 import { generateVBriefFilename, parseVBriefFilename, slugify } from '../vbrief/lifecycle.js'
 import { invalidateVBriefIndex } from '../vbrief/vbrief-index.js'
 import type { VBriefDocument } from '../vbrief/types.js'
-import { deriveProjectRoot, queueAutoCommit } from './auto-commit.js'
+import { deriveProjectRoot, flushAutoCommits, queueAutoCommit } from './auto-commit.js'
 import {
   PAN_DIRNAME,
   PAN_CONTINUES_DIRNAME,
@@ -279,6 +279,19 @@ export function writeSpecForIssue(
     const nextFilename = filename ?? generateVBriefFilename(doc.plan.id, doc.plan.title)
     const path = join(paths.specsDir, nextFilename)
     yield* writeSpec(path, specDocument)
+    queueAutoCommit({
+      projectRoot,
+      paths: [path],
+      subject: `chore(state): update spec for ${doc.plan.id.toUpperCase()} (status=${status})`,
+    })
+    const flushed = yield* flushAutoCommits(projectRoot)
+    if (flushed.pushed === false) {
+      return yield* Effect.fail(new FsError({
+        path,
+        operation: 'pushSpec',
+        cause: new Error(flushed.reason ?? 'spec commit was not pushed'),
+      }))
+    }
     invalidateVBriefIndex(projectRoot)
     return {
       path,
@@ -307,6 +320,19 @@ export function updateSpecStatus(
       status: newStatus,
     }
     yield* writeSpec(existing.path, nextDocument)
+    queueAutoCommit({
+      projectRoot,
+      paths: [existing.path],
+      subject: `chore(state): update spec for ${issueId.toUpperCase()} (status=${newStatus})`,
+    })
+    const flushed = yield* flushAutoCommits(projectRoot)
+    if (flushed.pushed === false) {
+      return yield* Effect.fail(new FsError({
+        path: existing.path,
+        operation: 'pushSpecStatus',
+        cause: new Error(flushed.reason ?? 'spec status commit was not pushed'),
+      }))
+    }
     invalidateVBriefIndex(projectRoot)
     return {
       ...existing,

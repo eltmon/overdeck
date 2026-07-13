@@ -46,6 +46,7 @@ pan-fly
 pan-flywheel
 pan-handoff
 pan-help
+pan-hygiene
 pan-install
 pan-issues
 pan-kill

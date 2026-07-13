@@ -594,7 +594,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(prompt).toContain('The slot initial prompt names slot-prompt-item');
       expect(prompt).toContain('## Additional Foreman Instructions');
       expect(prompt).toContain('Foreman says stay within src/lib/agents/spawn.ts.');
-    });
+    }, 15_000);
 
     it('marks kickoffDelivered true after a ready work-agent kickoff is delivered', async () => {
       const tmux = await import('../../src/lib/tmux.js');

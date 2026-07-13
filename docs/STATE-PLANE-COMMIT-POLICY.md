@@ -22,6 +22,13 @@ an unmarked branch is legacy/in-progress; reads continue through the legacy
   explicit operator override that trades durability latency for fewer commits.
   A failed origin push is logged and returned as `pushed: false`, never reported
   as fully durable success.
+- Spec lifecycle transitions are stricter: the transition does not return
+  success until its `plan.status` update has passed through the state writer's
+  commit-and-push flush. A configured origin that rejects the push fails the
+  transition instead of leaving an apparently successful local-only status.
+- Every Deacon patrol reconciles pre-existing dirty `specs/` and `records/`
+  paths through the same writer. It never stages source files or unrelated
+  operator changes.
 - Every state commit asserts that the dedicated worktree is on
   `overdeck-state`. A missing/wrong/dirty worktree is surfaced, never discarded.
 - `pan admin state migrate` owns a cross-process project lock. All write doors
