@@ -270,22 +270,22 @@
     "recordedAt": "2026-07-13T11:57:13.297Z"
   },
   "created": "2026-07-12T22:33:37.108Z",
-  "updated": "2026-07-13T15:20:05.387Z",
+  "updated": "2026-07-13T15:26:05.041Z",
   "pipeline": {
     "issueId": "PAN-2602",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T12:03:05.509Z",
-    "updatedAt": "2026-07-13T15:20:05.306Z",
+    "updatedAt": "2026-07-13T15:26:04.936Z",
     "reviewNotes": "main.ts dup-declares stopBeadsRollupService (real TS2440/TS2722, crashes shutdown); cycle-2's serial git-spawn perf blocker also still unfixed",
     "inspectNotes": "Bead beads-rollup-service ack: extractIssueLabels() now gates bare word-number labels through project.issuePrefixes, preventing phase-N labels from creating spurious rollups; tests cover phase exclusion and workspace: label mapping.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2636",
-    "lastVerifiedCommit": "5f631201aa29a44211498a768fb1489e950af455",
+    "lastVerifiedCommit": "bb30aafb0e303ebbae5ff26b8360d848127e07be",
     "reviewRequestedAt": "2026-07-13T12:03:05.509Z",
     "reviewSpawnedAt": "2026-07-13T14:46:15.859Z",
     "scopeDrift": {
@@ -499,9 +499,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 3520586,
-            "output": 553842,
-            "cacheRead": 267760128,
+            "input": 3529144,
+            "output": 555546,
+            "cacheRead": 269573632,
             "cacheWrite": 0
           }
         }
@@ -544,15 +544,15 @@
           "cacheWrite": 877009
         },
         "custom/kimi-k2.7-code": {
-          "input": 3520586,
-          "output": 553842,
-          "cacheRead": 267760128,
+          "input": 3529144,
+          "output": 555546,
+          "cacheRead": 269573632,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 128.071706,
-        "pricingAsOf": "2026-07-13T15:20:05.386Z"
+        "usd": 128.431216,
+        "pricingAsOf": "2026-07-13T15:26:05.030Z"
       }
     },
     "merges": [
