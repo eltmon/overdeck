@@ -21,20 +21,30 @@
   ],
   "feedback": [],
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T08:29:56.172Z",
+  "updated": "2026-07-13T08:30:07.097Z",
   "pipeline": {
     "issueId": "PAN-2596",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T08:15:51.950Z"
+    "updatedAt": "2026-07-13T08:30:07.042Z",
+    "inspectNotes": "Inspecting bead server-upload-allowlist"
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 271,
+            "output": 200,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
         "plan": {
           "anthropic/claude-fable-5": {
             "input": 24046,
@@ -42,19 +52,39 @@
             "cacheRead": 9398130,
             "cacheWrite": 213933
           }
+        },
+        "work": {
+          "custom/kimi-k2.7-code": {
+            "input": 362129,
+            "output": 38139,
+            "cacheRead": 8992512,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
+        "anthropic/claude-haiku-4-5": {
+          "input": 271,
+          "output": 200,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
         "anthropic/claude-fable-5": {
           "input": 24046,
           "output": 54582,
           "cacheRead": 9398130,
           "cacheWrite": 213933
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 362129,
+          "output": 38139,
+          "cacheRead": 8992512,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 15.041868000000001,
-        "pricingAsOf": "2026-07-13T08:15:52.061Z"
+        "usd": 17.248294,
+        "pricingAsOf": "2026-07-13T08:30:07.092Z"
       }
     },
     "merges": [],
