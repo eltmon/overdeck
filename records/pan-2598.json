@@ -195,7 +195,7 @@
     "recordedAt": "2026-07-13T09:48:30.294Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T09:49:12.709Z",
+  "updated": "2026-07-13T09:49:18.105Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "pending",
@@ -205,7 +205,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T09:49:12.436Z",
+    "updatedAt": "2026-07-13T09:49:17.833Z",
     "reviewNotes": "Verification failed at test",
     "inspectNotes": "Bead phase-banner-work-signal ack: workRunning now derives from activity.data.sections.some(type===work && status===running) (IssueMissionControl.tsx:828), verified via deriveNarrative precedence in StatusNarrative.tsx and existing+new tests covering all 3 ACs (planning-only session, live work session, beads-driven regression path); change is additive per NFR-1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2631",
@@ -357,7 +357,7 @@
       },
       "costAtCloseOut": {
         "usd": 64.133926,
-        "pricingAsOf": "2026-07-13T09:49:12.634Z"
+        "pricingAsOf": "2026-07-13T09:49:18.064Z"
       }
     },
     "merges": [
