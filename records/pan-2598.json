@@ -179,19 +179,20 @@
     "recordedAt": "2026-07-13T09:23:13.508Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T09:27:13.196Z",
+  "updated": "2026-07-13T09:34:11.555Z",
   "pipeline": {
     "issueId": "PAN-2598",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T09:26:52.681Z",
-    "updatedAt": "2026-07-13T09:27:10.372Z",
+    "updatedAt": "2026-07-13T09:34:10.604Z",
     "reviewNotes": "Verification failed at test",
+    "verificationNotes": "Verification FAILED at test (298821ms):\n\n   100|\n    101|   it('returns needs-you when no whole-issue or slot session is live', …\n       |   ^\n    102|     mockSessionExists.mockReturnValue(false);\n    103|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/47]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/hooks-turn-complete.test.ts > handleTurnCompleteBody > invokes handleTurnComplete for a known session and returns ok\n FAIL  |root| src/dashboard/server/routes/__tests__/hooks-turn-complete.test.ts > handleTurnCompleteBody > invokes handleTurnComplete for a known session and returns ok\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/routes/__tests__/hooks-turn-complete.test.ts:52:3\n     50|\n     51| describe('handleTurnCompleteBody', () => {\n     52|   it('invokes handleTurnComplete for a known session and returns ok', …\n       |   ^\n     53|     const { handleTurnCompleteBody } = await import('../../../server/r…\n     54|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/47]⎯\n\n FAIL  |root| src/dashboard/server/services/__tests__/conversation-compaction.test.ts > conversation native compaction > writes the compact boundary to a forked file without mutating the source\n FAIL  |root| src/dashboard/server/services/__tests__/conversation-compaction.test.ts > conversation native compaction > writes the compact boundary to a forked file without mutating the source\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/services/__tests__/conversation-compaction.test.ts:63:3\n     61|\n     62| describe('conversation native compaction', () => {\n     63|   it('writes the compact boundary to a forked file without mutating th…\n       |   ^\n     64|     const file = await writeJsonl('session.jsonl', [\n     65|       { type: 'user', message: { role: 'user', content: [{ type: 'text…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/47]⎯\n\n",
     "inspectNotes": "Bead phase-banner-work-signal ack: workRunning now derives from activity.data.sections.some(type===work && status===running) (IssueMissionControl.tsx:828), verified via deriveNarrative precedence in StatusNarrative.tsx and existing+new tests covering all 3 ACs (planning-only session, live work session, beads-driven regression path); change is additive per NFR-1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2631",
     "reviewRequestedAt": "2026-07-13T09:26:52.681Z",
@@ -336,7 +337,7 @@
       },
       "costAtCloseOut": {
         "usd": 62.695342,
-        "pricingAsOf": "2026-07-13T09:27:10.564Z"
+        "pricingAsOf": "2026-07-13T09:34:11.507Z"
       }
     },
     "merges": [
