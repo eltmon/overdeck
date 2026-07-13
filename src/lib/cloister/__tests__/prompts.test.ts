@@ -516,7 +516,7 @@ optional:
       })
     );
 
-    it.effect('renders per-bead push instruction only in REMOTE work prompt', () =>
+    it.effect('renders per-bead push instruction for local and remote work prompts', () =>
       Effect.gen(function* () {
         const baseVars = {
           ISSUE_ID: 'PAN-611',
@@ -540,11 +540,12 @@ optional:
           vars: { ...baseVars, LOCAL: true, REMOTE: false },
         });
 
-        expect(remote).toContain('push the feature branch to origin after every bead commit');
-        expect(remote).toContain('git push origin $(git branch --show-current)');
+        expect(remote).toContain('Every completed');
+        expect(remote).toContain('git push -u origin "$(git branch --show-current)"');
         expect(remote).toContain('REMOTE_DONE');
-        expect(local).not.toContain('push the feature branch to origin after every bead commit');
-        expect(local).not.toContain('### Remote durability');
+        expect(local).toContain('Every completed');
+        expect(local).toContain('git push -u origin "$(git branch --show-current)"');
+        expect(local).not.toContain('REMOTE_DONE');
       })
     );
   });

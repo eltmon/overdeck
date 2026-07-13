@@ -60,12 +60,13 @@ For every bead:
 2. `pan beads claim <bead-id>` — claim it.
 3. Implement only that bead.
 4. `git add` specific files and `git commit` — one bead = one commit.
-5. `pan beads close <bead-id> --reason="…"`. (The canonical writer records bead status automatically — do **not** write to the record or `.overdeck/continue.json` directly.)
-6. Re-read this bead's plan-item metadata (merged view via the spec on main) after the commit.
-7. If `metadata.requiresInspection === true`, run `pan inspect <ISSUE-ID> --bead <bead-id>` for `inspectionDepth: "fast"` or omitted, or add `--deep` for `inspectionDepth: "deep"`, then wait for the verdict via `pan tell`.
-8. If `metadata.requiresInspection === false`, skip inspection and continue.
-9. On `INSPECTION BLOCKED`: fix with a new commit, `pan beads close` again, then re-run the same inspection.
-10. Continue with the next ready bead.
+5. Immediately push that commit with `git push -u origin "$(git branch --show-current)"`. Every completed bead must exist on origin before its status is closed; generic project Git profiles do not override this managed-work invariant.
+6. `pan beads close <bead-id> --reason="…"`. (The canonical writer records bead status automatically — do **not** write to the record or `.overdeck/continue.json` directly.)
+7. Re-read this bead's plan-item metadata (merged view via the spec on main) after the commit.
+8. If `metadata.requiresInspection === true`, run `pan inspect <ISSUE-ID> --bead <bead-id>` for `inspectionDepth: "fast"` or omitted, or add `--deep` for `inspectionDepth: "deep"`, then wait for the verdict via `pan tell`.
+9. If `metadata.requiresInspection === false`, skip inspection and continue.
+10. On `INSPECTION BLOCKED`: fix with a new commit, push it, `pan beads close` again, then re-run the same inspection.
+11. Continue with the next ready bead.
 
 Never batch multiple beads into a single commit. A one-bead diff is what makes inspection, review, and rollback tractable.
 
@@ -146,7 +147,8 @@ git push -u origin "$(git branch --show-current)"
 pan done <ISSUE-ID> -c "<terse summary>"
 ```
 
-Work agents push only their feature branch. Never push to `origin/main` or merge into
+The final push is a verification pass; every bead commit was already pushed before its
+bead was closed. Work agents push only their feature branch. Never push to `origin/main` or merge into
 `main`; landing is the review pipeline's job via `pan done`, and the pre-push guard
 mechanically rejects agent code pushes to main.
 
