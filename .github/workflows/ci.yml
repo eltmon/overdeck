@@ -63,6 +63,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Build dashboard server bundle
+        run: npm run build:dashboard:server:bundle
+
       - name: Type check
         run: npm run typecheck
 
