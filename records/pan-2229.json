@@ -2,7 +2,7 @@
   "issueId": "PAN-2229",
   "schemaVersion": 2,
   "created": "2026-07-10T21:05:49.847Z",
-  "updated": "2026-07-13T05:15:20.714Z",
+  "updated": "2026-07-13T13:35:07.490Z",
   "feedback": [],
   "pipeline": {
     "issueId": "PAN-2229",
@@ -60,6 +60,13 @@
       "tripCount": 1,
       "open": true,
       "needsYouEmittedAt": "2026-07-13T04:50:14.582Z"
+    }
+  ],
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-13T13:35:07.450Z",
+      "reason": "start",
+      "agentModel": "kimi-k2.7-code"
     }
   ]
 }
