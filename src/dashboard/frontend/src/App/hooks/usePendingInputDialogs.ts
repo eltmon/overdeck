@@ -329,7 +329,10 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
         ? T extends { questions: infer Q } ? Q : never : never;
     }) => {
       if (kind === 'agent') {
-        const res = await fetch(`/api/agents/${encodeURIComponent(id)}/answer-question`, {
+        // fetchWithTimeout everywhere in these mutations: a plain fetch that
+        // never resolves (e.g. server restart mid-request) leaves isPending
+        // stuck true and every dialog button disabled until a page refresh.
+        const res = await fetchWithTimeout(`/api/agents/${encodeURIComponent(id)}/answer-question`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ answers }),
@@ -348,7 +351,7 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
         lines.push(`Q: ${q}\nA: ${answers[i]}`);
       }
       const composed = `Operator answered the pending question${answers.length > 1 ? 's' : ''}:\n\n${lines.join('\n\n')}`;
-      const res = await fetch(`/api/conversations/${encodeURIComponent(id)}/message`, {
+      const res = await fetchWithTimeout(`/api/conversations/${encodeURIComponent(id)}/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: composed }),
@@ -385,7 +388,7 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
       label?: string;
       toolUseId?: string;
     }) => {
-      const res = await fetch(`/api/conversations/${encodeURIComponent(id)}/codex-approval`, {
+      const res = await fetchWithTimeout(`/api/conversations/${encodeURIComponent(id)}/codex-approval`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ optionNumber }),
@@ -457,7 +460,7 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
       const url = kind === 'agent'
         ? `/api/agents/${encodeURIComponent(id)}/plan-action`
         : `/api/conversations/${encodeURIComponent(id)}/plan-action`;
-      const res = await fetch(url, {
+      const res = await fetchWithTimeout(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, feedback }),
