@@ -192,18 +192,18 @@
     "recordedAt": "2026-07-13T11:20:10.124Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T11:25:28.162Z",
+  "updated": "2026-07-13T11:25:45.894Z",
   "pipeline": {
     "issueId": "PAN-2596",
     "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T11:21:55.959Z",
-    "updatedAt": "2026-07-13T11:25:27.940Z",
+    "updatedAt": "2026-07-13T11:25:45.835Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-2596-review already running. Use 'pan tell' to message it.",
     "inspectNotes": "Bead server-upload-allowlist ack: validateUploadPayload correctly gates UTF-8 text extensions, PDF %PDF- magic prefix, and disallowed/extension-less types with 400s naming the mismatch, while preserving image magic-byte validation and <uuid><ext> naming; non-image files get <uuid>-<sanitized-name><ext>. All 5 ACs verified against diff + accompanying unit tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2634",
@@ -337,7 +337,7 @@
       },
       "costAtCloseOut": {
         "usd": 58.455931,
-        "pricingAsOf": "2026-07-13T11:25:28.119Z"
+        "pricingAsOf": "2026-07-13T11:25:45.893Z"
       }
     },
     "merges": [
