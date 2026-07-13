@@ -317,23 +317,24 @@
     "recordedAt": "2026-07-13T11:20:10.124Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T15:55:41.828Z",
+  "updated": "2026-07-13T15:55:57.947Z",
   "pipeline": {
     "issueId": "PAN-2596",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T11:21:55.959Z",
-    "updatedAt": "2026-07-13T15:52:43.992Z",
+    "updatedAt": "2026-07-13T15:55:57.810Z",
+    "reviewNotes": "Agent re-review request (1/25): Reset review cycles after dashboard boot gate; please run full convoy.",
     "inspectNotes": "Bead server-upload-allowlist ack: validateUploadPayload correctly gates UTF-8 text extensions, PDF %PDF- magic prefix, and disallowed/extension-less types with 400s naming the mismatch, while preserving image magic-byte validation and <uuid><ext> naming; non-image files get <uuid>-<sanitized-name><ext>. All 5 ACs verified against diff + accompanying unit tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2634",
     "lastVerifiedCommit": "66452d513cbf7e447bc977d03567c84a4f807c7f",
     "reviewRequestedAt": "2026-07-13T11:21:55.959Z",
-    "reviewSpawnedAt": "2026-07-13T15:41:34.330Z",
+    "reviewSpawnedAt": "2026-07-13T15:55:57.809Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/frontend/src/App.test.tsx",
@@ -501,7 +502,7 @@
       },
       "costAtCloseOut": {
         "usd": 76.152141,
-        "pricingAsOf": "2026-07-13T15:52:44.044Z"
+        "pricingAsOf": "2026-07-13T15:55:57.934Z"
       }
     },
     "merges": [
