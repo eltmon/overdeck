@@ -3,10 +3,11 @@ import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/re
 import { ComposerFooter } from '../ComposerFooter';
 import { resetComposerStore } from '../../../lib/composerStore';
 
-const { editorState, mockFocus, mockToastError, mockSaveStoredModel, voiceWidgetRenders } = vi.hoisted(() => ({
+const { editorState, mockFocus, mockToastError, mockToastWarning, mockSaveStoredModel, voiceWidgetRenders } = vi.hoisted(() => ({
   editorState: { text: '' },
   mockFocus: vi.fn(),
   mockToastError: vi.fn(),
+  mockToastWarning: vi.fn(),
   mockSaveStoredModel: vi.fn(),
   voiceWidgetRenders: [] as Array<{ autoStartToken?: number }>,
 }));
@@ -74,7 +75,7 @@ vi.mock('sonner', () => ({
   toast: {
     error: (...args: unknown[]) => mockToastError(...args),
     success: vi.fn(),
-    warning: vi.fn(),
+    warning: (...args: unknown[]) => mockToastWarning(...args),
   },
 }));
 
@@ -760,5 +761,46 @@ describe('ComposerFooter attachments', () => {
       expect.anything(),
     );
     expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it('uploads files selected through the paperclip attach button', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ path: '/tmp/overdeck-attached.md' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    render(<ComposerFooter conversation={conversation} />);
+
+    const file = new File(['# notes'], 'notes.md', { type: 'text/markdown' });
+    const input = screen.getByTestId('composer-attach-input');
+
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/conversations/test-conv/upload-image',
+        expect.objectContaining({ method: 'POST' }),
+      );
+    });
+    expect(await screen.findByText('notes.md')).toBeInTheDocument();
+  });
+
+  it('warns when the attach button selects unsupported files', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+
+    render(<ComposerFooter conversation={conversation} />);
+
+    const file = new File(['binary'], 'app.exe', { type: 'application/octet-stream' });
+    const input = screen.getByTestId('composer-attach-input');
+
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(mockToastWarning).toHaveBeenCalledWith('1 file not supported.');
+    });
   });
 });

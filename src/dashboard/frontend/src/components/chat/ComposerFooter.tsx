@@ -11,8 +11,8 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { AlertCircle, Mic, MicOff, Scissors, SendHorizontal, X, Loader2 } from 'lucide-react';
-import type { ClipboardEvent, DragEvent } from 'react';
+import { AlertCircle, Mic, MicOff, Paperclip, Scissors, SendHorizontal, X, Loader2 } from 'lucide-react';
+import type { ClipboardEvent, ChangeEvent, DragEvent } from 'react';
 import { toast } from 'sonner';
 import type { LexicalEditor } from 'lexical';
 import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical';
@@ -32,6 +32,7 @@ import {
   useConversationAttachments,
   getConversationAttachments,
   sendConversationMessage,
+  getAttachmentAccept,
 } from '../../lib/composerStore';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
@@ -108,6 +109,7 @@ export function ComposerFooter({
   const [voiceAutoStartToken, setVoiceAutoStartToken] = useState(0);
   const [voiceState, setVoiceState] = useState<{ isListening: boolean; error: string | null }>({ isListening: false, error: null });
   const editorRef = useRef<LexicalEditor | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const previousConversationNameRef = useRef(conversation.name);
   // Updated synchronously on every render so the in-flight-send guards below see
   // the currently-mounted conversation immediately (PAN-539 attribution race).
@@ -128,6 +130,19 @@ export function ComposerFooter({
       toast.warning(`${rejected.length} file${rejected.length === 1 ? '' : 's'} not supported.`);
     }
   }, [enqueueAttachmentsForConversation, conversation.name]);
+
+  const handleAttachClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileInputChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files ? Array.from(event.target.files) : [];
+    if (files.length > 0) {
+      enqueueAttachments(files);
+    }
+    // Reset the input so the same file can be selected again.
+    event.target.value = '';
+  }, [enqueueAttachments]);
 
   const removePendingAttachment = useCallback((id: string) => {
     removeAttachmentForConversation(conversation.name, id);
@@ -602,6 +617,17 @@ export function ComposerFooter({
           <div className={styles.composerToolbarSpacer} />
 
           <button
+            className={styles.voiceToolbarButton}
+            onClick={handleAttachClick}
+            disabled={isDisabled}
+            type="button"
+            title="Attach files"
+            aria-label="Attach files"
+          >
+            <Paperclip size={16} />
+          </button>
+
+          <button
             className={isVoiceWidgetOpen ? styles.voiceToolbarButtonActive : styles.voiceToolbarButton}
             onClick={() => setIsVoiceWidgetOpen((open) => !open)}
             disabled={isDisabled}
@@ -623,6 +649,17 @@ export function ComposerFooter({
             <SendHorizontal size={16} />
           </button>
         </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept={getAttachmentAccept()}
+          onChange={handleFileInputChange}
+          style={{ display: 'none' }}
+          aria-hidden="true"
+          tabIndex={-1}
+          data-testid="composer-attach-input"
+        />
         {isVoiceWidgetOpen && (
           <VoiceWidget
             conversation={conversation}
