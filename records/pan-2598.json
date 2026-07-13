@@ -248,7 +248,7 @@
     "recordedAt": "2026-07-13T10:56:03.885Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T11:11:40.272Z",
+  "updated": "2026-07-13T11:15:40.332Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "reviewing",
@@ -259,7 +259,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T10:55:39.955Z",
-    "updatedAt": "2026-07-13T11:11:40.199Z",
+    "updatedAt": "2026-07-13T11:15:39.662Z",
     "reviewNotes": "Verification failed at test",
     "inspectNotes": "Bead phase-banner-work-signal ack: workRunning now derives from activity.data.sections.some(type===work && status===running) (IssueMissionControl.tsx:828), verified via deriveNarrative precedence in StatusNarrative.tsx and existing+new tests covering all 3 ACs (planning-only session, live work session, beads-driven regression path); change is additive per NFR-1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2631",
@@ -379,9 +379,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 3472908,
-            "output": 446464,
-            "cacheRead": 203063296,
+            "input": 3482328,
+            "output": 451154,
+            "cacheRead": 205205504,
             "cacheWrite": 0
           }
         }
@@ -412,15 +412,15 @@
           "cacheWrite": 346536
         },
         "custom/kimi-k2.7-code": {
-          "input": 3472908,
-          "output": 446464,
-          "cacheRead": 203063296,
+          "input": 3482328,
+          "output": 451154,
+          "cacheRead": 205205504,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 70.707153,
-        "pricingAsOf": "2026-07-13T11:11:40.267Z"
+        "usd": 71.141883,
+        "pricingAsOf": "2026-07-13T11:15:40.041Z"
       }
     },
     "merges": [
