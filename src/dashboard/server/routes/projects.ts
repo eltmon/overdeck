@@ -316,6 +316,34 @@ async function collectSessionTreeNodes(
     }
   }
 
+  // Synthesize a planning node for a live tmux planning session even when the
+  // agent state dir is missing or unreadable. This catches the PAN-2597 case
+  // where only planning-<issue> (or agent-<issue>-plan) exists in tmux.
+  if (!hasPlanningSection) {
+    const planningTmuxId = context.tmuxSessionNames.has(planningAgentId)
+      ? planningAgentId
+      : context.tmuxSessionNames.has(planRunAgentId)
+        ? planRunAgentId
+        : null;
+    if (planningTmuxId) {
+      const jsonlPath = await resolveJsonlPath(planningTmuxId, workspacePath);
+      const presence = await deriveSessionPresence(planningTmuxId, null, context.tmuxSessionNames);
+      sections.push({
+        type: 'planning',
+        sessionId: planningTmuxId,
+        model: 'unknown',
+        startedAt: new Date().toISOString(),
+        duration: null,
+        status: 'running',
+        presence,
+        hasJsonl: !!jsonlPath,
+        tmuxSession: planningTmuxId,
+        planningComplete: planningFinished,
+      });
+      hasPlanningSection = true;
+    }
+  }
+
   if (!hasPlanningSection) {
     const panContinuePath = join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME);
     const planningPathForTimestamp = await pathExists(panContinuePath)

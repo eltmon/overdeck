@@ -644,4 +644,61 @@ describe('fetchProjectSessionTree', () => {
     expect(session).toBeDefined();
     expect(session?.type).toBe('planning');
   });
+
+  it('synthesizes a planning node from a tmux-only planning session', async () => {
+    (listProjectsSync as any).mockReturnValue([
+      {
+        key: 'overdeck',
+        config: { name: 'overdeck', path: '/tmp/overdeck', workspace: { workspaces_dir: 'workspaces' } },
+      },
+    ]);
+    (listSessionNames as any).mockReturnValue(Effect.succeed(['planning-pan-999']));
+    mockAccess(new Set([
+      '/tmp/overdeck/workspaces',
+      '/tmp/overdeck/workspaces/feature-pan-999/.overdeck',
+    ]));
+    mockWorkspaceReaddir([{ name: 'feature-pan-999', isDirectory: () => true, isFile: () => false }]);
+
+    const result = await fetchProjectSessionTree('overdeck');
+
+    const tree = result as { features: Array<{ issueId: string; sessions: Array<Record<string, unknown>> }> };
+    expect(tree.features).toHaveLength(1);
+    const sessions = tree.features[0]?.sessions ?? [];
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]?.sessionId).toBe('planning-pan-999');
+    expect(sessions[0]?.type).toBe('planning');
+    expect(sessions[0]?.presence).not.toBe('ended');
+    expect(sessions[0]?.tmuxSession).toBe('planning-pan-999');
+  });
+
+  it('emits exactly one planning node when a registered planning agent exists', async () => {
+    (listProjectsSync as any).mockReturnValue([
+      {
+        key: 'overdeck',
+        config: { name: 'overdeck', path: '/tmp/overdeck', workspace: { workspaces_dir: 'workspaces' } },
+      },
+    ]);
+    (listSessionNames as any).mockReturnValue(Effect.succeed(['planning-pan-539']));
+    (getAgentRuntimeState as any).mockReturnValue(Effect.succeed({ state: 'active' }));
+    mockAgentStates.set('planning-pan-539', agentState({
+      id: 'planning-pan-539',
+      role: 'plan',
+      status: 'running',
+      startedAt: '2026-01-01T00:00:00Z',
+    }));
+    mockAccess(new Set([
+      '/tmp/overdeck/workspaces',
+      join(getOverdeckHome(), 'agents', 'planning-pan-539'),
+      '/tmp/overdeck/workspaces/feature-pan-539/.pan',
+      '/tmp/overdeck/workspaces/feature-pan-539/.pan/continue.json',
+    ]));
+    mockWorkspaceReaddir([FEATURE_PAN_539_DIRENT]);
+
+    const result = await fetchProjectSessionTree('overdeck');
+
+    const tree = result as { features: Array<{ issueId: string; sessions: Array<Record<string, unknown>> }> };
+    const planningSessions = tree.features[0]?.sessions.filter((s) => s.type === 'planning') ?? [];
+    expect(planningSessions).toHaveLength(1);
+    expect(planningSessions[0]?.sessionId).toBe('planning-pan-539');
+  });
 });
