@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T17:54:45.646Z",
-  "updated": "2026-07-13T05:48:21.176Z",
+  "updated": "2026-07-13T06:25:36.991Z",
   "pipeline": {
     "issueId": "PAN-2564",
     "reviewStatus": "pending",
@@ -81,7 +81,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "glm-5.2",
+  "model": "claude-sonnet-5",
   "statusOverrides": {
     "migration-gate": "running",
     "beads-home": "running",
@@ -91,15 +91,7 @@
     "config-standardize.config-standardize.ac3": "completed"
   },
   "swarm": {
-    "slotAssignments": [
-      {
-        "slotIndex": 3,
-        "itemId": "config-standardize",
-        "agentId": "agent-pan-2564-slot-3",
-        "branch": "feature/pan-2564-slot-3",
-        "assignedAt": "2026-07-13T05:20:15.242Z"
-      }
-    ],
+    "slotAssignments": [],
     "slotCompletions": {}
   }
 }
