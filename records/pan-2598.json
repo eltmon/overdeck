@@ -144,6 +144,9 @@
       "src/dashboard/server/routes/__tests__/hooks-turn-complete.test.ts",
       "src/dashboard/server/services/__tests__/conversation-compaction.test.ts",
       "src/lib/channels/__tests__/overdeck-bridge.test.ts",
+      "src/lib/overdeck/__tests__/conversation-project-cwd.test.ts",
+      "tests/cli/commands/work/issue-beads-check.test.ts",
+      "tests/lib/agents-compact-session.test.ts",
       "tests/unit/lib/cloister/feedback-target.test.ts"
     ],
     "declaredScopeUntouched": [
@@ -185,17 +188,20 @@
       "src/dashboard/server/services/__tests__/conversation-compaction.test.ts",
       "src/lib/agent-enrichment.ts",
       "src/lib/channels/__tests__/overdeck-bridge.test.ts",
+      "src/lib/overdeck/__tests__/conversation-project-cwd.test.ts",
       "sync-sources/hooks/ask-user-question-hook",
+      "tests/cli/commands/work/issue-beads-check.test.ts",
       "tests/lib/agent-enrichment-pending-inputs.test.ts",
+      "tests/lib/agents-compact-session.test.ts",
       "tests/lib/auq-hook-detector-contract.test.ts",
       "tests/unit/dashboard/server/routes/command-deck.test.ts",
       "tests/unit/dashboard/server/routes/projects.test.ts",
       "tests/unit/lib/cloister/feedback-target.test.ts"
     ],
-    "recordedAt": "2026-07-13T09:48:30.294Z"
+    "recordedAt": "2026-07-13T10:12:32.889Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T10:00:53.900Z",
+  "updated": "2026-07-13T10:12:32.890Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "failed",
