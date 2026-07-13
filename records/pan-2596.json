@@ -136,17 +136,17 @@
     "recordedAt": "2026-07-13T09:57:24.734Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T10:52:34.049Z",
+  "updated": "2026-07-13T11:09:29.406Z",
   "pipeline": {
     "issueId": "PAN-2596",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T10:52:33.729Z",
+    "updatedAt": "2026-07-13T11:09:29.308Z",
     "reviewNotes": "[correctness] Dotfile and extensionless filenames bypass rejection when declared as images — `src/lib/overdeck/conversation-message.ts:136`",
     "inspectNotes": "Bead server-upload-allowlist ack: validateUploadPayload correctly gates UTF-8 text extensions, PDF %PDF- magic prefix, and disallowed/extension-less types with 400s naming the mismatch, while preserving image magic-byte validation and <uuid><ext> naming; non-image files get <uuid>-<sanitized-name><ext>. All 5 ACs verified against diff + accompanying unit tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2634",
@@ -192,9 +192,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 8842890,
-            "output": 38471,
-            "cacheRead": 7821824,
+            "input": 13224944,
+            "output": 50197,
+            "cacheRead": 11412736,
             "cacheWrite": 0
           }
         },
@@ -224,9 +224,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1351820,
-            "output": 195313,
-            "cacheRead": 85155072,
+            "input": 1539052,
+            "output": 206219,
+            "cacheRead": 90637568,
             "cacheWrite": 0
           }
         }
@@ -239,9 +239,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 8842890,
-          "output": 38471,
-          "cacheRead": 7821824,
+          "input": 13224944,
+          "output": 50197,
+          "cacheRead": 11412736,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -263,15 +263,15 @@
           "cacheWrite": 85508
         },
         "custom/kimi-k2.7-code": {
-          "input": 1351820,
-          "output": 195313,
-          "cacheRead": 85155072,
+          "input": 1539052,
+          "output": 206219,
+          "cacheRead": 90637568,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 43.76927,
-        "pricingAsOf": "2026-07-13T10:52:33.955Z"
+        "usd": 51.135381,
+        "pricingAsOf": "2026-07-13T11:09:29.404Z"
       }
     },
     "merges": [
