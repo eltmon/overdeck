@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T22:33:36.700Z",
-  "updated": "2026-07-13T12:19:53.988Z",
+  "updated": "2026-07-13T12:20:38.364Z",
   "pipeline": {
     "issueId": "PAN-2607",
     "reviewStatus": "pending",
@@ -21,8 +21,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T10:26:24.599Z",
-    "inspectNotes": "Bead comparator-metadata-drift ack: compareBeadsSources now classifies updated_at-only diffs as metadata-drift (without masking real field conflicts), and reportMarkdown emits a Summary by classification section ahead of the preserved full inventory table; verified via direct test run (4/4 pass)."
+    "updatedAt": "2026-07-13T12:20:38.154Z",
+    "inspectNotes": "Bead server-bundle-ci-gate ack: ci.yml build job runs npm run build:dashboard:server:bundle (line 66-67); panopticon-cli project in projects.yaml has required server-bundle quality gate (line 85-87) that exits 0; follow-up issue eltmon/overdeck#2635 records the 152-error server typecheck debt with per-file counts and intent to upgrade the gate."
   },
   "closeOut": {
     "usage": {
@@ -37,17 +37,17 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 14217,
-            "output": 5933,
-            "cacheRead": 351857,
-            "cacheWrite": 91870
+            "input": 30271,
+            "output": 8220,
+            "cacheRead": 1024043,
+            "cacheWrite": 214507
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 419880,
-            "output": 21128,
-            "cacheRead": 6522368,
+            "input": 1501407,
+            "output": 209679,
+            "cacheRead": 68454912,
             "cacheWrite": 0
           }
         }
@@ -60,21 +60,21 @@
           "cacheWrite": 1079410
         },
         "anthropic/claude-sonnet-5": {
-          "input": 14217,
-          "output": 5933,
-          "cacheRead": 351857,
-          "cacheWrite": 91870
+          "input": 30271,
+          "output": 8220,
+          "cacheRead": 1024043,
+          "cacheWrite": 214507
         },
         "custom/kimi-k2.7-code": {
-          "input": 419880,
-          "output": 21128,
-          "cacheRead": 6522368,
+          "input": 1501407,
+          "output": 209679,
+          "cacheRead": 68454912,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 50.896698,
-        "pricingAsOf": "2026-07-13T10:26:24.844Z"
+        "usd": 64.941536,
+        "pricingAsOf": "2026-07-13T12:20:38.289Z"
       }
     },
     "merges": [],
