@@ -429,26 +429,24 @@ describe('resource-discovery branch-ahead signal', () => {
     resetResourceAllocatedIssuesCacheForTests();
     mocks.execFile.mockImplementation((command: string, args: string[], _options: unknown, callback: (error: Error | null, result?: { stdout: string }) => void) => {
       if (command === 'git' && args[0] === 'for-each-ref') {
-        const ref = args[1] ?? '';
-        if (ref.includes('feature/*')) {
-          callback(null, { stdout: 'feature/pan-9001\nfeature/pan-9002\nfeature/pan-9003\n' });
-        } else if (ref.includes('bypass/*')) {
-          callback(null, { stdout: 'bypass/pan-9002\n' });
-        } else {
-          callback(null, { stdout: '' });
+        const patterns = args.filter((a) => a.includes('feature/*') || a.includes('bypass/*'));
+        const isNoMerged = args.includes('--no-merged=main');
+        const hasFeature = patterns.some((p) => p.includes('feature/*'));
+        const hasBypass = patterns.some((p) => p.includes('bypass/*'));
+        const isRemote = patterns.some((p) => p.includes('refs/remotes/'));
+        const prefix = isRemote ? 'origin/' : '';
+        const branches: string[] = [];
+        if (hasFeature) {
+          if (isNoMerged) {
+            branches.push(`${prefix}feature/pan-9002`, `${prefix}feature/pan-9003`);
+          } else {
+            branches.push(`${prefix}feature/pan-9001`, `${prefix}feature/pan-9002`, `${prefix}feature/pan-9003`);
+          }
         }
-        return;
-      }
-      if (command === 'git' && args[0] === 'merge-base') {
-        const branch = args[2];
-        // pan-9001 is fully merged into main; everything else is ahead.
-        if (branch === 'feature/pan-9001') {
-          callback(null, { stdout: '' });
-        } else {
-          const err = new Error('not an ancestor') as Error & { code: number };
-          err.code = 1;
-          callback(err, { stdout: '' });
+        if (hasBypass) {
+          branches.push(`${prefix}bypass/pan-9002`);
         }
+        callback(null, { stdout: branches.join('\n') + (branches.length ? '\n' : '') });
         return;
       }
       if (command === 'gh' && args[0] === 'pr') {

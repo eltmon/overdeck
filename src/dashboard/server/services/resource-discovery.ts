@@ -426,23 +426,29 @@ async function loadProjectBranches(projectPath: string): Promise<{ local: string
   }
 }
 
-async function isBranchAheadOfMain(branchName: string, projectPath: string): Promise<boolean> {
-  try {
-    await execFileAsync('git', ['merge-base', '--is-ancestor', branchName, 'main'], {
-      cwd: projectPath,
-      encoding: 'utf-8',
-      timeout: 10000,
-    });
-    return false;
-  } catch (err) {
-    // Exit code 1 means the branch is not an ancestor of main, i.e. it has
-    // unmerged work. Any other failure (timeout, missing ref, real error) is
-    // an error state; fail closed by treating the branch as merged.
-    if (err !== null && typeof err === 'object' && 'code' in err && err.code === 1) {
-      return true;
+async function loadBranchesAheadOfMain(projectPath: string): Promise<Set<string>> {
+  const ahead = new Set<string>();
+  const run = async (patterns: string[]) => {
+    if (patterns.length === 0) return;
+    try {
+      const { stdout } = await execFileAsync('git', ['for-each-ref', '--format=%(refname:short)', ...patterns, '--no-merged=main'], {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        timeout: 10000,
+      });
+      for (const line of stdout.split('\n')) {
+        const branch = line.trim();
+        if (branch) ahead.add(branch);
+      }
+    } catch {
+      // ignore: fail closed by treating all branches as merged
     }
-    return false;
-  }
+  };
+  await Promise.all([
+    run(['refs/heads/feature/*', 'refs/heads/bypass/*']),
+    run(['refs/remotes/origin/feature/*', 'refs/remotes/origin/bypass/*']),
+  ]);
+  return ahead;
 }
 
 interface WorkspaceScanResult {
@@ -659,6 +665,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
       loadProjectBranches(projectPath),
       readIssuesWithBeads(projectPath),
     ]);
+    const aheadBranches = await loadBranchesAheadOfMain(projectPath);
 
     await Promise.all(workspaceEntries.map(async (entry) => {
       if (!entry.isDirectory() || !entry.name.startsWith('feature-')) return;
@@ -686,33 +693,22 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
       issue.resourceDetails.workspaceMissing = gitInfo.workspaceMissing;
     }));
 
-    await Promise.all(branches.local.map(async (branch) => {
+    for (const [branch, key] of [
+      ...branches.local.map((b) => [b, 'localBranches'] as const),
+      ...branches.remote.map((b) => [b, 'remoteBranches'] as const),
+    ]) {
       const issueId = parseIssueIdFromTextSync(branch);
-      if (!issueId) return;
+      if (!issueId) continue;
       const issue = ensureIssue(issueId, project);
-      if (!issue) return;
+      if (!issue) continue;
       issue.resourceSources.add('branch');
-      if (!issue.resourceDetails.localBranches.includes(branch)) {
-        issue.resourceDetails.localBranches.push(branch);
+      if (!issue.resourceDetails[key].includes(branch)) {
+        issue.resourceDetails[key].push(branch);
       }
-      if (await isBranchAheadOfMain(branch, projectPath)) {
+      if (aheadBranches.has(branch)) {
         issue.resourceDetails.branchAheadOfMain = true;
       }
-    }));
-
-    await Promise.all(branches.remote.map(async (branch) => {
-      const issueId = parseIssueIdFromTextSync(branch);
-      if (!issueId) return;
-      const issue = ensureIssue(issueId, project);
-      if (!issue) return;
-      issue.resourceSources.add('branch');
-      if (!issue.resourceDetails.remoteBranches.includes(branch)) {
-        issue.resourceDetails.remoteBranches.push(branch);
-      }
-      if (await isBranchAheadOfMain(branch, projectPath)) {
-        issue.resourceDetails.branchAheadOfMain = true;
-      }
-    }));
+    }
   }));
 
   for (const [issueId, prs] of pullRequests) {

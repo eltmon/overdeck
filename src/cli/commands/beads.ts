@@ -71,6 +71,14 @@ function isSweepable(status: string): boolean {
   return SWEEPABLE_STATUSES.has(status);
 }
 
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
 function findIssueLabel(bead: BeadRecord): ParsedIssueId | null {
   for (const label of bead.labels) {
     const parsed = parseIssueIdSync(label);
@@ -184,12 +192,19 @@ async function enumerateClosedOrphanIssues(): Promise<
     beads.some((bead) => isSweepable(bead.status)),
   );
 
-  const trackerStates = await Promise.all(
-    candidates.map(async ([issueId]) => ({
-      issueId,
-      trackerState: await resolveGitHubCloseState(issueId),
-    })),
-  );
+  const trackerStates: Array<{
+    issueId: string;
+    trackerState: Awaited<ReturnType<typeof resolveGitHubCloseState>>;
+  }> = [];
+  for (const batch of chunk(candidates, 5)) {
+    const batchResults = await Promise.all(
+      batch.map(async ([issueId]) => ({
+        issueId,
+        trackerState: await resolveGitHubCloseState(issueId),
+      })),
+    );
+    trackerStates.push(...batchResults);
+  }
 
   for (const { issueId, trackerState } of trackerStates) {
     if (!trackerState.ok) {
