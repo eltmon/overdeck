@@ -425,7 +425,6 @@ async function loadProjectBranches(projectPath: string): Promise<{ local: string
     return { local: [], remote: [] };
   }
 }
-
 async function loadBranchesAheadOfMain(projectPath: string): Promise<Set<string>> {
   const ahead = new Set<string>();
   const run = async (patterns: string[]) => {
@@ -441,7 +440,7 @@ async function loadBranchesAheadOfMain(projectPath: string): Promise<Set<string>
         if (branch) ahead.add(branch);
       }
     } catch {
-      // ignore: fail closed by treating all branches as merged
+      // fail closed by treating all branches as merged
     }
   };
   await Promise.all([
