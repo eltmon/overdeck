@@ -5,6 +5,7 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
 import { getAgentRuntimeState } from '../../../lib/agents.js';
+import { listConversations, type LegacyConversation as Conversation } from '../../../lib/overdeck/conversations.js';
 import {
   PAN_CONTINUE_FILENAME,
   PAN_DIRNAME,
@@ -22,7 +23,7 @@ const execFileAsync = promisify(execFile);
 const RESOURCE_DISCOVERY_TTL_MS = 30_000;
 const RECENT_ACTIVITY_WINDOW_MS = 5_000;
 
-export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'vbrief' | 'beads' | 'docker' | 'remote-agent';
+export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'vbrief' | 'beads' | 'docker' | 'remote-agent' | 'conversation';
 
 export interface ResourcePullRequest {
   number: number;
@@ -51,6 +52,8 @@ export interface ResourceDetails {
   workspaceMissing: boolean;
   /** Remote (fly.io) work agent for this issue, when one is active (PAN-1676). */
   remoteAgent: { vmName: string; status: string; model: string; startedAt: string } | null;
+  /** Non-archived conversations explicitly linked to this issue. */
+  conversations: Array<{ title: string | null; status: string }>;
 }
 
 export interface ResourceDetailIdentifiers {
@@ -103,6 +106,7 @@ interface InternalResourceDetails {
   branchAheadOfMain: boolean;
   workspaceMissing: boolean;
   remoteAgent: { vmName: string; status: string; model: string; startedAt: string } | null;
+  conversations: Array<{ id: number; name: string; title: string | null; status: string; tmuxSession: string | null }>;
 }
 
 interface MutableResourceIssue {
@@ -222,6 +226,7 @@ function summarizeResourceDetails(details: InternalResourceDetails): ResourceDet
     branchAheadOfMain: details.branchAheadOfMain,
     workspaceMissing: details.workspaceMissing,
     remoteAgent: details.remoteAgent,
+    conversations: details.conversations.map((conv) => ({ title: conv.title, status: conv.status })),
   };
 }
 
@@ -304,6 +309,14 @@ async function loadTrackerIssues(): Promise<Map<string, TrackerIssueRecord>> {
 async function loadTmuxSessions(): Promise<string[]> {
   try {
     return (await Effect.runPromise(listSessionNames())).map((name) => name.trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function loadConversations(): Conversation[] {
+  try {
+    return listConversations();
   } catch {
     return [];
   }
@@ -525,6 +538,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
         branchAheadOfMain: false,
         workspaceMissing: false,
         remoteAgent: null,
+        conversations: [],
       },
     };
     issueMap.set(upper, created);
@@ -553,6 +567,24 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
     if (!issue.resourceDetails.tmuxSessions.includes(sessionName)) {
       issue.resourceDetails.tmuxSessions.push(sessionName);
     }
+  }
+
+  // Non-archived conversations explicitly linked to an issue are a distinct
+  // resource signal from tmux/agent sessions (PAN-2602). They indicate active
+  // operator attention even when no agent session is running.
+  const conversations = loadConversations();
+  for (const conv of conversations) {
+    if (!conv.issueId || conv.archivedAt) continue;
+    const issue = ensureIssue(conv.issueId);
+    if (!issue) continue;
+    issue.resourceSources.add('conversation');
+    issue.resourceDetails.conversations.push({
+      id: conv.id,
+      name: conv.name,
+      title: conv.title,
+      status: conv.status,
+      tmuxSession: conv.tmuxSession,
+    });
   }
 
   // Remote (fly.io) work agents have no local tmux session — surface them
@@ -834,6 +866,7 @@ export function sanitizeResourceAllocatedIssues(issues: ResourceAllocatedIssue[]
       branchAheadOfMain: issue.resourceDetails.branchAheadOfMain,
       workspaceMissing: issue.resourceDetails.workspaceMissing,
       remoteAgent: issue.resourceDetails.remoteAgent ?? null,
+      conversations: issue.resourceDetails.conversations.map((conv) => ({ title: conv.title, status: conv.status })),
     },
   }));
 }
