@@ -221,27 +221,74 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-12T22:51:34.994Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T05:16:04.679Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T05:16:09.475Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T05:16:09.480Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T05:16:09.481Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T05:16:09.482Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-12T20:45:31.659Z",
-  "updated": "2026-07-12T22:51:40.466Z",
+  "updated": "2026-07-13T05:20:14.952Z",
   "pipeline": {
     "issueId": "PAN-1232",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-12T22:02:39.443Z",
-    "updatedAt": "2026-07-12T22:51:40.384Z",
-    "reviewNotes": "Agent re-review request (4/25): Fixed cycle-6 findings: (1) Files-tab DiffPanel now uses isolateSelection (component-local state) so it neither inherits stale ?diff URL state from other surfaces nor defaults away from vs-main; (2) dropped agentId ?? '' — passes the real agentId (proven invariant when a workspace exists), so the fetch is scoped to /api/agents/<real-agent>/diffs/vs-main. Added a stale-URL-isolation test and tightened AC-34 test to assert real agent scope.",
+    "updatedAt": "2026-07-13T05:20:14.913Z",
+    "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/dashboard/server/routes/backlog.ts",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2604",
     "lastVerifiedCommit": "4543e2d6ac37fdb5419e89a0ea168639c636cd44",
     "reviewRequestedAt": "2026-07-12T22:02:39.443Z",
-    "reviewSpawnedAt": "2026-07-12T22:51:29.404Z"
+    "reviewSpawnedAt": "2026-07-13T05:15:48.073Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/.pan/review/agent-pan-1232-review-4543e2d6/security.md",
+        "atCommit": "4543e2d6ac37fdb5419e89a0ea168639c636cd44"
+      },
+      "correctness": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/.pan/review/agent-pan-1232-review-4543e2d6/correctness.md",
+        "atCommit": "4543e2d6ac37fdb5419e89a0ea168639c636cd44"
+      },
+      "performance": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/.pan/review/agent-pan-1232-review-4543e2d6/performance.md",
+        "atCommit": "4543e2d6ac37fdb5419e89a0ea168639c636cd44"
+      },
+      "requirements": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/.pan/review/agent-pan-1232-review-4543e2d6/requirements.md",
+        "atCommit": "4543e2d6ac37fdb5419e89a0ea168639c636cd44"
+      }
+    }
   },
   "closeOut": {
     "usage": {
@@ -254,9 +301,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 22860399,
-            "output": 93709,
-            "cacheRead": 20601088,
+            "input": 35248408,
+            "output": 119935,
+            "cacheRead": 31391360,
             "cacheWrite": 0
           }
         }
@@ -269,15 +316,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 22860399,
-          "output": 93709,
-          "cacheRead": 20601088,
+          "input": 35248408,
+          "output": 119935,
+          "cacheRead": 31391360,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 24.408369,
-        "pricingAsOf": "2026-07-12T22:51:40.460Z"
+        "usd": 38.57897,
+        "pricingAsOf": "2026-07-13T05:20:14.944Z"
       }
     },
     "merges": [
