@@ -1,0 +1,280 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-13T03:20:53Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2616: closed-issue reaper is blind to Linear-tracked issues — isTrackerIssueClosed returns false for any non-GitHub issue",
+    "updated": "2026-07-13T13:40:15.048Z"
+  },
+  "plan": {
+    "id": "pan-2616",
+    "title": "closed-issue reaper is blind to Linear-tracked issues — isTrackerIssueClosed returns false for any non-GitHub issue",
+    "status": "approved",
+    "uid": "d307044f-bd2a-4a47-8f93-3d4fb2169331",
+    "author": "agent:claude-fable-5",
+    "sequence": 5,
+    "created": "2026-07-13T03:20:53Z",
+    "updated": "2026-07-13T13:40:15.048Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2616",
+        "label": "PAN-2616",
+        "type": "issue"
+      },
+      {
+        "uri": "overdeck-state:drafts/pan-2616.md",
+        "label": "PRD draft",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "cloister",
+      "reaper",
+      "linear",
+      "tracker"
+    ],
+    "narratives": {
+      "Problem": "isTrackerIssueClosed (src/lib/cloister/issue-closed.ts:27-31) short-circuits to false for any issue that does not resolve to a GitHub repo, so Linear-tracked issues (MIN-*, AUR-*) never look closed unless shadow state happens to say done/canceled. The closed-issue reaper therefore never reaps their residue: tmux sessions, workspaces, and Docker _devnet networks leak until manual cleanup (evidence 2026-07-12: MIN-729/861/862 Done in Linear, myn-feature-min-*_devnet networks persisted for days).",
+      "Proposal": "Add a Linear branch to isTrackerIssueClosed mirroring the GitHub branch: when the issue's project resolves to the Linear tracker AND a configured project, query the Linear API through the existing LinearTracker adapter (client via createTracker({type:'linear'}) with getLinearApiKey() fallback), map normalized state 'closed' (Linear completed/canceled) to closed, guard on issue.ref equality against fuzzy search, bound the lookup with a 10s Effect.timeout, resolve every ambiguous outcome to false, and cache all outcomes for the existing 5-minute TTL. Full decision rules and before/after snippets are in the PRD draft (drafts/pan-2616.md on overdeck-state).",
+      "NonGoals": "- No Rally or GitLab closed-detection support; those tracker types keep returning false\n- No changes to shadow-state writing at merge/close time (rejected alternative)\n- No changes to isIssueClosed ordering, reconcileClosedIssueAgents, reapIssueResidue, or cache TTL semantics\n- No new configuration surface; existing Linear key sources only (config.yaml trackerKeys.linear, LINEAR_API_KEY, ~/.overdeck.env)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose the direct Linear API check in isTrackerIssueClosed over the shadow-state-write alternative offered by the issue.",
+        "rationale": "Shadow-state writes only cover Overdeck-initiated closes; the evidence issues were closed directly in the Linear UI, so the tracker check must observe external closes."
+      },
+      {
+        "summary": "Gate the Linear lookup on resolveTrackerTypeSync === 'linear' AND resolveProjectFromIssueSync non-null.",
+        "rationale": "resolveTrackerTypeSync falls back to 'linear' for unknown prefixes; requiring a configured project prevents fuzzy Linear API searches for junk IDs and preserves current false behavior for rally/gitlab/unknown."
+      },
+      {
+        "summary": "Resolve the Linear client via createTracker({type:'linear'}) first, falling back to getLinearApiKey() + new LinearTracker(key).",
+        "rationale": "createTracker covers config.yaml Settings key and LINEAR_API_KEY env; getLinearApiKey covers ~/.overdeck.env — the union covers all three key sources in the codebase."
+      },
+      {
+        "summary": "Require issue.ref case-insensitive equality with the requested issueId before reporting closed, bound the lookup with a 10s timeout, and resolve every error/ambiguity to false cached for the full TTL.",
+        "rationale": "LinearTracker.getIssue resolves identifiers via fuzzy searchIssues; the reaper is destructive, so false positives must be structurally impossible while false negatives only delay reaping by one patrol."
+      }
+    ],
+    "items": [
+      {
+        "id": "linear-closed-check",
+        "title": "Extend isTrackerIssueClosed with a Linear tracker branch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-13T03:20:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2616",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/issue-closed.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run build"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "build completes without circular-import failures"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/issue-closed.ts, replace the body of the !resolved.isGitHub short-circuit (lines 27-31) with a call to a new isLinearIssueClosed(issueId) helper whose result is cached in trackerClosedCache and returned. Implement the helper exactly per PRD WI-1: (1) return false unless resolveTrackerTypeSync(issueId) === 'linear' (src/lib/tracker-utils.ts) and resolveProjectFromIssueSync(issueId) (src/lib/projects.ts) is non-null; (2) build the tracker via createTracker({ type: 'linear' }) (src/lib/tracker/factory.ts) inside try/catch, falling back to getLinearApiKey() (src/lib/shadow-utils.ts) + new LinearTracker(key) (src/lib/tracker/linear.ts), returning false when no key resolves; (3) run tracker.getIssue(issueId) with Effect.timeout('10 seconds') via Effect.runPromise; (4) return issue.state === 'closed' && issue.ref?.toUpperCase() === issueId.toUpperCase(); (5) catch all errors (including timeout and IssueNotFoundError) and return false. Do not modify isIssueClosed, the GitHub branches, the cache structure, or TRACKER_CLOSED_CACHE_TTL_MS. No sync child-process calls."
+        },
+        "items": [
+          {
+            "id": "linear-closed-check.ac1",
+            "title": "Given a Linear-tracked issue whose mocked/normalized tracker state is 'closed' (Linear completed or canceled), isTrackerIssueClosed returns true and caches the verdict in trackerClosedCache",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-closed-check.ac2",
+            "title": "Given no Linear API key resolvable from createTracker or getLinearApiKey, isTrackerIssueClosed returns false without invoking tracker.getIssue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-closed-check.ac3",
+            "title": "Given an issue resolving to rally/gitlab tracker type or to no configured project, isTrackerIssueClosed returns false without constructing a Linear client (preserves pre-change behavior)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-closed-check.ac4",
+            "title": "Given the Linear lookup errors, exceeds the 10-second timeout, or returns an issue whose ref differs case-insensitively from the requested id, isTrackerIssueClosed returns false and caches false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-closed-check.ac5",
+            "title": "npm run typecheck exits 0 and npm run build exits 0, demonstrating the new tracker-factory import produces no type errors and no circular ESM import failures",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "linear-closed-tests",
+        "title": "Unit tests for the Linear closed-detection branch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-13T03:20:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-2616",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/__tests__/issue-closed.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/issue-closed.test.ts"
+          ],
+          "expected_outputs": [
+            "issue-closed.test.ts suite passes with new Linear-branch tests and all pre-existing GitHub-path tests green"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend src/lib/cloister/__tests__/issue-closed.test.ts following its existing vi.hoisted + vi.mock pattern. Add resolveTrackerTypeSync to the existing ../../../lib/tracker-utils.js mock, and add mocks for ../../../lib/projects.js (resolveProjectFromIssueSync), ../../../lib/tracker/factory.js (createTracker), ../../../lib/tracker/linear.js (LinearTracker), and ../../../lib/shadow-utils.js (getLinearApiKey). Cover the seven cases from PRD WI-2: closed-state true; no-key false without getIssue; rally-type and null-project false without client construction; TTL cache hit then re-query after advancing past TRACKER_CLOSED_CACHE_TTL_MS using vi.useFakeTimers()/vi.setSystemTime() (never real waits — repo fake-timers rule); getIssue rejection false; ref-mismatch false. Keep all existing GitHub-path tests passing unchanged; call clearIssueClosedCache() in beforeEach as the file already does. No network access anywhere."
+        },
+        "items": [
+          {
+            "id": "linear-closed-tests.ac1",
+            "title": "A test asserts a mocked Linear issue with normalized state 'closed' and matching ref produces true from isTrackerIssueClosed, with zero real network calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-closed-tests.ac2",
+            "title": "Given the missing-key, rally-tracker-type, unresolved-project, getIssue-error, and ref-mismatch paths, isTrackerIssueClosed returns false in each, and gated paths never invoke getIssue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-closed-tests.ac3",
+            "title": "Given fake timers, a second call within TRACKER_CLOSED_CACHE_TTL_MS returns the cached verdict without a second getIssue call, then a call after the TTL re-queries the tracker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-closed-tests.ac4",
+            "title": "The full issue-closed.test.ts suite passes, including every pre-existing GitHub-path and shadow-state test unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reaper-docs-linear",
+        "title": "Document Linear coverage in the reaper-backstop docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-13T03:20:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2616",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/WORKSPACE-CONTAINERS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Linear' docs/WORKSPACE-CONTAINERS.md"
+          ],
+          "expected_outputs": [
+            "the reaper-backstop paragraph mentions Linear-tracked issues and the false-on-failure posture"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Update the reaper-backstop paragraph in docs/WORKSPACE-CONTAINERS.md (currently around line 117, the bullet describing reconcileClosedIssueAgents → reapIssueResidue) so it states that closed detection consults the external tracker for both GitHub- and Linear-tracked issues (Linear completed/canceled state types count as closed), and that Linear API failures or timeouts never cause reaping — ambiguous outcomes read as not-closed. No other doc surface documents isTrackerIssueClosed; CLAUDE.md needs no change."
+        },
+        "items": [
+          {
+            "id": "reaper-docs-linear.ac1",
+            "title": "The docs/WORKSPACE-CONTAINERS.md reaper-backstop paragraph states closed detection covers GitHub- and Linear-tracked issues, naming completed/canceled as the Linear closed states",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reaper-docs-linear.ac2",
+            "title": "The same paragraph covers the false-on-failure posture: Linear API errors or timeouts read as not-closed and never trigger reaping",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "linear-closed-check",
+        "to": "linear-closed-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "linear-closed-check",
+        "to": "reaper-docs-linear",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-13-PAN-2616-closed-issue-reaper-is-blind-to-linear-tracked-issues-istrackerissueclosed-returns-false-for-any-non-github-issue.vbrief.json"
+    }
+  },
+  "status": "active"
+}
