@@ -46,6 +46,11 @@
       "timestamp": "2026-07-13T15:33:32.580Z",
       "reason": "end",
       "note": "Addressed feedback: fixed flaky verification timeouts from ignored Vitest v4 fork config; npm test/typecheck/lint pass"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T15:33:36.254Z"
     }
   ],
   "feedback": [],
@@ -115,7 +120,7 @@
     "recordedAt": "2026-07-13T15:33:26.736Z"
   },
   "created": "2026-07-10T21:05:49.847Z",
-  "updated": "2026-07-13T15:33:34.676Z",
+  "updated": "2026-07-13T15:33:36.263Z",
   "pipeline": {
     "issueId": "PAN-2229",
     "reviewStatus": "reviewing",
@@ -313,8 +318,8 @@
       }
     }
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "recoveryTrips": [
     {
       "issue": "PAN-2229",
