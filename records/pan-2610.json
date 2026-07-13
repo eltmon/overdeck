@@ -45,7 +45,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T22:50:33.242Z",
-  "updated": "2026-07-13T03:19:17.065Z",
+  "updated": "2026-07-13T03:53:37.762Z",
   "pipeline": {
     "issueId": "PAN-2610",
     "reviewStatus": "failed",
@@ -54,7 +54,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T03:19:17.032Z",
+    "updatedAt": "2026-07-13T03:53:37.729Z",
     "reviewNotes": "Verification failed at typecheck",
     "verificationNotes": "Verification FAILED at typecheck (112ms):\n\nnpm error code ENOENT\nnpm error syscall open\nnpm error path /home/eltmon/Projects/overdeck/workspaces/package.json\nnpm error errno -2\nnpm error enoent Could not read package.json: Error: ENOENT: no such file or directory, open '/home/eltmon/Projects/overdeck/workspaces/package.json'\nnpm error enoent This is related to npm not being able to find a file.\nnpm error enoent\nnpm error A complete log of this run can be found in: /home/eltmon/.npm/_logs/2026-07-13T02_52_19_616Z-debug-0.log\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2620",
@@ -78,9 +78,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 710185,
-            "output": 2037,
-            "cacheRead": 623616,
+            "input": 745751,
+            "output": 2126,
+            "cacheRead": 658176,
             "cacheWrite": 0
           }
         }
@@ -99,15 +99,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 710185,
-          "output": 2037,
-          "cacheRead": 623616,
+          "input": 745751,
+          "output": 2126,
+          "cacheRead": 658176,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 20.933706,
-        "pricingAsOf": "2026-07-13T03:19:17.064Z"
+        "usd": 20.958686,
+        "pricingAsOf": "2026-07-13T03:53:37.761Z"
       }
     },
     "merges": [
