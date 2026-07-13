@@ -167,17 +167,17 @@
     "recordedAt": "2026-07-13T11:20:10.124Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T11:21:17.605Z",
+  "updated": "2026-07-13T11:21:48.092Z",
   "pipeline": {
     "issueId": "PAN-2596",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T11:21:17.532Z",
+    "updatedAt": "2026-07-13T11:21:47.823Z",
     "inspectNotes": "Bead server-upload-allowlist ack: validateUploadPayload correctly gates UTF-8 text extensions, PDF %PDF- magic prefix, and disallowed/extension-less types with 400s naming the mismatch, while preserving image magic-byte validation and <uuid><ext> naming; non-image files get <uuid>-<sanitized-name><ext>. All 5 ACs verified against diff + accompanying unit tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2634",
     "lastVerifiedCommit": "991f28dcac2af9f4dd0da07e5bcd29f2c808d653",
@@ -263,9 +263,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1563904,
-            "output": 211759,
-            "cacheRead": 94157056,
+            "input": 1573188,
+            "output": 213731,
+            "cacheRead": 95149312,
             "cacheWrite": 0
           }
         }
@@ -302,15 +302,15 @@
           "cacheWrite": 85508
         },
         "custom/kimi-k2.7-code": {
-          "input": 1563904,
-          "output": 211759,
-          "cacheRead": 94157056,
+          "input": 1573188,
+          "output": 213731,
+          "cacheRead": 95149312,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 57.180391,
-        "pricingAsOf": "2026-07-13T11:21:17.602Z"
+        "usd": 57.385629,
+        "pricingAsOf": "2026-07-13T11:21:48.078Z"
       }
     },
     "merges": [
