@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T22:33:37.108Z",
-  "updated": "2026-07-13T08:59:19.495Z",
+  "updated": "2026-07-13T08:59:20.894Z",
   "pipeline": {
     "issueId": "PAN-2602",
     "reviewStatus": "pending",
@@ -99,8 +99,8 @@
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "sync-local-write-detection": "running",
     "branch-ahead-signal": "running",
