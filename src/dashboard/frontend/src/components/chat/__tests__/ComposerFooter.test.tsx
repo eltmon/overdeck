@@ -810,6 +810,27 @@ describe('ComposerFooter attachments', () => {
     });
   });
 
+  it('renders file chips with name, size, and status for non-image attachments', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ path: '/tmp/overdeck-attached.md' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    render(<ComposerFooter conversation={conversation} />);
+
+    const file = new File(['# notes content'], 'notes.md', { type: 'text/markdown' });
+    const input = screen.getByTestId('composer-attach-input');
+
+    fireEvent.change(input, { target: { files: [file] } });
+
+    expect(await screen.findByText('notes.md')).toBeInTheDocument();
+    expect(screen.getByText(/Uploaded/)).toBeInTheDocument();
+    expect(screen.getByText('· 15 B')).toBeInTheDocument();
+  });
+
   it('drops images on non-vision models while still allowing text attachments', async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockImplementation(async (input) => {

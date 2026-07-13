@@ -11,7 +11,7 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { AlertCircle, Mic, MicOff, Paperclip, Scissors, SendHorizontal, X, Loader2 } from 'lucide-react';
+import { AlertCircle, FileText, Mic, MicOff, Paperclip, Scissors, SendHorizontal, X, Loader2 } from 'lucide-react';
 import type { ClipboardEvent, ChangeEvent, DragEvent } from 'react';
 import { toast } from 'sonner';
 import type { LexicalEditor } from 'lexical';
@@ -66,6 +66,14 @@ type DeliverAs = 'auto' | 'steer' | 'follow_up';
 
 function isPiConversation(conversation: Conversation): boolean {
   return conversation.harness === 'ohmypi' || conversation.harness === 'pi';
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.min(Math.floor(Math.log10(bytes) / 3), units.length - 1);
+  const value = bytes / Math.pow(1000, i);
+  return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -548,13 +556,18 @@ export function ComposerFooter({
                   {attachment.previewUrl ? (
                     <img src={attachment.previewUrl} alt={attachment.file.name} className={styles.composerImageThumb} />
                   ) : (
-                    <div className={styles.composerImageThumb} title={attachment.file.name} />
+                    <div className={`${styles.composerImageThumb} ${styles.composerFileThumb}`} title={attachment.file.name}>
+                      <FileText size={16} />
+                    </div>
                   )}
                   <div className={styles.composerImageMeta}>
                     <span className={styles.composerImageName}>{attachment.file.name}</span>
                     <span className={attachment.error ? styles.composerImageError : styles.composerImageStatus}>
                       {isUploading ? <Loader2 size={12} className={styles.spinner} /> : null}
                       {statusLabel}
+                      {attachment.kind === 'file' && !attachment.error && (
+                        <span className={styles.composerFileSize}>· {formatFileSize(attachment.file.size)}</span>
+                      )}
                     </span>
                   </div>
                   <button

@@ -4364,6 +4364,19 @@
   color: var(--foreground);
 }
 
+.composerFileThumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+
+.composerFileSize {
+  margin-left: 4px;
+  color: var(--muted-foreground);
+}
+
 /* Spinner animation for uploading images */
 @keyframes spin {
   from { transform: rotate(0deg); }
