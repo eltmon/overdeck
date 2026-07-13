@@ -16,22 +16,44 @@
   ],
   "feedback": [],
   "created": "2026-07-12T22:33:37.108Z",
-  "updated": "2026-07-13T11:40:06.781Z",
+  "updated": "2026-07-13T11:41:22.872Z",
   "pipeline": {
     "issueId": "PAN-2602",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T07:01:32.606Z",
-    "inspectNotes": "Bead beads-rollup-service ack: extractIssueLabels() now gates bare word-number labels through project.issuePrefixes, preventing phase-N labels from creating spurious rollups; tests cover phase exclusion and workspace: label mapping."
+    "updatedAt": "2026-07-13T11:41:22.823Z",
+    "inspectNotes": "Bead beads-rollup-service ack: extractIssueLabels() now gates bare word-number labels through project.issuePrefixes, preventing phase-N labels from creating spurious rollups; tests cover phase exclusion and workspace: label mapping.",
+    "reviewRequestedAt": "2026-07-13T11:41:22.124Z",
+    "reviewSpawnedAt": "2026-07-13T11:41:22.823Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 327529,
+            "output": 1635,
+            "cacheRead": 209536,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.5": {
+            "input": 7450281,
+            "output": 14466,
+            "cacheRead": 7300992,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 650237,
+            "output": 2460,
+            "cacheRead": 564992,
+            "cacheWrite": 0
+          }
+        },
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
             "input": 271,
@@ -58,14 +80,32 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 497222,
-            "output": 111641,
-            "cacheRead": 39351296,
+            "input": 3167433,
+            "output": 498960,
+            "cacheRead": 238704896,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
+        "openai/codex-auto-review": {
+          "input": 327529,
+          "output": 1635,
+          "cacheRead": 209536,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.5": {
+          "input": 7450281,
+          "output": 14466,
+          "cacheRead": 7300992,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 650237,
+          "output": 2460,
+          "cacheRead": 564992,
+          "cacheWrite": 0
+        },
         "anthropic/claude-haiku-4-5": {
           "input": 271,
           "output": 200,
@@ -85,15 +125,15 @@
           "cacheWrite": 120513
         },
         "custom/kimi-k2.7-code": {
-          "input": 497222,
-          "output": 111641,
-          "cacheRead": 39351296,
+          "input": 3167433,
+          "output": 498960,
+          "cacheRead": 238704896,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 59.639459,
-        "pricingAsOf": "2026-07-13T07:01:32.721Z"
+        "usd": 107.327529,
+        "pricingAsOf": "2026-07-13T11:41:22.863Z"
       }
     },
     "merges": [],
