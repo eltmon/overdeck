@@ -45,6 +45,17 @@ temporary database, and compares local Dolt, remote Dolt, and derived JSONL. It
 does not import, push, delete, or select a winner. Review and approve the report
 before writing `beads-cutover.json`.
 
+You may include additional local `.beads` stores with a repeatable `--store
+<name>=<path>` flag — for example, `--store frontend=/path/to/frontend --store
+api=/path/to/api`. Each named store is read with `bd list --all --json` from the
+given path and compared as an additional source. Reserved names (`local-dolt`,
+`remote-dolt`, `state-jsonl`) are rejected.
+
+If `refs/dolt/data` has not been published for the project, the remote Dolt
+source is recorded as 0 records with a `refs/dolt/data not published` note
+instead of failing the reconcile. This lets you audit local and extra stores
+before the first push.
+
 For the schema transition, unify the local home first. On exactly one designated
 migrator run `BD_ALLOW_REMOTE_MIGRATE=1 bd migrate`, then publish the reviewed
 result with `bd dolt push`. Other machines adopt the remote schema with

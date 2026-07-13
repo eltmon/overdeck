@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { compareBeadsSources, reportMarkdown } from '../../../../src/lib/beads/reconcile.js';
+import { compareBeadsSources, reconcileBeads, reportMarkdown } from '../../../../src/lib/beads/reconcile.js';
 
 describe('beads reconciliation inventory', () => {
   it('accounts for identical, one-sided, conflicting, and scope-excluded records', () => {
@@ -73,9 +73,82 @@ describe('beads reconciliation inventory', () => {
     expect(report).toContain('## Summary by classification');
     expect(report).toContain('- identical: 1');
     expect(report).toContain('- metadata-drift: 1');
+    expect(report).toContain('## Source record counts');
+    expect(report).toContain('- local-dolt:');
+    expect(report).toContain('- remote-dolt:');
+    expect(report).toContain('- state-jsonl:');
     expect(report).toContain('## Full inventory');
     expect(report).toContain('| same | identical |');
     expect(report).toContain('| drift | metadata-drift |');
     expect(report).toContain('*metadata-drift* means the only differing field is `updated_at`');
+  });
+
+  it('includes extra stores in comparison and source counts', () => {
+    const inventory = compareBeadsSources({
+      'local-dolt': [{ id: 'shared', title: 'Shared' }],
+      'remote-dolt': [{ id: 'shared', title: 'Shared' }],
+      'state-jsonl': [{ id: 'shared', title: 'Shared' }],
+      'extra': [{ id: 'shared', title: 'Shared' }],
+    });
+    expect(inventory.counts).toHaveProperty('extra', 1);
+    expect(inventory.differences[0].classification).toBe('identical');
+    expect(inventory.differences[0].presentIn).toContain('extra');
+  });
+
+  it('classifies records missing from any compared source as one-sided regardless of source count', () => {
+    const inventory = compareBeadsSources({
+      'local-dolt': [{ id: 'partial', title: 'Partial' }],
+      'remote-dolt': [{ id: 'partial', title: 'Partial' }],
+      'state-jsonl': [{ id: 'partial', title: 'Partial' }],
+      'extra': [],
+    });
+    expect(inventory.differences[0].classification).toBe('one-sided');
+  });
+
+  it('rejects reserved extra store names during reconcile', async () => {
+    await expect(
+      reconcileBeads({
+        projectKey: 'test',
+        projectPath: '/tmp',
+        stateRoot: '/tmp',
+        remoteUrl: 'https://example.com/repo.git',
+        extraStores: [{ name: 'local-dolt', path: '/tmp' }],
+        execute: async () => '',
+      }),
+    ).rejects.toThrow('Reserved extra store name: local-dolt');
+  });
+
+  it('degrades to a zero-record remote when refs/dolt/data is not published', async () => {
+    const { mkdir, writeFile } = await import('node:fs/promises');
+    const { dirname } = await import('node:path');
+    const calls: { file: string; args: readonly string[]; cwd: string }[] = [];
+    const execute = async (file: string, args: readonly string[], cwd: string) => {
+      calls.push({ file, args, cwd });
+      if (file === 'git' && args[0] === 'fetch') {
+        const error = new Error("fatal: couldn't find remote ref refs/dolt/data") as Error & { stderr?: string };
+        error.stderr = "fatal: couldn't find remote ref refs/dolt/data";
+        throw error;
+      }
+      if (file === 'bd' && args[0] === 'export') {
+        const outPath = args[3];
+        await mkdir(dirname(outPath), { recursive: true });
+        await writeFile(outPath, '');
+        return '';
+      }
+      if (file === 'bd' && args[0] === 'vc') return 'Commit: abc1234';
+      if (file === 'bd' && args[0] === 'list') return '[]';
+      return '';
+    };
+    const result = await reconcileBeads({
+      projectKey: 'test',
+      projectPath: '/tmp',
+      stateRoot: '/tmp',
+      remoteUrl: 'https://example.com/repo.git',
+      execute,
+    });
+    expect(result.inventory.counts['remote-dolt']).toBe(0);
+    const report = await import('node:fs/promises').then(({ readFile }) => readFile(result.reportPath, 'utf8'));
+    expect(report).toContain('remote-dolt: 0 (refs/dolt/data not published)');
+    expect(report).toContain('not published');
   });
 });
