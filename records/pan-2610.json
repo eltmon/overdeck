@@ -46,6 +46,16 @@
       "reason": "feedback",
       "note": "[2026-07-13T04:07Z] review-agent → FAILED — seq 2",
       "timestamp": "2026-07-13T04:07:06.388Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-13T04:50Z] review-agent → FAILED — seq 3",
+      "timestamp": "2026-07-13T04:50:29.884Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-13T05:16Z] review-agent → FAILED — seq 4",
+      "timestamp": "2026-07-13T05:16:25.004Z"
     }
   ],
   "feedback": [
@@ -55,10 +65,24 @@
       "outcome": "failed",
       "timestamp": "2026-07-13T04:07:06Z",
       "markdownBody": "# Review FAILED for PAN-2610\n\nVerification failed at typecheck\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2610 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 3,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-07-13T04:50:29Z",
+      "markdownBody": "# Review FAILED for PAN-2610\n\nVerification failed at typecheck\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2610 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 4,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-07-13T05:16:25Z",
+      "markdownBody": "# Review FAILED for PAN-2610\n\nVerification failed at typecheck\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2610 -m \"Fixed review issues\"`"
     }
   ],
   "created": "2026-07-12T22:50:33.242Z",
-  "updated": "2026-07-13T04:36:11.293Z",
+  "updated": "2026-07-13T05:22:38.147Z",
   "pipeline": {
     "issueId": "PAN-2610",
     "reviewStatus": "failed",
@@ -67,7 +91,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T04:36:11.262Z",
+    "updatedAt": "2026-07-13T05:22:38.116Z",
     "reviewNotes": "Verification failed at typecheck",
     "verificationNotes": "Verification FAILED at typecheck (112ms):\n\nnpm error code ENOENT\nnpm error syscall open\nnpm error path /home/eltmon/Projects/overdeck/workspaces/package.json\nnpm error errno -2\nnpm error enoent Could not read package.json: Error: ENOENT: no such file or directory, open '/home/eltmon/Projects/overdeck/workspaces/package.json'\nnpm error enoent This is related to npm not being able to find a file.\nnpm error enoent\nnpm error A complete log of this run can be found in: /home/eltmon/.npm/_logs/2026-07-13T02_52_19_616Z-debug-0.log\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2620",
@@ -120,7 +144,7 @@
       },
       "costAtCloseOut": {
         "usd": 21.095178,
-        "pricingAsOf": "2026-07-13T04:36:11.292Z"
+        "pricingAsOf": "2026-07-13T05:22:38.146Z"
       }
     },
     "merges": [
