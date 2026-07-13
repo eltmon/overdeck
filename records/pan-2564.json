@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-2564",
   "schemaVersion": 2,
-  "created": "2026-07-12T17:54:45.646Z",
-  "updated": "2026-07-12T17:54:47.349Z",
-  "pipeline": {
-    "issueId": "PAN-2564",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-12T17:54:45.646Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -26,6 +9,77 @@
       "timestamp": "2026-07-12T17:54:45.645Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-12T17:54:45.646Z",
+  "updated": "2026-07-13T05:20:15.958Z",
+  "pipeline": {
+    "issueId": "PAN-2564",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-13T05:17:44.963Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 23824,
+            "output": 56596,
+            "cacheRead": 5105984,
+            "cacheWrite": 198579
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-fable-5": {
+          "input": 23824,
+          "output": 56596,
+          "cacheRead": 5105984,
+          "cacheWrite": 198579
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 10.656266,
+        "pricingAsOf": "2026-07-13T05:17:45.009Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
-  "model": "claude-fable-5"
+  "model": "kimi-k2.7-code",
+  "statusOverrides": {
+    "migration-gate": "running",
+    "beads-home": "running",
+    "config-standardize": "running"
+  },
+  "swarm": {
+    "slotAssignments": [
+      {
+        "slotIndex": 1,
+        "itemId": "migration-gate",
+        "agentId": "agent-pan-2564-slot-1",
+        "branch": "feature/pan-2564-slot-1",
+        "assignedAt": "2026-07-13T05:17:44.229Z"
+      },
+      {
+        "slotIndex": 2,
+        "itemId": "beads-home",
+        "agentId": "agent-pan-2564-slot-2",
+        "branch": "feature/pan-2564-slot-2",
+        "assignedAt": "2026-07-13T05:17:54.403Z"
+      },
+      {
+        "slotIndex": 3,
+        "itemId": "config-standardize",
+        "agentId": "agent-pan-2564-slot-3",
+        "branch": "feature/pan-2564-slot-3",
+        "assignedAt": "2026-07-13T05:20:15.242Z"
+      }
+    ]
+  }
 }
