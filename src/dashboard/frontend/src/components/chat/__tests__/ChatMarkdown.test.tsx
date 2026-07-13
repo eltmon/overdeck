@@ -115,6 +115,10 @@ describe('ChatMarkdown file links', () => {
   });
 
   it('keeps Streamdown-rendered external links safe and blocks scriptable hrefs', async () => {
+    // Preload streamdown so the React.lazy StreamdownRenderer resolves
+    // synchronously and we actually exercise the streamdown path.
+    await import('streamdown');
+
     const { rerender } = renderMarkdown(<ChatMarkdown text="Visit [site](https://example.com)." cwd="/tmp/project" />, true);
 
     const external = await screen.findByRole('link', { name: 'site' });

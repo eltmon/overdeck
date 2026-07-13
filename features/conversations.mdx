@@ -47,6 +47,32 @@ click:
   alt="The composer model and harness picker, showing Claude Code / Pi / Codex harnesses over Anthropic and other provider models with per-million pricing"
 />
 
+## Attachments
+
+You can attach files to a composer message in three ways:
+
+- **Paperclip button** — click the attach icon in the composer toolbar and select one or more files.
+- **Drag and drop** — drop files directly onto the composer area.
+- **Paste** — paste an image from your clipboard (screenshots, copied files, etc.).
+
+Supported attachments include images (`png`, `jpg`, `gif`, `webp`) and text/code/PDF
+files such as `md`, `json`, `ts`, `py`, `log`, `csv`, `yaml`, and `pdf`. Files are
+uploaded to the conversation's private attachment store and referenced as
+`@/attachments/conv/<path>` in the message the agent receives.
+
+### Vision gating
+
+Image attachments are only sent to models that support vision. If you attach an
+image while a text-only model is selected, the image is dropped with a clear
+notice and any text/code/PDF attachments still go through. Switch to a
+vision-capable model (for example, MiMo V2.5) to include images.
+
+### File size and limits
+
+- Maximum attachment size: **5 MB** per file.
+- Maximum message length: **50,000** characters.
+- Unsupported or binary file types are rejected at selection time with a toast.
+
 ## Why hand off?
 
 A conversation accumulates context as it works: dead ends it already ruled out,
