@@ -491,7 +491,11 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         // poller stops emitting events for non-running agents, so without this
         // a paused or stopped agent would keep showing INPUT/AskUserQuestion
         // forever from the operator's perspective.
-        if (event.payload.status !== 'running' && event.payload.status !== 'starting') {
+        // PAN-2633 — an idle-alive agent (stopped-shaped status, live tmux pane)
+        // is the archetypal awaiting-operator state and must keep its pending-input
+        // payload; gate the wipe on the liveness flag carried in the event.
+        const sessionAlive = event.payload.hasLiveTmuxSession === true
+        if (event.payload.status !== 'running' && event.payload.status !== 'starting' && !sessionAlive) {
           delete base['hasPendingQuestion']
           delete base['pendingQuestionCount']
           delete base['pendingQuestionPrompt']
