@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T08:48:04.494Z",
-  "updated": "2026-07-13T20:29:56.063Z",
+  "updated": "2026-07-13T20:32:46.289Z",
   "pipeline": {
     "issueId": "PAN-2633",
     "reviewStatus": "pending",
@@ -31,8 +31,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T20:29:55.990Z",
-    "inspectNotes": "Bead reducer-liveness-gate ack: commit 2e9cd0e0 merges e558a54701, which threads hasLiveTmuxSession through emitters (shared.ts, lifecycle-stop.ts, main.ts, deacon-main.ts) — a separate bead complementary to this one. No changes to event-reducers.ts or its tests; reducer behavior verified against AC1-4 in the prior review is unaffected and still holds."
+    "updatedAt": "2026-07-13T20:32:46.237Z",
+    "inspectNotes": "Bead reducer-liveness-gate ack: commit df35ff8b merges 438a42c8f7, which adds shouldForceReemitPendingInput to the enrichment poller (agent-enrichment-service.ts) — the convergence-guarantee bead, separate from this ones scope. No changes to event-reducers.ts or its tests; reducer behavior verified against AC1-4 remains unaffected and still holds."
   },
   "closeOut": {
     "usage": {
@@ -47,17 +47,17 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 17969,
-            "output": 2479,
-            "cacheRead": 1024024,
-            "cacheWrite": 92275
+            "input": 18949,
+            "output": 3686,
+            "cacheRead": 1517799,
+            "cacheWrite": 100367
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 455333,
-            "output": 48226,
-            "cacheRead": 19773952,
+            "input": 467551,
+            "output": 50250,
+            "cacheRead": 21701632,
             "cacheWrite": 0
           }
         }
@@ -70,21 +70,21 @@
           "cacheWrite": 418542
         },
         "anthropic/claude-sonnet-5": {
-          "input": 17969,
-          "output": 2479,
-          "cacheRead": 1024024,
-          "cacheWrite": 92275
+          "input": 18949,
+          "output": 3686,
+          "cacheRead": 1517799,
+          "cacheWrite": 100367
         },
         "custom/kimi-k2.7-code": {
-          "input": 455333,
-          "output": 48226,
-          "cacheRead": 19773952,
+          "input": 467551,
+          "output": 50250,
+          "cacheRead": 21701632,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 23.686173,
-        "pricingAsOf": "2026-07-13T20:29:56.054Z"
+        "usd": 24.20515,
+        "pricingAsOf": "2026-07-13T20:32:46.279Z"
       }
     },
     "merges": [],
