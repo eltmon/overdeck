@@ -268,18 +268,18 @@
     "recordedAt": "2026-07-11T10:51:47.612Z"
   },
   "created": "2026-07-11T09:48:27.729Z",
-  "updated": "2026-07-12T23:04:45.644Z",
+  "updated": "2026-07-13T00:09:13.442Z",
   "pipeline": {
     "issueId": "PAN-1491",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-12T23:04:13.240Z",
-    "reviewNotes": "Review reset by deacon: no active review session after 503min",
+    "updatedAt": "2026-07-13T00:09:13.331Z",
+    "reviewNotes": "Review reset by deacon: no active review session after 65min",
     "verificationNotes": "Verification FAILED at test (127955ms):\n\nial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n- Spawning knowledge agent for PAN-2468...\n✔ Knowledge agent spawned: agent-pan-2468-knowledge\n- Spawning knowledge agent for PAN-2468...\n✖ Knowledge agent for PAN-2468 failed: No OKF bundle is configured for Overdeck. Run `/okf init` in this workspace to create or connect a knowledge bundle, then retry `pan knowledge PAN-2468`.\n- Spawning knowledge agent for PAN-2468...\n⚠ mnemos unavailable; spawning knowledge agent with built-in OKF search: release fetch failed\n- Spawning knowledge agent for PAN-2468...\n✔ Knowledge agent spawned: agent-pan-2468-knowledge\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| tests/unit/lib/overdeck/no-loss-matrix.test.ts > G3 no-loss matrix > AC1/AC2: every enumerated HTTP route is present in the matrix\n FAIL  |root| tests/unit/lib/overdeck/no-loss-matrix.test.ts > G3 no-loss matrix > AC1/AC2: every enumerated HTTP route is present in the matrix\nAssertionError: The following HTTP routes exist in the codebase but have no entry in the\nNO_LOSS_MATRIX.  Add each one to tests/unit/lib/overdeck/no-loss-matrix.ts\nwith an explicit disposition (READ/WRITE/AGGREGATE/RELOCATE/DELETE/OUT_OF_SCOPE)\nand a non-empty door/reason string.\n  missing: GET /api/projects/:projectKey/release-status: expected [ Array(1) ] to deeply equal []\n\n- Expected\n+ Received\n\n- []\n+ [\n+   \"GET /api/projects/:projectKey/release-status\",\n+ ]\n\n ❯ tests/unit/lib/overdeck/no-loss-matrix.test.ts:95:19\n     93|       'and a non-empty door/reason string.',\n     94|       ...missing.map(r => `  missing: ${r}`),\n     95|     ].join('\\n')).toEqual([]);\n       |                   ^\n     96|   });\n     97|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n",
     "inspectNotes": "Bead b3-weight-fn BLOCKED: commit d813b8b4 does not implement computeSubstrateBugWeight(criteria, stats) at all. The diff only adds optional weight/weightReason fields to the FlywheelSuggestion interface/schema in packages/contracts/src/flywheel.ts:180-190 — no status-multiplier logic, no normalizedDistance calculation, no compound-value field reading (medianMs/p95Ms), no insufficient_data short-circuit, and no reason-string generation exist anywhere in this commit. None of AC1-AC5 can be evaluated because the function under review is absent. This is the same d813b8b4 diff already submitted (and blocked) against bead b2-parse-criteria moments ago — it looks like the wrong commit is being routed to review requests, or the actual b3-weight-fn implementation commit has not landed yet. Required fix: identify and deliver the commit that actually adds computeSubstrateBugWeight, implementing per-criterion status multiplier (red=1.6x per AC1 example: 3*(1+0.6)), a status floor that dominates over raw normalized drift for red vs green (AC2), safe reading of a configured valueField from compound values with graceful fallback to normalizedDistance 0 + floor when the field is absent (AC3), a weight-0 + insufficient-telemetry-reason short circuit when all criteria are insufficient_data (AC4), and a reason string naming the highest-contributing criterion by label/status/value-vs-target (AC5).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1636",
@@ -346,9 +346,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 51298147,
-            "output": 179323,
-            "cacheRead": 47249536,
+            "input": 55945885,
+            "output": 201856,
+            "cacheRead": 51379968,
             "cacheWrite": 0
           }
         },
@@ -437,9 +437,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 54477285,
-          "output": 219968,
-          "cacheRead": 48813184,
+          "input": 59125023,
+          "output": 242501,
+          "cacheRead": 52943616,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -504,8 +504,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 134.228738,
-        "pricingAsOf": "2026-07-12T23:04:13.338Z"
+        "usd": 139.556474,
+        "pricingAsOf": "2026-07-13T00:09:13.397Z"
       }
     },
     "merges": [
