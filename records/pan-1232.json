@@ -301,21 +301,25 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-13T14:47:52.207Z"
+    },
+    {
+      "timestamp": "2026-07-13T14:54:15.135Z",
+      "reason": "end",
+      "note": "Fixed verification failure: added missing selectAgentsWithPendingProposedPlan mock to App.test.tsx. Root tests + full frontend suite green."
     }
   ],
   "feedback": [],
   "created": "2026-07-12T20:45:31.659Z",
-  "updated": "2026-07-13T14:50:47.947Z",
+  "updated": "2026-07-13T14:54:15.229Z",
   "pipeline": {
     "issueId": "PAN-1232",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-07-13T14:46:28.116Z",
-    "updatedAt": "2026-07-13T14:50:47.893Z",
+    "updatedAt": "2026-07-13T14:54:15.138Z",
     "reviewNotes": "Verification failed at test",
     "blockerReasons": [
       {
@@ -326,7 +330,7 @@
     ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2604",
     "lastVerifiedCommit": "069d838c4573bf647e7ba4715fc1a4ad485f6c30",
-    "reviewRequestedAt": "2026-07-13T14:46:28.116Z",
+    "reviewRequestedAt": "2026-07-13T14:54:15.137Z",
     "reviewSpawnedAt": "2026-07-13T14:47:44.734Z"
   },
   "closeOut": {
@@ -356,9 +360,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 227743,
-            "output": 19015,
-            "cacheRead": 5850624,
+            "input": 238381,
+            "output": 21699,
+            "cacheRead": 7322624,
             "cacheWrite": 0
           }
         }
@@ -377,15 +381,15 @@
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 582246,
-          "output": 53971,
-          "cacheRead": 27955200,
+          "input": 592884,
+          "output": 56655,
+          "cacheRead": 29427200,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 44.659481,
-        "pricingAsOf": "2026-07-13T14:50:47.946Z"
+        "usd": 44.960003,
+        "pricingAsOf": "2026-07-13T14:54:15.228Z"
       }
     },
     "merges": [
@@ -393,8 +397,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "tab-files": "completed",
     "tab-files.ac1": "completed",
