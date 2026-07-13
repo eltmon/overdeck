@@ -110,6 +110,27 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Install beads, Dolt, and ripgrep
+        run: |
+          BD_VERSION=1.1.0
+          curl -fsSL -o /tmp/bd.tar.gz "https://github.com/gastownhall/beads/releases/download/v${BD_VERSION}/beads_${BD_VERSION}_linux_amd64.tar.gz"
+          tar -xzf /tmp/bd.tar.gz -C /tmp
+          sudo install /tmp/bd /usr/local/bin/bd
+
+          DOLT_VERSION=1.84.0
+          curl -fsSL -o /tmp/dolt.tar.gz "https://github.com/dolthub/dolt/releases/download/v${DOLT_VERSION}/dolt-linux-amd64.tar.gz"
+          tar -xzf /tmp/dolt.tar.gz -C /tmp
+          sudo install /tmp/dolt-linux-amd64/bin/dolt /usr/local/bin/dolt
+
+          RG_VERSION=15.1.0
+          curl -fsSL -o /tmp/ripgrep.tar.gz "https://github.com/BurntSushi/ripgrep/releases/download/${RG_VERSION}/ripgrep-${RG_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+          tar -xzf /tmp/ripgrep.tar.gz -C /tmp
+          sudo install "/tmp/ripgrep-${RG_VERSION}-x86_64-unknown-linux-musl/rg" /usr/local/bin/rg
+
+          bd --version
+          dolt version
+          rg --version
+
       - name: Build
         run: bun run build
 

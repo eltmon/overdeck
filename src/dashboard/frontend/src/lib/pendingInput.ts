@@ -47,8 +47,17 @@ export function describePendingInput(kinds: ReadonlyArray<string> | undefined): 
  * that branched on only one of these drifted; everyone should use this.
  */
 export function isAwaitingInput(
-  agent: { hasPendingQuestion?: boolean; pendingInputCount?: number } | null | undefined,
+  agent: { id?: string; hasPendingQuestion?: boolean; pendingInputCount?: number } | null | undefined,
+  /**
+   * PAN-1520 (FR-6) — agent ids with a pending channel permission request
+   * (from `selectPendingPermissionAgentIds`). Permission requests live in a
+   * separate store slice from the enrichment-owned agent snapshot, so
+   * card-level surfaces must pass this set for a permission-only agent to
+   * light the indicator. Optional so payload-based callers keep working.
+   */
+  pendingPermissionAgentIds?: ReadonlySet<string>,
 ): boolean {
   if (!agent) return false;
-  return agent.hasPendingQuestion === true || (agent.pendingInputCount ?? 0) > 0;
+  if (agent.hasPendingQuestion === true || (agent.pendingInputCount ?? 0) > 0) return true;
+  return typeof agent.id === 'string' && pendingPermissionAgentIds?.has(agent.id) === true;
 }

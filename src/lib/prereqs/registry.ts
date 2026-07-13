@@ -10,6 +10,7 @@ import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import chalk from "chalk";
 import { Effect } from "effect";
 import { detectPlatform } from "../platform.js";
 
@@ -22,6 +23,7 @@ export const PREREQ_REGISTRY = {
   openInteractiveTerminal: ["ttyd"],
   enableHttps: ["mkcert", "docker", "traefik"],
   enableBeads: ["bd"],
+  runClaudeCodeHooks: ["jq"],
   useClaudeCodeRoutedAgents: [],
   useOxAgents: ["ox"],
 } as const;
@@ -35,6 +37,7 @@ export const INSTALLABLE_TOOLS: readonly PrereqTool[] = [
   "ttyd",
   "mkcert",
   "bd",
+  "jq",
   "ox",
 ];
 
@@ -91,6 +94,8 @@ export async function installTool(tool: PrereqTool): Promise<InstallResult> {
         return await installMkcert();
       case "bd":
         return await installBeads();
+      case "jq":
+        return await installJq();
       case "ox":
         return await installOx();
       default:
@@ -106,6 +111,53 @@ export async function installTool(tool: PrereqTool): Promise<InstallResult> {
       success: false,
       message: error instanceof Error ? error.message : String(error),
     };
+  }
+}
+
+/**
+ * Boot-time host-tool guarantee for `pan up`. tmux is fatal — no agent or
+ * conversation session runs without it, so a failed install exits the process.
+ * bd (beads) is best-effort — only the work pipeline needs it, so a failed
+ * install warns and boot continues. Already-present tools are silent no-ops.
+ */
+export async function ensureHostTools(): Promise<void> {
+  const tools: Array<{ tool: PrereqTool; label: string; fatal: boolean; manual: string }> = [
+    {
+      tool: "tmux",
+      label: "tmux",
+      fatal: true,
+      manual: "brew install tmux (macOS) or sudo apt-get install tmux (Linux)",
+    },
+    {
+      tool: "bd",
+      label: "beads (bd)",
+      fatal: false,
+      manual:
+        "brew install gastownhall/beads/bd (macOS) or run the beads install script (Linux) — the work pipeline needs it.",
+    },
+    {
+      tool: "jq",
+      label: "jq",
+      fatal: false,
+      manual:
+        "brew install jq (macOS) or sudo apt install jq (Linux) — the Claude Code hooks (auto-approve, live status, cost tracking) need it.",
+    },
+  ];
+  for (const { tool, label, fatal, manual } of tools) {
+    if (await isToolInstalled(tool)) continue;
+    console.log(chalk.yellow(`  ${label} not found. Installing...`));
+    const result = await installTool(tool);
+    if (result.success) {
+      console.log(chalk.green(`  ✓ ${result.message}`));
+      continue;
+    }
+    console.error(
+      fatal
+        ? chalk.red(`  ✗ Failed to install ${label}: ${result.message}`)
+        : chalk.yellow(`  ⚠ Failed to install ${label}: ${result.message}`),
+    );
+    console.error(chalk.dim(`  Install manually: ${manual}`));
+    if (fatal) process.exit(1);
   }
 }
 
@@ -204,6 +256,18 @@ async function installBeads(): Promise<InstallResult> {
     success: true,
     message: "beads installed via install script",
   };
+}
+
+async function installJq(): Promise<InstallResult> {
+  const plat = await Effect.runPromise(detectPlatform());
+  if (plat === "darwin") {
+    await execAsync("brew install jq", { timeout: 120000 });
+  } else {
+    await execAsync("sudo apt-get update && sudo apt-get install -y jq", {
+      timeout: 120000,
+    });
+  }
+  return { tool: "jq", success: true, message: "jq installed" };
 }
 
 async function installOx(): Promise<InstallResult> {

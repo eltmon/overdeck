@@ -46,6 +46,33 @@ const PLAN_ACTION_KEYSTROKES: Record<string, string> = {
   'reject-ultraplan': '3',
 };
 
+/**
+ * PAN-1520 (FR-4) — deliver a native plan-menu action to any tmux session
+ * (conversation or agent). The plan menu is answered with raw keystrokes
+ * (1/2/3/4), not a text message; `reject-feedback` follows the '4' keystroke
+ * with the operator's feedback through the normal message pipeline.
+ * Returns null on success, or an error string for an invalid action.
+ */
+export async function deliverPlanActionToSession(
+  sessionName: string,
+  action: string,
+  feedback: string,
+  deliveryMethod: 'auto' | 'channels' | 'tmux' = 'auto',
+): Promise<string | null> {
+  if (action === 'reject-feedback') {
+    await Effect.runPromise(sendRawKeystroke(sessionName, '4', 'plan-action-reject'));
+    if (feedback) {
+      await new Promise(r => setTimeout(r, 300));
+      await deliverAgentMessage(sessionName, feedback, 'plan-action-feedback', deliveryMethod);
+    }
+    return null;
+  }
+  const keystroke = PLAN_ACTION_KEYSTROKES[action];
+  if (!keystroke) return `Invalid action: ${action}`;
+  await Effect.runPromise(sendRawKeystroke(sessionName, keystroke, `plan-action-${action}`));
+  return null;
+}
+
 export function registerConversationControlAck(
   commandId: string,
   timeoutMs: number = CONTROL_ACK_TIMEOUT_MS,
@@ -175,19 +202,15 @@ export async function handleConversationPlanAction(
     }
     const action = typeof body['action'] === 'string' ? body['action'] : '';
     const feedback = typeof body['feedback'] === 'string' ? body['feedback'].trim() : '';
-    if (action === 'reject-feedback') {
-      await Effect.runPromise(sendRawKeystroke(conv.tmuxSession, '4', 'plan-action-reject'));
-      if (feedback) {
-        await new Promise(r => setTimeout(r, 300));
-        await deliverAgentMessage(conv.tmuxSession, feedback, 'plan-action-feedback', resolveConversationDeliveryMethod(conv));
-      }
-      return jsonResponse({ ok: true });
+    const error = await deliverPlanActionToSession(
+      conv.tmuxSession,
+      action,
+      feedback,
+      resolveConversationDeliveryMethod(conv),
+    );
+    if (error) {
+      return jsonResponse({ error }, { status: 400 });
     }
-    const keystroke = PLAN_ACTION_KEYSTROKES[action];
-    if (!keystroke) {
-      return jsonResponse({ error: `Invalid action: ${action}` }, { status: 400 });
-    }
-    await Effect.runPromise(sendRawKeystroke(conv.tmuxSession, keystroke, `plan-action-${action}`));
     return jsonResponse({ ok: true });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);

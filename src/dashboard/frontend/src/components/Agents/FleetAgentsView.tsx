@@ -5,7 +5,7 @@ import { isAgentProblemStatus, isAgentRunningStatus } from '../../lib/pipeline-s
 import { isAwaitingInput } from '../../lib/pendingInput';
 import { useSharedTick } from '../../lib/useSharedTick';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
-import { useDashboardStore, selectAgents, selectIssues } from '../../lib/store';
+import { useDashboardStore, selectAgents, selectIssues, selectPendingPermissionAgentIds } from '../../lib/store';
 import { cn } from '../../lib/utils';
 import type { Agent, Issue } from '../../types';
 import AgentCard, { type AgentCardRole } from '../primitives/AgentCard';
@@ -160,14 +160,14 @@ function stuckHours(agent: Agent, now: Date) {
   return Math.max(0, Math.floor((now.getTime() - sinceTime) / 3_600_000));
 }
 
-function verbBadgeForAgent(agent: Agent, now: Date): VerbBadgeProps {
+function verbBadgeForAgent(agent: Agent, now: Date, pendingPermissionAgentIds?: ReadonlySet<string>): VerbBadgeProps {
   if (agent.status === 'unknown' && agent.hasLiveTmuxSession === false) {
     return { variant: 'UNREACHABLE' };
   }
   if (isAgentProblemStatus(agent.status) || agent.troubled) {
     return { variant: 'STUCK · Nh', hours: stuckHours(agent, now) };
   }
-  if (isAwaitingInput(agent)) return { variant: 'INPUT' };
+  if (isAwaitingInput(agent, pendingPermissionAgentIds)) return { variant: 'INPUT' };
 
   switch (agent.role) {
     case 'plan':
@@ -295,6 +295,7 @@ function DropdownFilter({ label, selected, options, onToggle }: {
 export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: () => void } = {}) {
   const now = useSharedTick();
   const agents = useDashboardStore(selectAgents) as Agent[];
+  const pendingPermissionAgentIds = useDashboardStore(selectPendingPermissionAgentIds);
   const issues = useDashboardStore(selectIssues) as Issue[];
   const agentOutputById = useDashboardStore((state) => state.agentOutputById);
   const openIssue = useDashboardStore((state) => state.openIssue);
@@ -514,7 +515,7 @@ export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: (
                       { label: 'Last heard', value: lastHeard },
                     ]}
                     streamLines={output.slice(-16)}
-                    verbBadge={verbBadgeForAgent(agent, now)}
+                    verbBadge={verbBadgeForAgent(agent, now, pendingPermissionAgentIds)}
                     stuck={stuck}
                     stuckMessage={agent.lastFailureReason ?? agent.error ?? 'Agent requires attention.'}
                     onOpenIssue={agent.issueId ? () => openAgentIssue(agent.issueId!) : undefined}

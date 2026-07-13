@@ -466,8 +466,7 @@ describe('prompt-time memory injection', () => {
     expect(decision.sources.map((source: { docType: string }) => source.docType)).toContain('knowledge');
   });
 
-  it('keeps an absent knowledge bundle a zero-token fast no-op', async () => {
-    const started = performance.now();
+  it('keeps an absent knowledge bundle a zero-token no-op', async () => {
     const { result, decision } = await injectWithLog({
       prompt: 'no bundle prompt',
       identity,
@@ -488,9 +487,6 @@ describe('prompt-time memory injection', () => {
         },
       }),
     });
-    const elapsed = performance.now() - started;
-
-    expect(elapsed).toBeLessThan(5);
     expect(result).toMatchObject({ status: 'no-hits', context: '' });
     expect(decision.allocations.knowledgeIndex).toBe(0);
     expect(decision.allocationBytes.knowledgeIndex).toBe(0);

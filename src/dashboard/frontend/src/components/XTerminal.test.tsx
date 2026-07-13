@@ -30,11 +30,15 @@ vi.mock('@xterm/xterm', () => ({
       (this.constructor as typeof this.constructor & { instances: unknown[] }).instances.push(this);
     }
     wheelHandler: ((event: WheelEvent) => boolean) | null = null;
+    keyEventHandler: ((event: KeyboardEvent) => boolean) | null = null;
     onData(): { dispose(): void } { return { dispose() {} }; }
     onSelectionChange(): { dispose(): void } { return { dispose() {} }; }
     onResize(): { dispose(): void } { return { dispose() {} }; }
     attachCustomWheelEventHandler = vi.fn((handler: (event: WheelEvent) => boolean) => {
       this.wheelHandler = handler;
+    });
+    attachCustomKeyEventHandler = vi.fn((handler: (event: KeyboardEvent) => boolean) => {
+      this.keyEventHandler = handler;
     });
     getSelection(): string { return ''; }
     hasSelection(): boolean { return false; }
@@ -389,6 +393,33 @@ describe('XTerminal', () => {
     expect(result).toBe(true);
     expect(preventDefault).toHaveBeenCalled();
     expect(stopPropagation).toHaveBeenCalled();
+  });
+
+  it('lets plain Ctrl+V fall through to the native browser paste on non-Mac', async () => {
+    render(<XTerminal sessionName="test-session" />);
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
+
+    const term = (Terminal as unknown as { instances: Array<{ keyEventHandler: ((event: KeyboardEvent) => boolean) | null }> }).instances[0];
+    expect(term.keyEventHandler).toBeTruthy();
+
+    // Plain Ctrl+V keydown: xterm must skip it (return false) so the browser's
+    // trusted `paste` event reaches xterm's helper textarea.
+    const ctrlV = new KeyboardEvent('keydown', { key: 'v', ctrlKey: true });
+    expect(term.keyEventHandler!(ctrlV)).toBe(false);
+
+    // Ctrl+Shift+V and other keys keep xterm's default handling.
+    const ctrlShiftV = new KeyboardEvent('keydown', { key: 'V', ctrlKey: true, shiftKey: true });
+    expect(term.keyEventHandler!(ctrlShiftV)).toBe(true);
+    const plainV = new KeyboardEvent('keydown', { key: 'v' });
+    expect(term.keyEventHandler!(plainV)).toBe(true);
+    const ctrlC = new KeyboardEvent('keydown', { key: 'c', ctrlKey: true });
+    expect(term.keyEventHandler!(ctrlC)).toBe(true);
+    // keyup for the same combo must not be swallowed either.
+    const ctrlVUp = new KeyboardEvent('keyup', { key: 'v', ctrlKey: true });
+    expect(term.keyEventHandler!(ctrlVUp)).toBe(true);
   });
 });
 

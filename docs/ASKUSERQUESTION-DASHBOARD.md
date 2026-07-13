@@ -1,5 +1,12 @@
 # AskUserQuestion in the dashboard — pipeline, the 2026-05-31 outage, and the "Needs you" recovery
 
+> **Scope note (PAN-1520):** AUQ is one kind in the unified pending-input
+> subsystem — plan approval, permission requests, session-resume, and
+> rate-limit modals share the same indicator, needs-you list, notification,
+> and reopen routing. The subsystem overview lives in
+> [PENDING-INPUT.md](PENDING-INPUT.md); this file remains the AUQ-specific
+> debugging field guide.
+
 This documents how an agent's **AskUserQuestion** (AUQ) becomes a clickable
 dialog in the dashboard, the two root-cause bugs that silently broke it, and the
 "Needs you" recovery surface added so a dismissed question is never stranded.

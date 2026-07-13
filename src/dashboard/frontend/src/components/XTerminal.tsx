@@ -286,12 +286,15 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       // If no selection, let terminal handle (interrupt signal)
     }
 
-    // Ctrl+V / Cmd+V: do NOT intercept. xterm.js handles paste natively via a
-    // `paste` listener on its helper textarea, which works cross-browser
+    // Ctrl+V / Cmd+V: do NOT intercept here. xterm.js handles paste natively
+    // via a `paste` listener on its helper textarea, which works cross-browser
     // (including Firefox) and needs no clipboard-read permission because it
     // rides the browser's trusted paste gesture. Calling preventDefault() +
     // navigator.clipboard.readText() here suppressed that native path and broke
     // paste wherever readText() is blocked or unfocused. (PAN-2529)
+    // Plain Ctrl+V on Linux/Windows reaches that native path only because the
+    // attachCustomKeyEventHandler set at terminal creation tells xterm to skip
+    // the keystroke instead of swallowing it as a literal ^V.
   }, [copySelection]);
 
   // Handle context menu (right-click)
@@ -466,6 +469,23 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       // outer browser/app-shell handlers (like chat-input history navigation)
       // never consume them while the pointer is over the terminal.
       term.attachCustomWheelEventHandler(handleTerminalWheel);
+
+      // Plain Ctrl+V on Linux/Windows: xterm.js would otherwise consume the
+      // keystroke and send a literal ^V (0x16) to the pty, so the browser's
+      // native paste never fires and only Ctrl+Shift+V pastes — while the
+      // context menu already advertises Ctrl+V. Returning false makes xterm
+      // skip the event WITHOUT preventDefault, so the browser delivers its
+      // trusted `paste` event to xterm's helper textarea and the native paste
+      // path handles it (no clipboard-read permission needed — PAN-2529).
+      // Trade-off: the pty app can no longer receive a literal ^V (e.g. vim
+      // visual-block). macOS is left alone — Cmd+V is the paste gesture there
+      // and Ctrl+V keeps its terminal meaning.
+      if (!isMac) {
+        term.attachCustomKeyEventHandler((e) =>
+          !(e.type === 'keydown' && e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey
+            && e.key.toLowerCase() === 'v')
+        );
+      }
 
       // On Linux/non-Mac, xterm only forces selection through mouse-reporting mode
       // when Shift is held. Claude's TUI enables mouse reporting, which makes plain
