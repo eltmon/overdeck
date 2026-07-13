@@ -403,6 +403,11 @@ Work agents cannot start without beads tasks in the workspace. The start-agent e
 returns 422 if the canonical Dolt resolver reports no issue beads. Planning must create beads via
 `bd create` before handing off to implementation.
 
+The verification gate also blocks completion while the issue has open beads: `runVerificationForIssue`
+calls `checkOpenBeadsPromise` after the vBRIEF acceptance-criteria check, and a non-empty result (or a
+timeout, which is unknown-not-zero per PAN-1812) produces `failedCheck: 'open-beads'`. Finally,
+merge-time and close-out sweeps remove remaining open beads from terminal issues so that a closed
+issue never carries open beads.
 ## postMergeLifecycle Idempotency (enforced by a test, not by this note)
 
 `postMergeLifecycle` must run **at most once per merge**. If it can re-trigger
@@ -592,7 +597,7 @@ for projects without a valid migration completion marker.
 
 The issue body should then contain a tight summary (vision, motivation, design goals, key capabilities, phases) -- NOT a full copy of the PRD. The PRD is the source of truth for data models, architecture, code samples, and implementation details. Duplicating that content into the issue creates drift.
 
-<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
+<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:7510c1e2 -->
 ## Beads Issue Tracker
 
 This project uses **bd (beads)** for issue tracking. Run `bd prime` to see full workflow context and commands.
@@ -612,6 +617,8 @@ bd close <id>         # Complete work
 - Run `bd prime` for detailed command reference and session close protocol
 - Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
 
+**Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/SYNC_CONCEPTS.md for details and anti-patterns.
+
 ## Session Completion
 
 **When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
@@ -627,10 +634,6 @@ bd close <id>         # Complete work
    git push
    git status  # MUST show "up to date with origin"
    ```
-   For migrated projects, run `bd` from
-   `${OVERDECK_HOME}/state/<project>/`; the write door commits and pushes bead
-   state to `overdeck-state` automatically. Do not manually push the Beads
-   store from the code checkout or expect a root `.beads/` directory.
 5. **Clean up** - Clear stashes, prune remote branches
 6. **Verify** - All changes committed AND pushed
 7. **Hand off** - Provide context for next session

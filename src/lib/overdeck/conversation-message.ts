@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { extname, join } from 'node:path';
+import { basename, extname, join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { readFile, realpath, rename, rm, writeFile } from 'node:fs/promises';
 
@@ -37,6 +37,8 @@ import {
 
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const MAX_MESSAGE_LENGTH = 50_000;
+const MAX_ATTACHMENT_PATHS_PER_MESSAGE = 64;
+const ATTACHMENT_CHECK_BATCH_SIZE = 8;
 const MAX_FILENAME_LENGTH = 255;
 const UPLOAD_READ_TIMEOUT_MS = 10_000;
 const UPLOAD_RATE_LIMIT_WINDOW_MS = 60_000;
@@ -70,6 +72,48 @@ const ALLOWED_UPLOAD_MIME_TYPES = new Map<string, string>([
   ['image/webp', '.webp'],
 ]);
 
+export const IMAGE_ATTACHMENT_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp'] as const;
+
+export const ALLOWED_ATTACHMENT_EXTENSIONS = [
+  '.txt',
+  '.md',
+  '.markdown',
+  '.json',
+  '.jsonl',
+  '.log',
+  '.csv',
+  '.tsv',
+  '.yaml',
+  '.yml',
+  '.toml',
+  '.xml',
+  '.html',
+  '.css',
+  '.js',
+  '.jsx',
+  '.ts',
+  '.tsx',
+  '.py',
+  '.sh',
+  '.bash',
+  '.sql',
+  '.diff',
+  '.patch',
+  '.ini',
+  '.conf',
+  '.cfg',
+  '.pdf',
+] as const;
+
+export function isImageAttachmentPath(path: string): boolean {
+  return IMAGE_ATTACHMENT_EXTENSIONS.includes(extname(path).toLowerCase() as typeof IMAGE_ATTACHMENT_EXTENSIONS[number]);
+}
+
+export interface UploadValidationError {
+  error: string;
+  status: number;
+}
+
 function validateImageMagicBytes(bytes: Buffer, mimeType: string): boolean {
   switch (mimeType) {
     case 'image/png':
@@ -89,6 +133,64 @@ function validateImageMagicBytes(bytes: Buffer, mimeType: string): boolean {
   }
 }
 
+export function validateUploadPayload(filename: string, mimeType: string, bytes: Buffer): UploadValidationError | null {
+  // Enforce basename policy before MIME magic-byte checks so a file named
+  // `.env` or `Makefile` cannot masquerade as an image/PDF by mimeType alone.
+  if (filename.startsWith('.')) {
+    return { error: 'Dotfiles are not supported', status: 400 };
+  }
+  const ext = extname(filename).toLowerCase();
+  if (ext === '') {
+    return { error: 'Extensionless files are not supported', status: 400 };
+  }
+
+  if (ALLOWED_UPLOAD_MIME_TYPES.has(mimeType)) {
+    if (!validateImageMagicBytes(bytes, mimeType)) {
+      return { error: 'File content does not match declared MIME type', status: 400 };
+    }
+    return null;
+  }
+
+  // Unsupported image MIME types keep the legacy error shape for backwards compatibility.
+  if (mimeType.startsWith('image/')) {
+    return { error: `Unsupported mimeType: ${mimeType}`, status: 400 };
+  }
+
+  if (ext === '.pdf') {
+    if (
+      bytes.length >= 5 &&
+      bytes[0] === 0x25 &&
+      bytes[1] === 0x50 &&
+      bytes[2] === 0x44 &&
+      bytes[3] === 0x46 &&
+      bytes[4] === 0x2d
+    ) {
+      return null;
+    }
+    return { error: 'File content does not match declared file type', status: 400 };
+  }
+
+  if (ALLOWED_ATTACHMENT_EXTENSIONS.includes(ext as typeof ALLOWED_ATTACHMENT_EXTENSIONS[number])) {
+    try {
+      const decoder = new TextDecoder('utf-8', { fatal: true });
+      decoder.decode(bytes);
+      if (bytes.includes(0)) {
+        return { error: 'File content does not match declared file type', status: 400 };
+      }
+      return null;
+    } catch {
+      return { error: 'File content does not match declared file type', status: 400 };
+    }
+  }
+
+  return { error: `Unsupported file type: ${ext || mimeType}`, status: 400 };
+}
+
+function sanitizeUploadBasename(name: string): string {
+  const cleaned = name.toLowerCase().replace(/[^a-z0-9._-]/g, '');
+  return cleaned.slice(0, 48) || 'file';
+}
+
 export interface ConversationMessageDependencies {
   resolveSessionFile(conv: Conversation): Promise<string | null>;
   generateAiTitle(name: string, message: string): Promise<void>;
@@ -96,9 +198,14 @@ export interface ConversationMessageDependencies {
 
 export function safeUploadExtension(filename: string, mimeType: string): string {
   const mimeExtension = ALLOWED_UPLOAD_MIME_TYPES.get(mimeType);
-  if (!mimeExtension) return '';
   const originalExtension = extname(filename).toLowerCase();
-  return originalExtension === mimeExtension ? originalExtension : mimeExtension;
+  if (mimeExtension) {
+    return originalExtension === mimeExtension ? originalExtension : mimeExtension;
+  }
+  if (ALLOWED_ATTACHMENT_EXTENSIONS.includes(originalExtension as typeof ALLOWED_ATTACHMENT_EXTENSIONS[number])) {
+    return originalExtension;
+  }
+  return '';
 }
 
 export async function handleConversationImageUpload(
@@ -116,18 +223,20 @@ export async function handleConversationImageUpload(
   if (filename.length > MAX_FILENAME_LENGTH) {
     return jsonResponse({ error: `filename exceeds maximum length of ${MAX_FILENAME_LENGTH} characters` }, { status: 400 });
   }
-  if (!ALLOWED_UPLOAD_MIME_TYPES.has(mimeType)) {
-    return jsonResponse({ error: `Unsupported mimeType: ${mimeType}` }, { status: 400 });
-  }
   if (bytes.length === 0) return jsonResponse({ error: 'Payload is empty' }, { status: 400 });
   if (bytes.length > MAX_UPLOAD_BYTES) {
     return jsonResponse({ error: `Payload exceeds maximum size of ${MAX_UPLOAD_BYTES} bytes` }, { status: 400 });
   }
-  if (!validateImageMagicBytes(bytes, mimeType)) {
-    return jsonResponse({ error: 'File content does not match declared MIME type' }, { status: 400 });
+
+  const validation = validateUploadPayload(filename, mimeType, bytes);
+  if (validation) {
+    return jsonResponse({ error: validation.error }, { status: validation.status });
   }
 
-  const extension = safeUploadExtension(filename, mimeType)!;
+  const extension = safeUploadExtension(filename, mimeType);
+  if (!extension) {
+    return jsonResponse({ error: `Unsupported file type: ${extname(filename).toLowerCase() || mimeType}` }, { status: 400 });
+  }
   if (!getConversationByName(name)) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
 
   const attachmentDir = await ensureConversationAttachmentDir(name);
@@ -144,7 +253,14 @@ export async function handleConversationImageUpload(
     return jsonResponse({ error: 'Invalid attachment path' }, { status: 500 });
   }
 
-  const fileName = `${randomUUID()}${extension}`;
+  let fileName: string;
+  if (ALLOWED_UPLOAD_MIME_TYPES.has(mimeType)) {
+    fileName = `${randomUUID()}${extension}`;
+  } else {
+    const base = basename(filename, extension);
+    const sanitized = sanitizeUploadBasename(base);
+    fileName = `${randomUUID()}-${sanitized}${extension}`;
+  }
   const path = join(resolvedDir, fileName);
   const tmpPath = `${path}.tmp`;
   try {
@@ -237,9 +353,34 @@ export function transformMessageForHarness(message: string, harness: RuntimeName
   userText = userText.trim();
   const attachments = attachmentPaths.map((path) => `- ${path}`).join('\n');
   if (!userText) {
-    return `Use the Read tool to inspect these attached image files, then describe what you see:\n${attachments}`;
+    return `Use the Read tool to inspect these attached files, then describe what you see:\n${attachments}`;
   }
-  return `Use the Read tool to inspect these attached image files:\n${attachments}\n\nMessage:\n${userText}`;
+  return `Use the Read tool to inspect these attached files:\n${attachments}\n\nMessage:\n${userText}`;
+}
+
+export function partitionAttachmentsForModel(
+  message: string,
+  attachmentPaths: string[],
+  supportsImages: boolean,
+): { outboundMessage: string; effectiveAttachmentPaths: string[]; droppedImageCount: number } {
+  if (attachmentPaths.length === 0 || supportsImages) {
+    return { outboundMessage: message, effectiveAttachmentPaths: attachmentPaths, droppedImageCount: 0 };
+  }
+
+  const imagePaths = attachmentPaths.filter((p) => isImageAttachmentPath(p));
+  const nonImagePaths = attachmentPaths.filter((p) => !isImageAttachmentPath(p));
+
+  let outboundMessage = message;
+  for (const p of imagePaths) {
+    outboundMessage = outboundMessage.split(`@${p}`).join('');
+  }
+  outboundMessage = outboundMessage.trim();
+
+  return {
+    outboundMessage,
+    effectiveAttachmentPaths: nonImagePaths,
+    droppedImageCount: imagePaths.length,
+  };
 }
 
 export async function handleConversationMessage(
@@ -273,14 +414,29 @@ export async function handleConversationMessage(
   }
 
   const allAttachmentPaths = extractConversationAttachmentPaths(message);
-  const managedChecks = await Promise.all(
-    allAttachmentPaths.map(async (attachmentPath) => {
-      const managed = await isManagedConversationAttachmentPath(attachmentPath);
-      if (!managed) return { managed: false as const, attachmentPath };
-      const hasAttachment = await hasConversationAttachment(conv.name, attachmentPath);
-      return { managed: true as const, attachmentPath, hasAttachment };
-    }),
-  );
+  if (allAttachmentPaths.length > MAX_ATTACHMENT_PATHS_PER_MESSAGE) {
+    return jsonResponse(
+      { error: `Message contains too many attachment references (maximum ${MAX_ATTACHMENT_PATHS_PER_MESSAGE})` },
+      { status: 400 },
+    );
+  }
+
+  const managedChecks: Array<
+    | { managed: false; attachmentPath: string }
+    | { managed: true; attachmentPath: string; hasAttachment: boolean }
+  > = [];
+  for (let i = 0; i < allAttachmentPaths.length; i += ATTACHMENT_CHECK_BATCH_SIZE) {
+    const batch = allAttachmentPaths.slice(i, i + ATTACHMENT_CHECK_BATCH_SIZE);
+    const batchResults = await Promise.all(
+      batch.map(async (attachmentPath) => {
+        const managed = await isManagedConversationAttachmentPath(attachmentPath);
+        if (!managed) return { managed: false as const, attachmentPath };
+        const hasAttachment = await hasConversationAttachment(conv.name, attachmentPath);
+        return { managed: true as const, attachmentPath, hasAttachment };
+      }),
+    );
+    managedChecks.push(...batchResults);
+  }
   for (const check of managedChecks) {
     if (check.managed && !check.hasAttachment) {
       return jsonResponse({ error: 'One or more attached images are unavailable for this conversation' }, { status: 400 });
@@ -292,22 +448,17 @@ export async function handleConversationMessage(
 
   const harness: RuntimeName = conv.harness ?? 'claude-code';
   const behavior = getHarnessBehavior(harness);
-  let outboundMessage = message;
-  let effectiveAttachmentPaths = managedAttachmentPaths;
-  let droppedImageCount = 0;
-  if (managedAttachmentPaths.length > 0 && !modelSupportsImagesSync(conv.model ?? '')) {
-    for (const p of managedAttachmentPaths) {
-      outboundMessage = outboundMessage.split(`@${p}`).join('');
-    }
-    outboundMessage = outboundMessage.trim();
-    droppedImageCount = managedAttachmentPaths.length;
-    effectiveAttachmentPaths = [];
-    if (!outboundMessage) {
-      return jsonResponse(
-        { error: `${conv.model ?? 'This model'} can't read images. Switch to a vision-capable model (e.g. mimo-v2.5) to send images.` },
-        { status: 422 },
-      );
-    }
+  const supportsImages = modelSupportsImagesSync(conv.model ?? '');
+  const partition = partitionAttachmentsForModel(message, managedAttachmentPaths, supportsImages);
+  const outboundMessage = partition.outboundMessage;
+  const effectiveAttachmentPaths = partition.effectiveAttachmentPaths;
+  const droppedImageCount = partition.droppedImageCount;
+
+  if (droppedImageCount > 0 && !outboundMessage && effectiveAttachmentPaths.length === 0) {
+    return jsonResponse(
+      { error: `${conv.model ?? 'This model'} can't read images. Switch to a vision-capable model (e.g. mimo-v2.5) to send images.` },
+      { status: 422 },
+    );
   }
 
   let deliveredMessage = transformMessageForHarness(outboundMessage, harness, effectiveAttachmentPaths);

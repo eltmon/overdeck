@@ -31,6 +31,7 @@ export interface ForkViaServerOptions {
   summaryHarness?: RuntimeName;
   title?: string;
   focus?: string;
+  issueId?: string;
   handoffAuthor?: 'source' | 'external';
   handoffAuthorModel?: string;
   handoffAuthorHarness?: RuntimeName;
@@ -49,6 +50,7 @@ export interface ForkResultConv {
   handoffDocPath?: string | null;
   sessionAlive?: boolean;
   status?: string;
+  issueId?: string | null;
 }
 
 export class ForkServerError extends Error {}
@@ -86,6 +88,7 @@ export async function forkConversationViaServer(
   if (opts.summaryHarness) body['summaryHarness'] = opts.summaryHarness;
   if (opts.title) body['title'] = opts.title;
   if (opts.focus) body['focus'] = opts.focus;
+  if (opts.issueId) body['issueId'] = opts.issueId;
   if (opts.handoffAuthor) body['handoffAuthor'] = opts.handoffAuthor;
   if (opts.handoffAuthorModel) body['handoffAuthorModel'] = opts.handoffAuthorModel;
   if (opts.handoffAuthorHarness) body['handoffAuthorHarness'] = opts.handoffAuthorHarness;

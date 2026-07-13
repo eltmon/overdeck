@@ -29,10 +29,12 @@ const {
     mockOpenIssue,
     mockDashboardState: {
       agents: [],
+      agentsById: {},
       issues: [{ identifier: 'PAN-123', url: 'https://example.com/issues/PAN-123' }],
       dashboardLifecycle: { active: false },
       channelPermissionRequestsById: {},
       agentsWithPendingAskUserQuestion: [],
+      agentsWithPendingProposedPlan: [],
       drawer: { issueId: null, tab: 'overview' },
       openIssue: mockOpenIssue,
     },
@@ -122,6 +124,8 @@ vi.mock('./lib/store', () => ({
   selectDashboardLifecycle: (state: { dashboardLifecycle: { active: boolean } }) => state.dashboardLifecycle,
   selectAgentsWithPendingAskUserQuestion: (state: { agentsWithPendingAskUserQuestion?: unknown[] }) =>
     state.agentsWithPendingAskUserQuestion ?? [],
+  selectAgentsWithPendingProposedPlan: (state: { agentsById?: Record<string, unknown> }) =>
+    Object.values(state.agentsById ?? {}).filter((a) => (a as { pendingProposedPlan?: unknown }).pendingProposedPlan != null),
 }));
 vi.mock('./lib/refresh-dashboard-state', () => ({
   refreshDashboardState: mockRefreshDashboardState,
@@ -176,10 +180,12 @@ function renderApp() {
 
 beforeEach(() => {
   mockDashboardState.agents = []
+  mockDashboardState.agentsById = {}
   mockDashboardState.issues = [{ identifier: 'PAN-123', url: 'https://example.com/issues/PAN-123' }]
   mockDashboardState.dashboardLifecycle = { active: false }
   mockDashboardState.channelPermissionRequestsById = {}
   mockDashboardState.agentsWithPendingAskUserQuestion = []
+  mockDashboardState.agentsWithPendingProposedPlan = []
   mockDashboardState.drawer = { issueId: null, tab: 'overview' }
   mockDashboardState.openIssue = mockOpenIssue
   mockOpenIssue.mockClear()

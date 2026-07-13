@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import { existsSync } from 'fs';
 import { getConversationById, getConversationByName } from '../../lib/overdeck/conversations.js';
 import { resolveCurrentConversation } from '../../lib/conversations/current.js';
+import { parseIssueIdSync } from '../../lib/issue-id.js';
 import { forkConversationViaServer, ForkServerError, isForkResultInProgress } from './fork-client.js';
 import { sessionFilePath } from '../../lib/paths.js';
 
@@ -9,6 +10,7 @@ interface HandoffOptions {
   model?: string;
   harness?: string;
   cwd?: string;
+  issue?: string;
   author?: string;
   authorModel?: string;
   authorHarness?: string;
@@ -79,6 +81,15 @@ export async function handoffCommand(
     console.log(chalk.yellow(`Invalid --author: ${options.author}. Expected source or external.`));
     process.exit(1);
   }
+  let issueId: string | undefined;
+  if (options.issue !== undefined) {
+    const parsed = parseIssueIdSync(options.issue.trim());
+    if (!parsed) {
+      console.log(chalk.yellow(`Invalid --issue: ${options.issue}. Expected an issue ID like PAN-123.`));
+      process.exit(1);
+    }
+    issueId = parsed.raw;
+  }
   console.log(chalk.gray(`Creating handoff from conversation: ${conv.name} (${conv.title || 'untitled'})`));
   console.log(chalk.gray(`  Author: ${author}${author === 'external' ? ` (model=${options.authorModel ?? 'default'}, harness=provider-default)` : ' (in-source agent)'}`));
   if (focus) {
@@ -94,6 +105,7 @@ export async function handoffCommand(
     newConv = await forkConversationViaServer(conv.name, {
       model: options.model,
       cwd: options.cwd,
+      issueId,
       forkMode: 'handoff',
       focus,
       handoffAuthor: author,
@@ -127,6 +139,7 @@ export async function handoffCommand(
   console.log(chalk.gray(`  Session: ${newConv.tmuxSession}${newConv.sessionAlive ? ' (live)' : ''}`));
   console.log(chalk.gray(`  Model: ${newConv.model || 'default'}`));
   console.log(chalk.gray(`  Harness: ${newConv.harness || 'claude-code'}`));
+  console.log(chalk.gray(`  Issue: ${newConv.issueId ?? 'none'}${options.issue ? ' (from --issue)' : ''}`));
   if (newConv.handoffDocPath) {
     console.log(chalk.gray(`  Handoff doc: ${newConv.handoffDocPath}`));
   }

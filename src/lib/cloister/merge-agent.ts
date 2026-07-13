@@ -447,6 +447,18 @@ export async function postMergeLifecycle(
       console.warn(`[merge-agent] Beads compaction failed: ${err}`);
     }
 
+    // 2b. Sweep any remaining open beads (backstop for bypass/admin merges that skip verification).
+    try {
+      const { sweepOrphanedBeads } = await import('../lifecycle/orphaned-beads-sweep.js');
+      const sweepResult = await sweepOrphanedBeads({ beadsCwd: projectPath, issueId, reason: 'issue merged; remaining open beads swept' });
+      if (sweepResult.ok && sweepResult.closedIds.length > 0) {
+        console.log(`[merge-agent] ✓ Swept ${sweepResult.closedIds.length} open bead(s) for ${issueId}`);
+        logActivity('beads_sweep_complete', `Swept ${sweepResult.closedIds.length} open bead(s) for ${issueId}`);
+      }
+    } catch (err) {
+      console.warn(`[merge-agent] Beads sweep failed: ${err}`);
+    }
+
     // 3. Pause work/planning agents and kill their tmux panes to free resources.
     try {
       const { setAgentPaused, getAgentState } = await import('../agents.js');
