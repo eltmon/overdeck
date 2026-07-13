@@ -57,6 +57,31 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-13T06:00:01.897Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T06:04:58.612Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T06:05:06.952Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T06:05:06.955Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T06:05:06.959Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T06:05:06.963Z"
     }
   ],
   "feedback": [],
@@ -80,19 +105,19 @@
     "recordedAt": "2026-07-13T05:58:56.677Z"
   },
   "created": "2026-07-13T03:16:32.338Z",
-  "updated": "2026-07-13T06:02:42.222Z",
+  "updated": "2026-07-13T06:05:06.964Z",
   "pipeline": {
     "issueId": "PAN-2611",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T06:01:45.491Z",
+    "updatedAt": "2026-07-13T06:04:57.130Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2624",
     "reviewRequestedAt": "2026-07-13T05:59:13.358Z",
-    "reviewSpawnedAt": "2026-07-13T05:59:24.690Z",
+    "reviewSpawnedAt": "2026-07-13T06:04:57.128Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -140,9 +165,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 346758,
-            "output": 27386,
-            "cacheRead": 13791488,
+            "input": 349032,
+            "output": 27572,
+            "cacheRead": 14300416,
             "cacheWrite": 0
           }
         }
@@ -167,15 +192,15 @@
           "cacheWrite": 366084
         },
         "custom/kimi-k2.7-code": {
-          "input": 346758,
-          "output": 27386,
-          "cacheRead": 13791488,
+          "input": 349032,
+          "output": 27572,
+          "cacheRead": 14300416,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 21.056569,
-        "pricingAsOf": "2026-07-13T06:01:47.983Z"
+        "usd": 21.156169,
+        "pricingAsOf": "2026-07-13T06:04:57.319Z"
       }
     },
     "merges": [
@@ -183,8 +208,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "test-worktree-redirect": "completed",
     "test-worktree-redirect.ac1": "completed",
