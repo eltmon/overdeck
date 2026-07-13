@@ -33,7 +33,7 @@ async function defaultExecute(args: readonly string[], cwd: string): Promise<str
 }
 
 function doltHead(status: string): string | null {
-  return /^Commit:\s*([0-9a-f]{7,40})\s*$/im.exec(status)?.[1] ?? null;
+  return /^Commit:\s*([0-9a-v]{7,40})\s*$/im.exec(status)?.[1] ?? null;
 }
 
 function recordsFromJsonl(raw: string): Array<Record<string, unknown>> {
