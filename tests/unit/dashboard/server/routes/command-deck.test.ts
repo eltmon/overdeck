@@ -220,4 +220,26 @@ describe('fetchActivityDataWithContext', () => {
     expect(typeof work?.duration).toBe('number');
     expect(Number.isFinite(work?.duration)).toBe(true);
   });
+
+  it('classifies agent-<issue>-plan as a planning section', async () => {
+    const issueId = 'PAN-901';
+    const planId = 'agent-pan-901-plan';
+    mockAgentStates.set(planId, {
+      id: planId,
+      issueId,
+      role: 'plan',
+      model: 'gpt-4',
+      status: 'running',
+      startedAt: '2026-01-01T00:00:00Z',
+    });
+    mockRuntimeStates.set(planId, { state: 'active' });
+
+    const result = await fetchActivityDataWithContext(issueId, { tmuxSessionNames: new Set([planId]) });
+    const sections = (result as { sections: Array<{ sessionId: string; type: string; planningComplete?: boolean }> }).sections;
+    const planning = sections.find((s) => s.sessionId === planId);
+
+    expect(planning).toBeDefined();
+    expect(planning?.type).toBe('planning');
+    expect(planning?.planningComplete).toBe(false);
+  });
 });

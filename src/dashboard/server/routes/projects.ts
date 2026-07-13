@@ -206,6 +206,7 @@ async function collectSessionTreeNodes(
   const agentsDir = join(getOverdeckHome(), 'agents');
   const agentId = `agent-${issueLower}`;
   const planningAgentId = `planning-${issueLower}`;
+  const planRunAgentId = `agent-${issueLower}-plan`;
   const strikeAgentId = `strike-${issueLower}`;
   const knowledgeAgentId = `agent-${issueLower}-knowledge`;
   const slotWorkSessionPattern = getSlotWorkSessionPattern(issueLower);
@@ -220,7 +221,13 @@ async function collectSessionTreeNodes(
     // ignore read/parse failures — treat as unfinished
   }
 
-  const candidateSessionIds = new Set<string>([planningAgentId, agentId, strikeAgentId, knowledgeAgentId]);
+  const candidateSessionIds = new Set<string>([
+    planningAgentId,
+    agentId,
+    planRunAgentId,
+    strikeAgentId,
+    knowledgeAgentId,
+  ]);
   const agentEntries = await readdir(agentsDir, { withFileTypes: true }).catch(() => []);
 
   for (const entry of agentEntries) {
@@ -243,7 +250,7 @@ async function collectSessionTreeNodes(
     if (!state) continue;
 
     try {
-      const isPlanning = checkId.startsWith('planning-');
+      const isPlanning = checkId.startsWith('planning-') || state.role === 'plan';
       const isStrike = checkId.startsWith('strike-');
       const sectionType: SessionNodeType = isPlanning
         ? 'planning'

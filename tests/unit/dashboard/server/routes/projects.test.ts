@@ -610,4 +610,38 @@ describe('fetchProjectSessionTree', () => {
     expect(tree.features[0]?.issueId).toBe('PAN-888');
     expect(tree.features[0]?.sessions).toHaveLength(0);
   });
+
+  it('classifies agent-<issue>-plan as a planning session', async () => {
+    (listProjectsSync as any).mockReturnValue([
+      {
+        key: 'overdeck',
+        config: { name: 'overdeck', path: '/tmp/overdeck', workspace: { workspaces_dir: 'workspaces' } },
+      },
+    ]);
+    (listSessionNames as any).mockReturnValue(Effect.succeed(['agent-pan-900-plan']));
+    (getAgentRuntimeState as any).mockReturnValue(Effect.succeed({ state: 'active' }));
+    mockAgentStates.set('agent-pan-900-plan', agentState({
+      id: 'agent-pan-900-plan',
+      issueId: 'PAN-900',
+      role: 'plan',
+      status: 'running',
+      startedAt: '2026-01-01T00:00:00Z',
+    }));
+    mockAccess(new Set([
+      '/tmp/overdeck/workspaces',
+      join(getOverdeckHome(), 'agents', 'agent-pan-900-plan'),
+      '/tmp/overdeck/workspaces/feature-pan-900/.pan',
+    ]));
+    mockWorkspaceReaddir([{ name: 'feature-pan-900', isDirectory: () => true, isFile: () => false }]);
+
+    const result = await fetchProjectSessionTree('overdeck');
+
+    const tree = result as { features: Array<{ issueId: string; sessions: Array<Record<string, unknown>> }> };
+    expect(tree.features).toHaveLength(1);
+    const session = tree.features[0]?.sessions.find(
+      (candidate) => candidate.sessionId === 'agent-pan-900-plan',
+    );
+    expect(session).toBeDefined();
+    expect(session?.type).toBe('planning');
+  });
 });
