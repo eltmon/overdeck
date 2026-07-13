@@ -192,7 +192,7 @@
     "recordedAt": "2026-07-13T11:20:10.124Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T11:25:20.306Z",
+  "updated": "2026-07-13T11:25:23.124Z",
   "pipeline": {
     "issueId": "PAN-2596",
     "reviewStatus": "reviewing",
@@ -203,10 +203,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T11:21:55.959Z",
-    "updatedAt": "2026-07-13T11:25:12.915Z",
+    "updatedAt": "2026-07-13T11:25:22.383Z",
     "inspectNotes": "Bead server-upload-allowlist ack: validateUploadPayload correctly gates UTF-8 text extensions, PDF %PDF- magic prefix, and disallowed/extension-less types with 400s naming the mismatch, while preserving image magic-byte validation and <uuid><ext> naming; non-image files get <uuid>-<sanitized-name><ext>. All 5 ACs verified against diff + accompanying unit tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2634",
-    "lastVerifiedCommit": "991f28dcac2af9f4dd0da07e5bcd29f2c808d653",
+    "lastVerifiedCommit": "7cf60996f8e5ae5da607fc6ae51272764c107143",
     "reviewRequestedAt": "2026-07-13T11:21:55.959Z",
     "reviewSpawnedAt": "2026-07-13T11:25:12.914Z",
     "scopeDrift": {
@@ -289,9 +289,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1583960,
-            "output": 216695,
-            "cacheRead": 97474816,
+            "input": 1584518,
+            "output": 216813,
+            "cacheRead": 97736960,
             "cacheWrite": 0
           }
         }
@@ -328,15 +328,15 @@
           "cacheWrite": 85508
         },
         "custom/kimi-k2.7-code": {
-          "input": 1583960,
-          "output": 216695,
-          "cacheRead": 97474816,
+          "input": 1584518,
+          "output": 216813,
+          "cacheRead": 97736960,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 58.405121,
-        "pricingAsOf": "2026-07-13T11:25:14.122Z"
+        "usd": 58.455931,
+        "pricingAsOf": "2026-07-13T11:25:22.569Z"
       }
     },
     "merges": [
