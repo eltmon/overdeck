@@ -53,7 +53,7 @@ async function readGitHubCanonicalState(owner: string, repo: string, number: num
     `${owner}/${repo}`,
     '--json',
     'state,labels',
-  ], { encoding: 'utf-8' });
+  ], { encoding: 'utf-8', timeout: 10000 });
   const parsed = JSON.parse(stdout) as { state?: string; labels?: Array<string | { name?: string }> };
   const labels = (parsed.labels ?? [])
     .map(label => typeof label === 'string' ? label : label.name)
@@ -82,7 +82,7 @@ export async function readGitHubCloseState(owner: string, repo: string, number: 
     `${owner}/${repo}`,
     '--json',
     'state,stateReason',
-  ], { encoding: 'utf-8' });
+  ], { encoding: 'utf-8', timeout: 10000 });
   const parsed = JSON.parse(stdout) as { state?: string; stateReason?: string | null };
   const stateLower = (parsed.state ?? 'open').toLowerCase();
   const reasonLower = parsed.stateReason?.toLowerCase();

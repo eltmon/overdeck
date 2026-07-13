@@ -485,8 +485,6 @@ console.log(conversationSearchWatcher
   ? '[overdeck] Conversation search watcher started'
   : '[overdeck] Conversation search watcher skipped (conversationSearch.enabled=false)');
 
-let stopBeadsRollupService: (() => void) | undefined;
-
 void (async () => {
   const store = await initEventStore();
   const beadsSync = createBeadsSyncService({

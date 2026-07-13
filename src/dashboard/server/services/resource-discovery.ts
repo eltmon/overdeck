@@ -434,10 +434,14 @@ async function isBranchAheadOfMain(branchName: string, projectPath: string): Pro
       timeout: 10000,
     });
     return false;
-  } catch {
-    // Non-zero exit (or any failure) means the branch is not an ancestor of main,
-    // i.e. it has unmerged work. Fail closed on errors: treat as not ahead.
-    return true;
+  } catch (err) {
+    // Exit code 1 means the branch is not an ancestor of main, i.e. it has
+    // unmerged work. Any other failure (timeout, missing ref, real error) is
+    // an error state; fail closed by treating the branch as merged.
+    if (err !== null && typeof err === 'object' && 'code' in err && err.code === 1) {
+      return true;
+    }
+    return false;
   }
 }
 
@@ -682,11 +686,11 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
       issue.resourceDetails.workspaceMissing = gitInfo.workspaceMissing;
     }));
 
-    for (const branch of branches.local) {
+    await Promise.all(branches.local.map(async (branch) => {
       const issueId = parseIssueIdFromTextSync(branch);
-      if (!issueId) continue;
+      if (!issueId) return;
       const issue = ensureIssue(issueId, project);
-      if (!issue) continue;
+      if (!issue) return;
       issue.resourceSources.add('branch');
       if (!issue.resourceDetails.localBranches.includes(branch)) {
         issue.resourceDetails.localBranches.push(branch);
@@ -694,13 +698,13 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
       if (await isBranchAheadOfMain(branch, projectPath)) {
         issue.resourceDetails.branchAheadOfMain = true;
       }
-    }
+    }));
 
-    for (const branch of branches.remote) {
+    await Promise.all(branches.remote.map(async (branch) => {
       const issueId = parseIssueIdFromTextSync(branch);
-      if (!issueId) continue;
+      if (!issueId) return;
       const issue = ensureIssue(issueId, project);
-      if (!issue) continue;
+      if (!issue) return;
       issue.resourceSources.add('branch');
       if (!issue.resourceDetails.remoteBranches.includes(branch)) {
         issue.resourceDetails.remoteBranches.push(branch);
@@ -708,7 +712,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
       if (await isBranchAheadOfMain(branch, projectPath)) {
         issue.resourceDetails.branchAheadOfMain = true;
       }
-    }
+    }));
   }));
 
   for (const [issueId, prs] of pullRequests) {

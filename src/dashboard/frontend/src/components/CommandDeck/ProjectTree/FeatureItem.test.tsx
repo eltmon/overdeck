@@ -1109,7 +1109,7 @@ describe('FeatureItem', () => {
 
   it('shows cleanup affordances for orphaned resources', () => {
     const onCleanupOrphanedResources = vi.fn();
-    renderFeature(
+    const { container } = renderFeature(
       <FeatureItem
         feature={makeFeature({
           issueId: 'PAN-777',
@@ -1133,6 +1133,16 @@ describe('FeatureItem', () => {
         onCleanupOrphanedResources={onCleanupOrphanedResources}
       />,
     );
+
+    const strip = container.querySelector('.featureResourceStrip');
+    expect(strip).toBeTruthy();
+    if (strip) fireEvent.mouseEnter(strip);
+
+    const cleanupButton = screen.getByTitle('Clean up orphaned workspace resources');
+    fireEvent.click(cleanupButton);
+
+    expect(onCleanupOrphanedResources).toHaveBeenCalledTimes(1);
+    expect(onCleanupOrphanedResources).toHaveBeenCalledWith('PAN-777');
   });
 
   it('renders issue-linked conversations as child rows with links to /conv/<id>', () => {

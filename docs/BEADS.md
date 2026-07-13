@@ -147,3 +147,30 @@ re-requesting review.
 This check is intentionally placed **after** the vBRIEF acceptance-criteria gate
 and **before** the empty-changeset guard. A timeout is treated as unknown, not
 proof of zero open beads, so the gate fails closed per PAN-1812.
+
+## Dashboard bead signals
+
+The Command Deck surfaces beads as resource signals alongside branches, workspaces,
+and sessions. The dashboard does not read beads directly from Dolt; it consumes
+the same resolver through a background rollup service.
+
+- **`beadTotals`** — `BeadsRollupService` computes a per-project snapshot of total,
+  closed, and in-progress bead counts and caches it in memory. Resource discovery
+  attaches the relevant row to each issue. `BeadsRail` and the issue resource strip
+  display this as a `beads` icon plus counts.
+- **`branchAheadOfMain`** — When a `feature/*` or `bypass/*` branch is not an
+  ancestor of `main`, resource discovery sets `branchAheadOfMain: true`. This is
+  one of the artifact signals used to decide whether an issue has unmerged work.
+- **`conversation` resource source** — Non-archived conversations linked to an issue
+  (`loadConversations`) are treated as a live resource signal independent of tmux
+  or agent sessions. They keep an issue visible in the Command Deck even when no
+  agent is running.
+- **`stalled` bucket** — Pipeline grouping uses the artifact signals above (ahead
+  branch, linked conversations, in-progress beads, or partially-closed beads) plus
+  the absence of a live agent and 14 days of inactivity to place an issue in the
+  `stalled` bucket. Stalled issues are shown after `needs-you` and are excluded
+  from ordinary phase buckets.
+
+The rollup service refreshes on a background interval and on `beads.freshness_changed`
+events, so the Command Deck stays consistent with the canonical Dolt state without
+issuing a resolver call per rendered issue.

@@ -445,7 +445,9 @@ describe('resource-discovery branch-ahead signal', () => {
         if (branch === 'feature/pan-9001') {
           callback(null, { stdout: '' });
         } else {
-          callback(new Error('not an ancestor'), { stdout: '' });
+          const err = new Error('not an ancestor') as Error & { code: number };
+          err.code = 1;
+          callback(err, { stdout: '' });
         }
         return;
       }

@@ -196,7 +196,12 @@ export function closeOut(
       ? 'issue closed (not planned); bead cancelled'
       : 'issue closed (completed); orphaned bead swept';
     const sweepResult = yield* Effect.promise(() =>
-      sweepOrphanedBeads({ beadsCwd: ctx.projectPath, issueId: ctx.issueId, reason: sweepReason }),
+      sweepOrphanedBeads({ beadsCwd: ctx.projectPath, issueId: ctx.issueId, reason: sweepReason }).catch((err) => ({
+        ok: false,
+        closedIds: [],
+        skipped: 0,
+        error: err instanceof Error ? err.message : String(err),
+      })),
     );
     if (sweepResult.ok) {
       if (sweepResult.closedIds.length > 0) {

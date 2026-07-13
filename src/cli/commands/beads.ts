@@ -166,7 +166,7 @@ async function sweepIssue(issueId: string, options: SweepOptions): Promise<
 }
 
 async function enumerateClosedOrphanIssues(): Promise<
-  | { ok: true; issueIds: string[]; openWithOrphans: string[] }
+  | { ok: true; issueIds: string[]; openWithOrphans: string[]; unresolved: string[] }
   | { ok: false; reason: string }
 > {
   const resolver = createBeadsResolver(process.cwd());
@@ -178,14 +178,23 @@ async function enumerateClosedOrphanIssues(): Promise<
   const groups = groupBeadsByIssue(readResult.value);
   const issueIds: string[] = [];
   const openWithOrphans: string[] = [];
+  const unresolved: string[] = [];
 
-  for (const [issueId, beads] of groups) {
-    if (!beads.some((bead) => isSweepable(bead.status))) continue;
+  const candidates = [...groups.entries()].filter(([, beads]) =>
+    beads.some((bead) => isSweepable(bead.status)),
+  );
 
-    const trackerState = await resolveGitHubCloseState(issueId);
+  const trackerStates = await Promise.all(
+    candidates.map(async ([issueId]) => ({
+      issueId,
+      trackerState: await resolveGitHubCloseState(issueId),
+    })),
+  );
+
+  for (const { issueId, trackerState } of trackerStates) {
     if (!trackerState.ok) {
-      // Treat unresolvable tracker state as a failed candidate rather than
-      // aborting the entire enumeration.
+      // Surface tracker-resolution failures so they are not silently dropped.
+      unresolved.push(issueId);
       continue;
     }
 
@@ -196,7 +205,7 @@ async function enumerateClosedOrphanIssues(): Promise<
     }
   }
 
-  return { ok: true, issueIds, openWithOrphans };
+  return { ok: true, issueIds, openWithOrphans, unresolved };
 }
 
 async function sweepCommand(issueIds: string[], options: SweepOptions): Promise<void> {
@@ -220,6 +229,9 @@ async function sweepCommand(issueIds: string[], options: SweepOptions): Promise<
     spinner.succeed(`Found ${enumeration.issueIds.length} closed issue(s) with orphaned beads`);
     if (enumeration.openWithOrphans.length > 0) {
       report.skippedOpen = enumeration.openWithOrphans;
+    }
+    if (enumeration.unresolved.length > 0) {
+      report.failed.push(...enumeration.unresolved.map((issue) => ({ issue, reason: 'could not resolve tracker state' })));
     }
     targetIssueIds = enumeration.issueIds;
   }
