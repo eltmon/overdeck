@@ -21,16 +21,18 @@
   ],
   "feedback": [],
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T05:41:52.596Z",
+  "updated": "2026-07-13T06:03:00.174Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T04:53:03.014Z"
+    "updatedAt": "2026-07-13T06:02:59.634Z",
+    "inspectNotes": "Bead activity-terminal-end-signal BLOCKED: AC4 requires a duration-preservation regression assertion in BOTH route tests, but tests/unit/dashboard/server/routes/command-deck.test.ts has none. The three new tests added there (leaves endedAt undefined for a live work session, line 141; populates endedAt when the session has ended, line 162; sets planningComplete on planning sections only when planning is finished, line 183) never reference `.duration` at all. tests/unit/dashboard/server/routes/projects.test.ts does add duration checks (typeof/Number.isFinite) in its two new endedAt tests, so only the command-deck.ts builder side is missing coverage. Required fix: add `expect(typeof section?.duration).toBe(\"number\")` (or equivalent elapsed-seconds assertion) to the live-session and ended-session tests in command-deck.test.ts. Functional logic in both command-deck.ts and projects.ts (endedAt/planningComplete derivation) otherwise satisfies AC1-AC3 correctly."
   },
   "closeOut": {
     "usage": {
@@ -43,12 +45,36 @@
             "cacheWrite": 7922
           }
         },
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 271,
+            "output": 200,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
         "plan": {
           "anthropic/claude-fable-5": {
             "input": 15375,
             "output": 60799,
             "cacheRead": 6424652,
             "cacheWrite": 196799
+          }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 15820,
+            "output": 3135,
+            "cacheRead": 747135,
+            "cacheWrite": 101843
+          }
+        },
+        "work": {
+          "custom/kimi-k2.7-code": {
+            "input": 956310,
+            "output": 125139,
+            "cacheRead": 42863104,
+            "cacheWrite": 0
           }
         }
       },
@@ -58,16 +84,34 @@
           "output": 63672,
           "cacheRead": 8283531,
           "cacheWrite": 204721
+        },
+        "anthropic/claude-haiku-4-5": {
+          "input": 271,
+          "output": 200,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 15820,
+          "output": 3135,
+          "cacheRead": 747135,
+          "cacheWrite": 101843
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 956310,
+          "output": 125139,
+          "cacheRead": 42863104,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 14.181351,
-        "pricingAsOf": "2026-07-13T04:53:03.052Z"
+        "usd": 24.202691,
+        "pricingAsOf": "2026-07-13T06:03:00.033Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "kimi-k2.7-code"
+  "model": "claude-sonnet-5"
 }
