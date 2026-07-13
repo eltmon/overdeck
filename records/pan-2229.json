@@ -41,6 +41,11 @@
       "timestamp": "2026-07-13T14:35:49.183Z",
       "reason": "start",
       "agentModel": "kimi-k2.7-code"
+    },
+    {
+      "timestamp": "2026-07-13T15:33:32.580Z",
+      "reason": "end",
+      "note": "Addressed feedback: fixed flaky verification timeouts from ignored Vitest v4 fork config; npm test/typecheck/lint pass"
     }
   ],
   "feedback": [],
@@ -110,7 +115,7 @@
     "recordedAt": "2026-07-13T15:33:26.736Z"
   },
   "created": "2026-07-10T21:05:49.847Z",
-  "updated": "2026-07-13T15:33:26.737Z",
+  "updated": "2026-07-13T15:33:32.665Z",
   "pipeline": {
     "issueId": "PAN-2229",
     "reviewStatus": "pending",
@@ -120,9 +125,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T15:09:56.178Z",
+    "updatedAt": "2026-07-13T15:33:32.582Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2638",
-    "reviewRequestedAt": "2026-07-13T14:20:36.574Z",
+    "reviewRequestedAt": "2026-07-13T15:33:32.581Z",
     "reviewSpawnedAt": "2026-07-13T14:28:17.521Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -133,7 +138,9 @@
         "package.json",
         "tests/unit/evals/lib/prompt-harness.test.ts",
         "tests/unit/evals/prompt-rails.test.ts",
-        "tests/unit/scripts/check-prompt-change-trailer.test.ts"
+        "tests/unit/scripts/check-prompt-change-trailer.test.ts",
+        "tests/unit/vitest-config.test.ts",
+        "vitest.config.ts"
       ],
       "declaredScopeUntouched": [
         "evals/fixtures/flywheel/board-auto-pickup-off.json",
@@ -181,9 +188,11 @@
         "tests/unit/evals/lib/prompt-harness.test.ts",
         "tests/unit/evals/prompt-rails.test.ts",
         "tests/unit/prompts/prompt-invariants.test.ts",
-        "tests/unit/scripts/check-prompt-change-trailer.test.ts"
+        "tests/unit/scripts/check-prompt-change-trailer.test.ts",
+        "tests/unit/vitest-config.test.ts",
+        "vitest.config.ts"
       ],
-      "recordedAt": "2026-07-13T14:19:02.691Z"
+      "recordedAt": "2026-07-13T15:33:26.736Z"
     }
   },
   "closeOut": {
@@ -235,9 +244,9 @@
             "cacheWrite": 0
           },
           "custom/kimi-k2.7-code": {
-            "input": 7248240,
-            "output": 125458,
-            "cacheRead": 98476544,
+            "input": 7492762,
+            "output": 154837,
+            "cacheRead": 109638144,
             "cacheWrite": 0
           }
         }
@@ -274,15 +283,15 @@
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 7248240,
-          "output": 125458,
-          "cacheRead": 98476544,
+          "input": 7492762,
+          "output": 154837,
+          "cacheRead": 109638144,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 49.283437,
-        "pricingAsOf": "2026-07-13T15:09:56.221Z"
+        "usd": 51.753951,
+        "pricingAsOf": "2026-07-13T15:33:32.664Z"
       }
     },
     "merges": [
