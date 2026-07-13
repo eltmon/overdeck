@@ -52,9 +52,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-13T10:18:14.994Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-13T10:24Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-13T10:24:19.114Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-13T10:24:19Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2596\n\n# Review Synthesis — PAN-2596 — 2026-07-13T06:23:48-04:00\n\n## Verdict: CHANGES REQUESTED — dotfile and extensionless filenames bypass rejection when declared as images\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2596/.pan/review/agent-pan-2596-review-6963ab31/context.json\n- Branch: feature/pan-2596\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2596\n- HEAD reviewed: 6963ab31309ae138d5532a7150447e95fcc1bcaa\n- Cycle number: 2\n- Prior cycle SHA: a13f42ba507501e32535d52188811f5440136770\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2596/.pan/review/agent-pan-2596-review-6963ab31/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2596/.pan/review/agent-pan-2596-review-6963ab31/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2596/.pan/review/agent-pan-2596-review-6963ab31/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2596/.pan/review/agent-pan-2596-review-6963ab31/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Dotfile and extensionless filenames bypass rejection when declared as images — `src/lib/overdeck/conversation-message.ts:136`\n`validateUploadPayload` accepts any allowed image MIME type after magic-byte validation and returns before checking the original filename. `safeUploadExtension` then stores the upload under a generated image extension, so a direct upload request can send `filename=.env` or `filename=Makefile` with `mimeType=image/png` and valid PNG bytes and have it accepted. The frontend mirrors the same issue: `classifyAttachmentKind` accepts `file.type.startsWith('image/')` before the dotfile and extensionless filename helpers can reject the name.\n\nThis is in the PR diff and violates the must-not constraint that extensionless files and dotfiles remain unsupported. Enforce the basename policy before MIME/type acceptance on both server and frontend, then keep the existing image magic-byte validation for allowed image filenames.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\n- security\n- performance\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2596/.pan/review/agent-pan-2596-review-6963ab31/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2596 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/frontend/src/App.test.tsx"
@@ -86,18 +99,18 @@
     "recordedAt": "2026-07-13T09:57:24.734Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T10:22:00.549Z",
+  "updated": "2026-07-13T10:24:19.115Z",
   "pipeline": {
     "issueId": "PAN-2596",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T10:22:00.462Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-13T10:24:18.371Z",
+    "reviewNotes": "Dotfile and extensionless filenames bypass rejection when declared as images",
     "verificationNotes": "Verification FAILED at test (107741ms):\n\n[2m) // element.getAttribute(\"href\") === \"https://example.com/\"\u001b[22m\n\nExpected the element to have attribute:\n\u001b[32m  href=\"https://example.com/\"\u001b[39m\nReceived:\n\u001b[31m  href=\"https://example.com\"\u001b[39m\n\nIgnored nodes: comments, script, style\n\u001b[36m<html>\u001b[39m\n  \u001b[36m<head />\u001b[39m\n  \u001b[36m<body>\u001b[39m\n    \u001b[36m<div>\u001b[39m\n      \u001b[36m<div\u001b[39m\n        \u001b[33mclass\u001b[39m=\u001b[32m\"_chatMarkdown_10de07\"\u001b[39m\n      \u001b[36m>\u001b[39m\n        \u001b[36m<div\u001b[39m\n          \u001b[33mclass\u001b[39m=\u001b[32m\"space-y-4 whitespace-normal [&>*:first-child]:mt-0 [&>*:last-child]:mb-0\"\u001b[39m\n        \u001b[36m>\u001b[39m\n          \u001b[36m<p>\u001b[39m\n            \u001b[0mVisit \u001b[0m\n            \u001b[36m<a\u001b[39m\n              \u001b[33mclass\u001b[39m=\u001b[32m\"_mdLink_10de07\"\u001b[39m\n              \u001b[33mhref\u001b[39m=\u001b[32m\"https://example.com/\"\u001b[39m\n              \u001b[33mrel\u001b[39m=\u001b[32m\"noopener noreferrer\"\u001b[39m\n              \u001b[33mtarget\u001b[39m=\u001b[32m\"_blank\"\u001b[39m\n            \u001b[36m>\u001b[39m\n              \u001b[0msite\u001b[0m\n            \u001b[36m</a>\u001b[39m\n            \u001b[0m.\u001b[0m\n          \u001b[36m</p>\u001b[39m\n        \u001b[36m</div>\u001b[39m\n      \u001b[36m</div>\u001b[39m\n    \u001b[36m</div>\u001b[39m\n  \u001b[36m</body>\u001b[39m\n\u001b[36m</html>\u001b[39m...\n ❯ src/components/chat/__tests__/ChatMarkdown.test.tsx:121:42\n    119|\n    120|     const external = await screen.findByRole('link', { name: 'site' });\n    121|     await waitFor(() => expect(external).toHaveAttribute('href', 'http…\n       |                                          ^\n    122|     expect(external).toHaveAttribute('target', '_blank');\n    123|     expect(external).toHaveAttribute('rel', 'noopener noreferrer');\n ❯ runWithExpensiveErrorDiagnosticsDisabled ../../../node_modules/.bun/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/config.js:47:12\n ❯ checkCallback ../../../node_modules/.bun/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/wait-for.js:124:77\n ❯ Timeout.checkRealTimersCallback ../../../node_modules/.bun/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/wait-for.js:118:16\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n",
     "inspectNotes": "Bead server-upload-allowlist ack: validateUploadPayload correctly gates UTF-8 text extensions, PDF %PDF- magic prefix, and disallowed/extension-less types with 400s naming the mismatch, while preserving image magic-byte validation and <uuid><ext> naming; non-image files get <uuid>-<sanitized-name><ext>. All 5 ACs verified against diff + accompanying unit tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2634",
@@ -130,6 +143,24 @@
         "tests/unit/lib/overdeck/conversation-upload-validation.test.ts"
       ],
       "recordedAt": "2026-07-13T09:47:33.191Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "6963ab31309ae138d5532a7150447e95fcc1bcaa"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "6963ab31309ae138d5532a7150447e95fcc1bcaa"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "6963ab31309ae138d5532a7150447e95fcc1bcaa"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "6963ab31309ae138d5532a7150447e95fcc1bcaa"
+      }
     }
   },
   "closeOut": {
@@ -137,15 +168,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 74609,
-            "output": 138,
-            "cacheRead": 40192,
+            "input": 105884,
+            "output": 232,
+            "cacheRead": 47744,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 8055894,
-            "output": 36061,
-            "cacheRead": 7050752,
+            "input": 8639097,
+            "output": 38144,
+            "cacheRead": 7619840,
             "cacheWrite": 0
           }
         },
@@ -175,24 +206,24 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1227510,
-            "output": 172007,
-            "cacheRead": 71885568,
+            "input": 1240286,
+            "output": 175093,
+            "cacheRead": 74253568,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 74609,
-          "output": 138,
-          "cacheRead": 40192,
+          "input": 105884,
+          "output": 232,
+          "cacheRead": 47744,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 8055894,
-          "output": 36061,
-          "cacheRead": 7050752,
+          "input": 8639097,
+          "output": 38144,
+          "cacheRead": 7619840,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -214,15 +245,15 @@
           "cacheWrite": 85508
         },
         "custom/kimi-k2.7-code": {
-          "input": 1227510,
-          "output": 172007,
-          "cacheRead": 71885568,
+          "input": 1240286,
+          "output": 175093,
+          "cacheRead": 74253568,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 40.499288,
-        "pricingAsOf": "2026-07-13T10:22:00.537Z"
+        "usd": 41.391299000000004,
+        "pricingAsOf": "2026-07-13T10:24:18.439Z"
       }
     },
     "merges": [
