@@ -62,6 +62,16 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-13T11:58:19.939Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T12:03:20.007Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T12:03:20.328Z"
     }
   ],
   "feedback": [],
@@ -187,7 +197,7 @@
     "recordedAt": "2026-07-13T11:57:13.297Z"
   },
   "created": "2026-07-12T22:33:37.108Z",
-  "updated": "2026-07-13T12:03:18.843Z",
+  "updated": "2026-07-13T12:03:20.328Z",
   "pipeline": {
     "issueId": "PAN-2602",
     "reviewStatus": "reviewing",
@@ -436,8 +446,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "sync-local-write-detection": "completed",
     "branch-ahead-signal": "completed",
