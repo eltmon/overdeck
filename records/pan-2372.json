@@ -1,0 +1,78 @@
+{
+  "issueId": "PAN-2372",
+  "schemaVersion": 2,
+  "feedback": [],
+  "harness": "claude-code",
+  "model": "glm-5.2",
+  "pipeline": {
+    "issueId": "PAN-2372",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
+    "mergeStatus": "merged",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-13T03:19:16.899Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2562",
+    "lastVerifiedCommit": "fe313fab31c68cd77177c3890ad0e2b2f0b65953",
+    "reviewSpawnedAt": "2026-07-10T20:07:58.783Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 28473,
+            "output": 100,
+            "cacheRead": 3072,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.5": {
+            "input": 2901796,
+            "output": 11088,
+            "cacheRead": 2568448,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 16205,
+            "output": 78219,
+            "cacheRead": 13633013,
+            "cacheWrite": 235996
+          }
+        }
+      },
+      "totals": {
+        "openai/codex-auto-review": {
+          "input": 28473,
+          "output": 100,
+          "cacheRead": 3072,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.5": {
+          "input": 2901796,
+          "output": 11088,
+          "cacheRead": 2568448,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 16205,
+          "output": 78219,
+          "cacheRead": 13633013,
+          "cacheWrite": 235996
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 23.939582,
+        "pricingAsOf": "2026-07-13T03:19:16.983Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2562"
+    ],
+    "ranOn": "eltmon-z790"
+  },
+  "created": "2026-07-13T03:19:16.986Z",
+  "updated": "2026-07-13T03:19:16.986Z"
+}

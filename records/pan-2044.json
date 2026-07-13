@@ -92,18 +92,19 @@
   ],
   "feedback": [],
   "created": "2026-06-24T16:16:16.756Z",
-  "updated": "2026-07-06T12:54:15.335Z",
+  "updated": "2026-07-13T03:18:01.574Z",
   "pipeline": {
     "issueId": "PAN-2044",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-06-25T11:37:42.865Z",
+    "updatedAt": "2026-07-13T03:18:01.574Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2048",
-    "lastVerifiedCommit": "8438f38c9c4f1b9717243bce0faafe7038191603"
+    "lastVerifiedCommit": "8438f38c9c4f1b9717243bce0faafe7038191603",
+    "closedOut": true,
+    "closedOutAt": "2026-07-13T03:18:01.574Z"
   },
   "closeOut": {
     "usage": {
@@ -197,8 +198,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8",
+  "harness": "ohmypi",
+  "model": "glm-5.2",
   "statusOverrides": {
     "driver-readonly-option": "completed",
     "driver-readonly-option.ac1": "completed",

@@ -123,19 +123,22 @@
   },
   "pipeline": {
     "issueId": "PAN-2468",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-09T13:58:24.919Z",
+    "updatedAt": "2026-07-13T03:18:53.509Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "testNotes": "Role-based verification for PAN-2468 completed. Track A self-test, TypeScript typecheck, and ESLint lint all passed. The vitest project gate failed with two fixture/matrix omissions: (1) the synced-skills fixture is missing the pan-knowledge skill added by WI-17, and (2) the G3 no-loss matrix is missing the GET /api/issues/:id/ship-log route present in src/dashboard/server/routes/issues.ts. Both failures require updates to test fixtures/matrix files. Because the instructions prohibit editing code, tests, fixtures, snapshots, or configuration, the verdict is TESTS FAILED.",
     "inspectNotes": "Bead ollama-ensure ack: curl|sh auto-install replaced with macOS-only Homebrew path + explicit manual-install error on other platforms; verified the change is isolated to installOllamaWithPlatformCommand() and does not affect AC1/AC2 test paths (both go through the injectable options.installOllama hook), and AC3 PAN-1641 note test at ollama.test.ts:131 is untouched.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2488",
+    "reviewedAtCommit": "153415d43a4d0d47cabf9f3abeb67812cc2e3a89",
     "lastVerifiedCommit": "097e1cf5085230887d2dc55b73af4fb5b8266f1a",
     "reviewRequestedAt": "2026-07-09T08:04:54.567Z",
+    "reviewSpawnedAt": "2026-07-09T13:58:21.759Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/records/pan-2468.json",
@@ -353,9 +356,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 128177141,
-            "output": 274992,
-            "cacheRead": 122921600,
+            "input": 129345337,
+            "output": 278156,
+            "cacheRead": 124076672,
             "cacheWrite": 0
           }
         },
@@ -409,9 +412,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 3033905,
-            "output": 284101,
-            "cacheRead": 150048020,
+            "input": 3037023,
+            "output": 284553,
+            "cacheRead": 151120148,
             "cacheWrite": 0
           }
         }
@@ -430,9 +433,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 128177141,
-          "output": 274992,
-          "cacheRead": 122921600,
+          "input": 129345337,
+          "output": 278156,
+          "cacheRead": 124076672,
           "cacheWrite": 0
         },
         "anthropic/claude-opus-4-8": {
@@ -460,15 +463,15 @@
           "cacheWrite": 231255
         },
         "custom/kimi-k2.7-code": {
-          "input": 4448715,
-          "output": 320511,
-          "cacheRead": 173788180,
+          "input": 4451833,
+          "output": 320963,
+          "cacheRead": 174860308,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 169.14615425,
-        "pricingAsOf": "2026-07-09T13:58:24.951Z"
+        "usd": 170.09270425,
+        "pricingAsOf": "2026-07-13T03:18:53.544Z"
       }
     },
     "merges": [
@@ -477,5 +480,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-09T08:06:45.604Z",
-  "updated": "2026-07-09T13:58:24.957Z"
+  "updated": "2026-07-13T03:18:53.545Z"
 }
