@@ -301,6 +301,53 @@ describe('handoff fork handshake', () => {
     rmSync(home, { recursive: true, force: true });
   });
 
+  it('persists an explicit issueId instead of inheriting the source conversation issue', async () => {
+    const home = join(tmpdir(), `pan-handoff-issue-override-${Date.now()}`);
+    const source = await createSourceConversation(home, { issueId: 'PAN-1358' });
+    const docText = validDoc();
+
+    vi.mocked(deliverAgentMessage).mockImplementation(async (_agentId, message) => {
+      const outputPath = message.match(/`([^`]+\/handoffs\/[^`]+\.md)`/)?.[1];
+      if (!outputPath) throw new Error('missing output path');
+      await mkdir(dirname(outputPath), { recursive: true });
+      await writeFile(outputPath, docText, 'utf-8');
+      await writeFile(`${outputPath}.done`, '', 'utf-8');
+    });
+
+    const result = await Effect.runPromise(createSummaryFork(source, {
+      forkMode: 'handoff',
+      issueId: 'PAN-9004',
+      handoffAuthor: 'source',
+    }));
+
+    expect(result.conversation.issueId).toBe('PAN-9004');
+    expect(getConversationByName(result.conversation.name)?.issueId).toBe('PAN-9004');
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it('inherits the source conversation issue when no explicit issueId is provided', async () => {
+    const home = join(tmpdir(), `pan-handoff-issue-inherit-${Date.now()}`);
+    const source = await createSourceConversation(home, { issueId: 'PAN-1358' });
+    const docText = validDoc();
+
+    vi.mocked(deliverAgentMessage).mockImplementation(async (_agentId, message) => {
+      const outputPath = message.match(/`([^`]+\/handoffs\/[^`]+\.md)`/)?.[1];
+      if (!outputPath) throw new Error('missing output path');
+      await mkdir(dirname(outputPath), { recursive: true });
+      await writeFile(outputPath, docText, 'utf-8');
+      await writeFile(`${outputPath}.done`, '', 'utf-8');
+    });
+
+    const result = await Effect.runPromise(createSummaryFork(source, {
+      forkMode: 'handoff',
+      handoffAuthor: 'source',
+    }));
+
+    expect(result.conversation.issueId).toBe('PAN-1358');
+    expect(getConversationByName(result.conversation.name)?.issueId).toBe('PAN-1358');
+    rmSync(home, { recursive: true, force: true });
+  });
+
   it('falls back to summary fork when the source conversation has ended', async () => {
     const home = join(tmpdir(), `pan-handoff-ended-${Date.now()}`);
     const source = await createSourceConversation(home, { status: 'ended' });

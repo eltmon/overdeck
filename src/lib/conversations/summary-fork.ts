@@ -52,6 +52,7 @@ export interface SummaryForkOptions {
   harness?: RuntimeName;
   localSummaryOnly?: boolean;
   forkMode?: SummaryForkMode;
+  issueId?: string;
   focus?: string;
   handoffTimeoutMs?: number;
   handoffPollIntervalMs?: number;
@@ -677,7 +678,7 @@ async function createSummaryForkPromise(
     name: newName,
     tmuxSession: newTmux,
     cwd,
-    issueId: conv.issueId ?? undefined,
+    issueId: options.issueId ?? conv.issueId ?? undefined,
     title: effectiveForkMode === 'plain'
       ? `Fork: ${conv.title || conv.name}`
       : effectiveForkMode === 'handoff'
