@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import type { Command } from 'commander';
 import { Schema } from 'effect';
 import { HygieneReport as HygieneReportSchema, type HygieneReport } from '@overdeck/contracts';
 import { collectHygieneReport } from '../../lib/hygiene.js';
@@ -62,4 +63,12 @@ export async function hygieneCommand(options: HygieneCommandOptions): Promise<vo
     console.error(chalk.red('Hygiene findings require attention.'));
     process.exitCode = 1;
   }
+}
+
+export function registerHygieneCommand(program: Command): void {
+  program.command('hygiene').description('Audit push, worktree, PR, agent, session, branch, workspace, and disk hygiene')
+    .option('--json', 'Emit a schema-validated JSON report').option('--strict', 'Exit 1 when any finding needs attention')
+    .option('--skip <check...>', 'Skip checks: push tree prs agents sessions branches workspaces').option('--since <duration>', 'Age threshold for stale branches/workspaces', '4w')
+    .option('--fix-safe', 'Delete only confirmed merged branches; under disk pressure remove independently verified clean terminal workspaces')
+    .option('--fix-disk-pressure-floor <GB>', 'Override the disk cleanup floor used with --fix-safe').action(hygieneCommand);
 }

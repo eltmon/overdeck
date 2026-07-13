@@ -1,8 +1,10 @@
 import chalk from 'chalk';
+import type { Command } from 'commander';
 import { execSync } from 'child_process';
 import { readlinkSync } from 'fs';
 import { listSessionsSync } from '../../lib/tmux.js';
 import { listConversations } from '../../lib/overdeck/conversations.js';
+import { registerHygieneCommand } from './hygiene.js';
 
 interface ResourcesOptions {
   json?: boolean;
@@ -457,4 +459,9 @@ export function resourcesCommand(options: ResourcesOptions): void {
   }
 
   printReport(report);
+}
+
+export function registerResourceCommands(program: Command): void {
+  program.command('resources').description('Show RAM usage by agents, conversations, and system processes').option('--json', 'Output as JSON').action(resourcesCommand);
+  registerHygieneCommand(program);
 }
