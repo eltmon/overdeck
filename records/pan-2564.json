@@ -11,16 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-12T17:54:45.646Z",
-  "updated": "2026-07-13T05:36:13.211Z",
+  "updated": "2026-07-13T05:48:21.176Z",
   "pipeline": {
     "issueId": "PAN-2564",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T05:17:44.963Z"
+    "updatedAt": "2026-07-13T05:42:51.673Z",
+    "inspectNotes": "Bead config-standardize ack: src/lib/beads/config-standardize.ts implements removeNoDbKey (AC1), sync.remote-vs-origin validation with actionable bd config set message (AC2), and gitignore patterns for dolt/, embeddeddolt/, dolt-server.*, *.dolt, .beads/backup/ in both project and .beads gitignores (AC3), wired into pan beads doctor before bd doctor in src/cli/commands/beads.ts; 11/11 unit tests in tests/unit/lib/beads/config-standardize.test.ts pass, verified live."
   },
   "closeOut": {
     "usage": {
@@ -32,6 +34,22 @@
             "cacheRead": 5105984,
             "cacheWrite": 198579
           }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 14215,
+            "output": 4067,
+            "cacheRead": 840073,
+            "cacheWrite": 128834
+          }
+        },
+        "work": {
+          "custom/kimi-k2.7-code": {
+            "input": 250448,
+            "output": 42022,
+            "cacheRead": 12510208,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
@@ -40,18 +58,30 @@
           "output": 56596,
           "cacheRead": 5105984,
           "cacheWrite": 198579
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 14215,
+          "output": 4067,
+          "cacheRead": 840073,
+          "cacheWrite": 128834
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 250448,
+          "output": 42022,
+          "cacheRead": 12510208,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 10.656266,
-        "pricingAsOf": "2026-07-13T05:17:45.009Z"
+        "usd": 13.998428,
+        "pricingAsOf": "2026-07-13T05:42:51.808Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "glm-5.2",
   "statusOverrides": {
     "migration-gate": "running",
     "beads-home": "running",
@@ -62,20 +92,6 @@
   },
   "swarm": {
     "slotAssignments": [
-      {
-        "slotIndex": 1,
-        "itemId": "migration-gate",
-        "agentId": "agent-pan-2564-slot-1",
-        "branch": "feature/pan-2564-slot-1",
-        "assignedAt": "2026-07-13T05:17:44.229Z"
-      },
-      {
-        "slotIndex": 2,
-        "itemId": "beads-home",
-        "agentId": "agent-pan-2564-slot-2",
-        "branch": "feature/pan-2564-slot-2",
-        "assignedAt": "2026-07-13T05:17:54.403Z"
-      },
       {
         "slotIndex": 3,
         "itemId": "config-standardize",
