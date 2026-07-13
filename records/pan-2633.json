@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T08:48:04.494Z",
-  "updated": "2026-07-13T20:32:46.289Z",
+  "updated": "2026-07-13T20:44:10.391Z",
   "pipeline": {
     "issueId": "PAN-2633",
     "reviewStatus": "pending",
@@ -91,22 +91,23 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "reducer-liveness-gate": "completed",
     "reducer-liveness-gate.reducer-liveness-gate.ac1": "completed",
     "reducer-liveness-gate.reducer-liveness-gate.ac2": "completed",
     "reducer-liveness-gate.reducer-liveness-gate.ac3": "completed",
-    "reducer-liveness-gate.reducer-liveness-gate.ac4": "completed"
+    "reducer-liveness-gate.reducer-liveness-gate.ac4": "completed",
+    "emitter-liveness-threading": "running"
   },
   "swarm": {
     "slotAssignments": [
       {
-        "slotIndex": 1,
-        "itemId": "reducer-liveness-gate",
-        "agentId": "agent-pan-2633-slot-1",
-        "branch": "feature/pan-2633-slot-1",
-        "assignedAt": "2026-07-13T20:08:05.689Z"
+        "slotIndex": 2,
+        "itemId": "emitter-liveness-threading",
+        "agentId": "agent-pan-2633-slot-2",
+        "branch": "feature/pan-2633-slot-2",
+        "assignedAt": "2026-07-13T20:44:10.391Z"
       }
     ],
     "slotCompletions": {}
