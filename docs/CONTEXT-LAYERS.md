@@ -98,7 +98,10 @@ markers:
 ```
 
 Content **outside** the markers is preserved untouched — a hand-authored
-`~/.claude/CLAUDE.md` is never clobbered. Edit the layer source
+`~/.claude/CLAUDE.md` is never clobbered. The sole managed-content exception is
+a block explicitly marked `BEGIN/END BEADS INTEGRATION`: `pan sync` removes it
+because Beads' generic conservative Git profiles conflict with Overdeck's
+managed-work lifecycle. Edit the layer source
 (`global.md` / `project.md`) and re-run `pan sync`; never edit the region
 directly.
 

@@ -19,6 +19,18 @@ export const REGION_BEGIN =
 /** Closing marker of the Overdeck-managed region. */
 export const REGION_END = '<!-- END OVERDECK CONTEXT -->';
 
+const BEADS_REGION = /<!-- BEGIN BEADS INTEGRATION\b[\s\S]*?<!-- END BEADS INTEGRATION -->\s*/g;
+
+/**
+ * Remove bd's generic agent-policy block before Overdeck renders its canonical
+ * project context. The Beads block's conservative/minimal profiles forbid the
+ * commit and push operations that managed work agents must perform per bead.
+ * Its marker makes the ownership unambiguous; hand-authored content remains.
+ */
+export function stripBeadsManagedRegion(existing: string): string {
+  return existing.replace(BEADS_REGION, '').replace(/\n{3,}/g, '\n\n').trimEnd();
+}
+
 /**
  * Insert or replace the Overdeck-managed region inside an existing file.
  *
@@ -28,6 +40,7 @@ export const REGION_END = '<!-- END OVERDECK CONTEXT -->';
  * span between the markers.
  */
 export function applyManagedRegion(existing: string, managed: string): string {
+  existing = stripBeadsManagedRegion(existing);
   const region = `${REGION_BEGIN}\n${managed.trim()}\n${REGION_END}`;
   const beginIdx = existing.indexOf(REGION_BEGIN);
   // Use the LAST end-marker, not the first. Layer content may legitimately
