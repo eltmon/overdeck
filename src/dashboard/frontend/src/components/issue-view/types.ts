@@ -111,11 +111,19 @@ export interface VerificationGateModel {
   status: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
 }
 
+export interface ShipLogModel {
+  startedAt?: string;
+  updatedAt?: string;
+  step?: string;
+  lines: Array<{ ts: string; line: string }>;
+}
+
 export interface IssueShipModel {
   status: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed' | 'ready';
   readyForMerge: boolean;
   mergeStep: string | null;
   blockerReason?: string;
+  log?: ShipLogModel | null;
 }
 
 export interface IssueBeadsModel {

@@ -21,8 +21,18 @@ export const AGENT_ROW_SECTIONS = [
 
 export type AgentRowSection = (typeof AGENT_ROW_SECTIONS)[number];
 
+export const SHIP_PROGRESS_SECTIONS = [
+  'ship-progress-full',
+  'ship-progress-compact',
+  'ship-progress-steps',
+  'ship-progress-step',
+  'ship-progress-log',
+] as const;
+
+export type ShipProgressSection = (typeof SHIP_PROGRESS_SECTIONS)[number];
+
 /** Full inventory of all issue-view sections that participate in the no-loss gate. */
 export const SECTION_INVENTORY: readonly string[] = [
   ...AGENT_ROW_SECTIONS,
-  // placeholder for future wave-1/wave-2 sections; add here as they land
+  ...SHIP_PROGRESS_SECTIONS,
 ];

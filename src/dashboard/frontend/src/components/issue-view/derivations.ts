@@ -1,5 +1,6 @@
 import type { AgentSnapshot, SessionNode } from '@overdeck/contracts';
 import type { ReviewStatusData } from '../CommandDeck/ZoneCOverviewTabs/queries';
+import type { IssueShipModel, ShipLogModel } from './types';
 
 /**
  * Issue-view derivations (PAN-2499).
@@ -42,4 +43,26 @@ export function stuckReason(reviewStatus: ReviewStatusData | undefined): string 
   if (reviewStatus?.mergeStatus === 'failed') return 'Merge failed';
   if (reviewStatus?.verificationStatus === 'failed') return 'Verification failed';
   return 'Needs attention';
+}
+
+/** Derive the unified ship model from review status and the optional ship log. */
+export function deriveShip(
+  reviewStatus: ReviewStatusData | undefined,
+  log?: ShipLogModel | null,
+): IssueShipModel {
+  let status: IssueShipModel['status'] = 'pending';
+  if (reviewStatus?.mergeStatus === 'merged') status = 'merged';
+  else if (readyForMerge(reviewStatus)) status = 'ready';
+  else if (reviewStatus?.mergeStatus === 'queued') status = 'queued';
+  else if (reviewStatus?.mergeStatus === 'merging') status = 'merging';
+  else if (reviewStatus?.mergeStatus === 'verifying') status = 'verifying';
+  else if (reviewStatus?.mergeStatus === 'failed') status = 'failed';
+
+  return {
+    status,
+    readyForMerge: readyForMerge(reviewStatus),
+    mergeStep: mergeStep(reviewStatus),
+    blockerReason: status === 'ready' || status === 'merged' ? undefined : stuckReason(reviewStatus),
+    log: log ?? null,
+  };
 }

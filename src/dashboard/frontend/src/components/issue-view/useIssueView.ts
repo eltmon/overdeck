@@ -5,14 +5,16 @@ import {
   useActivityQuery,
   useIssueCostsQuery,
   useReviewStatusQuery,
+  useShipLogQuery,
   useWorkspaceQuery,
   type ActivityResponse,
   type ActivitySection,
   type IssueCostData,
   type ReviewStatusData,
+  type ShipLogData,
   type WorkspaceData,
 } from '../CommandDeck/ZoneCOverviewTabs/queries';
-import { isAgentRunning, mergeStep, readyForMerge, stuckReason } from './derivations';
+import { deriveShip, isAgentRunning, readyForMerge } from './derivations';
 import type {
   AgentRowModel,
   IssueActivityModel,
@@ -374,20 +376,13 @@ function deriveVerification(reviewStatus: ReviewStatusData | undefined): IssueVe
   };
 }
 
-function deriveShip(reviewStatus: ReviewStatusData | undefined): IssueShipModel {
-  let status: IssueShipModel['status'] = 'pending';
-  if (reviewStatus?.mergeStatus === 'merged') status = 'merged';
-  else if (readyForMerge(reviewStatus)) status = 'ready';
-  else if (reviewStatus?.mergeStatus === 'queued') status = 'queued';
-  else if (reviewStatus?.mergeStatus === 'merging') status = 'merging';
-  else if (reviewStatus?.mergeStatus === 'verifying') status = 'verifying';
-  else if (reviewStatus?.mergeStatus === 'failed') status = 'failed';
-
+function toShipLogModel(data: ShipLogData | undefined): import('./types').ShipLogModel | null {
+  if (!data?.log) return null;
   return {
-    status,
-    readyForMerge: readyForMerge(reviewStatus),
-    mergeStep: mergeStep(reviewStatus),
-    blockerReason: status === 'ready' || status === 'merged' ? undefined : stuckReason(reviewStatus),
+    startedAt: data.log.startedAt,
+    updatedAt: data.log.updatedAt,
+    step: data.log.step,
+    lines: data.log.lines,
   };
 }
 
@@ -463,6 +458,7 @@ export function buildIssueViewModel(
   workspace: WorkspaceData | undefined,
   activity: ActivityResponse | undefined,
   agentsById: Record<string, AgentSnapshot>,
+  shipLog?: ShipLogData | undefined,
 ): IssueViewModel {
   const sessions = (activity?.sections ?? []).map(toSessionNode);
   const agents = sessions.map((session) => buildAgentRow(session, agentsById, costs));
@@ -473,7 +469,7 @@ export function buildIssueViewModel(
     pipeline: derivePipeline(reviewStatus, sessions),
     agents,
     verification: deriveVerification(reviewStatus),
-    ship: deriveShip(reviewStatus),
+    ship: deriveShip(reviewStatus, toShipLogModel(shipLog)),
     beads: deriveBeads(),
     activity: deriveActivity(activity),
     resources: deriveResources(workspace),
@@ -493,6 +489,7 @@ export function useIssueView(
   const costs = useIssueCostsQuery(issueId);
   const workspace = useWorkspaceQuery(issueId);
   const activity = useActivityQuery(issueId);
+  const shipLog = useShipLogQuery(issueId);
   const agentsById = useDashboardStore((s) => s.agentsById);
 
   return useMemo(
@@ -507,6 +504,7 @@ export function useIssueView(
         workspace.data,
         activity.data,
         agentsById,
+        shipLog.data,
       ),
     [
       issueId,
@@ -518,6 +516,7 @@ export function useIssueView(
       workspace.data,
       activity.data,
       agentsById,
+      shipLog.data,
     ],
   );
 }

@@ -7,6 +7,7 @@ import {
   useActivityQuery,
   useIssueCostsQuery,
   useReviewStatusQuery,
+  useShipLogQuery,
   useWorkspaceQuery,
   type ActivityResponse,
   type IssueCostData,
@@ -441,6 +442,7 @@ describe('useIssueView hook', () => {
     vi.mocked(useIssueCostsQuery).mockReturnValue({ data: undefined } as ReturnType<typeof useIssueCostsQuery>);
     vi.mocked(useWorkspaceQuery).mockReturnValue({ data: undefined } as ReturnType<typeof useWorkspaceQuery>);
     vi.mocked(useActivityQuery).mockReturnValue({ data: undefined } as ReturnType<typeof useActivityQuery>);
+    vi.mocked(useShipLogQuery).mockReturnValue({ data: undefined } as ReturnType<typeof useShipLogQuery>);
     vi.mocked(useDashboardStore).mockImplementation((selector) => selector({ agentsById: {} } as never));
 
     const { result } = renderHook(() => useIssueView('PAN-2499'), { wrapper: wrapper(queryClient) });
@@ -449,6 +451,7 @@ describe('useIssueView hook', () => {
     expect(useIssueCostsQuery).toHaveBeenCalledWith('PAN-2499');
     expect(useWorkspaceQuery).toHaveBeenCalledWith('PAN-2499');
     expect(useActivityQuery).toHaveBeenCalledWith('PAN-2499');
+    expect(useShipLogQuery).toHaveBeenCalledWith('PAN-2499');
     expect(result.current.header.issueId).toBe('PAN-2499');
   });
 
@@ -459,6 +462,7 @@ describe('useIssueView hook', () => {
     vi.mocked(useIssueCostsQuery).mockReturnValue({ data: undefined } as ReturnType<typeof useIssueCostsQuery>);
     vi.mocked(useWorkspaceQuery).mockReturnValue({ data: undefined } as ReturnType<typeof useWorkspaceQuery>);
     vi.mocked(useActivityQuery).mockReturnValue({ data: activity } as ReturnType<typeof useActivityQuery>);
+    vi.mocked(useShipLogQuery).mockReturnValue({ data: undefined } as ReturnType<typeof useShipLogQuery>);
     vi.mocked(useDashboardStore).mockImplementation((selector) => selector({ agentsById: { 'agent-pan-2499-slot-2': agent } } as never));
 
     const { result } = renderHook(() => useIssueView('PAN-2499'), { wrapper: wrapper(queryClient) });

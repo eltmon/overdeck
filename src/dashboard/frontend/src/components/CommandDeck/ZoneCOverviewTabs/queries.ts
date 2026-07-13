@@ -287,6 +287,34 @@ export function useReviewStatusQuery(issueId: string): UseQueryResult<ReviewStat
   });
 }
 
+export interface ShipLogEntry {
+  ts: string;
+  line: string;
+}
+
+export interface ShipLogData {
+  issueId: string;
+  mergeStatus: string | null;
+  mergeStep: string | null;
+  log: {
+    startedAt: string;
+    updatedAt: string;
+    step?: string;
+    lines: ShipLogEntry[];
+  } | null;
+}
+
+export function useShipLogQuery(issueId: string): UseQueryResult<ShipLogData> {
+  return useQuery({
+    queryKey: ['ship-log', issueId],
+    queryFn: () => fetchJson<ShipLogData>(`/api/issues/${issueId}/ship-log`),
+    refetchInterval: (query) => {
+      const s = query.state.data?.mergeStatus;
+      return s === 'merging' || s === 'verifying' ? 2_000 : 15_000;
+    },
+  });
+}
+
 export function useIssueCostsQuery(issueId: string): UseQueryResult<IssueCostData> {
   return useQuery({
     queryKey: ['issueCosts', issueId],
