@@ -2,7 +2,7 @@
   "issueId": "PAN-2229",
   "schemaVersion": 2,
   "created": "2026-07-10T21:05:49.847Z",
-  "updated": "2026-07-13T13:35:07.490Z",
+  "updated": "2026-07-13T14:18:55.771Z",
   "feedback": [],
   "pipeline": {
     "issueId": "PAN-2229",
@@ -68,5 +68,32 @@
       "reason": "start",
       "agentModel": "kimi-k2.7-code"
     }
-  ]
+  ],
+  "statusOverrides": {
+    "review-blocker-format-eval": "completed",
+    "review-blocker-format-eval.ac1": "completed",
+    "review-blocker-format-eval.ac2": "completed",
+    "review-blocker-format-eval.ac3": "completed",
+    "review-blocker-format-eval.ac4": "completed",
+    "flywheel-launch-eval": "completed",
+    "flywheel-launch-eval.ac1": "completed",
+    "flywheel-launch-eval.ac2": "completed",
+    "flywheel-launch-eval.ac3": "completed",
+    "flywheel-launch-eval.ac4": "completed",
+    "prompt-eval-docs": "completed",
+    "prompt-eval-docs.ac1": "completed",
+    "prompt-eval-docs.ac2": "completed",
+    "prompt-eval-docs.ac3": "completed",
+    "ci-prompt-change-gate": "completed",
+    "ci-prompt-change-gate.ac1": "completed",
+    "ci-prompt-change-gate.ac2": "completed",
+    "ci-prompt-change-gate.ac3": "completed",
+    "ci-prompt-change-gate.ac4": "completed",
+    "prompt-invariant-tests": "completed",
+    "eval-prompt-harness": "completed",
+    "eval-prompt-harness.ac1": "completed",
+    "eval-prompt-harness.ac2": "completed",
+    "eval-prompt-harness.ac3": "completed",
+    "eval-prompt-harness.ac4": "completed"
+  }
 }
