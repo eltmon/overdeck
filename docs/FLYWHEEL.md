@@ -173,6 +173,16 @@ The default brief lives at [`docs/flywheel-brief.md`](./flywheel-brief.md). Cust
 
 Do not put secrets, machine-local paths, or one-time session state in a brief. Put durable operating rules in the brief and transient run state in the Flywheel run directory.
 
+## Prompt-regression protection
+
+`roles/flywheel.md` and `docs/flywheel-brief.md` are load-bearing safety surfaces: the author/assignee gate, the `vetoed`-is-absolute rule, the saturation cap, and the `auto_pickup_backlog` switch exist only in prose. The following protection is in place to catch accidental prompt drift:
+
+- **Deterministic rail tests** in [`tests/unit/evals/prompt-rails.test.ts`](../tests/unit/evals/prompt-rails.test.ts) assert the load-bearing text is still present and run in the default `npm test` path.
+- **Live-model golden-scenario evals** in [`evals/flywheel-launch.eval.ts`](../evals/flywheel-launch.eval.ts) verify the role still produces launch decisions (not just reports) given fixture board states, including the author-gate negative case. They require `OVERDECK_EVAL_MODEL` and do not run in blocking CI.
+- **CI prompt gate** — any PR that diffs `roles/*.md` or `docs/flywheel-brief.md` must include a `Prompt-Change:` trailer in at least one commit. The check is enforced by [`scripts/check-prompt-change-trailer.sh`](../scripts/check-prompt-change-trailer.sh) via the `prompt-gate` CI job and `npm run lint`.
+
+When you change flywheel doctrine, update the rail tests and add a `Prompt-Change:` trailer explaining the behavioral impact. Do not rely on prose alone to preserve safety behavior across edits.
+
 ## Skill → CLI → API → UI map
 
 | Layer | Surface | Responsibility |
