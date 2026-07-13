@@ -312,145 +312,29 @@
     "recordedAt": "2026-07-13T11:57:13.297Z"
   },
   "created": "2026-07-12T22:33:37.108Z",
-  "updated": "2026-07-13T16:08:24.014Z",
+  "updated": "2026-07-13T16:09:22.395Z",
   "pipeline": {
     "issueId": "PAN-2602",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T12:03:05.509Z",
-    "updatedAt": "2026-07-13T16:07:10.585Z",
-    "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
-    "inspectNotes": "Bead beads-rollup-service ack: extractIssueLabels() now gates bare word-number labels through project.issuePrefixes, preventing phase-N labels from creating spurious rollups; tests cover phase exclusion and workspace: label mapping.",
+    "updatedAt": "2026-07-13T16:09:22.319Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-07-13T16:09:22.318Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2636",
+    "reviewedAtCommit": "d1bc4dfb119ca34e40f2ed0014ff3296b2a05eed",
     "lastVerifiedCommit": "d1bc4dfb119ca34e40f2ed0014ff3296b2a05eed",
-    "reviewRequestedAt": "2026-07-13T12:03:05.509Z",
-    "reviewSpawnedAt": "2026-07-13T16:06:59.048Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        "scripts/file-size-baseline.txt",
-        "src/cli/commands/__tests__/handoff.test.ts",
-        "src/cli/commands/close.ts",
-        "src/dashboard/frontend/src/App.test.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
-        "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
-        "src/dashboard/server/services/beads-rollup-singleton.ts",
-        "src/dashboard/server/services/resource-discovery-signals.ts",
-        "src/lib/work/done-preflight.ts",
-        "sync-sources/skills/pan-handoff/SKILL.md",
-        "tests/cloister/verification-runner.test.ts",
-        "tests/dashboard/beads-freshness.test.ts",
-        "tests/unit/cli/fork-client.test.ts",
-        "tests/unit/dashboard/server/routes/conversations-fork-pipeline.test.ts",
-        "tests/unit/dashboard/server/services/resource-discovery.test.ts",
-        "tests/unit/lib/cloister/postmerge-auto-retro.test.ts",
-        "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts",
-        "tests/unit/lib/lifecycle/orphaned-beads-sweep.test.ts",
-        "tests/unit/lib/lifecycle/workflows.test.ts",
-        "tests/unit/lib/webhook-handlers.test.ts"
-      ],
-      "declaredScopeUntouched": [
-        "skills/pan-handoff/SKILL.md",
-        "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
-        "src/dashboard/server/services/__tests__/beads-sync-service.test.ts",
-        "src/dashboard/server/services/__tests__/resource-discovery.test.ts",
-        "src/dashboard/server/services/conversation-lifecycle.ts",
-        "src/lib/cloister/__tests__/verification-runner.test.ts",
-        "src/lib/lifecycle/__tests__/orphaned-beads-sweep.test.ts",
-        "src/lib/lifecycle/__tests__/workflows.test.ts",
-        "tests/unit/lib/cloister/in-flight-guard.test.ts"
-      ],
-      "declaredScope": [
-        "CLAUDE.md",
-        "configuration/beads.mdx",
-        "docs/BEADS.md",
-        "skills/pan-handoff/SKILL.md",
-        "src/cli/commands/__tests__/beads-sweep.test.ts",
-        "src/cli/commands/beads.ts",
-        "src/cli/commands/fork-client.ts",
-        "src/cli/commands/handoff.ts",
-        "src/cli/index.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/__tests__/pipeline-helpers.test.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/pipeline-helpers.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
-        "src/dashboard/server/main.ts",
-        "src/dashboard/server/services/__tests__/beads-rollup-service.test.ts",
-        "src/dashboard/server/services/__tests__/beads-sync-service.test.ts",
-        "src/dashboard/server/services/__tests__/resource-discovery.test.ts",
-        "src/dashboard/server/services/beads-rollup-service.ts",
-        "src/dashboard/server/services/beads-sync-service.ts",
-        "src/dashboard/server/services/conversation-lifecycle.ts",
-        "src/dashboard/server/services/resource-discovery.ts",
-        "src/lib/cloister/__tests__/verification-runner.test.ts",
-        "src/lib/cloister/merge-agent.ts",
-        "src/lib/cloister/verification-runner.ts",
-        "src/lib/lifecycle/__tests__/orphaned-beads-sweep.test.ts",
-        "src/lib/lifecycle/__tests__/workflows.test.ts",
-        "src/lib/lifecycle/orphaned-beads-sweep.ts",
-        "src/lib/lifecycle/workflows.ts",
-        "src/lib/overdeck/conversation-forks.ts",
-        "src/lib/overdeck/conversations.ts",
-        "src/lib/webhook-handlers.ts",
-        "tests/unit/lib/cloister/in-flight-guard.test.ts"
-      ],
-      "actualChangedFiles": [
-        "CLAUDE.md",
-        "configuration/beads.mdx",
-        "docs/BEADS.md",
-        "scripts/file-size-baseline.txt",
-        "src/cli/commands/__tests__/beads-sweep.test.ts",
-        "src/cli/commands/__tests__/handoff.test.ts",
-        "src/cli/commands/beads.ts",
-        "src/cli/commands/close.ts",
-        "src/cli/commands/fork-client.ts",
-        "src/cli/commands/handoff.ts",
-        "src/cli/index.ts",
-        "src/dashboard/frontend/src/App.test.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/__tests__/pipeline-helpers.test.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/pipeline-helpers.ts",
-        "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
-        "src/dashboard/server/main.ts",
-        "src/dashboard/server/services/__tests__/beads-rollup-service.test.ts",
-        "src/dashboard/server/services/beads-rollup-service.ts",
-        "src/dashboard/server/services/beads-rollup-singleton.ts",
-        "src/dashboard/server/services/beads-sync-service.ts",
-        "src/dashboard/server/services/resource-discovery-signals.ts",
-        "src/dashboard/server/services/resource-discovery.ts",
-        "src/lib/cloister/merge-agent.ts",
-        "src/lib/cloister/verification-runner.ts",
-        "src/lib/lifecycle/orphaned-beads-sweep.ts",
-        "src/lib/lifecycle/workflows.ts",
-        "src/lib/overdeck/conversation-forks.ts",
-        "src/lib/overdeck/conversations.ts",
-        "src/lib/webhook-handlers.ts",
-        "src/lib/work/done-preflight.ts",
-        "sync-sources/skills/pan-handoff/SKILL.md",
-        "tests/cloister/verification-runner.test.ts",
-        "tests/dashboard/beads-freshness.test.ts",
-        "tests/unit/cli/fork-client.test.ts",
-        "tests/unit/dashboard/server/routes/conversations-fork-pipeline.test.ts",
-        "tests/unit/dashboard/server/services/resource-discovery.test.ts",
-        "tests/unit/lib/cloister/postmerge-auto-retro.test.ts",
-        "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts",
-        "tests/unit/lib/lifecycle/orphaned-beads-sweep.test.ts",
-        "tests/unit/lib/lifecycle/workflows.test.ts",
-        "tests/unit/lib/webhook-handlers.test.ts"
-      ],
-      "recordedAt": "2026-07-13T11:57:13.297Z"
-    }
+    "reviewSpawnedAt": "2026-07-13T16:06:59.048Z"
   },
   "closeOut": {
     "usage": {
@@ -493,10 +377,10 @@
         },
         "review": {
           "anthropic/claude-sonnet-5": {
-            "input": 35482,
-            "output": 53768,
-            "cacheRead": 16145131,
-            "cacheWrite": 679711
+            "input": 36602,
+            "output": 56642,
+            "cacheRead": 16473629,
+            "cacheWrite": 956271
           }
         },
         "review.correctness": {
@@ -580,10 +464,10 @@
           "cacheWrite": 683275
         },
         "anthropic/claude-sonnet-5": {
-          "input": 115701,
-          "output": 137505,
-          "cacheRead": 36923042,
-          "cacheWrite": 1388847
+          "input": 116821,
+          "output": 140379,
+          "cacheRead": 37251540,
+          "cacheWrite": 1665407
         },
         "custom/kimi-k2.7-code": {
           "input": 4013194,
@@ -593,8 +477,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 148.753978,
-        "pricingAsOf": "2026-07-13T16:07:11.100Z"
+        "usd": 149.542057,
+        "pricingAsOf": "2026-07-13T16:09:22.386Z"
       }
     },
     "merges": [
