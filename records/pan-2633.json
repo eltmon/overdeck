@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T08:48:04.494Z",
-  "updated": "2026-07-13T20:11:58.434Z",
+  "updated": "2026-07-13T20:14:46.709Z",
   "pipeline": {
     "issueId": "PAN-2633",
     "reviewStatus": "pending",
@@ -61,9 +61,13 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "model": "claude-sonnet-5",
   "statusOverrides": {
-    "reducer-liveness-gate": "running"
+    "reducer-liveness-gate": "completed",
+    "reducer-liveness-gate.reducer-liveness-gate.ac1": "completed",
+    "reducer-liveness-gate.reducer-liveness-gate.ac2": "completed",
+    "reducer-liveness-gate.reducer-liveness-gate.ac3": "completed",
+    "reducer-liveness-gate.reducer-liveness-gate.ac4": "completed"
   },
   "swarm": {
     "slotAssignments": [
@@ -75,12 +79,6 @@
         "assignedAt": "2026-07-13T20:08:05.689Z"
       }
     ],
-    "slotCompletions": {
-      "1": {
-        "slotIndex": 1,
-        "agentId": "agent-pan-2633-slot-1",
-        "completedAt": "2026-07-13T20:11:58.418Z"
-      }
-    }
+    "slotCompletions": {}
   }
 }
