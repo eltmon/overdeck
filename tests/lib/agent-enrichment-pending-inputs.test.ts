@@ -98,6 +98,21 @@ describe('getPendingQuestions — AskUserQuestion lifecycle', () => {
     expect(result[0].toolId).toBe('t1')
   })
 
+  it('KEEPS the question pending on the production deny phrase even WITHOUT the PAN-1520 marker', async () => {
+    // Regression (2026-07-13): a hook rewording dropped the literal "PAN-1520"
+    // marker from the deny reason, so this exact text was treated as a real
+    // operator answer — no modal, no notification, for every AUQ. The detector
+    // now also keys on the stable phrase so wording drift can't kill detection.
+    const rewordedDeny = 'Your question has been surfaced to the operator in the Overdeck dashboard, where they answer it directly. Restate the question and its options to the operator as a short plain-text message and wait for their reply (it arrives as a normal user message).'
+    const path = writeJsonlSession('a.jsonl', [
+      { timestamp: '2026-07-13T07:00:00Z', message: { content: [askToolUse('t1', ['A', 'B'])] } },
+      { timestamp: '2026-07-13T07:00:01Z', message: { content: [toolResult('t1', { content: rewordedDeny, is_error: true })] } },
+    ])
+    const result = await Effect.runPromise(getPendingQuestions(path))
+    expect(result).toHaveLength(1)
+    expect(result[0].toolId).toBe('t1')
+  })
+
   it('handles tool_result with content as array-of-blocks (Claude SDK shape)', async () => {
     const denyText = 'See PAN-1520 — restate the question to the operator in plain text.'
     const path = writeJsonlSession('a.jsonl', [

@@ -251,19 +251,31 @@ async function readFileTail(filePath: string, maxBytes: number): Promise<string>
  * deny verdict with this reason string. When we see a tool_result whose content
  * matches this, treat it as a "still pending" — the operator has NOT actually
  * answered; the upstream tool was denied to force a plain-text restate.
+ *
+ * Two signals are accepted, because each has failed alone: the literal
+ * "PAN-1520" marker (dropped once in a hook rewording, which silently killed
+ * all AUQ detection — no modal, no notification — until 2026-07-13), and the
+ * stable deny phrase (survives marker loss; the marker survives phrase
+ * rewording). Change the hook's REASON only in lockstep with these.
  */
 const ASK_USER_QUESTION_HOOK_DENY_MARKER = 'PAN-1520'
+const ASK_USER_QUESTION_HOOK_DENY_PHRASE = 'surfaced to the operator in the Overdeck dashboard'
+
+function isHookDenyText(text: string): boolean {
+  return text.includes(ASK_USER_QUESTION_HOOK_DENY_MARKER)
+    || text.includes(ASK_USER_QUESTION_HOOK_DENY_PHRASE)
+}
 
 function isAskUserQuestionHookDenyToolResult(item: { content?: unknown; is_error?: unknown }): boolean {
   if (item.is_error !== true) return false
   const content = item.content
-  if (typeof content === 'string') return content.includes(ASK_USER_QUESTION_HOOK_DENY_MARKER)
+  if (typeof content === 'string') return isHookDenyText(content)
   if (Array.isArray(content)) {
     return content.some((part: unknown) => {
-      if (typeof part === 'string') return part.includes(ASK_USER_QUESTION_HOOK_DENY_MARKER)
+      if (typeof part === 'string') return isHookDenyText(part)
       if (part && typeof part === 'object' && 'text' in part) {
         const text = (part as { text?: unknown }).text
-        return typeof text === 'string' && text.includes(ASK_USER_QUESTION_HOOK_DENY_MARKER)
+        return typeof text === 'string' && isHookDenyText(text)
       }
       return false
     })
