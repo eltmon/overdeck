@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T08:30:53.078Z",
+  "updated": "2026-07-13T09:47:22.813Z",
   "pipeline": {
     "issueId": "PAN-2596",
     "reviewStatus": "pending",
@@ -91,5 +91,37 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5"
+  "model": "claude-sonnet-5",
+  "statusOverrides": {
+    "composer-file-chip": "completed",
+    "composer-file-chip.ac1": "completed",
+    "composer-file-chip.ac2": "completed",
+    "composer-file-chip.ac3": "completed",
+    "composer-drop-and-gate": "completed",
+    "composer-drop-and-gate.ac1": "completed",
+    "composer-drop-and-gate.ac2": "completed",
+    "composer-drop-and-gate.ac3": "completed",
+    "composer-attach-button": "completed",
+    "composer-attach-button.ac1": "completed",
+    "composer-attach-button.ac2": "completed",
+    "composer-attach-button.ac3": "completed",
+    "frontend-attachment-store": "completed",
+    "frontend-attachment-store.ac1": "completed",
+    "frontend-attachment-store.ac2": "completed",
+    "frontend-attachment-store.ac3": "completed",
+    "frontend-attachment-store.ac4": "completed",
+    "send-path-image-only-gate": "completed",
+    "send-path-image-only-gate.ac1": "completed",
+    "send-path-image-only-gate.ac2": "completed",
+    "send-path-image-only-gate.ac3": "completed",
+    "docs-attachments": "completed",
+    "docs-attachments.ac1": "completed",
+    "docs-attachments.ac2": "completed",
+    "server-upload-allowlist": "completed",
+    "server-upload-allowlist.ac1": "completed",
+    "server-upload-allowlist.ac2": "completed",
+    "server-upload-allowlist.ac3": "completed",
+    "server-upload-allowlist.ac4": "completed",
+    "server-upload-allowlist.ac5": "completed"
+  }
 }
