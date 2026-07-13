@@ -250,45 +250,23 @@
   ],
   "feedback": [],
   "created": "2026-07-12T20:45:31.659Z",
-  "updated": "2026-07-13T05:20:14.952Z",
+  "updated": "2026-07-13T05:26:10.141Z",
   "pipeline": {
     "issueId": "PAN-1232",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-12T22:02:39.443Z",
-    "updatedAt": "2026-07-13T05:20:14.913Z",
+    "updatedAt": "2026-07-13T05:26:10.079Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/dashboard/server/routes/backlog.ts",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2604",
     "lastVerifiedCommit": "4543e2d6ac37fdb5419e89a0ea168639c636cd44",
     "reviewRequestedAt": "2026-07-12T22:02:39.443Z",
-    "reviewSpawnedAt": "2026-07-13T05:15:48.073Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/.pan/review/agent-pan-1232-review-4543e2d6/security.md",
-        "atCommit": "4543e2d6ac37fdb5419e89a0ea168639c636cd44"
-      },
-      "correctness": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/.pan/review/agent-pan-1232-review-4543e2d6/correctness.md",
-        "atCommit": "4543e2d6ac37fdb5419e89a0ea168639c636cd44"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/.pan/review/agent-pan-1232-review-4543e2d6/performance.md",
-        "atCommit": "4543e2d6ac37fdb5419e89a0ea168639c636cd44"
-      },
-      "requirements": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1232/.pan/review/agent-pan-1232-review-4543e2d6/requirements.md",
-        "atCommit": "4543e2d6ac37fdb5419e89a0ea168639c636cd44"
-      }
-    }
+    "reviewSpawnedAt": "2026-07-13T05:15:48.073Z"
   },
   "closeOut": {
     "usage": {
@@ -324,7 +302,7 @@
       },
       "costAtCloseOut": {
         "usd": 38.57897,
-        "pricingAsOf": "2026-07-13T05:20:14.944Z"
+        "pricingAsOf": "2026-07-13T05:26:10.122Z"
       }
     },
     "merges": [
@@ -332,8 +310,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "tab-files": "completed",
     "tab-files.ac1": "completed",
