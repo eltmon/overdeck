@@ -160,18 +160,18 @@
     "recordedAt": "2026-07-13T08:53:00.165Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T09:02:10.353Z",
+  "updated": "2026-07-13T09:02:17.362Z",
   "pipeline": {
     "issueId": "PAN-2598",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T09:02:09.476Z",
-    "reviewNotes": "Review role spawn failed: Role run agent-pan-2598-review already running. Use 'pan tell' to message it.",
+    "updatedAt": "2026-07-13T09:02:17.148Z",
+    "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (191274ms):\n\nt: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\n- Spawning knowledge agent for PAN-2468...\n✔ Knowledge agent spawned: agent-pan-2468-knowledge\n- Spawning knowledge agent for PAN-2468...\n✖ Knowledge agent for PAN-2468 failed: No OKF bundle is configured for Overdeck. Run `/okf init` in this workspace to create or connect a knowledge bundle, then retry `pan knowledge PAN-2468`.\n- Spawning knowledge agent for PAN-2468...\n⚠ mnemos unavailable; spawning knowledge agent with built-in OKF search: release fetch failed\n- Spawning knowledge agent for PAN-2468...\n✔ Knowledge agent spawned: agent-pan-2468-knowledge\n",
     "inspectNotes": "Bead phase-banner-work-signal ack: workRunning now derives from activity.data.sections.some(type===work && status===running) (IssueMissionControl.tsx:828), verified via deriveNarrative precedence in StatusNarrative.tsx and existing+new tests covering all 3 ACs (planning-only session, live work session, beads-driven regression path); change is additive per NFR-1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2631",
@@ -313,7 +313,7 @@
       },
       "costAtCloseOut": {
         "usd": 60.60905,
-        "pricingAsOf": "2026-07-13T09:02:10.220Z"
+        "pricingAsOf": "2026-07-13T09:02:17.312Z"
       }
     },
     "merges": [
