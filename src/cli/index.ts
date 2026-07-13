@@ -490,6 +490,7 @@ program
   .option('--model <model>', 'Model for the handoff-forked (new) conversation')
   .option('--harness <harness>', 'Ignored: harness is provider-default-only (PAN-1984)')
   .option('--cwd <path>', 'Working directory for the new conversation')
+  .option('--issue <id>', 'Issue ID to associate with the new conversation')
   .option('--author <author>', 'Who authors the handoff doc: external (default) or source', 'external')
   .option('--author-model <model>', 'Model for the external authoring session (only when --author=external)')
   .option('--author-harness <harness>', 'Ignored: author harness is provider-default-only (PAN-1984)')

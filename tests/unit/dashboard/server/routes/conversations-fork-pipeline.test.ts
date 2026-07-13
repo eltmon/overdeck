@@ -34,7 +34,7 @@ const {
   generateSummaryForFork,
 } = await import('../../../../../src/lib/conversations/summary-fork.js');
 
-const { runForkPipeline } = forksModule;
+const { runForkPipeline, buildForkRequest } = forksModule;
 
 describe('runForkPipeline fallback resilience', () => {
   let TEST_HOME: string;
@@ -205,5 +205,26 @@ describe('runForkPipeline fallback resilience', () => {
     );
     const fork = getConversationByName('fork-conv')!;
     expect(fork.forkFallbackReason).toBeTruthy();
+  });
+});
+
+describe('buildForkRequest', () => {
+  it('carries an explicit issueId when provided', () => {
+    const req = buildForkRequest({
+      parentConversationName: 'parent',
+      sessionId: 'session-uuid',
+      forkMode: 'handoff',
+      issueId: 'PAN-2602',
+    });
+    expect(req.issueId).toBe('PAN-2602');
+  });
+
+  it('omits issueId when not provided', () => {
+    const req = buildForkRequest({
+      parentConversationName: 'parent',
+      sessionId: 'session-uuid',
+      forkMode: 'summary',
+    });
+    expect(req.issueId).toBeUndefined();
   });
 });

@@ -1,7 +1,7 @@
 1013 src/cli/commands/doctor.ts
 1060 src/cli/commands/done.ts
 1521 src/cli/commands/start.ts
-1461 src/cli/index.ts
+1462 src/cli/index.ts
 1012 src/dashboard/frontend/src/components/AwaitingMergePage.tsx
 1374 src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx
 1540 src/dashboard/frontend/src/components/CommandDeck/index.tsx
@@ -24,7 +24,7 @@
 1742 src/lib/database/schema.ts
 1364 src/lib/model-capabilities.ts
 1113 src/lib/overdeck/agents.ts
-1539 src/lib/overdeck/conversations.ts
+1540 src/lib/overdeck/conversations.ts
 1050 src/lib/overdeck/memory.ts
 1002 src/lib/overdeck/merge.ts
 1164 src/lib/review-status.ts
