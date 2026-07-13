@@ -16,17 +16,18 @@
   ],
   "feedback": [],
   "created": "2026-07-12T22:33:37.108Z",
-  "updated": "2026-07-13T11:41:22.872Z",
+  "updated": "2026-07-13T11:41:24.017Z",
   "pipeline": {
     "issueId": "PAN-2602",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T11:41:22.823Z",
+    "updatedAt": "2026-07-13T11:41:23.936Z",
+    "reviewNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf set-option -t agent-pan-2602-review destroy-unattached off\nno such session: agent-pan-2602-review\n",
     "inspectNotes": "Bead beads-rollup-service ack: extractIssueLabels() now gates bare word-number labels through project.issuePrefixes, preventing phase-N labels from creating spurious rollups; tests cover phase exclusion and workspace: label mapping.",
     "reviewRequestedAt": "2026-07-13T11:41:22.124Z",
     "reviewSpawnedAt": "2026-07-13T11:41:22.823Z"
@@ -133,14 +134,14 @@
       },
       "costAtCloseOut": {
         "usd": 107.327529,
-        "pricingAsOf": "2026-07-13T11:41:22.863Z"
+        "pricingAsOf": "2026-07-13T11:41:24.000Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "sync-local-write-detection": "completed",
     "branch-ahead-signal": "completed",
