@@ -155,7 +155,7 @@ import { tryYieldForAdvancingDispatch } from './preemption.js';
 import { setReviewStatusSync, loadReviewStatuses, getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { needsReviewDispatch } from '../review-dispatch-decision.js';
 import { readIssueRecordSync, ensureIssueRecordSync, writeIssueRecordSync } from '../pan-dir/record.js';
-import { queryBeadsForIssue } from '../beads-query.js';
+import { readBeadsForIssueCached } from '../beads/presence.js';
 import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
 import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
@@ -1183,9 +1183,9 @@ export async function checkOrphanedCompletions(): Promise<string[]> {
         const workspacePath = findWorkspacePath(resolved.projectPath, issueLower);
         if (!workspacePath || !existsSync(workspacePath)) continue;
 
-        const beadResult = await Effect.runPromise(queryBeadsForIssue(workspacePath, issueId));
-        if (beadResult.transientFailure || beadResult.beads.length === 0) continue;
-        if (beadResult.beads.some((bead) => bead.status !== 'closed')) continue;
+        const beadResult = await readBeadsForIssueCached(workspacePath, issueId);
+        if (!beadResult.ok || beadResult.value.length === 0) continue;
+        if (beadResult.value.some((bead) => bead.status !== 'closed')) continue;
 
         const { stdout } = await execAsync(
           `gh pr list --head feature/${issueLower} --state open --json url --jq '.[0].url'`,
