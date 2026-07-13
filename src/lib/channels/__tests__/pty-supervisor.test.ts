@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PTY_TOKEN_HEADER, writePtyToken } from '../../pty-token.js';
 import { createPtySupervisorServer, injectPtyMessage } from '../pty-supervisor.js';
+import { INPUT_PURGE_MAX_CHARS, echoConfirmTimeoutMs, purgeSettleMs } from '../injection-budget.js';
 
 const REPO_ROOT = process.cwd();
 const SUPERVISOR_ENTRY = join(REPO_ROOT, 'dist/pty-supervisor.js');
@@ -293,16 +294,58 @@ describe.skipIf(isBun)('injectPtyMessage', () => {
     const fake = createFakePty();
     // 2 KiB => echoConfirmTimeoutMs = 2500 + 2*100 = 2700ms.
     const content = 'x'.repeat(2 * 1024);
+    const echoTimeout = echoConfirmTimeoutMs(content.length);
+    const settle = purgeSettleMs(content.length + 8);
 
     const delivered = injectPtyMessage(fake.child, 'agent-unit-warn', { content, echo: false });
-    await vi.advanceTimersByTimeAsync(2_700);
+    await vi.advanceTimersByTimeAsync(echoTimeout);
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('after 2700ms'),
+      expect.stringContaining(`after ${echoTimeout}ms`),
     );
 
-    await vi.advanceTimersByTimeAsync(3_000);
+    // Second attempt echo timeout + both purge settles + margin.
+    await vi.advanceTimersByTimeAsync(echoTimeout + 2 * settle + 100);
     await expect(delivered).rejects.toThrow(/input echo confirmation failed/);
     warnSpy.mockRestore();
+  });
+
+  it('purges the full 30,000-char written length, not the old 8,192-char cap', async () => {
+    vi.useFakeTimers();
+    const fake = createFakePty();
+    const content = 'x'.repeat(30_000);
+    const purge = '\x7f'.repeat(30_008);
+    const echoTimeout = echoConfirmTimeoutMs(content.length);
+    const settle = purgeSettleMs(content.length + 8);
+
+    const delivered = injectPtyMessage(fake.child, 'agent-unit-purge-full', { content, echo: false });
+    const rejected = expect(delivered).rejects.toThrow(/input echo confirmation failed/);
+
+    await vi.advanceTimersByTimeAsync(echoTimeout);
+    expect(fake.writes).toEqual([content, purge]);
+
+    // Second attempt echo timeout + both purge settles + margin.
+    await vi.advanceTimersByTimeAsync(echoTimeout + 2 * settle + 100);
+    await rejected;
+  });
+
+  it('scales the post-purge settle with the erased length', async () => {
+    vi.useFakeTimers();
+    const fake = createFakePty();
+    const content = 'x'.repeat(30_000);
+    const purge = '\x7f'.repeat(30_008);
+    const echoTimeout = echoConfirmTimeoutMs(content.length);
+    const settle = purgeSettleMs(content.length + 8);
+
+    const delivered = injectPtyMessage(fake.child, 'agent-unit-purge-settle', { content, echo: false });
+
+    await vi.advanceTimersByTimeAsync(echoTimeout + settle - 100);
+    expect(fake.writes).toEqual([content, purge]);
+
+    await vi.advanceTimersByTimeAsync(100);
+    expect(fake.writes).toEqual([content, purge, content]);
+
+    await vi.runAllTimersAsync();
+    await expect(delivered).rejects.toThrow(/input echo confirmation failed/);
   });
 
   it('returns non-2xx from the supervisor server when echo confirmation fails', async () => {
@@ -399,6 +442,27 @@ describe.skipIf(isBun)('pty-supervisor subprocess', () => {
     const logPath = join(tmpHome, 'logs', 'pty-supervisor-agent-no-echo.log');
     expect(readFileSync(logPath, 'utf8')).toContain('"kind":"echo_confirm_failed"');
   }, 15_000);
+
+  it('rejects socket posts whose content exceeds INPUT_PURGE_MAX_CHARS', async () => {
+    const agentId = 'agent-server-too-long';
+    const token = await writePtyToken(agentId);
+    const fake = createFakePty();
+    const server = createPtySupervisorServer(agentId, fake.child);
+    const socketPath = join(tmpHome, 'sockets', `pty-${agentId}.sock`);
+    mkdirSync(join(tmpHome, 'sockets'), { recursive: true, mode: 0o700 });
+    await new Promise<void>((resolve) => server.listen(socketPath, () => resolve()));
+
+    try {
+      const result = await postToUnixSocket(socketPath, token, {
+        content: 'x'.repeat(INPUT_PURGE_MAX_CHARS + 1),
+        echo: false,
+      });
+      expect(result.status).toBe(400);
+      expect(fake.writes).toEqual([]);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
 
   it('creates the supervisor socket at mode 0600', async () => {
     const { socketPath } = await readySupervisor('agent-mode');
