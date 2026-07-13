@@ -35,6 +35,11 @@ export interface MatrixEntry {
 
 export const NO_LOSS_MATRIX: MatrixEntry[] = [
 
+  // ── updater.ts ────────────────────────────────────────────────────────────
+  { surface: 'GET /api/update/status',                        kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Updater service; preserves and extends the existing version surface' },
+  { surface: 'POST /api/update/check',                        kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Updater service; explicit fresh release discovery' },
+  { surface: 'POST /api/update/install',                      kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Updater service; exact-version npm installation' },
+
   // ── admin.ts ──────────────────────────────────────────────────────────────
   { surface: 'GET /api/admin/tldr/:issueId',                       kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'TLDR admin helper; outside 8 remodel domains' },
   { surface: 'POST /api/admin/conversations/backfill-titles',    kind: 'http', disposition: 'WRITE',      door: 'ConversationWriter.retitle (deterministic backfill)' },
