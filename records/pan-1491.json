@@ -311,17 +311,17 @@
     "recordedAt": "2026-07-11T10:51:47.612Z"
   },
   "created": "2026-07-11T09:48:27.729Z",
-  "updated": "2026-07-13T05:49:36.394Z",
+  "updated": "2026-07-13T06:03:04.992Z",
   "pipeline": {
     "issueId": "PAN-1491",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T05:48:01.926Z",
+    "updatedAt": "2026-07-13T06:03:04.867Z",
     "reviewNotes": "[correctness] Existing `overdeck.db` files never get the new `affected_criteria` column — `src/lib/overdeck/flywheel-substrate-bugs.ts:102`",
     "verificationNotes": "Verification FAILED at test (127955ms):\n\nial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n- Spawning knowledge agent for PAN-2468...\n✔ Knowledge agent spawned: agent-pan-2468-knowledge\n- Spawning knowledge agent for PAN-2468...\n✖ Knowledge agent for PAN-2468 failed: No OKF bundle is configured for Overdeck. Run `/okf init` in this workspace to create or connect a knowledge bundle, then retry `pan knowledge PAN-2468`.\n- Spawning knowledge agent for PAN-2468...\n⚠ mnemos unavailable; spawning knowledge agent with built-in OKF search: release fetch failed\n- Spawning knowledge agent for PAN-2468...\n✔ Knowledge agent spawned: agent-pan-2468-knowledge\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| tests/unit/lib/overdeck/no-loss-matrix.test.ts > G3 no-loss matrix > AC1/AC2: every enumerated HTTP route is present in the matrix\n FAIL  |root| tests/unit/lib/overdeck/no-loss-matrix.test.ts > G3 no-loss matrix > AC1/AC2: every enumerated HTTP route is present in the matrix\nAssertionError: The following HTTP routes exist in the codebase but have no entry in the\nNO_LOSS_MATRIX.  Add each one to tests/unit/lib/overdeck/no-loss-matrix.ts\nwith an explicit disposition (READ/WRITE/AGGREGATE/RELOCATE/DELETE/OUT_OF_SCOPE)\nand a non-empty door/reason string.\n  missing: GET /api/projects/:projectKey/release-status: expected [ Array(1) ] to deeply equal []\n\n- Expected\n+ Received\n\n- []\n+ [\n+   \"GET /api/projects/:projectKey/release-status\",\n+ ]\n\n ❯ tests/unit/lib/overdeck/no-loss-matrix.test.ts:95:19\n     93|       'and a non-empty door/reason string.',\n     94|       ...missing.map(r => `  missing: ${r}`),\n     95|     ].join('\\n')).toEqual([]);\n       |                   ^\n     96|   });\n     97|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n",
     "inspectNotes": "Bead b3-weight-fn BLOCKED: commit d813b8b4 does not implement computeSubstrateBugWeight(criteria, stats) at all. The diff only adds optional weight/weightReason fields to the FlywheelSuggestion interface/schema in packages/contracts/src/flywheel.ts:180-190 — no status-multiplier logic, no normalizedDistance calculation, no compound-value field reading (medianMs/p95Ms), no insufficient_data short-circuit, and no reason-string generation exist anywhere in this commit. None of AC1-AC5 can be evaluated because the function under review is absent. This is the same d813b8b4 diff already submitted (and blocked) against bead b2-parse-criteria moments ago — it looks like the wrong commit is being routed to review requests, or the actual b3-weight-fn implementation commit has not landed yet. Required fix: identify and deliver the commit that actually adds computeSubstrateBugWeight, implementing per-criterion status multiplier (red=1.6x per AC1 example: 3*(1+0.6)), a status floor that dominates over raw normalized drift for red vs green (AC2), safe reading of a configured valueField from compound values with graceful fallback to normalizedDistance 0 + floor when the field is absent (AC3), a weight-0 + insufficient-telemetry-reason short circuit when all criteria are insufficient_data (AC4), and a reason string naming the highest-contributing criterion by label/status/value-vs-target (AC5).",
@@ -376,28 +376,6 @@
         "vision.mdx"
       ],
       "recordedAt": "2026-07-11T10:51:47.612Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-c7e0b638/security.md",
-        "atCommit": "c7e0b6386488f85dda6eeed49f5586db6b64a71c"
-      },
-      "correctness": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-c7e0b638/correctness.md",
-        "atCommit": "c7e0b6386488f85dda6eeed49f5586db6b64a71c"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-c7e0b638/performance.md",
-        "atCommit": "c7e0b6386488f85dda6eeed49f5586db6b64a71c"
-      },
-      "requirements": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-c7e0b638/requirements.md",
-        "atCommit": "c7e0b6386488f85dda6eeed49f5586db6b64a71c"
-      }
     }
   },
   "closeOut": {
@@ -487,9 +465,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 2892230,
-            "output": 387053,
-            "cacheRead": 200904448,
+            "input": 2986883,
+            "output": 402506,
+            "cacheRead": 207547648,
             "cacheWrite": 0
           }
         }
@@ -562,15 +540,15 @@
           "cacheWrite": 256982
         },
         "custom/kimi-k2.7-code": {
-          "input": 2892230,
-          "output": 387053,
-          "cacheRead": 200904448,
+          "input": 2986883,
+          "output": 402506,
+          "cacheRead": 207547648,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 143.408762,
-        "pricingAsOf": "2026-07-13T05:48:01.959Z"
+        "usd": 144.822706,
+        "pricingAsOf": "2026-07-13T06:03:04.989Z"
       }
     },
     "merges": [
