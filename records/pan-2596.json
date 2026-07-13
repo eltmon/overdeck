@@ -312,18 +312,18 @@
     "recordedAt": "2026-07-13T11:20:10.124Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T15:32:52.139Z",
+  "updated": "2026-07-13T15:39:08.372Z",
   "pipeline": {
     "issueId": "PAN-2596",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T11:21:55.959Z",
-    "updatedAt": "2026-07-13T15:32:49.782Z",
+    "updatedAt": "2026-07-13T15:39:08.325Z",
     "inspectNotes": "Bead server-upload-allowlist ack: validateUploadPayload correctly gates UTF-8 text extensions, PDF %PDF- magic prefix, and disallowed/extension-less types with 400s naming the mismatch, while preserving image magic-byte validation and <uuid><ext> naming; non-image files get <uuid>-<sanitized-name><ext>. All 5 ACs verified against diff + accompanying unit tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2634",
     "lastVerifiedCommit": "66452d513cbf7e447bc977d03567c84a4f807c7f",
@@ -401,10 +401,10 @@
         },
         "review": {
           "anthropic/claude-sonnet-5": {
-            "input": 22597,
-            "output": 11403,
-            "cacheRead": 3106650,
-            "cacheWrite": 452596
+            "input": 22599,
+            "output": 11806,
+            "cacheRead": 3297379,
+            "cacheWrite": 455465
           }
         },
         "review.correctness": {
@@ -449,9 +449,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 2595586,
-            "output": 230191,
-            "cacheRead": 107430144,
+            "input": 2606890,
+            "output": 234063,
+            "cacheRead": 110460672,
             "cacheWrite": 0
           }
         }
@@ -482,21 +482,21 @@
           "cacheWrite": 213933
         },
         "anthropic/claude-sonnet-5": {
-          "input": 122712,
-          "output": 64418,
-          "cacheRead": 13369544,
-          "cacheWrite": 1125689
+          "input": 122714,
+          "output": 64821,
+          "cacheRead": 13560273,
+          "cacheWrite": 1128558
         },
         "custom/kimi-k2.7-code": {
-          "input": 2595586,
-          "output": 230191,
-          "cacheRead": 107430144,
+          "input": 2606890,
+          "output": 234063,
+          "cacheRead": 110460672,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 74.580776,
-        "pricingAsOf": "2026-07-13T15:32:49.851Z"
+        "usd": 75.232154,
+        "pricingAsOf": "2026-07-13T15:39:08.364Z"
       }
     },
     "merges": [
