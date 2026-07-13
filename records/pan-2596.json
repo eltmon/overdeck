@@ -110,7 +110,10 @@
   ],
   "scopeDrift": {
     "outsideDeclaredScope": [
-      "src/dashboard/frontend/src/App.test.tsx"
+      "src/dashboard/frontend/src/App.test.tsx",
+      "src/dashboard/frontend/src/components/chat/__tests__/ChatMarkdown.test.tsx",
+      "src/dashboard/frontend/src/lib/__tests__/attachmentTypes.test.ts",
+      "src/lib/overdeck/__tests__/conversation-message-upload.test.ts"
     ],
     "declaredScopeUntouched": [],
     "declaredScope": [
@@ -129,17 +132,20 @@
       "src/dashboard/frontend/src/App.test.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
       "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+      "src/dashboard/frontend/src/components/chat/__tests__/ChatMarkdown.test.tsx",
       "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.test.tsx",
+      "src/dashboard/frontend/src/lib/__tests__/attachmentTypes.test.ts",
       "src/dashboard/frontend/src/lib/__tests__/composerStore.test.ts",
       "src/dashboard/frontend/src/lib/attachmentTypes.ts",
       "src/dashboard/frontend/src/lib/composerStore.ts",
+      "src/lib/overdeck/__tests__/conversation-message-upload.test.ts",
       "src/lib/overdeck/conversation-message.ts",
       "tests/unit/lib/overdeck/conversation-upload-validation.test.ts"
     ],
-    "recordedAt": "2026-07-13T09:57:24.734Z"
+    "recordedAt": "2026-07-13T11:20:10.124Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T11:18:14.055Z",
+  "updated": "2026-07-13T11:20:10.125Z",
   "pipeline": {
     "issueId": "PAN-2596",
     "reviewStatus": "pending",
