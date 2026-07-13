@@ -105,7 +105,7 @@
     "recordedAt": "2026-07-13T05:58:56.677Z"
   },
   "created": "2026-07-13T03:16:32.338Z",
-  "updated": "2026-07-13T14:17:22.577Z",
+  "updated": "2026-07-13T14:17:56.988Z",
   "pipeline": {
     "issueId": "PAN-2611",
     "reviewStatus": "passed",
@@ -211,8 +211,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-fable-5",
   "statusOverrides": {
     "test-worktree-redirect": "completed",
     "test-worktree-redirect.ac1": "completed",
