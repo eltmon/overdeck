@@ -71,6 +71,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-13T15:33:41.416Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T16:12:57.850Z"
     }
   ],
   "feedback": [],
@@ -140,7 +145,7 @@
     "recordedAt": "2026-07-13T15:33:26.736Z"
   },
   "created": "2026-07-10T21:05:49.847Z",
-  "updated": "2026-07-13T16:12:55.402Z",
+  "updated": "2026-07-13T16:12:57.863Z",
   "pipeline": {
     "issueId": "PAN-2229",
     "reviewStatus": "reviewing",
@@ -339,8 +344,8 @@
       }
     }
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "recoveryTrips": [
     {
       "issue": "PAN-2229",
