@@ -230,6 +230,18 @@
             "typecheck completes without errors"
           ],
           "readiness": "ready",
+          "synthesisContext": {
+            "summary": "Blocking parents injection-budget and size-scaled-waits are in progress. The shared timing module and size-scaled supervisor waits exist as uncommitted changes in slot-2; the delivery-client timeout side of injection-budget is not yet done.",
+            "parentOutputs": {
+              "injection-budget": "Slot-1 (agent-pan-2568-slot-1) was stopped manually with no output. Slot-2 workspace has created src/lib/channels/injection-budget.ts exporting INPUT_PURGE_MAX_CHARS=262_144, purgeSettleMs, echoConfirmTimeoutMs, inputSettleMs, etc. It has NOT modified src/lib/agents/delivery.ts to replace the hardcoded 8_000 ms timeout.",
+              "size-scaled-waits": "Slot-2 workspace has updated src/lib/channels/pty-supervisor.ts: waitForPtyEcho now takes a timeoutMs parameter; injectPtyMessage uses echoConfirmTimeoutMs(trimmed.length) and inputSettleMs(trimmed.length); local echo constants removed; warn/error messages interpolate computed values. Tests extended in src/lib/channels/__tests__/pty-supervisor.test.ts. These changes are uncommitted."
+            },
+            "coordinationNotes": [
+              "full-length-purge can import INPUT_PURGE_MAX_CHARS and purgeSettleMs from the slot-2 injection-budget module.",
+              "full-length-purge will also edit pty-supervisor.ts (purgePtyInput and parsePayload), so it must coordinate with or wait for slot-2 to commit to avoid conflicting edits to the same file.",
+              "The delivery.ts change is not required for full-length-purge acceptance criteria."
+            ]
+          },
           "traces": [
             "FR-3",
             "NFR-1"
