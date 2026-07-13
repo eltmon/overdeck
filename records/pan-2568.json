@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-13T07:36:58.620Z",
+  "updated": "2026-07-13T07:58:37.551Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "pending",
@@ -93,7 +93,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "model": "claude-sonnet-5",
   "statusOverrides": {
     "injection-budget": "running",
     "size-scaled-waits": "completed",
