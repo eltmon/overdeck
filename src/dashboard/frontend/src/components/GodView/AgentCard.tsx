@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { Clock, GitBranch, Cpu, AlertTriangle, CheckCircle, XCircle, Minus, Radio } from 'lucide-react';
 import { CanvasTerminal } from './CanvasTerminal';
 import { selectGodViewAgentOutput, selectGodViewAgentStatuses } from '../../hooks/useGodViewSocket';
-import { useDashboardStore } from '../../lib/store';
+import { useDashboardStore, selectPendingPermissionAgentIds } from '../../lib/store';
 import type { Agent } from '../../types';
 
 interface AgentCardProps {
@@ -82,6 +82,7 @@ function LastHeardCounter({ lastActivity }: { lastActivity?: string }) {
 export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: AgentCardProps) {
   const agentOutput = useDashboardStore(selectGodViewAgentOutput);
   const agentStatuses = useDashboardStore(selectGodViewAgentStatuses);
+  const pendingPermissionAgentIds = useDashboardStore(selectPendingPermissionAgentIds);
   const terminalLines = agentOutput[agent.id] || [];
   const liveStatus = agentStatuses[agent.id] || agent.status;
 
@@ -196,11 +197,15 @@ export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: Agen
 
       {/* PAN-1520 — unified pending-input indicator (covers AskUserQuestion,
           PermissionRequest, ExitPlanMode, EnterPlanMode in one pulse). */}
-      {isAwaitingInput(agent) && (
+      {isAwaitingInput(agent, pendingPermissionAgentIds) && (
         <div
           className="absolute top-1 right-1 w-2 h-2 rounded-full"
           style={{ backgroundColor: 'var(--gv-amber)', animation: 'gv-pulse 1s ease-in-out infinite' }}
-          title={describePendingInput(agent.pendingInputKinds)}
+          title={describePendingInput(
+            pendingPermissionAgentIds.has(agent.id) && !agent.pendingInputKinds?.includes('permissionRequest')
+              ? [...(agent.pendingInputKinds ?? []), 'permissionRequest']
+              : agent.pendingInputKinds,
+          )}
         />
       )}
     </motion.div>
