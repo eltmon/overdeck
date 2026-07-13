@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T22:33:36.700Z",
-  "updated": "2026-07-13T12:49:38.600Z",
+  "updated": "2026-07-13T13:04:58.708Z",
   "pipeline": {
     "issueId": "PAN-2607",
     "reviewStatus": "pending",
@@ -81,7 +81,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "glm-5.2",
+  "model": "claude-sonnet-5",
   "statusOverrides": {
     "comparator-metadata-drift": "completed",
     "comparator-metadata-drift.comparator-metadata-drift.ac1": "completed",
