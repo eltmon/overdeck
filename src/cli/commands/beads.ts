@@ -12,6 +12,9 @@ import { join } from 'path';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { platform } from 'os';
+import { findProjectByPathSync } from '../../lib/projects.js';
+import { resolveSharedBeadsDir } from '../../lib/bd-process-lock.js';
+import { standardizeBeadsConfig } from '../../lib/beads/config-standardize.js';
 
 const execAsync = promisify(exec);
 
@@ -354,25 +357,51 @@ async function upgradeCommand(checkOnly: boolean = false): Promise<void> {
 }
 
 /**
- * Run bd doctor to check and fix beads database issues
+ * Run bd doctor to check and fix beads database issues, plus Overdeck-managed
+ * configuration standardization (PAN-2564 FR-8 / WI-8).
  */
 async function doctorCommand(dryRun: boolean = false): Promise<void> {
-  const spinner = ora('Running beads doctor...').start();
+  const cwd = process.cwd();
+  const project = findProjectByPathSync(cwd);
+  const projectPath = project?.path ?? cwd;
+  const beadsDir = await resolveSharedBeadsDir(cwd);
+
+  const configSpinner = ora('Checking beads configuration...').start();
+  const configResult = await standardizeBeadsConfig({ projectPath, beadsDir, dryRun });
+
+  if (configResult.ok) {
+    configSpinner.succeed('Beads configuration check complete');
+  } else {
+    configSpinner.warn('Beads configuration check found issues');
+  }
+
+  for (const message of configResult.messages) {
+    console.log(`  ${chalk.cyan('•')} ${message}`);
+  }
+  for (const error of configResult.errors) {
+    console.log(`  ${chalk.red('✗')} ${error}`);
+  }
+
+  if (!configResult.ok) {
+    process.exit(1);
+  }
+
+  const bdSpinner = ora('Running beads doctor...').start();
 
   try {
     if (dryRun) {
       const { stdout } = await execAsync('bd doctor', { encoding: 'utf-8' });
-      spinner.succeed('Beads doctor check complete');
+      bdSpinner.succeed('Beads doctor check complete');
       console.log(stdout);
       return;
     }
 
     const { stdout } = await execAsync('bd doctor --fix', { encoding: 'utf-8' });
-    spinner.succeed('Beads doctor fix complete');
+    bdSpinner.succeed('Beads doctor fix complete');
     console.log(stdout);
   } catch (error: any) {
     // bd doctor exits non-zero when there are fixable issues, but still outputs useful info
-    spinner.warn('Beads doctor completed with warnings');
+    bdSpinner.warn('Beads doctor completed with warnings');
     if (error.stdout) {
       console.log(error.stdout);
     }
