@@ -62,7 +62,23 @@ describe('validateUploadPayload', () => {
     const result = validateUploadPayload('README', 'text/plain', Buffer.from('hello', 'utf-8'));
     expect(result).not.toBeNull();
     expect(result!.status).toBe(400);
-    expect(result!.error).toContain('text/plain');
+    expect(result!.error).toBe('Extensionless files are not supported');
+  });
+
+  it('rejects a dotfile even when it declares an image MIME type', () => {
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const result = validateUploadPayload('.env', 'image/png', png);
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe(400);
+    expect(result!.error).toBe('Dotfiles are not supported');
+  });
+
+  it('rejects an extensionless file even when it declares an image MIME type', () => {
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const result = validateUploadPayload('Makefile', 'image/png', png);
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe(400);
+    expect(result!.error).toBe('Extensionless files are not supported');
   });
 
   it('rejects an unsupported image MIME type with the legacy error shape', () => {

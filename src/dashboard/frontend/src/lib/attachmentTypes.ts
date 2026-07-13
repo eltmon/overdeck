@@ -77,6 +77,7 @@ const EXTENSION_TO_MIME: Record<string, string> = {
 };
 
 export function classifyAttachmentKind(file: File): AttachmentKind | null {
+  if (isDotfileAttachment(file.name) || isExtensionlessAttachment(file.name)) return null;
   if (file.type.startsWith('image/')) return 'image';
   const ext = extname(file.name);
   if ((ALLOWED_ATTACHMENT_EXTENSIONS as readonly string[]).includes(ext)) return 'file';

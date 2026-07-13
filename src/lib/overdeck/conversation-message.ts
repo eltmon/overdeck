@@ -134,6 +134,16 @@ function validateImageMagicBytes(bytes: Buffer, mimeType: string): boolean {
 }
 
 export function validateUploadPayload(filename: string, mimeType: string, bytes: Buffer): UploadValidationError | null {
+  // Enforce basename policy before MIME magic-byte checks so a file named
+  // `.env` or `Makefile` cannot masquerade as an image/PDF by mimeType alone.
+  if (filename.startsWith('.')) {
+    return { error: 'Dotfiles are not supported', status: 400 };
+  }
+  const ext = extname(filename).toLowerCase();
+  if (ext === '') {
+    return { error: 'Extensionless files are not supported', status: 400 };
+  }
+
   if (ALLOWED_UPLOAD_MIME_TYPES.has(mimeType)) {
     if (!validateImageMagicBytes(bytes, mimeType)) {
       return { error: 'File content does not match declared MIME type', status: 400 };
@@ -145,8 +155,6 @@ export function validateUploadPayload(filename: string, mimeType: string, bytes:
   if (mimeType.startsWith('image/')) {
     return { error: `Unsupported mimeType: ${mimeType}`, status: 400 };
   }
-
-  const ext = extname(filename).toLowerCase();
 
   if (ext === '.pdf') {
     if (
