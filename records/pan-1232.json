@@ -276,11 +276,16 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-13T14:43:06.259Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T14:47:46.931Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-12T20:45:31.659Z",
-  "updated": "2026-07-13T14:47:44.843Z",
+  "updated": "2026-07-13T14:47:46.933Z",
   "pipeline": {
     "issueId": "PAN-1232",
     "reviewStatus": "reviewing",
@@ -368,8 +373,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "tab-files": "completed",
     "tab-files.ac1": "completed",
