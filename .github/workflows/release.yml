@@ -222,15 +222,25 @@ jobs:
           - os: ubuntu-latest
             target: linux
             script: build:desktop:linux
-            artifact: apps/desktop/dist/*.AppImage
+            artifact: |
+              apps/desktop/dist/*.AppImage
+              apps/desktop/dist/*.yml
+              apps/desktop/dist/*.blockmap
           - os: macos-latest
             target: mac
             script: build:desktop:mac
-            artifact: apps/desktop/dist/*.dmg
+            artifact: |
+              apps/desktop/dist/*.dmg
+              apps/desktop/dist/*.zip
+              apps/desktop/dist/*.yml
+              apps/desktop/dist/*.blockmap
           - os: windows-latest
             target: win
             script: build:desktop:win
-            artifact: apps/desktop/dist/*.exe
+            artifact: |
+              apps/desktop/dist/*.exe
+              apps/desktop/dist/*.yml
+              apps/desktop/dist/*.blockmap
     runs-on: ${{ matrix.os }}
     env:
       # The `secrets` context is not allowed in step-level `if:` expressions

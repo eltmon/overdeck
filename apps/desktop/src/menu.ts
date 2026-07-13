@@ -12,7 +12,7 @@ import { app, Menu, shell } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
 
 import { callServerApi, showOrCreateWindow, dispatchMenuAction, serverUrl } from "./main.js";
-import { checkForUpdates, quitAndInstall, onUpdateStatusChange } from "./updater.js";
+import { quitAndInstall, onUpdateStatusChange } from "./updater.js";
 
 // ─── Workspace submenu (refreshed on open) ────────────────────────────────────
 
@@ -188,7 +188,8 @@ function buildMenuTemplate(): MenuItemConstructorOptions[] {
       {
         label: "Check for Updates...",
         click: () => {
-          void checkForUpdates();
+          showOrCreateWindow();
+          dispatchMenuAction("open-updater");
         },
       },
       { type: "separator" },
@@ -258,7 +259,7 @@ export function configureApplicationMenu(): void {
 
   // Listen for update status changes to rebuild menu when update is downloaded
   onUpdateStatusChange((status) => {
-    if (status.downloaded && !updateDownloaded) {
+    if (status.phase === 'ready' && !updateDownloaded) {
       updateDownloaded = true;
       rebuildMenu();
     }
