@@ -22,7 +22,7 @@ Claude Code exposes nine lifecycle hook events. Overdeck registers shell scripts
 
 ## Hook Registration
 
-All nine Claude Code hook events live in global `~/.claude/settings.json`. `pan install` and `pan admin hooks install` install the hook scripts into `~/.overdeck/bin/` and idempotently add any missing registrations to settings.json.
+All nine Claude Code hook events live in global `~/.claude/settings.json`. `pan install`, `pan sync`, and `pan admin hooks install` install the hook scripts into `~/.overdeck/bin/` and idempotently add any missing registrations to settings.json. Before launching a managed Claude Code agent, Overdeck repeats the same in-process provisioning check and refuses to launch if the lifecycle hooks are unavailable; this check is awaited so `SessionStart` cannot race ahead of registration and does not depend on `pan` being available on the child shell's `PATH`.
 
 The global registry is the single source of truth for `PreToolUse`, `PostToolUse`, `Stop`, `SessionStart`, `Notification`, `PreCompact`, `PostCompact`, `UserPromptSubmit`, and `PermissionRequest`. Role files under `roles/` and synced agent definitions under `sync-sources/agents/` do not declare `hooks:` frontmatter.
 

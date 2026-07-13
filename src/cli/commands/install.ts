@@ -166,7 +166,7 @@ function checkPrerequisites(): { results: PrereqResult[]; allPassed: boolean } {
   results.push({
     name: 'jq',
     passed: hasJq,
-    message: hasJq ? 'installed' : 'not found',
+    message: hasJq ? 'installed' : 'not found (will auto-install)',
     fix: 'apt install jq / brew install jq',
   });
 
@@ -190,8 +190,9 @@ function checkPrerequisites(): { results: PrereqResult[]; allPassed: boolean } {
 
   return {
     results,
-    // mkcert, ttyd, and beads are optional (will be auto-installed or skipped)
-    allPassed: results.filter((r) => r.name !== 'mkcert' && r.name !== 'ttyd' && r.name !== 'Beads CLI (bd)').every((r) => r.passed),
+    // These are auto-installed later or optional. jq must not block before
+    // setupHooksCommand gets the chance to install it.
+    allPassed: results.filter((r) => !['mkcert', 'ttyd', 'Beads CLI (bd)', 'jq'].includes(r.name)).every((r) => r.passed),
   };
 }
 

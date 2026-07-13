@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { mkdir, writeFile, writeFile as writeFileAsync } from 'fs/promises';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -79,6 +79,7 @@ import {
 import { stopAgent } from './termination.js';
 import { resolveBdAgentShimPath } from '../beads/bd-shim.js';
 import { createFreshSessionIdentity, logLauncherSessionPinned } from '../session-history.js';
+import { ensureLifecycleHooksBeforeLaunch } from './hook-readiness.js';
 const execAsync = promisify(exec);
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions = {}): Promise<AgentState> {
   const workspace = options.workspace ?? defaultRunWorkspace(issueId);
@@ -164,6 +165,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     role,
     model: selectedModel,
   });
+  await ensureLifecycleHooksBeforeLaunch(agentId, resolvedHarness);
 
   if (
     getProviderForModelSync(selectedModel).name === 'openai'
@@ -228,8 +230,6 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
       await Effect.runPromise(saveAgentState(state));
     }
   }
-
-  checkAndSetupHooks();
 
   const provider = getProviderForModelSync(selectedModel as ModelId);
   if (provider.authType === 'credential-file') {
@@ -518,6 +518,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     role,
     model: selectedModel,
   });
+  await ensureLifecycleHooksBeforeLaunch(agentId, resolvedHarness);
   // Create state
   const state: AgentState = {
     id: agentId,
@@ -641,9 +642,6 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
       saveAgentStateSync(state);
     }
   }
-
-  // Auto-setup hooks if not configured
-  checkAndSetupHooks();
 
   // Ensure TLDR daemon is running for the workspace (non-blocking, non-fatal).
   // Gated by the operator TLDR toggle: when disabled, the daemon is not started
@@ -932,53 +930,6 @@ async function gitBranchExists(workspace: string, branch: string): Promise<boole
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
- * Check if Overdeck hooks are configured, and auto-setup if not
- */
-function checkAndSetupHooks(): void {
-  const settingsPath = join(homedir(), '.claude', 'settings.json');
-  const hookPath = join(homedir(), '.overdeck', 'bin', 'heartbeat-hook');
-
-  // Check if settings.json exists and has heartbeat hook configured
-  if (existsSync(settingsPath)) {
-    try {
-      const settingsContent = readFileSync(settingsPath, 'utf-8');
-      const settings = JSON.parse(settingsContent);
-      const postToolUse = settings?.hooks?.PostToolUse || [];
-
-      const hookConfigured = postToolUse.some((hookConfig: any) =>
-        hookConfig.hooks?.some((hook: any) =>
-          hook.command === hookPath ||
-          hook.command?.includes('overdeck') ||
-          hook.command?.includes('heartbeat-hook')
-        )
-      );
-
-      if (hookConfigured) {
-        return; // Already configured
-      }
-    } catch {
-      // Ignore errors, will attempt setup
-    }
-  }
-
-  // Hooks not configured - run setup silently
-  try {
-    console.log('Configuring Overdeck heartbeat hooks...');
-    // Note: This runs during spawn which is now async, so we can use execAsync
-    // But this is called from a sync context in checkAndSetupHooks, so we use fire-and-forget
-    exec('pan admin hooks install', (error: Error | null) => {
-      if (error) {
-        console.warn('⚠ Failed to auto-configure hooks. Run `pan admin hooks install` manually.');
-      } else {
-        console.log('✓ Heartbeat hooks configured');
-      }
-    });
-  } catch (error) {
-    console.warn('⚠ Failed to auto-configure hooks. Run `pan admin hooks install` manually.');
-  }
 }
 
 /**

@@ -14,6 +14,7 @@ let createSessionMock: ReturnType<typeof vi.fn>;
 let sendRawKeystrokeMock: ReturnType<typeof vi.fn>;
 let resolveHarnessMock: ReturnType<typeof vi.fn>;
 let emitAgentEventMock: ReturnType<typeof vi.fn>;
+let ensureLifecycleHooksMock: ReturnType<typeof vi.fn>;
 let capturePaneText: string;
 let channelsMcpEnabled: boolean;
 let activeFlywheelRunId: string | null;
@@ -44,6 +45,7 @@ function mockSpawnDependencies(): void {
   createSessionMock = vi.fn(() => undefined);
   sendRawKeystrokeMock = vi.fn(() => Effect.void);
   emitAgentEventMock = vi.fn(() => Effect.succeed(true));
+  ensureLifecycleHooksMock = vi.fn(async () => undefined);
   resolveHarnessMock = vi.fn(async ({ explicit, model }: { explicit?: string; model: string }) => {
     if (explicit) return explicit;
     if (model === 'gpt-5.5') return 'codex';
@@ -56,6 +58,9 @@ function mockSpawnDependencies(): void {
   }));
   vi.doMock('../agent-runtime.js', () => ({
     emitAgentEvent: emitAgentEventMock,
+  }));
+  vi.doMock('../agents/hook-readiness.js', () => ({
+    ensureLifecycleHooksBeforeLaunch: ensureLifecycleHooksMock,
   }));
   vi.doMock('../agent-runtime-mirror.js', () => ({
     getRuntimeSnapshot: vi.fn(() => Effect.succeed(null)),
@@ -186,6 +191,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.doUnmock('../harness-resolve.js');
   vi.doUnmock('../agent-runtime.js');
+  vi.doUnmock('../agents/hook-readiness.js');
   vi.doUnmock('../agent-runtime-mirror.js');
   vi.doUnmock('../runtimes/codex.js');
   vi.doUnmock('../runtimes/pi-fifo.js');
@@ -304,6 +310,10 @@ describe('spawnAgent PTY supervisor wiring', () => {
     expect(launcher).not.toContain('--mcp-config');
     expect(launcher).not.toContain('--dangerously-load-development-channels');
     expect(sendRawKeystrokeMock).not.toHaveBeenCalled();
+    expect(ensureLifecycleHooksMock).toHaveBeenCalledWith('agent-pan-1405', 'claude-code');
+    expect(ensureLifecycleHooksMock.mock.invocationCallOrder[0]).toBeLessThan(
+      createSessionMock.mock.invocationCallOrder[0],
+    );
     expect(createSessionMock).toHaveBeenCalledWith(
       'agent-pan-1405',
       workspace,
