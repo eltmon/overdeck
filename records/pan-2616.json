@@ -86,18 +86,19 @@
     "recordedAt": "2026-07-13T14:03:46.895Z"
   },
   "created": "2026-07-13T03:17:01.668Z",
-  "updated": "2026-07-13T15:33:27.521Z",
+  "updated": "2026-07-13T15:42:25.362Z",
   "pipeline": {
     "issueId": "PAN-2616",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-13T14:09:14.431Z",
-    "updatedAt": "2026-07-13T15:33:27.467Z",
+    "updatedAt": "2026-07-13T15:42:25.287Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
+    "testNotes": "Reconciled from green GitHub Actions CI on 37ffd996: guard (https://github.com/eltmon/overdeck/actions/runs/29256378410/job/86837708496)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2637",
     "lastVerifiedCommit": "37ffd996e535b39bc7ed21b919c944f2c5fa4d2d",
     "reviewRequestedAt": "2026-07-13T14:09:14.431Z",
@@ -116,28 +117,6 @@
         "src/lib/cloister/issue-closed.ts"
       ],
       "recordedAt": "2026-07-13T14:03:46.895Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2616/.pan/review/agent-pan-2616-review-37ffd996/security.md",
-        "atCommit": "37ffd996e535b39bc7ed21b919c944f2c5fa4d2d"
-      },
-      "correctness": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2616/.pan/review/agent-pan-2616-review-37ffd996/correctness.md",
-        "atCommit": "37ffd996e535b39bc7ed21b919c944f2c5fa4d2d"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2616/.pan/review/agent-pan-2616-review-37ffd996/performance.md",
-        "atCommit": "37ffd996e535b39bc7ed21b919c944f2c5fa4d2d"
-      },
-      "requirements": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2616/.pan/review/agent-pan-2616-review-37ffd996/requirements.md",
-        "atCommit": "37ffd996e535b39bc7ed21b919c944f2c5fa4d2d"
-      }
     }
   },
   "closeOut": {
@@ -188,7 +167,7 @@
       },
       "costAtCloseOut": {
         "usd": 22.47526,
-        "pricingAsOf": "2026-07-13T15:33:27.513Z"
+        "pricingAsOf": "2026-07-13T15:42:25.342Z"
       }
     },
     "merges": [
