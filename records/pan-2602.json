@@ -132,9 +132,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-13T14:40:19.893Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-13T15:01Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-13T15:01:09.979Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-13T15:01:09Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2602\n\n# Review Synthesis — PAN-2602 — 2026-07-13T15:00:12.000Z\n\n## Verdict: CHANGES REQUESTED — dashboard server has a duplicate top-level declaration of `stopBeadsRollupService` that produces a real `SyntaxError`-class defect (`src/dashboard/server/main.ts:19,488`)\n\n## Context\n- Manifest: `.pan/review/agent-pan-2602-review-5f631201/context.json`\n- Branch: feature/pan-2602\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2602\n- HEAD reviewed: 5f631201aa29a44211498a768fb1489e950af455\n- Cycle number: 3\n- Prior cycle SHA: 163a64c5af33bcafc472f85c624d0877c006f094\n- Cycle diff (163a64c5..HEAD): 1 commit — `test(dashboard): add missing selectAgentsWithPendingProposedPlan mock in App.test.tsx` (`src/dashboard/frontend/src/App.test.tsx`, +2/-0 only)\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `.pan/review/agent-pan-2602-review-5f631201/security.md` | 0 |\n| correctness | ready | `.pan/review/agent-pan-2602-review-5f631201/correctness.md` | 2 (1 kept, 1 demoted — see gates) |\n| performance | ready | `.pan/review/agent-pan-2602-review-5f631201/performance.md` | 1 |\n| requirements | ready | `.pan/review/agent-pan-2602-review-5f631201/requirements.md` | 1 (dedupes with correctness) |\n\n## Convergence-Gate Analysis (cycle 3)\n\nThis is cycle 3, so the mandatory convergence gate applies: only block on findings whose cited file:line falls inside the **cycle diff** (163a64c5..HEAD, one commit, `App.test.tsx` only), unless the finding was never actually reviewed-and-passed by the prior cycle. I independently verified both contested findings with `Bash` (not just reasoning from the reports) before deciding gate treatment:\n\n1. **`main.ts:19,488` duplicate `stopBeadsRollupService` — NOT gated, kept as blocking.** Cycle 2's correctness reviewer marked \"Clean Areas Checked\" only for \"singleton startup wiring\" — it never mentions `main.ts`, the shutdown handler, or this declaration. This is a miss, not a \"saw-and-passed\" judgment call, so the gate's protection does not apply. I confirmed the defect myself: `cd src/dashboard/server && npx tsc --noEmit -p tsconfig.json` (the tsconfig that actually covers this file — the root `npm run typecheck` excludes `src/dashboard/**/*` and never sees it) produces:\n   ```\n   main.ts(19,35): error TS2440: Import declaration conflicts with local declaration of 'stopBeadsRollupService'.\n   main.ts(583,3): error TS2722: Cannot invoke an object which is possibly 'undefined'.\n   ```\n   Both the correctness and requirements reviewers independently found this (different evidence tiers — static trace vs. an actual `node` `SyntaxError` repro of the same declaration pattern). Two of four sub-roles converging on the same defect from independent angles is strong signal, not overreach.\n2. **`resource-discovery.ts:678-704` serial `git merge-base` spawns — NOT gated, kept as blocking (carried forward, unresolved).** This is the *exact* finding that made cycle 2 \"CHANGES REQUESTED\" (see `.pan/review/agent-pan-2602-review-163a64c5/synthesis.md`). The file has not been touched since cycle 2 (`git log 163a64c5..HEAD -- src/dashboard/server/services/resource-discovery.ts` is empty) — meaning the fix was never applied, not that a reviewer is re-litigating passed code. The gate protects findings a prior cycle **saw-and-passed**; it does not launder a standing, unaddressed blocker just because the intervening commit touched an unrelated file. Blocking again is correct, not a promotion.\n3. **`workflows.ts:194-209` `closeOut()` sweep not-actually-non-fatal — GATED, demoted to non-blocking.** Cycle 2's correctness reviewer explicitly listed \"CLI bead sweep and lifecycle close-out bead sweep: ... non-fatal close-out sweep failure path\" under Clean Areas Checked — this is a genuine saw-and-passed case, and `workflows.ts` was not touched in the cycle-3 diff. Per the gate this cannot be promoted to a blocker this cycle. See Non-blocking Findings for the technical detail — it is a real concern worth a follow-up.\n\n## Blocking Findings\n\n### [correctness + requirements, cross-confirmed] Duplicate declaration of `stopBeadsRollupService` — `src/dashboard/server/main.ts:19,488,583`\n`main.ts:19` imports `stopBeadsRollupService` from `./services/beads-rollup-singleton.js`; `main.ts:488` redeclares it with `let stopBeadsRollupService: (() => void) | undefined;` in the same top-level module scope, and it is never assigned. Confirmed independently in this synthesis pass via `tsc --noEmit -p src/dashboard/server/tsconfig.json` (TS2440 duplicate declaration, TS2722 invoking a possibly-undefined value) — the root `npm run typecheck` does not catch this because its `tsconfig.json` excludes `src/dashboard/**/*`. The requirements reviewer additionally reproduced the underlying pattern as a hard `node` `SyntaxError` (\"Identifier 'stopBeadsRollupService' has already been declared\").\n\nRuntime impact, traced directly in `main.ts`: the local `let` is never assigned anywhere in the file, so `stopBeadsRollupService();` at line 583 — inside `handleShutdownSignal`, invoked on every `SIGTERM`/`SIGINT`/`SIGHUP` (`pan restart`, `pan down`) — calls `undefined` as a function. That throws before reaching the remaining shutdown steps (584-589: `stopDeaconChild`, `flushAllPendingAutoCommits`, `closeConversationSearchService`, `closeMemoryFtsDatabases`, and `process.exit(0)` itself), and the real imported `stopBeadsRollupService()` (the one that actually stops the new rollup service this PR ships) is dead code, never invoked.\n\nAlso confirmed: this is the same defect CodeRabbit flagged as Critical on an earlier commit in this PR's history (`main.ts:488`); the suggested fix was never applied.\n\n**Fix:** delete the local `let stopBeadsRollupService` at line 488 and call the imported singleton function directly at line 583, matching every other service in this file (`stopAgentEnrichmentService()`, `stopConversationLifecycleService()`, etc.).\n\n### [performance, carried forward from cycle 2, still unresolved] Sequential per-branch `git merge-base` subprocess spawns — `src/dashboard/server/services/resource-discovery.ts:678-704`\nEach `feature/*`/`bypass/*` local and remote branch that resolves to an issue ID triggers its own `git merge-base --is-ancestor` subprocess, awaited one at a time in a plain `for` loop (not `Promise.all`'d like the surrounding branch discovery), on a recurring 30s-TTL background daemon pass. Local/remote copies of the same branch are checked twice for no new information. This project alone has dozens of active issues and a large tail of merged-but-undeleted branches, so this pass's cost grows unbounded with branch count, on every project, every refresh cycle, forever.\n\n**Fix (either is sufficient):** parallelize with `Promise.all` and dedupe local/remote pairs sharing a name, or replace the per-branch loop with one `git for-each-ref --merged=main ...` call per project (O(1) subprocess spawns instead of O(branches)), matching the existing `loadProjectBranches` pattern.\n\n## Non-blocking Findings\n\n### correctness\n- `[demoted: previously reviewed]` **`~` `closeOut()` bead sweep not actually non-fatal — `src/lib/lifecycle/workflows.ts:194-209`.** `sweepOrphanedBeads` is called via `Effect.promise` (expects the promise to never reject) rather than `Effect.tryPromise`; `runMutationBatch`/`withBdProcessLock` can throw on a bd-lock acquisition timeout or a non-ENOENT release error, which this repo has hit before (zero-byte lock poisoning, `plan finalize` holding the global lock). A rejection here becomes an unhandled Effect defect that aborts `closeOut()` itself, skipping teardown/issue-close/labeling — contradicting the step's own \"non-fatal\" comment. `merge-agent.ts:451-460`'s equivalent call already wraps this correctly in `try/catch`; `workflows.ts` should match. Demoted per the cycle-3 convergence gate (cycle 2 explicitly reviewed and passed this exact path; file untouched since). Worth a follow-up issue given the concrete incident history this codebase has with bd-lock contention.\n- `~` `isBranchAheadOfMain` fail-open/fail-closed comment mismatch — `resource-discovery.ts:429-442`. Any `git merge-base` failure (timeout, missing ref, real error) is treated the same as \"not an ancestor\" and returns `true` (\"branch ahead\"), contradicting the adjacent \"fail closed\" comment. Carried forward unchanged from cycle 2's identical non-blocking note. Recommend gating on `err.code === 1` specifically.\n- `~` Enumeration silently drops tracker-resolution failures — `src/cli/commands/beads.ts:168-200` (`enumerateClosedOrphanIssues`). A `resolveGitHubCloseState` failure during `--all-closed` drops the issue via `continue` with no `unresolved`/`failed` record, unlike the single-issue path.\n- `~` Unbounded `gh issue view` subprocess calls, no `timeout` — `src/cli/commands/close.ts:47-93`, unlike every other `execFileAsync` call touched in this PR (which set `timeout: 10000`/`15000`).\n- `?` Potential out-of-order rollup writes — `beads-rollup-service.ts:124-151`. `refreshProject` is fire-and-forgotten; a slow earlier call can overwrite a newer result. Self-heals on the next `beads.freshness_changed` event; low severity.\n- `?` Test coverage weakened, not a runtime bug — `FeatureItem.test.tsx:1108-1136`. The \"cleanup affordances\" test no longer clicks the Cleanup button or asserts the callback fires; `onCleanupOrphanedResources` wiring is now uncovered in this file. Also flagged by the requirements reviewer as pre-existing/whole-feature-scope. Worth restoring per this repo's additive-refactor/no-loss-audit house rule.\n\n### performance\n- `~` `enumerateClosedOrphanIssues` calls `resolveGitHubCloseState` sequentially per issue group in `pan beads sweep --all-closed` — an operator-invoked CLI backfill, not a hot path, but could hit GitHub rate limits on a large backlog.\n- `≉` `groupPipelineEntries` recomputes `isStalledFeature`/`isNeedsYouFeature` up to 8x per entry (once for the stalled bucket, once per phase bucket). Negligible at current scale; memoize if entry count grows significantly.\n- Confirmed clean: bead rollup design satisfies NFR-1 (one bulk pass per project, O(1) per-issue lookups against the cache), `beads-sync-service.ts`'s new local-head probe is bounded by project count, and the sweep call sites in `orphaned-beads-sweep.ts`/`merge-agent.ts`/`workflows.ts` are single-issue-scoped, low-frequency operations.\n\n### requirements\n- `~` (in_pr_scope) docs-update only partially covers FR-1 — `configuration/beads.mdx`, `docs/BEADS.md`, `CLAUDE.md`, and `pan-handoff/SKILL.md` document the bead sweep (FR-3), verification gate (FR-4), and handoff `--issue` precedence (FR-2), but no changed doc mentions the FR-1 dashboard signals: the `stalled` bucket, `branchAheadOfMain`, the `conversation` resource source, or the rollup service driving `beadTotals`. Recommend adding a short section to `docs/BEADS.md` or a Command-Deck-focused doc covering these before this cycle's fixes ship, since it's cheap and these are user-visible additions — but not gating.\n- `?` Same `enumerateClosedOrphanIssues` silent-drop behavior as noted under correctness (cross-reference, not a distinct defect).\n\n### security\n- `~` (pre-existing, out of PR scope) `src/cli/commands/beads.ts`'s `getOldClosedCount`/`compactCommand`/`statsCommand` build shell strings via `exec()` piping through `jq` on a numeric, `parseInt`-coerced value — untouched by this diff (`+232/-0`, purely additive file). If touched again, prefer `execFile('bd', [...])` piped through JS JSON parsing, consistent with the new `sweep` command's pattern.\n- `?` Close `reason` string flows into `execFile('bd', [...])` as an argv element (safe, not a shell string) — no action needed.\n\n## Clean Sub-roles\n- security\n\n## Scope Note\nNone — the proportionality check does not fire (3 distinct blocking findings across 4 sub-roles against a 16-commit PR diff, well under the 3×-commits threshold), and no requirements finding needed scope-classification correction.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2602/.pan/review/agent-pan-2602-review-5f631201/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2602 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
@@ -257,10 +270,10 @@
     "recordedAt": "2026-07-13T11:57:13.297Z"
   },
   "created": "2026-07-12T22:33:37.108Z",
-  "updated": "2026-07-13T14:46:18.658Z",
+  "updated": "2026-07-13T15:01:09.980Z",
   "pipeline": {
     "issueId": "PAN-2602",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -268,7 +281,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T12:03:05.509Z",
-    "updatedAt": "2026-07-13T14:46:15.860Z",
+    "updatedAt": "2026-07-13T15:01:09.179Z",
+    "reviewNotes": "main.ts dup-declares stopBeadsRollupService (real TS2440/TS2722, crashes shutdown); cycle-2's serial git-spawn perf blocker also still unfixed",
     "inspectNotes": "Bead beads-rollup-service ack: extractIssueLabels() now gates bare word-number labels through project.issuePrefixes, preventing phase-N labels from creating spurious rollups; tests cover phase exclusion and workspace: label mapping.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2636",
     "lastVerifiedCommit": "5f631201aa29a44211498a768fb1489e950af455",
@@ -394,6 +408,24 @@
         "tests/unit/lib/webhook-handlers.test.ts"
       ],
       "recordedAt": "2026-07-13T11:57:13.297Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "5f631201aa29a44211498a768fb1489e950af455"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "5f631201aa29a44211498a768fb1489e950af455"
+      },
+      "performance": {
+        "status": "blocked",
+        "atCommit": "5f631201aa29a44211498a768fb1489e950af455"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "5f631201aa29a44211498a768fb1489e950af455"
+      }
     }
   },
   "closeOut": {
@@ -433,6 +465,46 @@
             "output": 143772,
             "cacheRead": 34086873,
             "cacheWrite": 683275
+          }
+        },
+        "review": {
+          "anthropic/claude-sonnet-5": {
+            "input": 24911,
+            "output": 28891,
+            "cacheRead": 4907752,
+            "cacheWrite": 162776
+          }
+        },
+        "review.correctness": {
+          "anthropic/claude-sonnet-5": {
+            "input": 22970,
+            "output": 19368,
+            "cacheRead": 4371559,
+            "cacheWrite": 192128
+          }
+        },
+        "review.performance": {
+          "anthropic/claude-sonnet-5": {
+            "input": 18803,
+            "output": 15236,
+            "cacheRead": 2884544,
+            "cacheWrite": 138824
+          }
+        },
+        "review.requirements": {
+          "anthropic/claude-sonnet-5": {
+            "input": 1411,
+            "output": 22415,
+            "cacheRead": 7416664,
+            "cacheWrite": 105372
+          }
+        },
+        "review.security": {
+          "anthropic/claude-sonnet-5": {
+            "input": 19463,
+            "output": 11936,
+            "cacheRead": 3721093,
+            "cacheWrite": 152299
           }
         },
         "review.supervisor": {
@@ -484,10 +556,10 @@
           "cacheWrite": 683275
         },
         "anthropic/claude-sonnet-5": {
-          "input": 17572,
-          "output": 14782,
-          "cacheRead": 2384051,
-          "cacheWrite": 120513
+          "input": 105130,
+          "output": 112628,
+          "cacheRead": 25685663,
+          "cacheWrite": 871912
         },
         "custom/kimi-k2.7-code": {
           "input": 3221727,
@@ -497,8 +569,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 116.234476,
-        "pricingAsOf": "2026-07-13T14:46:15.956Z"
+        "usd": 123.926882,
+        "pricingAsOf": "2026-07-13T15:01:09.222Z"
       }
     },
     "merges": [
