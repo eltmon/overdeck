@@ -288,6 +288,8 @@ export interface PendingInputsScan {
   readonly enterPlanModeOpen: boolean
   /** Outstanding ExitPlanMode tool_use without a matching tool_result (operator approval pending). */
   readonly exitPlanModePending: boolean
+  /** Payload for the outstanding ExitPlanMode, when its plan text is available. */
+  readonly pendingProposedPlan?: { toolUseId: string; askedAt: string; plan: string }
 }
 
 /**
@@ -331,6 +333,8 @@ export async function scanPendingInputsPromise(jsonlPath: string): Promise<Pendi
     const askDeniedAwaitingUser = new Set<string>()
     const exitPlanModeIds = new Set<string>()
     const exitPlanModeAnswered = new Set<string>()
+    const exitPlanModeCalls = new Map<string, { timestamp: string; plan: string }>()
+    let pendingExitPlanId: string | undefined
     const enterPlanModeIds = new Set<string>()
     const exitPlanModeFiredAfterEnter = new Set<string>() // tracks any ExitPlanMode (signals plan-mode session ended)
 
@@ -360,6 +364,9 @@ export async function scanPendingInputsPromise(jsonlPath: string): Promise<Pendi
             } else if (item.name === 'ExitPlanMode' && typeof item.id === 'string') {
               exitPlanModeIds.add(item.id)
               exitPlanModeFiredAfterEnter.add(item.id)
+              const planText = typeof item.input?.plan === 'string' ? item.input.plan : ''
+              exitPlanModeCalls.set(item.id, { timestamp: entry.timestamp || new Date().toISOString(), plan: planText })
+              pendingExitPlanId = item.id
             } else if (item.name === 'EnterPlanMode' && typeof item.id === 'string') {
               enterPlanModeIds.add(item.id)
             }
@@ -389,12 +396,21 @@ export async function scanPendingInputsPromise(jsonlPath: string): Promise<Pendi
 
     const exitPlanModePending = Array.from(exitPlanModeIds).some(id => !exitPlanModeAnswered.has(id))
 
+    // FR-1 — carry the plan payload so the dashboard can promote it to an
+    // approval modal (instead of the plan being visible only in the terminal).
+    const pendingCall = pendingExitPlanId && !exitPlanModeAnswered.has(pendingExitPlanId)
+      ? exitPlanModeCalls.get(pendingExitPlanId)
+      : undefined
+    const pendingProposedPlan = pendingCall
+      ? { toolUseId: pendingExitPlanId!, askedAt: pendingCall.timestamp, plan: pendingCall.plan }
+      : undefined
+
     // EnterPlanMode is "open" only if no ExitPlanMode has fired since the last
     // EnterPlanMode. Approximation: if there are EnterPlanMode ids AND no
     // ExitPlanMode has fired, we're still in plan mode.
     const enterPlanModeOpen = enterPlanModeIds.size > 0 && exitPlanModeFiredAfterEnter.size === 0
 
-    return { askUserQuestions, enterPlanModeOpen, exitPlanModePending }
+    return { askUserQuestions, enterPlanModeOpen, exitPlanModePending, ...(pendingProposedPlan ? { pendingProposedPlan } : {}) }
   } catch {
     return { askUserQuestions: [], enterPlanModeOpen: false, exitPlanModePending: false }
   }
