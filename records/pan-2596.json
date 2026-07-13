@@ -104,15 +104,7 @@
       "note": "Agent signaled work complete"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-13T11:13:58Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2596\n\n# Review Synthesis — PAN-2596 — 2026-07-13T07:13:27-04:00\n\n## Verdict: CHANGES REQUESTED — convoy reviewers failed to start for this run\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2596/.pan/review/agent-pan-2596-review-991f28dc/context.json\n- Branch: feature/pan-2596\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2596\n- HEAD reviewed: 991f28dcac2af9f4dd0da07e5bcd29f2c808d653\n- Cycle number: 4\n- Prior cycle SHA: aa5085397e4c1e61dc76f80c7ec0b3d58b8bd537\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | failed: Role run agent-pan-2596-review-security already running. Use 'pan tell' to message it. | — | infrastructure failure |\n| correctness | failed: Role run agent-pan-2596-review-correctness already running. Use 'pan tell' to message it. | — | infrastructure failure |\n| performance | failed: Role run agent-pan-2596-review-performance already running. Use 'pan tell' to message it. | — | infrastructure failure |\n| requirements | failed: Role run agent-pan-2596-review-requirements already running. Use 'pan tell' to message it. | — | infrastructure failure |\n\n## Blocking Findings\n\n### [infrastructure] Convoy reviewer runs failed to start\nAll four terminal signals for this cycle were `REVIEWER_FAILED` with the same root cause: the corresponding role run was already running. Per `roles/review.md`, any failed reviewer is blocking, and the review cannot approve without readable reports from the required sub-roles.\n\n## Non-blocking Findings\nNone.\n\n## Scope Note\nNo reviewer output files were read for this run because all four sub-roles signaled failure rather than readiness. This synthesis records the infrastructure failure only; it does not make a code-quality determination for `991f28dcac2af9f4dd0da07e5bcd29f2c808d653`.\n\n## Clean Sub-roles\nNone.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2596/.pan/review/agent-pan-2596-review-991f28dc/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2596 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/frontend/src/App.test.tsx",
@@ -150,23 +142,23 @@
     "recordedAt": "2026-07-13T11:20:10.124Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T11:20:13.164Z",
+  "updated": "2026-07-13T11:20:14.863Z",
   "pipeline": {
     "issueId": "PAN-2596",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T11:20:13.065Z",
+    "updatedAt": "2026-07-13T11:20:14.592Z",
     "verificationNotes": "Verification FAILED at build (3006ms):\n\n\n> @overdeck/core@0.45.16 build\n> npm run build:contracts && npm run build:pi-extension && npm run build:ohmypi-extension && npm run build:cli && node scripts/build-post-cli.mjs\n\n\n> @overdeck/core@0.45.16 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.45.16 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-2596/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n",
     "inspectNotes": "Bead server-upload-allowlist ack: validateUploadPayload correctly gates UTF-8 text extensions, PDF %PDF- magic prefix, and disallowed/extension-less types with 400s naming the mismatch, while preserving image magic-byte validation and <uuid><ext> naming; non-image files get <uuid>-<sanitized-name><ext>. All 5 ACs verified against diff + accompanying unit tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2634",
     "lastVerifiedCommit": "991f28dcac2af9f4dd0da07e5bcd29f2c808d653",
     "reviewRequestedAt": "2026-07-13T11:20:13.065Z",
-    "reviewSpawnedAt": "2026-07-13T11:13:01.375Z",
+    "reviewSpawnedAt": "2026-07-13T11:20:14.591Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/frontend/src/App.test.tsx",
@@ -294,7 +286,7 @@
       },
       "costAtCloseOut": {
         "usd": 52.050423,
-        "pricingAsOf": "2026-07-13T11:20:13.164Z"
+        "pricingAsOf": "2026-07-13T11:20:14.797Z"
       }
     },
     "merges": [
