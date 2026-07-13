@@ -216,7 +216,7 @@
     "recordedAt": "2026-07-13T10:12:32.889Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T10:34:34.645Z",
+  "updated": "2026-07-13T10:41:04.679Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "failed",
@@ -227,7 +227,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T10:14:31.402Z",
-    "updatedAt": "2026-07-13T10:34:32.854Z",
+    "updatedAt": "2026-07-13T10:41:03.801Z",
     "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (169753ms):\n\n repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n- Spawning knowledge agent for PAN-2468...\n✔ Knowledge agent spawned: agent-pan-2468-knowledge\n- Spawning knowledge agent for PAN-2468...\n✖ Knowledge agent for PAN-2468 failed: No OKF bundle is configured for Overdeck. Run `/okf init` in this workspace to create or connect a knowledge bundle, then retry `pan knowledge PAN-2468`.\n- Spawning knowledge agent for PAN-2468...\n⚠ mnemos unavailable; spawning knowledge agent with built-in OKF search: release fetch failed\n- Spawning knowledge agent for PAN-2468...\n✔ Knowledge agent spawned: agent-pan-2468-knowledge\n",
     "inspectNotes": "Bead phase-banner-work-signal ack: workRunning now derives from activity.data.sections.some(type===work && status===running) (IssueMissionControl.tsx:828), verified via deriveNarrative precedence in StatusNarrative.tsx and existing+new tests covering all 3 ACs (planning-only session, live work session, beads-driven regression path); change is additive per NFR-1.",
@@ -386,7 +386,7 @@
       },
       "costAtCloseOut": {
         "usd": 66.587491,
-        "pricingAsOf": "2026-07-13T10:34:34.380Z"
+        "pricingAsOf": "2026-07-13T10:41:04.426Z"
       }
     },
     "merges": [
