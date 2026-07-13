@@ -206,23 +206,23 @@
     "recordedAt": "2026-07-13T10:12:32.889Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T10:12:58.103Z",
+  "updated": "2026-07-13T10:12:59.129Z",
   "pipeline": {
     "issueId": "PAN-2598",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T10:12:57.994Z",
+    "updatedAt": "2026-07-13T10:12:58.953Z",
     "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (326441ms):\n\na long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ tests/lib/agents-compact-session.test.ts:69:3\n     67|\n     68| describe('buildCompactRecoverySeed (PAN-1781)', () => {\n     69|   it('resolves the agent JSONL and embeds a smart summary in the fresh…\n       |   ^\n     70|     writeAgent({ workspace: WORKSPACE, sessionId: SESSION_ID });\n     71|     const { buildCompactRecoverySeed } = await import('../../src/lib/a…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯\n\n FAIL  |root| tests/lib/agents-compact-session.test.ts > buildCompactRecoverySeed (PAN-1781) > resolves the agent JSONL and embeds a smart summary in the fresh-session seed\nAssertionError: expected { …(2) } to deeply equal { summarized: true, …(1) }\n\n- Expected\n+ Received\n\n  {\n-   \"seed\": StringContaining \"Recovered session summary\",\n+   \"seed\": \"Your previous session for PAN-TEST hit the model's context-window limit, so you are starting a fresh session. This freed tokens; it did not reset your filesystem work.\n+ Do NOT start over and do NOT expect the prior conversation to be available.\n+\n+ Summary of the archived session:\n+\n+ Fallback session summary\n+\n+ Reconstruct your exact work-in-progress from durable artifacts:\n+ 1. Read .pan/continue.json for resumePoint, decisions, hazards, feedback, and sessionHistory.\n+ 2. Run `bd ready` for your open beads and `bd show <id>` for the bead you are working on.\n+ 3. Inspect `git status` and `git diff` for uncommitted work already on disk.\n+ Then continue from that reconstructed state and complete the next required bead — do not wait for further instructions.\",\n    \"summarized\": true,\n  }\n\n ❯ tests/lib/agents-compact-session.test.ts:76:20\n     74|     const result = await buildCompactRecoverySeed(AGENT_ID);\n     75|\n     76|     expect(result).toEqual({\n       |                    ^\n     77|       summarized: true,\n     78|       seed: expect.stringContaining('Recovered session summary'),\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯\n\n",
     "inspectNotes": "Bead phase-banner-work-signal ack: workRunning now derives from activity.data.sections.some(type===work && status===running) (IssueMissionControl.tsx:828), verified via deriveNarrative precedence in StatusNarrative.tsx and existing+new tests covering all 3 ACs (planning-only session, live work session, beads-driven regression path); change is additive per NFR-1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2631",
     "reviewRequestedAt": "2026-07-13T10:12:57.993Z",
-    "reviewSpawnedAt": "2026-07-13T09:48:56.510Z",
+    "reviewSpawnedAt": "2026-07-13T10:12:58.951Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -375,7 +375,7 @@
       },
       "costAtCloseOut": {
         "usd": 66.088693,
-        "pricingAsOf": "2026-07-13T10:12:58.102Z"
+        "pricingAsOf": "2026-07-13T10:12:59.060Z"
       }
     },
     "merges": [
