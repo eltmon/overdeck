@@ -143,6 +143,26 @@ describe('runMutationBatch', () => {
     expect(h.calls.some((call) => call.startsWith('dolt commit'))).toBe(false);
   });
 
+  it('does not classify maxBuffer failures as conflicts based on partial stdout content', async () => {
+    const h = harness();
+    const cause = Object.assign(new Error('stdout maxBuffer length exceeded'), {
+      stdout: JSON.stringify([{ id: 'PAN-1', title: 'contains the word conflict in bead content' }]),
+    });
+    const result = await withProjectDir(true, (workspacePath) =>
+      runMutationBatch(
+        { project: { workspacePath }, reason: 'export large beads' },
+        (bd) => bd.mutate(['create', 'one']),
+        { ...h, exportSnapshot: vi.fn(async () => { h.calls.push('export-snapshot'); throw cause; }) },
+      ),
+    );
+
+    expect(result).toMatchObject({ ok: false, needsOperatorRecovery: true });
+    expect(result).toHaveProperty('cause', cause);
+    expect(h.calls).not.toContain('dolt push');
+    if (result.ok) throw new Error('expected mutation batch failure');
+    expect(formatMutationBatchFailure(result)).toContain('stdout maxBuffer length exceeded');
+  });
+
   it('formats operator recovery failures with the captured cause', async () => {
     const cause = Object.assign(new Error('operation failed'), {
       stderr: 'Bootstrap failed: clone from remote: database exists',

@@ -8,6 +8,7 @@ import { exportBeadsJsonl } from './export.js';
 import { recordBeadsConflict, recordBeadsPull, recordBeadsPush, recordBeadsSyncError } from './telemetry.js';
 
 const execFileAsync = promisify(execFile);
+const BD_EXEC_MAX_BUFFER = 64 * 1024 * 1024;
 
 export interface BeadsMutationProject {
   workspacePath: string;
@@ -42,6 +43,12 @@ function errorText(error: unknown): string {
   return [record.stderr, record.message, record.stdout].filter((value) => typeof value === 'string').join('\n');
 }
 
+function errorDiagnosticText(error: unknown): string {
+  if (!error || typeof error !== 'object') return String(error);
+  const record = error as Record<string, unknown>;
+  return [record.stderr, record.message].filter((value) => typeof value === 'string').join('\n');
+}
+
 export function formatMutationBatchFailure(result: Extract<MutationBatchResult<unknown>, { ok: false }>): string {
   if (!('cause' in result)) return result.message;
   const cause = errorText(result.cause).trim();
@@ -49,7 +56,7 @@ export function formatMutationBatchFailure(result: Extract<MutationBatchResult<u
 }
 
 function isConflict(error: unknown): boolean {
-  return /conflict|non-fast-forward|rejected|diverge/i.test(errorText(error));
+  return /conflict|non-fast-forward|rejected|diverge/i.test(errorDiagnosticText(error));
 }
 
 function parseHead(status: string): string | null {
@@ -57,7 +64,7 @@ function parseHead(status: string): string | null {
 }
 
 async function defaultExecute(args: readonly string[], cwd: string): Promise<string> {
-  const { stdout } = await execFileAsync('bd', [...args], { cwd, encoding: 'utf8', timeout: 120_000 });
+  const { stdout } = await execFileAsync('bd', [...args], { cwd, encoding: 'utf8', timeout: 120_000, maxBuffer: BD_EXEC_MAX_BUFFER });
   return stdout;
 }
 

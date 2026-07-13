@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import { resolveSharedBeadsDir } from '../bd-process-lock.js';
 
 const execFileAsync = promisify(execFile);
+const BD_EXEC_MAX_BUFFER = 64 * 1024 * 1024;
 
 export interface BeadsExportState {
   universe: 'all';
@@ -28,7 +29,7 @@ export interface ExportBeadsResult {
 }
 
 async function defaultExecute(args: readonly string[], cwd: string): Promise<string> {
-  const { stdout } = await execFileAsync('bd', [...args], { cwd, encoding: 'utf8', timeout: 120_000 });
+  const { stdout } = await execFileAsync('bd', [...args], { cwd, encoding: 'utf8', timeout: 120_000, maxBuffer: BD_EXEC_MAX_BUFFER });
   return stdout;
 }
 
