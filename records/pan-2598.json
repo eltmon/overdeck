@@ -160,7 +160,7 @@
     "recordedAt": "2026-07-13T08:53:00.165Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T08:59:12.212Z",
+  "updated": "2026-07-13T09:00:29.415Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "pending",
@@ -321,7 +321,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "activity-terminal-end-signal": "completed",
     "activity-terminal-end-signal.activity-terminal-end-signal.ac1": "completed",
