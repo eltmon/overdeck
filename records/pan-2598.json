@@ -243,18 +243,18 @@
     "recordedAt": "2026-07-13T10:56:03.885Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T10:56:19.258Z",
+  "updated": "2026-07-13T10:57:11.822Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T10:55:39.955Z",
-    "updatedAt": "2026-07-13T10:56:17.942Z",
+    "updatedAt": "2026-07-13T10:57:11.705Z",
     "reviewNotes": "Verification failed at test",
     "inspectNotes": "Bead phase-banner-work-signal ack: workRunning now derives from activity.data.sections.some(type===work && status===running) (IssueMissionControl.tsx:828), verified via deriveNarrative precedence in StatusNarrative.tsx and existing+new tests covering all 3 ACs (planning-only session, live work session, beads-driven regression path); change is additive per NFR-1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2631",
@@ -373,9 +373,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 3419964,
-            "output": 431596,
-            "cacheRead": 195764992,
+            "input": 3421182,
+            "output": 432310,
+            "cacheRead": 195954944,
             "cacheWrite": 0
           }
         }
@@ -406,15 +406,15 @@
           "cacheWrite": 346536
         },
         "custom/kimi-k2.7-code": {
-          "input": 3419964,
-          "output": 431596,
-          "cacheRead": 195764992,
+          "input": 3421182,
+          "output": 432310,
+          "cacheRead": 195954944,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 69.210707,
-        "pricingAsOf": "2026-07-13T10:56:18.010Z"
+        "usd": 69.250811,
+        "pricingAsOf": "2026-07-13T10:57:11.798Z"
       }
     },
     "merges": [
