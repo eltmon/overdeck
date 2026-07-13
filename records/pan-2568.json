@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-2568",
   "schemaVersion": 2,
-  "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-11T17:44:01.222Z",
-  "pipeline": {
-    "issueId": "PAN-2568",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-11T17:44:00.676Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -26,6 +9,61 @@
       "timestamp": "2026-07-11T17:44:00.675Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-11T17:44:00.676Z",
+  "updated": "2026-07-13T05:48:22.233Z",
+  "pipeline": {
+    "issueId": "PAN-2568",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-13T05:48:22.189Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 15117,
+            "output": 31127,
+            "cacheRead": 2685260,
+            "cacheWrite": 148063
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-fable-5": {
+          "input": 15117,
+          "output": 31127,
+          "cacheRead": 2685260,
+          "cacheWrite": 148063
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 6.243573,
+        "pricingAsOf": "2026-07-13T05:48:22.232Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
-  "model": "claude-fable-5"
+  "model": "MiniMax-M3",
+  "statusOverrides": {
+    "injection-budget": "running"
+  },
+  "swarm": {
+    "slotAssignments": [
+      {
+        "slotIndex": 1,
+        "itemId": "injection-budget",
+        "agentId": "agent-pan-2568-slot-1",
+        "branch": "feature/pan-2568-slot-1",
+        "assignedAt": "2026-07-13T05:48:21.301Z"
+      }
+    ]
+  }
 }
