@@ -246,21 +246,25 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-13T05:16:09.482Z"
+    },
+    {
+      "timestamp": "2026-07-13T14:42:59.446Z",
+      "reason": "end",
+      "note": "All beads implemented: IssueDrawer header restructure, Files/Activity/Terminal/Conversation/Beads/Plan tabs, stream color helpers, Space Grotesk title. Deviations documented in prior session note: used agent.git?.branch for branch field, rounded-md for medium radius, exported formatSpend from DrawerActiveAgent, DiffPanel rendered inline scoped to work agent. Full test suite green (1016 files / 9473 tests), frontend suite green."
     }
   ],
   "feedback": [],
   "created": "2026-07-12T20:45:31.659Z",
-  "updated": "2026-07-13T14:38:55.912Z",
+  "updated": "2026-07-13T14:43:00.229Z",
   "pipeline": {
     "issueId": "PAN-1232",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-07-12T22:02:39.443Z",
-    "updatedAt": "2026-07-13T14:38:55.873Z",
+    "updatedAt": "2026-07-13T14:43:00.127Z",
     "blockerReasons": [
       {
         "type": "failing_checks",
@@ -269,7 +273,8 @@
       }
     ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2604",
-    "reviewSpawnedAt": "2026-07-13T05:15:48.073Z"
+    "reviewRequestedAt": "2026-07-13T14:42:59.448Z",
+    "reviewSpawnedAt": "2026-07-13T14:43:00.127Z"
   },
   "closeOut": {
     "usage": {
@@ -295,6 +300,14 @@
             "cacheRead": 22104576,
             "cacheWrite": 0
           }
+        },
+        "work": {
+          "custom/kimi-k2.7-code": {
+            "input": 178930,
+            "output": 12119,
+            "cacheRead": 2153984,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
@@ -311,15 +324,15 @@
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 354503,
-          "output": 34956,
-          "cacheRead": 22104576,
+          "input": 533433,
+          "output": 47075,
+          "cacheRead": 24258560,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 43.255446,
-        "pricingAsOf": "2026-07-13T14:38:55.911Z"
+        "usd": 43.883160000000004,
+        "pricingAsOf": "2026-07-13T14:43:00.221Z"
       }
     },
     "merges": [
