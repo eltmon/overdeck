@@ -14,6 +14,7 @@ let createSessionMock: ReturnType<typeof vi.fn>;
 let sendRawKeystrokeMock: ReturnType<typeof vi.fn>;
 let resolveHarnessMock: ReturnType<typeof vi.fn>;
 let emitAgentEventMock: ReturnType<typeof vi.fn>;
+let ensureLifecycleHooksMock: ReturnType<typeof vi.fn>;
 let capturePaneText: string;
 let channelsMcpEnabled: boolean;
 let activeFlywheelRunId: string | null;
@@ -44,6 +45,7 @@ function mockSpawnDependencies(): void {
   createSessionMock = vi.fn(() => undefined);
   sendRawKeystrokeMock = vi.fn(() => Effect.void);
   emitAgentEventMock = vi.fn(() => Effect.succeed(true));
+  ensureLifecycleHooksMock = vi.fn(async () => undefined);
   resolveHarnessMock = vi.fn(async ({ explicit, model }: { explicit?: string; model: string }) => {
     if (explicit) return explicit;
     if (model === 'gpt-5.5') return 'codex';
@@ -56,6 +58,9 @@ function mockSpawnDependencies(): void {
   }));
   vi.doMock('../agent-runtime.js', () => ({
     emitAgentEvent: emitAgentEventMock,
+  }));
+  vi.doMock('../agents/hook-readiness.js', () => ({
+    ensureLifecycleHooksBeforeLaunch: ensureLifecycleHooksMock,
   }));
   vi.doMock('../agent-runtime-mirror.js', () => ({
     getRuntimeSnapshot: vi.fn(() => Effect.succeed(null)),
@@ -186,6 +191,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.doUnmock('../harness-resolve.js');
   vi.doUnmock('../agent-runtime.js');
+  vi.doUnmock('../agents/hook-readiness.js');
   vi.doUnmock('../agent-runtime-mirror.js');
   vi.doUnmock('../runtimes/codex.js');
   vi.doUnmock('../runtimes/pi-fifo.js');
@@ -304,11 +310,51 @@ describe('spawnAgent PTY supervisor wiring', () => {
     expect(launcher).not.toContain('--mcp-config');
     expect(launcher).not.toContain('--dangerously-load-development-channels');
     expect(sendRawKeystrokeMock).not.toHaveBeenCalled();
+    expect(ensureLifecycleHooksMock).toHaveBeenCalledWith('agent-pan-1405', 'claude-code');
+    expect(ensureLifecycleHooksMock.mock.invocationCallOrder[0]).toBeLessThan(
+      createSessionMock.mock.invocationCallOrder[0],
+    );
     expect(createSessionMock).toHaveBeenCalledWith(
       'agent-pan-1405',
       workspace,
       `bash ${join(agentDir, 'launcher.sh')}`,
       expect.any(Object),
+    );
+  });
+
+  it('pins and persists a fresh Claude work-agent session before hooks run', async () => {
+    writeSupervisorArtifact();
+    const { spawnAgent } = await import('../agents.js');
+
+    const state = await spawnAgent({
+      issueId: 'PAN-1409',
+      workspace,
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+    });
+
+    const agentDir = join(tmpHome, 'agents', 'agent-pan-1409');
+    const persisted = JSON.parse(readFileSync(join(agentDir, 'state.json'), 'utf8')) as AgentState;
+    const sessionId = readFileSync(join(agentDir, 'session.id'), 'utf8').trim();
+    const history = JSON.parse(readFileSync(join(agentDir, 'sessions.json'), 'utf8')) as string[];
+    const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
+    const lifecycle = readFileSync(join(agentDir, 'lifecycle.log'), 'utf8');
+
+    expect(sessionId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(state.sessionId).toBe(sessionId);
+    expect(persisted.sessionId).toBe(sessionId);
+    expect(history).toEqual([sessionId]);
+    expect(launcher).toContain(`--session-id '${sessionId}'`);
+    expect(lifecycle).toContain(`session identity allocated: harness=claude-code sessionId=${sessionId}`);
+    expect(lifecycle).toContain('pointerPersisted=true historyPersisted=true');
+    expect(lifecycle).toContain(`launcher session pinned: sessionId=${sessionId}`);
+    expect(emitAgentEventMock).toHaveBeenCalledWith(
+      'agent-pan-1409',
+      expect.objectContaining({
+        kind: 'model_set',
+        claudeSessionId: sessionId,
+        sessionHarness: 'claude-code',
+      }),
     );
   });
 

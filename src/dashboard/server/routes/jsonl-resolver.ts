@@ -10,7 +10,8 @@
  *
  * For claude-code agents the JSONL filename is the *Claude session ID* (a UUID
  * written by Claude Code itself), NOT the agent/tmux name. Lookup order:
- *   1. session.id     — single UUID written by auto-suspend
+ *   1. session.id     — UUID pinned before fresh work-agent launch and updated
+ *                       by auto-suspend/resume flows
  *   2. sessions.json  — array of UUIDs the agent has used; the heartbeat hook
  *                       APPENDS new IDs and dedupes, so once a session has been
  *                       seen its array index never moves. After a `pan resume`
@@ -32,6 +33,7 @@ import { encodeClaudeProjectDir, getOverdeckHome } from '../../../lib/paths.js';
 import { getAgentWorkspace } from '../../../lib/agent-enrichment.js';
 import { getHarnessBehavior } from '../../../lib/runtimes/behavior.js';
 import type { HarnessName } from '../../../lib/runtimes/types.js';
+import { logAgentLifecycleSync } from '../../../lib/persistent-logger.js';
 
 export interface ResolveJsonlPathOptions {
   /** Override the ~/.overdeck/agents directory (test hook). */
@@ -40,6 +42,26 @@ export interface ResolveJsonlPathOptions {
   claudeProjectsDirOverride?: string;
   /** Override the runtime-state lookup (test hook). */
   getRuntimeStateAsync?: (agentId: string) => Promise<{ claudeSessionId?: string } | null>;
+  /** Override forensic logging (test hook). */
+  logDiagnostic?: (agentId: string, message: string) => void;
+}
+
+// Command Deck polling can resolve the same session repeatedly. Keep forensic
+// logging useful by writing only when the resolution outcome changes.
+const transcriptResolutionSignatures = new Map<string, string>();
+
+function logTranscriptResolution(
+  agentId: string,
+  signature: string,
+  message: string,
+  opts: ResolveJsonlPathOptions,
+): void {
+  const signatureKey = `${agentId}:${opts.agentsDirOverride ?? 'live'}`;
+  if (transcriptResolutionSignatures.get(signatureKey) === signature) return;
+  transcriptResolutionSignatures.set(signatureKey, signature);
+  const logger = opts.logDiagnostic
+    ?? (opts.agentsDirOverride ? undefined : logAgentLifecycleSync);
+  logger?.(agentId, `transcript resolution: ${message}`);
 }
 
 async function pathExists(p: string): Promise<boolean> {
@@ -126,8 +148,8 @@ export async function resolveClaudeSessionId(
   const agentsRoot = opts.agentsDirOverride ?? join(getOverdeckHome(), 'agents');
   const agentDir = join(agentsRoot, agentId);
 
-  // 1. session.id — single UUID written by auto-suspend. Authoritative when
-  //    present (only one session is alive when suspend writes this file).
+  // 1. session.id — UUID pinned before fresh work-agent launch and updated by
+  //    suspend/resume flows. Authoritative when present.
   const sessionIdRaw = await readOptional(join(agentDir, 'session.id'));
   const sessionIdTrimmed = sessionIdRaw?.trim();
   if (sessionIdTrimmed) return sessionIdTrimmed;
@@ -360,11 +382,35 @@ export async function resolveJsonlPath(
   }
 
   const claudeSessionId = await resolveClaudeSessionId(agentId, opts);
-  if (!claudeSessionId) return null;
+  if (!claudeSessionId) {
+    logTranscriptResolution(
+      agentId,
+      `missing-session-id:${harness ?? 'unknown'}`,
+      `failed harness=${harness ?? 'unknown'} reason=no-session-id `
+        + 'checked=session.id,sessions.json,runtime-state',
+      opts,
+    );
+    return null;
+  }
 
   const projectsRoot = opts.claudeProjectsDirOverride ?? join(homedir(), '.claude', 'projects');
   const encodedDir = encodeClaudeProjectDir(workspacePath);
   const jsonlPath = join(projectsRoot, encodedDir, `${claudeSessionId}.jsonl`);
-  if (await pathExists(jsonlPath)) return jsonlPath;
+  if (await pathExists(jsonlPath)) {
+    logTranscriptResolution(
+      agentId,
+      `resolved:${jsonlPath}`,
+      `resolved harness=${harness ?? 'claude-code'} sessionId=${claudeSessionId} path=${jsonlPath}`,
+      opts,
+    );
+    return jsonlPath;
+  }
+  logTranscriptResolution(
+    agentId,
+    `missing-jsonl:${jsonlPath}`,
+    `failed harness=${harness ?? 'claude-code'} reason=jsonl-missing sessionId=${claudeSessionId} `
+      + `workspace=${workspacePath} expectedPath=${jsonlPath}`,
+    opts,
+  );
   return null;
 }

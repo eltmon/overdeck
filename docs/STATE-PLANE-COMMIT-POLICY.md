@@ -17,6 +17,11 @@ an unmarked branch is legacy/in-progress; reads continue through the legacy
   immutable-spec conflict rejection, and append/deduplicate for append-only data.
 - The paths-only auto-commit queue stages concrete writer results on
   `overdeck-state`; it never rebases or replays a mutation it cannot understand.
+- Each queued result is committed and pushed on the next timer turn by default;
+  there is no shipped batching delay. `OVERDECK_STATE_FLUSH_WINDOW_MS` is an
+  explicit operator override that trades durability latency for fewer commits.
+  A failed origin push is logged and returned as `pushed: false`, never reported
+  as fully durable success.
 - Every state commit asserts that the dedicated worktree is on
   `overdeck-state`. A missing/wrong/dirty worktree is surfaced, never discarded.
 - `pan admin state migrate` owns a cross-process project lock. All write doors

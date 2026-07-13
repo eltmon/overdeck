@@ -133,6 +133,42 @@ describe('resolveClaudeSessionId (PAN-830)', () => {
 });
 
 describe('resolveJsonlPath (PAN-830)', () => {
+  it('logs a durable diagnostic when no session identity source exists', async () => {
+    const diagnostics: string[] = [];
+
+    const path = await resolveJsonlPath(AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+      getRuntimeStateAsync: async () => null,
+      logDiagnostic: (_agentId, message) => diagnostics.push(message),
+    });
+
+    expect(path).toBeNull();
+    expect(diagnostics).toEqual([
+      expect.stringContaining('reason=no-session-id checked=session.id,sessions.json,runtime-state'),
+    ]);
+  });
+
+  it('logs the workspace and expected JSONL path when the pinned file is missing', async () => {
+    const diagnostics: string[] = [];
+    await writeFile(join(agentsDir, AGENT_ID, 'session.id'), `${CLAUDE_SESSION_ID}\n`);
+
+    const path = await resolveJsonlPath(AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+      getRuntimeStateAsync: async () => null,
+      logDiagnostic: (_agentId, message) => diagnostics.push(message),
+    });
+
+    expect(path).toBeNull();
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]).toContain(`reason=jsonl-missing sessionId=${CLAUDE_SESSION_ID}`);
+    expect(diagnostics[0]).toContain(`workspace=${WORKSPACE_PATH}`);
+    expect(diagnostics[0]).toContain(
+      `expectedPath=${join(claudeProjectsDir, encodeClaudeProjectDir(WORKSPACE_PATH), `${CLAUDE_SESSION_ID}.jsonl`)}`,
+    );
+  });
+
   it('returns the JSONL path when claudeSessionId resolves AND file exists', async () => {
     const encoded = encodeClaudeProjectDir(WORKSPACE_PATH);
     const projectDir = join(claudeProjectsDir, encoded);

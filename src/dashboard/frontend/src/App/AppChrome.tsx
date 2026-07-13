@@ -7,6 +7,7 @@ import { StoppedAgentsBanner } from '../components/StoppedAgentsBanner';
 import { OrphanTestAgentsSurface } from '../components/OrphanTestAgentsSurface';
 import { CodexAuthBanner } from '../components/CodexAuthBanner';
 import { SetupChecklistBanner } from '../components/SetupChecklistBanner';
+import { SyncRequiredBanner } from '../components/SyncRequiredBanner';
 import { SystemHealthPill } from '../components/SystemHealthPill';
 import { triggerEmergencyStop, EMERGENCY_STOP_HOTKEY_LABEL } from '../components/EmergencyStopOverlay';
 import type { Tab } from '../components/Header';
@@ -70,6 +71,9 @@ export function AppChrome({
       {/* Setup checklist — shown while a required host tool (tmux, git, node,
           claude) is missing from the server's PATH (PAN-774) */}
       <SetupChecklistBanner />
+
+      {/* Package/context inputs changed since the last pan sync. */}
+      <SyncRequiredBanner />
 
       {/* Codex Auth Banner — shown when Codex OAuth tokens are expired/burned */}
       <CodexAuthBanner />

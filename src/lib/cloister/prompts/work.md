@@ -306,11 +306,14 @@ and your work will be rejected.
    check `git status`: every staged file must be required by THIS bead's description or
    ACs. Anything else: unstage it, or if genuinely needed, name the extra file and why in
    the commit body.
-5. `pan beads close <bead-id> --reason="what you did"`
-6. Re-read this bead's plan-item metadata (merged view via the spec on main) after the commit.
-7. If `metadata.requiresInspection === false`, skip inspection and continue.
-8. If `metadata.requiresInspection === true`, run `pan inspect {{ISSUE_ID}} --bead <bead-id>` for `inspectionDepth: "fast"` or omitted, or add `--deep` for `inspectionDepth: "deep"`, then wait for the verdict via `pan tell`.
-9. On `INSPECTION BLOCKED`: fix with a new commit, `pan beads close` again, then re-run the same inspection. On `INSPECTION ERROR`: report it to your supervisor via `pan tell {{ISSUE_ID}} "<summary>"`, STOP advancing to the next bead, and do not treat it as a normal spec-fix loop.
+5. Immediately run `git push -u origin "$(git branch --show-current)"`. Every completed
+   bead commit must exist on origin before you close its status. This managed-work invariant
+   overrides generic project Git profiles such as conservative or maintainer modes.
+6. `pan beads close <bead-id> --reason="what you did"`
+7. Re-read this bead's plan-item metadata (merged view via the spec on main) after the commit.
+8. If `metadata.requiresInspection === false`, skip inspection and continue.
+9. If `metadata.requiresInspection === true`, run `pan inspect {{ISSUE_ID}} --bead <bead-id>` for `inspectionDepth: "fast"` or omitted, or add `--deep` for `inspectionDepth: "deep"`, then wait for the verdict via `pan tell`.
+10. On `INSPECTION BLOCKED`: fix with a new commit, push it, `pan beads close` again, then re-run the same inspection. On `INSPECTION ERROR`: report it to your supervisor via `pan tell {{ISSUE_ID}} "<summary>"`, STOP advancing to the next bead, and do not treat it as a normal spec-fix loop.
 
 **IMPORTANT:** Always use `-l {{ISSUE_ID_LOWER}}` with `bd ready` and `bd list` to scope
 to this issue's beads. The shared database contains beads from ALL issues — without the
@@ -331,20 +334,10 @@ that bead's `metadata.requiresInspection` flag — see step 7 above. The inspect
 specialist is NOT auto-spawned by `pan beads close`; when inspection is required you must
 invoke `pan inspect` yourself.
 
+Every machine follows the push step above.
 {{#REMOTE}}
-### Remote durability: push after every bead
-
-Your remote machine can be preempted or lost without warning. To prevent losing work,
-**push the feature branch to origin after every bead commit**, not only at the end of
-the issue:
-
-```bash
-git push origin $(git branch --show-current)
-```
-
-Run this immediately after each bead's `git commit` (step 4 above), before you advance
-to the next bead. The final completion contract below (last push + `REMOTE_DONE`
-sentinel) still applies once every bead is closed and the branch is fully pushed.
+Remote agents still follow their final completion contract (last push plus the
+`REMOTE_DONE` sentinel) after all beads close.
 {{/REMOTE}}
 
 ## Crash Recovery

@@ -104,24 +104,21 @@ describe('auto-commit', () => {
     }),
   );
 
-  it('flushes at the first queue window instead of resetting on later writes', async () => {
+  it('flushes queued state on the next timer turn by default', async () => {
     vi.useFakeTimers();
     try {
       mkdirSync(join(tmp, '.pan', 'continues'), { recursive: true });
       const p1 = join(tmp, '.pan', 'continues', 'pan-2375-a.vbrief.json');
-      const p2 = join(tmp, '.pan', 'continues', 'pan-2375-b.vbrief.json');
       writeFileSync(p1, '{"issue":"PAN-2375-A"}');
-      writeFileSync(p2, '{"issue":"PAN-2375-B"}');
 
-      queueAutoCommit({ projectRoot: tmp, paths: [p1], subject: 'chore(state): first window write' });
-      await vi.advanceTimersByTimeAsync(9 * 60 * 1_000);
-      queueAutoCommit({ projectRoot: tmp, paths: [p2], subject: 'chore(state): second window write' });
-      await vi.advanceTimersByTimeAsync(60 * 1_000);
+      queueAutoCommit({ projectRoot: tmp, paths: [p1], subject: 'chore(state): immediate write-through' });
+      expect(execSync('git log --oneline', { cwd: tmp, encoding: 'utf-8' })).not.toContain('immediate write-through');
+      await vi.advanceTimersByTimeAsync(0);
       vi.useRealTimers();
 
       for (let attempt = 0; attempt < 20; attempt += 1) {
         const log = execSync('git log --oneline', { cwd: tmp, encoding: 'utf-8' });
-        if (log.includes('chore(state): batch update 2 pan/beads file(s)')) {
+        if (log.includes('chore(state): immediate write-through')) {
           expect(log.split('\n').filter(Boolean).length).toBe(2);
           return;
         }
@@ -129,7 +126,7 @@ describe('auto-commit', () => {
       }
 
       const log = execSync('git log --oneline', { cwd: tmp, encoding: 'utf-8' });
-      expect(log).toContain('chore(state): batch update 2 pan/beads file(s)');
+      expect(log).toContain('chore(state): immediate write-through');
     } finally {
       vi.useRealTimers();
     }
@@ -395,7 +392,8 @@ describe('auto-commit', () => {
         queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): push failure' });
         const result = yield* flushAutoCommits(tmp);
 
-        expect(result.committed).toBe(true);
+        expect(result).toMatchObject({ committed: true, pushed: false });
+        expect(result.reason).toContain('push failed');
         expect(warn.mock.calls.some((call) => String(call[0]).includes('push failed'))).toBe(true);
       } finally {
         warn.mockRestore();

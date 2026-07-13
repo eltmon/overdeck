@@ -98,7 +98,10 @@ markers:
 ```
 
 Content **outside** the markers is preserved untouched — a hand-authored
-`~/.claude/CLAUDE.md` is never clobbered. Edit the layer source
+`~/.claude/CLAUDE.md` is never clobbered. The sole managed-content exception is
+a block explicitly marked `BEGIN/END BEADS INTEGRATION`: `pan sync` removes it
+because Beads' generic conservative Git profiles conflict with Overdeck's
+managed-work lifecycle. Edit the layer source
 (`global.md` / `project.md`) and re-run `pan sync`; never edit the region
 directly.
 
@@ -110,6 +113,10 @@ like `CLAUDE.md`. A project with no `project.md` gets neither file touched.
 
 `pan sync` also:
 
+- writes a sync-input manifest. After an Overdeck upgrade changes bundled
+  context, hooks, agents, or skills, the dashboard shows a **Sync now** banner;
+  the button runs `pan sync` on the host and disappears only after the manifest
+  matches the installed package;
 - distributes Overdeck's bundled skills → `~/.claude/skills/` and agent
   definitions → `~/.claude/agents/`, with manifest-based conflict resolution
   (a file you modified is left alone; an unmodified one is updated);

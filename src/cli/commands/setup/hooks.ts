@@ -76,7 +76,7 @@ interface McpServer {
  */
 function checkJqInstalled(): boolean {
   try {
-    execSync('which jq', { stdio: 'pipe' });
+    execFileSync('jq', ['--version'], { stdio: 'pipe' });
     return true;
   } catch {
     return false;

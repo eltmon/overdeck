@@ -35,6 +35,7 @@ import { ensurePlaywrightIsolationSync, ensureExcalidrawMcpSync } from '../../li
 import { resolveProjectContextFile } from '../../lib/context-layers/layers.js';
 import { resolveStateReadHomeSync } from '../../lib/state-read-home.js';
 import { ensureProjectBeadsBootstrap } from '../../lib/beads/bootstrap.js';
+import { provisionClaudeHooks } from '../../lib/claude-hooks-provision.js';
 
 // Bundled git hooks distributed to registered projects (PAN-1201: sync-sources/).
 const BUNDLED_GIT_HOOKS_DIR = SYNC_SOURCES.gitHooks;
@@ -361,6 +362,19 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     hooksSpinner.succeed(`Synced ${hooksResult.synced.length} hooks to ~/.overdeck/bin/`);
   } else {
     hooksSpinner.info('No hooks to sync');
+  }
+
+  // Registration is as important as copying the scripts. Repair the complete
+  // global hook table on every explicit sync so upgrades cannot leave an old
+  // heartbeat hook present while SessionStart is still missing.
+  const hookRegistrationSpinner = ora('Registering Claude Code hooks...').start();
+  const hookProvision = await timeAsync('register-claude-hooks', () => provisionClaudeHooks());
+  if (!hookProvision.ok) {
+    hookRegistrationSpinner.warn(`Claude Code hooks unavailable: ${hookProvision.reason}`);
+  } else if (hookProvision.changed) {
+    hookRegistrationSpinner.succeed(`Registered ${hookProvision.registered.length} Claude Code hook(s)`);
+  } else {
+    hookRegistrationSpinner.info('Claude Code hooks already registered');
   }
 
   // Ensure beads database exists for each registered project (first-time setup guard).

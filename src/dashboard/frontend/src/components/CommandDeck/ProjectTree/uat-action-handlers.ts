@@ -41,6 +41,18 @@ async function fetchUatAction(url: string, init?: RequestInit): Promise<Record<s
   return data;
 }
 
+async function requireUatHttpsPrerequisites(): Promise<void> {
+  const status = await fetchUatAction('/api/prereqs/enableHttps');
+  if (status.ready === true) return;
+  const missing = Array.isArray(status.missing)
+    ? status.missing.filter((tool): tool is string => typeof tool === 'string')
+    : [];
+  const detail = missing.length > 0 ? missing.join(', ') : 'Docker, Traefik, or HTTPS certificates';
+  throw new Error(
+    `UAT HTTPS setup is incomplete (${detail}). Run pan install in a terminal; if Docker is missing, install/start Docker first, then run pan install again.`,
+  );
+}
+
 export function createUatActionHandler({
   issueId,
   workspace,
@@ -51,10 +63,12 @@ export function createUatActionHandler({
       switch (action.id) {
         case 'open-uat':
           if (!workspace?.frontendUrl) throw new Error('UAT frontend URL is not available');
+          await requireUatHttpsPrerequisites();
           window.open(workspace.frontendUrl, '_blank', 'noopener,noreferrer');
           return;
         case 'open-api':
           if (!workspace?.apiUrl) throw new Error('UAT API URL is not available');
+          await requireUatHttpsPrerequisites();
           window.open(workspace.apiUrl, '_blank', 'noopener,noreferrer');
           return;
         case 'copy-stack-name': {

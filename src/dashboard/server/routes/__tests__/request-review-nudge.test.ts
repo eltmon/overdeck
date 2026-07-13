@@ -430,7 +430,7 @@ describe('POST /api/review/:id/status', () => {
     expect(setReviewStatusMock).toHaveBeenCalledWith('PAN-2329', { readyForMerge: true });
     expect(messageAgentMock).toHaveBeenCalledWith(
       'agent-pan-2329',
-      expect.stringContaining('ALL CHECKS PASSED for PAN-2329'),
+      expect.stringContaining("open Overdeck's Awaiting Merge page and click MERGE"),
     );
     expect(result.appendedEvents).toEqual([
       expect.objectContaining({

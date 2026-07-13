@@ -22,11 +22,15 @@ Claude Code exposes nine lifecycle hook events. Overdeck registers shell scripts
 
 ## Hook Registration
 
-All nine Claude Code hook events live in global `~/.claude/settings.json`. `pan install` and `pan admin hooks install` install the hook scripts into `~/.overdeck/bin/` and idempotently add any missing registrations to settings.json.
+All nine Claude Code hook events live in global `~/.claude/settings.json`. `pan install`, `pan sync`, and `pan admin hooks install` install the hook scripts into `~/.overdeck/bin/` and idempotently add any missing registrations to settings.json. Before launching a managed Claude Code agent, Overdeck repeats the same in-process provisioning check and refuses to launch if the lifecycle hooks are unavailable; this check is awaited so `SessionStart` cannot race ahead of registration and does not depend on `pan` being available on the child shell's `PATH`.
 
 The global registry is the single source of truth for `PreToolUse`, `PostToolUse`, `Stop`, `SessionStart`, `Notification`, `PreCompact`, `PostCompact`, `UserPromptSubmit`, and `PermissionRequest`. Role files under `roles/` and synced agent definitions under `sync-sources/agents/` do not declare `hooks:` frontmatter.
 
 Users upgrading across PAN-1402 should re-run `pan install` (or `pan admin hooks install`) after pulling the fixed version. Any work agent that was already running before the reinstall must be stopped and restarted before it can pick up the restored hook registration.
+
+Fresh Claude Code work agents do not depend on these hooks for transcript identity. Overdeck allocates the Claude session UUID before launch, writes it to `state.json`, `session.id`, and `sessions.json`, and pins the same UUID in `launcher.sh`. Missing hooks can still degrade readiness/activity reporting, but they must not make a healthy Terminal session disappear from the Conversation view.
+
+For a Conversation/Terminal mismatch, inspect the agent's append-only `~/.overdeck/agents/<agent-id>/lifecycle.log`. The relevant lines begin with `session identity allocated`, `launcher session pinned`, and `transcript resolution`. Resolution failures state whether no session pointer exists or the expected JSONL path is missing, including the workspace and absolute expected path.
 
 ### History
 

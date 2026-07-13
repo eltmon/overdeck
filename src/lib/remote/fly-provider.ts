@@ -598,7 +598,7 @@ export class FlyProvider implements RemoteProvider {
     // files, including the just-synced issues.jsonl).
     const result = await this.sshImpl(
       vmName,
-      `cd ${workspacePath} && (bd init --prefix PAN --from-jsonl --non-interactive 2>&1 || bd init --from-jsonl --non-interactive 2>&1)`
+      `cd ${workspacePath} && (bd init --prefix PAN --from-jsonl --non-interactive --skip-agents 2>&1 || bd init --from-jsonl --non-interactive --skip-agents 2>&1)`
     );
     return result.exitCode === 0;
   }
