@@ -34,6 +34,22 @@ async function withProjectDir<T>(hasEmbeddedStore: boolean, fn: (cwd: string) =>
   }
 }
 
+async function withRedirectedProjectDir<T>(fn: (cwd: string) => Promise<T>): Promise<T> {
+  const cwd = await mkdtemp(join(tmpdir(), 'beads-writer-project-'));
+  const redirectedBeadsDir = await mkdtemp(join(tmpdir(), 'beads-writer-state-'));
+  try {
+    await mkdir(join(cwd, '.beads'), { recursive: true });
+    await writeFile(join(cwd, '.beads', 'redirect'), `${redirectedBeadsDir}\n`);
+    const storePath = join(redirectedBeadsDir, 'embeddeddolt', 'overdeck');
+    await mkdir(storePath, { recursive: true });
+    await writeFile(join(storePath, 'store'), 'present');
+    return await fn(cwd);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+    await rm(redirectedBeadsDir, { recursive: true, force: true });
+  }
+}
+
 describe('runMutationBatch', () => {
   it('uses an existing embedded Dolt store without bootstrapping, then pulls, commits, exports, and pushes once', async () => {
     const h = harness();
@@ -58,6 +74,29 @@ describe('runMutationBatch', () => {
       'close one --dolt-auto-commit batch',
       'close two --dolt-auto-commit batch',
       'dolt commit -m close planned beads',
+      'export-snapshot',
+      'dolt push',
+      'vc status',
+    ]);
+  });
+
+  it('uses a redirected existing embedded Dolt store without bootstrapping', async () => {
+    const h = harness();
+    const result = await withRedirectedProjectDir((workspacePath) =>
+      runMutationBatch(
+        { project: { workspacePath }, reason: 'close redirected beads' },
+        (bd) => bd.mutate(['close', 'one']),
+        h,
+      ),
+    );
+    expect(result).toMatchObject({ ok: true, value: '' });
+    expect(h.calls).toEqual([
+      'lock',
+      'dolt pull',
+      'vc status',
+      'dolt remote show origin --json',
+      'close one --dolt-auto-commit batch',
+      'dolt commit -m close redirected beads',
       'export-snapshot',
       'dolt push',
       'vc status',

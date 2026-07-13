@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { readdir, stat } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -86,12 +86,23 @@ async function readRemoteHead(client: BdMutationClient): Promise<string | null> 
 
 async function hasExistingEmbeddedDoltStore(cwd: string): Promise<boolean> {
   try {
-    const storePath = join(cwd, '.beads', 'embeddeddolt');
+    const beadsDir = await resolveBeadsDir(cwd);
+    const storePath = join(beadsDir, 'embeddeddolt');
     const storeStat = await stat(storePath);
     if (!storeStat.isDirectory()) return false;
     return (await readdir(storePath)).length > 0;
   } catch {
     return false;
+  }
+}
+
+async function resolveBeadsDir(cwd: string): Promise<string> {
+  const localBeadsDir = join(cwd, '.beads');
+  try {
+    const redirect = (await readFile(join(localBeadsDir, 'redirect'), 'utf8')).trim();
+    return redirect || localBeadsDir;
+  } catch {
+    return localBeadsDir;
   }
 }
 
