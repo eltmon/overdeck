@@ -36,17 +36,19 @@
     "recordedAt": "2026-07-13T14:03:46.895Z"
   },
   "created": "2026-07-13T03:17:01.668Z",
-  "updated": "2026-07-13T14:09:54.404Z",
+  "updated": "2026-07-13T14:13:12.402Z",
   "pipeline": {
     "issueId": "PAN-2616",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T14:09:54.363Z",
+    "panDoneRecoveredAt": "2026-07-13T14:09:14.431Z",
+    "updatedAt": "2026-07-13T14:13:12.067Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2637",
+    "lastVerifiedCommit": "37ffd996e535b39bc7ed21b919c944f2c5fa4d2d",
     "reviewRequestedAt": "2026-07-13T14:09:14.431Z",
     "reviewSpawnedAt": "2026-07-13T14:04:16.103Z",
     "scopeDrift": {
@@ -63,8 +65,7 @@
         "src/lib/cloister/issue-closed.ts"
       ],
       "recordedAt": "2026-07-13T14:03:46.895Z"
-    },
-    "panDoneRecoveredAt": "2026-07-13T14:09:14.431Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -114,7 +115,7 @@
       },
       "costAtCloseOut": {
         "usd": 18.100457,
-        "pricingAsOf": "2026-07-13T14:09:54.400Z"
+        "pricingAsOf": "2026-07-13T14:13:12.359Z"
       }
     },
     "merges": [
