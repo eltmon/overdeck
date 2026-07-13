@@ -2,7 +2,7 @@
   "issueId": "PAN-2229",
   "schemaVersion": 2,
   "created": "2026-07-10T21:05:49.847Z",
-  "updated": "2026-07-13T14:18:55.771Z",
+  "updated": "2026-07-13T14:19:02.693Z",
   "feedback": [],
   "pipeline": {
     "issueId": "PAN-2229",
@@ -95,5 +95,66 @@
     "eval-prompt-harness.ac2": "completed",
     "eval-prompt-harness.ac3": "completed",
     "eval-prompt-harness.ac4": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "AGENTS.md",
+      "CLAUDE.md",
+      "evals/flywheel-launch.eval.ts",
+      "evals/review-synthesis.eval.ts",
+      "package.json",
+      "tests/unit/evals/lib/prompt-harness.test.ts",
+      "tests/unit/evals/prompt-rails.test.ts",
+      "tests/unit/scripts/check-prompt-change-trailer.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "evals/fixtures/flywheel/board-auto-pickup-off.json",
+      "evals/fixtures/flywheel/board-auto-pickup-on.json",
+      "evals/fixtures/flywheel/board-untrusted-author.json",
+      "evals/fixtures/review/correctness.md",
+      "evals/fixtures/review/performance.md",
+      "evals/fixtures/review/pr-diff-files.json",
+      "evals/fixtures/review/requirements.md",
+      "evals/fixtures/review/security.md",
+      "evals/flywheel-launch-decision.eval.ts",
+      "evals/review-synthesis-format.eval.ts",
+      "tests/unit/scripts/prompt-change-trailer.test.ts"
+    ],
+    "declaredScope": [
+      ".github/workflows/ci.yml",
+      "docs/FLYWHEEL.md",
+      "evals/README.md",
+      "evals/fixtures/flywheel/board-auto-pickup-off.json",
+      "evals/fixtures/flywheel/board-auto-pickup-on.json",
+      "evals/fixtures/flywheel/board-untrusted-author.json",
+      "evals/fixtures/review/correctness.md",
+      "evals/fixtures/review/performance.md",
+      "evals/fixtures/review/pr-diff-files.json",
+      "evals/fixtures/review/requirements.md",
+      "evals/fixtures/review/security.md",
+      "evals/flywheel-launch-decision.eval.ts",
+      "evals/lib/prompt-harness.ts",
+      "evals/review-synthesis-format.eval.ts",
+      "scripts/check-prompt-change-trailer.sh",
+      "tests/unit/prompts/prompt-invariants.test.ts",
+      "tests/unit/scripts/prompt-change-trailer.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".github/workflows/ci.yml",
+      "AGENTS.md",
+      "CLAUDE.md",
+      "docs/FLYWHEEL.md",
+      "evals/README.md",
+      "evals/flywheel-launch.eval.ts",
+      "evals/lib/prompt-harness.ts",
+      "evals/review-synthesis.eval.ts",
+      "package.json",
+      "scripts/check-prompt-change-trailer.sh",
+      "tests/unit/evals/lib/prompt-harness.test.ts",
+      "tests/unit/evals/prompt-rails.test.ts",
+      "tests/unit/prompts/prompt-invariants.test.ts",
+      "tests/unit/scripts/check-prompt-change-trailer.test.ts"
+    ],
+    "recordedAt": "2026-07-13T14:19:02.691Z"
   }
 }
