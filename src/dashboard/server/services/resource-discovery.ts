@@ -45,6 +45,8 @@ export interface ResourceDetails {
   actualBranch: string | null;
   /** True when the workspace HEAD differs from the expected feature/<id> branch. */
   branchDrifted: boolean;
+  /** True when a feature/* or bypass/* branch for the issue has unmerged commits not on main. */
+  branchAheadOfMain: boolean;
   /** True when the workspace path is configured but missing on disk. */
   workspaceMissing: boolean;
   /** Remote (fly.io) work agent for this issue, when one is active (PAN-1676). */
@@ -98,6 +100,7 @@ interface InternalResourceDetails {
   dockerContainers: string[];
   actualBranch: string | null;
   branchDrifted: boolean;
+  branchAheadOfMain: boolean;
   workspaceMissing: boolean;
   remoteAgent: { vmName: string; status: string; model: string; startedAt: string } | null;
 }
@@ -216,6 +219,7 @@ function summarizeResourceDetails(details: InternalResourceDetails): ResourceDet
     dockerContainerCount: details.dockerContainers.length,
     actualBranch: details.actualBranch,
     branchDrifted: details.branchDrifted,
+    branchAheadOfMain: details.branchAheadOfMain,
     workspaceMissing: details.workspaceMissing,
     remoteAgent: details.remoteAgent,
   };
@@ -357,7 +361,7 @@ async function loadOpenPullRequests(): Promise<Map<string, GhPullRequest[]>> {
 
 async function loadProjectBranches(projectPath: string): Promise<{ local: string[]; remote: string[] }> {
   try {
-    const [localResult, remoteResult] = await Promise.all([
+    const [localFeature, remoteFeature, localBypass, remoteBypass] = await Promise.all([
       execFileAsync('git', ['for-each-ref', 'refs/heads/feature/*', '--format=%(refname:short)'], {
         cwd: projectPath,
         encoding: 'utf-8',
@@ -368,14 +372,45 @@ async function loadProjectBranches(projectPath: string): Promise<{ local: string
         encoding: 'utf-8',
         timeout: 10000,
       }).catch(() => ({ stdout: '' })),
+      execFileAsync('git', ['for-each-ref', 'refs/heads/bypass/*', '--format=%(refname:short)'], {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        timeout: 10000,
+      }).catch(() => ({ stdout: '' })),
+      execFileAsync('git', ['for-each-ref', 'refs/remotes/origin/bypass/*', '--format=%(refname:short)'], {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        timeout: 10000,
+      }).catch(() => ({ stdout: '' })),
     ]);
 
     return {
-      local: localResult.stdout.split('\n').map((line) => line.trim()).filter(Boolean),
-      remote: remoteResult.stdout.split('\n').map((line) => line.trim()).filter(Boolean),
+      local: [
+        ...localFeature.stdout.split('\n').map((line) => line.trim()).filter(Boolean),
+        ...localBypass.stdout.split('\n').map((line) => line.trim()).filter(Boolean),
+      ],
+      remote: [
+        ...remoteFeature.stdout.split('\n').map((line) => line.trim()).filter(Boolean),
+        ...remoteBypass.stdout.split('\n').map((line) => line.trim()).filter(Boolean),
+      ],
     };
   } catch {
     return { local: [], remote: [] };
+  }
+}
+
+async function isBranchAheadOfMain(branchName: string, projectPath: string): Promise<boolean> {
+  try {
+    await execFileAsync('git', ['merge-base', '--is-ancestor', branchName, 'main'], {
+      cwd: projectPath,
+      encoding: 'utf-8',
+      timeout: 10000,
+    });
+    return false;
+  } catch {
+    // Non-zero exit (or any failure) means the branch is not an ancestor of main,
+    // i.e. it has unmerged work. Fail closed on errors: treat as not ahead.
+    return true;
   }
 }
 
@@ -484,6 +519,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
         dockerContainers: [],
         actualBranch: null,
         branchDrifted: false,
+        branchAheadOfMain: false,
         workspaceMissing: false,
         remoteAgent: null,
       },
@@ -588,6 +624,9 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
       if (!issue.resourceDetails.localBranches.includes(branch)) {
         issue.resourceDetails.localBranches.push(branch);
       }
+      if (await isBranchAheadOfMain(branch, projectPath)) {
+        issue.resourceDetails.branchAheadOfMain = true;
+      }
     }
 
     for (const branch of branches.remote) {
@@ -598,6 +637,9 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
       issue.resourceSources.add('branch');
       if (!issue.resourceDetails.remoteBranches.includes(branch)) {
         issue.resourceDetails.remoteBranches.push(branch);
+      }
+      if (await isBranchAheadOfMain(branch, projectPath)) {
+        issue.resourceDetails.branchAheadOfMain = true;
       }
     }
   }));
@@ -782,6 +824,7 @@ export function sanitizeResourceAllocatedIssues(issues: ResourceAllocatedIssue[]
       dockerContainerCount: issue.resourceDetails.dockerContainerCount,
       actualBranch: issue.resourceDetails.actualBranch,
       branchDrifted: issue.resourceDetails.branchDrifted,
+      branchAheadOfMain: issue.resourceDetails.branchAheadOfMain,
       workspaceMissing: issue.resourceDetails.workspaceMissing,
       remoteAgent: issue.resourceDetails.remoteAgent ?? null,
     },
