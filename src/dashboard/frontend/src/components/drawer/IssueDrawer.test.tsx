@@ -79,7 +79,11 @@ function mockFetch() {
       beadsCount: currentIssue?.hasBeads ? 1 : 0,
       planningComplete: currentIssue?.planningComplete ?? currentIssue?.hasPlan ?? false,
     });
-    if (url.includes('/api/workspaces/')) return Response.json({ exists: true, issueId: 'PAN-1', path: currentIssue?.workspacePath ?? '/tmp/pan-1' });
+    if (url.includes('/api/review/') && url.endsWith('/status')) {
+      const rs = useDashboardStore.getState().reviewStatusByIssueId['PAN-1'];
+      return Response.json(rs ?? { issueId: 'PAN-1', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: new Date().toISOString() });
+    }
+    if (url.includes('/api/workspaces/')) return Response.json({ exists: true, issueId: 'PAN-1', hasDocker: true, path: currentIssue?.workspacePath ?? '/tmp/pan-1' });
     if (url.includes('/has-session')) return Response.json({ lifecycle: { canResumeSession: false } });
     return Response.json({ success: true });
   });
@@ -590,8 +594,9 @@ describe('IssueDrawer', () => {
     expect(within(screen.getByTestId('drawer-phase-merged')).getByText('—')).toHaveClass('text-muted-foreground');
   });
 
-  it('renders verification gates from drawer data with PRD border tones', () => {
+  it('renders verification gates from drawer data with PRD border tones', async () => {
     useDashboardStore.setState({
+      issuesRaw: [{ ...issue, workspacePath: '/tmp/pan-1' }],
       reviewStatusByIssueId: {
         'PAN-1': {
           issueId: 'PAN-1',
@@ -609,14 +614,16 @@ describe('IssueDrawer', () => {
 
     renderDrawer();
 
-    expect(screen.getByTestId('drawer-verification-gates')).toBeInTheDocument();
-    expect(screen.getByTestId('drawer-verification-gates').lastElementChild).toHaveClass('grid-cols-4', 'gap-[8px]');
-    expect(screen.getByTestId('drawer-verification-gate-typecheck')).toHaveClass('drawer-gate-border-pass', 'text-success-foreground');
-    expect(within(screen.getByTestId('drawer-verification-gate-typecheck')).getByText('pass')).toHaveClass('text-[14px]', 'font-medium');
-    expect(screen.getByTestId('drawer-verification-gate-lint')).toHaveClass('drawer-gate-border-fail', 'text-destructive-foreground');
-    expect(within(screen.getByTestId('drawer-verification-gate-lint')).getByText('lint')).toHaveClass('font-mono', 'text-[10px]', 'text-muted-foreground');
-    expect(screen.getByTestId('drawer-verification-gate-test')).toHaveClass('badge-border-muted', 'text-muted-foreground');
-    expect(screen.getByTestId('drawer-verification-gate-uat')).toHaveClass('badge-border-info', 'text-info-foreground');
+    await waitFor(() => expect(screen.getByTestId('verification-gate-typecheck')).toHaveAttribute('data-gate-status', 'passed'));
+
+    expect(screen.getByTestId('verification-gates')).toBeInTheDocument();
+    expect(screen.getByTestId('verification-gates').lastElementChild).toHaveClass('grid-cols-4', 'gap-[8px]');
+    expect(screen.getByTestId('verification-gate-typecheck')).toHaveClass('border-success/40', 'bg-success/10', 'text-success-foreground');
+    expect(within(screen.getByTestId('verification-gate-typecheck')).getByText('pass')).toHaveClass('text-[14px]', 'font-medium');
+    expect(screen.getByTestId('verification-gate-lint')).toHaveClass('border-destructive/40', 'bg-destructive/10', 'text-destructive-foreground');
+    expect(within(screen.getByTestId('verification-gate-lint')).getByText('lint')).toHaveClass('font-mono', 'text-[10px]', 'text-muted-foreground');
+    expect(screen.getByTestId('verification-gate-test')).toHaveClass('border-muted', 'text-muted-foreground');
+    expect(screen.getByTestId('verification-gate-uat')).toHaveClass('border-info/40', 'bg-info/10', 'text-info-foreground');
   });
 
   it('renders active agent card with stream excerpt and sends tell input', async () => {

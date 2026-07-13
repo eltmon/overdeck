@@ -410,7 +410,24 @@ describe('buildIssueViewModel', () => {
       'typecheck:passed',
       'lint:failed',
       'test:pending',
+      'uat:infra-unavailable',
     ]);
+  });
+
+  it('maps uat status from review status when workspace has docker', () => {
+    const workspace: WorkspaceData = { exists: true, issueId: 'PAN-2499', hasDocker: true };
+    const model = buildIssueViewModel(
+      'PAN-2499',
+      undefined,
+      undefined,
+      undefined,
+      makeReviewStatus({ uatStatus: 'passed' }),
+      undefined,
+      workspace,
+      undefined,
+      {},
+    );
+    expect(model.verification.gates.find((g) => g.id === 'uat')?.status).toBe('passed');
   });
 
   it('exposes resources from workspace query', () => {

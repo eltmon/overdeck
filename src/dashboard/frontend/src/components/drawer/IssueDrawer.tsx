@@ -14,7 +14,7 @@ import DrawerArtifactsPanel from './DrawerArtifactsPanel';
 import DrawerBeadsList from './DrawerBeadsList';
 import DrawerReviewSpecialists from './DrawerReviewSpecialists';
 import DrawerTabs from './DrawerTabs';
-import DrawerVerificationGates from './DrawerVerificationGates';
+import { VerificationGates } from '../issue-view/VerificationGates';
 import PhaseTimeline from './PhaseTimeline';
 import { PickupGateControls } from '../backlog/PickupGateControls';
 import { useDrawerData, type DrawerActivityPhase } from './useDrawerData';
@@ -288,7 +288,7 @@ export function IssueDrawer() {
                 <DrawerPickupSection issueId={drawer.issueId} />
                 <DrawerWorkspaceSection issueId={drawer.issueId} />
                 <DrawerActiveAgent />
-                <DrawerVerificationGates />
+                <VerificationGates issueId={drawer.issueId} />
                 <DrawerBeadsList />
                 <DrawerReviewSpecialists />
               </div>

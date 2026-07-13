@@ -337,6 +337,23 @@ function derivePipeline(
   };
 }
 
+function gateStatus(
+  status: string | undefined,
+): VerificationGateModel['status'] {
+  if (
+    status === 'passed' ||
+    status === 'failed' ||
+    status === 'pending' ||
+    status === 'running' ||
+    status === 'skipped' ||
+    status === 'infra-unavailable'
+  ) {
+    return status;
+  }
+  if (status === 'testing') return 'running';
+  return 'pending';
+}
+
 function qualityGateStatus(
   gate: string,
   reviewStatus: ReviewStatusData | undefined,
@@ -358,15 +375,21 @@ function qualityGateStatus(
   return 'pending';
 }
 
-function deriveVerification(reviewStatus: ReviewStatusData | undefined): IssueVerificationModel {
+function deriveVerification(
+  reviewStatus: ReviewStatusData | undefined,
+  workspace: WorkspaceData | undefined,
+): IssueVerificationModel {
   const cycle = reviewStatus?.verificationCycleCount
     ? `cycle ${reviewStatus.verificationCycleCount}${reviewStatus.verificationMaxCycles ? `/${reviewStatus.verificationMaxCycles}` : ''}`
     : undefined;
+
+  const uatStatus = !workspace?.exists || workspace?.hasDocker === false ? 'infra-unavailable' : gateStatus(reviewStatus?.uatStatus);
 
   const gates: VerificationGateModel[] = [
     { id: 'typecheck', label: 'typecheck', status: qualityGateStatus('typecheck', reviewStatus) },
     { id: 'lint', label: 'lint', status: qualityGateStatus('lint', reviewStatus) },
     { id: 'test', label: 'test', status: qualityGateStatus('test', reviewStatus) },
+    { id: 'uat', label: 'UAT', status: uatStatus },
   ];
 
   return {
@@ -468,7 +491,7 @@ export function buildIssueViewModel(
     narrative: deriveNarrative(reviewStatus, agents),
     pipeline: derivePipeline(reviewStatus, sessions),
     agents,
-    verification: deriveVerification(reviewStatus),
+    verification: deriveVerification(reviewStatus, workspace),
     ship: deriveShip(reviewStatus, toShipLogModel(shipLog)),
     beads: deriveBeads(),
     activity: deriveActivity(activity),

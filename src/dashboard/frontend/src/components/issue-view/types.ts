@@ -108,7 +108,7 @@ export interface IssueVerificationModel {
 export interface VerificationGateModel {
   id: string;
   label: string;
-  status: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
+  status: 'pending' | 'running' | 'passed' | 'failed' | 'skipped' | 'infra-unavailable';
 }
 
 export interface ShipLogModel {

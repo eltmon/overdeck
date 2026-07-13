@@ -31,8 +31,16 @@ export const SHIP_PROGRESS_SECTIONS = [
 
 export type ShipProgressSection = (typeof SHIP_PROGRESS_SECTIONS)[number];
 
+export const VERIFICATION_GATES_SECTIONS = [
+  'verification-gates',
+  'verification-gate',
+] as const;
+
+export type VerificationGatesSection = (typeof VERIFICATION_GATES_SECTIONS)[number];
+
 /** Full inventory of all issue-view sections that participate in the no-loss gate. */
 export const SECTION_INVENTORY: readonly string[] = [
   ...AGENT_ROW_SECTIONS,
   ...SHIP_PROGRESS_SECTIONS,
+  ...VERIFICATION_GATES_SECTIONS,
 ];

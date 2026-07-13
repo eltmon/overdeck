@@ -209,6 +209,7 @@ export interface ReviewStatusData {
   verificationNotes?: string;
   verificationCycleCount?: number;
   verificationMaxCycles?: number;
+  uatStatus?: 'pending' | 'testing' | 'passed' | 'failed';
   testNotes?: string;
   reviewNotes?: string;
   mergeNotes?: string;

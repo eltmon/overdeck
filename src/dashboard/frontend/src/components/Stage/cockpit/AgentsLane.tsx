@@ -2,7 +2,7 @@ import { useState } from 'react'
 import {
   Compass, FlaskConical, BadgeCheck,
   ChevronRight, ChevronDown, GitPullRequest, GitBranch,
-  CircleCheck, CircleX, Circle, Loader2, type LucideIcon,
+  CircleCheck, CircleX, Loader2, type LucideIcon,
 } from 'lucide-react'
 import { useIssueCostsQuery, useReviewStatusQuery, useWorkspaceQuery, type ReviewStatusData } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import { useIssueActions, type IssueActionView } from '../../IssueActionMenu/useIssueActions'
@@ -10,6 +10,7 @@ import { UatStackStatus, getUatStackSummary } from '../../CommandDeck/UatStackSt
 import type { ProjectFeature } from '../../CommandDeck/ProjectTree/ProjectNode'
 import type { SessionNode } from '@overdeck/contracts'
 import { AgentStepRow } from '../../issue-view/AgentStepRow'
+import { VerificationGates } from '../../issue-view/VerificationGates'
 import styles from './agentsLane.module.css'
 
 /**
@@ -22,8 +23,6 @@ import styles from './agentsLane.module.css'
  */
 
 type Tone = 'info' | 'ok' | 'bad' | 'muted'
-
-const cap = (s: string) => (s ? s[0]!.toUpperCase() + s.slice(1) : s)
 
 const VERIFICATION_TONE: Record<string, { label: string; tone: Tone }> = {
   pending: { label: 'not run', tone: 'muted' },
@@ -40,22 +39,6 @@ const TEST_TONE: Record<string, { label: string; tone: Tone }> = {
   failed: { label: 'failed', tone: 'bad' },
   dispatch_failed: { label: 'failed', tone: 'bad' },
   skipped: { label: 'skipped', tone: 'muted' },
-}
-
-const QUALITY_GATES = ['typecheck', 'lint', 'test'] as const
-
-/** Per-gate breakdown — only meaningful on failure (parsed from notes), matching
- * ReviewVerificationCard.deriveGates. While running/passed all gates share the
- * aggregate state, so we only expand the breakdown when verification failed. */
-function deriveFailedGates(rs: ReviewStatusData | undefined): { id: string; tone: Tone; label: string }[] {
-  const m = rs?.verificationNotes?.match(/Verification FAILED at (typecheck|lint|test)\b/i)
-  const failedIdx = m ? QUALITY_GATES.indexOf(m[1].toLowerCase() as (typeof QUALITY_GATES)[number]) : -1
-  return QUALITY_GATES.map((id, i) => {
-    if (failedIdx < 0) return { id, tone: 'bad' as Tone, label: 'failed' }
-    if (i < failedIdx) return { id, tone: 'ok' as Tone, label: 'passed' }
-    if (i === failedIdx) return { id, tone: 'bad' as Tone, label: 'failed' }
-    return { id, tone: 'muted' as Tone, label: 'pending' }
-  })
 }
 
 function sessionStatus(session: SessionNode): { label: string; tone: Tone } {
@@ -351,11 +334,7 @@ export function AgentsLane({
         sub={rs?.verificationCycleCount ? `cycle ${rs.verificationCycleCount}${rs.verificationMaxCycles ? `/${rs.verificationMaxCycles}` : ''}` : undefined}
         expandable={verFailed} expanded={verExpanded} onToggle={() => setVerExpanded((v) => !v)}
         onClick={onOpenVerification} />
-      {verFailed && verExpanded && deriveFailedGates(rs).map((g) => (
-        <InfoRow key={g.id} icon={Circle} indent name={cap(g.id)} status={{ label: g.label, tone: g.tone }}
-          verdictTile={g.tone === 'ok' ? 'ok' : g.tone === 'bad' ? 'bad' : undefined}
-          onClick={onOpenVerification} />
-      ))}
+      {verFailed && verExpanded && <VerificationGates issueId={issueId} />}
 
       {/* Test — its session if dispatched (click → its terminal/output), else a synthetic step. */}
       {testSession ? (
