@@ -651,14 +651,14 @@ describe('IssueDrawer', () => {
 
     renderDrawer();
 
-    expect(screen.getByTestId('drawer-active-agent')).toHaveClass('border-l-[3px]', 'border-l-signal-review');
+    expect(screen.getByTestId('active-agent-panel')).toHaveClass('border-l-[3px]', 'border-l-signal-review');
     expect(screen.getByText('agent-PAN-1')).toHaveClass('font-mono', 'text-[13px]');
     expect(screen.getByText('WORK RUNNING').closest('[data-component="verb-badge"]')).toHaveClass('text-[9px]');
-    expect(screen.getByText(/GPT-5\.5 · .* · spend loading/)).toHaveClass('text-right', 'font-mono');
-    expect(screen.getByTestId('drawer-active-agent-stream')).toHaveClass('bg-[rgb(0_0_0_/_32%)]', 'text-[11px]', 'max-h-[180px]', 'overflow-auto');
-    expect(within(screen.getByTestId('drawer-active-agent-stream')).getByText('Implementing drawer card')).toBeInTheDocument();
+    expect(screen.getByText(/GPT-5\.5 · claude-code · spend loading/)).toHaveClass('text-right', 'font-mono');
+    expect(screen.getByTestId('active-agent-panel-stream')).toHaveClass('bg-[rgb(0_0_0_/_32%)]', 'text-[11px]', 'max-h-[180px]', 'overflow-auto');
+    expect(within(screen.getByTestId('active-agent-panel-stream')).getByText('Implementing drawer card')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Tell active agent'), { target: { value: 'Please continue' } });
+    fireEvent.change(screen.getByLabelText('Tell agent-PAN-1'), { target: { value: 'Please continue' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send' }));
 
     await waitFor(() => {
@@ -667,7 +667,7 @@ describe('IssueDrawer', () => {
         body: JSON.stringify({ message: 'Please continue' }),
       }));
     });
-    expect(screen.getByLabelText('Tell active agent')).toHaveValue('');
+    expect(screen.getByLabelText('Tell agent-PAN-1')).toHaveValue('');
   });
 
   it('renders action bar with the shared hybrid menu and pinned merge control', () => {
@@ -882,7 +882,7 @@ describe('IssueDrawer', () => {
 
     renderDrawer();
 
-    expect(screen.getByTestId('drawer-active-agent')).toBeInTheDocument();
+    expect(screen.getByTestId('active-agent-panel')).toBeInTheDocument();
     expect(screen.getByText('No active agent.')).toHaveClass('text-muted-foreground');
   });
 

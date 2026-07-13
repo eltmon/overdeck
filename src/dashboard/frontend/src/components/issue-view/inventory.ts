@@ -38,9 +38,21 @@ export const VERIFICATION_GATES_SECTIONS = [
 
 export type VerificationGatesSection = (typeof VERIFICATION_GATES_SECTIONS)[number];
 
+export const ACTIVE_AGENT_PANEL_SECTIONS = [
+  'active-agent-panel',
+  'active-agent-panel-header',
+  'active-agent-panel-stream',
+  'active-agent-panel-stream-line',
+  'active-agent-panel-resume',
+  'active-agent-panel-tell',
+] as const;
+
+export type ActiveAgentPanelSection = (typeof ACTIVE_AGENT_PANEL_SECTIONS)[number];
+
 /** Full inventory of all issue-view sections that participate in the no-loss gate. */
 export const SECTION_INVENTORY: readonly string[] = [
   ...AGENT_ROW_SECTIONS,
   ...SHIP_PROGRESS_SECTIONS,
   ...VERIFICATION_GATES_SECTIONS,
+  ...ACTIVE_AGENT_PANEL_SECTIONS,
 ];

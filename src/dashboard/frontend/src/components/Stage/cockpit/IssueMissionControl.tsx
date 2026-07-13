@@ -25,6 +25,7 @@ import { useIssueActions, type IssueActionView } from '../../IssueActionMenu/use
 import { ReviewPolicyControl } from '../../ReviewPolicyControl'
 import { type ProjectFeature } from '../../CommandDeck/ProjectTree/ProjectNode'
 import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
+import { MissionConversationTab } from './MissionConversationTab'
 import type { PaneType } from '../../../lib/panesStore'
 import { formatRelativeTime } from '../../../lib/formatRelativeTime'
 import { ISSUE_ACTIONS, type IssueActionGroup } from '../../../lib/issueActions'
@@ -547,7 +548,7 @@ function IssueTreeContextPanel({
       )
     }
     if (context === 'issue') return <OverviewTab issueId={issueId} onTab={onTab} onOpenAgent={onOpenAgent} />
-    return <ConversationTab launcher={launcher} agentDock={agentDock} actionDock={actionDock} timeline={timeline} />
+    return <MissionConversationTab launcher={launcher} agentDock={agentDock} actionDock={actionDock} timeline={timeline} sessions={treeSessions} />
   })()
 
   const title = selectedSession
@@ -787,20 +788,6 @@ function OverviewTab({ issueId, onTab, onOpenAgent, sessions, onSelectSession }:
   )
 }
 
-/** Conversation tab — the issue-scoped launch composition + timeline. */
-function ConversationTab({ launcher, agentDock, actionDock, timeline }: Pick<IssueMissionControlProps, 'launcher' | 'agentDock' | 'actionDock' | 'timeline'>) {
-  return (
-    <div className="space-y-3.5">
-      <CockpitCard tone="info" title="Launch">{launcher}</CockpitCard>
-      <div className="grid gap-3.5 xl:grid-cols-2">
-        <CockpitCard tone="success" title="Agents">{agentDock}</CockpitCard>
-        <CockpitCard tone="muted" title="Quick tools">{actionDock}</CockpitCard>
-      </div>
-      <CockpitCard tone="warning" title="Conversation timeline">{timeline}</CockpitCard>
-    </div>
-  )
-}
-
 function tabBadge(tab: MissionTab, checks: ReturnType<typeof useIssueCheckRunsQuery>['data']): { label: string; tone: CockpitTone } | null {
   if (tab === 'code' && checks?.summary.total) return { label: checks.summary.failed ? '!' : checks.summary.running || checks.summary.pending ? '…' : '✓', tone: checks.summary.failed ? 'destructive' : checks.summary.running || checks.summary.pending ? 'info' : 'success' }
   return null
@@ -986,7 +973,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             {activeTab === 'costs' && <CostsTab issueId={issueId} />}
             {activeTab === 'artifacts' && <DrawerArtifactsPanel issueId={issueId} />}
             {activeTab === 'ship' && <ShipTab issueId={issueId} />}
-            {activeTab === 'conversation' && <ConversationTab launcher={launcher} agentDock={agentDock} actionDock={actionDock} timeline={timeline} />}
+            {activeTab === 'conversation' && <MissionConversationTab launcher={launcher} agentDock={agentDock} actionDock={actionDock} timeline={timeline} sessions={treeSessions} />}
             {activeTab === 'files' && <OpenPaneCard title="Files" description="Open the issue-scoped workspace file browser in a deck pane." action="Open files pane" onOpen={() => onOpenPane('files')} />}
             {activeTab === 'terminal' && <OpenPaneCard title="Terminal" description="Open the issue terminal drawer for the current workspace." action="Open terminal" onOpen={() => onOpenPane('terminal')} />}
             {activeTab === 'beads' && <BeadsTab issueId={issueId} />}

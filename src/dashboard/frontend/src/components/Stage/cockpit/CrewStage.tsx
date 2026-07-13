@@ -14,6 +14,7 @@
  */
 
 import type { SessionNode } from '@overdeck/contracts'
+import { ActiveAgentPanel } from '../../issue-view/ActiveAgentPanel'
 import { compactModelName, initialsFor } from '../../../lib/model-names'
 
 type CrewState = 'working' | 'listening' | 'reviewing' | 'idle' | 'done'
@@ -166,6 +167,14 @@ export function CrewStage({ sessions, onSelectSession }: {
             </button>
           ))}
         </div>
+      )}
+      {tiers[0] && (
+        <ActiveAgentPanel
+          agentId={tiers[0].session.sessionId}
+          density="cockpit"
+          className="mt-3"
+          title="Active work agent"
+        />
       )}
     </div>
   )

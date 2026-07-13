@@ -8,7 +8,6 @@ import {
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import type { ProjectFeature, ProjectFeatureResourceIdentifiers, ResourceSource } from './ProjectNode';
 import type { Harness } from '../../shared/ModelPicker';
-import { SessionNode } from './SessionNode';
 import { type StatusDotStatus } from '../StatusDot';
 import { ResourcesGroup } from './ResourcesGroup';
 import { getUatStackSummary } from '../UatStackStatus';
@@ -31,6 +30,7 @@ import { MergeButton } from '../../MergeButton';
 import { TroubledBadges } from './TroubledBadges';
 import { ShipProgress } from '../../issue-view/ShipProgress';
 import { deriveShip } from '../../issue-view/derivations';
+import { ExpandableSessionNode } from './ExpandableSessionNode';
 import styles from '../styles/command-deck.module.css';
 
 export type TreeSessionFilter = 'all' | 'alive' | 'failed';
@@ -1276,7 +1276,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                     );
                   }
                   return (
-                    <SessionNode
+                    <ExpandableSessionNode
                       key={session.sessionId}
                       session={session}
                       issueId={feature.issueId}

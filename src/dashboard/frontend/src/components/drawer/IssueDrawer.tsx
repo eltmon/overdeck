@@ -7,7 +7,6 @@ import { cn } from '../../lib/utils';
 import { trackerIssueUrl } from '../../lib/issueLinks';
 import { toast } from 'sonner';
 import DrawerActionBar from './DrawerActionBar';
-import DrawerActiveAgent from './DrawerActiveAgent';
 import { DrawerAgentSession, pickDefaultDrawerAgent } from './DrawerAgentSession';
 import DrawerActivityRail from './DrawerActivityRail';
 import DrawerArtifactsPanel from './DrawerArtifactsPanel';
@@ -15,6 +14,7 @@ import DrawerBeadsList from './DrawerBeadsList';
 import DrawerReviewSpecialists from './DrawerReviewSpecialists';
 import DrawerTabs from './DrawerTabs';
 import { VerificationGates } from '../issue-view/VerificationGates';
+import { ActiveAgentPanel } from '../issue-view/ActiveAgentPanel';
 import PhaseTimeline from './PhaseTimeline';
 import { PickupGateControls } from '../backlog/PickupGateControls';
 import { useDrawerData, type DrawerActivityPhase } from './useDrawerData';
@@ -287,7 +287,7 @@ export function IssueDrawer() {
                 <PhaseTimeline />
                 <DrawerPickupSection issueId={drawer.issueId} />
                 <DrawerWorkspaceSection issueId={drawer.issueId} />
-                <DrawerActiveAgent />
+                <ActiveAgentPanel agentId={effectiveAgentId ?? ''} density="console" />
                 <VerificationGates issueId={drawer.issueId} />
                 <DrawerBeadsList />
                 <DrawerReviewSpecialists />
