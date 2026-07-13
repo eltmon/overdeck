@@ -1,0 +1,23 @@
+{
+  "issueId": "PAN-2643",
+  "schemaVersion": 2,
+  "created": "2026-07-13T19:53:17.742Z",
+  "updated": "2026-07-13T19:53:17.742Z",
+  "pipeline": {
+    "issueId": "PAN-2643",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-13T19:53:17.742Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {}
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5"
+}
