@@ -270,18 +270,18 @@
     "recordedAt": "2026-07-13T11:57:13.297Z"
   },
   "created": "2026-07-12T22:33:37.108Z",
-  "updated": "2026-07-13T15:04:21.725Z",
+  "updated": "2026-07-13T15:20:05.387Z",
   "pipeline": {
     "issueId": "PAN-2602",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T12:03:05.509Z",
-    "updatedAt": "2026-07-13T15:01:09.179Z",
+    "updatedAt": "2026-07-13T15:20:05.306Z",
     "reviewNotes": "main.ts dup-declares stopBeadsRollupService (real TS2440/TS2722, crashes shutdown); cycle-2's serial git-spawn perf blocker also still unfixed",
     "inspectNotes": "Bead beads-rollup-service ack: extractIssueLabels() now gates bare word-number labels through project.issuePrefixes, preventing phase-N labels from creating spurious rollups; tests cover phase exclusion and workspace: label mapping.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2636",
@@ -408,24 +408,6 @@
         "tests/unit/lib/webhook-handlers.test.ts"
       ],
       "recordedAt": "2026-07-13T11:57:13.297Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "5f631201aa29a44211498a768fb1489e950af455"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "5f631201aa29a44211498a768fb1489e950af455"
-      },
-      "performance": {
-        "status": "blocked",
-        "atCommit": "5f631201aa29a44211498a768fb1489e950af455"
-      },
-      "requirements": {
-        "status": "blocked",
-        "atCommit": "5f631201aa29a44211498a768fb1489e950af455"
-      }
     }
   },
   "closeOut": {
@@ -469,10 +451,10 @@
         },
         "review": {
           "anthropic/claude-sonnet-5": {
-            "input": 24911,
-            "output": 28891,
-            "cacheRead": 4907752,
-            "cacheWrite": 162776
+            "input": 24913,
+            "output": 29158,
+            "cacheRead": 5099729,
+            "cacheWrite": 167873
           }
         },
         "review.correctness": {
@@ -517,9 +499,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 3221727,
-            "output": 511306,
-            "cacheRead": 248618240,
+            "input": 3520586,
+            "output": 553842,
+            "cacheRead": 267760128,
             "cacheWrite": 0
           }
         }
@@ -556,21 +538,21 @@
           "cacheWrite": 683275
         },
         "anthropic/claude-sonnet-5": {
-          "input": 105130,
-          "output": 112628,
-          "cacheRead": 25685663,
-          "cacheWrite": 871912
+          "input": 105132,
+          "output": 112895,
+          "cacheRead": 25877640,
+          "cacheWrite": 877009
         },
         "custom/kimi-k2.7-code": {
-          "input": 3221727,
-          "output": 511306,
-          "cacheRead": 248618240,
+          "input": 3520586,
+          "output": 553842,
+          "cacheRead": 267760128,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 123.926882,
-        "pricingAsOf": "2026-07-13T15:01:09.222Z"
+        "usd": 128.071706,
+        "pricingAsOf": "2026-07-13T15:20:05.386Z"
       }
     },
     "merges": [
