@@ -1,28 +1,34 @@
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, expectTypeOf, it } from 'vitest';
 
-const root = process.cwd();
+import { buildClassifyLookups } from '../lookups.js';
+
+const roots: string[] = [];
+
+afterEach(() => {
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+});
 
 describe('PAN-2640 classify-lookups no-loss audit', () => {
-  it('keeps every caller on the bulk beads-presence door', () => {
-    const callers = [
-      'src/cli/commands/flywheel-surfaces.ts',
-      'src/lib/cloister/flywheel.ts',
-      'src/dashboard/server/routes/backlog.ts',
-    ];
-
-    for (const file of callers) {
-      const source = readFileSync(join(root, file), 'utf8');
-      expect(source, file).toContain('buildClassifyLookups');
-      expect(source, file).toContain('issuesWithBeads');
-    }
+  it('requires every compiled caller to supply the bulk presence snapshot', () => {
+    expectTypeOf(buildClassifyLookups).parameter(1).toMatchTypeOf<{
+      issuesWithBeads: ReadonlySet<string>;
+      labels?: (id: string) => readonly string[];
+    }>();
   });
 
-  it('cannot fall back to a synchronous per-workspace bd read', () => {
-    const source = readFileSync(join(root, 'src/lib/backlog/lookups.ts'), 'utf8');
+  it('derives planned state only from the supplied bulk snapshot', () => {
+    const root = mkdtempSync(join(tmpdir(), 'pan-2640-lookups-'));
+    roots.push(root);
+    mkdirSync(join(root, '.pan', 'specs'), { recursive: true });
+    writeFileSync(join(root, '.pan', 'specs', '1-PAN-2640-plan.json'), '{}');
 
-    expect(source).not.toContain('getBeadsForIssueSync');
-    expect(source).not.toContain('createBeadsResolver');
+    const absent = buildClassifyLookups(root, { issuesWithBeads: new Set() });
+    const present = buildClassifyLookups(root, { issuesWithBeads: new Set(['PAN-2640']) });
+
+    expect(absent.isPlanned('PAN-2640')).toBe(false);
+    expect(present.isPlanned('PAN-2640')).toBe(true);
   });
 });
