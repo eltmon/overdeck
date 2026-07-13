@@ -130,6 +130,8 @@ vi.mock('../../../lib/config.js', async (importActual) => ({
   loadConfigSync: loadConfigSyncMock,
 }));
 
+const { issueCommand } = await import('../start.js');
+
 describe('pan start planning-mode routing (PAN-2407)', () => {
   let tmpDir: string;
   let stableCwd: string;
@@ -250,7 +252,6 @@ describe('pan start planning-mode routing (PAN-2407)', () => {
   it('POSTs start-planning with auto:true/autoStart:true when no plan exists and mode is auto', async () => {
     mockFetchStream();
 
-    const { issueCommand } = await import('../start.js');
     await issueCommand('PAN-X', { model: 'claude-sonnet-4-6', plan: 'auto' } as any);
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -268,7 +269,6 @@ describe('pan start planning-mode routing (PAN-2407)', () => {
   it('POSTs start-planning with auto:false/autoStart:true when mode is interactive', async () => {
     mockFetchStream();
 
-    const { issueCommand } = await import('../start.js');
     await issueCommand('PAN-X', { model: 'claude-sonnet-4-6', plan: 'interactive' } as any);
 
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
@@ -290,7 +290,6 @@ describe('pan start planning-mode routing (PAN-2407)', () => {
     const originalCwd = process.cwd();
     process.chdir(tmpDir);
 
-    const { issueCommand } = await import('../start.js');
     await issueCommand('PAN-X', { model: 'claude-sonnet-4-6', plan: 'auto' } as any);
 
     process.chdir(originalCwd);
@@ -308,7 +307,6 @@ describe('pan start planning-mode routing (PAN-2407)', () => {
     const originalCwd = process.cwd();
     process.chdir(tmpDir);
 
-    const { issueCommand } = await import('../start.js');
     await issueCommand('PAN-X', { model: 'claude-sonnet-4-6', plan: 'auto' } as any);
 
     process.chdir(originalCwd);
