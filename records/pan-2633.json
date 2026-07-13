@@ -2,7 +2,7 @@
   "issueId": "PAN-2633",
   "schemaVersion": 2,
   "created": "2026-07-13T08:48:04.494Z",
-  "updated": "2026-07-13T08:48:04.494Z",
+  "updated": "2026-07-13T08:48:26.446Z",
   "pipeline": {
     "issueId": "PAN-2633",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-2633: bug(dashboard): pending-question payload wiped when an idle-alive asking agent flaps to 'stopped' — needs-you entry vanishes while the question is still live",
       "timestamp": "2026-07-13T08:48:04.494Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
