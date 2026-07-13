@@ -217,23 +217,24 @@
     "recordedAt": "2026-07-13T11:20:10.124Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T11:57:20.501Z",
+  "updated": "2026-07-13T12:00:07.647Z",
   "pipeline": {
     "issueId": "PAN-2596",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T11:21:55.959Z",
-    "updatedAt": "2026-07-13T11:57:20.443Z",
+    "updatedAt": "2026-07-13T12:00:07.332Z",
+    "reviewNotes": "Agent re-review request (2/25): Restarting review after partial run; correctness already passed.",
     "inspectNotes": "Bead server-upload-allowlist ack: validateUploadPayload correctly gates UTF-8 text extensions, PDF %PDF- magic prefix, and disallowed/extension-less types with 400s naming the mismatch, while preserving image magic-byte validation and <uuid><ext> naming; non-image files get <uuid>-<sanitized-name><ext>. All 5 ACs verified against diff + accompanying unit tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2634",
     "lastVerifiedCommit": "7cf60996f8e5ae5da607fc6ae51272764c107143",
     "reviewRequestedAt": "2026-07-13T11:21:55.959Z",
-    "reviewSpawnedAt": "2026-07-13T11:53:32.686Z",
+    "reviewSpawnedAt": "2026-07-13T12:00:07.331Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/frontend/src/App.test.tsx",
@@ -282,9 +283,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 22690468,
-            "output": 81010,
-            "cacheRead": 19830400,
+            "input": 22758471,
+            "output": 81047,
+            "cacheRead": 19897728,
             "cacheWrite": 0
           }
         },
@@ -329,9 +330,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 22690468,
-          "output": 81010,
-          "cacheRead": 19830400,
+          "input": 22758471,
+          "output": 81047,
+          "cacheRead": 19897728,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -360,8 +361,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 63.793969,
-        "pricingAsOf": "2026-07-13T11:57:20.499Z"
+        "usd": 63.832118,
+        "pricingAsOf": "2026-07-13T12:00:07.538Z"
       }
     },
     "merges": [
