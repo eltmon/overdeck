@@ -32,4 +32,19 @@ describe('PAN-2543 Codex rate-limit modal detector', () => {
     expect(paneShowsModelSwitch('Model switched to gpt-5.4-mini', 'gpt-5.6')).toBe(true);
     expect(paneShowsModelSwitch('codex ready · gpt-5.6', 'gpt-5.6')).toBe(false);
   });
+
+  it('detects a model-shaped target even without the word "model" in the phrase', () => {
+    expect(paneShowsModelSwitch('switched to gpt-5.4-mini', 'gpt-5.6')).toBe(true);
+    expect(paneShowsModelSwitch('switching to claude-sonnet-5', 'gpt-5.6')).toBe(true);
+  });
+
+  it('ignores git checkout output and other non-model "switched to" phrases (PAN-1491 false positive)', () => {
+    expect(paneShowsModelSwitch("Switched to branch 'feature/pan-1491'", 'gpt-5.5')).toBe(false);
+    expect(paneShowsModelSwitch("Switched to a new branch 'fix/detector'", 'gpt-5.5')).toBe(false);
+    expect(paneShowsModelSwitch('switching to workspace view', 'gpt-5.5')).toBe(false);
+  });
+
+  it('does not flag when the named model matches the launch model', () => {
+    expect(paneShowsModelSwitch('Model switched to gpt-5.6', 'gpt-5.6')).toBe(false);
+  });
 });
