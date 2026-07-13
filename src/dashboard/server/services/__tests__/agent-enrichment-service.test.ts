@@ -2,10 +2,15 @@ import { describe, expect, it } from 'vitest'
 import {
   buildAwaitingInputActivityMessage,
   isAwaitingInputRisingEdge,
+  shouldForceReemitPendingInput,
 } from '../agent-enrichment-service.js'
 import type { AgentEnrichment } from '../../../../lib/agent-enrichment.js'
 
-function makeEnrichment(pendingInputCount: number, pendingInputKinds: string[] = []): AgentEnrichment {
+function makeEnrichment(
+  pendingInputCount: number,
+  pendingInputKinds: string[] = [],
+  overrides: Partial<AgentEnrichment> = {},
+): AgentEnrichment {
   return {
     role: 'work',
     hasPendingQuestion: pendingInputCount > 0,
@@ -14,6 +19,7 @@ function makeEnrichment(pendingInputCount: number, pendingInputKinds: string[] =
     pendingInputKinds: pendingInputKinds as AgentEnrichment['pendingInputKinds'],
     resolution: 'working',
     resolutionCount: 0,
+    ...overrides,
   }
 }
 
@@ -62,5 +68,43 @@ describe('buildAwaitingInputActivityMessage', () => {
     expect(buildAwaitingInputActivityMessage('agent-pan-123', 'PAN-123', [])).toBe(
       'agent-pan-123 on PAN-123 is waiting for input',
     )
+  })
+})
+
+describe('shouldForceReemitPendingInput', () => {
+  it('returns true for stopped status with pendingAskUserQuestion', () => {
+    const enrichment = makeEnrichment(0, [], { pendingAskUserQuestion: { toolUseId: 't1' } as any })
+    expect(shouldForceReemitPendingInput('stopped', enrichment)).toBe(true)
+  })
+
+  it('returns true for stopped status with pendingProposedPlan', () => {
+    const enrichment = makeEnrichment(0, [], { pendingProposedPlan: { toolUseId: 't2' } as any })
+    expect(shouldForceReemitPendingInput('stopped', enrichment)).toBe(true)
+  })
+
+  it('returns true for stopped status with pendingInputCount > 0', () => {
+    const enrichment = makeEnrichment(1, ['askUserQuestion'])
+    expect(shouldForceReemitPendingInput('stopped', enrichment)).toBe(true)
+  })
+
+  it('returns false for running and starting status regardless of pending payload', () => {
+    const enrichment = makeEnrichment(2, ['askUserQuestion', 'plan'], {
+      pendingAskUserQuestion: { toolUseId: 't1' } as any,
+      pendingProposedPlan: { toolUseId: 't2' } as any,
+    })
+    expect(shouldForceReemitPendingInput('running', enrichment)).toBe(false)
+    expect(shouldForceReemitPendingInput('starting', enrichment)).toBe(false)
+  })
+
+  it('returns false for stopped status with empty enrichment', () => {
+    const enrichment = makeEnrichment(0)
+    expect(shouldForceReemitPendingInput('stopped', enrichment)).toBe(false)
+  })
+})
+
+describe('forced re-emission does not re-trigger awaiting-input rising edge', () => {
+  it('returns false when previous equals current with pendingInputCount > 0', () => {
+    const enrichment = makeEnrichment(2, ['askUserQuestion'])
+    expect(isAwaitingInputRisingEdge(enrichment, enrichment)).toBe(false)
   })
 })

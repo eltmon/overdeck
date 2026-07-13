@@ -67,6 +67,24 @@ export function isAwaitingInputRisingEdge(
   return previousCount === 0 && current.pendingInputCount > 0
 }
 
+// PAN-2633 — force re-emission for idle-alive waiting agents. A stop-shaped
+// status_changed event can wipe the read model's pending payload, and the
+// private lastEnrichment cache cannot see that wipe. While the agent's tmux
+// session is still alive and a pending payload exists, bypass the dedup so the
+// read model converges within one ~10s poll. previousEnrichment stays intact,
+// so the PAN-1834 awaiting-input rising edge (activity + TTS) does not re-fire.
+export function shouldForceReemitPendingInput(
+  agentStatus: string,
+  enrichment: AgentEnrichment,
+): boolean {
+  if (agentStatus === 'running' || agentStatus === 'starting') return false
+  return (
+    enrichment.pendingInputCount > 0 ||
+    enrichment.pendingAskUserQuestion != null ||
+    enrichment.pendingProposedPlan != null
+  )
+}
+
 export function buildAwaitingInputActivityMessage(
   agentId: string,
   issueId: string | undefined,
@@ -204,7 +222,12 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
         emitActivityTtsSync({ utterance: message, priority: 1, issueId, source, eventType: 'awaiting_input' })
       }
 
-      if (!enrichmentChanged(previousEnrichment, enrichment)) {
+      // PAN-2633 — a stop-shaped status_changed event may have wiped the read
+      // model's pending payload while the tmux session is still alive. Bypass
+      // the dedup for idle-alive waiting agents so the read model converges
+      // within one poll; keep lastEnrichment intact so the rising-edge above
+      // does not re-fire every poll.
+      if (!enrichmentChanged(previousEnrichment, enrichment) && !shouldForceReemitPendingInput(agent.status, enrichment)) {
         return
       }
 
