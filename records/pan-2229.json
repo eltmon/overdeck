@@ -76,10 +76,10 @@
     "recordedAt": "2026-07-13T14:19:02.691Z"
   },
   "created": "2026-07-10T21:05:49.847Z",
-  "updated": "2026-07-13T14:27:46.971Z",
+  "updated": "2026-07-13T14:27:50.551Z",
   "pipeline": {
     "issueId": "PAN-2229",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
@@ -87,7 +87,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T14:20:36.574Z",
-    "updatedAt": "2026-07-13T14:27:42.743Z",
+    "updatedAt": "2026-07-13T14:27:48.053Z",
+    "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (241274ms):\n\n writer or review scripts/state-write-allowlist.txt.\n- Spawning knowledge agent for PAN-2468...\n✔ Knowledge agent spawned: agent-pan-2468-knowledge\n- Spawning knowledge agent for PAN-2468...\n✖ Knowledge agent for PAN-2468 failed: No OKF bundle is configured for Overdeck. Run `/okf init` in this workspace to create or connect a knowledge bundle, then retry `pan knowledge PAN-2468`.\n- Spawning knowledge agent for PAN-2468...\n⚠ mnemos unavailable; spawning knowledge agent with built-in OKF search: release fetch failed\n- Spawning knowledge agent for PAN-2468...\n✔ Knowledge agent spawned: agent-pan-2468-knowledge\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯\n\nVitest caught 1 unhandled error during the test run.\nThis might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.\n\n⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯\nError: ENOENT: no such file or directory, open '/tmp/pan-test-jsonl-1YFEI5/.claude/projects/-tmp-pan-test-jsonl-1YFEI5-test-workspace-5/new-session.jsonl'\n ❯ writeFileSync node:fs:2437:20\n ❯ guardedFsWrite tests/setup/no-real-home-writes.ts:49:20\n     47|   return function guardedFsWrite(this: unknown, ...args: unknown[]) {\n     48|     assertNotRealOverdeckHome(pathArgIndexes.map(index => args[index])…\n     49|     return Reflect.apply(original, this, args);\n       |                    ^\n     50|   } as T;\n     51| }\n ❯ Timeout._onTimeout tests/lib/cost-parsers/jsonl-parser.test.ts:188:7\n ❯ listOnTimeout node:internal/timers:588:17\n ❯ processTimers node:internal/timers:523:7\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\nSerialized Error: { errno: -2, code: 'ENOENT', syscall: 'open', path: '/tmp/pan-test-jsonl-1YFEI5/.claude/projects/-tmp-pan-test-jsonl-1YFEI5-test-workspace-5/new-session.jsonl' }\nThis error originated in \"tests/lib/cost-parsers/jsonl-parser.test.ts\" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2638",
     "reviewRequestedAt": "2026-07-13T14:20:36.574Z",
@@ -250,7 +251,7 @@
       },
       "costAtCloseOut": {
         "usd": 47.840005,
-        "pricingAsOf": "2026-07-13T14:27:45.835Z"
+        "pricingAsOf": "2026-07-13T14:27:50.076Z"
       }
     },
     "merges": [
