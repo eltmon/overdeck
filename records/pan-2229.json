@@ -2,7 +2,7 @@
   "issueId": "PAN-2229",
   "schemaVersion": 2,
   "created": "2026-07-10T21:05:49.847Z",
-  "updated": "2026-07-13T02:39:39.457Z",
+  "updated": "2026-07-13T05:15:20.714Z",
   "feedback": [],
   "pipeline": {
     "issueId": "PAN-2229",
@@ -52,6 +52,14 @@
       "tripCount": 1,
       "open": true,
       "needsYouEmittedAt": "2026-07-11T13:14:11.604Z"
+    },
+    {
+      "issue": "PAN-2229",
+      "recoveryPath": "stuck-remediation",
+      "obligationGeneration": "2026-07-13T03:19:59.000Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-13T04:50:14.582Z"
     }
   ]
 }
