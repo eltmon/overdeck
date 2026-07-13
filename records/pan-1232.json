@@ -305,19 +305,18 @@
   ],
   "feedback": [],
   "created": "2026-07-12T20:45:31.659Z",
-  "updated": "2026-07-13T14:47:52.207Z",
+  "updated": "2026-07-13T14:50:47.947Z",
   "pipeline": {
     "issueId": "PAN-1232",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T14:46:28.116Z",
-    "updatedAt": "2026-07-13T14:47:44.734Z",
+    "updatedAt": "2026-07-13T14:50:47.893Z",
     "reviewNotes": "Verification failed at test",
-    "verificationNotes": "Verification FAILED at test (23723ms):\n\nact-dom/cjs/react-dom.development.js:\u001b[2m15486:18\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m mountIndeterminateComponent ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:\u001b[2m20103:13\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m beginWork ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:\u001b[2m21626:16\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m beginWork$1 ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:\u001b[2m27465:14\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m performUnitOfWork ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:\u001b[2m26599:12\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m workLoopSync ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:\u001b[2m26505:5\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/21]⎯\u001b[22m\u001b[39m\n\n\u001b[2minclude: \u001b[22m\u001b[33mtests/**/*.test.ts\u001b[2m, \u001b[22mtests/**/*.spec.ts\u001b[2m, \u001b[22msrc/**/__tests__/**/*.test.ts\u001b[2m, \u001b[22mpackages/**/src/__tests__/**/*.test.ts\u001b[39m\n\u001b[2mexclude:  \u001b[22m\u001b[33m**/node_modules/**\u001b[2m, \u001b[22m**/dist/**\u001b[2m, \u001b[22msrc/dashboard/frontend/**\u001b[2m, \u001b[22mtests/playwright/conversation-supervisor-uat.test.ts\u001b[2m, \u001b[22msrc/lib/vbrief/__tests__/create-beads.test.ts\u001b[2m, \u001b[22msrc/dashboard/server/routes/__tests__/agents-switch-model.test.ts\u001b[2m, \u001b[22msrc/dashboard/server/routes/__tests__/cloister-config.test.ts\u001b[2m, \u001b[22msrc/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts\u001b[2m, \u001b[22msrc/dashboard/server/routes/__tests__/operator-interventions.test.ts\u001b[2m, \u001b[22msrc/dashboard/server/services/__tests__/issue-lifecycle.test.ts\u001b[2m, \u001b[22mtests/unit/lib/cloister/deacon-swarm-enumerate.test.ts\u001b[2m, \u001b[22mtests/unit/lib/cloister/deacon-swarm-hold.test.ts\u001b[2m, \u001b[22mtests/cli/commands/work/reopen.test.ts\u001b[2m, \u001b[22mtests/unit/cli/commands/pause.test.ts\u001b[2m, \u001b[22mtests/unit/lib/cloister/deacon-swarm-doneness.test.ts\u001b[2m, \u001b[22mtests/cli/commands/work/start-workspace-rollback.test.ts\u001b[39m\n\n",
     "blockerReasons": [
       {
         "type": "failing_checks",
@@ -326,6 +325,7 @@
       }
     ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2604",
+    "lastVerifiedCommit": "069d838c4573bf647e7ba4715fc1a4ad485f6c30",
     "reviewRequestedAt": "2026-07-13T14:46:28.116Z",
     "reviewSpawnedAt": "2026-07-13T14:47:44.734Z"
   },
@@ -356,9 +356,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 182466,
-            "output": 12899,
-            "cacheRead": 2652160,
+            "input": 227743,
+            "output": 19015,
+            "cacheRead": 5850624,
             "cacheWrite": 0
           }
         }
@@ -377,15 +377,15 @@
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 536969,
-          "output": 47855,
-          "cacheRead": 24756736,
+          "input": 582246,
+          "output": 53971,
+          "cacheRead": 27955200,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 43.984292,
-        "pricingAsOf": "2026-07-13T14:47:44.826Z"
+        "usd": 44.659481,
+        "pricingAsOf": "2026-07-13T14:50:47.946Z"
       }
     },
     "merges": [
