@@ -56,7 +56,7 @@
     "recordedAt": "2026-07-13T09:57:24.734Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T09:57:39.674Z",
+  "updated": "2026-07-13T10:02:32.286Z",
   "pipeline": {
     "issueId": "PAN-2596",
     "reviewStatus": "failed",
@@ -199,8 +199,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "composer-file-chip": "completed",
     "composer-file-chip.ac1": "completed",
