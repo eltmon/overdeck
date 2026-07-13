@@ -19,8 +19,8 @@
     }
   ],
   "feedback": [],
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "okf-user-docs": "completed",
     "okf-user-docs.ac1": "completed",
@@ -125,12 +125,11 @@
     "issueId": "PAN-2468",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T03:18:53.509Z",
+    "updatedAt": "2026-07-13T04:36:11.168Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "testNotes": "Role-based verification for PAN-2468 completed. Track A self-test, TypeScript typecheck, and ESLint lint all passed. The vitest project gate failed with two fixture/matrix omissions: (1) the synced-skills fixture is missing the pan-knowledge skill added by WI-17, and (2) the G3 no-loss matrix is missing the GET /api/issues/:id/ship-log route present in src/dashboard/server/routes/issues.ts. Both failures require updates to test fixtures/matrix files. Because the instructions prohibit editing code, tests, fixtures, snapshots, or configuration, the verdict is TESTS FAILED.",
     "inspectNotes": "Bead ollama-ensure ack: curl|sh auto-install replaced with macOS-only Homebrew path + explicit manual-install error on other platforms; verified the change is isolated to installOllamaWithPlatformCommand() and does not affect AC1/AC2 test paths (both go through the injectable options.installOllama hook), and AC3 PAN-1641 note test at ollama.test.ts:131 is untouched.",
@@ -337,7 +336,9 @@
         "tests/unit/lib/pan-444-post-merge-step0.test.ts"
       ],
       "recordedAt": "2026-07-09T08:04:47.060Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-13T04:36:11.168Z"
   },
   "closeOut": {
     "usage": {
@@ -480,5 +481,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-09T08:06:45.604Z",
-  "updated": "2026-07-13T03:18:53.545Z"
+  "updated": "2026-07-13T04:36:11.168Z"
 }

@@ -92,16 +92,15 @@
     "recordedAt": "2026-07-09T22:25:31.219Z"
   },
   "created": "2026-07-09T20:58:28.334Z",
-  "updated": "2026-07-13T03:19:04.927Z",
+  "updated": "2026-07-13T04:36:10.904Z",
   "pipeline": {
     "issueId": "PAN-2542",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T03:19:04.893Z",
+    "updatedAt": "2026-07-13T04:36:10.904Z",
     "reviewNotes": "No blocking findings; focused GPT-5.6 model registry/policy tests passed",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2544",
     "lastVerifiedCommit": "e5f608a9a99c80d75dfa28ec9332efe1c58683e1",
@@ -182,7 +181,9 @@
         "tests/unit/lib/harness-resolve.test.ts"
       ],
       "recordedAt": "2026-07-09T22:25:31.219Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-13T04:36:10.904Z"
   },
   "closeOut": {
     "usage": {

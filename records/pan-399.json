@@ -460,18 +460,17 @@
     "recordedAt": "2026-07-12T08:40:28.078Z"
   },
   "created": "2026-07-11T09:28:34.266Z",
-  "updated": "2026-07-13T03:19:01.624Z",
+  "updated": "2026-07-13T04:36:11.229Z",
   "pipeline": {
     "issueId": "PAN-399",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-12T09:16:46.873Z",
-    "updatedAt": "2026-07-13T03:19:01.587Z",
+    "updatedAt": "2026-07-13T04:36:11.229Z",
     "reviewNotes": "Review APPROVED by agent-pan-399-review-076c4cf4; all blocking findings resolved",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2577",
@@ -603,7 +602,9 @@
         "tests/unit/lib/review-status-release.test.ts"
       ],
       "recordedAt": "2026-07-12T08:40:28.078Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-13T04:36:11.229Z"
   },
   "closeOut": {
     "usage": {
@@ -750,7 +751,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-4-8",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "release-engine-tests": "completed",
     "release-engine-tests.ac1": "completed",
