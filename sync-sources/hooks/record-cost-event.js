@@ -25530,12 +25530,12 @@ function resolveStateReadHomeSync(project, projectKey$1) {
 }
 promisify(execFile$1);
 layer$4.pipe(provide(mergeAll(layer$2, layer)));
-const DEFAULT_STATE_FLUSH_WINDOW_MS = 600 * 1e3;
+const DEFAULT_STATE_FLUSH_WINDOW_MS = 0;
 parseStateFlushWindowMs(process.env.OVERDECK_STATE_FLUSH_WINDOW_MS);
 function parseStateFlushWindowMs(value) {
 	if (!value) return DEFAULT_STATE_FLUSH_WINDOW_MS;
 	const parsed = Number(value);
-	if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_STATE_FLUSH_WINDOW_MS;
+	if (!Number.isFinite(parsed) || parsed < 0) return DEFAULT_STATE_FLUSH_WINDOW_MS;
 	return parsed;
 }
 Promise.resolve();
