@@ -174,19 +174,18 @@
     "recordedAt": "2026-07-13T09:23:13.508Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T09:24:11.742Z",
+  "updated": "2026-07-13T09:24:33.041Z",
   "pipeline": {
     "issueId": "PAN-2598",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T09:24:10.075Z",
+    "updatedAt": "2026-07-13T09:24:32.939Z",
     "reviewNotes": "Verification failed at test",
-    "verificationNotes": "Verification FAILED at test (235389ms):\n\n/failure-tracking.test.ts:197:3\n    195|   }\n    196|\n    197|   it('increments the counter when resumeAgent fails during auto-resume…\n       |   ^\n    198|     const agentId = 'agent-pan-1141-resume-fails';\n    199|     resumeAgentMock.mockResolvedValue({ success: false, error: 'tmux c…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/10]⎯\n\n FAIL  |root| src/cli/commands/__tests__/agent-targeting.test.ts > resolveAgentTargetSync (PAN-1760) > preserves strike-/inspect- prefixed agent IDs\n FAIL  |root| src/cli/commands/__tests__/agent-targeting.test.ts > resolveAgentTargetSync (PAN-1760) > preserves strike-/inspect- prefixed agent IDs\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/cli/commands/__tests__/agent-targeting.test.ts:102:3\n    100|\n    101| describe('resolveAgentTargetSync (PAN-1760)', () => {\n    102|   it('preserves strike-/inspect- prefixed agent IDs', async () => {\n       |   ^\n    103|     const { resolveAgentTargetSync } = await vi.importActual<typeof im…\n    104|     expect(resolveAgentTargetSync('strike-pan-1723')).toBe('strike-pan…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/10]⎯\n\n FAIL  |root| src/cli/commands/__tests__/start-plan-routing.test.ts > pan start planning-mode routing (PAN-2407) > POSTs start-planning with auto:true/autoStart:true when no plan exists and mode is auto\n FAIL  |root| src/cli/commands/__tests__/start-plan-routing.test.ts > pan start planning-mode routing (PAN-2407) > POSTs start-planning with auto:true/autoStart:true when no plan exists and mode is auto\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/cli/commands/__tests__/start-plan-routing.test.ts:250:3\n    248|   }\n    249|\n    250|   it('POSTs start-planning with auto:true/autoStart:true when no plan …\n       |   ^\n    251|     mockFetchStream();\n    252|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/10]⎯\n\n",
     "inspectNotes": "Bead phase-banner-work-signal ack: workRunning now derives from activity.data.sections.some(type===work && status===running) (IssueMissionControl.tsx:828), verified via deriveNarrative precedence in StatusNarrative.tsx and existing+new tests covering all 3 ACs (planning-only session, live work session, beads-driven regression path); change is additive per NFR-1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2631",
     "reviewRequestedAt": "2026-07-13T09:24:04.787Z",
@@ -331,7 +330,7 @@
       },
       "costAtCloseOut": {
         "usd": 62.659298,
-        "pricingAsOf": "2026-07-13T09:24:10.204Z"
+        "pricingAsOf": "2026-07-13T09:24:33.038Z"
       }
     },
     "merges": [
