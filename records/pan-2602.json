@@ -267,7 +267,7 @@
     "recordedAt": "2026-07-13T11:57:13.297Z"
   },
   "created": "2026-07-12T22:33:37.108Z",
-  "updated": "2026-07-13T15:34:48.631Z",
+  "updated": "2026-07-13T15:34:55.096Z",
   "pipeline": {
     "issueId": "PAN-2602",
     "reviewStatus": "reviewing",
@@ -278,7 +278,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T12:03:05.509Z",
-    "updatedAt": "2026-07-13T15:34:46.895Z",
+    "updatedAt": "2026-07-13T15:34:55.044Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "Bead beads-rollup-service ack: extractIssueLabels() now gates bare word-number labels through project.issuePrefixes, preventing phase-N labels from creating spurious rollups; tests cover phase exclusion and workspace: label mapping.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2636",
@@ -549,7 +549,7 @@
       },
       "costAtCloseOut": {
         "usd": 129.132478,
-        "pricingAsOf": "2026-07-13T15:34:46.965Z"
+        "pricingAsOf": "2026-07-13T15:34:55.080Z"
       }
     },
     "merges": [
