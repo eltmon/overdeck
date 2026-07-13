@@ -483,7 +483,12 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
   close_out: {
     remove_workspace: false,
     delete_feature_branch: false,
-    auto: false,
+    // Auto close-out is ON by default: without it merged issues sit in
+    // "awaiting close-out (verify on main)" forever and their Docker stacks,
+    // branches, and agent state leak. Correct operation must not depend on an
+    // operator discovering an opt-in flag; `auto = false` remains an explicit
+    // opt-out escape hatch for debugging.
+    auto: true,
     auto_delay_minutes: 60,
   },
   orphanProposedReconciler: {
