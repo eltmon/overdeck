@@ -251,22 +251,30 @@ async function readFileTail(filePath: string, maxBytes: number): Promise<string>
  * answered; the upstream tool was denied to force a plain-text restate.
  */
 const ASK_USER_QUESTION_HOOK_DENY_MARKER = 'PAN-1520'
+const ASK_USER_QUESTION_HOOK_DENY_PHRASE = 'surfaced to the operator'
 
-function isAskUserQuestionHookDenyToolResult(item: { content?: unknown; is_error?: unknown }): boolean {
-  if (item.is_error !== true) return false
-  const content = item.content
-  if (typeof content === 'string') return content.includes(ASK_USER_QUESTION_HOOK_DENY_MARKER)
+function askUserQuestionDenySignalPresent(content: unknown): boolean {
+  const checkString = (text: string) =>
+    text.includes(ASK_USER_QUESTION_HOOK_DENY_MARKER) ||
+    text.includes(ASK_USER_QUESTION_HOOK_DENY_PHRASE)
+
+  if (typeof content === 'string') return checkString(content)
   if (Array.isArray(content)) {
     return content.some((part: unknown) => {
-      if (typeof part === 'string') return part.includes(ASK_USER_QUESTION_HOOK_DENY_MARKER)
+      if (typeof part === 'string') return checkString(part)
       if (part && typeof part === 'object' && 'text' in part) {
         const text = (part as { text?: unknown }).text
-        return typeof text === 'string' && text.includes(ASK_USER_QUESTION_HOOK_DENY_MARKER)
+        return typeof text === 'string' && checkString(text)
       }
       return false
     })
   }
   return false
+}
+
+function isAskUserQuestionHookDenyToolResult(item: { content?: unknown; is_error?: unknown }): boolean {
+  if (item.is_error !== true) return false
+  return askUserQuestionDenySignalPresent(item.content)
 }
 
 async function getPendingQuestionsPromise(jsonlPath: string): Promise<PendingQuestion[]> {

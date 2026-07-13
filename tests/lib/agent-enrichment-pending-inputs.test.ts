@@ -190,6 +190,17 @@ describe('getPendingQuestions — AskUserQuestion lifecycle', () => {
     expect(result).toHaveLength(1)
     expect(result[0].toolId).toBe('t1')
   })
+
+  it('KEEPS the question pending when the deny hook reason contains only the stable phrase', async () => {
+    const denyReason = 'Your question has been surfaced to the operator in the Overdeck dashboard, where they answer it directly.'
+    const path = writeJsonlSession('a.jsonl', [
+      { timestamp: '2026-05-26T01:00:00Z', message: { content: [askToolUse('t1', ['A', 'B'])] } },
+      { timestamp: '2026-05-26T01:00:01Z', message: { content: [toolResult('t1', { content: denyReason, is_error: true })] } },
+    ])
+    const result = await Effect.runPromise(getPendingQuestions(path))
+    expect(result).toHaveLength(1)
+    expect(result[0].toolId).toBe('t1')
+  })
 })
 
 describe('agent-enrichment scan — plan mode + missing files', () => {
