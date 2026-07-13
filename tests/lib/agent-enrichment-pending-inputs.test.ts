@@ -13,10 +13,24 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { Effect } from 'effect'
-import { mkdtempSync, writeFileSync, rmSync } from 'fs'
+import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
+import { fileURLToPath } from 'url'
 import { getPendingQuestions } from '../../src/lib/agent-enrichment.js'
+
+const hookPath = join(fileURLToPath(import.meta.url), '..', '..', '..', 'sync-sources/hooks/ask-user-question-hook')
+
+/**
+ * Extract the live REASON string from the deny hook source so pending-input
+ * tests never drift from the hook's actual emitted text.
+ */
+function extractHookDenyReason(): string {
+  const source = readFileSync(hookPath, 'utf-8')
+  const match = source.match(/REASON='([^'\\]*(?:\\.[^'\\]*)*)'/)
+  if (!match) throw new Error('Could not extract REASON from ask-user-question-hook')
+  return match[1].replace(/\\'/g, "'")
+}
 
 let testDir: string
 
@@ -88,7 +102,7 @@ describe('getPendingQuestions — AskUserQuestion lifecycle', () => {
     // The deny hook returns an is_error: true tool_result whose content
     // mentions PAN-1520 — the scanner must treat this as "operator has not
     // actually answered yet" and keep the question pending.
-    const denyReason = 'AskUserQuestion is blocked in Overdeck environments to prevent silent corruption (PAN-1520).'
+    const denyReason = extractHookDenyReason()
     const path = writeJsonlSession('a.jsonl', [
       { timestamp: '2026-05-26T01:00:00Z', message: { content: [askToolUse('t1', ['A', 'B'])] } },
       { timestamp: '2026-05-26T01:00:01Z', message: { content: [toolResult('t1', { content: denyReason, is_error: true })] } },
@@ -134,7 +148,7 @@ describe('getPendingQuestions — AskUserQuestion lifecycle', () => {
     // as a normal user-text turn, NOT a tool_result. Without recognising it
     // as the resolution, reloading the page resurrects an already-answered
     // question.
-    const denyReason = 'AskUserQuestion blocked (PAN-1520). Restate to operator.'
+    const denyReason = extractHookDenyReason()
     const path = writeJsonlSession('a.jsonl', [
       { timestamp: '2026-05-26T01:00:00Z', type: 'assistant', message: { content: [askToolUse('t1', ['A', 'B'])] } },
       { timestamp: '2026-05-26T01:00:01Z', type: 'user', message: { content: [toolResult('t1', { content: denyReason, is_error: true })] } },
@@ -146,7 +160,7 @@ describe('getPendingQuestions — AskUserQuestion lifecycle', () => {
   })
 
   it('RESOLVES a hook-denied AUQ when the operator types prose (not a literal option label)', async () => {
-    const denyReason = 'AskUserQuestion blocked (PAN-1520).'
+    const denyReason = extractHookDenyReason()
     const path = writeJsonlSession('a.jsonl', [
       { timestamp: '2026-05-26T01:00:00Z', type: 'assistant', message: { content: [askToolUse('t1', ['Yes', 'No'])] } },
       { timestamp: '2026-05-26T01:00:01Z', type: 'user', message: { content: [toolResult('t1', { content: denyReason, is_error: true })] } },
@@ -160,7 +174,7 @@ describe('getPendingQuestions — AskUserQuestion lifecycle', () => {
     // Some Claude Code conv message turns serialize their content as an array
     // of blocks (e.g. text + image). As long as ANY block is non-tool_result
     // it counts as operator text.
-    const denyReason = 'AskUserQuestion blocked (PAN-1520).'
+    const denyReason = extractHookDenyReason()
     const path = writeJsonlSession('a.jsonl', [
       { timestamp: '2026-05-26T01:00:00Z', type: 'assistant', message: { content: [askToolUse('t1', ['A', 'B'])] } },
       { timestamp: '2026-05-26T01:00:01Z', type: 'user', message: { content: [toolResult('t1', { content: denyReason, is_error: true })] } },
@@ -177,7 +191,7 @@ describe('getPendingQuestions — AskUserQuestion lifecycle', () => {
   it('KEEPS a hook-denied AUQ pending while ONLY tool_result wrapper turns follow', async () => {
     // Intermediate user turns that are nothing but tool_result wrappers do
     // NOT count as operator answers — only a real user-text turn does.
-    const denyReason = 'AskUserQuestion blocked (PAN-1520).'
+    const denyReason = extractHookDenyReason()
     const path = writeJsonlSession('a.jsonl', [
       { timestamp: '2026-05-26T01:00:00Z', type: 'assistant', message: { content: [askToolUse('t1', ['A', 'B'])] } },
       { timestamp: '2026-05-26T01:00:01Z', type: 'user', message: { content: [toolResult('t1', { content: denyReason, is_error: true })] } },
