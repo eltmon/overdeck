@@ -110,18 +110,18 @@
   ],
   "feedback": [],
   "created": "2026-07-12T20:43:21.494Z",
-  "updated": "2026-07-12T22:54:12.600Z",
+  "updated": "2026-07-13T05:17:43.971Z",
   "pipeline": {
     "issueId": "PAN-1234",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-12T22:39:37.230Z",
-    "updatedAt": "2026-07-12T22:54:12.521Z",
-    "reviewNotes": "Agent re-review request (2/25): frontend-typecheck fixed",
+    "updatedAt": "2026-07-13T05:17:43.857Z",
+    "reviewNotes": "Review reset by deacon: no active review session after 384min",
     "verificationNotes": "Verification FAILED at frontend-typecheck (22665ms):\n\nsrc/components/KanbanBoard.tsx(1,53): error TS6133: 'useRef' is declared but its value is never read.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2606",
     "lastVerifiedCommit": "2ea5a6da1a3429ae071245846092cbb1eaa1b795",
@@ -133,38 +133,38 @@
       "byStage": {
         "codex": {
           "openai/gpt-5.5": {
-            "input": 11978266,
-            "output": 50872,
-            "cacheRead": 10986752,
+            "input": 16138987,
+            "output": 63288,
+            "cacheRead": 14491392,
             "cacheWrite": 0
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1573612,
-            "output": 223331,
-            "cacheRead": 127210752,
+            "input": 1575738,
+            "output": 223645,
+            "cacheRead": 127864576,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 11978266,
-          "output": 50872,
-          "cacheRead": 10986752,
+          "input": 16138987,
+          "output": 63288,
+          "cacheRead": 14491392,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 1573612,
-          "output": 223331,
-          "cacheRead": 127210752,
+          "input": 1575738,
+          "output": 223645,
+          "cacheRead": 127864576,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 38.535414,
-        "pricingAsOf": "2026-07-12T22:54:12.599Z"
+        "usd": 44.068123,
+        "pricingAsOf": "2026-07-13T05:17:43.936Z"
       }
     },
     "merges": [
