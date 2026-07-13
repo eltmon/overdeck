@@ -107,6 +107,14 @@ export const ProposedPlan = Schema.Struct({
 })
 export type ProposedPlan = typeof ProposedPlan.Type
 
+export const PendingProposedPlan = Schema.Struct({
+  toolUseId: Schema.String,
+  plan: Schema.String,
+  planFilePath: Schema.optional(Schema.String),
+  createdAt: Schema.String,
+})
+export type PendingProposedPlan = typeof PendingProposedPlan.Type
+
 // ─── Compact boundary types ──────────────────────────────────────────────────
 
 export const CompactBoundary = Schema.Struct({

@@ -4,6 +4,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { Effect } from 'effect';
+import type { ProposedPlan } from '@overdeck/contracts';
 
 import { withConcurrencyLimit } from '../concurrency.js';
 import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../agent-enrichment.js';
@@ -51,6 +52,13 @@ import {
   resolvePiSessionPath,
 } from '../../dashboard/server/routes/jsonl-resolver.js';
 import { codexConversationPendingInput } from './conversation-delivery.js';
+
+interface PendingProposedPlan {
+  toolUseId: string;
+  plan: string;
+  planFilePath?: string;
+  createdAt: string;
+}
 
 export interface ConversationReadResult {
   body: unknown;
@@ -326,6 +334,17 @@ export function askUserQuestionSnapshotFromScan(
   };
 }
 
+function pendingProposedPlanSnapshot(plan: ProposedPlan | undefined): PendingProposedPlan | null {
+  if (!plan || plan.status !== 'pending') return null;
+  const pending: PendingProposedPlan = {
+    toolUseId: plan.id,
+    plan: plan.plan,
+    createdAt: plan.createdAt,
+  };
+  if (plan.planFilePath !== undefined) pending.planFilePath = plan.planFilePath;
+  return pending;
+}
+
 export async function getConversationsPendingInputFeed(
   deps: Pick<ConversationReadDependencies, 'resolveSessionFile' | 'listSessionNames'>,
 ): Promise<ConversationReadResult> {
@@ -339,6 +358,7 @@ export async function getConversationsPendingInputFeed(
       alive.map((conv) => Effect.promise(async () => {
         const convSf = await deps.resolveSessionFile(conv);
         let pending: PendingAskUserQuestionSnapshot | undefined;
+        let pendingProposedPlan: PendingProposedPlan | null = null;
         let lastActivityAt: string | null = null;
         if (convSf && existsSync(convSf)) {
           try {
@@ -351,6 +371,11 @@ export async function getConversationsPendingInputFeed(
           } catch {
             // JSONL scan failure — non-fatal
           }
+          try {
+            pendingProposedPlan = pendingProposedPlanSnapshot((await getCachedMessages(convSf, false)).proposedPlan);
+          } catch {
+            // JSONL parse failure — non-fatal
+          }
         }
         if (!pending) {
           const codex = await codexConversationPendingInput(
@@ -360,12 +385,13 @@ export async function getConversationsPendingInputFeed(
           );
           if (codex.approval) pending = codex.approval;
         }
-        if (!pending) return null;
+        if (!pending && !pendingProposedPlan) return null;
         return {
           name: conv.name,
           title: conv.title ?? null,
           issueId: conv.issueId ?? null,
-          pendingAskUserQuestion: pending,
+          pendingAskUserQuestion: pending ?? null,
+          pendingProposedPlan,
         };
       })),
       8,
