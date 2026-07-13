@@ -1,0 +1,1122 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-13T13:55:01Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2499: feat(dashboard): unify the three issue views into one progressive-density Issue View (rail · cockpit · console)",
+    "updated": "2026-07-13T14:17:55.597Z"
+  },
+  "plan": {
+    "id": "pan-2499",
+    "title": "feat(dashboard): unify the three issue views into one progressive-density Issue View (rail · cockpit · console)",
+    "status": "proposed",
+    "uid": "3eb72615-9698-44ba-b8df-52f4d107c9b4",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-13T13:55:01Z",
+    "updated": "2026-07-13T14:17:55.597Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2499",
+        "label": "PAN-2499",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/main/docs/design/mockups/three-issue-views-naming.html",
+        "label": "Binding mockup + no-loss inventory",
+        "type": "design"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2493",
+        "label": "PAN-2493 parity audit (predecessor)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2487",
+        "label": "PAN-2487 drift incident (spinner/ship row added twice)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2037",
+        "label": "PAN-2037 start-agent CTA (absorbed by start-agent-cta bead)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1874",
+        "label": "PAN-1874 ReviewPolicyControl (must keep a home)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "refactor",
+      "issue-view",
+      "no-loss"
+    ],
+    "narratives": {
+      "Problem": "One issue's live pipeline state renders in three independently built components — Console (drawer/IssueDrawer.tsx), Cockpit (Stage/cockpit/IssueMissionControl.tsx + AgentsLane.tsx), and Rail (CommandDeck/ProjectTree/FeatureItem.tsx + SessionNode.tsx, 4,001 lines total) — that read the same hooks/store but each re-implement the agent row, ship progress, verification gates, and beads panel. Drift is structural: the active-node spinner and Ship-door row were each added twice (PAN-2487, PAN-2493), the ★ Active-Agent panel exists only in the Console, and when PAN-2229 sat troubled there was no recovery button on any surface.",
+      "Proposal": "One data model + one component family at three densities. Build useIssueView(issueId) → IssueViewModel composed strictly from the existing hooks (ZoneCOverviewTabs/queries.ts) + Zustand store (D2: no new endpoint/state). Extract a shared kit under components/issue-view/ (AgentStepRow, ShipProgress, VerificationGates, BeadsPanel, ActiveAgentPanel, StartAgentCta), one cluster per bead with old duplicates deleted in the same bead (D1). Compose them in <IssueView density=\"rail|cockpit|console\"> driven by a declarative DENSITY_SECTIONS map (D3); the three shells become thin adapters. A no-loss test locked to the mockup inventory gates every bead (FR-0). Finish with rail expand-in-place (FR-8) and the needs-you recovery CTA that clears troubled/paused gates server-side and starts the agent in one click (FR-9).",
+      "NonGoals": "- WI-8 (retiring the bespoke Console/Cockpit shells) is deferred out of this issue; it needs operator sign-off on the new surface first (PRD marks it OPTIONAL). All three entry points keep working (D5).\n- No new API endpoints and no new server-side state for the view-model (D2); a datum needing a new endpoint is a separate issue.\n- No removal of the \"open in a Command Deck tab\" navigation path — it is preserved during this issue (removal belongs to the deferred WI-8/Phase 5).\n- No redesign of section content or visual refresh beyond the pan-style-guide; this issue relocates and unifies, it does not restyle.\n- No changes to the review convoy, verification gate, or merge pipeline behavior — UI-side unification only, except the single clearGates option on the existing start-agent route.\n- No section listed in the mockup no-loss inventory may be dropped — relocation only."
+    },
+    "autoDecisions": [
+      {
+        "summary": "FR-0 gate lands first as a manifest-completeness test (every inventory section maps to a declared component home), upgraded to render-based data-section assertions in the issue-view-wrapper bead.",
+        "rationale": "FR-0 says the gate exists from Phase 1, but its literal assertion target (<IssueView> densities) does not exist until WI-6; a manifest test enforces the surface-lock from day one without asserting against components that do not exist yet."
+      },
+      {
+        "summary": "WI-8 (retire shells) excluded from this plan's beads and recorded as a NonGoal.",
+        "rationale": "The PRD marks WI-8 'OPTIONAL, deferrable' and conditions it on the operator confirming the new surface feels right — that confirmation cannot happen inside this issue's pipeline run."
+      },
+      {
+        "summary": "WI-4 split into two beads (VerificationGates, BeadsPanel) and WI-9 split into three (server clearGates, StartAgentCta at IssueView densities, kanban/fleet chip adoption); other WIs map 1:1 to beads.",
+        "rationale": "Each split piece is independently reviewable and testable; PRD D1 only requires extract+adopt+delete atomicity per cluster, which each split bead preserves."
+      },
+      {
+        "summary": "ReviewPolicyControl (PAN-1874) added to the no-loss manifest with a cockpit+console home in DENSITY_SECTIONS.",
+        "rationale": "The issue comment (2026-07-11) mandates it survive unification; verified 2026-07-13 it renders in ReviewPolicyControl.tsx via SessionView/IssueHeader.tsx and IssueMissionControl.tsx."
+      },
+      {
+        "summary": "Added a docs bead (docs/ISSUE-VIEW.md + codebase-map architecture note) not present in the PRD's work items.",
+        "rationale": "Repo PRD-authoring rule requires a documentation work item for any changed surface; the PRD itself omitted one."
+      },
+      {
+        "summary": "useIssueView bead gets requiresInspection:true with inspectionDepth:deep; issue-view-wrapper gets requiresInspection:true with fast depth; all other beads false.",
+        "rationale": "The view-model is the cross-cutting foundation every subsequent bead consumes (MIN-796-class risk); the DENSITY_SECTIONS wrapper is the architectural decision the interaction and CTA beads build on. The rest are leaf extractions verified by their own tests and the no-loss gate."
+      }
+    ],
+    "items": [
+      {
+        "id": "no-loss-manifest",
+        "title": "FR-0 surface-lock: no-loss inventory manifest + gate test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-13T13:55:01Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-2499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/inventory.ts",
+            "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/dashboard/frontend/issue-view-no-loss.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "issue-view-no-loss.test.ts passes, with one assertion per inventory section",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-0"
+          ]
+        },
+        "narrative": {
+          "Action": "Encode the mockup's complete component inventory (docs/design/mockups/three-issue-views-naming.html, 'Complete component inventory — the no-loss checklist': 14 Console entries, 16 Cockpit entries, 13 Rail entries, PLUS ReviewPolicyControl from PAN-1874) as a typed data module src/dashboard/frontend/src/components/issue-view/inventory.ts: an array of { section: string, view: 'console'|'cockpit'|'rail', home: string } where home is the repo-relative path of the component currently rendering that section. Write tests/unit/dashboard/frontend/issue-view-no-loss.test.ts asserting (a) every section name from the mockup list is present in the manifest — hardcode the expected names in the test so removing a manifest entry fails, and (b) every manifest 'home' path exists on disk. Later beads update 'home' as clusters move to the shared kit; the issue-view-wrapper bead adds render-based data-section assertions on top. This mirrors the discipline of tests/unit/lib/overdeck/no-loss-matrix.ts."
+        },
+        "items": [
+          {
+            "id": "no-loss-manifest.ac1",
+            "title": "Given the mockup inventory, the test enumerates every section name (Console 14 + Cockpit 16 + Rail 13 + ReviewPolicyControl) and fails if any name is missing from inventory.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-manifest.ac2",
+            "title": "The test rejects a manifest entry whose 'home' path does not exist on disk (deleting a home component without re-homing its section turns the build red)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-manifest.ac3",
+            "title": "npx vitest run on the new test file exits 0 on the current tree with all sections mapped to their legacy homes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "issue-view-model",
+        "title": "WI-1: useIssueView(issueId) + IssueViewModel types (the one data model)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-13T13:55:01Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-2499",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "agent-step-row",
+            "ship-progress",
+            "verification-gates",
+            "beads-panel",
+            "active-agent-panel",
+            "issue-view-wrapper",
+            "start-agent-cta"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/useIssueView.ts",
+            "src/dashboard/frontend/src/components/issue-view/types.ts",
+            "src/dashboard/frontend/src/components/issue-view/useIssueView.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/issue-view/useIssueView.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "useIssueView.test.tsx passes: assembled IssueViewModel matches fixtures, running agent yields agents[].active === true, merged issue yields ship.status === 'merged'",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "readinessReason": "Wave-0 foundation bead: every component bead carries a blocks edge from it, so nothing else dispatches concurrently against its files.",
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create components/issue-view/types.ts defining IssueViewModel with sub-objects { header, narrative, pipeline, agents: AgentRowModel[], verification, ship, beads, activity, resources, operator } and AgentRowModel (icon/role, status, active, model, harness, cost, duration, verdict, pendingInput, sessionId — derived from contracts SessionNode + ReviewStatusData). Create useIssueView.ts calling the EXISTING exported hooks from components/CommandDeck/ZoneCOverviewTabs/queries.ts (useReviewStatusQuery, useIssueCostsQuery, useWorkspaceQuery, useActivityQuery — same queryKeys and refetchIntervals, per NFR-2 do NOT declare new queries) plus useDashboardStore(s => s.agentsById). Centralize the four duplicated derivations ONCE here: isAgentRunning, readyForMerge, mergeStep, stuckReason. Also derive operator-blocked state for FR-9 (agent troubled / paused-with-needs-you / stopped-while-in-progress) so StartAgentCta can consume it later. No UI changes; nothing consumes the hook yet."
+        },
+        "items": [
+          {
+            "id": "issue-view-model.ac1",
+            "title": "Given fixture query results + a fake store, useIssueView returns a populated IssueViewModel with all ten sub-objects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-view-model.ac2",
+            "title": "Given a running work agent in the store fixture, useIssueView returns agents[].active === true; given a merged review-status fixture, it returns ship.status === 'merged'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-view-model.ac3",
+            "title": "The hook produces its data by invoking the existing queries.ts hooks (asserted via mocks) and creates no new useQuery keys — polling is not multiplied",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-view-model.ac4",
+            "title": "The module contains exactly one definition each of isAgentRunning, readyForMerge, mergeStep, and stuckReason, exported from issue-view; a frontend-wide grep returns no second definition added",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-view-model.ac5",
+            "title": "Given a troubled-agent fixture, the model contains an operator-blocked state (operator.needsYou populated with kind 'troubled') consumable by the future CTA",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-step-row",
+        "title": "WI-2: shared <AgentStepRow> replaces AgentsLane Row + SessionNode row body",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-13T13:55:01Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-2499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/AgentStepRow.tsx",
+            "src/dashboard/frontend/src/components/issue-view/AgentStepRow.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/AgentsLane.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.tsx",
+            "src/dashboard/frontend/src/components/issue-view/inventory.ts",
+            "scripts/file-size-baseline.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/issue-view/AgentStepRow.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "AgentStepRow.test.tsx passes: spinner only when active, all 9 context-menu items present, verdict tick for reviewers, renders at cockpit and rail densities",
+            "lint:file-size passes with LOWERED baselines for AgentsLane.tsx and SessionNode.tsx"
+          ],
+          "readiness": "ready",
+          "readinessReason": "Parallel-safe with the other extraction beads except for append-only touches to inventory.ts and file-size-baseline.txt; its primary files (AgentStepRow, AgentsLane, SessionNode) are exclusive to this bead.",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create <AgentStepRow model={AgentRowModel} density onAction/> in components/issue-view/AgentStepRow.tsx rendering the UNION of today's two implementations: cockpit's verdict tile (AgentsLane.tsx function Row) + rail's icon tile, PhaseIcon spinner, model, cost, duration, verdict tick, and the 9-item context menu (Stop / Pause / Unpause / Resume / Restart(model/harness) / Deep-wipe / Open-state-dir / View-JSONL / View-terminal) from SessionNode.tsx. Spinner logic lives here once: active/running renders a BLUE spinner (style guide: never green for running). Then adopt: replace Row inside AgentsLane.tsx and replace SessionNode.tsx's row markup (keep its tree expand/children logic), DELETE both old row bodies in this same bead (D1). Lower AgentsLane.tsx and SessionNode.tsx entries in scripts/file-size-baseline.txt. Update inventory.ts homes for the agent-row sections."
+        },
+        "items": [
+          {
+            "id": "agent-step-row.ac1",
+            "title": "One <AgentStepRow> renders in both AgentsLane (cockpit) and SessionNode (rail); the old Row function and SessionNode row markup are deleted (grep finds no duplicate row implementation)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-step-row.ac2",
+            "title": "The component renders a blue spinner only when the model is active, and no spinner for stopped/finished fixtures",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-step-row.ac3",
+            "title": "The component renders all 9 context-menu actions and emits onAction with the correct action kind; it renders the verdict tick for reviewer fixtures",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-step-row.ac4",
+            "title": "scripts/file-size-baseline.txt entries for AgentsLane.tsx and SessionNode.tsx decrease; lint passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ship-progress",
+        "title": "WI-3: shared <ShipProgress> replaces ShipTab body + ShipDoorTreeRow",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-13T13:55:01Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/ShipProgress.tsx",
+            "src/dashboard/frontend/src/components/issue-view/ShipProgress.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/ShipTab.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+            "src/dashboard/frontend/src/components/issue-view/inventory.ts",
+            "scripts/file-size-baseline.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/issue-view/ShipProgress.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "ShipProgress.test.tsx passes: rebasing→verifying→merged fixture drives step progression; non-compact mode renders log lines",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create <ShipProgress compact?/> in components/issue-view/ShipProgress.tsx rendering the server-side merge-door progress (rebase → verify → merge → cleanup step indicator + live ship-log lines from GET /api/issues/:id/ship-log, consumed via IssueViewModel.ship). compact=true (rail) renders one row + current step; compact=false (cockpit/console) renders the step indicator + full log stream. Adopt in ShipTab.tsx (replace its body) and replace ShipDoorTreeRow inside FeatureItem.tsx; delete both old implementations in this bead (D1). Poll-driven tests use vi.useFakeTimers() + advanceTimersByTimeAsync (repo rule). Update inventory.ts homes; lower FeatureItem.tsx baseline if its line count drops."
+        },
+        "items": [
+          {
+            "id": "ship-progress.ac1",
+            "title": "Given a ship-log fixture progressing rebasing→verifying→merged, the step indicator advances accordingly and non-compact mode renders the log lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ship-progress.ac2",
+            "title": "ShipTab.tsx renders <ShipProgress> and FeatureItem.tsx renders <ShipProgress compact>; the old ShipTab body and ShipDoorTreeRow are deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ship-progress.ac3",
+            "title": "The ShipProgress polling test passes using vi.useFakeTimers() + advanceTimersByTimeAsync, with no real setTimeout waits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verification-gates",
+        "title": "WI-4a: shared <VerificationGates> replaces DrawerVerificationGates + cockpit verification node",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-13T13:55:01Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/VerificationGates.tsx",
+            "src/dashboard/frontend/src/components/issue-view/VerificationGates.test.tsx",
+            "src/dashboard/frontend/src/components/drawer/DrawerVerificationGates.tsx",
+            "src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/AgentsLane.tsx",
+            "src/dashboard/frontend/src/components/issue-view/inventory.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/issue-view/VerificationGates.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "VerificationGates.test.tsx passes: all four gates render pass/fail/pending/infra-unavailable states from fixtures",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create <VerificationGates> in components/issue-view/VerificationGates.tsx rendering the four gate cards (typecheck / lint / test / uat) with pass / fail / pending / infra-unavailable states from IssueViewModel.verification. Adopt in the Console (replace DrawerVerificationGates usage in IssueDrawer.tsx) and in the Cockpit's verification node (locate the verification rendering in AgentsLane.tsx / IssueMissionControl.tsx and re-point it); delete the superseded DrawerVerificationGates.tsx and the cockpit duplicate in this bead (D1). Update inventory.ts homes for the Verification Gates sections."
+        },
+        "items": [
+          {
+            "id": "verification-gates.ac1",
+            "title": "One <VerificationGates> renders all four gate cards in each of the pass, fail, pending, and infra-unavailable fixture states",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verification-gates.ac2",
+            "title": "Console and Cockpit each renders the shared component; the bead deletes DrawerVerificationGates.tsx and the cockpit duplicate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verification-gates.ac3",
+            "title": "The no-loss test still passes with the Verification Gates sections re-homed to the shared kit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "beads-panel",
+        "title": "WI-4b: shared <BeadsPanel> replaces DrawerBeadsList + BeadsRail/BeadsTab + rail beads chip",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-13T13:55:01Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/BeadsPanel.tsx",
+            "src/dashboard/frontend/src/components/issue-view/BeadsPanel.test.tsx",
+            "src/dashboard/frontend/src/components/drawer/DrawerBeadsList.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/BeadsRail.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+            "src/dashboard/frontend/src/components/issue-view/inventory.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/issue-view/BeadsPanel.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "BeadsPanel.test.tsx passes: plan-progress bar + completed/open list render from fixtures at full and compact densities",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create <BeadsPanel compact?/> in components/issue-view/BeadsPanel.tsx rendering the bead plan-progress bar + completed/open list from IssueViewModel.beads. Adopt in the Console (replace DrawerBeadsList usage), Cockpit (replace BeadsRail.tsx / BeadsTab body), and give the Rail a compact variant replacing its beads chip in FeatureItem.tsx's ResourceStrip context (keep the chip look at rail density — compact renders count + progress). Delete/collapse the superseded duplicates in this bead (D1). Update inventory.ts homes for the beads sections."
+        },
+        "items": [
+          {
+            "id": "beads-panel.ac1",
+            "title": "One <BeadsPanel> renders progress bar + bead list from fixtures; compact mode renders the rail chip form with open/done counts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "beads-panel.ac2",
+            "title": "Console, Cockpit, and Rail each renders the shared component; the bead deletes DrawerBeadsList and the BeadsRail duplicate body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "beads-panel.ac3",
+            "title": "The no-loss test still passes with beads sections re-homed to the shared kit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "active-agent-panel",
+        "title": "WI-5: <ActiveAgentPanel> (★ live stream + Tell + Resume) available at every density",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-13T13:55:01Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-2499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/ActiveAgentPanel.tsx",
+            "src/dashboard/frontend/src/components/issue-view/ActiveAgentPanel.test.tsx",
+            "src/dashboard/frontend/src/components/drawer/DrawerActiveAgent.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/CrewStage.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.tsx",
+            "src/dashboard/frontend/src/components/issue-view/inventory.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/issue-view/ActiveAgentPanel.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "ActiveAgentPanel.test.tsx passes: live lines render from fixture; the tell input posts to the same endpoint DrawerActiveAgent used (mocked fetch asserts URL/body)",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "readinessReason": "Parallel-safe with the other extraction beads except for append-only touches to inventory.ts; its primary files (ActiveAgentPanel, DrawerActiveAgent, CrewStage) are exclusive to this bead.",
+          "traces": [
+            "FR-6",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Extract <ActiveAgentPanel> into components/issue-view/ActiveAgentPanel.tsx from DrawerActiveAgent.tsx: the live output stream + 'Tell this agent…' input + Resume button. Wire it to the SAME message-delivery endpoint DrawerActiveAgent already calls (read DrawerActiveAgent.tsx to find it — do NOT invent a new endpoint). Surface it: Console keeps it (IssueDrawer path), Cockpit gains it in the Conversation tab and the Overview crew section, Rail gains it on session-node expand (mount ONLY for the expanded node — hazard H3 — never one live stream per row). DrawerActiveAgent.tsx becomes a thin re-export/adapter or is deleted with its usage re-pointed (D1). Poll/stream tests use fake timers. Update inventory.ts home for the ★ Active Agent panel and mark it present in all three views."
+        },
+        "items": [
+          {
+            "id": "active-agent-panel.ac1",
+            "title": "<ActiveAgentPanel> renders live output lines from a fixture and its Tell input posts to the same endpoint the drawer used (fetch mock asserts URL and body)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "active-agent-panel.ac2",
+            "title": "The panel renders in Console AND Cockpit (Conversation tab + crew section) AND Rail (on session-node expand)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "active-agent-panel.ac3",
+            "title": "At rail density only the expanded session node renders a panel — collapsed nodes render zero stream consumers (asserted in test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "active-agent-panel.ac4",
+            "title": "When the Resume button is clicked, the panel sends POST /api/agents/:agentId/resume (asserted via mocked fetch)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "issue-view-wrapper",
+        "title": "WI-6: <IssueView density> + DENSITY_SECTIONS map; shells become adapters; FR-0 render gate",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-13T13:55:01Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-2499",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "rail-expand",
+            "start-agent-cta"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/IssueView.tsx",
+            "src/dashboard/frontend/src/components/issue-view/densitySections.ts",
+            "src/dashboard/frontend/src/components/issue-view/IssueView.test.tsx",
+            "src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+            "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts",
+            "scripts/file-size-baseline.txt"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/issue-view/IssueView.test.tsx",
+            "npx vitest run --configLoader runner tests/unit/dashboard/frontend/issue-view-no-loss.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "IssueView.test.tsx passes: every inventory section renders a data-section attribute at >=1 density; density-map test asserts operator gates render at console but not rail",
+            "no-loss manifest test passes; typecheck and lint complete without errors; the three shells' baselines move DOWN"
+          ],
+          "readiness": "ready",
+          "readinessReason": "Runs alone by construction: blocks edges from every extraction bead plus the manifest bead gate it, so it dispatches only after wave 1 completes.",
+          "traces": [
+            "FR-0",
+            "FR-7",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create <IssueView issueId density=\"rail|cockpit|console\"> in components/issue-view/IssueView.tsx composing the shared kit + remaining view-specific sections (StatusNarrative, PipelineBand, operator gates/PickupGateControls, lifecycle band/PhaseTimeline, activity rail, detail tabs, ResourceStrip, ReviewPolicyControl at cockpit+console per D7). Layout branches ONLY via a declarative DENSITY_SECTIONS map in densitySections.ts (D3) — no forked component trees. Every rendered section carries data-section=\"<inventory name>\". Re-point the three shells as thin adapters: IssueDrawer.tsx body → <IssueView density=\"console\">, IssueMissionControl.tsx body → <IssueView density=\"cockpit\">, FeatureItem.tsx expanded body → <IssueView density=\"rail\"> — each shell keeps its own routing/URL/tab glue (hazard H7). Upgrade the FR-0 gate: add render-based assertions (frontend Vitest) that every inventory section name appears as a data-section at >=1 density, asserting presence only, never layout (hazard H5). Lower the three shells' file-size baselines."
+        },
+        "items": [
+          {
+            "id": "issue-view-wrapper.ac1",
+            "title": "<IssueView> renders at all three densities from one component; sections show/hide per the DENSITY_SECTIONS map (operator gates render at console, not at rail — asserted)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-view-wrapper.ac2",
+            "title": "The FR-0 render gate passes: every no-loss inventory section name appears as a data-section attribute at at least one density",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-view-wrapper.ac3",
+            "title": "Each shell (IssueDrawer, IssueMissionControl, FeatureItem) renders <IssueView> for its body and preserves its own routing/URL/tab behavior (existing shell tests stay green)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-view-wrapper.ac4",
+            "title": "ReviewPolicyControl renders at cockpit and console densities via the density map",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-view-wrapper.ac5",
+            "title": "file-size baselines for IssueDrawer/IssueMissionControl/FeatureItem move down; lint passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rail-expand",
+        "title": "WI-7: rail-first expand-in-place (rail→cockpit in place, full-screen→console)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-13T13:55:01Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+            "src/dashboard/frontend/src/components/issue-view/IssueView.tsx",
+            "src/dashboard/frontend/src/components/issue-view/IssueView.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/issue-view/IssueView.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "Interaction test passes: expand toggles rail→cockpit density in place; full-screen control promotes to console; collapse returns to rail",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "In FeatureItem.tsx, make the issue's expand affordance grow the SAME <IssueView> instance from rail to cockpit density in place (no separate tab); add a full-screen control that promotes to console density; collapse returns to rail. PRESERVE the existing 'open in a Command Deck tab' path — removal belongs to the deferred Phase 5 (NonGoals). Interaction test covers expand → cockpit, full-screen → console, collapse → rail."
+        },
+        "items": [
+          {
+            "id": "rail-expand.ac1",
+            "title": "Clicking a rail issue's expand affordance renders the same <IssueView> at cockpit density in place, without opening a tab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rail-expand.ac2",
+            "title": "The full-screen control promotes the view to console density; collapse returns it to rail density",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rail-expand.ac3",
+            "title": "The existing open-in-tab path still opens the Cockpit tab (preserved during migration)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "clear-gates-server",
+        "title": "WI-9a: spawn route honors clearGates (server-side untroubled/unpause equivalents)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-13T13:55:01Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/spawn.ts",
+            "src/lib/agents/agent-state.ts",
+            "src/cli/commands/untroubled.ts",
+            "src/cli/commands/unpause.ts",
+            "src/dashboard/server/routes/__tests__/operator-interventions.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/dashboard/server/routes/__tests__/operator-interventions.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "Route test passes: POST /api/agents with clearGates:true clears troubled and paused gates then proceeds to spawn; without clearGates a gated agent request is rejected with the gate reason",
+            "lint:state-writes passes (no new direct state writes outside the doors)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Add an explicit clearGates: true option to the start-agent handler behind POST /api/agents (src/dashboard/server/routes/agents/spawn.ts), honored only for operator-origin requests. When set, clear the troubled gate and the paused gate through the SAME code paths pan untroubled (src/cli/commands/untroubled.ts) and pan unpause (src/cli/commands/unpause.ts) use — if that logic is inlined in the CLI commands, first extract shared functions into src/lib/agents/ and have both CLI and route call them (two-door rule, hazard H4; no direct state.json/DB writes in the route). Emit the same operator-intervention events the CLI emits (appendOperatorInterventionEvent). Requests without clearGates keep today's behavior: a gated agent is refused with the gate reason so the failure is never a silent no-op."
+        },
+        "items": [
+          {
+            "id": "clear-gates-server.ac1",
+            "title": "Given a troubled agent, POST /api/agents with clearGates:true clears the troubled gate and spawns the agent (asserted via route test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clear-gates-server.ac2",
+            "title": "Given a paused agent, POST /api/agents with clearGates:true clears the pause gate and spawns the agent; the CLI commands and the route share the same gate-clearing functions (no duplicated logic)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clear-gates-server.ac3",
+            "title": "POST /api/agents without clearGates on a gated agent returns the gate reason as an error (no silent no-op); operator-intervention events are emitted on clearing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "start-agent-cta",
+        "title": "WI-9b: shared <StartAgentCta> (plain start / clear-and-start / resume) at all densities",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-13T13:55:01Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-2499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/StartAgentCta.tsx",
+            "src/dashboard/frontend/src/components/issue-view/StartAgentCta.test.tsx",
+            "src/dashboard/frontend/src/lib/issueActions.ts",
+            "src/dashboard/frontend/src/components/Stage/cockpit/AgentActivityCards.tsx",
+            "src/dashboard/frontend/src/components/issue-view/densitySections.ts",
+            "src/dashboard/frontend/src/components/issue-view/IssueView.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/issue-view/StartAgentCta.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "StartAgentCta.test.tsx passes: mode selection fixtures (troubled / paused-needs-you / plain-stopped / resumable / running→no CTA); clearGates sent only in clear-and-start mode; resume hits POST /api/agents/:agentId/resume",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Build ONE shared <StartAgentCta> in components/issue-view/StartAgentCta.tsx with three affordances derived from IssueViewModel.operator (absorbs PAN-2037): (a) plain start when canStartAgent (lib/issueActions.ts line ~157) — primary button labeled exactly 'Start work agent'; (b) clear-and-start when the agent is troubled or paused-with-needs-you — same button behind a confirm dialog whose copy NAMES the gate being cleared in a complete sentence (e.g. 'This agent was marked troubled after repeated failed resumes. Clear the flag and start a fresh work agent?' — operator-facing-messages rule), posting to /api/agents with clearGates: true; (c) a secondary 'Resume session' button adjacent (never in a menu) when hasResumableSession, invoking the existing resumeSession action (POST /api/agents/:agentId/resume). Extract the model/harness override panel from the cockpit's AgentLaunchControl (Stage/cockpit/AgentActivityCards.tsx lines ~65–217) — reuse, don't reimplement; keep the existing cockpit startMutation button until this replaces it in the same bead. Surface via DENSITY_SECTIONS in the status-narrative/needs-you band: rail = compact button, cockpit/console = full-width primary + drawer header action row. Spawn outcome is surfaced: success → the live agent row appears; failure → inline error, never a silent no-op. A running agent renders no CTA. No regression on the other phase-primary CTAs (planning, review, merge)."
+        },
+        "items": [
+          {
+            "id": "start-agent-cta.ac1",
+            "title": "Given fixtures for troubled / paused-needs-you / plain-stopped / stopped-with-resumable-session / running, the CTA renders clear-and-start-with-confirm, clear-and-start, 'Start work agent', an adjacent 'Resume session', and no CTA respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-agent-cta.ac2",
+            "title": "The confirm dialog renders copy naming the specific gate being cleared; the fetch mock shows the POST /api/agents body contains clearGates only in clear-and-start mode; resume sends POST /api/agents/:agentId/resume",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-agent-cta.ac3",
+            "title": "The CTA renders at rail, cockpit, AND console densities (density-map test), reproducing PAN-2229's troubled-no-live-session state in a fixture end-to-end",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-agent-cta.ac4",
+            "title": "A failed spawn surfaces the server error inline (asserted with a rejecting fetch mock); a successful spawn resolves without error UI",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-agent-cta.ac5",
+            "title": "This bead replaces the cockpit AgentLaunchControl start path with the shared CTA and preserves the model/harness override panel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cta-kanban-fleet",
+        "title": "WI-9c: adopt <StartAgentCta> chip form on kanban cards + fleet rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-13T13:55:01Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/KanbanBoard/cards/KanbanCards.tsx",
+            "src/dashboard/frontend/src/components/Agents/FleetAgentsView.tsx",
+            "src/dashboard/frontend/src/components/issue-view/StartAgentCta.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/issue-view/StartAgentCta.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "Chip-form tests pass: kanban card face renders a minimal start chip with no override panel; fleet row renders inline Start",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Adopt the SAME <StartAgentCta> component in chip form on: (1) the kanban card face (components/KanbanBoard/cards/KanbanCards.tsx) — a minimal '▶ Start' chip, no model/harness override panel; (2) the Fleet/Agents row actions (components/Agents/FleetAgentsView.tsx) — inline 'Start'. Both use the same mode-selection logic (plain vs clear-and-start vs resume) from the shared component; do not fork the logic. Add chip-form test cases to StartAgentCta.test.tsx or colocated tests for the adopting components."
+        },
+        "items": [
+          {
+            "id": "cta-kanban-fleet.ac1",
+            "title": "A startable issue's kanban card renders the minimal start chip (no override panel); clicking it posts to /api/agents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cta-kanban-fleet.ac2",
+            "title": "The fleet/agents row renders inline Start driven by the same shared component (no duplicated mode logic — grep confirms one implementation)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-issue-view",
+        "title": "Docs: document the issue-view kit, density model, no-loss gate, and recovery CTA",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-13T13:55:01Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2499",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ISSUE-VIEW.md",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "docs/ISSUE-VIEW.md exists describing IssueViewModel, the shared kit, DENSITY_SECTIONS, the FR-0 no-loss gate, and StartAgentCta; lint passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-0",
+            "FR-1",
+            "FR-7",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Write docs/ISSUE-VIEW.md documenting: the IssueViewModel shape and useIssueView composition rule (existing hooks only, two-door), the shared kit components under components/issue-view/, the DENSITY_SECTIONS density model and how to add a new section WITHOUT breaking the no-loss gate (add to inventory.ts + density map + data-section attribute), the FR-0 test's role as the surface-lock, and the StartAgentCta modes incl. the server clearGates contract. Add a short pointer paragraph to the repo CLAUDE.md dashboard section so future agents find the kit instead of re-implementing per-view sections. Update the mockup's surface-lock note is NOT needed (mockup stays the historical binding inventory)."
+        },
+        "items": [
+          {
+            "id": "docs-issue-view.ac1",
+            "title": "docs/ISSUE-VIEW.md contains every shared kit component name, the density map file, and the add-a-section procedure that keeps the no-loss gate green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-issue-view.ac2",
+            "title": "CLAUDE.md contains a pointer to docs/ISSUE-VIEW.md in its dashboard/frontend guidance so new sections route through the kit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "issue-view-model",
+        "to": "agent-step-row",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-view-model",
+        "to": "ship-progress",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-view-model",
+        "to": "verification-gates",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-view-model",
+        "to": "beads-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-view-model",
+        "to": "active-agent-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-view-model",
+        "to": "issue-view-wrapper",
+        "type": "blocks"
+      },
+      {
+        "from": "no-loss-manifest",
+        "to": "issue-view-wrapper",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-step-row",
+        "to": "issue-view-wrapper",
+        "type": "blocks"
+      },
+      {
+        "from": "ship-progress",
+        "to": "issue-view-wrapper",
+        "type": "blocks"
+      },
+      {
+        "from": "verification-gates",
+        "to": "issue-view-wrapper",
+        "type": "blocks"
+      },
+      {
+        "from": "beads-panel",
+        "to": "issue-view-wrapper",
+        "type": "blocks"
+      },
+      {
+        "from": "active-agent-panel",
+        "to": "issue-view-wrapper",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-view-wrapper",
+        "to": "rail-expand",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-view-wrapper",
+        "to": "start-agent-cta",
+        "type": "blocks"
+      },
+      {
+        "from": "clear-gates-server",
+        "to": "start-agent-cta",
+        "type": "blocks"
+      },
+      {
+        "from": "start-agent-cta",
+        "to": "cta-kanban-fleet",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-view-wrapper",
+        "to": "docs-issue-view",
+        "type": "blocks"
+      },
+      {
+        "from": "start-agent-cta",
+        "to": "docs-issue-view",
+        "type": "blocks"
+      },
+      {
+        "from": "no-loss-manifest",
+        "to": "agent-step-row",
+        "type": "informs"
+      },
+      {
+        "from": "no-loss-manifest",
+        "to": "ship-progress",
+        "type": "informs"
+      },
+      {
+        "from": "no-loss-manifest",
+        "to": "verification-gates",
+        "type": "informs"
+      },
+      {
+        "from": "no-loss-manifest",
+        "to": "beads-panel",
+        "type": "informs"
+      },
+      {
+        "from": "no-loss-manifest",
+        "to": "active-agent-panel",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-13-PAN-2499-feat-dashboard-unify-the-three-issue-views-into-one-progressive-density-issue-view-rail-cockpit-console.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
