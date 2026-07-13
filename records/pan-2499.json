@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-13T17:56:02.391Z",
+  "updated": "2026-07-13T17:58:36.349Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -53,8 +53,11 @@
   "harness": "claude-code",
   "model": "glm-5.2",
   "statusOverrides": {
-    "no-loss-manifest": "running",
-    "issue-view-model": "running"
+    "no-loss-manifest": "completed",
+    "issue-view-model": "running",
+    "no-loss-manifest.no-loss-manifest.ac1": "completed",
+    "no-loss-manifest.no-loss-manifest.ac2": "completed",
+    "no-loss-manifest.no-loss-manifest.ac3": "completed"
   },
   "swarm": {
     "slotAssignments": [
@@ -74,11 +77,6 @@
       }
     ],
     "slotCompletions": {
-      "1": {
-        "slotIndex": 1,
-        "agentId": "agent-pan-2499-slot-1",
-        "completedAt": "2026-07-13T17:56:02.375Z"
-      },
       "2": {
         "slotIndex": 2,
         "agentId": "agent-pan-2499-slot-2",
