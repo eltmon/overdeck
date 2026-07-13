@@ -342,21 +342,22 @@
     "recordedAt": "2026-07-13T16:25:29.668Z"
   },
   "created": "2026-07-12T22:33:37.108Z",
-  "updated": "2026-07-13T19:29:15.711Z",
+  "updated": "2026-07-13T19:32:14.980Z",
   "pipeline": {
     "issueId": "PAN-2602",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T19:28:29.884Z",
+    "updatedAt": "2026-07-13T19:31:51.937Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2636",
     "reviewedAtCommit": "0fb503c484ad438ee45e69f4517c14b3b19ba0bd",
     "lastVerifiedCommit": "d1bc4dfb119ca34e40f2ed0014ff3296b2a05eed",
-    "reviewSpawnedAt": "2026-07-13T16:19:04.267Z"
+    "reviewSpawnedAt": "2026-07-13T16:19:04.267Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-13T19:31:51.937Z"
   },
   "closeOut": {
     "usage": {
@@ -616,5 +617,15 @@
         "completedAt": "2026-07-13T11:05:35.807Z"
       }
     }
-  }
+  },
+  "recoveryTrips": [
+    {
+      "issue": "PAN-2602",
+      "recoveryPath": "stuck-remediation",
+      "obligationGeneration": "2026-07-13T15:39:30.000Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-13T19:32:14.980Z"
+    }
+  ]
 }
