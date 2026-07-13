@@ -4,17 +4,17 @@
     "created": "2026-07-12T22:42:27Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2602: feat(pipeline): union in-pipeline signal + bead↔issue state fidelity (visibility gap + orphaned-bead leak)",
-    "updated": "2026-07-13T05:46:05.328Z"
+    "updated": "2026-07-13T19:31:11.138Z"
   },
   "plan": {
     "id": "pan-2602",
     "title": "feat(pipeline): union in-pipeline signal + bead↔issue state fidelity (visibility gap + orphaned-bead leak)",
-    "status": "running",
+    "status": "completed",
     "uid": "438f004f-5e10-4436-9514-f440f20c97df",
     "author": "agent:claude-fable-5",
-    "sequence": 7,
+    "sequence": 8,
     "created": "2026-07-12T22:42:27Z",
-    "updated": "2026-07-13T05:46:05.328Z",
+    "updated": "2026-07-13T19:31:11.138Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2602",
@@ -1131,5 +1131,5 @@
       "canonicalFilename": "2026-07-13-PAN-2602-feat-pipeline-union-in-pipeline-signal-bead-issue-state-fidelity-visibility-gap-orphaned-bead-leak.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
