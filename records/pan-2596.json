@@ -317,7 +317,7 @@
     "recordedAt": "2026-07-13T11:20:10.124Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T15:52:44.046Z",
+  "updated": "2026-07-13T15:55:34.374Z",
   "pipeline": {
     "issueId": "PAN-2596",
     "reviewStatus": "pending",
@@ -509,8 +509,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "composer-file-chip": "completed",
     "composer-file-chip.ac1": "completed",
