@@ -165,18 +165,16 @@ export function ComposerFooter({
         (file) => !isDotfileAttachment(file.name) && !isExtensionlessAttachment(file.name),
       );
 
+      const joinedNames = (files: File[]) => files.map((file) => file.name).join(', ');
+
       if (dotfiles.length > 0) {
-        toast.warning(
-          `${dotfiles.length} dotfile${dotfiles.length === 1 ? '' : 's'} not supported (e.g. .env).`,
-        );
+        toast.warning(`${joinedNames(dotfiles)} not supported (dotfile).`);
       }
       if (extensionless.length > 0) {
-        toast.warning(
-          `${extensionless.length} extensionless file${extensionless.length === 1 ? '' : 's'} not supported (e.g. Makefile).`,
-        );
+        toast.warning(`${joinedNames(extensionless)} not supported (extensionless file).`);
       }
       if (other.length > 0) {
-        toast.warning(`${other.length} file${other.length === 1 ? '' : 's'} not supported.`);
+        toast.warning(`${joinedNames(other)} not supported.`);
       }
     }
   }, [enqueueAttachmentsForConversation, conversation.name, model]);

@@ -806,7 +806,7 @@ describe('ComposerFooter attachments', () => {
     fireEvent.change(input, { target: { files: [file] } });
 
     await waitFor(() => {
-      expect(mockToastWarning).toHaveBeenCalledWith('1 file not supported.');
+      expect(mockToastWarning).toHaveBeenCalledWith('app.exe not supported.');
     });
   });
 
@@ -822,7 +822,7 @@ describe('ComposerFooter attachments', () => {
     fireEvent.change(input, { target: { files: [file] } });
 
     await waitFor(() => {
-      expect(mockToastWarning).toHaveBeenCalledWith('1 dotfile not supported (e.g. .env).');
+      expect(mockToastWarning).toHaveBeenCalledWith('.env not supported (dotfile).');
     });
   });
 
@@ -838,7 +838,7 @@ describe('ComposerFooter attachments', () => {
     fireEvent.change(input, { target: { files: [file] } });
 
     await waitFor(() => {
-      expect(mockToastWarning).toHaveBeenCalledWith('1 extensionless file not supported (e.g. Makefile).');
+      expect(mockToastWarning).toHaveBeenCalledWith('Makefile not supported (extensionless file).');
     });
   });
 
@@ -854,7 +854,7 @@ describe('ComposerFooter attachments', () => {
     fireEvent.change(input, { target: { files: [file] } });
 
     await waitFor(() => {
-      expect(mockToastWarning).toHaveBeenCalledWith('1 dotfile not supported (e.g. .env).');
+      expect(mockToastWarning).toHaveBeenCalledWith('.env not supported (dotfile).');
     });
   });
 
@@ -870,7 +870,7 @@ describe('ComposerFooter attachments', () => {
     fireEvent.change(input, { target: { files: [file] } });
 
     await waitFor(() => {
-      expect(mockToastWarning).toHaveBeenCalledWith('1 extensionless file not supported (e.g. Makefile).');
+      expect(mockToastWarning).toHaveBeenCalledWith('Makefile not supported (extensionless file).');
     });
   });
 
