@@ -52,7 +52,7 @@ export interface WebhookPayload {
 }
 
 export function issueIdFromBranch(ref: string): string | null {
-  const match = ref.match(/(?:feature|strike)\/([a-z]+-\d+)$/i);
+  const match = ref.match(/(?:feature|strike|bypass)\/([a-z]+-\d+)$/i);
   return match ? match[1].toUpperCase() : null;
 }
 

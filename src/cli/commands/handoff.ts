@@ -139,6 +139,7 @@ export async function handoffCommand(
   console.log(chalk.gray(`  Session: ${newConv.tmuxSession}${newConv.sessionAlive ? ' (live)' : ''}`));
   console.log(chalk.gray(`  Model: ${newConv.model || 'default'}`));
   console.log(chalk.gray(`  Harness: ${newConv.harness || 'claude-code'}`));
+  console.log(chalk.gray(`  Issue: ${newConv.issueId ?? 'none'}${options.issue ? ' (from --issue)' : ''}`));
   if (newConv.handoffDocPath) {
     console.log(chalk.gray(`  Handoff doc: ${newConv.handoffDocPath}`));
   }
