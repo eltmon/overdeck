@@ -22,25 +22,150 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-13T07:59:54.033Z"
+    },
+    {
+      "timestamp": "2026-07-13T08:18:02.914Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T08:18:06.862Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T08:18:17.202Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T08:18:17.203Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T08:18:17.205Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T08:18:17.298Z"
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/dashboard/frontend/src/components/Stage/cockpit/StatusNarrative.tsx"
+    ],
+    "declaredScope": [
+      "docs/ASKUSERQUESTION-DASHBOARD.md",
+      "docs/MISSION-CONTROL.md",
+      "packages/contracts/src/types.ts",
+      "src/dashboard/frontend/src/components/Stage/cockpit/HappenedFeed.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/HappenedFeed.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/StatusNarrative.tsx",
+      "src/dashboard/server/routes/command-deck.ts",
+      "src/dashboard/server/routes/projects.ts",
+      "src/lib/agent-enrichment.ts",
+      "sync-sources/hooks/ask-user-question-hook*",
+      "tests/lib/agent-enrichment-pending-inputs.test.ts",
+      "tests/lib/auq-hook-detector-contract.test.ts",
+      "tests/unit/dashboard/server/routes/command-deck.test.ts",
+      "tests/unit/dashboard/server/routes/projects.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/ASKUSERQUESTION-DASHBOARD.md",
+      "docs/MISSION-CONTROL.md",
+      "packages/contracts/src/types.ts",
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
+      "src/dashboard/frontend/src/components/Stage/cockpit/HappenedFeed.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/HappenedFeed.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+      "src/dashboard/server/routes/command-deck.ts",
+      "src/dashboard/server/routes/projects.ts",
+      "src/lib/agent-enrichment.ts",
+      "sync-sources/hooks/ask-user-question-hook",
+      "tests/lib/agent-enrichment-pending-inputs.test.ts",
+      "tests/lib/auq-hook-detector-contract.test.ts",
+      "tests/unit/dashboard/server/routes/command-deck.test.ts",
+      "tests/unit/dashboard/server/routes/projects.test.ts"
+    ],
+    "recordedAt": "2026-07-13T08:17:44.938Z"
+  },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T08:06:21.147Z",
+  "updated": "2026-07-13T08:18:17.299Z",
   "pipeline": {
     "issueId": "PAN-2598",
-    "reviewStatus": "failed",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T08:03:51.798Z",
+    "updatedAt": "2026-07-13T08:18:04.308Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-2598-review already running. Use 'pan tell' to message it.",
     "inspectNotes": "Bead phase-banner-work-signal ack: workRunning now derives from activity.data.sections.some(type===work && status===running) (IssueMissionControl.tsx:828), verified via deriveNarrative precedence in StatusNarrative.tsx and existing+new tests covering all 3 ACs (planning-only session, live work session, beads-driven regression path); change is additive per NFR-1.",
-    "reviewRequestedAt": "2026-07-13T07:59:52.293Z",
-    "reviewSpawnedAt": "2026-07-13T07:59:53.031Z"
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2631",
+    "reviewRequestedAt": "2026-07-13T08:18:02.919Z",
+    "reviewSpawnedAt": "2026-07-13T08:18:04.307Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts"
+      ],
+      "declaredScopeUntouched": [
+        "src/dashboard/frontend/src/components/Stage/cockpit/StatusNarrative.tsx"
+      ],
+      "declaredScope": [
+        "docs/ASKUSERQUESTION-DASHBOARD.md",
+        "docs/MISSION-CONTROL.md",
+        "packages/contracts/src/types.ts",
+        "src/dashboard/frontend/src/components/Stage/cockpit/HappenedFeed.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/cockpit/HappenedFeed.tsx",
+        "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+        "src/dashboard/frontend/src/components/Stage/cockpit/StatusNarrative.tsx",
+        "src/dashboard/server/routes/command-deck.ts",
+        "src/dashboard/server/routes/projects.ts",
+        "src/lib/agent-enrichment.ts",
+        "sync-sources/hooks/ask-user-question-hook*",
+        "tests/lib/agent-enrichment-pending-inputs.test.ts",
+        "tests/lib/auq-hook-detector-contract.test.ts",
+        "tests/unit/dashboard/server/routes/command-deck.test.ts",
+        "tests/unit/dashboard/server/routes/projects.test.ts"
+      ],
+      "actualChangedFiles": [
+        "docs/ASKUSERQUESTION-DASHBOARD.md",
+        "docs/MISSION-CONTROL.md",
+        "packages/contracts/src/types.ts",
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
+        "src/dashboard/frontend/src/components/Stage/cockpit/HappenedFeed.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/cockpit/HappenedFeed.tsx",
+        "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+        "src/dashboard/server/routes/command-deck.ts",
+        "src/dashboard/server/routes/projects.ts",
+        "src/lib/agent-enrichment.ts",
+        "sync-sources/hooks/ask-user-question-hook",
+        "tests/lib/agent-enrichment-pending-inputs.test.ts",
+        "tests/lib/auq-hook-detector-contract.test.ts",
+        "tests/unit/dashboard/server/routes/command-deck.test.ts",
+        "tests/unit/dashboard/server/routes/projects.test.ts"
+      ],
+      "recordedAt": "2026-07-13T08:17:44.938Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -79,17 +204,17 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 52897,
-            "output": 29633,
-            "cacheRead": 7097065,
-            "cacheWrite": 343687
+            "input": 53046,
+            "output": 33115,
+            "cacheRead": 7379673,
+            "cacheWrite": 346536
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 2116125,
-            "output": 314190,
-            "cacheRead": 141256704,
+            "input": 2195388,
+            "output": 331034,
+            "cacheRead": 149274624,
             "cacheWrite": 0
           }
         }
@@ -114,24 +239,26 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 52897,
-          "output": 29633,
-          "cacheRead": 7097065,
-          "cacheWrite": 343687
+          "input": 53046,
+          "output": 33115,
+          "cacheRead": 7379673,
+          "cacheWrite": 346536
         },
         "custom/kimi-k2.7-code": {
-          "input": 2116125,
-          "output": 314190,
-          "cacheRead": 141256704,
+          "input": 2195388,
+          "output": 331034,
+          "cacheRead": 149274624,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 50.936758,
-        "pricingAsOf": "2026-07-13T08:03:52.267Z"
+        "usd": 52.701601,
+        "pricingAsOf": "2026-07-13T08:18:04.515Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2631"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
@@ -184,13 +311,6 @@
   },
   "swarm": {
     "slotAssignments": [
-      {
-        "slotIndex": 1,
-        "itemId": "activity-terminal-end-signal",
-        "agentId": "agent-pan-2598-slot-1",
-        "branch": "feature/pan-2598-slot-1",
-        "assignedAt": "2026-07-13T07:18:40.414Z"
-      },
       {
         "slotIndex": 2,
         "itemId": "phase-banner-work-signal",
