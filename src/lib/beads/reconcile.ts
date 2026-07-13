@@ -13,7 +13,7 @@ export type ReconcileRecord = Record<string, unknown> & { id: string };
 
 export interface ReconcileDifference {
   id: string;
-  classification: 'identical' | 'one-sided' | 'conflicting' | 'outside-export-scope';
+  classification: 'identical' | 'metadata-drift' | 'one-sided' | 'conflicting' | 'outside-export-scope';
   presentIn: ReconcileSourceName[];
 }
 
@@ -44,6 +44,11 @@ function mapRecords(records: ReconcileRecord[]): Map<string, ReconcileRecord> {
   return new Map(records.map((record) => [record.id, record]));
 }
 
+function withoutUpdatedAt(record: ReconcileRecord): ReconcileRecord {
+  const { updated_at: _updated_at, ...rest } = record;
+  return rest as ReconcileRecord;
+}
+
 function exportedByIssuesJsonl(record: ReconcileRecord): boolean {
   const kind = String(record.issue_type ?? record.type ?? 'issue').toLowerCase();
   return !['config', 'metadata', 'comment', 'dependency'].includes(kind);
@@ -57,11 +62,18 @@ export function compareBeadsSources(sources: Record<ReconcileSourceName, Reconci
     const presentIn = (Object.keys(maps) as ReconcileSourceName[]).filter((name) => maps[name].has(id));
     const values = presentIn.map((name) => stable(maps[name].get(id)));
     const localOrRemote = maps['local-dolt'].get(id) ?? maps['remote-dolt'].get(id);
+    const allValuesIdentical = new Set(values).size === 1;
+    const valuesWithoutUpdatedAt = presentIn.map((name) => stable(withoutUpdatedAt(maps[name].get(id)!)));
+    const onlyUpdatedAtDiffers = !allValuesIdentical && new Set(valuesWithoutUpdatedAt).size === 1;
     const classification = localOrRemote && !exportedByIssuesJsonl(localOrRemote) && !maps['state-jsonl'].has(id)
       ? 'outside-export-scope'
       : presentIn.length < 3
         ? 'one-sided'
-        : new Set(values).size === 1 ? 'identical' : 'conflicting';
+        : onlyUpdatedAtDiffers
+          ? 'metadata-drift'
+          : allValuesIdentical
+            ? 'identical'
+            : 'conflicting';
     return { id, classification, presentIn };
   });
   return {
@@ -90,9 +102,14 @@ function parseJsonl(raw: string): ReconcileRecord[] {
   return raw.split('\n').filter((line) => line.trim()).map((line) => JSON.parse(line) as ReconcileRecord).filter((record) => typeof record.id === 'string');
 }
 
-function reportMarkdown(options: ReconcileBeadsOptions, inventory: ReconcileInventory, heads: Record<'local' | 'remote', string>): string {
+export function reportMarkdown(options: ReconcileBeadsOptions, inventory: ReconcileInventory, heads: Record<'local' | 'remote', string>): string {
   const rows = inventory.differences.map((difference) => `| ${difference.id} | ${difference.classification} | ${difference.presentIn.join(', ')} |`).join('\n');
-  return `# Beads reconciliation report — ${options.projectKey}\n\nThis is a read-only no-loss audit. It does not choose a winner, import, push, or delete any source.\n\n## Heads\n\n- Local Dolt: ${heads.local || 'unknown'}\n- Isolated remote refs/dolt/data clone: ${heads.remote || 'unknown'}\n\n## Full inventory\n\n- Local records: ${inventory.counts['local-dolt']}\n- Remote records: ${inventory.counts['remote-dolt']}\n- Derived JSONL records: ${inventory.counts['state-jsonl']}\n- Columns observed: ${inventory.columns.join(', ')}\n\n| Record | Classification | Present in |\n| --- | --- | --- |\n${rows || '| — | identical | no records |'}\n`;
+  const classificationOrder: ReconcileDifference['classification'][] = ['identical', 'metadata-drift', 'conflicting', 'one-sided', 'outside-export-scope'];
+  const countsByClassification = classificationOrder.map((classification) => {
+    const count = inventory.differences.filter((difference) => difference.classification === classification).length;
+    return `- ${classification}: ${count}`;
+  }).join('\n');
+  return `# Beads reconciliation report — ${options.projectKey}\n\nThis is a read-only no-loss audit. It does not choose a winner, import, push, or delete any source.\n\n## Heads\n\n- Local Dolt: ${heads.local || 'unknown'}\n- Isolated remote refs/dolt/data clone: ${heads.remote || 'unknown'}\n\n## Summary by classification\n\n${countsByClassification}\n\n*metadata-drift* means the only differing field is \`updated_at\`. The v53 migration on 2026-07-12 bumped \`updated_at\` on every row, so these records are otherwise identical.\n\n## Full inventory\n\n- Local records: ${inventory.counts['local-dolt']}\n- Remote records: ${inventory.counts['remote-dolt']}\n- Derived JSONL records: ${inventory.counts['state-jsonl']}\n- Columns observed: ${inventory.columns.join(', ')}\n\n| Record | Classification | Present in |\n| --- | --- | --- |\n${rows || '| — | identical | no records |'}\n`;
 }
 
 /** Read-only, isolated three-source reconciliation. */
