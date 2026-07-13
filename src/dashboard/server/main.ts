@@ -390,10 +390,12 @@ setAgentStoppedNotifier((agentId) => {
         } as any);
         // PAN-1908: write-through projection — agents-row upsert + lifecycle
         // event append in one SQLite transaction.
+        // PAN-2633: heartbeat_dead means the deacon has determined the tmux
+        // session is gone, so assert hasLiveTmuxSession: false explicitly.
         saveAgentStateAndEmitEvent(state, {
           type: 'agent.status_changed',
           timestamp: new Date().toISOString(),
-          payload: buildAgentStatusChangedPayload(state),
+          payload: buildAgentStatusChangedPayload(state, undefined, false),
         });
         return;
       }

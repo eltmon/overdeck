@@ -270,12 +270,13 @@ function toAgentStatusPayload(status: AgentState['status'] | undefined): AgentSt
     : 'unknown';
 }
 
-function buildAgentControlEventPayload(state: AgentState, previousStatus?: AgentStatus) {
+function buildAgentControlEventPayload(state: AgentState, previousStatus: AgentStatus | undefined, hasLiveTmuxSession: boolean) {
   return {
     agentId: state.id,
     issueId: state.issueId,
     status: toAgentStatusPayload(state.status),
     previousStatus,
+    hasLiveTmuxSession,
     stoppedByUser: state.stoppedByUser === true,
     paused: state.paused === true,
     pausedReason: state.pausedReason ?? null,
