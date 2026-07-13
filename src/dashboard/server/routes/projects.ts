@@ -37,6 +37,7 @@ import { getReviewStatusSync } from '../review-status.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/index.js';
+import { isPlanningCompleteSync } from '../../../lib/vbrief/io.js';
 import { findSpecByIssueThroughOverdeck } from '../../../lib/overdeck/specs.js';
 import { getOverdeckHome } from '../../../lib/paths.js';
 
@@ -211,6 +212,14 @@ async function collectSessionTreeNodes(
   const sections: SessionNode[] = [];
   let hasPlanningSection = false;
 
+  // Resolve once per request: canonical spec exists and planning has finished.
+  let planningFinished = false;
+  try {
+    planningFinished = isPlanningCompleteSync(workspacePath);
+  } catch {
+    // ignore read/parse failures — treat as unfinished
+  }
+
   const candidateSessionIds = new Set<string>([planningAgentId, agentId, strikeAgentId, knowledgeAgentId]);
   const agentEntries = await readdir(agentsDir, { withFileTypes: true }).catch(() => []);
 
@@ -254,13 +263,24 @@ async function collectSessionTreeNodes(
           : null;
       const sessionWorkspacePath = getSessionTreeWorkspacePath(issueLower, workspacePath, projectPath, checkId);
       const jsonlPath = await resolveJsonlPath(checkId, sessionWorkspacePath);
+
+      // Terminal-end signal: endedAt is populated only when the session has
+      // actually ended. duration is preserved as elapsed seconds for existing UI.
+      const tmuxAlive = context.tmuxSessionNames.has(checkId);
+      const sessionEnded = rtState?.state === 'suspended'
+        || presence === 'ended'
+        || (!!state.stoppedAt && !tmuxAlive);
+      const endedAt = sessionEnded
+        ? (state.stoppedAt || state.lastActivity || state.startedAt)
+        : undefined;
+
       sections.push({
         type: sectionType,
         sessionId: checkId,
         tmuxSession: sectionType === 'work' || sectionType === 'planning' || sectionType === 'strike' || sectionType === 'knowledge' ? checkId : undefined,
         model: state.model || 'unknown',
         startedAt: state.startedAt || new Date().toISOString(),
-        endedAt: undefined,
+        endedAt,
         duration: state.startedAt
           ? (() => {
               const ms = Date.now() - new Date(state.startedAt).getTime();
@@ -281,6 +301,7 @@ async function collectSessionTreeNodes(
         hasJsonl: !!jsonlPath,
         harness: state.harness,
         deliveryMethod: state.deliveryMethod,
+        planningComplete: isPlanning ? planningFinished : undefined,
         ...await readSessionGateFields(checkId, state),
       });
     } catch {

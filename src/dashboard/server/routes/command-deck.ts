@@ -64,7 +64,7 @@ import { httpHandler } from './http-handler.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
-import { readWorkspacePlan } from '../../../lib/vbrief/io.js';
+import { isPlanningCompleteSync, readWorkspacePlan } from '../../../lib/vbrief/io.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -267,11 +267,21 @@ export async function fetchActivityDataWithContext(
     hasJsonl?: boolean;
     roundMetadata?: ReviewerRoundMetadata;
     modelOrigin?: ModelOriginData;
+    planningComplete?: boolean;
   }> = [];
 
   // Shared workspace path for JSONL resolution (PAN-821)
   const projectPath = getProjectPath(issuePrefix);
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+
+  // Resolve once per request: canonical spec exists and planning has finished.
+  const planningFinished = (() => {
+    try {
+      return isPlanningCompleteSync(workspacePath);
+    } catch {
+      return false;
+    }
+  })();
 
   const agentId = `agent-${issueLower}`;
   const planningAgentId = `planning-${issueLower}`;
@@ -332,11 +342,22 @@ export async function fetchActivityDataWithContext(
       // Only expose interactive terminal for work/planning sessions (PAN-821 review)
       const exposeInteractiveTerminal = sectionType === 'work' || sectionType === 'planning';
 
+      // Terminal-end signal: endedAt is populated only when the session has
+      // actually ended. duration is preserved as elapsed seconds for existing UI.
+      const tmuxAlive = tmuxSessionNames.has(checkId);
+      const sessionEnded = rtState?.state === 'suspended'
+        || presence === 'ended'
+        || (!!state.stoppedAt && !tmuxAlive);
+      const endedAt = sessionEnded
+        ? (state.stoppedAt || state.lastActivity || state.startedAt)
+        : undefined;
+
       sections.push({
         type: sectionType,
         sessionId: checkId,
         model: state.model || 'unknown',
         startedAt: state.startedAt || new Date().toISOString(),
+        endedAt,
         duration: state.startedAt ? (() => {
           const ms = Date.now() - new Date(state.startedAt).getTime();
           return Number.isNaN(ms) ? null : Math.floor(ms / 1000);
@@ -356,6 +377,7 @@ export async function fetchActivityDataWithContext(
         hasJsonl: !!jsonlPath,
         harness: state.harness,
         tmuxSession: exposeInteractiveTerminal ? checkId : undefined,
+        planningComplete: sectionType === 'planning' ? planningFinished : undefined,
       });
     } catch { /* skip malformed state */ }
   }
