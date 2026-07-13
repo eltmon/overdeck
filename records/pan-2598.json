@@ -113,6 +113,8 @@
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
+      "src/cli/commands/__tests__/agent-targeting.test.ts",
+      "src/cli/commands/__tests__/start-plan-routing.test.ts",
       "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
       "src/lib/channels/__tests__/overdeck-bridge.test.ts"
     ],
@@ -142,6 +144,8 @@
       "docs/MISSION-CONTROL.md",
       "packages/contracts/src/types.ts",
       "scripts/file-size-baseline.txt",
+      "src/cli/commands/__tests__/agent-targeting.test.ts",
+      "src/cli/commands/__tests__/start-plan-routing.test.ts",
       "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
       "src/dashboard/frontend/src/components/Stage/cockpit/HappenedFeed.test.tsx",
       "src/dashboard/frontend/src/components/Stage/cockpit/HappenedFeed.tsx",
@@ -157,10 +161,10 @@
       "tests/unit/dashboard/server/routes/command-deck.test.ts",
       "tests/unit/dashboard/server/routes/projects.test.ts"
     ],
-    "recordedAt": "2026-07-13T08:53:00.165Z"
+    "recordedAt": "2026-07-13T09:23:13.508Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T09:10:21.446Z",
+  "updated": "2026-07-13T09:23:13.510Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "failed",
