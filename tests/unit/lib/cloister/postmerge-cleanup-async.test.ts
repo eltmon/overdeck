@@ -24,6 +24,7 @@ const mockRunRelease = vi.hoisted(() =>
 
 // ── Track cleanup side effects ────────────────────────────────────────────────
 const mockCompactBeads = vi.hoisted(() => vi.fn(() => Effect.succeed({ success: true, skipped: false, details: ['compacted'] })));
+const mockSweepOrphanedBeads = vi.hoisted(() => vi.fn().mockResolvedValue({ ok: true, closedIds: [], skipped: 0 }));
 const mockCleanupMergedLabels = vi.hoisted(() => vi.fn(() => Effect.succeed({ success: true, skipped: true, details: ['skipped'] })));
 const mockSetAgentPaused = vi.hoisted(() => vi.fn(() => Effect.succeed(null)));
 const mockCreateResetMarker = vi.hoisted(() => vi.fn(async (input: unknown) => ({ id: 'reset-1', ...(input as Record<string, unknown>) })));
@@ -169,6 +170,10 @@ vi.mock('../../../../src/lib/lifecycle/compact-beads.js', () => ({
   compactBeads: mockCompactBeads,
 }));
 
+vi.mock('../../../../src/lib/lifecycle/orphaned-beads-sweep.js', () => ({
+  sweepOrphanedBeads: mockSweepOrphanedBeads,
+}));
+
 vi.mock('../../../../src/lib/lifecycle/label-cleanup.js', () => ({
   cleanupMergedLabels: mockCleanupMergedLabels,
 }));
@@ -230,6 +235,11 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
 
     // Cleanup must have proceeded before release resolves.
     expect(mockCompactBeads).toHaveBeenCalled();
+    expect(mockSweepOrphanedBeads).toHaveBeenCalledWith({
+      beadsCwd: PROJECT_PATH,
+      issueId: ISSUE_ID,
+      reason: 'issue merged; remaining open beads swept',
+    });
     expect(mockSetAgentPaused).toHaveBeenCalled();
     expect(mockCreateResetMarker).toHaveBeenCalled();
 
