@@ -21,18 +21,18 @@
   ],
   "feedback": [],
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T06:12:57.569Z",
+  "updated": "2026-07-13T06:13:10.077Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T06:12:57.469Z",
-    "inspectNotes": "Inspecting bead activity-terminal-end-signal"
+    "updatedAt": "2026-07-13T06:13:09.557Z",
+    "inspectNotes": "Bead activity-terminal-end-signal ack: duration regression assertions added to all three command-deck.test.ts tests, closing the AC4 gap from the prior BLOCKED verdict; both route test files now assert duration is preserved alongside endedAt/planningComplete. AC1-AC4 all satisfied."
   },
   "closeOut": {
     "usage": {
@@ -106,7 +106,7 @@
       },
       "costAtCloseOut": {
         "usd": 24.973641,
-        "pricingAsOf": "2026-07-13T06:12:57.562Z"
+        "pricingAsOf": "2026-07-13T06:13:09.905Z"
       }
     },
     "merges": [],
