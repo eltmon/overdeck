@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-13T19:16:44.264Z",
+  "updated": "2026-07-13T19:36:50.070Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -81,13 +81,14 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "model": "glm-5.2",
   "statusOverrides": {
     "no-loss-manifest": "completed",
     "issue-view-model": "running",
     "no-loss-manifest.no-loss-manifest.ac1": "completed",
     "no-loss-manifest.no-loss-manifest.ac2": "completed",
-    "no-loss-manifest.no-loss-manifest.ac3": "completed"
+    "no-loss-manifest.no-loss-manifest.ac3": "completed",
+    "clear-gates-server": "running"
   },
   "swarm": {
     "slotAssignments": [
@@ -97,6 +98,13 @@
         "agentId": "agent-pan-2499-slot-2",
         "branch": "feature/pan-2499-slot-2",
         "assignedAt": "2026-07-13T15:10:25.079Z"
+      },
+      {
+        "slotIndex": 3,
+        "itemId": "clear-gates-server",
+        "agentId": "agent-pan-2499-slot-3",
+        "branch": "feature/pan-2499-slot-3",
+        "assignedAt": "2026-07-13T19:36:49.334Z"
       }
     ],
     "slotCompletions": {
