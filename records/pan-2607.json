@@ -11,16 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-12T22:33:36.700Z",
-  "updated": "2026-07-13T10:24:44.846Z",
+  "updated": "2026-07-13T10:26:25.834Z",
   "pipeline": {
     "issueId": "PAN-2607",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T09:34:59.253Z"
+    "updatedAt": "2026-07-13T10:26:24.599Z",
+    "inspectNotes": "Bead comparator-metadata-drift ack: compareBeadsSources now classifies updated_at-only diffs as metadata-drift (without masking real field conflicts), and reportMarkdown emits a Summary by classification section ahead of the preserved full inventory table; verified via direct test run (4/4 pass)."
   },
   "closeOut": {
     "usage": {
@@ -32,6 +34,22 @@
             "cacheRead": 29318972,
             "cacheWrite": 1079410
           }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 14217,
+            "output": 5933,
+            "cacheRead": 351857,
+            "cacheWrite": 91870
+          }
+        },
+        "work": {
+          "custom/kimi-k2.7-code": {
+            "input": 419880,
+            "output": 21128,
+            "cacheRead": 6522368,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
@@ -40,18 +58,30 @@
           "output": 113937,
           "cacheRead": 29318972,
           "cacheWrite": 1079410
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 14217,
+          "output": 5933,
+          "cacheRead": 351857,
+          "cacheWrite": 91870
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 419880,
+          "output": 21128,
+          "cacheRead": 6522368,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 48.78624,
-        "pricingAsOf": "2026-07-13T09:34:59.350Z"
+        "usd": 50.896698,
+        "pricingAsOf": "2026-07-13T10:26:24.844Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "comparator-metadata-drift": "completed",
     "comparator-metadata-drift.comparator-metadata-drift.ac1": "completed",
