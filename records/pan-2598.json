@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T06:56:16.144Z",
+  "updated": "2026-07-13T07:18:41.270Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "pending",
@@ -113,5 +113,19 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5"
+  "model": "kimi-k2.7-code",
+  "statusOverrides": {
+    "activity-terminal-end-signal": "running"
+  },
+  "swarm": {
+    "slotAssignments": [
+      {
+        "slotIndex": 1,
+        "itemId": "activity-terminal-end-signal",
+        "agentId": "agent-pan-2598-slot-1",
+        "branch": "feature/pan-2598-slot-1",
+        "assignedAt": "2026-07-13T07:18:40.414Z"
+      }
+    ]
+  }
 }
