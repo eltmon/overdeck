@@ -36,8 +36,17 @@ export function UpdateDialog({ isOpen, runningAgentCount, onClose }: UpdateDialo
 
   useEffect(() => {
     if (!isOpen) return;
-    void check();
-  }, [check, isOpen]);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const initial = bridge ? await bridge.getUpdateStatus() : await requestSnapshot('/api/update/status', 'GET');
+        if (!cancelled) setSnapshot(initial);
+      } finally {
+        if (!cancelled) void check();
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [bridge, check, isOpen]);
 
   useEffect(() => {
     if (!bridge) return;
@@ -131,7 +140,7 @@ export function UpdateDialog({ isOpen, runningAgentCount, onClose }: UpdateDialo
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 rounded-xl border border-border bg-background/50 p-4">
             <div><div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Installed</div><div className="mt-1 font-mono text-sm text-foreground">v{snapshot?.currentVersion ?? '…'}</div></div>
             <ArrowUpRight className="h-4 w-4 text-primary" />
-            <div><div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Latest</div><div className="mt-1 font-mono text-sm text-foreground">v{snapshot?.targetVersion ?? 'Checking…'}</div></div>
+            <div><div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Latest</div><div className="mt-1 font-mono text-sm text-foreground">{snapshot?.targetVersion ? `v${snapshot.targetVersion}` : 'Checking…'}</div></div>
           </div>
 
           {(phase === 'checking' || phase === 'downloading' || phase === 'installing') && (

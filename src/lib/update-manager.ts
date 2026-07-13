@@ -93,8 +93,8 @@ export class UpdateManager {
     this.snapshot = { ...this.snapshot, phase: 'checking', error: null };
     try {
       const [tagsResponse, releasesResponse] = await Promise.all([
-        this.fetchImpl(NPM_DIST_TAGS_URL, { headers: { accept: 'application/json' } }),
-        this.fetchImpl(GITHUB_RELEASES_URL, { headers: { accept: 'application/vnd.github+json' } }),
+        this.fetchImpl(NPM_DIST_TAGS_URL, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(10_000) }),
+        this.fetchImpl(GITHUB_RELEASES_URL, { headers: { accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(10_000) }),
       ]);
       if (!tagsResponse.ok) throw new Error(`npm registry returned ${tagsResponse.status}`);
       if (!releasesResponse.ok) throw new Error(`GitHub Releases returned ${releasesResponse.status}`);

@@ -64,7 +64,7 @@ function manifestName(): string {
 }
 
 async function configureExactReleaseFeed(): Promise<void> {
-  const response = await fetch(RELEASES_URL, { headers: { accept: 'application/vnd.github+json' } });
+  const response = await fetch(RELEASES_URL, { headers: { accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(10_000) });
   if (!response.ok) throw new Error(`GitHub Releases returned ${response.status}`);
   const releases = await response.json() as Array<{
     tag_name: string;
@@ -80,7 +80,7 @@ async function configureExactReleaseFeed(): Promise<void> {
   const manifest = release.assets?.find((asset) => asset.name === manifestName());
   if (!manifest) throw new Error(`${release.tag_name} is missing ${manifestName()}`);
 
-  const manifestResponse = await fetch(manifest.browser_download_url);
+  const manifestResponse = await fetch(manifest.browser_download_url, { signal: AbortSignal.timeout(10_000) });
   if (!manifestResponse.ok) throw new Error(`Update manifest returned ${manifestResponse.status}`);
   const manifestText = await manifestResponse.text();
   const dashboardProtocol = Number(manifestText.match(/^overdeckDashboardProtocol:\s*(\d+)/m)?.[1]) || null;
