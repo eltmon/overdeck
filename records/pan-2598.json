@@ -157,6 +157,11 @@
       "reason": "resume",
       "agentModel": "kimi-k2.7-code",
       "timestamp": "2026-07-13T10:41:34.889Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T10:56:02.382Z"
     }
   ],
   "feedback": [],
@@ -165,6 +170,7 @@
       "scripts/file-size-baseline.txt",
       "src/cli/commands/__tests__/agent-targeting.test.ts",
       "src/cli/commands/__tests__/start-plan-routing.test.ts",
+      "src/dashboard/frontend/src/App.test.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
       "src/dashboard/server/routes/__tests__/hooks-turn-complete.test.ts",
       "src/dashboard/server/services/__tests__/conversation-compaction.test.ts",
@@ -202,6 +208,7 @@
       "scripts/file-size-baseline.txt",
       "src/cli/commands/__tests__/agent-targeting.test.ts",
       "src/cli/commands/__tests__/start-plan-routing.test.ts",
+      "src/dashboard/frontend/src/App.test.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
       "src/dashboard/frontend/src/components/Stage/cockpit/HappenedFeed.test.tsx",
       "src/dashboard/frontend/src/components/Stage/cockpit/HappenedFeed.tsx",
@@ -223,10 +230,10 @@
       "tests/unit/dashboard/server/routes/projects.test.ts",
       "tests/unit/lib/cloister/feedback-target.test.ts"
     ],
-    "recordedAt": "2026-07-13T10:12:32.889Z"
+    "recordedAt": "2026-07-13T10:56:03.885Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T10:56:00.224Z",
+  "updated": "2026-07-13T10:56:03.886Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "reviewing",
@@ -404,8 +411,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "activity-terminal-end-signal": "completed",
     "activity-terminal-end-signal.activity-terminal-end-signal.ac1": "completed",
