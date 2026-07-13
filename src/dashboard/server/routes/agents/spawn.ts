@@ -7,11 +7,19 @@ import { dirname, join } from 'node:path';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { saveAgentStateSync, determineModel, getProviderAuthMode, getAgentState } from '../../../../lib/agents.js';
+import {
+  saveAgentStateSync,
+  determineModel,
+  getProviderAuthMode,
+  getAgentState,
+  clearAgentPaused,
+  clearAgentTroubled,
+} from '../../../../lib/agents.js';
 import { buildChildEnvWithoutTmuxSync } from '../../../../lib/child-env.js';
 import { checkCodexAuthStatus } from '../../../../lib/codex-auth.js';
 import { canUseHarnessSync } from '../../../../lib/harness-policy.js';
 import { emitActivityEntrySync } from '../../../../lib/activity-logger.js';
+import { appendOperatorInterventionEvent } from '../../../../lib/operator-interventions.js';
 import { extractPrefixSync, parseIssueIdSync } from '../../../../lib/issue-id.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../../lib/pan-dir/types.js';
 import { loadWorkspaceMetadataSync as loadWorkspaceMetadataFn } from '../../../../lib/remote/workspace-metadata.js';
@@ -49,6 +57,7 @@ import {
   readJsonBody,
   spawnPanCommandDetached,
   updateRegistryForAgentStart,
+  type AgentStartGateDecision,
 } from './shared.js';
 import {
   handleContainerOrchestration,
@@ -118,6 +127,71 @@ export const countBeadsForIssue = (
       },
     }),
   );
+
+// ─── Start-agent gate resolution (PAN-2499) ───────────────────────────────────
+
+/**
+ * Evaluate the persistent start gate for an agent and, if the request is
+ * operator-origin and `clearGates` is set, clear the paused/troubled gates
+ * through the same write paths used by `pan unpause` and `pan untroubled`.
+ *
+ * Returns the gate decision when the agent is still blocked, or `null` when
+ * the agent may proceed. Emits `operator.intervention` events when a gate is
+ * actually cleared.
+ */
+export function resolveStartAgentGateForRoute(input: {
+  agentSessionName: string;
+  issueId: string;
+  clearGates: boolean;
+  originOk: boolean;
+}): Effect.Effect<AgentStartGateDecision | null, never> {
+  let gate: AgentStartGateDecision | null = null;
+
+  return Effect.gen(function* () {
+    const state = yield* getAgentState(input.agentSessionName);
+    gate = evaluateAgentStartGate(input.agentSessionName, state);
+    if (!gate) return null;
+
+    const shouldClear = input.originOk && input.clearGates;
+    if (!shouldClear) return gate;
+    if (!state) return gate;
+
+    let cleared = false;
+    if (state.paused === true) {
+      yield* clearAgentPaused(input.agentSessionName);
+      yield* Effect.promise(() =>
+        appendOperatorInterventionEvent({
+          issueId: input.issueId,
+          kind: 'unpause',
+          source: 'dashboard start-agent',
+        }),
+      );
+      cleared = true;
+    }
+
+    if (state.troubled === true || (state.consecutiveFailures ?? 0) > 0) {
+      yield* clearAgentTroubled(input.agentSessionName);
+      yield* Effect.promise(() =>
+        appendOperatorInterventionEvent({
+          issueId: input.issueId,
+          kind: 'untroubled',
+          source: 'dashboard start-agent',
+        }),
+      );
+      cleared = true;
+    }
+
+    if (!cleared) return gate;
+
+    gate = evaluateAgentStartGate(input.agentSessionName, yield* getAgentState(input.agentSessionName));
+    return gate;
+  }).pipe(
+    Effect.catch((err) => {
+      console.error(`[start-agent] Failed to clear gates for ${input.issueId}: ${err instanceof Error ? err.message : String(err)}`);
+      return Effect.succeed(gate);
+    }),
+  );
+}
 
 // ─── Route: POST /api/agents (start agent) ───────────────────────────────────
 
@@ -210,7 +284,13 @@ export const postAgentsRoute = HttpRouter.add(
 
     const issueLower = parsedIssueId.normalized;
     const agentSessionName = `agent-${issueLower}`;
-    const startGateBlock = evaluateAgentStartGate(agentSessionName, yield* getAgentState(agentSessionName));
+    const clearGates = originCheck.ok && (body as any).clearGates === true;
+    const startGateBlock = yield* resolveStartAgentGateForRoute({
+      agentSessionName,
+      issueId,
+      clearGates,
+      originOk: originCheck.ok,
+    });
     if (startGateBlock) {
       yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_blocked_gate', {
         issueId,
