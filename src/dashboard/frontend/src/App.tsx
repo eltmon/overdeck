@@ -5,6 +5,7 @@ import { ConfirmationDialog } from './components/ConfirmationDialog';
 import { EmergencyStopOverlay } from './components/EmergencyStopOverlay';
 import { ChannelPermissionDialog } from './components/ChannelPermissionDialog';
 import { AskUserQuestionDialog } from './components/AskUserQuestionDialog';
+import { PlanApprovalDialog } from './components/PlanApprovalDialog';
 import { EventRouter } from './components/EventRouter';
 import { SearchModal } from './components/search/SearchModal';
 import { CommandPalette, type ConversationPaletteOpenRequest } from './components/CommandPalette';
@@ -508,6 +509,11 @@ export default function App() {
     isAskUserQuestionSubmitting,
     handleSubmitAskUserQuestion,
     handleDismissAskUserQuestion,
+    currentPlanApprovalSubject,
+    isPlanActionSubmitting,
+    handleApprovePlan,
+    handleRequestPlanChanges,
+    handleDismissPlanApproval,
     currentConfirmation,
     handleConfirm,
     handleDeny,
@@ -753,6 +759,17 @@ export default function App() {
         isSubmitting={isAskUserQuestionSubmitting}
         onSubmit={handleSubmitAskUserQuestion}
         onDismiss={handleDismissAskUserQuestion}
+      />
+
+      {/* PAN-1520 (FR-3) — plan-approval popup modal. Priority: permission
+          modal > AUQ dialog > plan dialog (extends the existing exclusion). */}
+      <PlanApprovalDialog
+        subject={currentPlanApprovalSubject}
+        isOpen={!!currentPlanApprovalSubject && !currentChannelPermissionRequest && !currentAskUserQuestionSubject}
+        isSubmitting={isPlanActionSubmitting}
+        onApprove={handleApprovePlan}
+        onRequestChanges={handleRequestPlanChanges}
+        onDismiss={handleDismissPlanApproval}
       />
 
       {/* Confirmation Dialog */}

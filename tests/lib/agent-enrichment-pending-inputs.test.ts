@@ -16,7 +16,7 @@ import { Effect } from 'effect'
 import { mkdtempSync, writeFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
-import { getPendingQuestions } from '../../src/lib/agent-enrichment.js'
+import { getPendingQuestions, scanPendingInputsPromise } from '../../src/lib/agent-enrichment.js'
 
 let testDir: string
 
@@ -207,5 +207,68 @@ describe('agent-enrichment scan — plan mode + missing files', () => {
     ].join('\n'), 'utf-8')
     const result = await Effect.runPromise(getPendingQuestions(path))
     expect(result).toHaveLength(1)
+  })
+})
+
+describe('scanPendingInputsPromise — pendingProposedPlan payload (PAN-1520 FR-1)', () => {
+  function exitPlanToolUse(id: string, plan?: string): unknown {
+    return {
+      type: 'tool_use',
+      id,
+      name: 'ExitPlanMode',
+      input: plan === undefined ? {} : { plan },
+    }
+  }
+
+  it('carries the plan markdown for an unanswered ExitPlanMode', async () => {
+    const path = writeJsonlSession('plan.jsonl', [
+      {
+        timestamp: '2026-07-13T01:00:00Z',
+        message: { content: [exitPlanToolUse('ep1', '## The Plan\n\n1. Do the thing')] },
+      },
+    ])
+    const scan = await scanPendingInputsPromise(path)
+    expect(scan.exitPlanModePending).toBe(true)
+    expect(scan.pendingProposedPlan).toEqual({
+      toolUseId: 'ep1',
+      askedAt: '2026-07-13T01:00:00Z',
+      plan: '## The Plan\n\n1. Do the thing',
+    })
+  })
+
+  it('clears the payload once the ExitPlanMode is answered', async () => {
+    const path = writeJsonlSession('plan.jsonl', [
+      {
+        timestamp: '2026-07-13T01:00:00Z',
+        message: { content: [exitPlanToolUse('ep1', 'plan text')] },
+      },
+      {
+        timestamp: '2026-07-13T01:00:10Z',
+        message: { content: [toolResult('ep1', { content: 'approved' })] },
+      },
+    ])
+    const scan = await scanPendingInputsPromise(path)
+    expect(scan.exitPlanModePending).toBe(false)
+    expect(scan.pendingProposedPlan).toBeUndefined()
+  })
+
+  it('still reports exitPlanModePending without a payload when input.plan is absent', async () => {
+    const path = writeJsonlSession('plan.jsonl', [
+      { timestamp: '2026-07-13T01:00:00Z', message: { content: [exitPlanToolUse('ep1')] } },
+    ])
+    const scan = await scanPendingInputsPromise(path)
+    expect(scan.exitPlanModePending).toBe(true)
+    expect(scan.pendingProposedPlan).toBeUndefined()
+  })
+
+  it('targets the payload at the UNANSWERED ExitPlanMode when several exist', async () => {
+    const path = writeJsonlSession('plan.jsonl', [
+      { timestamp: '2026-07-13T01:00:00Z', message: { content: [exitPlanToolUse('ep1', 'first plan')] } },
+      { timestamp: '2026-07-13T01:00:10Z', message: { content: [toolResult('ep1', { content: 'rejected' })] } },
+      { timestamp: '2026-07-13T02:00:00Z', message: { content: [exitPlanToolUse('ep2', 'revised plan')] } },
+    ])
+    const scan = await scanPendingInputsPromise(path)
+    expect(scan.pendingProposedPlan?.toolUseId).toBe('ep2')
+    expect(scan.pendingProposedPlan?.plan).toBe('revised plan')
   })
 })

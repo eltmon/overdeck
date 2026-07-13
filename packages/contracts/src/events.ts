@@ -203,6 +203,12 @@ export const AgentEnrichmentChangedEvent = Schema.Struct({
         })),
       })),
     })),
+    // PAN-1520 (FR-1) — pending ExitPlanMode plan payload for the approval modal.
+    pendingProposedPlan: Schema.optional(Schema.Struct({
+      toolUseId: Schema.String,
+      askedAt: Schema.String,
+      plan: Schema.String,
+    })),
     resolution: Schema.optional(AgentResolution),
     resolutionCount: Schema.optional(Schema.Number),
   }),

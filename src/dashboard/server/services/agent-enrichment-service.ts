@@ -51,6 +51,7 @@ function enrichmentChanged(prev: AgentEnrichment | undefined, next: AgentEnrichm
     prev.pendingInputCount !== next.pendingInputCount ||
     prev.pendingInputKinds.join(',') !== next.pendingInputKinds.join(',') ||
     prev.pendingAskUserQuestion?.toolUseId !== next.pendingAskUserQuestion?.toolUseId ||
+    prev.pendingProposedPlan?.toolUseId !== next.pendingProposedPlan?.toolUseId ||
     prev.resolution !== next.resolution ||
     prev.resolutionCount !== next.resolutionCount
   )
@@ -223,6 +224,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
           pendingInputCount: enrichment.pendingInputCount,
           pendingInputKinds: enrichment.pendingInputKinds,
           pendingAskUserQuestion: enrichment.pendingAskUserQuestion,
+          pendingProposedPlan: enrichment.pendingProposedPlan,
           resolution: enrichment.resolution as AgentEnrichmentChangedEvent['payload']['resolution'],
           resolutionCount: enrichment.resolutionCount,
         },

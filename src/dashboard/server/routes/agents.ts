@@ -28,6 +28,7 @@ import {
 import {
   getAgentPendingQuestionsRoute,
   postAgentAnswerQuestionRoute,
+  postAgentPlanActionRoute,
   postInternalAgentPermissionRequestRoute,
   postAgentPermissionResponseRoute,
 } from './agents/permissions.js';
@@ -103,6 +104,7 @@ export const agentsRouteLayer = Layer.mergeAll(
   postAgentPokeRoute,
   getAgentPendingQuestionsRoute,
   postAgentAnswerQuestionRoute,
+  postAgentPlanActionRoute,
   postAgentHeartbeatRoute,
   postAgentWorkCompleteRoute,
   postAgentStuckRoute,

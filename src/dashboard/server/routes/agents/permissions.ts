@@ -7,6 +7,8 @@ import {
   getAgentRuntimeState,
   getAgentState,
 } from '../../../../lib/agents.js';
+import { getAgentJsonlPath, scanPendingInputsPromise } from '../../../../lib/agent-enrichment.js';
+import { deliverPlanActionToSession } from '../../../../lib/overdeck/conversation-delivery.js';
 import { emitActivityEntrySync } from '../../../../lib/activity-logger.js';
 import { ReadModelService } from '../../read-model.js';
 import { EventStoreService } from '../../services/domain-services.js';
@@ -88,6 +90,57 @@ export const postAgentAnswerQuestionRoute = HttpRouter.add(
 
     yield* Effect.promise(() => deliverAgentMessage(id, message, 'ask-user-question-answer'));
     return jsonResponse({ success: true, agentId: id, delivered: answers.length });
+  })),
+);
+
+// ─── Route: POST /api/agents/:id/plan-action (PAN-1520 FR-4) ─────────────────
+//
+// Agent-scoped mirror of POST /api/conversations/:name/plan-action. The native
+// ExitPlanMode approval menu is answered with raw keystrokes (1/2/3/4), not a
+// text message, so the conversation delivery door can't serve it — and the
+// existing route is conversation-name-scoped. Guarded on the agent actually
+// having a pending ExitPlanMode so a stale dashboard click can never inject
+// keystrokes into a session that has already moved on.
+//
+// Body: { action: 'approve-auto' | 'approve-manual' | 'reject-ultraplan' | 'reject-feedback', feedback?: string }
+
+export const postAgentPlanActionRoute = HttpRouter.add(
+  'POST',
+  '/api/agents/:id/plan-action',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    if (!id.trim()) {
+      return jsonResponse({ error: 'missing agent id' }, { status: 400 });
+    }
+    const body = (yield* readJsonBody) as Record<string, unknown>;
+    const action = typeof body['action'] === 'string' ? body['action'] : '';
+    const feedback = typeof body['feedback'] === 'string' ? body['feedback'].trim() : '';
+
+    const agentState = yield* getAgentState(id).pipe(Effect.catch(() => Effect.succeed(null)));
+    if (!agentState) {
+      return jsonResponse({ error: 'Agent not found' }, { status: 404 });
+    }
+
+    const jsonlPath = yield* getAgentJsonlPath(id).pipe(Effect.catch(() => Effect.succeed(null)));
+    const scan = jsonlPath
+      ? yield* Effect.promise(() => scanPendingInputsPromise(jsonlPath))
+      : null;
+    if (!scan?.exitPlanModePending) {
+      return jsonResponse({ error: 'No pending plan approval for this agent' }, { status: 409 });
+    }
+
+    const error = yield* Effect.promise(() => deliverPlanActionToSession(id, action, feedback));
+    if (error) {
+      return jsonResponse({ error }, { status: 400 });
+    }
+    emitActivityEntrySync({
+      source: 'dashboard',
+      level: 'info',
+      issueId: agentState.issueId,
+      message: `Operator ${action.startsWith('approve') ? 'approved' : 'requested changes to'} ${id}'s plan from the dashboard`,
+    });
+    return jsonResponse({ success: true, agentId: id, action });
   })),
 );
 

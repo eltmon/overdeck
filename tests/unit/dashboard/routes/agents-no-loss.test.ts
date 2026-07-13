@@ -20,6 +20,7 @@ const EXPECTED_AGENT_ROUTE_LAYERS = [
   'postAgentPokeRoute',
   'getAgentPendingQuestionsRoute',
   'postAgentAnswerQuestionRoute',
+  'postAgentPlanActionRoute',
   'postAgentHeartbeatRoute',
   'postAgentWorkCompleteRoute',
   'postAgentStuckRoute',
@@ -93,7 +94,7 @@ describe('PAN-2147 agents route barrel no-loss audit', () => {
     const liveLayers = enumerateMergeAllLayers(readAgentsRoute());
 
     expect(liveLayers).toEqual(EXPECTED_AGENT_ROUTE_LAYERS);
-    expect(liveLayers).toHaveLength(43);
+    expect(liveLayers).toHaveLength(44);
   });
 
   it('keeps routes/agents.ts as a thin barrel with no handler bodies', () => {

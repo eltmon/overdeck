@@ -139,6 +139,12 @@ export interface Agent {
       options: ReadonlyArray<{ label: string; description?: string }>;
     }>;
   };
+  // PAN-1520 (FR-1) — pending ExitPlanMode plan payload for the approval modal.
+  pendingProposedPlan?: {
+    toolUseId: string;
+    askedAt: string;
+    plan: string;
+  };
   resolution?: AgentResolution;  // Lifecycle completion signal (PAN-309)
   resolutionCount?: number;      // How many times this resolution was set
   runtimeState?: string;         // 'completed' when agent finished normally (not session lost)
