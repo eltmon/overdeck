@@ -8,6 +8,7 @@ import { Effect } from 'effect';
 import { HttpServerResponse } from 'effect/unstable/http';
 
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
+import { parseIssueIdSync } from '../issue-id.js';
 import {
   createConversation,
   getConversationByName,
@@ -174,6 +175,7 @@ export function buildForkRequest(params: ForkRequest): ForkRequest {
     parentConversationName: params.parentConversationName,
     sessionId: params.sessionId,
     forkMode: params.forkMode,
+    ...(params.issueId !== undefined ? { issueId: params.issueId } : {}),
     ...(params.summaryModel !== undefined ? { summaryModel: params.summaryModel } : {}),
     localSummaryOnly: params.localSummaryOnly,
     ...(params.includeThinkingInSummary !== undefined ? { includeThinkingInSummary: params.includeThinkingInSummary } : {}),
@@ -634,6 +636,14 @@ export async function handleConversationSummaryFork(
       return jsonResponse({ error: focusResult.error }, { status: 400 });
     }
     const handoffFocus = focusResult.focus;
+    const requestedIssueId = body['issueId'];
+    let explicitIssueId: string | undefined;
+    if (requestedIssueId !== undefined) {
+      if (typeof requestedIssueId !== 'string' || !parseIssueIdSync(requestedIssueId.trim())) {
+        return jsonResponse({ error: 'Invalid issueId' }, { status: 400 });
+      }
+      explicitIssueId = requestedIssueId.trim();
+    }
     const requestedHandoffAuthor = body['handoffAuthor'];
     let handoffAuthor: HandoffAuthor = 'external';
     if (requestedHandoffAuthor !== undefined) {
@@ -705,7 +715,7 @@ export async function handleConversationSummaryFork(
       name: newName,
       tmuxSession: newTmux,
       cwd: cwd || conv.cwd || process.cwd(),
-      issueId: conv.issueId ?? undefined,
+      issueId: explicitIssueId ?? conv.issueId ?? undefined,
       title: customTitle || defaultTitle,
       titleSource: 'manual',
       titleSeed: forkMode === 'plain'
@@ -723,6 +733,7 @@ export async function handleConversationSummaryFork(
       parentConversationName: conv.name,
       sessionId,
       forkMode,
+      ...(explicitIssueId !== undefined ? { issueId: explicitIssueId } : {}),
       ...(summaryModel !== undefined ? { summaryModel } : {}),
       localSummaryOnly,
       includeThinkingInSummary,

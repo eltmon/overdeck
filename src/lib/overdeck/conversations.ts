@@ -625,6 +625,7 @@ export interface ForkRequest {
   parentConversationName: string;
   sessionId: string;
   forkMode: 'summary' | 'plain' | 'handoff';
+  issueId?: string;
   summaryModel?: string;
   localSummaryOnly: boolean;
   includeThinkingInSummary?: boolean;
