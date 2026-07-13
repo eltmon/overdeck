@@ -29,14 +29,14 @@ import type { Conversation } from '../CommandDeck/ConversationList';
 import {
   useComposerStore,
   useConversationSending,
-  useConversationImages,
-  getConversationImages,
+  useConversationAttachments,
+  getConversationAttachments,
   sendConversationMessage,
 } from '../../lib/composerStore';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
-// Pasted-image state and its upload pump live in `lib/composerStore.ts` so they
-// survive a pane unmount (PAN-1591 renders only the active pane). `PendingImage`,
+// Pending-attachment state and its upload pump live in `lib/composerStore.ts` so they
+// survive a pane unmount (PAN-1591 renders only the active pane). `PendingAttachment`,
 // the upload/delete API, and `revokePreviewUrl` moved there with them.
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -90,18 +90,18 @@ export function ComposerFooter({
   const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
   const [deliverAs, setDeliverAs] = useState<DeliverAs>('auto');
   const [compactPending, setCompactPending] = useState(false);
-  // `sending`, pending images, and their upload pump live in the module-level
+  // `sending`, pending attachments, and their upload pump live in the module-level
   // composerStore, keyed by conversation name (the same key drafts use). The
   // PAN-1591 Stage renders only the active pane, so switching conversations
   // unmounts ComposerFooter entirely — any component-local state would be wiped.
-  // Sourcing them from the store makes the "Sending…" indicator and pasted
-  // images follow their conversation and survive a switch away and back.
+  // Sourcing them from the store makes the "Sending…" indicator and pending
+  // attachments follow their conversation and survive a switch away and back.
   const sending = useConversationSending(conversation.name);
-  const pendingImages = useConversationImages(conversation.name);
+  const pendingAttachments = useConversationAttachments(conversation.name);
   const setSendingFor = useComposerStore((s) => s.setSending);
-  const enqueueImagesForConversation = useComposerStore((s) => s.enqueueImages);
-  const removeImageForConversation = useComposerStore((s) => s.removeImage);
-  const consumeImagesForConversation = useComposerStore((s) => s.consumeImages);
+  const enqueueAttachmentsForConversation = useComposerStore((s) => s.enqueueAttachments);
+  const removeAttachmentForConversation = useComposerStore((s) => s.removeAttachment);
+  const consumeAttachmentsForConversation = useComposerStore((s) => s.consumeAttachments);
 
   const [text, setText] = useState('');
   const [isVoiceWidgetOpen, setIsVoiceWidgetOpen] = useState(false);
@@ -119,29 +119,19 @@ export function ComposerFooter({
   const canEditModelBeforeStart = !agentId && !conversation.sessionAlive && !conversation.claudeSessionId;
   const isEmpty = text.trim() === '';
 
-  // Images are pasted/dropped into the active composer, so conversation.name is
-  // the owning conversation. The store stamps it onto each image for async
+  // Attachments are pasted/dropped into the active composer, so conversation.name is
+  // the owning conversation. The store stamps it onto each attachment for async
   // upload attribution.
-  //
-  // Guard: text-only models (e.g. mimo-v2.5-pro) return 404 on image input,
-  // which the harness mistranslates as "model may not exist". Rather than block
-  // the whole message, drop the image and pin a notice — the text still sends.
-  // PAN-1685.
-  const enqueueImages = useCallback((files: File[]) => {
-    if (files.length > 0 && !modelSupportsImages(model)) {
-      const def = findModelDef(model);
-      toast.warning(
-        `${def?.name ?? model} can't read images — image not attached. ` +
-        `Switch to a vision-capable model (e.g. MiMo V2.5) to send images.`,
-      );
-      return;
+  const enqueueAttachments = useCallback((files: File[]) => {
+    const { rejected } = enqueueAttachmentsForConversation(conversation.name, files);
+    if (rejected.length > 0) {
+      toast.warning(`${rejected.length} file${rejected.length === 1 ? '' : 's'} not supported.`);
     }
-    enqueueImagesForConversation(conversation.name, files);
-  }, [enqueueImagesForConversation, conversation.name, model]);
+  }, [enqueueAttachmentsForConversation, conversation.name]);
 
-  const removePendingImage = useCallback((id: string) => {
-    removeImageForConversation(conversation.name, id);
-  }, [removeImageForConversation, conversation.name]);
+  const removePendingAttachment = useCallback((id: string) => {
+    removeAttachmentForConversation(conversation.name, id);
+  }, [removeAttachmentForConversation, conversation.name]);
 
   // Existing sessions are model-locked. This handler is only reachable while
   // composing before a session exists, so it updates local draft defaults only.
@@ -216,32 +206,26 @@ export function ComposerFooter({
     const clipboardData = event.clipboardData;
     if (!clipboardData) return;
 
-    // Harvest images from the canonical surface first:
+    // Harvest files from the canonical surface first:
     //  - clipboardData.files: the FileList of files in this paste
     //  - clipboardData.items (kind:'file'): per-item access; only consulted when
     //    .files is empty (some Wayland Chromium screenshot-tool pastes).
-    // We do NOT iterate both surfaces and dedupe — Chromium synthesizes
-    // distinct File objects for each surface with their own `lastModified`
-    // ticks, so a key built from (name,size,lastModified) can't reliably
-    // recognize them as the same image and the user ends up with two copies
-    // of the same screenshot intermittently.
     const collected: File[] = [];
-    const addIfImage = (file: File | null) => {
-      if (!file || !file.type.startsWith('image/')) return;
-      collected.push(file);
-    };
     const filesFromFiles = clipboardData.files ? Array.from(clipboardData.files) : [];
     if (filesFromFiles.length > 0) {
-      for (const file of filesFromFiles) addIfImage(file);
+      collected.push(...filesFromFiles);
     } else if (clipboardData.items) {
       for (const item of Array.from(clipboardData.items)) {
-        if (item.kind === 'file') addIfImage(item.getAsFile());
+        if (item.kind === 'file') {
+          const file = item.getAsFile();
+          if (file) collected.push(file);
+        }
       }
     }
 
     if (collected.length > 0) {
       event.preventDefault();
-      enqueueImages(collected);
+      enqueueAttachments(collected);
       return;
     }
 
@@ -273,7 +257,7 @@ export function ComposerFooter({
               }
             }
             if (recovered.length > 0) {
-              enqueueImages(recovered);
+              enqueueAttachments(recovered);
             } else {
               toast.error('Couldn\'t read the pasted image. Try saving it to a file and dragging it onto the composer.');
             }
@@ -296,21 +280,21 @@ export function ComposerFooter({
     }
 
     // Otherwise this is a regular text paste — pass through unchanged.
-  }, [enqueueImages, sending]);
+  }, [enqueueAttachments, sending]);
 
   const handleDrop = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     if (sending || !conversation.sessionAlive) return;
-    const imageFiles = Array.from(event.dataTransfer.files).filter((file) => file.type.startsWith('image/'));
-    if (imageFiles.length === 0) return;
-    enqueueImages(imageFiles);
-  }, [enqueueImages, sending, conversation.sessionAlive]);
+    const files = Array.from(event.dataTransfer.files);
+    if (files.length === 0) return;
+    enqueueAttachments(files);
+  }, [enqueueAttachments, sending, conversation.sessionAlive]);
 
   const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
     const items = Array.from(event.dataTransfer.items);
     // Accept any file-kind drag (files don't expose their MIME type during dragover —
-    // type is empty until drop on most browsers). Also accept anything declared as an image.
-    if (items.some((item) => item.kind === 'file' || item.type.startsWith('image/'))) {
+    // type is empty until drop on most browsers).
+    if (items.some((item) => item.kind === 'file')) {
       event.preventDefault();
     }
   }, []);
@@ -361,30 +345,30 @@ export function ComposerFooter({
 
     const submitConversationName = conversation.name;
 
-    // Re-read pending images before any async work — if uploads are still in
+    // Re-read pending attachments before any async work — if uploads are still in
     // progress we must return early without switching model or sending. Read
     // this conversation's slice from the store (synchronous, unmount-proof).
-    const currentPendingImages = getConversationImages(submitConversationName);
-    const uploadingImages = currentPendingImages.filter((image) => !image.serverPath && !image.error);
-    if (uploadingImages.length > 0) {
-      toast.error('Please wait for image uploads to finish');
+    const currentPendingAttachments = getConversationAttachments(submitConversationName);
+    const uploadingAttachments = currentPendingAttachments.filter((attachment) => !attachment.serverPath && !attachment.error);
+    if (uploadingAttachments.length > 0) {
+      toast.error('Please wait for uploads to finish');
       return;
     }
 
-    const failedImages = currentPendingImages.filter((image) => image.error);
-    if (failedImages.length > 0) {
-      toast.error('Remove failed image uploads before sending');
+    const failedAttachments = currentPendingAttachments.filter((attachment) => attachment.error);
+    if (failedAttachments.length > 0) {
+      toast.error('Remove failed uploads before sending');
       return;
     }
 
-    const uploadedImages = currentPendingImages.filter((image) => image.serverPath);
-    if (!messageText && uploadedImages.length === 0) return;
+    const uploadedAttachments = currentPendingAttachments.filter((attachment) => attachment.serverPath);
+    if (!messageText && uploadedAttachments.length === 0) return;
 
     setSendingFor(submitConversationName, true);
-    const imagePrefix = uploadedImages
-      .map((image) => `@${image.serverPath}`)
+    const attachmentPrefix = uploadedAttachments
+      .map((attachment) => `@${attachment.serverPath}`)
       .join('\n');
-    const composedMessage = [imagePrefix, messageText].filter(Boolean).join('\n');
+    const composedMessage = [attachmentPrefix, messageText].filter(Boolean).join('\n');
     try {
       // DISABLED 2026-06-16: a plain message-send must NEVER switch the model.
       // This auto-switch silently killed a running agent's live session (the Opus
@@ -396,7 +380,7 @@ export function ComposerFooter({
       // (a) the picker reflecting the agent's true model and (b) an explicit confirm.
 
       // Abort if conversation switched during the async model switch. Leave the
-      // pasted images in their owning conversation (they persist now) so they
+      // pending attachments in their owning conversation (they persist now) so they
       // survive for a retry when the user returns — do not revoke or delete.
       if (submitConversationName !== currentConversationNameRef.current) {
         return;
@@ -413,12 +397,12 @@ export function ComposerFooter({
       );
       onSendAcknowledged?.(composedMessage);
 
-      // The send consumed this conversation's images — revoke their previews and
+      // The send consumed this conversation's attachments — revoke their previews and
       // drop them from the store. Target submitConversationName explicitly so the
       // right conversation is cleared even if the user switched while the send
       // was in flight. The sent message references the server uploads by @path,
-      // so consumeImages does NOT delete them server-side.
-      consumeImagesForConversation(submitConversationName);
+      // so consumeAttachments does NOT delete them server-side.
+      consumeAttachmentsForConversation(submitConversationName);
 
       // Only clear the editor if still on the same conversation, to avoid wiping
       // the new conversation's draft if the user switched while the send was in
@@ -440,7 +424,7 @@ export function ComposerFooter({
       // Refocus editor
       editor.focus();
     }
-  }, [agentId, conversation.model, conversation.name, conversation.sessionAlive, consumeImagesForConversation, deliverAs, harness, isDisabled, model, onSend, onSendAcknowledged, onSendFailed, piConversation, sending, setSendingFor]);
+  }, [agentId, conversation.model, conversation.name, conversation.sessionAlive, consumeAttachmentsForConversation, deliverAs, harness, isDisabled, model, onSend, onSendAcknowledged, onSendFailed, piConversation, sending, setSendingFor]);
 
   useEffect(() => {
     const previousConversationName = previousConversationNameRef.current;
@@ -449,8 +433,8 @@ export function ComposerFooter({
     }
 
     previousConversationNameRef.current = conversation.name;
-    // Do NOT touch pending images or sending here. Both live in the
-    // composerStore keyed per-conversation, so a screenshot pasted into one
+    // Do NOT touch pending attachments or sending here. Both live in the
+    // composerStore keyed per-conversation, so an attachment pasted into one
     // conversation — or a send still in flight — survives navigating away and
     // back. In-flight uploads attach to their owning conversation; the send's
     // own finally clears its sending flag by submitConversationName.
@@ -512,21 +496,25 @@ export function ComposerFooter({
     <div className={styles.composerFooter}>
       {/* Single unified container — T3Chat style */}
       <div className={styles.composerBox} onDrop={handleDrop} onDragOver={handleDragOver}>
-        {pendingImages.length > 0 && (
+        {pendingAttachments.length > 0 && (
           <div className={styles.composerImageStrip}>
-            {pendingImages.map((image) => {
-              const isUploading = !image.serverPath && !image.error;
-              const statusLabel = image.error
-                ? image.error
-                : image.serverPath
+            {pendingAttachments.map((attachment) => {
+              const isUploading = !attachment.serverPath && !attachment.error;
+              const statusLabel = attachment.error
+                ? attachment.error
+                : attachment.serverPath
                   ? 'Uploaded'
                   : 'Uploading…';
               return (
-                <div key={image.id} className={styles.composerImageCard}>
-                  <img src={image.previewUrl} alt={image.file.name} className={styles.composerImageThumb} />
+                <div key={attachment.id} className={styles.composerImageCard}>
+                  {attachment.previewUrl ? (
+                    <img src={attachment.previewUrl} alt={attachment.file.name} className={styles.composerImageThumb} />
+                  ) : (
+                    <div className={styles.composerImageThumb} title={attachment.file.name} />
+                  )}
                   <div className={styles.composerImageMeta}>
-                    <span className={styles.composerImageName}>{image.file.name}</span>
-                    <span className={image.error ? styles.composerImageError : styles.composerImageStatus}>
+                    <span className={styles.composerImageName}>{attachment.file.name}</span>
+                    <span className={attachment.error ? styles.composerImageError : styles.composerImageStatus}>
                       {isUploading ? <Loader2 size={12} className={styles.spinner} /> : null}
                       {statusLabel}
                     </span>
@@ -534,8 +522,8 @@ export function ComposerFooter({
                   <button
                     type="button"
                     className={styles.composerImageRemoveButton}
-                    onClick={() => removePendingImage(image.id)}
-                    title={`Remove ${image.file.name}`}
+                    onClick={() => removePendingAttachment(attachment.id)}
+                    title={`Remove ${attachment.file.name}`}
                   >
                     <X size={14} />
                   </button>
@@ -628,7 +616,7 @@ export function ComposerFooter({
           <button
             className={styles.sendButton}
             onClick={() => void handleSubmit()}
-            disabled={(isEmpty && pendingImages.filter((image) => !!image.serverPath).length === 0) || isDisabled}
+            disabled={(isEmpty && pendingAttachments.filter((attachment) => !!attachment.serverPath).length === 0) || isDisabled}
             type="button"
             title="Send message (Enter)"
           >

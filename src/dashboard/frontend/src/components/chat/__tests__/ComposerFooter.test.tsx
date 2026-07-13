@@ -106,7 +106,7 @@ const secondConversation = {
   title: 'Other Conversation',
 };
 
-describe('ComposerFooter image attachments', () => {
+describe('ComposerFooter attachments', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetComposerStore();
@@ -612,7 +612,7 @@ describe('ComposerFooter image attachments', () => {
 
     fireEvent.click(screen.getByTitle('Send message (Enter)'));
 
-    expect(mockToastError).toHaveBeenCalledWith('Please wait for image uploads to finish');
+    expect(mockToastError).toHaveBeenCalledWith('Please wait for uploads to finish');
     expect(fetchMock).not.toHaveBeenCalledWith(
       '/api/conversations/test-conv/message',
       expect.anything(),
@@ -749,12 +749,12 @@ describe('ComposerFooter image attachments', () => {
 
     expect(await screen.findByText('broken.png')).toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.getByText(/Failed to upload image/i)).toBeInTheDocument();
+      expect(screen.getByText(/Failed to upload attachment/i)).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByTitle('Send message (Enter)'));
 
-    expect(mockToastError).toHaveBeenCalledWith('Remove failed image uploads before sending');
+    expect(mockToastError).toHaveBeenCalledWith('Remove failed uploads before sending');
     expect(fetchMock).not.toHaveBeenCalledWith(
       '/api/conversations/test-conv/message',
       expect.anything(),
