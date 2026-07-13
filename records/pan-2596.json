@@ -21,18 +21,18 @@
   ],
   "feedback": [],
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T08:30:07.097Z",
+  "updated": "2026-07-13T08:30:53.078Z",
   "pipeline": {
     "issueId": "PAN-2596",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T08:30:07.042Z",
-    "inspectNotes": "Inspecting bead server-upload-allowlist"
+    "updatedAt": "2026-07-13T08:30:52.581Z",
+    "inspectNotes": "Bead server-upload-allowlist ack: validateUploadPayload correctly gates UTF-8 text extensions, PDF %PDF- magic prefix, and disallowed/extension-less types with 400s naming the mismatch, while preserving image magic-byte validation and <uuid><ext> naming; non-image files get <uuid>-<sanitized-name><ext>. All 5 ACs verified against diff + accompanying unit tests."
   },
   "closeOut": {
     "usage": {
@@ -55,9 +55,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 362129,
-            "output": 38139,
-            "cacheRead": 8992512,
+            "input": 363261,
+            "output": 38463,
+            "cacheRead": 9263872,
             "cacheWrite": 0
           }
         }
@@ -76,15 +76,15 @@
           "cacheWrite": 213933
         },
         "custom/kimi-k2.7-code": {
-          "input": 362129,
-          "output": 38139,
-          "cacheRead": 8992512,
+          "input": 363261,
+          "output": 38463,
+          "cacheRead": 9263872,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 17.248294,
-        "pricingAsOf": "2026-07-13T08:30:07.092Z"
+        "usd": 17.302224,
+        "pricingAsOf": "2026-07-13T08:30:52.905Z"
       }
     },
     "merges": [],
