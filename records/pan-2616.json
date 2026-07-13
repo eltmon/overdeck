@@ -12,11 +12,31 @@
       "reason": "resume",
       "agentModel": "claude-fable-5",
       "timestamp": "2026-07-13T04:08:41.668Z"
+    },
+    {
+      "timestamp": "2026-07-13T14:04:14.861Z",
+      "reason": "end",
+      "note": "No deviations. All 3 beads shipped, each as its own commit, all pushed; requiresInspection=false on every bead so no inspection gates ran.\n\nDelivered (PAN-2616): isTrackerIssueClosed in src/lib/cloister/issue-closed.ts now detects Linear-tracked closed issues instead of short-circuiting to false. Added isLinearIssueClosed helper: gates on resolveTrackerTypeSync==='linear' AND resolveProjectFromIssueSync non-null; resolves the tracker via createTracker({type:'linear'}) with a getLinearApiKey()+new LinearTracker(key) fallback; calls tracker.getIssue with Effect.timeout('10 seconds'); returns true only when issue.state==='closed' AND issue.ref matches the requested id case-insensitively (guards LinearTracker's fuzzy searchIssues). Strictly false-on-failure: no key, error, timeout, or ref mismatch returns false and caches it for the 5-min TTL, so the destructive reaper can never tear down a live issue on a Linear API outage.\n\nGates: npm run typecheck clean; npm run build exit 0 (confirms no circular ESM import from the new tracker/factory import); npm run lint clean (ratchet + quarantine audits); full suite 9473 passed / 0 failed; issue-closed.test.ts 16/16 (9 new Linear cases covering FR-1..FR-6, cache TTL fakes Date only so Effect runtime stays real per NFR-2). docs/WORKSPACE-CONTAINERS.md reaper-backstop paragraph updated to name both trackers and the false-on-failure posture."
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/WORKSPACE-CONTAINERS.md",
+      "src/lib/cloister/__tests__/issue-closed.test.ts",
+      "src/lib/cloister/issue-closed.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/WORKSPACE-CONTAINERS.md",
+      "src/lib/cloister/__tests__/issue-closed.test.ts",
+      "src/lib/cloister/issue-closed.ts"
+    ],
+    "recordedAt": "2026-07-13T14:03:46.895Z"
+  },
   "created": "2026-07-13T03:17:01.668Z",
-  "updated": "2026-07-13T14:03:46.896Z",
+  "updated": "2026-07-13T14:04:14.950Z",
   "pipeline": {
     "issueId": "PAN-2616",
     "reviewStatus": "pending",
@@ -25,7 +45,24 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T13:40:05.763Z"
+    "updatedAt": "2026-07-13T14:04:14.863Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2637",
+    "reviewRequestedAt": "2026-07-13T14:04:14.862Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/WORKSPACE-CONTAINERS.md",
+        "src/lib/cloister/__tests__/issue-closed.test.ts",
+        "src/lib/cloister/issue-closed.ts"
+      ],
+      "actualChangedFiles": [
+        "docs/WORKSPACE-CONTAINERS.md",
+        "src/lib/cloister/__tests__/issue-closed.test.ts",
+        "src/lib/cloister/issue-closed.ts"
+      ],
+      "recordedAt": "2026-07-13T14:03:46.895Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -49,10 +86,12 @@
       },
       "costAtCloseOut": {
         "usd": 15.026894,
-        "pricingAsOf": "2026-07-13T13:40:05.818Z"
+        "pricingAsOf": "2026-07-13T14:04:14.949Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2637"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -72,20 +111,5 @@
     "linear-closed-check.ac3": "completed",
     "linear-closed-check.ac4": "completed",
     "linear-closed-check.ac5": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/WORKSPACE-CONTAINERS.md",
-      "src/lib/cloister/__tests__/issue-closed.test.ts",
-      "src/lib/cloister/issue-closed.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/WORKSPACE-CONTAINERS.md",
-      "src/lib/cloister/__tests__/issue-closed.test.ts",
-      "src/lib/cloister/issue-closed.ts"
-    ],
-    "recordedAt": "2026-07-13T14:03:46.895Z"
   }
 }
