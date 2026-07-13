@@ -19,7 +19,7 @@ import { resolveProjectFromIssueSync } from '../projects.js';
 import { loadRemoteAgentState } from '../remote/remote-agents.js';
 import { loadWorkspaceMetadataSync as loadWorkspaceMetadataStatic } from '../remote/workspace-metadata.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
-import { createBeadsResolver } from '../beads/resolver.js';
+import { readBeadsForIssueCached } from '../beads/presence.js';
 import { getBeadsHealth } from '../beads/telemetry.js';
 
 function isGitHubIssue(issueId: string): {
@@ -209,11 +209,11 @@ export function getIssueBeads(id: string) {
     // Try local beads query (non-fatal on bd error)
     const { beads, querySource, staleReason } = yield* Effect.promise(async (): Promise<{ beads: any[]; querySource: string; staleReason?: string }> => {
       const bdSearchDir = (workspacePath && existsSync(workspacePath)) ? workspacePath : (projectPath || homedir());
-      // 8s (was 500ms): under live pipeline traffic the shared bd lock queue
-      // is hot and a 500ms acquisition virtually never wins, leaving the rail
-      // permanently stale. The wait is async (never blocks the event loop)
-      // and stays under the rail's 10s poll interval.
-      const result = await createBeadsResolver(bdSearchDir, { retry: { acquisitionTimeoutMs: 8_000 } }).getBeadsForIssue(id);
+      // Cached bulk snapshot (10s TTL): the rail polls this route every 10s
+      // PER OPEN ISSUE, and post-PAN-2564 each bd process costs ~2s — the
+      // per-request `bd list -l <issue>` shape spawned a continuous stream of
+      // Dolt processes and kept the shared bd lock hot (PAN-2640).
+      const result = await readBeadsForIssueCached(bdSearchDir, id);
       return result.ok
         ? { beads: result.value, querySource: 'canonical-dolt' }
         : { beads: [], querySource: 'canonical-dolt', staleReason: result.reason };

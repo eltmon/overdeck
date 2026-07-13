@@ -1,4 +1,5 @@
-import { createBeadsResolver } from './resolver.js';
+import { createBeadsResolver, type BeadRecord, type BeadsReadResult } from './resolver.js';
+import { resolveCanonicalBeadsHome } from './home.js';
 
 /**
  * Bulk beads-presence snapshot: which issues have at least one bead.
@@ -31,7 +32,7 @@ export async function readIssuesWithBeads(
 ): Promise<BeadsPresence> {
   const set = new Set<string>();
   const all = await Promise.race([
-    createBeadsResolver(projectRoot).getAllBeads(),
+    readAllBeadsCached(projectRoot),
     new Promise<{ ok: false }>((resolve) => {
       setTimeout(() => resolve({ ok: false }), timeoutMs).unref?.();
     }),
@@ -43,4 +44,70 @@ export async function readIssuesWithBeads(
     }
   }
   return { known: true, set };
+}
+
+// ─── Cached bulk snapshot (request-driven readers) ───────────────────────────
+
+/**
+ * TTL for the cached all-beads snapshot. Request-driven per-issue readers
+ * (e.g. the dashboard BeadsRail polls /api/issues/:id/beads every 10s per
+ * open issue) share ONE bd process per store per TTL window instead of
+ * spawning one per request. Staleness is bounded by the rail's own poll
+ * cadence, so the UI converges within one refetch.
+ */
+const ALL_BEADS_SNAPSHOT_TTL_MS = 10_000;
+
+type SnapshotEntry = { at: number; result: BeadsReadResult<BeadRecord[]> };
+const snapshotCache = new Map<string, SnapshotEntry>();
+const snapshotInFlight = new Map<string, Promise<BeadsReadResult<BeadRecord[]>>>();
+
+/** Drop cached snapshots (all stores). Call after a beads mutation lands, or from tests. */
+export function clearBeadsSnapshotCache(): void {
+  snapshotCache.clear();
+}
+
+/** Cache key: the canonical beads store, so every workspace of a project shares one snapshot. */
+function snapshotKey(dir: string): string {
+  try {
+    return resolveCanonicalBeadsHome(dir) ?? dir;
+  } catch {
+    return dir;
+  }
+}
+
+/**
+ * All beads from the store `dir` resolves to, served from a short-TTL cache
+ * with in-flight dedupe. Failures are cached for the same TTL — a contended
+ * bd lock must not let per-request retries re-create the process storm.
+ */
+export async function readAllBeadsCached(dir: string): Promise<BeadsReadResult<BeadRecord[]>> {
+  const key = snapshotKey(dir);
+  const cached = snapshotCache.get(key);
+  if (cached && Date.now() - cached.at < ALL_BEADS_SNAPSHOT_TTL_MS) return cached.result;
+
+  const inFlight = snapshotInFlight.get(key);
+  if (inFlight) return inFlight;
+
+  const read = createBeadsResolver(dir)
+    .getAllBeads()
+    .then((result) => {
+      snapshotCache.set(key, { at: Date.now(), result });
+      return result;
+    })
+    .finally(() => {
+      snapshotInFlight.delete(key);
+    });
+  snapshotInFlight.set(key, read);
+  return read;
+}
+
+/** Beads carrying `issueId` as a label, filtered from the cached bulk snapshot. */
+export async function readBeadsForIssueCached(
+  dir: string,
+  issueId: string,
+): Promise<BeadsReadResult<BeadRecord[]>> {
+  const all = await readAllBeadsCached(dir);
+  if (!all.ok) return all;
+  const wanted = issueId.toLowerCase();
+  return { ok: true, value: all.value.filter((bead) => (bead.labels ?? []).some((l) => l.toLowerCase() === wanted)) };
 }
