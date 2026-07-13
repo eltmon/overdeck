@@ -1,101 +1,19 @@
 {
   "issueId": "PAN-2229",
   "schemaVersion": 2,
-  "created": "2026-07-10T21:05:49.847Z",
-  "updated": "2026-07-13T14:19:02.693Z",
-  "feedback": [],
-  "pipeline": {
-    "issueId": "PAN-2229",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "mergeStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-10T21:05:49.847Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": ""
-  },
-  "swarm": {
-    "slotCompletions": {
-      "2": {
-        "slotIndex": 2,
-        "agentId": "agent-pan-2229-slot-2",
-        "completedAt": "2026-07-13T02:39:39.442Z"
-      },
-      "3": {
-        "slotIndex": 3,
-        "agentId": "agent-pan-2229-slot-3",
-        "completedAt": "2026-07-10T21:15:10.169Z"
-      }
-    }
-  },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
-  "recoveryTrips": [
-    {
-      "issue": "PAN-2229",
-      "recoveryPath": "stuck-remediation",
-      "obligationGeneration": "2026-07-10T21:32:52.000Z",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-10T23:22:27.105Z"
-    },
-    {
-      "issue": "PAN-2229",
-      "recoveryPath": "stuck-remediation",
-      "obligationGeneration": "2026-07-11T11:44:06.000Z",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-11T13:14:11.604Z"
-    },
-    {
-      "issue": "PAN-2229",
-      "recoveryPath": "stuck-remediation",
-      "obligationGeneration": "2026-07-13T03:19:59.000Z",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-13T04:50:14.582Z"
-    }
-  ],
   "sessionHistory": [
     {
       "timestamp": "2026-07-13T13:35:07.450Z",
       "reason": "start",
       "agentModel": "kimi-k2.7-code"
+    },
+    {
+      "timestamp": "2026-07-13T14:19:22.633Z",
+      "reason": "end",
+      "note": "summary"
     }
   ],
-  "statusOverrides": {
-    "review-blocker-format-eval": "completed",
-    "review-blocker-format-eval.ac1": "completed",
-    "review-blocker-format-eval.ac2": "completed",
-    "review-blocker-format-eval.ac3": "completed",
-    "review-blocker-format-eval.ac4": "completed",
-    "flywheel-launch-eval": "completed",
-    "flywheel-launch-eval.ac1": "completed",
-    "flywheel-launch-eval.ac2": "completed",
-    "flywheel-launch-eval.ac3": "completed",
-    "flywheel-launch-eval.ac4": "completed",
-    "prompt-eval-docs": "completed",
-    "prompt-eval-docs.ac1": "completed",
-    "prompt-eval-docs.ac2": "completed",
-    "prompt-eval-docs.ac3": "completed",
-    "ci-prompt-change-gate": "completed",
-    "ci-prompt-change-gate.ac1": "completed",
-    "ci-prompt-change-gate.ac2": "completed",
-    "ci-prompt-change-gate.ac3": "completed",
-    "ci-prompt-change-gate.ac4": "completed",
-    "prompt-invariant-tests": "completed",
-    "eval-prompt-harness": "completed",
-    "eval-prompt-harness.ac1": "completed",
-    "eval-prompt-harness.ac2": "completed",
-    "eval-prompt-harness.ac3": "completed",
-    "eval-prompt-harness.ac4": "completed"
-  },
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "AGENTS.md",
@@ -156,5 +74,228 @@
       "tests/unit/scripts/check-prompt-change-trailer.test.ts"
     ],
     "recordedAt": "2026-07-13T14:19:02.691Z"
+  },
+  "created": "2026-07-10T21:05:49.847Z",
+  "updated": "2026-07-13T14:19:22.701Z",
+  "pipeline": {
+    "issueId": "PAN-2229",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-13T14:19:22.634Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2638",
+    "reviewRequestedAt": "2026-07-13T14:19:22.634Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "AGENTS.md",
+        "CLAUDE.md",
+        "evals/flywheel-launch.eval.ts",
+        "evals/review-synthesis.eval.ts",
+        "package.json",
+        "tests/unit/evals/lib/prompt-harness.test.ts",
+        "tests/unit/evals/prompt-rails.test.ts",
+        "tests/unit/scripts/check-prompt-change-trailer.test.ts"
+      ],
+      "declaredScopeUntouched": [
+        "evals/fixtures/flywheel/board-auto-pickup-off.json",
+        "evals/fixtures/flywheel/board-auto-pickup-on.json",
+        "evals/fixtures/flywheel/board-untrusted-author.json",
+        "evals/fixtures/review/correctness.md",
+        "evals/fixtures/review/performance.md",
+        "evals/fixtures/review/pr-diff-files.json",
+        "evals/fixtures/review/requirements.md",
+        "evals/fixtures/review/security.md",
+        "evals/flywheel-launch-decision.eval.ts",
+        "evals/review-synthesis-format.eval.ts",
+        "tests/unit/scripts/prompt-change-trailer.test.ts"
+      ],
+      "declaredScope": [
+        ".github/workflows/ci.yml",
+        "docs/FLYWHEEL.md",
+        "evals/README.md",
+        "evals/fixtures/flywheel/board-auto-pickup-off.json",
+        "evals/fixtures/flywheel/board-auto-pickup-on.json",
+        "evals/fixtures/flywheel/board-untrusted-author.json",
+        "evals/fixtures/review/correctness.md",
+        "evals/fixtures/review/performance.md",
+        "evals/fixtures/review/pr-diff-files.json",
+        "evals/fixtures/review/requirements.md",
+        "evals/fixtures/review/security.md",
+        "evals/flywheel-launch-decision.eval.ts",
+        "evals/lib/prompt-harness.ts",
+        "evals/review-synthesis-format.eval.ts",
+        "scripts/check-prompt-change-trailer.sh",
+        "tests/unit/prompts/prompt-invariants.test.ts",
+        "tests/unit/scripts/prompt-change-trailer.test.ts"
+      ],
+      "actualChangedFiles": [
+        ".github/workflows/ci.yml",
+        "AGENTS.md",
+        "CLAUDE.md",
+        "docs/FLYWHEEL.md",
+        "evals/README.md",
+        "evals/flywheel-launch.eval.ts",
+        "evals/lib/prompt-harness.ts",
+        "evals/review-synthesis.eval.ts",
+        "package.json",
+        "scripts/check-prompt-change-trailer.sh",
+        "tests/unit/evals/lib/prompt-harness.test.ts",
+        "tests/unit/evals/prompt-rails.test.ts",
+        "tests/unit/prompts/prompt-invariants.test.ts",
+        "tests/unit/scripts/check-prompt-change-trailer.test.ts"
+      ],
+      "recordedAt": "2026-07-13T14:19:02.691Z"
+    }
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 390,
+            "output": 17273,
+            "cacheRead": 9343489,
+            "cacheWrite": 29473
+          }
+        },
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 16994,
+            "output": 42118,
+            "cacheRead": 2817379,
+            "cacheWrite": 148243
+          }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 17805,
+            "output": 6715,
+            "cacheRead": 834135,
+            "cacheWrite": 99054
+          }
+        },
+        "work": {
+          "custom/MiniMax-M3": {
+            "input": 1339227,
+            "output": 123767,
+            "cacheRead": 30261120,
+            "cacheWrite": 0
+          },
+          "custom/kimi-k2.7-code": {
+            "input": 7247042,
+            "output": 124862,
+            "cacheRead": 98308608,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-fable-5": {
+          "input": 17384,
+          "output": 59391,
+          "cacheRead": 12160868,
+          "cacheWrite": 177716
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 17805,
+          "output": 6715,
+          "cacheRead": 834135,
+          "cacheWrite": 99054
+        },
+        "custom/MiniMax-M3": {
+          "input": 1339227,
+          "output": 123767,
+          "cacheRead": 30261120,
+          "cacheWrite": 0
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 7247042,
+          "output": 124862,
+          "cacheRead": 98308608,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 44.656022,
+        "pricingAsOf": "2026-07-13T14:19:22.700Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2638"
+    ],
+    "ranOn": "eltmon-z790"
+  },
+  "swarm": {
+    "slotCompletions": {
+      "2": {
+        "slotIndex": 2,
+        "agentId": "agent-pan-2229-slot-2",
+        "completedAt": "2026-07-13T02:39:39.442Z"
+      },
+      "3": {
+        "slotIndex": 3,
+        "agentId": "agent-pan-2229-slot-3",
+        "completedAt": "2026-07-10T21:15:10.169Z"
+      }
+    }
+  },
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
+  "recoveryTrips": [
+    {
+      "issue": "PAN-2229",
+      "recoveryPath": "stuck-remediation",
+      "obligationGeneration": "2026-07-10T21:32:52.000Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-10T23:22:27.105Z"
+    },
+    {
+      "issue": "PAN-2229",
+      "recoveryPath": "stuck-remediation",
+      "obligationGeneration": "2026-07-11T11:44:06.000Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-11T13:14:11.604Z"
+    },
+    {
+      "issue": "PAN-2229",
+      "recoveryPath": "stuck-remediation",
+      "obligationGeneration": "2026-07-13T03:19:59.000Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-13T04:50:14.582Z"
+    }
+  ],
+  "statusOverrides": {
+    "review-blocker-format-eval": "completed",
+    "review-blocker-format-eval.ac1": "completed",
+    "review-blocker-format-eval.ac2": "completed",
+    "review-blocker-format-eval.ac3": "completed",
+    "review-blocker-format-eval.ac4": "completed",
+    "flywheel-launch-eval": "completed",
+    "flywheel-launch-eval.ac1": "completed",
+    "flywheel-launch-eval.ac2": "completed",
+    "flywheel-launch-eval.ac3": "completed",
+    "flywheel-launch-eval.ac4": "completed",
+    "prompt-eval-docs": "completed",
+    "prompt-eval-docs.ac1": "completed",
+    "prompt-eval-docs.ac2": "completed",
+    "prompt-eval-docs.ac3": "completed",
+    "ci-prompt-change-gate": "completed",
+    "ci-prompt-change-gate.ac1": "completed",
+    "ci-prompt-change-gate.ac2": "completed",
+    "ci-prompt-change-gate.ac3": "completed",
+    "ci-prompt-change-gate.ac4": "completed",
+    "prompt-invariant-tests": "completed",
+    "eval-prompt-harness": "completed",
+    "eval-prompt-harness.ac1": "completed",
+    "eval-prompt-harness.ac2": "completed",
+    "eval-prompt-harness.ac3": "completed",
+    "eval-prompt-harness.ac4": "completed"
   }
 }
