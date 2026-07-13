@@ -160,19 +160,19 @@
     "recordedAt": "2026-07-13T08:53:00.165Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T09:02:17.362Z",
+  "updated": "2026-07-13T09:10:15.048Z",
   "pipeline": {
     "issueId": "PAN-2598",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T09:02:17.148Z",
+    "updatedAt": "2026-07-13T09:10:14.208Z",
     "reviewNotes": "Verification failed at test",
-    "verificationNotes": "Verification FAILED at test (191274ms):\n\nt: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\n- Spawning knowledge agent for PAN-2468...\n✔ Knowledge agent spawned: agent-pan-2468-knowledge\n- Spawning knowledge agent for PAN-2468...\n✖ Knowledge agent for PAN-2468 failed: No OKF bundle is configured for Overdeck. Run `/okf init` in this workspace to create or connect a knowledge bundle, then retry `pan knowledge PAN-2468`.\n- Spawning knowledge agent for PAN-2468...\n⚠ mnemos unavailable; spawning knowledge agent with built-in OKF search: release fetch failed\n- Spawning knowledge agent for PAN-2468...\n✔ Knowledge agent spawned: agent-pan-2468-knowledge\n",
+    "verificationNotes": "Verification FAILED at test (235389ms):\n\n/failure-tracking.test.ts:197:3\n    195|   }\n    196|\n    197|   it('increments the counter when resumeAgent fails during auto-resume…\n       |   ^\n    198|     const agentId = 'agent-pan-1141-resume-fails';\n    199|     resumeAgentMock.mockResolvedValue({ success: false, error: 'tmux c…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/10]⎯\n\n FAIL  |root| src/cli/commands/__tests__/agent-targeting.test.ts > resolveAgentTargetSync (PAN-1760) > preserves strike-/inspect- prefixed agent IDs\n FAIL  |root| src/cli/commands/__tests__/agent-targeting.test.ts > resolveAgentTargetSync (PAN-1760) > preserves strike-/inspect- prefixed agent IDs\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/cli/commands/__tests__/agent-targeting.test.ts:102:3\n    100|\n    101| describe('resolveAgentTargetSync (PAN-1760)', () => {\n    102|   it('preserves strike-/inspect- prefixed agent IDs', async () => {\n       |   ^\n    103|     const { resolveAgentTargetSync } = await vi.importActual<typeof im…\n    104|     expect(resolveAgentTargetSync('strike-pan-1723')).toBe('strike-pan…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/10]⎯\n\n FAIL  |root| src/cli/commands/__tests__/start-plan-routing.test.ts > pan start planning-mode routing (PAN-2407) > POSTs start-planning with auto:true/autoStart:true when no plan exists and mode is auto\n FAIL  |root| src/cli/commands/__tests__/start-plan-routing.test.ts > pan start planning-mode routing (PAN-2407) > POSTs start-planning with auto:true/autoStart:true when no plan exists and mode is auto\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/cli/commands/__tests__/start-plan-routing.test.ts:250:3\n    248|   }\n    249|\n    250|   it('POSTs start-planning with auto:true/autoStart:true when no plan …\n       |   ^\n    251|     mockFetchStream();\n    252|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/10]⎯\n\n",
     "inspectNotes": "Bead phase-banner-work-signal ack: workRunning now derives from activity.data.sections.some(type===work && status===running) (IssueMissionControl.tsx:828), verified via deriveNarrative precedence in StatusNarrative.tsx and existing+new tests covering all 3 ACs (planning-only session, live work session, beads-driven regression path); change is additive per NFR-1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2631",
     "reviewRequestedAt": "2026-07-13T08:53:36.817Z",
@@ -272,9 +272,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 2429176,
-            "output": 341602,
-            "cacheRead": 157341696,
+            "input": 2466472,
+            "output": 345008,
+            "cacheRead": 160443904,
             "cacheWrite": 0
           }
         }
@@ -305,15 +305,15 @@
           "cacheWrite": 346536
         },
         "custom/kimi-k2.7-code": {
-          "input": 2429176,
-          "output": 341602,
-          "cacheRead": 157341696,
+          "input": 2466472,
+          "output": 345008,
+          "cacheRead": 160443904,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 60.60905,
-        "pricingAsOf": "2026-07-13T09:02:17.312Z"
+        "usd": 61.247522000000004,
+        "pricingAsOf": "2026-07-13T09:10:14.941Z"
       }
     },
     "merges": [
