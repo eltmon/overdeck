@@ -14,8 +14,14 @@ export interface ProjectRollupState {
   stale: boolean;
 }
 
+export interface RollupProject {
+  key: string;
+  beadsCwd: string;
+  issuePrefixes: string[];
+}
+
 export interface BeadsRollupServiceDependencies {
-  projects?: () => Array<{ key: string; beadsCwd: string }>;
+  projects?: () => RollupProject[];
   createResolver?: (beadsCwd: string) => BeadsResolver;
   subscribe?: (listener: (event: { type: string; payload?: Record<string, unknown> }) => void) => (() => void) | void;
   now?: () => number;
@@ -24,10 +30,20 @@ export interface BeadsRollupServiceDependencies {
 
 const DEBOUNCE_MS = 2_000;
 
-function defaultProjects() {
+function normalizeIssuePrefixes(config: { issue_prefix?: string; issue_prefixes?: string[] }): string[] {
+  const prefixes = new Set<string>();
+  if (config.issue_prefix) prefixes.add(config.issue_prefix.toLowerCase());
+  for (const prefix of config.issue_prefixes ?? []) {
+    prefixes.add(prefix.toLowerCase());
+  }
+  return Array.from(prefixes);
+}
+
+function defaultProjects(): RollupProject[] {
   return listProjectsSync().map(({ key, config }) => ({
     key,
     beadsCwd: resolveStateReadHomeSync(config).root,
+    issuePrefixes: normalizeIssuePrefixes(config),
   }));
 }
 
@@ -37,16 +53,20 @@ function defaultCreateResolver(beadsCwd: string): BeadsResolver {
   });
 }
 
-function extractIssueLabels(labels: string[]): string[] {
+function extractIssueLabels(labels: string[], issuePrefixes: string[]): string[] {
   const result = new Set<string>();
   for (const label of labels) {
     const normalized = label.toLowerCase();
-    if (/^[a-z]+-\d+$/.test(normalized)) {
+    const bareMatch = /^([a-z]+)-(\d+)$/.exec(normalized);
+    if (bareMatch && issuePrefixes.includes(bareMatch[1]!)) {
       result.add(normalized);
     }
     const workspaceMatch = /^workspace:([a-z]+-\d+)$/.exec(normalized);
     if (workspaceMatch) {
-      result.add(workspaceMatch[1]!);
+      const wsBareMatch = /^([a-z]+)-(\d+)$/.exec(workspaceMatch[1]!);
+      if (wsBareMatch && issuePrefixes.includes(wsBareMatch[1]!)) {
+        result.add(workspaceMatch[1]!);
+      }
     }
   }
   return Array.from(result);
@@ -58,10 +78,10 @@ function maxUpdated(a: string | null, b: string | null): string | null {
   return a > b ? a : b;
 }
 
-function computeRollups(beads: BeadRecord[]): Map<string, BeadRollup> {
+function computeRollups(beads: BeadRecord[], issuePrefixes: string[]): Map<string, BeadRollup> {
   const groups = new Map<string, BeadRollup>();
   for (const bead of beads) {
-    const issueLabels = extractIssueLabels(bead.labels);
+    const issueLabels = extractIssueLabels(bead.labels, issuePrefixes);
     if (issueLabels.length === 0) continue;
     const status = typeof bead.status === 'string' ? bead.status.toLowerCase() : 'open';
     const updatedAt = typeof bead.updated_at === 'string'
@@ -101,14 +121,14 @@ export function createBeadsRollupService(dependencies: BeadsRollupServiceDepende
   let unsubscribe: (() => void) | undefined;
   let stopped = false;
 
-  async function refreshProject(projectKey: string, beadsCwd: string): Promise<void> {
-    const resolver = createResolver(beadsCwd);
+  async function refreshProject(project: RollupProject): Promise<void> {
+    const resolver = createResolver(project.beadsCwd);
     const result = await resolver.getAllBeads();
     if (result.ok) {
-      stateByProject.set(projectKey, { rollups: computeRollups(result.value), stale: false });
+      stateByProject.set(project.key, { rollups: computeRollups(result.value, project.issuePrefixes), stale: false });
     } else {
-      const previous = stateByProject.get(projectKey);
-      stateByProject.set(projectKey, {
+      const previous = stateByProject.get(project.key);
+      stateByProject.set(project.key, {
         rollups: previous?.rollups ?? new Map<string, BeadRollup>(),
         stale: true,
       });
@@ -124,7 +144,7 @@ export function createBeadsRollupService(dependencies: BeadsRollupServiceDepende
         debounceTimers.delete(projectKey);
         const project = projects().find((p) => p.key === projectKey);
         if (project) {
-          void refreshProject(project.key, project.beadsCwd);
+          void refreshProject(project);
         }
       }, debounceMs),
     );
@@ -133,7 +153,7 @@ export function createBeadsRollupService(dependencies: BeadsRollupServiceDepende
   function start(): void {
     if (stopped) return;
     for (const project of projects()) {
-      void refreshProject(project.key, project.beadsCwd);
+      void refreshProject(project);
     }
     if (subscribe) {
       unsubscribe = subscribe((event) => {

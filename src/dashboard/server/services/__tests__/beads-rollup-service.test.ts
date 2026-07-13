@@ -21,6 +21,8 @@ function rollupToObject(rollup: BeadRollup) {
   };
 }
 
+const testProject = { key: 'proj', beadsCwd: '/state', issuePrefixes: ['pan'] };
+
 describe('beads rollup service', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -41,7 +43,7 @@ describe('beads rollup service', () => {
     } as BeadsReadResult<BeadRecord[]>);
 
     const service = createBeadsRollupService({
-      projects: () => [{ key: 'proj', beadsCwd: '/state' }],
+      projects: () => [testProject],
       createResolver: () => ({ getAllBeads } as any),
       now: () => Date.parse('2026-07-12T12:00:00Z'),
     });
@@ -68,7 +70,7 @@ describe('beads rollup service', () => {
     } as BeadsReadResult<BeadRecord[]>);
 
     const service = createBeadsRollupService({
-      projects: () => [{ key: 'proj', beadsCwd: '/state' }],
+      projects: () => [testProject],
       createResolver: () => ({ getAllBeads } as any),
     });
 
@@ -80,6 +82,25 @@ describe('beads rollup service', () => {
     expect(state!.rollups.has('workspace:pan-9002')).toBe(false);
   });
 
+  it('excludes non-issue labels such as vBRIEF phase labels', async () => {
+    const getAllBeads = vi.fn().mockResolvedValue({
+      ok: true,
+      value: [makeBead({ id: 'b1', labels: ['pan-9003', 'phase-1'], status: 'open' })],
+    } as BeadsReadResult<BeadRecord[]>);
+
+    const service = createBeadsRollupService({
+      projects: () => [testProject],
+      createResolver: () => ({ getAllBeads } as any),
+    });
+
+    service.start();
+    await vi.runAllTimersAsync();
+
+    const state = service.getProjectRollups('proj');
+    expect(state!.rollups.has('pan-9003')).toBe(true);
+    expect(state!.rollups.has('phase-1')).toBe(false);
+  });
+
   it('refreshes on beads.freshness_changed with a trailing-edge debounce', async () => {
     const getAllBeads = vi.fn().mockResolvedValue({
       ok: true,
@@ -88,7 +109,7 @@ describe('beads rollup service', () => {
 
     const listeners: Array<(event: { type: string; payload?: Record<string, unknown> }) => void> = [];
     const service = createBeadsRollupService({
-      projects: () => [{ key: 'proj', beadsCwd: '/state' }],
+      projects: () => [testProject],
       createResolver: () => ({ getAllBeads } as any),
       subscribe: (listener) => {
         listeners.push(listener);
@@ -131,7 +152,7 @@ describe('beads rollup service', () => {
 
     const listeners: Array<(event: { type: string; payload?: Record<string, unknown> }) => void> = [];
     const service = createBeadsRollupService({
-      projects: () => [{ key: 'proj', beadsCwd: '/state' }],
+      projects: () => [testProject],
       createResolver: () => ({ getAllBeads } as any),
       subscribe: (listener) => {
         listeners.push(listener);
