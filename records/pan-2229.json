@@ -165,7 +165,7 @@
     "recordedAt": "2026-07-13T15:33:26.736Z"
   },
   "created": "2026-07-10T21:05:49.847Z",
-  "updated": "2026-07-13T19:29:41.287Z",
+  "updated": "2026-07-13T19:30:43.586Z",
   "pipeline": {
     "issueId": "PAN-2229",
     "reviewStatus": "passed",
@@ -367,7 +367,7 @@
     }
   },
   "harness": "claude-code",
-  "model": "claude-fable-5",
+  "model": "kimi-k2.7-code",
   "recoveryTrips": [
     {
       "issue": "PAN-2229",
