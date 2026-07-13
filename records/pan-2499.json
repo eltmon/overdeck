@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-13T17:58:36.349Z",
+  "updated": "2026-07-13T17:58:50.866Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -51,7 +51,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "glm-5.2",
+  "model": "claude-sonnet-5",
   "statusOverrides": {
     "no-loss-manifest": "completed",
     "issue-view-model": "running",
