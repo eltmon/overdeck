@@ -27,6 +27,7 @@ import {
   createWorktree,
   preTrustDirectorySync,
   relocateVenvScripts,
+  resolveFinalBeadsTarget,
   restorePreWorktreeMetadataSync,
   stagePreWorktreeMetadataSync,
   validateFeatureName,
@@ -256,8 +257,10 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
   restorePreWorktreeMetadataSync(stagedMetadataPath, workspacePath);
 
   // For polyrepo workspaces, create a beads redirect at the workspace root
-  // pointing to the first repo that has a .beads/ directory. Without this,
+  // pointing to the first repo's resolved canonical beads store. Without this,
   // agents starting at the workspace root can't find beads and try to re-init.
+  // Post-PAN-2564 we must resolve through any repo-level redirect so the
+  // workspace redirect points at the final target, never a chained redirect.
   if (workspaceConfig.type === 'polyrepo' && workspaceConfig.repos) {
     const workspaceBeadsDir = join(workspacePath, '.beads');
     if (!existsSync(workspaceBeadsDir)) {
@@ -266,10 +269,11 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
         const repoBeadsDir = existsSync(sourceRepoPath)
           ? join(realpathSync(sourceRepoPath), '.beads')
           : join(sourceRepoPath, '.beads');
-        if (existsSync(repoBeadsDir) && !existsSync(join(repoBeadsDir, 'redirect'))) {
+        const finalBeadsDir = resolveFinalBeadsTarget(repoBeadsDir);
+        if (existsSync(finalBeadsDir) && finalBeadsDir !== workspaceBeadsDir) {
           try {
             mkdirSync(workspaceBeadsDir, { recursive: true });
-            writeFileSync(join(workspaceBeadsDir, 'redirect'), repoBeadsDir, 'utf-8');
+            writeFileSync(join(workspaceBeadsDir, 'redirect'), resolve(finalBeadsDir), 'utf-8');
             result.steps.push(`Created beads redirect at workspace root → ${repo.name}/.beads`);
           } catch { /* non-fatal */ }
           break;
