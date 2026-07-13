@@ -460,7 +460,13 @@ function IssueTreeLane({
   }), [actions.state.hasBeads, actions.state.hasPlan, issueId, projectName, review.data, sessions, title])
 
   const feature = projectFeature.data ?? fallbackFeature
-  const renderedSessions = useMemo(() => feature.sessions ?? [], [feature.sessions])
+  const renderedSessions = useMemo(() => {
+    const treeSessions = feature.sessions ?? []
+    // When the resource-allocated feature resolves but its session-trees payload
+    // is empty, fall back to the activity-derived sessions so a live planning
+    // agent (or other activity-only session) is still visible in the issue tree.
+    return treeSessions.length > 0 ? treeSessions : sessions
+  }, [feature.sessions, sessions])
 
   // Stale-review detection (PAN-1866): quick review — the current hardcoded mode —
   // produces a single `review` parent and NO `reviewer` sub-sessions. So any reviewer

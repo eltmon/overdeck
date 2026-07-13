@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { PaneType } from '../../../lib/panesStore'
 
@@ -104,7 +104,17 @@ vi.mock('../../CommandDeck/SessionView/SessionPanel', () => ({
 vi.mock('./ReviewVerificationCard', () => ({ ReviewVerificationCard: () => <div>Review card</div> }))
 vi.mock('./StatusHistoryTab', () => ({ StatusHistoryTab: () => <div>Status history</div> }))
 vi.mock('./IssueBlockerSpotlight', () => ({ IssueBlockerSpotlight: () => <div>Blocker spotlight</div> }))
-vi.mock('./AgentsLane', () => ({ AgentsLane: () => <div>Agents lane</div> }))
+vi.mock('./AgentsLane', () => ({
+  AgentsLane: ({ sessions }: { sessions: readonly { sessionId: string; type: string; model?: string; status?: string; presence?: string }[] }) => (
+    <div data-testid="agents-lane">
+      {sessions.map((s) => (
+        <div key={s.sessionId} data-testid="agents-lane-session">
+          {s.type}: {s.sessionId}
+        </div>
+      ))}
+    </div>
+  ),
+}))
 vi.mock('./BeadsRail', () => ({ BeadsRail: () => <div>Beads rail</div> }))
 vi.mock('./PickupGateCard', () => ({ PickupGateCard: () => <div>Pickup gate</div> }))
 vi.mock('./ChangedFilesView', () => ({ ChangedFilesView: () => <div>Changed files</div> }))
@@ -207,6 +217,57 @@ describe('IssueMissionControl', () => {
 
     expect(screen.getByRole('button', { name: 'Overview' }).getAttribute('aria-selected')).toBe('true')
     expect(screen.queryByTestId('issue-tree-context-panel')).toBeNull()
+  })
+
+  it('falls back to activity-derived sessions when session-trees resolves an empty feature', async () => {
+    const originalFetch = globalThis.fetch
+    const originalSections = queryMocks.activityQuery.data.sections
+
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url.includes('/api/session-trees')) {
+        return new Response(JSON.stringify({ trees: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      return new Response(
+        JSON.stringify([
+          {
+            issueId: 'PAN-1661',
+            title: 'Mission control',
+            projectName: 'overdeck',
+            branch: 'feature/pan-1661',
+            sessions: [],
+          },
+        ]),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )
+    }) as unknown as typeof fetch
+
+    queryMocks.activityQuery.data.sections = [
+      {
+        type: 'planning',
+        sessionId: 'planning-pan-1661',
+        model: 'claude-sonnet-5',
+        status: 'running',
+        startedAt: '2026-06-07T00:00:00Z',
+        duration: null,
+      },
+    ]
+
+    renderMissionControl()
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByTestId('agents-lane-session').some((el) =>
+          el.textContent?.includes('planning-pan-1661'),
+        ),
+      ).toBe(true)
+    })
+
+    globalThis.fetch = originalFetch
+    queryMocks.activityQuery.data.sections = originalSections
   })
 
   it('groups all issue actions in the mega-menu', () => {
