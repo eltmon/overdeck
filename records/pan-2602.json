@@ -257,7 +257,7 @@
     "recordedAt": "2026-07-13T11:57:13.297Z"
   },
   "created": "2026-07-12T22:33:37.108Z",
-  "updated": "2026-07-13T14:46:15.973Z",
+  "updated": "2026-07-13T14:46:18.658Z",
   "pipeline": {
     "issueId": "PAN-2602",
     "reviewStatus": "reviewing",
@@ -506,8 +506,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-sonnet-5",
   "statusOverrides": {
     "sync-local-write-detection": "completed",
     "branch-ahead-signal": "completed",
