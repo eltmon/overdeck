@@ -165,7 +165,7 @@
     "recordedAt": "2026-07-13T15:33:26.736Z"
   },
   "created": "2026-07-10T21:05:49.847Z",
-  "updated": "2026-07-13T19:29:28.519Z",
+  "updated": "2026-07-13T19:29:41.287Z",
   "pipeline": {
     "issueId": "PAN-2229",
     "reviewStatus": "passed",
@@ -366,8 +366,8 @@
       }
     }
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-fable-5",
   "recoveryTrips": [
     {
       "issue": "PAN-2229",
