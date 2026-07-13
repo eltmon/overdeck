@@ -140,7 +140,7 @@
     "recordedAt": "2026-07-13T15:33:26.736Z"
   },
   "created": "2026-07-10T21:05:49.847Z",
-  "updated": "2026-07-13T15:33:48.915Z",
+  "updated": "2026-07-13T15:34:24.527Z",
   "pipeline": {
     "issueId": "PAN-2229",
     "reviewStatus": "pending",
@@ -150,7 +150,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T15:33:48.846Z",
+    "updatedAt": "2026-07-13T15:34:24.415Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2638",
     "reviewRequestedAt": "2026-07-13T15:33:32.581Z",
     "reviewSpawnedAt": "2026-07-13T15:33:34.548Z",
@@ -231,9 +231,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 3678421,
-            "output": 19132,
-            "cacheRead": 3194240,
+            "input": 4861637,
+            "output": 23934,
+            "cacheRead": 4031232,
             "cacheWrite": 0
           }
         },
@@ -269,9 +269,9 @@
             "cacheWrite": 0
           },
           "custom/kimi-k2.7-code": {
-            "input": 7492762,
-            "output": 154837,
-            "cacheRead": 109638144,
+            "input": 7493874,
+            "output": 155691,
+            "cacheRead": 109868544,
             "cacheWrite": 0
           }
         }
@@ -284,9 +284,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 3678421,
-          "output": 19132,
-          "cacheRead": 3194240,
+          "input": 4861637,
+          "output": 23934,
+          "cacheRead": 4031232,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -308,15 +308,15 @@
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 7492762,
-          "output": 154837,
-          "cacheRead": 109638144,
+          "input": 7493874,
+          "output": 155691,
+          "cacheRead": 109868544,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 51.753951,
-        "pricingAsOf": "2026-07-13T15:33:48.914Z"
+        "usd": 54.095875,
+        "pricingAsOf": "2026-07-13T15:34:24.521Z"
       }
     },
     "merges": [
