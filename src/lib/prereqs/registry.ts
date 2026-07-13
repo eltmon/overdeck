@@ -23,6 +23,7 @@ export const PREREQ_REGISTRY = {
   openInteractiveTerminal: ["ttyd"],
   enableHttps: ["mkcert", "docker", "traefik"],
   enableBeads: ["bd"],
+  runClaudeCodeHooks: ["jq"],
   useClaudeCodeRoutedAgents: [],
   useOxAgents: ["ox"],
 } as const;
@@ -36,6 +37,7 @@ export const INSTALLABLE_TOOLS: readonly PrereqTool[] = [
   "ttyd",
   "mkcert",
   "bd",
+  "jq",
   "ox",
 ];
 
@@ -92,6 +94,8 @@ export async function installTool(tool: PrereqTool): Promise<InstallResult> {
         return await installMkcert();
       case "bd":
         return await installBeads();
+      case "jq":
+        return await installJq();
       case "ox":
         return await installOx();
       default:
@@ -130,6 +134,13 @@ export async function ensureHostTools(): Promise<void> {
       fatal: false,
       manual:
         "brew install gastownhall/beads/bd (macOS) or run the beads install script (Linux) — the work pipeline needs it.",
+    },
+    {
+      tool: "jq",
+      label: "jq",
+      fatal: false,
+      manual:
+        "brew install jq (macOS) or sudo apt install jq (Linux) — the Claude Code hooks (auto-approve, live status, cost tracking) need it.",
     },
   ];
   for (const { tool, label, fatal, manual } of tools) {
@@ -245,6 +256,18 @@ async function installBeads(): Promise<InstallResult> {
     success: true,
     message: "beads installed via install script",
   };
+}
+
+async function installJq(): Promise<InstallResult> {
+  const plat = await Effect.runPromise(detectPlatform());
+  if (plat === "darwin") {
+    await execAsync("brew install jq", { timeout: 120000 });
+  } else {
+    await execAsync("sudo apt-get update && sudo apt-get install -y jq", {
+      timeout: 120000,
+    });
+  }
+  return { tool: "jq", success: true, message: "jq installed" };
 }
 
 async function installOx(): Promise<InstallResult> {
