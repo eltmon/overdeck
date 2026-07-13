@@ -52,6 +52,18 @@ at read time) enumerates the active blocking surfaces. Labels live in one map:
   payload and the reconcile effect prunes optimistic/dismissed marks.
 - **Stale clicks can't inject keystrokes.** `POST /api/agents/:id/plan-action`
   409s unless the agent's JSONL still shows a pending `ExitPlanMode`.
+- **PAN-2633: liveness-gated wipe.** Pending-input payloads survive agent
+  status flaps while the agent's tmux session is alive. The
+  `agent.status_changed` reducer wipes them only when a stop-shaped event does
+  not assert `hasLiveTmuxSession: true` (origin PAN-1520). This prevents an
+  idle-alive agent (registry status `stopped` but pane still live and showing
+  an AskUserQuestion) from losing its needs-you entry and modal.
+- **PAN-2633: ≤10s convergence.** If a stop-shaped status event ever wipes the
+  read model's pending payload for a tmux-alive waiting agent, the enrichment
+  poller re-emits it on the next poll (~10s), so the read model converges
+  without a page refresh. The poller's `lastEnrichment` cache is intentionally
+  not cleared, preserving the PAN-1834 awaiting-input rising edge as a
+  single-shot activity entry + TTS notification.
 
 ## Data flow (plan approval)
 
