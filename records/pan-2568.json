@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-13T06:01:07.037Z",
+  "updated": "2026-07-13T06:19:13.017Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "pending",
@@ -54,23 +54,24 @@
   "model": "kimi-k2.7-code",
   "statusOverrides": {
     "injection-budget": "running",
-    "size-scaled-waits": "running"
+    "size-scaled-waits": "running",
+    "full-length-purge": "running"
   },
   "swarm": {
     "slotAssignments": [
-      {
-        "slotIndex": 1,
-        "itemId": "injection-budget",
-        "agentId": "agent-pan-2568-slot-1",
-        "branch": "feature/pan-2568-slot-1",
-        "assignedAt": "2026-07-13T05:48:21.301Z"
-      },
       {
         "slotIndex": 2,
         "itemId": "size-scaled-waits",
         "agentId": "agent-pan-2568-slot-2",
         "branch": "feature/pan-2568-slot-2",
         "assignedAt": "2026-07-13T06:01:05.152Z"
+      },
+      {
+        "slotIndex": 3,
+        "itemId": "full-length-purge",
+        "agentId": "agent-pan-2568-slot-3",
+        "branch": "feature/pan-2568-slot-3",
+        "assignedAt": "2026-07-13T06:19:12.063Z"
       }
     ]
   }
