@@ -10,7 +10,7 @@ import {
   PAN_DIRNAME,
 } from '../../../lib/pan-dir/index.js';
 import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
-import { createBeadsResolver } from '../../../lib/beads/resolver.js';
+import { readIssuesWithBeads, type BeadsPresence } from '../../../lib/beads/presence.js';
 import { listProjectsSync, resolveProjectFromIssueSync, type ResolvedProject } from '../../../lib/projects.js';
 import { listSessionNames } from '../../../lib/tmux.js';
 import { loadReadyForMergeFlags } from '../review-status.js';
@@ -389,7 +389,11 @@ interface WorkspaceScanResult {
   hasBeads: boolean;
 }
 
-async function scanWorkspace(workspacesDir: string, workspaceName: string): Promise<WorkspaceScanResult> {
+async function scanWorkspace(
+  workspacesDir: string,
+  workspaceName: string,
+  beadsPresence: BeadsPresence,
+): Promise<WorkspaceScanResult> {
   const workspacePath = join(workspacesDir, workspaceName);
   const projectRoot = join(workspacesDir, '..');
   const workspaceEntries = new Set(await readdir(workspacePath).catch(() => [] as string[]));
@@ -402,7 +406,6 @@ async function scanWorkspace(workspacesDir: string, workspaceName: string): Prom
     ? await Effect.runPromise(findSpecByIssue(projectRoot, issueId)).catch(() => null)
     : null;
   const vbriefPath = specEntry ? specEntry.path : null;
-  const beadsResult = issueId ? await createBeadsResolver(workspacePath).issueHasBeads(issueId) : null;
 
   return {
     workspacePath,
@@ -411,7 +414,7 @@ async function scanWorkspace(workspacesDir: string, workspaceName: string): Prom
     hasState: panEntries.has(PAN_CONTINUE_FILENAME),
     hasVbrief: vbriefPath !== null,
     vbriefPath,
-    hasBeads: beadsResult?.ok === true && beadsResult.value,
+    hasBeads: issueId !== null && beadsPresence.set.has(issueId),
   };
 }
 
@@ -549,9 +552,13 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
   await Promise.all(projects.map(async (project) => {
     const projectPath = project.config.path;
     const workspacesDir = join(projectPath, 'workspaces');
-    const [workspaceEntries, branches] = await Promise.all([
+    // ONE bulk beads read per project per refresh. Per-workspace issueHasBeads
+    // here used to fire ~45 concurrent ~2s Dolt processes every 30s TTL, all
+    // contending on the global bd process lock (spawn gates queued behind it).
+    const [workspaceEntries, branches, beadsPresence] = await Promise.all([
       readdir(workspacesDir, { withFileTypes: true }).catch(() => []),
       loadProjectBranches(projectPath),
+      readIssuesWithBeads(projectPath),
     ]);
 
     await Promise.all(workspaceEntries.map(async (entry) => {
@@ -559,7 +566,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
       const issueId = entry.name.replace(/^feature-/, '').toUpperCase();
       const issue = ensureIssue(issueId, project);
       if (!issue) return;
-      const workspace = await scanWorkspace(workspacesDir, entry.name);
+      const workspace = await scanWorkspace(workspacesDir, entry.name, beadsPresence);
       issue.resourceSources.add('workspace');
       issue.resourceDetails.workspacePath = workspace.workspacePath;
       issue.hasPlanning = workspace.hasPlanning;

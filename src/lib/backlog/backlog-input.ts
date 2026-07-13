@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import type { Issue, IssueState, TrackerType } from '../tracker/interface.js';
 import { getReviewStatusSync } from '../review-status.js';
-import { createBeadsResolver } from '../beads/resolver.js';
+import { readIssuesWithBeads } from '../beads/presence.js';
 import { parseSequenceMd } from './sequence-io.js';
 import type { SequenceDoc } from './types.js';
 
@@ -133,13 +133,15 @@ export async function collectOpenBacklog(
         if (match) issuesWithSpecs.add(match[1]!.toUpperCase());
       }
     }
+    // One bulk presence read — the old per-workspace issueHasBeads loop spawned
+    // a ~2s Dolt process per dir (minutes on a big repo, serialized on the bd lock).
+    const beadsPresence = await readIssuesWithBeads(projectRoot);
     if (existsSync(workspacesDir)) {
       for (const dir of readdirSync(workspacesDir)) {
         const match = /^feature-([a-z]+-\d+)$/i.exec(dir);
         if (match) {
           const issueId = match[1]!.toUpperCase();
-          const result = await createBeadsResolver(join(workspacesDir, dir)).issueHasBeads(issueId);
-          if (result.ok && result.value) issuesWithBeads.add(issueId);
+          if (beadsPresence.set.has(issueId)) issuesWithBeads.add(issueId);
         }
       }
     }

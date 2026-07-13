@@ -202,6 +202,7 @@ export class CloisterService {
   // ineffective-poke count. A poke that changes neither the workspace HEAD nor
   // the pane content did nothing; escalating beats poking forever.
   private pokeProgress: Map<string, { fingerprint: string; ineffective: number }> = new Map();
+  private activeCostAlertKeys: Set<string> = new Set(); // cost-alert dedupe — see checkCostAlerts
   private domainEventUnsubscribe: (() => void) | null = null;
   private eventStore: CloisterEventStore | null = null;
 
@@ -229,6 +230,7 @@ export class CloisterService {
       get lastPokeTimestamps() { return service.lastPokeTimestamps; },
       get pokeProgress() { return service.pokeProgress; },
       get previousStates() { return service.previousStates; },
+      get activeCostAlertKeys() { return service.activeCostAlertKeys; },
       handleAgentCrash: (agentId: string) => service.handleAgentCrash(agentId),
       checkCompletionMarkers: () => service.checkCompletionMarkers(),
       recordHealthEvent: (health: AgentHealth) => service.recordHealthEvent(health),

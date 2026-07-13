@@ -21,7 +21,7 @@ import {
   type ForecastNode, type LaneBlock,
 } from '../../../lib/backlog/pickup.js';
 import { buildClassifyLookups } from '../../../lib/backlog/lookups.js';
-import { createBeadsResolver } from '../../../lib/beads/resolver.js';
+import { readIssuesWithBeads } from '../../../lib/beads/presence.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { getBacklogSequenceForRoot, clearBacklogSequence } from '../../../lib/overdeck/backlog.js';
 import { isFlywheelAutoPickupBacklog } from '../../../lib/overdeck/control-settings.js';
@@ -44,27 +44,6 @@ const readJsonBody = Effect.gen(function* () {
   }
 });
 
-/**
- * Bounded, event-loop-safe beads-presence snapshot shared by the backlog
- * routes. One bulk resolver read (never per-workspace sync bd calls — those
- * block the event loop ~2s × ~30 dirs). Under bd lock contention the 8s bound
- * returns { known: false } so routes degrade instead of hanging (NFR-2).
- */
-async function issuesWithBeadsBounded(projectRoot: string): Promise<{ known: boolean; set: Set<string> }> {
-  const set = new Set<string>();
-  const all = await Promise.race([
-    createBeadsResolver(projectRoot).getAllBeads(),
-    new Promise<{ ok: false }>((resolve) => { setTimeout(() => resolve({ ok: false }), 8_000).unref?.(); }),
-  ]);
-  if (!all.ok) return { known: false, set };
-  for (const bead of all.value) {
-    for (const label of bead.labels ?? []) {
-      if (/^[a-z]+-\d+$/i.test(label)) set.add(label.toUpperCase());
-    }
-  }
-  return { known: true, set };
-}
-
 // ─── Route: GET /api/backlog/sequence ────────────────────────────────────────
 
 const getBacklogSequenceRoute = HttpRouter.add(
@@ -73,7 +52,7 @@ const getBacklogSequenceRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     // Beads presence is async (canonical resolver) — computed in generator
     // scope; `yield*` cannot appear inside the sync Effect.try callback below.
-    const beadsPresence = yield* Effect.promise(() => issuesWithBeadsBounded(process.cwd()));
+    const beadsPresence = yield* Effect.promise(() => readIssuesWithBeads(process.cwd()));
     const issuesWithBeads = beadsPresence.set;
     const beadsPresenceKnown = beadsPresence.known;
     return yield* Effect.try({
@@ -315,7 +294,7 @@ const getBacklogForecastRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const url = new URL(request.url, 'http://localhost');
     const n = Math.max(1, Math.min(20, Number.parseInt(url.searchParams.get('n') ?? '5', 10) || 5));
-    const beadsPresence = yield* Effect.promise(() => issuesWithBeadsBounded(process.cwd()));
+    const beadsPresence = yield* Effect.promise(() => readIssuesWithBeads(process.cwd()));
     return yield* Effect.try({
       try: () => {
         const projectRoot = process.cwd();
@@ -424,7 +403,7 @@ const getBacklogIssueStateRoute = HttpRouter.add(
     const url = new URL(request.url, 'http://localhost');
     const issueId = (url.searchParams.get('issueId') ?? '').trim();
     if (!issueId) return yield* Effect.fail(new Error('issueId is required') as never);
-    const beadsPresence = yield* Effect.promise(() => issuesWithBeadsBounded(process.cwd()));
+    const beadsPresence = yield* Effect.promise(() => readIssuesWithBeads(process.cwd()));
     return yield* Effect.try({
       try: () => {
         const projectRoot = process.cwd();
