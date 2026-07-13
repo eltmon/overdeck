@@ -99,18 +99,18 @@
     "recordedAt": "2026-07-13T09:57:24.734Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T10:48:35.743Z",
+  "updated": "2026-07-13T10:52:10.646Z",
   "pipeline": {
     "issueId": "PAN-2596",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T10:48:35.677Z",
-    "reviewNotes": "Dotfile and extensionless filenames bypass rejection when declared as images",
+    "updatedAt": "2026-07-13T10:52:07.119Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issues: enforce filename policy before MIME checks, cap and batch @path validation, add tests.",
     "inspectNotes": "Bead server-upload-allowlist ack: validateUploadPayload correctly gates UTF-8 text extensions, PDF %PDF- magic prefix, and disallowed/extension-less types with 400s naming the mismatch, while preserving image magic-byte validation and <uuid><ext> naming; non-image files get <uuid>-<sanitized-name><ext>. All 5 ACs verified against diff + accompanying unit tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2634",
     "lastVerifiedCommit": "aa5085397e4c1e61dc76f80c7ec0b3d58b8bd537",
@@ -234,7 +234,7 @@
       },
       "costAtCloseOut": {
         "usd": 43.76927,
-        "pricingAsOf": "2026-07-13T10:48:35.740Z"
+        "pricingAsOf": "2026-07-13T10:52:09.830Z"
       }
     },
     "merges": [
