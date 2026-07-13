@@ -2,12 +2,13 @@
 
 import { app, BrowserWindow } from 'electron';
 import { autoUpdater, type UpdateInfo } from 'electron-updater';
-import {
-  OVERDECK_AGENT_PROTOCOL_VERSION,
-  OVERDECK_DASHBOARD_PROTOCOL_VERSION,
-  type UpdateChannel,
-  type UpdateSnapshot,
-} from '@overdeck/contracts';
+import type { UpdateChannel, UpdateSnapshot } from '@overdeck/contracts';
+
+// Keep the Electron entrypoint small: importing the contracts runtime would
+// bundle every schema and Effect dependency. The release-manifest verifier
+// guards these literals against packages/contracts/src/update.ts.
+const OVERDECK_DASHBOARD_PROTOCOL_VERSION = 1;
+const OVERDECK_AGENT_PROTOCOL_VERSION = 1;
 
 const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
 const DOWNLOAD_RETRY_MS = [0, 1_000, 4_000] as const;

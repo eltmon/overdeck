@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 
 const handlers = new Map<string, (...args: any[]) => void>();
 
@@ -24,6 +25,16 @@ import { checkForUpdates, currentStatus, downloadUpdate, getUpdateStatus, initia
 const autoUpdater = (await import('electron-updater')).autoUpdater as any;
 
 describe('desktop updater', () => {
+  it('keeps compact desktop protocol literals aligned with shared contracts', () => {
+    const contracts = readFileSync('../../packages/contracts/src/update.ts', 'utf8');
+    const updater = readFileSync('src/updater.ts', 'utf8');
+    for (const name of ['OVERDECK_DASHBOARD_PROTOCOL_VERSION', 'OVERDECK_AGENT_PROTOCOL_VERSION']) {
+      const expected = contracts.match(new RegExp(`${name} = (\\d+)`))?.[1];
+      expect(expected).toBeTruthy();
+      expect(updater).toContain(`const ${name} = ${expected};`);
+    }
+  });
+
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify([{

@@ -355,194 +355,184 @@ function stopServer() {
 }
 //#endregion
 //#region src/updater.ts
-/**
-* Auto-updater service using electron-updater.
-*
-* Handles automatic background checks for updates, downloads, and installation.
-* Uses GitHub Releases as the update server.
-*/
+/** Native desktop updater backed by electron-updater and exact GitHub releases. */
+const OVERDECK_DASHBOARD_PROTOCOL_VERSION = 1;
+const OVERDECK_AGENT_PROTOCOL_VERSION = 1;
 const FOUR_HOURS_MS = 14400 * 1e3;
+const DOWNLOAD_RETRY_MS = [
+	0,
+	1e3,
+	4e3
+];
+const RELEASES_URL = "https://api.github.com/repos/eltmon/overdeck/releases";
 let checkIntervalId = null;
 let initialized = false;
+let channel = "stable";
 let currentStatus = {
-	checking: false,
-	available: false,
-	downloaded: false,
-	version: null,
-	error: null
+	phase: "idle",
+	installMode: "desktop",
+	channel: "stable",
+	currentVersion: electron.app.getVersion(),
+	targetVersion: null,
+	releaseName: null,
+	releaseNotes: null,
+	releaseUrl: null,
+	publishedAt: null,
+	progressPercent: null,
+	error: null,
+	lastCheckedAt: null,
+	compatibility: "unknown",
+	currentDashboardProtocol: OVERDECK_DASHBOARD_PROTOCOL_VERSION,
+	currentAgentProtocol: OVERDECK_AGENT_PROTOCOL_VERSION,
+	targetDashboardProtocol: null,
+	targetAgentProtocol: null
 };
-let statusCallbacks = [];
-/**
-* Register a callback to receive update status changes.
-*/
+const statusCallbacks = [];
 function onUpdateStatusChange(callback) {
 	statusCallbacks.push(callback);
+	return () => {
+		const index = statusCallbacks.indexOf(callback);
+		if (index >= 0) statusCallbacks.splice(index, 1);
+	};
 }
-/**
-* Notify all listeners of status change
-*/
-function notifyStatusChange() {
-	for (const cb of statusCallbacks) cb(currentStatus);
+function publish(patch) {
+	currentStatus = {
+		...currentStatus,
+		...patch
+	};
+	for (const callback of statusCallbacks) callback(currentStatus);
+	for (const win of electron.BrowserWindow.getAllWindows()) if (!win.isDestroyed()) win.webContents.send("update-status", currentStatus);
 }
-/**
-* Send update event to all browser windows
-*/
-function broadcastToRenderers(channel, ...args) {
-	for (const win of electron.BrowserWindow.getAllWindows()) if (!win.isDestroyed()) win.webContents.send(channel, ...args);
+function manifestName() {
+	const prefix = channel === "canary" ? "beta" : "latest";
+	if (process.platform === "darwin") return `${prefix}-mac.yml`;
+	if (process.platform === "linux") return `${prefix}-linux.yml`;
+	return `${prefix}.yml`;
 }
-/**
-* Initialize the auto-updater service.
-* Sets up event handlers and starts periodic update checks.
-*/
-function initializeAutoUpdater(channel = "latest") {
-	if (initialized) {
-		console.log("[updater] Already initialized, skipping...");
-		return;
-	}
-	initialized = true;
+async function configureExactReleaseFeed() {
+	const response = await fetch(RELEASES_URL, {
+		headers: { accept: "application/vnd.github+json" },
+		signal: AbortSignal.timeout(1e4)
+	});
+	if (!response.ok) throw new Error(`GitHub Releases returned ${response.status}`);
+	const release = (await response.json()).find((item) => channel === "canary" ? item.prerelease : !item.prerelease);
+	if (!release) throw new Error(`No ${channel} desktop release is published`);
+	const manifest = release.assets?.find((asset) => asset.name === manifestName());
+	if (!manifest) throw new Error(`${release.tag_name} is missing ${manifestName()}`);
+	const manifestResponse = await fetch(manifest.browser_download_url, { signal: AbortSignal.timeout(1e4) });
+	if (!manifestResponse.ok) throw new Error(`Update manifest returned ${manifestResponse.status}`);
+	const manifestText = await manifestResponse.text();
+	const dashboardProtocol = Number(manifestText.match(/^overdeckDashboardProtocol:\s*(\d+)/m)?.[1]) || null;
+	const agentProtocol = Number(manifestText.match(/^overdeckAgentProtocol:\s*(\d+)/m)?.[1]) || null;
+	publish({
+		releaseName: release.name ?? `Overdeck ${release.tag_name}`,
+		releaseNotes: release.body ?? "Release notes are not available for this release.",
+		releaseUrl: release.html_url ?? null,
+		publishedAt: release.published_at ?? null,
+		targetDashboardProtocol: dashboardProtocol,
+		targetAgentProtocol: agentProtocol,
+		compatibility: dashboardProtocol === OVERDECK_DASHBOARD_PROTOCOL_VERSION && agentProtocol === OVERDECK_AGENT_PROTOCOL_VERSION ? "compatible" : "unknown"
+	});
 	electron_updater.autoUpdater.setFeedURL({
-		provider: "github",
-		owner: "eltmon",
-		repo: "overdeck"
+		provider: "generic",
+		url: `https://github.com/eltmon/overdeck/releases/download/${release.tag_name}`
 	});
-	electron_updater.autoUpdater.channel = channel;
+	electron_updater.autoUpdater.channel = channel === "canary" ? "beta" : "latest";
+}
+function initializeAutoUpdater(requestedChannel = "latest") {
+	if (initialized) return;
+	initialized = true;
+	channel = requestedChannel === "canary" || requestedChannel === "beta" ? "canary" : "stable";
+	publish({ channel });
 	electron_updater.autoUpdater.autoDownload = false;
-	electron_updater.autoUpdater.autoInstallOnAppQuit = true;
-	electron_updater.autoUpdater.on("checking-for-update", () => {
-		currentStatus = {
-			...currentStatus,
-			checking: true,
-			error: null
-		};
-		notifyStatusChange();
-		broadcastToRenderers("update-status", currentStatus);
-		console.log("[updater] Checking for update...");
-	});
-	electron_updater.autoUpdater.on("update-available", (info) => {
-		currentStatus = {
-			checking: false,
-			available: true,
-			downloaded: false,
-			version: info.version,
-			error: null
-		};
-		notifyStatusChange();
-		broadcastToRenderers("update-status", currentStatus);
-		console.log(`[updater] Update available: ${info.version}`);
-	});
-	electron_updater.autoUpdater.on("update-not-available", (info) => {
-		currentStatus = {
-			checking: false,
-			available: false,
-			downloaded: false,
-			version: info.version,
-			error: null
-		};
-		notifyStatusChange();
-		broadcastToRenderers("update-status", currentStatus);
-		console.log(`[updater] Update not available. Current version: ${info.version}`);
-	});
-	electron_updater.autoUpdater.on("download-progress", (progressObj) => {
-		const percent = progressObj.percent.toFixed(1);
-		currentStatus = {
-			...currentStatus,
-			checking: false
-		};
-		notifyStatusChange();
-		broadcastToRenderers("update-download-progress", {
-			percent,
-			transferred: progressObj.transferred,
-			total: progressObj.total
-		});
-		console.log(`[updater] Download progress: ${percent}%`);
-	});
-	electron_updater.autoUpdater.on("update-downloaded", (info) => {
-		currentStatus = {
-			checking: false,
-			available: true,
-			downloaded: true,
-			version: info.version,
-			error: null
-		};
-		notifyStatusChange();
-		broadcastToRenderers("update-status", currentStatus);
-		broadcastToRenderers("update-downloaded", { version: info.version });
-		console.log(`[updater] Update downloaded: ${info.version}`);
-	});
-	electron_updater.autoUpdater.on("error", (err) => {
-		currentStatus = {
-			checking: false,
-			available: false,
-			downloaded: false,
-			version: null,
-			error: err.message
-		};
-		notifyStatusChange();
-		broadcastToRenderers("update-status", currentStatus);
-		console.error("[updater] Error:", err.message);
-	});
+	electron_updater.autoUpdater.autoInstallOnAppQuit = false;
+	electron_updater.autoUpdater.on("checking-for-update", () => publish({
+		phase: "checking",
+		error: null
+	}));
+	electron_updater.autoUpdater.on("update-available", (info) => publish({
+		phase: "available",
+		targetVersion: info.version,
+		progressPercent: null,
+		error: null,
+		lastCheckedAt: (/* @__PURE__ */ new Date()).toISOString()
+	}));
+	electron_updater.autoUpdater.on("update-not-available", (info) => publish({
+		phase: "current",
+		targetVersion: info.version,
+		progressPercent: null,
+		error: null,
+		lastCheckedAt: (/* @__PURE__ */ new Date()).toISOString()
+	}));
+	electron_updater.autoUpdater.on("download-progress", (progress) => publish({
+		phase: "downloading",
+		progressPercent: Math.round(progress.percent * 10) / 10
+	}));
+	electron_updater.autoUpdater.on("update-downloaded", (info) => publish({
+		phase: "ready",
+		targetVersion: info.version,
+		progressPercent: 100,
+		error: null
+	}));
+	electron_updater.autoUpdater.on("error", (error) => publish({
+		phase: "error",
+		error: error.message
+	}));
 	setTimeout(() => {
 		checkForUpdates();
-	}, 3e3);
+	}, 5e3);
 	startPeriodicChecks();
 }
-/**
-* Start periodic update checks every 4 hours.
-*/
 function startPeriodicChecks() {
-	if (checkIntervalId !== null) return;
-	checkIntervalId = setInterval(() => {
+	checkIntervalId ??= setInterval(() => {
 		checkForUpdates();
 	}, FOUR_HOURS_MS);
-	console.log("[updater] Started periodic update checks (every 4 hours)");
 }
-/**
-* Check for updates manually.
-* Returns a promise that resolves when the check completes.
-*/
 async function checkForUpdates() {
-	if (currentStatus.checking) {
-		console.log("[updater] Already checking for update, skipping...");
-		return;
-	}
+	if (currentStatus.phase === "checking") return getUpdateStatus();
+	publish({
+		phase: "checking",
+		error: null
+	});
 	try {
-		console.log("[updater] Starting update check...");
+		await configureExactReleaseFeed();
 		await electron_updater.autoUpdater.checkForUpdates();
-	} catch (err) {
-		console.error("[updater] Check for updates failed:", err);
+	} catch (error) {
+		publish({
+			phase: "error",
+			error: error instanceof Error ? error.message : String(error),
+			lastCheckedAt: (/* @__PURE__ */ new Date()).toISOString()
+		});
 	}
+	return getUpdateStatus();
 }
-/**
-* Download the available update.
-*/
 async function downloadUpdate() {
-	if (!currentStatus.available) {
-		console.log("[updater] No update available to download");
-		return;
+	if (currentStatus.phase !== "available") return getUpdateStatus();
+	for (let attempt = 0; attempt < DOWNLOAD_RETRY_MS.length; attempt += 1) {
+		const delay = DOWNLOAD_RETRY_MS[attempt] ?? 0;
+		if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
+		try {
+			publish({
+				phase: "downloading",
+				error: null,
+				progressPercent: 0
+			});
+			await electron_updater.autoUpdater.downloadUpdate();
+			return getUpdateStatus();
+		} catch (error) {
+			if (attempt === DOWNLOAD_RETRY_MS.length - 1) publish({
+				phase: "error",
+				error: error instanceof Error ? error.message : String(error)
+			});
+		}
 	}
-	try {
-		console.log("[updater] Starting update download...");
-		await electron_updater.autoUpdater.downloadUpdate();
-	} catch (err) {
-		console.error("[updater] Download update failed:", err);
-	}
+	return getUpdateStatus();
 }
-/**
-* Quit and install the downloaded update.
-*/
 function quitAndInstall() {
-	if (!currentStatus.downloaded) {
-		console.log("[updater] No update downloaded to install");
-		return;
-	}
-	console.log("[updater] Quitting and installing update...");
-	electron_updater.autoUpdater.quitAndInstall();
+	if (currentStatus.phase === "ready") electron_updater.autoUpdater.quitAndInstall(false, true);
 }
-/**
-* Get current update status.
-*/
 function getUpdateStatus() {
-	return currentStatus;
+	return { ...currentStatus };
 }
 //#endregion
 //#region src/menu.ts
@@ -673,7 +663,8 @@ function buildMenuTemplate() {
 			{
 				label: "Check for Updates...",
 				click: () => {
-					checkForUpdates();
+					showOrCreateWindow();
+					dispatchMenuAction("open-updater");
 				}
 			},
 			{ type: "separator" },
@@ -713,7 +704,7 @@ function configureApplicationMenu() {
 		});
 	});
 	onUpdateStatusChange((status) => {
-		if (status.downloaded && !updateDownloaded) {
+		if (status.phase === "ready" && !updateDownloaded) {
 			updateDownloaded = true;
 			rebuildMenu();
 		}
