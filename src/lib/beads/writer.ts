@@ -1,4 +1,6 @@
 import { execFile } from 'node:child_process';
+import { readFile, readdir, stat } from 'node:fs/promises';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 import { withBdProcessLock, type BdProcessLockOptions } from '../bd-process-lock.js';
@@ -6,6 +8,7 @@ import { exportBeadsJsonl } from './export.js';
 import { recordBeadsConflict, recordBeadsPull, recordBeadsPush, recordBeadsSyncError } from './telemetry.js';
 
 const execFileAsync = promisify(execFile);
+const BD_EXEC_MAX_BUFFER = 64 * 1024 * 1024;
 
 export interface BeadsMutationProject {
   workspacePath: string;
@@ -40,16 +43,28 @@ function errorText(error: unknown): string {
   return [record.stderr, record.message, record.stdout].filter((value) => typeof value === 'string').join('\n');
 }
 
+function errorDiagnosticText(error: unknown): string {
+  if (!error || typeof error !== 'object') return String(error);
+  const record = error as Record<string, unknown>;
+  return [record.stderr, record.message].filter((value) => typeof value === 'string').join('\n');
+}
+
+export function formatMutationBatchFailure(result: Extract<MutationBatchResult<unknown>, { ok: false }>): string {
+  if (!('cause' in result)) return result.message;
+  const cause = errorText(result.cause).trim();
+  return cause ? `${result.message}\nCause: ${cause}` : result.message;
+}
+
 function isConflict(error: unknown): boolean {
-  return /conflict|non-fast-forward|rejected|diverge/i.test(errorText(error));
+  return /conflict|non-fast-forward|rejected|diverge/i.test(errorDiagnosticText(error));
 }
 
 function parseHead(status: string): string | null {
-  return /^Commit:\s*([0-9a-f]{7,40})\s*$/im.exec(status)?.[1] ?? null;
+  return /^\s*Commit:\s*([0-9a-v]{7,40})\s*$/im.exec(status)?.[1] ?? null;
 }
 
 async function defaultExecute(args: readonly string[], cwd: string): Promise<string> {
-  const { stdout } = await execFileAsync('bd', [...args], { cwd, encoding: 'utf8', timeout: 120_000 });
+  const { stdout } = await execFileAsync('bd', [...args], { cwd, encoding: 'utf8', timeout: 120_000, maxBuffer: BD_EXEC_MAX_BUFFER });
   return stdout;
 }
 
@@ -73,6 +88,28 @@ async function readRemoteHead(client: BdMutationClient): Promise<string | null> 
     return typeof head === 'string' ? head : null;
   } catch {
     return null;
+  }
+}
+
+async function hasExistingEmbeddedDoltStore(cwd: string): Promise<boolean> {
+  try {
+    const beadsDir = await resolveBeadsDir(cwd);
+    const storePath = join(beadsDir, 'embeddeddolt');
+    const storeStat = await stat(storePath);
+    if (!storeStat.isDirectory()) return false;
+    return (await readdir(storePath)).length > 0;
+  } catch {
+    return false;
+  }
+}
+
+async function resolveBeadsDir(cwd: string): Promise<string> {
+  const localBeadsDir = join(cwd, '.beads');
+  try {
+    const redirect = (await readFile(join(localBeadsDir, 'redirect'), 'utf8')).trim();
+    return redirect || localBeadsDir;
+  } catch {
+    return localBeadsDir;
   }
 }
 
@@ -102,7 +139,9 @@ export async function runMutationBatch<T>(
   return withLock(`beads mutation: ${context.reason}`, async () => {
     let value: T;
     try {
-      await client.run(['bootstrap', '--yes', '--json']);
+      if (!(await hasExistingEmbeddedDoltStore(cwd))) {
+        await client.run(['bootstrap', '--yes', '--json']);
+      }
       await client.run(['dolt', 'pull']);
       recordBeadsPull(telemetryKey, await readHead(client), await readRemoteHead(client));
       value = await mutate(client);

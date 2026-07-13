@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import { resolveSharedBeadsDir } from '../bd-process-lock.js';
 
 const execFileAsync = promisify(execFile);
+const BD_EXEC_MAX_BUFFER = 64 * 1024 * 1024;
 
 export interface BeadsExportState {
   universe: 'all';
@@ -28,12 +29,12 @@ export interface ExportBeadsResult {
 }
 
 async function defaultExecute(args: readonly string[], cwd: string): Promise<string> {
-  const { stdout } = await execFileAsync('bd', [...args], { cwd, encoding: 'utf8', timeout: 120_000 });
+  const { stdout } = await execFileAsync('bd', [...args], { cwd, encoding: 'utf8', timeout: 120_000, maxBuffer: BD_EXEC_MAX_BUFFER });
   return stdout;
 }
 
 function doltHead(status: string): string | null {
-  return /^Commit:\s*([0-9a-f]{7,40})\s*$/im.exec(status)?.[1] ?? null;
+  return /^\s*Commit:\s*([0-9a-v]{7,40})\s*$/im.exec(status)?.[1] ?? null;
 }
 
 function recordsFromJsonl(raw: string): Array<Record<string, unknown>> {

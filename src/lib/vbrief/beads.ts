@@ -19,7 +19,7 @@ import { extractACFromDocument } from './acceptance-criteria.js';
 import type { AcceptanceCriterion } from './acceptance-criteria.js';
 import { subItemsOf, type VBriefDocument, type VBriefEdge, type VBriefInspectionPolicy, type VBriefItem, type VBriefItemStatus } from './types.js';
 import { createBeadsResolver } from '../beads/resolver.js';
-import { runMutationBatch, type BdMutationClient } from '../beads/writer.js';
+import { formatMutationBatchFailure, runMutationBatch, type BdMutationClient } from '../beads/writer.js';
 import { resolveCanonicalBeadsHome } from '../beads/home.js';
 
 const execFileAsync = promisify(execFile);
@@ -333,7 +333,7 @@ export async function clearBeadsForIssue(
     { project: { workspacePath }, reason: `clear beads for ${issueLabel}`, lockOptions: options },
     (client) => clearBeadsForIssueWithClient(client, workspacePath, issueLabel, options),
   );
-  return batch.ok ? batch.value : { cleared: 0, errors: [batch.message] };
+  return batch.ok ? batch.value : { cleared: 0, errors: [formatMutationBatchFailure(batch)] };
 }
 
 async function clearBeadsForIssueWithClient(
@@ -651,7 +651,7 @@ async function createBeadsFromVBriefPromise(
   );
   return batch.ok
     ? batch.value
-    : { success: false, created: [], errors: [batch.message], beadIds: new Map() };
+    : { success: false, created: [], errors: [formatMutationBatchFailure(batch)], beadIds: new Map() };
 }
 
 /**

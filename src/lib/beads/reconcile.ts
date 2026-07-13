@@ -122,7 +122,7 @@ export async function reconcileBeads(options: ReconcileBeadsOptions) {
     const jsonlPath = join(options.stateRoot, '.beads', 'issues.jsonl');
     const stateJsonl = existsSync(jsonlPath) ? parseJsonl(await readFile(jsonlPath, 'utf8')) : [];
     const inventory = compareBeadsSources({ 'local-dolt': local, 'remote-dolt': remote, 'state-jsonl': stateJsonl });
-    const head = (raw: string) => /^Commit:\s*([0-9a-f]{7,40})\s*$/im.exec(raw)?.[1] ?? '';
+    const head = (raw: string) => /^\s*Commit:\s*([0-9a-v]{7,40})\s*$/im.exec(raw)?.[1] ?? '';
     const reportPath = join(notesDir, `beads-reconcile-${date}.md`);
     const report = reportMarkdown(options, inventory, { local: head(localHead), remote: head(remoteHead) });
     await writeFile(reportPath, report);
