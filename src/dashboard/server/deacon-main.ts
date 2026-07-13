@@ -78,7 +78,9 @@ setAgentStoppedNotifier((agentId) => {
       const state = await Effect.runPromise(getAgentState(agentId));
       if (state) {
         append(domainEvent('agent.heartbeat_dead', { agentId, issueId: state.issueId, sessionId: state.sessionId }));
-        append(domainEvent('agent.status_changed', buildAgentStatusChangedPayload(state)));
+        // PAN-2633: heartbeat_dead means the deacon has determined the tmux
+        // session is gone, so assert hasLiveTmuxSession: false explicitly.
+        append(domainEvent('agent.status_changed', buildAgentStatusChangedPayload(state, undefined, false)));
         return;
       }
       append(domainEvent('agent.heartbeat_dead', { agentId }));
