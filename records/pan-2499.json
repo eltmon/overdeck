@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-13T15:06:16.159Z",
+  "updated": "2026-07-13T15:10:25.908Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -51,9 +51,10 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "glm-5.2",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
-    "no-loss-manifest": "running"
+    "no-loss-manifest": "running",
+    "issue-view-model": "running"
   },
   "swarm": {
     "slotAssignments": [
@@ -63,6 +64,13 @@
         "agentId": "agent-pan-2499-slot-1",
         "branch": "feature/pan-2499-slot-1",
         "assignedAt": "2026-07-13T15:06:15.340Z"
+      },
+      {
+        "slotIndex": 2,
+        "itemId": "issue-view-model",
+        "agentId": "agent-pan-2499-slot-2",
+        "branch": "feature/pan-2499-slot-2",
+        "assignedAt": "2026-07-13T15:10:25.079Z"
       }
     ]
   }
