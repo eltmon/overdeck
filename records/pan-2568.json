@@ -11,16 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-13T06:58:01.009Z",
+  "updated": "2026-07-13T07:12:39.464Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T05:48:22.189Z"
+    "updatedAt": "2026-07-13T07:12:39.396Z",
+    "inspectNotes": "Bead size-scaled-waits BLOCKED: AC1 requires a 30 KB payload whose echo appears at t=6s to confirm on attempt 1 without purging. The shipped echoConfirmTimeoutMs formula in src/lib/channels/injection-budget.ts (2500 + ceil(len/1024)*100, capped 15000) yields 5500ms for a literal 30 KB payload (30720 or 30000 bytes) — an echo at t=6000ms arrives 500ms AFTER that deadline, so attempt 1 would still time out and trigger purge+retry, reproducing the exact bug this bead exists to fix. The new test in src/lib/channels/__tests__/pty-supervisor.test.ts (\"scales the echo-confirm window so a large payload confirms without purging\") does not test this: it substitutes a 36 KB payload (comment: \"36 KiB => echoConfirmTimeoutMs = 2500 + 36*100 = 6100ms\"), which does clear the 6s mark but silently avoids the 30 KB figure AC1 specifies. Required fix: either raise the ms-per-KB coefficient (or floor) in echoConfirmTimeoutMs so a literal 30 KB payload yields >=6000ms, or add/replace the test with the literal 30 KB/t=6s case from AC1 and confirm it actually passes against the real formula — do not substitute a larger payload to make the assertion pass. AC2 (0.5KB/2.5s) and AC3 (inputSettleMs pre-Enter sleep + computed-value warn log) are satisfied and not in question."
   },
   "closeOut": {
     "usage": {
@@ -32,6 +34,28 @@
             "cacheRead": 2685260,
             "cacheWrite": 148063
           }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 16036,
+            "output": 5985,
+            "cacheRead": 599805,
+            "cacheWrite": 98815
+          }
+        },
+        "work": {
+          "custom/MiniMax-M3": {
+            "input": 248850,
+            "output": 123393,
+            "cacheRead": 14008576,
+            "cacheWrite": 0
+          },
+          "custom/kimi-k2.7-code": {
+            "input": 1072427,
+            "output": 158620,
+            "cacheRead": 23329792,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
@@ -40,22 +64,43 @@
           "output": 31127,
           "cacheRead": 2685260,
           "cacheWrite": 148063
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 16036,
+          "output": 5985,
+          "cacheRead": 599805,
+          "cacheWrite": 98815
+        },
+        "custom/MiniMax-M3": {
+          "input": 248850,
+          "output": 123393,
+          "cacheRead": 14008576,
+          "cacheWrite": 0
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 1072427,
+          "output": 158620,
+          "cacheRead": 23329792,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 6.243573,
-        "pricingAsOf": "2026-07-13T05:48:22.232Z"
+        "usd": 13.01117,
+        "pricingAsOf": "2026-07-13T07:12:39.449Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "model": "claude-sonnet-5",
   "statusOverrides": {
     "injection-budget": "running",
-    "size-scaled-waits": "running",
-    "full-length-purge": "running"
+    "size-scaled-waits": "completed",
+    "full-length-purge": "running",
+    "size-scaled-waits.size-scaled-waits.ac1": "completed",
+    "size-scaled-waits.size-scaled-waits.ac2": "completed",
+    "size-scaled-waits.size-scaled-waits.ac3": "completed"
   },
   "swarm": {
     "slotAssignments": [
@@ -75,11 +120,6 @@
       }
     ],
     "slotCompletions": {
-      "2": {
-        "slotIndex": 2,
-        "agentId": "agent-pan-2568-slot-2",
-        "completedAt": "2026-07-13T06:58:00.986Z"
-      },
       "3": {
         "slotIndex": 3,
         "agentId": "agent-pan-2568-slot-3",
