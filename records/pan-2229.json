@@ -165,18 +165,17 @@
     "recordedAt": "2026-07-13T15:33:26.736Z"
   },
   "created": "2026-07-10T21:05:49.847Z",
-  "updated": "2026-07-13T19:30:43.586Z",
+  "updated": "2026-07-13T19:30:45.915Z",
   "pipeline": {
     "issueId": "PAN-2229",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T15:40:07.948Z",
-    "updatedAt": "2026-07-13T19:29:28.430Z",
+    "updatedAt": "2026-07-13T19:30:45.914Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "testNotes": "Reconciled from green GitHub Actions CI on e4571696: guard (https://github.com/eltmon/overdeck/actions/runs/29262684339/job/86859814146)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2638",
@@ -246,7 +245,9 @@
         "vitest.config.ts"
       ],
       "recordedAt": "2026-07-13T15:33:26.736Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-13T19:30:45.914Z"
   },
   "closeOut": {
     "usage": {

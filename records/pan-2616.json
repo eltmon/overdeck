@@ -86,17 +86,16 @@
     "recordedAt": "2026-07-13T14:03:46.895Z"
   },
   "created": "2026-07-13T03:17:01.668Z",
-  "updated": "2026-07-13T19:30:10.492Z",
+  "updated": "2026-07-13T19:30:12.899Z",
   "pipeline": {
     "issueId": "PAN-2616",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T14:09:14.431Z",
-    "updatedAt": "2026-07-13T19:28:29.956Z",
+    "updatedAt": "2026-07-13T19:30:12.899Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "testNotes": "Reconciled from green GitHub Actions CI on 37ffd996: guard (https://github.com/eltmon/overdeck/actions/runs/29256378410/job/86837708496)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2637",
@@ -117,7 +116,9 @@
         "src/lib/cloister/issue-closed.ts"
       ],
       "recordedAt": "2026-07-13T14:03:46.895Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-13T19:30:12.899Z"
   },
   "closeOut": {
     "usage": {
