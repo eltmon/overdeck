@@ -4,17 +4,17 @@
     "created": "2026-07-13T07:45:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2596: feat(dashboard): generic file attachment in conversation composer (+ button and drag-and-drop)",
-    "updated": "2026-07-13T08:16:05.228Z"
+    "updated": "2026-07-13T19:30:46.866Z"
   },
   "plan": {
     "id": "pan-2596",
     "title": "feat(dashboard): generic file attachment in conversation composer (+ button and drag-and-drop)",
-    "status": "running",
+    "status": "completed",
     "uid": "c02d4ab0-78a0-4f4d-aaac-35b49d7cffb1",
     "author": "agent:claude-fable-5",
-    "sequence": 9,
+    "sequence": 10,
     "created": "2026-07-13T07:45:00.000Z",
-    "updated": "2026-07-13T08:16:05.228Z",
+    "updated": "2026-07-13T19:30:46.866Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2596",
@@ -556,5 +556,5 @@
       "canonicalFilename": "2026-07-13-PAN-2596-feat-dashboard-generic-file-attachment-in-conversation-composer-button-and-drag-and-drop.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
