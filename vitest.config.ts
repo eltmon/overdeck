@@ -31,10 +31,11 @@ export default defineConfig({
     // GitHub Actions runners have limited memory (~7GB). Keep CI parallel but
     // bounded; tests that OOM under two forks need fixture/timer cleanup, not
     // suite-wide serialization. Verification runs preserve the normal local
-    // fork count so PAN-2373 only changes retry/quarantine policy there.
+    // worker count so PAN-2373 only changes retry/quarantine policy there.
     // Local development can use up to 4 workers.
-    // Vitest 4 moved these settings out of poolOptions; keeping the old shape is ignored.
-    forks: { minForks: 1, maxForks: process.env.CI ? 2 : 4, singleFork: false },
+    // Vitest 4 replaced the `forks: { minForks, maxForks }` shape with top-level
+    // `maxWorkers`; the old shape is silently ignored and defaults to CPU count.
+    maxWorkers: process.env.CI ? 2 : 4,
     // Retry once in CI, verification-gate, and flake-lane runs. Local dev stays
     // retry:0 so flakes remain visible during development. A retried-then-passed
     // test is still surfaced by vitest's default reporter.
