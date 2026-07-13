@@ -77,6 +77,9 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   try { db.exec('ALTER TABLE `review_status` ADD COLUMN `strike_recovery_count` integer DEFAULT 0'); } catch { /* already exists or table absent */ }
   try { db.exec('ALTER TABLE `review_status` ADD COLUMN `strike_landing_attempts` text'); } catch { /* already exists or table absent */ }
   ensureReleaseSetTablesSync(db);
+  // PAN-1491: existing overdeck.db files created before substrate-bug weights need
+  // the new `affected_criteria` column added idempotently.
+  try { db.exec('ALTER TABLE `flywheel_substrate_bugs` ADD COLUMN `affected_criteria` text'); } catch { /* already exists or table absent */ }
   db.exec('CREATE INDEX IF NOT EXISTS `cost_session_id_idx` ON `cost_events` (`session_id`)');
   // PAN-2507: preemptive-scheduler yield attribution on agents. The init
   // migration only runs on a fresh DB, so existing overdeck.db files need these
