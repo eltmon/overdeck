@@ -23,7 +23,7 @@
     }
   ],
   "created": "2026-07-12T22:50:33.242Z",
-  "updated": "2026-07-13T02:11:49.063Z",
+  "updated": "2026-07-13T02:25:15.158Z",
   "pipeline": {
     "issueId": "PAN-2610",
     "reviewStatus": "blocked",
@@ -32,7 +32,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T02:11:49.037Z",
+    "updatedAt": "2026-07-13T02:25:15.127Z",
     "reviewNotes": "Relative .beads/redirect targets resolve against process cwd",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2620",
     "reviewRequestedAt": "2026-07-13T00:46:26.136Z",
@@ -55,9 +55,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 535701,
-            "output": 1448,
-            "cacheRead": 476416,
+            "input": 569935,
+            "output": 1507,
+            "cacheRead": 486400,
             "cacheWrite": 0
           }
         }
@@ -76,15 +76,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 535701,
-          "output": 1448,
-          "cacheRead": 476416,
+          "input": 569935,
+          "output": 1507,
+          "cacheRead": 486400,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 18.622544,
-        "pricingAsOf": "2026-07-13T02:11:49.063Z"
+        "usd": 18.750556,
+        "pricingAsOf": "2026-07-13T02:25:15.157Z"
       }
     },
     "merges": [
