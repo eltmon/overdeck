@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-13T09:00:44.340Z",
+  "updated": "2026-07-13T09:28:13.823Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "pending",
@@ -116,7 +116,7 @@
       "3": {
         "slotIndex": 3,
         "agentId": "agent-pan-2568-slot-3",
-        "completedAt": "2026-07-13T09:00:44.297Z"
+        "completedAt": "2026-07-13T09:28:13.791Z"
       }
     }
   }
