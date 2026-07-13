@@ -12,235 +12,14 @@
       "reason": "resume",
       "agentModel": "claude-fable-5",
       "timestamp": "2026-07-13T04:08:59.678Z"
+    },
+    {
+      "timestamp": "2026-07-13T11:42:21.318Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
-  "created": "2026-07-12T22:33:37.108Z",
-  "updated": "2026-07-13T11:42:15.998Z",
-  "pipeline": {
-    "issueId": "PAN-2602",
-    "reviewStatus": "failed",
-    "testStatus": "pending",
-    "verificationStatus": "pending",
-    "inspectStatus": "passed",
-    "mergeStatus": "pending",
-    "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-13T11:41:23.936Z",
-    "reviewNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf set-option -t agent-pan-2602-review destroy-unattached off\nno such session: agent-pan-2602-review\n",
-    "inspectNotes": "Bead beads-rollup-service ack: extractIssueLabels() now gates bare word-number labels through project.issuePrefixes, preventing phase-N labels from creating spurious rollups; tests cover phase exclusion and workspace: label mapping.",
-    "reviewRequestedAt": "2026-07-13T11:41:22.124Z",
-    "reviewSpawnedAt": "2026-07-13T11:41:22.823Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {
-        "codex": {
-          "openai/codex-auto-review": {
-            "input": 327529,
-            "output": 1635,
-            "cacheRead": 209536,
-            "cacheWrite": 0
-          },
-          "openai/gpt-5.5": {
-            "input": 7450281,
-            "output": 14466,
-            "cacheRead": 7300992,
-            "cacheWrite": 0
-          },
-          "openai/gpt-5.6-sol": {
-            "input": 650237,
-            "output": 2460,
-            "cacheRead": 564992,
-            "cacheWrite": 0
-          }
-        },
-        "memory-extraction": {
-          "anthropic/claude-haiku-4-5": {
-            "input": 271,
-            "output": 200,
-            "cacheRead": 0,
-            "cacheWrite": 0
-          }
-        },
-        "plan": {
-          "anthropic/claude-fable-5": {
-            "input": 46502,
-            "output": 143772,
-            "cacheRead": 34086873,
-            "cacheWrite": 683275
-          }
-        },
-        "review.supervisor": {
-          "anthropic/claude-sonnet-5": {
-            "input": 17572,
-            "output": 14782,
-            "cacheRead": 2384051,
-            "cacheWrite": 120513
-          }
-        },
-        "work": {
-          "custom/kimi-k2.7-code": {
-            "input": 3167433,
-            "output": 498960,
-            "cacheRead": 238704896,
-            "cacheWrite": 0
-          }
-        }
-      },
-      "totals": {
-        "openai/codex-auto-review": {
-          "input": 327529,
-          "output": 1635,
-          "cacheRead": 209536,
-          "cacheWrite": 0
-        },
-        "openai/gpt-5.5": {
-          "input": 7450281,
-          "output": 14466,
-          "cacheRead": 7300992,
-          "cacheWrite": 0
-        },
-        "openai/gpt-5.6-sol": {
-          "input": 650237,
-          "output": 2460,
-          "cacheRead": 564992,
-          "cacheWrite": 0
-        },
-        "anthropic/claude-haiku-4-5": {
-          "input": 271,
-          "output": 200,
-          "cacheRead": 0,
-          "cacheWrite": 0
-        },
-        "anthropic/claude-fable-5": {
-          "input": 46502,
-          "output": 143772,
-          "cacheRead": 34086873,
-          "cacheWrite": 683275
-        },
-        "anthropic/claude-sonnet-5": {
-          "input": 17572,
-          "output": 14782,
-          "cacheRead": 2384051,
-          "cacheWrite": 120513
-        },
-        "custom/kimi-k2.7-code": {
-          "input": 3167433,
-          "output": 498960,
-          "cacheRead": 238704896,
-          "cacheWrite": 0
-        }
-      },
-      "costAtCloseOut": {
-        "usd": 107.327529,
-        "pricingAsOf": "2026-07-13T11:41:24.000Z"
-      }
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "codex",
-  "model": "gpt-5.5",
-  "statusOverrides": {
-    "sync-local-write-detection": "completed",
-    "branch-ahead-signal": "completed",
-    "handoff-issue-flag": "completed",
-    "stalled-surface": "completed",
-    "stalled-surface.ac1": "completed",
-    "stalled-surface.ac2": "completed",
-    "stalled-surface.ac3": "completed",
-    "docs-update": "completed",
-    "docs-update.ac1": "completed",
-    "docs-update.ac2": "completed",
-    "docs-update.ac3": "completed",
-    "conversation-nesting-frontend": "completed",
-    "conversation-nesting-frontend.ac1": "completed",
-    "conversation-nesting-frontend.ac2": "completed",
-    "conversation-nesting-frontend.ac3": "completed",
-    "pipeline-signal-union": "completed",
-    "pipeline-signal-union.ac1": "completed",
-    "pipeline-signal-union.ac2": "completed",
-    "pipeline-signal-union.ac3": "completed",
-    "pipeline-signal-union.ac4": "completed",
-    "pipeline-signal-union.ac5": "completed",
-    "sweep-backfill-cmd": "completed",
-    "sweep-backfill-cmd.ac1": "completed",
-    "sweep-backfill-cmd.ac2": "completed",
-    "sweep-backfill-cmd.ac3": "completed",
-    "sweep-backfill-cmd.ac4": "completed",
-    "merge-sweep-hook": "completed",
-    "merge-sweep-hook.ac1": "completed",
-    "merge-sweep-hook.ac2": "completed",
-    "merge-sweep-hook.ac3": "completed",
-    "closeout-sweep-hook": "completed",
-    "closeout-sweep-hook.ac1": "completed",
-    "closeout-sweep-hook.ac2": "completed",
-    "closeout-sweep-hook.ac3": "completed",
-    "handoff-issue-autodetect": "completed",
-    "handoff-issue-autodetect.ac1": "completed",
-    "handoff-issue-autodetect.ac2": "completed",
-    "handoff-issue-autodetect.ac3": "completed",
-    "conversation-signal": "completed",
-    "conversation-signal.ac1": "completed",
-    "conversation-signal.ac2": "completed",
-    "conversation-signal.ac3": "completed",
-    "verification-open-beads-gate": "completed",
-    "verification-open-beads-gate.ac1": "completed",
-    "verification-open-beads-gate.ac2": "completed",
-    "verification-open-beads-gate.ac3": "completed",
-    "verification-open-beads-gate.ac4": "completed",
-    "orphaned-beads-sweep-module": "completed",
-    "orphaned-beads-sweep-module.ac1": "completed",
-    "orphaned-beads-sweep-module.ac2": "completed",
-    "orphaned-beads-sweep-module.ac3": "completed",
-    "orphaned-beads-sweep-module.ac4": "completed",
-    "handoff-issue-flag.ac1": "completed",
-    "handoff-issue-flag.ac2": "completed",
-    "handoff-issue-flag.ac3": "completed",
-    "handoff-issue-flag.ac4": "completed",
-    "branch-ahead-signal.ac1": "completed",
-    "branch-ahead-signal.ac2": "completed",
-    "branch-ahead-signal.ac3": "completed",
-    "beads-rollup-service": "completed",
-    "beads-rollup-service.ac1": "completed",
-    "beads-rollup-service.ac2": "completed",
-    "beads-rollup-service.ac3": "completed",
-    "beads-rollup-service.ac4": "completed",
-    "sync-local-write-detection.ac1": "completed",
-    "sync-local-write-detection.ac2": "completed",
-    "sync-local-write-detection.ac3": "completed"
-  },
-  "swarm": {
-    "slotAssignments": [
-      {
-        "slotIndex": 2,
-        "itemId": "branch-ahead-signal",
-        "agentId": "agent-pan-2602-slot-2",
-        "branch": "feature/pan-2602-slot-2",
-        "assignedAt": "2026-07-13T08:39:46.284Z"
-      },
-      {
-        "slotIndex": 3,
-        "itemId": "handoff-issue-flag",
-        "agentId": "agent-pan-2602-slot-3",
-        "branch": "feature/pan-2602-slot-3",
-        "assignedAt": "2026-07-13T08:59:19.495Z"
-      }
-    ],
-    "slotCompletions": {
-      "2": {
-        "slotIndex": 2,
-        "agentId": "agent-pan-2602-slot-2",
-        "completedAt": "2026-07-13T11:26:36.031Z"
-      },
-      "3": {
-        "slotIndex": 3,
-        "agentId": "agent-pan-2602-slot-3",
-        "completedAt": "2026-07-13T11:05:35.807Z"
-      }
-    }
-  },
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
@@ -359,5 +138,353 @@
       "tests/unit/lib/webhook-handlers.test.ts"
     ],
     "recordedAt": "2026-07-13T11:42:15.994Z"
+  },
+  "created": "2026-07-12T22:33:37.108Z",
+  "updated": "2026-07-13T11:42:21.446Z",
+  "pipeline": {
+    "issueId": "PAN-2602",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-13T11:42:21.322Z",
+    "reviewNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf set-option -t agent-pan-2602-review destroy-unattached off\nno such session: agent-pan-2602-review\n",
+    "inspectNotes": "Bead beads-rollup-service ack: extractIssueLabels() now gates bare word-number labels through project.issuePrefixes, preventing phase-N labels from creating spurious rollups; tests cover phase exclusion and workspace: label mapping.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2636",
+    "reviewRequestedAt": "2026-07-13T11:42:21.321Z",
+    "reviewSpawnedAt": "2026-07-13T11:41:22.823Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "scripts/file-size-baseline.txt",
+        "src/cli/commands/__tests__/handoff.test.ts",
+        "src/cli/commands/close.ts",
+        "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+        "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+        "src/dashboard/server/services/beads-rollup-singleton.ts",
+        "src/dashboard/server/services/resource-discovery-signals.ts",
+        "src/lib/work/done-preflight.ts",
+        "sync-sources/skills/pan-handoff/SKILL.md",
+        "tests/cloister/verification-runner.test.ts",
+        "tests/dashboard/beads-freshness.test.ts",
+        "tests/unit/cli/fork-client.test.ts",
+        "tests/unit/dashboard/server/routes/conversations-fork-pipeline.test.ts",
+        "tests/unit/dashboard/server/services/resource-discovery.test.ts",
+        "tests/unit/lib/cloister/postmerge-auto-retro.test.ts",
+        "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts",
+        "tests/unit/lib/lifecycle/orphaned-beads-sweep.test.ts",
+        "tests/unit/lib/lifecycle/workflows.test.ts",
+        "tests/unit/lib/webhook-handlers.test.ts"
+      ],
+      "declaredScopeUntouched": [
+        "skills/pan-handoff/SKILL.md",
+        "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+        "src/dashboard/server/services/__tests__/beads-sync-service.test.ts",
+        "src/dashboard/server/services/__tests__/resource-discovery.test.ts",
+        "src/dashboard/server/services/conversation-lifecycle.ts",
+        "src/lib/cloister/__tests__/verification-runner.test.ts",
+        "src/lib/lifecycle/__tests__/orphaned-beads-sweep.test.ts",
+        "src/lib/lifecycle/__tests__/workflows.test.ts",
+        "tests/unit/lib/cloister/in-flight-guard.test.ts"
+      ],
+      "declaredScope": [
+        "CLAUDE.md",
+        "configuration/beads.mdx",
+        "docs/BEADS.md",
+        "skills/pan-handoff/SKILL.md",
+        "src/cli/commands/__tests__/beads-sweep.test.ts",
+        "src/cli/commands/beads.ts",
+        "src/cli/commands/fork-client.ts",
+        "src/cli/commands/handoff.ts",
+        "src/cli/index.ts",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/__tests__/pipeline-helpers.test.ts",
+        "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/pipeline-helpers.ts",
+        "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+        "src/dashboard/server/main.ts",
+        "src/dashboard/server/services/__tests__/beads-rollup-service.test.ts",
+        "src/dashboard/server/services/__tests__/beads-sync-service.test.ts",
+        "src/dashboard/server/services/__tests__/resource-discovery.test.ts",
+        "src/dashboard/server/services/beads-rollup-service.ts",
+        "src/dashboard/server/services/beads-sync-service.ts",
+        "src/dashboard/server/services/conversation-lifecycle.ts",
+        "src/dashboard/server/services/resource-discovery.ts",
+        "src/lib/cloister/__tests__/verification-runner.test.ts",
+        "src/lib/cloister/merge-agent.ts",
+        "src/lib/cloister/verification-runner.ts",
+        "src/lib/lifecycle/__tests__/orphaned-beads-sweep.test.ts",
+        "src/lib/lifecycle/__tests__/workflows.test.ts",
+        "src/lib/lifecycle/orphaned-beads-sweep.ts",
+        "src/lib/lifecycle/workflows.ts",
+        "src/lib/overdeck/conversation-forks.ts",
+        "src/lib/overdeck/conversations.ts",
+        "src/lib/webhook-handlers.ts",
+        "tests/unit/lib/cloister/in-flight-guard.test.ts"
+      ],
+      "actualChangedFiles": [
+        "CLAUDE.md",
+        "configuration/beads.mdx",
+        "docs/BEADS.md",
+        "scripts/file-size-baseline.txt",
+        "src/cli/commands/__tests__/beads-sweep.test.ts",
+        "src/cli/commands/__tests__/handoff.test.ts",
+        "src/cli/commands/beads.ts",
+        "src/cli/commands/close.ts",
+        "src/cli/commands/fork-client.ts",
+        "src/cli/commands/handoff.ts",
+        "src/cli/index.ts",
+        "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/__tests__/pipeline-helpers.test.ts",
+        "src/dashboard/frontend/src/components/CommandDeck/pipeline-helpers.ts",
+        "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+        "src/dashboard/server/main.ts",
+        "src/dashboard/server/services/__tests__/beads-rollup-service.test.ts",
+        "src/dashboard/server/services/beads-rollup-service.ts",
+        "src/dashboard/server/services/beads-rollup-singleton.ts",
+        "src/dashboard/server/services/beads-sync-service.ts",
+        "src/dashboard/server/services/resource-discovery-signals.ts",
+        "src/dashboard/server/services/resource-discovery.ts",
+        "src/lib/cloister/merge-agent.ts",
+        "src/lib/cloister/verification-runner.ts",
+        "src/lib/lifecycle/orphaned-beads-sweep.ts",
+        "src/lib/lifecycle/workflows.ts",
+        "src/lib/overdeck/conversation-forks.ts",
+        "src/lib/overdeck/conversations.ts",
+        "src/lib/webhook-handlers.ts",
+        "src/lib/work/done-preflight.ts",
+        "sync-sources/skills/pan-handoff/SKILL.md",
+        "tests/cloister/verification-runner.test.ts",
+        "tests/dashboard/beads-freshness.test.ts",
+        "tests/unit/cli/fork-client.test.ts",
+        "tests/unit/dashboard/server/routes/conversations-fork-pipeline.test.ts",
+        "tests/unit/dashboard/server/services/resource-discovery.test.ts",
+        "tests/unit/lib/cloister/postmerge-auto-retro.test.ts",
+        "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts",
+        "tests/unit/lib/lifecycle/orphaned-beads-sweep.test.ts",
+        "tests/unit/lib/lifecycle/workflows.test.ts",
+        "tests/unit/lib/webhook-handlers.test.ts"
+      ],
+      "recordedAt": "2026-07-13T11:42:15.994Z"
+    }
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 327529,
+            "output": 1635,
+            "cacheRead": 209536,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.5": {
+            "input": 7450281,
+            "output": 14466,
+            "cacheRead": 7300992,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 650237,
+            "output": 2460,
+            "cacheRead": 564992,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 271,
+            "output": 200,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 46502,
+            "output": 143772,
+            "cacheRead": 34086873,
+            "cacheWrite": 683275
+          }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 17572,
+            "output": 14782,
+            "cacheRead": 2384051,
+            "cacheWrite": 120513
+          }
+        },
+        "work": {
+          "custom/kimi-k2.7-code": {
+            "input": 3172553,
+            "output": 500192,
+            "cacheRead": 240147712,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/codex-auto-review": {
+          "input": 327529,
+          "output": 1635,
+          "cacheRead": 209536,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.5": {
+          "input": 7450281,
+          "output": 14466,
+          "cacheRead": 7300992,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 650237,
+          "output": 2460,
+          "cacheRead": 564992,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-haiku-4-5": {
+          "input": 271,
+          "output": 200,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 46502,
+          "output": 143772,
+          "cacheRead": 34086873,
+          "cacheWrite": 683275
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 17572,
+          "output": 14782,
+          "cacheRead": 2384051,
+          "cacheWrite": 120513
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 3172553,
+          "output": 500192,
+          "cacheRead": 240147712,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 107.611457,
+        "pricingAsOf": "2026-07-13T11:42:21.445Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2636"
+    ],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
+  "statusOverrides": {
+    "sync-local-write-detection": "completed",
+    "branch-ahead-signal": "completed",
+    "handoff-issue-flag": "completed",
+    "stalled-surface": "completed",
+    "stalled-surface.ac1": "completed",
+    "stalled-surface.ac2": "completed",
+    "stalled-surface.ac3": "completed",
+    "docs-update": "completed",
+    "docs-update.ac1": "completed",
+    "docs-update.ac2": "completed",
+    "docs-update.ac3": "completed",
+    "conversation-nesting-frontend": "completed",
+    "conversation-nesting-frontend.ac1": "completed",
+    "conversation-nesting-frontend.ac2": "completed",
+    "conversation-nesting-frontend.ac3": "completed",
+    "pipeline-signal-union": "completed",
+    "pipeline-signal-union.ac1": "completed",
+    "pipeline-signal-union.ac2": "completed",
+    "pipeline-signal-union.ac3": "completed",
+    "pipeline-signal-union.ac4": "completed",
+    "pipeline-signal-union.ac5": "completed",
+    "sweep-backfill-cmd": "completed",
+    "sweep-backfill-cmd.ac1": "completed",
+    "sweep-backfill-cmd.ac2": "completed",
+    "sweep-backfill-cmd.ac3": "completed",
+    "sweep-backfill-cmd.ac4": "completed",
+    "merge-sweep-hook": "completed",
+    "merge-sweep-hook.ac1": "completed",
+    "merge-sweep-hook.ac2": "completed",
+    "merge-sweep-hook.ac3": "completed",
+    "closeout-sweep-hook": "completed",
+    "closeout-sweep-hook.ac1": "completed",
+    "closeout-sweep-hook.ac2": "completed",
+    "closeout-sweep-hook.ac3": "completed",
+    "handoff-issue-autodetect": "completed",
+    "handoff-issue-autodetect.ac1": "completed",
+    "handoff-issue-autodetect.ac2": "completed",
+    "handoff-issue-autodetect.ac3": "completed",
+    "conversation-signal": "completed",
+    "conversation-signal.ac1": "completed",
+    "conversation-signal.ac2": "completed",
+    "conversation-signal.ac3": "completed",
+    "verification-open-beads-gate": "completed",
+    "verification-open-beads-gate.ac1": "completed",
+    "verification-open-beads-gate.ac2": "completed",
+    "verification-open-beads-gate.ac3": "completed",
+    "verification-open-beads-gate.ac4": "completed",
+    "orphaned-beads-sweep-module": "completed",
+    "orphaned-beads-sweep-module.ac1": "completed",
+    "orphaned-beads-sweep-module.ac2": "completed",
+    "orphaned-beads-sweep-module.ac3": "completed",
+    "orphaned-beads-sweep-module.ac4": "completed",
+    "handoff-issue-flag.ac1": "completed",
+    "handoff-issue-flag.ac2": "completed",
+    "handoff-issue-flag.ac3": "completed",
+    "handoff-issue-flag.ac4": "completed",
+    "branch-ahead-signal.ac1": "completed",
+    "branch-ahead-signal.ac2": "completed",
+    "branch-ahead-signal.ac3": "completed",
+    "beads-rollup-service": "completed",
+    "beads-rollup-service.ac1": "completed",
+    "beads-rollup-service.ac2": "completed",
+    "beads-rollup-service.ac3": "completed",
+    "beads-rollup-service.ac4": "completed",
+    "sync-local-write-detection.ac1": "completed",
+    "sync-local-write-detection.ac2": "completed",
+    "sync-local-write-detection.ac3": "completed"
+  },
+  "swarm": {
+    "slotAssignments": [
+      {
+        "slotIndex": 2,
+        "itemId": "branch-ahead-signal",
+        "agentId": "agent-pan-2602-slot-2",
+        "branch": "feature/pan-2602-slot-2",
+        "assignedAt": "2026-07-13T08:39:46.284Z"
+      },
+      {
+        "slotIndex": 3,
+        "itemId": "handoff-issue-flag",
+        "agentId": "agent-pan-2602-slot-3",
+        "branch": "feature/pan-2602-slot-3",
+        "assignedAt": "2026-07-13T08:59:19.495Z"
+      }
+    ],
+    "slotCompletions": {
+      "2": {
+        "slotIndex": 2,
+        "agentId": "agent-pan-2602-slot-2",
+        "completedAt": "2026-07-13T11:26:36.031Z"
+      },
+      "3": {
+        "slotIndex": 3,
+        "agentId": "agent-pan-2602-slot-3",
+        "completedAt": "2026-07-13T11:05:35.807Z"
+      }
+    }
   }
 }
