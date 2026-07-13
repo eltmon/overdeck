@@ -370,21 +370,21 @@
   ],
   "feedback": [],
   "created": "2026-07-12T20:45:31.659Z",
-  "updated": "2026-07-13T17:05:52.847Z",
+  "updated": "2026-07-13T17:06:33.196Z",
   "pipeline": {
     "issueId": "PAN-1232",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "passed",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T15:01:32.197Z",
-    "updatedAt": "2026-07-13T17:05:52.737Z",
+    "updatedAt": "2026-07-13T17:06:33.135Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2604",
     "lastVerifiedCommit": "ab6ec68f49fa280b7cf8499ce70a444de95057ce",
     "reviewRequestedAt": "2026-07-13T15:43:07.129Z",
-    "reviewSpawnedAt": "2026-07-13T16:15:32.896Z"
+    "reviewSpawnedAt": "2026-07-13T17:06:33.135Z"
   },
   "closeOut": {
     "usage": {
@@ -442,7 +442,7 @@
       },
       "costAtCloseOut": {
         "usd": 47.192589,
-        "pricingAsOf": "2026-07-13T17:05:52.845Z"
+        "pricingAsOf": "2026-07-13T17:06:33.187Z"
       }
     },
     "merges": [
