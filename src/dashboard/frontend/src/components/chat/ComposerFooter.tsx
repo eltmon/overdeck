@@ -34,7 +34,7 @@ import {
   sendConversationMessage,
   getAttachmentAccept,
 } from '../../lib/composerStore';
-import { isDotfileAttachment, isExtensionlessAttachment } from '../../lib/attachmentTypes';
+import { classifyAttachmentKind, isDotfileAttachment, isExtensionlessAttachment } from '../../lib/attachmentTypes';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // Pending-attachment state and its upload pump live in `lib/composerStore.ts` so they
@@ -141,7 +141,7 @@ export function ComposerFooter({
     const imageFiles: File[] = [];
     const nonImageFiles: File[] = [];
     for (const file of files) {
-      if (file.type.startsWith('image/')) {
+      if (classifyAttachmentKind(file) === 'image') {
         imageFiles.push(file);
       } else {
         nonImageFiles.push(file);

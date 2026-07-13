@@ -936,6 +936,45 @@ describe('ComposerFooter attachments', () => {
     expect(screen.queryByText('drop-image.png')).not.toBeInTheDocument();
   });
 
+  it('drops images with empty MIME type on non-vision models', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/upload-image')) {
+        return new Response(JSON.stringify({ path: '/tmp/overdeck-dropped.md' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.includes('/api/settings/claude-auth')) {
+        return Promise.resolve(new Response(JSON.stringify({ loggedIn: true, hasAnthropicApiKey: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }));
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    vi.mocked(modelSupportsImages).mockReturnValue(false);
+    vi.mocked(findModelDef).mockReturnValue({ name: 'MiMo V2.5 Pro' } as ReturnType<typeof findModelDef>);
+
+    render(<ComposerFooter conversation={conversation} />);
+
+    const image = new File(['png-bytes'], 'drop-image.png', { type: '' });
+
+    fireEvent.drop(screen.getByTestId('composer-editor'), {
+      dataTransfer: { files: [image], items: [{ kind: 'file' }] },
+    });
+
+    await waitFor(() => {
+      expect(mockToastWarning).toHaveBeenCalledWith(
+        "MiMo V2.5 Pro can't read images — image not attached. Switch to a vision-capable model (e.g. MiMo V2.5) to send images.",
+      );
+    });
+
+    expect(screen.queryByText('drop-image.png')).not.toBeInTheDocument();
+  });
+
   it('accepts all allowed file kinds on vision models', async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockImplementation(async (input) => {
