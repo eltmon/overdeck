@@ -2,7 +2,7 @@
   "issueId": "PAN-2499",
   "schemaVersion": 2,
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-13T13:51:25.019Z",
+  "updated": "2026-07-13T13:51:27.507Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-2499: feat(dashboard): unify the three issue views into one progressive-density Issue View (rail · cockpit · console)",
       "timestamp": "2026-07-13T13:51:25.019Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
