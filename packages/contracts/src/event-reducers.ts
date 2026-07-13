@@ -384,6 +384,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
             pendingInputCount: event.payload.pendingInputCount,
             pendingInputKinds: event.payload.pendingInputKinds,
             pendingAskUserQuestion: event.payload.pendingAskUserQuestion,
+            pendingProposedPlan: event.payload.pendingProposedPlan,
             resolution: event.payload.resolution,
             resolutionCount: event.payload.resolutionCount,
           },
@@ -498,6 +499,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
           delete base['pendingInputCount']
           delete base['pendingInputKinds']
           delete base['pendingAskUserQuestion']
+          delete base['pendingProposedPlan']
         }
         return base as AgentSnapshot
       })()

@@ -325,6 +325,13 @@ export const AgentSnapshot = Schema.Struct({
       })),
     })),
   })),
+  // PAN-1520 (FR-1) — plan markdown for a pending ExitPlanMode so the operator
+  // can approve/reject from a dashboard modal instead of only the terminal.
+  pendingProposedPlan: Schema.optional(Schema.Struct({
+    toolUseId: Schema.String,
+    askedAt: Schema.String,
+    plan: Schema.String,
+  })),
   resolution: Schema.optional(AgentResolution),
   resolutionCount: Schema.optional(Schema.Number),
   // PAN-800 — bumped on every runtime event so subscribers can cheaply detect

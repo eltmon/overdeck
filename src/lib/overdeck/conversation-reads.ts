@@ -339,6 +339,9 @@ export async function getConversationsPendingInputFeed(
       alive.map((conv) => Effect.promise(async () => {
         const convSf = await deps.resolveSessionFile(conv);
         let pending: PendingAskUserQuestionSnapshot | undefined;
+        // PAN-1520 (FR-2) — pending ExitPlanMode plan payload, so the plan
+        // approval modal covers conversation sessions too.
+        let pendingPlan: { toolUseId: string; askedAt: string; plan: string } | undefined;
         let lastActivityAt: string | null = null;
         if (convSf && existsSync(convSf)) {
           try {
@@ -347,7 +350,9 @@ export async function getConversationsPendingInputFeed(
             // non-fatal — askedAt falls back to now for the codex path
           }
           try {
-            pending = askUserQuestionSnapshotFromScan(await scanPendingInputsPromise(convSf));
+            const scan = await scanPendingInputsPromise(convSf);
+            pending = askUserQuestionSnapshotFromScan(scan);
+            pendingPlan = scan.pendingProposedPlan;
           } catch {
             // JSONL scan failure — non-fatal
           }
@@ -360,12 +365,13 @@ export async function getConversationsPendingInputFeed(
           );
           if (codex.approval) pending = codex.approval;
         }
-        if (!pending) return null;
+        if (!pending && !pendingPlan) return null;
         return {
           name: conv.name,
           title: conv.title ?? null,
           issueId: conv.issueId ?? null,
-          pendingAskUserQuestion: pending,
+          ...(pending ? { pendingAskUserQuestion: pending } : {}),
+          ...(pendingPlan ? { pendingProposedPlan: pendingPlan } : {}),
         };
       })),
       8,
