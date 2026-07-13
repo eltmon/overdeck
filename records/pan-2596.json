@@ -99,19 +99,18 @@
     "recordedAt": "2026-07-13T09:57:24.734Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T10:24:19.115Z",
+  "updated": "2026-07-13T10:25:04.532Z",
   "pipeline": {
     "issueId": "PAN-2596",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T10:24:18.371Z",
+    "updatedAt": "2026-07-13T10:25:04.444Z",
     "reviewNotes": "Dotfile and extensionless filenames bypass rejection when declared as images",
-    "verificationNotes": "Verification FAILED at test (107741ms):\n\n[2m) // element.getAttribute(\"href\") === \"https://example.com/\"\u001b[22m\n\nExpected the element to have attribute:\n\u001b[32m  href=\"https://example.com/\"\u001b[39m\nReceived:\n\u001b[31m  href=\"https://example.com\"\u001b[39m\n\nIgnored nodes: comments, script, style\n\u001b[36m<html>\u001b[39m\n  \u001b[36m<head />\u001b[39m\n  \u001b[36m<body>\u001b[39m\n    \u001b[36m<div>\u001b[39m\n      \u001b[36m<div\u001b[39m\n        \u001b[33mclass\u001b[39m=\u001b[32m\"_chatMarkdown_10de07\"\u001b[39m\n      \u001b[36m>\u001b[39m\n        \u001b[36m<div\u001b[39m\n          \u001b[33mclass\u001b[39m=\u001b[32m\"space-y-4 whitespace-normal [&>*:first-child]:mt-0 [&>*:last-child]:mb-0\"\u001b[39m\n        \u001b[36m>\u001b[39m\n          \u001b[36m<p>\u001b[39m\n            \u001b[0mVisit \u001b[0m\n            \u001b[36m<a\u001b[39m\n              \u001b[33mclass\u001b[39m=\u001b[32m\"_mdLink_10de07\"\u001b[39m\n              \u001b[33mhref\u001b[39m=\u001b[32m\"https://example.com/\"\u001b[39m\n              \u001b[33mrel\u001b[39m=\u001b[32m\"noopener noreferrer\"\u001b[39m\n              \u001b[33mtarget\u001b[39m=\u001b[32m\"_blank\"\u001b[39m\n            \u001b[36m>\u001b[39m\n              \u001b[0msite\u001b[0m\n            \u001b[36m</a>\u001b[39m\n            \u001b[0m.\u001b[0m\n          \u001b[36m</p>\u001b[39m\n        \u001b[36m</div>\u001b[39m\n      \u001b[36m</div>\u001b[39m\n    \u001b[36m</div>\u001b[39m\n  \u001b[36m</body>\u001b[39m\n\u001b[36m</html>\u001b[39m...\n ❯ src/components/chat/__tests__/ChatMarkdown.test.tsx:121:42\n    119|\n    120|     const external = await screen.findByRole('link', { name: 'site' });\n    121|     await waitFor(() => expect(external).toHaveAttribute('href', 'http…\n       |                                          ^\n    122|     expect(external).toHaveAttribute('target', '_blank');\n    123|     expect(external).toHaveAttribute('rel', 'noopener noreferrer');\n ❯ runWithExpensiveErrorDiagnosticsDisabled ../../../node_modules/.bun/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/config.js:47:12\n ❯ checkCallback ../../../node_modules/.bun/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/wait-for.js:124:77\n ❯ Timeout.checkRealTimersCallback ../../../node_modules/.bun/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/wait-for.js:118:16\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n",
     "inspectNotes": "Bead server-upload-allowlist ack: validateUploadPayload correctly gates UTF-8 text extensions, PDF %PDF- magic prefix, and disallowed/extension-less types with 400s naming the mismatch, while preserving image magic-byte validation and <uuid><ext> naming; non-image files get <uuid>-<sanitized-name><ext>. All 5 ACs verified against diff + accompanying unit tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2634",
     "lastVerifiedCommit": "6963ab31309ae138d5532a7150447e95fcc1bcaa",
@@ -143,24 +142,6 @@
         "tests/unit/lib/overdeck/conversation-upload-validation.test.ts"
       ],
       "recordedAt": "2026-07-13T09:47:33.191Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "6963ab31309ae138d5532a7150447e95fcc1bcaa"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "6963ab31309ae138d5532a7150447e95fcc1bcaa"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "6963ab31309ae138d5532a7150447e95fcc1bcaa"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "6963ab31309ae138d5532a7150447e95fcc1bcaa"
-      }
     }
   },
   "closeOut": {
@@ -253,7 +234,7 @@
       },
       "costAtCloseOut": {
         "usd": 41.391299000000004,
-        "pricingAsOf": "2026-07-13T10:24:18.439Z"
+        "pricingAsOf": "2026-07-13T10:25:04.526Z"
       }
     },
     "merges": [
