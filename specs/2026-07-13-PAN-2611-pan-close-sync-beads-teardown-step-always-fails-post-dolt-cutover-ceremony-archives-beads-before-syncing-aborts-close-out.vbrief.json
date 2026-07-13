@@ -4,17 +4,17 @@
     "created": "2026-07-13T03:26:05Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2611: pan close: sync-beads teardown step always fails post-Dolt-cutover — ceremony archives .beads/ before syncing, aborts close-out",
-    "updated": "2026-07-13T05:32:25.784Z"
+    "updated": "2026-07-13T14:35:59.400Z"
   },
   "plan": {
     "id": "pan-2611",
     "title": "pan close: sync-beads teardown step always fails post-Dolt-cutover — ceremony archives .beads/ before syncing, aborts close-out",
-    "status": "running",
+    "status": "completed",
     "uid": "6bae9409-5439-4fb2-9201-641a08dd5820",
     "author": "agent:claude-fable-5",
-    "sequence": 9,
+    "sequence": 10,
     "created": "2026-07-13T03:26:05Z",
-    "updated": "2026-07-13T05:32:25.784Z",
+    "updated": "2026-07-13T14:35:59.400Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2611",
@@ -387,5 +387,5 @@
       "canonicalFilename": "2026-07-13-PAN-2611-pan-close-sync-beads-teardown-step-always-fails-post-dolt-cutover-ceremony-archives-beads-before-syncing-aborts-close-out.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
