@@ -1,211 +1,248 @@
-# AskUserQuestion in the dashboard — pipeline, the 2026-05-31 outage, and the "Needs you" recovery
+# Unified pending input in the dashboard
 
-This documents how an agent's **AskUserQuestion** (AUQ) becomes a clickable
-dialog in the dashboard, the two root-cause bugs that silently broke it, and the
-"Needs you" recovery surface added so a dismissed question is never stranded.
+This documents PAN-1520's unified "agent awaiting input" subsystem: how an
+operator-blocking surface becomes visible in the dashboard, which payloads are
+actionable, and where to debug when an indicator, modal, notification, or
+"Needs you" row is missing.
 
-It is written as a debugging field guide: if the Q&A popup "doesn't appear", read
-this before touching anything.
+The original version of this doc covered only AskUserQuestion (AUQ). AUQ is now
+one source in a broader pending-input system that also covers plan approval,
+plan drafting, channel permission requests, session-resume waits, and known
+interactive harness modals.
 
 ## TL;DR
 
-- The popup is driven **entirely by the Zustand store**, not `/api/agents`.
-- A **PreToolUse hook deny** is what makes a native AUQ detectable at all.
-- Two bugs broke it: (1) the tmux-liveness check ignored `planning-`/`conv-`/
-  `strike-` sessions, and (2) the enrichment poller `await`ed an **Effect**
-  instead of running it, nulling every enrichment field for every agent.
-- ESC on the dialog used to strand the question; the **"Needs you"** section in
-  the activity feeds now re-opens it on click.
+- `pendingInputKinds` is the shared vocabulary for blocking surfaces:
+  `askUserQuestion`, `permissionRequest`, `exitPlanMode`, `enterPlanMode`,
+  `sessionResume`, and `rateLimit`.
+- `pendingAskUserQuestion` is an actionable AUQ payload used by
+  `AskUserQuestionDialog`. Do not treat it as the whole pending-input system.
+- `pendingProposedPlan` is the actionable plan-approval payload for unresolved
+  `ExitPlanMode` plans. It carries `toolUseId`, `plan`, optional
+  `planFilePath`, and `createdAt`.
+- Agent rows get pending input from enrichment events and the channel-permission
+  stream. Conversation rows use the lightweight
+  `GET /api/conversations/pending-input` feed.
+- The feed intentionally scans only tmux-alive conversations. Do not replace it
+  with full conversation-list enrichment or non-live transcript scans.
+- The "Needs you" list and unified indicator must be kind-agnostic. They should
+  recover dismissed AUQs, plan approvals, permission requests, and pane-detected
+  waits.
 
-## The pipeline
+## Vocabulary
+
+`src/dashboard/frontend/src/lib/pendingInput.ts` owns UI labels for
+pending-input kinds. Keep new labels there so AgentCard, ConversationRow,
+notifications, and tooltips do not drift.
+
+| Kind | Meaning | Primary source |
+| --- | --- | --- |
+| `askUserQuestion` | Agent asked the operator a structured question. | JSONL AUQ scan |
+| `permissionRequest` | Runtime channel permission needs approval or denial. | channel-permission event stream |
+| `exitPlanMode` | Agent proposed a plan and waits for approval/rejection. | JSONL `ExitPlanMode` / conversation parser |
+| `enterPlanMode` | Agent is in plan mode and still drafting a plan. | JSONL `EnterPlanMode` tail scan |
+| `sessionResume` | A live session is waiting for resume/continuation input. | runtime/pane detection |
+| `rateLimit` | A known harness modal asks the operator to keep or switch model. | pane detection |
+
+Use `isAwaitingInput(agent)` for compact UI indicators. Use
+`selectPendingInputSubjects` for actionable "Needs you" rows because it merges
+JSONL-derived agent kinds with channel permission requests at read time.
+
+## Agent Flow
 
 ```
-agent calls AskUserQuestion
-        │
-   PreToolUse hook  (sync-sources/hooks/ask-user-question-hook, "PAN-1520")
-   └─ DENIES it → writes a tool_result containing the literal "PAN-1520"
-        │           (a native, un-denied AUQ does NOT write its tool_use to the
-        │            JSONL until answered → it would be undetectable)
-        ▼
-   Claude JSONL  (~/.claude/projects/<encoded-workspace>/<session>.jsonl)
-        │
-   enrichment poller  (src/dashboard/server/services/agent-enrichment-service.ts, ~10s)
-   ├─ listRunningAgents() → keep only agents with a live tmux session
-   ├─ computeAgentEnrichment(agentId)  (src/lib/agent-enrichment.ts)
-   │    └─ scanPendingInputsPromise() reads the tail of the JSONL, pairs the
-   │       AskUserQuestion tool_use with its deny tool_result, and (unless a
-   │       later user-text turn cleared it) returns it as pending
-   └─ emits agent.enrichment_changed { pendingAskUserQuestion }
-        ▼
-   read-model reducer  (packages/contracts/src/event-reducers.ts)
-   └─ writes pendingAskUserQuestion onto agentsById[id]
-        ▼
-   selectAgentsWithPendingAskUserQuestion  (frontend/src/lib/store.ts)
-        ▼
-   App.tsx  → builds subjects → <AskUserQuestionDialog>
+agent reaches a blocking surface
+        |
+        +-- JSONL-derived surface
+        |     scanPendingInputsPromise(jsonl)
+        |       - AskUserQuestion
+        |       - EnterPlanMode
+        |       - ExitPlanMode pending tool_result
+        |
+        +-- pane/runtime-derived surface
+        |     detectAwaitingInputFromPaneSync(...)
+        |       - rateLimit
+        |       - sessionResume / runtime waiting-on-human
+        |
+        v
+computeAgentEnrichment(agentId)
+        |
+        v
+agent.enrichment_changed
+        |
+        v
+read-model reducer writes:
+        - hasPendingQuestion
+        - pendingInputCount
+        - pendingInputKinds
+        - pendingAskUserQuestion, when present
+        |
+        v
+frontend store selectors:
+        - isAwaitingInput for indicators
+        - selectPendingInputSubjects for Needs you
+        - selectAgentsWithPendingAskUserQuestion for AUQ modal subjects
 ```
 
-### `/api/agents` is a red herring
+Channel permission requests are deliberately separate from enrichment. The
+permission stream owns the request payloads, while `selectPendingInputSubjects`
+adds `permissionRequest` to the subject kinds for any agent with outstanding
+permission requests. Do not bake permission kinds into enrichment output; each
+poll would overwrite that state.
 
-The dialog never reads `/api/agents`. That REST endpoint hardcodes
-`hasLiveTmuxSession=false` and feeds unrelated UI (the stopped-agents banner,
-spawn forms). A planning session being absent from `/api/agents` says nothing
-about the popup. Debug the **store**, not that endpoint.
+## Conversation Flow
 
-### Why the hook deny is load-bearing
+Conversations do not have agent enrichment events, and polling the full
+conversation list just to find pending input was too expensive. PAN-1705 added:
 
-A native AUQ renders its choice menu in the agent's TUI but does **not** append
-its `tool_use` to the JSONL until it is answered — so it cannot be detected from
-the JSONL. The PAN-1520 hook converts the AUQ into a *visible, detectable* state
-by denying it: the deny writes a `tool_result` whose text contains `PAN-1520`,
-and `isAskUserQuestionHookDenyToolResult` keys on that exact marker. **If you
-reword the hook's reason, keep the `(PAN-1520)` string** or detection breaks and
-the popup silently stops appearing. The operator's next plain-text answer turn
-clears the "denied-awaiting-user" state.
+```
+GET /api/conversations/pending-input
+```
 
-## The two root-cause bugs (fixed 2026-05-31, commit `360edc268`)
+The route is implemented through `getConversationsPendingInputFeed` in
+`src/lib/overdeck/conversation-reads.ts`. Its contract:
 
-### 1. tmux liveness ignored non-`agent-` sessions
+- list conversations only as metadata candidates;
+- intersect them with `listSessionNames()` and keep only tmux-alive sessions;
+- resolve and scan JSONL only for those live sessions;
+- return only rows that currently need input;
+- do not call full-list enrichment or scan non-alive conversations.
 
-`listRunningAgents()` (`src/lib/agents.ts`) computed `tmuxActive` against
-`getAgentSessions()`, which returns **only `agent-*`** sessions:
+Rows may carry:
 
 ```ts
-export const getAgentSessions = () =>
-  listSessions().pipe(Effect.map(s => s.filter(x => x.name.startsWith('agent-'))))
+{
+  name: string;
+  title: string | null;
+  issueId: string | null;
+  pendingAskUserQuestion: PendingAskUserQuestionSnapshot | null;
+  pendingProposedPlan: PendingProposedPlan | null;
+}
 ```
 
-So `planning-`, `conv-`, and `strike-` sessions always read `tmuxActive: false`.
-The enrichment poller scans only `runningAgents.filter(a => a.tmuxActive)`, so
-**planning agents were never scanned** → never got `pendingAskUserQuestion` →
-no popup for the most common interactive case (a planning agent asking the
-operator a question).
+`pendingProposedPlan` is derived from the conversation parser's `ProposedPlan`
+only while `status === 'pending'`. A matching `tool_result` for the
+`ExitPlanMode` tool use removes it from the feed on the next poll.
 
-**Fix:** `listRunningAgents` now matches liveness against the **unfiltered**
-`listSessions()`. It already enumerates every agent state dir regardless of role
-prefix, so liveness must consider all sessions, not just `agent-*`.
+## AskUserQuestion Details
 
-### 2. the poller `await`ed an Effect instead of running it
+AUQ is special because a native AUQ renders its choice menu in the agent's TUI
+but does not append the `tool_use` to JSONL until it is answered. Without PAN-1520
+hook handling, the dashboard cannot detect it.
 
-`computeAgentEnrichment()` and `getAgentJsonlMtime()` are **Effect-returning**
-functions. The poller did:
+The PreToolUse hook at `sync-sources/hooks/ask-user-question-hook` denies AUQ and
+writes a tool_result containing the literal `PAN-1520`. The scanner treats that
+marker as "still pending" because the upstream tool was denied only to make the
+question visible. The operator's next plain-text user turn, whether typed in the
+terminal, sent from the conversation composer, or delivered by the dashboard
+answer route, clears the denied-awaiting-user state.
 
-```ts
-const enrichment = await computeAgentEnrichment(agentId, ...)   // BUG
-```
+If you reword the hook reason, keep the `PAN-1520` marker or AUQ detection will
+silently stop working.
 
-`await` on a non-thenable Effect resolves to **the Effect object**, not the
-computed value. So `enrichment.hasPendingQuestion` was `undefined`,
-`enrichment.pendingAskUserQuestion` was `undefined`, etc. — for **every agent**.
-The reducer coerced `hasPendingQuestion ?? false` and dropped
-`pendingAskUserQuestion`, so no agent ever surfaced a question.
+### Historical AUQ Outage
 
-The diagnostic tell: logging `currentMtime` printed
-`{ _id: 'Effect', op: 'Async' }` instead of a number.
+Two bugs fixed on 2026-05-31 caused every AUQ popup to disappear:
 
-**Fix:** wrap both calls in `Effect.runPromise(...)`.
+1. `listRunningAgents()` checked tmux liveness against `getAgentSessions()`,
+   which returned only `agent-*` sessions. Planning, conversation, and strike
+   sessions were never scanned. The fix was to compare against the unfiltered
+   tmux session list.
+2. The enrichment poller `await`ed Effect values instead of running them with
+   `Effect.runPromise(...)`. The diagnostic was values like
+   `{ _id: 'Effect', op: 'Async' }` where numbers or enrichment objects were
+   expected.
 
-This bug had been latent since `computeAgentEnrichment` was migrated to Effect;
-the poller's `await` was never updated. Note `enrichmentChanged(undefined, x)`
-returns `true`, so the first poll always emits — meaning a stuck `false`/`undefined`
-could only come from the value never resolving, which pointed straight at the
-un-run Effect.
+Keep those failure modes in mind when all pending-input fields are suddenly
+empty for every agent.
 
-## The "Needs you" recovery (commits `28ed5edc3`, `13ed4f39e`)
+## Needs You Recovery
 
-Pressing **ESC** on the dialog adds the subject to App's
-`dismissedAskUserQuestionAgentIds`, which is only re-allowed once the AUQ clears
-server-side. A still-pending, ESC-dismissed question therefore became
-**unreachable** — the operator had no way to get the dialog back.
+The "Needs you" section in `SessionFeedSidebar` is the recovery surface for any
+actionable pending input, not just AUQ. It exists because dismissing a modal
+should not strand the operator: a still-pending item must remain clickable until
+the underlying wait clears server-side.
 
-Added a pinned **"Needs you"** section to
-`frontend/src/components/sessionFeed/SessionFeedSidebar.tsx`, which renders in
-**both** the home **Activity Feed** and the Command Deck **Project Activity**
-(the same component). It lists every agent with an outstanding AskUserQuestion
-(scoped to the feed's `issueIds`, or all when `unscoped`) and persists regardless
-of the dismissed flag. Clicking an entry calls
-`useAskUserQuestionUiStore.requestReopen(subjectId)` — a tiny sibling Zustand
-store (`frontend/src/lib/askUserQuestionUiStore.ts`, kept out of the
-event-sourced store like `panesStore`). App.tsx watches the reopen nonce and,
-when it changes, **un-dismisses** the subject and **focuses** it so
-`currentAskUserQuestionSubject` resolves to that exact question (rather than the
-default oldest-first) and the dialog re-opens.
+For AUQ, clicking a row calls
+`useAskUserQuestionUiStore.requestReopen(subjectId)`, which un-dismisses and
+focuses that subject so `AskUserQuestionDialog` opens again.
 
-### Verifying the popup locally without waiting for a real AUQ
+For non-AUQ kinds, the row should route the operator to the relevant live
+surface: a plan approval dialog, a permission dialog, or the terminal/session
+where a harness modal is visible. A row without a concrete kind is not
+actionable and should not be shown.
 
-Inject a synthetic pending AUQ into the store from the browser console (the
-dialog auto-opens; the "Needs you" entry appears; ESC dismisses; clicking the
-entry — `button[title="Re-open this question"]` — re-opens it):
+## Notifications
+
+`agent-enrichment-service.ts` tracks each agent's previous `pendingInputCount`.
+On a rising edge from zero to non-zero, it emits one `activity.entry` and one
+priority-1 `activity.tts` notification naming the pending kind(s). It should not
+repeat notifications while the same wait remains pending.
+
+This notification path is kind-agnostic. Adding a pending-input kind means the
+rising-edge notification should work without a new bespoke notifier.
+
+## Local Verification
+
+### AUQ Modal
+
+Inject a synthetic AUQ into the browser store. The dialog should open; ESC should
+dismiss it; the "Needs you" row should remain; clicking the row should reopen it.
 
 ```js
 const store = window.useDashboardStore
-store.setState(p => ({ agentsById: { ...p.agentsById, 'test-auq-agent': {
-  id: 'test-auq-agent', issueId: 'ZZTESTAUQ', status: 'running', role: 'plan',
-  pendingAskUserQuestion: { toolUseId: 't1', askedAt: new Date().toISOString(),
-    questions: [{ question: 'verify?', header: 'Q', multiSelect: false,
-      options: [{label:'Yes'},{label:'No'}] }] } } } }))
-// cleanup: delete agentsById['test-auq-agent'] or reload
+store.setState((p) => ({
+  agentsById: {
+    ...p.agentsById,
+    'test-auq-agent': {
+      id: 'test-auq-agent',
+      issueId: 'ZZTESTAUQ',
+      status: 'running',
+      role: 'plan',
+      pendingInputCount: 1,
+      pendingInputKinds: ['askUserQuestion'],
+      pendingAskUserQuestion: {
+        toolUseId: 't1',
+        askedAt: new Date().toISOString(),
+        questions: [{
+          question: 'verify?',
+          header: 'Q',
+          multiSelect: false,
+          options: [{ label: 'Yes' }, { label: 'No' }],
+        }],
+      },
+    },
+  },
+}))
 ```
 
-Match the **`button[title="Re-open this question"]`** specifically — a loose
-text match also hits the phantom issue card the fake agent spawns and will
-navigate to `/board` instead.
+Match `button[title="Re-open this question"]` specifically in Playwright; a loose
+text match can hit an issue card instead.
 
-## Blocked-agent surfaces beyond AskUserQuestion (PAN-1834)
+### Conversation Plan Feed
 
-Not every stall is an AUQ. A convoy sub-reviewer blocked on an interactive harness
-modal (e.g. the gpt-5.5 rate-limit / model-switch dialog) never writes an AUQ to
-the JSONL, so the pipeline above cannot detect it. PAN-1834 adds three additional
-visibility surfaces:
+For `GET /api/conversations/pending-input`, use a tmux-alive conversation JSONL
+with an unresolved `ExitPlanMode` tool_use. The response should include
+`pendingProposedPlan.toolUseId` and `pendingProposedPlan.plan`. After a matching
+`tool_result` appears, the next response should omit `pendingProposedPlan`.
 
-### 1. Pane-detected rate-limit / model-switch modal
+The regression test for that contract is
+`tests/unit/lib/overdeck/conversations-pending-input-feed.test.ts`.
 
-`detectAwaitingInputFromPaneSync` (`src/lib/agent-input-detection.ts`) recognizes
-a conservative signature for the harness rate-limit dialog: the pane must contain
-both a `Keep current model` option line and a `Switch to <model>` option line near
-the bottom. A pane that merely mentions a rate limit in prose, or a modal that has
-scrolled out of the recent window, does **not** match.
+## Debugging Checklist
 
-When matched, the detection returns reason `'rate_limit'`, which
-`computeAgentEnrichmentPromise` promotes into the `pendingInputKinds` array as the
-`'rateLimit'` kind. That kind drives the **Needs you** triangle and list with the
-label *"Rate-limit modal — pick a model"*.
-
-### 2. Active specialists are no longer suppressed
-
-`computeAgentEnrichmentPromise` historically skipped all pending-input population
-when `hasActiveSpecialist` was true. That guard was meant to silence the parked
-work/plan agent while a review/test/ship specialist runs on the same issue, but
-it also silenced the specialist itself. PAN-1834 narrows the guard: suppression
-applies only when the agent is **not** itself the active specialist. Agents with
-`role ∈ {review, test, ship}` still surface their own pending input even when
-another specialist is active.
-
-Inspect agents (`inspect-<issue>-<bead>`) are now enumerable by writing a minimal
-`state.json` at spawn (`src/lib/cloister/inspect-agent.ts`). The enrichment poller
-sees them the same way it sees sub-reviewers, so a blocked inspector also raises
-a Needs you row. Deacon orphan-recovery ignores the `inspect-` prefix, so the new
-state.json does not make inspect agents auto-resumable.
-
-### 3. Rising-edge activity-feed + TTS notification
-
-The enrichment poller (`src/dashboard/server/services/agent-enrichment-service.ts`)
-tracks the previous `pendingInputCount` per agent. When an agent transitions from
-`pendingInputCount === 0` to `pendingInputCount > 0`, the poller emits one
-`activity.entry` naming the agent, its issue, and the pending kind(s), plus one
-`activity.tts` utterance at priority 1 (warn). While the agent stays blocked across
-subsequent polls, no further activity or TTS events fire.
-
-This is kind-agnostic: it fires for AUQ, plan-mode approval, session-resume, and
-the new rate-limit modal.
-
-## Gotchas for future debugging
-
-- Dashboard runs under `pan dev`: the **frontend is Vite HMR** (source changes
-  hot-reload, no rebuild), the **backend is `node dist/dashboard/server.js`**
-  (Node 22). Only server changes need `npm run build` + a server-child restart.
-- To restart the server child, get its PID via `ps -C node | grep
-  dist/dashboard/server.js`. **Never** `pkill -f dist/dashboard/server.js` — the
-  pattern matches your own shell and self-kills it (exit 144).
-- `getAgentJsonlMtime` / `computeAgentEnrichment` / `getAgentJsonlPath` are all
-  Effects. Anything calling them must `Effect.runPromise`.
+- If every agent lacks pending input, verify the enrichment poller is running
+  Effects with `Effect.runPromise(...)`.
+- If planning or conversation waits do not surface, verify tmux liveness uses the
+  unfiltered live-session list.
+- If AUQ never appears, verify the hook deny still includes `PAN-1520` and that
+  `scanPendingInputsPromise` sees the JSONL tail.
+- If channel permissions light one surface but not another, check
+  `selectPendingInputSubjects`; permission requests live outside enrichment.
+- If conversation waits are missing, check
+  `GET /api/conversations/pending-input` before the full conversation list.
+- If a "Needs you" row says nothing is waiting when clicked, the row likely came
+  from a fuzzy `hasPendingQuestion` without a concrete kind. Require actionable
+  `pendingInputKinds`.
+- Dashboard server changes require build/restart of `node dist/dashboard/server.js`.
+  Frontend-only changes hot-reload under Vite.
