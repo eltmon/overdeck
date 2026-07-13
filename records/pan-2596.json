@@ -305,18 +305,18 @@
     "recordedAt": "2026-07-13T11:20:10.124Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T14:51:32.537Z",
+  "updated": "2026-07-13T14:55:46.628Z",
   "pipeline": {
     "issueId": "PAN-2596",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T11:21:55.959Z",
-    "updatedAt": "2026-07-13T14:51:31.767Z",
+    "updatedAt": "2026-07-13T14:55:46.557Z",
     "reviewNotes": "[requirements] Rejection toast does not name the rejected file (D11 violated) — composer-drop-and-gate",
     "inspectNotes": "Bead server-upload-allowlist ack: validateUploadPayload correctly gates UTF-8 text extensions, PDF %PDF- magic prefix, and disallowed/extension-less types with 400s naming the mismatch, while preserving image magic-byte validation and <uuid><ext> naming; non-image files get <uuid>-<sanitized-name><ext>. All 5 ACs verified against diff + accompanying unit tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2634",
@@ -358,28 +358,6 @@
         "tests/unit/lib/overdeck/conversation-upload-validation.test.ts"
       ],
       "recordedAt": "2026-07-13T11:20:10.124Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2596/.pan/review/agent-pan-2596-review-7cf60996/security.md",
-        "atCommit": "7cf60996f8e5ae5da607fc6ae51272764c107143"
-      },
-      "correctness": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2596/.pan/review/agent-pan-2596-review-7cf60996/correctness.md",
-        "atCommit": "7cf60996f8e5ae5da607fc6ae51272764c107143"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2596/.pan/review/agent-pan-2596-review-7cf60996/performance.md",
-        "atCommit": "7cf60996f8e5ae5da607fc6ae51272764c107143"
-      },
-      "requirements": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2596/.pan/review/agent-pan-2596-review-7cf60996/requirements.md",
-        "atCommit": "7cf60996f8e5ae5da607fc6ae51272764c107143"
-      }
     }
   },
   "closeOut": {
@@ -417,10 +395,10 @@
         },
         "review": {
           "anthropic/claude-sonnet-5": {
-            "input": 20130,
-            "output": 309,
-            "cacheRead": 431116,
-            "cacheWrite": 113797
+            "input": 20132,
+            "output": 1194,
+            "cacheRead": 544913,
+            "cacheWrite": 121000
           }
         },
         "review.correctness": {
@@ -465,9 +443,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 2029258,
-            "output": 220081,
-            "cacheRead": 100489472,
+            "input": 2306932,
+            "output": 226241,
+            "cacheRead": 103906048,
             "cacheWrite": 0
           }
         }
@@ -498,21 +476,21 @@
           "cacheWrite": 213933
         },
         "anthropic/claude-sonnet-5": {
-          "input": 120245,
-          "output": 53324,
-          "cacheRead": 10694010,
-          "cacheWrite": 786890
+          "input": 120247,
+          "output": 54209,
+          "cacheRead": 10807807,
+          "cacheWrite": 794093
         },
         "custom/kimi-k2.7-code": {
-          "input": 2029258,
-          "output": 220081,
-          "cacheRead": 100489472,
+          "input": 2306932,
+          "output": 226241,
+          "cacheRead": 103906048,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 71.185619,
-        "pricingAsOf": "2026-07-13T14:51:31.797Z"
+        "usd": 72.17282,
+        "pricingAsOf": "2026-07-13T14:55:46.612Z"
       }
     },
     "merges": [
