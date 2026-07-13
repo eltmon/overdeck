@@ -105,16 +105,16 @@
     "recordedAt": "2026-07-13T05:58:56.677Z"
   },
   "created": "2026-07-13T03:16:32.338Z",
-  "updated": "2026-07-13T11:20:19.106Z",
+  "updated": "2026-07-13T14:17:08.081Z",
   "pipeline": {
     "issueId": "PAN-2611",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-13T06:31:12.520Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-13T14:17:08.032Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "testNotes": "Reconciled from green GitHub Actions CI on 2e2342fc: guard (https://github.com/eltmon/overdeck/actions/runs/29227661868/job/86745082401)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2624",
@@ -203,7 +203,7 @@
       },
       "costAtCloseOut": {
         "usd": 23.602965,
-        "pricingAsOf": "2026-07-13T06:31:12.588Z"
+        "pricingAsOf": "2026-07-13T14:17:08.080Z"
       }
     },
     "merges": [
