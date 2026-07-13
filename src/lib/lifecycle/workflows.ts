@@ -27,6 +27,7 @@ import { archivePlanning, findWorkspacePath } from './archive-planning.js';
 import { closeIssue, type CloseIssueOptions } from './close-issue.js';
 import { teardownWorkspace } from './teardown-workspace.js';
 import { compactBeads } from './compact-beads.js';
+import { sweepOrphanedBeads } from './orphaned-beads-sweep.js';
 import { loadCloisterConfig } from '../cloister/config.js';
 import { extractNumberSync, extractPrefixSync } from '../issue-id.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
@@ -190,7 +191,24 @@ export function closeOut(
       return buildResult('close-out', ctx.issueId, allSteps, start);
     }
 
-    // 4+5. Teardown workspace + agent state
+    // 4. Sweep any orphaned beads before teardown removes the workspace/.beads redirect.
+    const sweepReason = opts.reason && /not\s*planned|cancelled/i.test(opts.reason)
+      ? 'issue closed (not planned); bead cancelled'
+      : 'issue closed (completed); orphaned bead swept';
+    const sweepResult = yield* Effect.promise(() =>
+      sweepOrphanedBeads({ beadsCwd: ctx.projectPath, issueId: ctx.issueId, reason: sweepReason }),
+    );
+    if (sweepResult.ok) {
+      if (sweepResult.closedIds.length > 0) {
+        allSteps.push(stepOk('close-out:sweep-orphaned-beads', [`Closed ${sweepResult.closedIds.length} orphaned bead(s); skipped ${sweepResult.skipped}`]));
+      } else {
+        allSteps.push(stepSkipped('close-out:sweep-orphaned-beads', [`No orphaned beads to sweep; skipped ${sweepResult.skipped}`]));
+      }
+    } else {
+      allSteps.push(stepSkipped('close-out:sweep-orphaned-beads', [`Bead sweep failed (non-fatal): ${sweepResult.error ?? 'unknown error'}`]));
+    }
+
+    // 5+6. Teardown workspace + agent state
     const closeOutConfig = (yield* Effect.promise(() => Effect.runPromise(loadCloisterConfig()))).close_out;
     const teardownSteps = yield* teardownWorkspace(ctx, {
       deleteWorkspace: closeOutConfig?.remove_workspace ?? false,
