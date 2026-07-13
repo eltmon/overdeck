@@ -1,0 +1,656 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-13T06:22:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-1520: [META] Unified \"agent awaiting input\" — finish AskUserQuestion, generalize indicator + notification across all blocking surfaces",
+    "updated": "2026-07-13T06:25:37.412Z"
+  },
+  "plan": {
+    "id": "pan-1520",
+    "title": "[META] Unified \"agent awaiting input\" — finish AskUserQuestion, generalize indicator + notification across all blocking surfaces",
+    "status": "proposed",
+    "uid": "ed66519e-45bd-475f-91f8-e70b3afd9609",
+    "author": "agent:claude-fable-5",
+    "sequence": 3,
+    "created": "2026-07-13T06:22:00.000Z",
+    "updated": "2026-07-13T06:25:37.412Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1520",
+        "label": "PAN-1520",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1671",
+        "label": "PAN-1671 (absorbed: plan-approval popup modal)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1102",
+        "label": "PAN-1102 (verified delivered; close at close-out)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "pending-input",
+      "plan-approval",
+      "frontend",
+      "backend"
+    ],
+    "narratives": {
+      "Problem": "The PAN-1520 unified pending-input subsystem shipped its detection layer, uniform indicator, notifications, and safe AskUserQuestion answering in 2026-05/06 (verified in code this session). Three gaps remain: (1) a pending ExitPlanMode plan never promotes to a popup modal — only pendingAskUserQuestion does (App.tsx:748), so operators approve plans in the terminal after the fact (#1671); (2) card-level surfaces (AgentCard/FleetAgentsView/DrawerActiveAgent/SessionPanel) read only the agent snapshot, so a pending channel permission request lights needs-you but not the card indicator; (3) docs cover AUQ only.",
+      "Proposal": "Mirror the proven AskUserQuestion architecture for plans: expose the pending plan payload (pendingProposedPlan { toolUseId, plan }) via agent enrichment and via the lightweight GET /api/conversations/pending-input feed; add a PlanApprovalDialog modal reusing chat/PlanCard's approval body; deliver approve/reject through the existing conversation /plan-action route plus a new agent-scoped mirror route; wire notification + needs-you reopen; close the card-level permission gap with one shared store selector; document the unified subsystem. Modal priority: permission > AUQ > plan. No auto-defaulting anywhere.",
+      "NonGoals": "- No keystroke routing for pane-detected terminal dialogs (sessionResume, rateLimit) from the dashboard — they stay terminal-answered with the existing guidance toast (deferred per operator; #1197 closed)\n- No changes to #1060 self-modify permission loop (own PRD; stays open, cross-linked)\n- No Pi-harness event-channel work (#1134 closed separately)\n- No new delivery mechanism for plan actions — reuse native plan-menu keystrokes via sendRawKeystroke\n- No edits to the AUQ deny hook (sync-sources/hooks/ask-user-question-hook); its '(PAN-1520)' reason literal is a detection contract\n- No auto-defaulting or synthesized responses for any pending input, under any condition\n- No rebuild of shipped groundwork: detection layer, AwaitingInputIndicator/isAwaitingInput, AUQ dialog + answer routing, needs-you list, desktop notifications, pending-input feed\n- pendingProposedPlan is NOT added to AgentState/state.json or the agents DB table — it is ephemeral enrichment state only"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Scope limited to residual gaps (plan modal #1671, card-level permission indicator, docs); shipped groundwork not rebuilt.",
+        "rationale": "Verified in code this session that detection, indicator, notifications, AUQ routing, needs-you, and the pending-input feed all landed (commits 360edc268..0a1703f07); #1102/#1671 both carry explicit do-not-rebuild inventories."
+      },
+      {
+        "summary": "Plan payload mirrors the AUQ precedent: enrichment payload for agents, pending-input feed field for conversations.",
+        "rationale": "Identical proven pipeline (enrichment event -> contracts reducer -> store; feed poll for conversations); avoids inventing a new state plane."
+      },
+      {
+        "summary": "Agent-side approvals get a new POST /api/agents/:id/plan-action mirroring handleConversationPlanAction.",
+        "rationale": "The native plan menu requires raw keystrokes (approve-manual='2', reject-feedback='4'+text), not a text message; the existing route is conversation-name-scoped."
+      },
+      {
+        "summary": "Modal priority: channel permission modal > AskUserQuestion dialog > PlanApprovalDialog.",
+        "rationale": "Extends the existing exclusion at App.tsx:752 where the AUQ dialog is gated on !currentChannelPermissionRequest."
+      },
+      {
+        "summary": "Session-resume and rate-limit dialogs remain terminal-answered (NonGoal).",
+        "rationale": "Operator explicitly deferred keystroke routing (issue comment 2026-06-01); #1197 was closed completed."
+      },
+      {
+        "summary": "No new code for #1102; close it and #1671 at close-out.",
+        "rationale": "Notification, interactive prompts, and the delivery-confirmation loop (optimistic mark, unmark on error, reconcile against live toolUseIds) verified present in usePendingInputDialogs.ts and routes/agents/permissions.ts."
+      }
+    ],
+    "items": [
+      {
+        "id": "plan-payload-enrichment",
+        "title": "Expose pendingProposedPlan payload from agent enrichment to the frontend store",
+        "status": "running",
+        "priority": "high",
+        "created": "2026-07-13T06:22:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1520",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "plan-feed-conversations",
+            "plan-approval-wiring",
+            "plan-notify-reopen"
+          ],
+          "files_scope": [
+            "src/lib/agent-enrichment.ts",
+            "src/lib/__tests__/agent-enrichment.test.ts",
+            "src/dashboard/server/services/agent-enrichment-service.ts",
+            "packages/contracts/src/event-reducers.ts",
+            "packages/contracts/src/types.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/agent-enrichment.test.ts --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "agent-enrichment.test.ts passes including new pendingProposedPlan cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/agent-enrichment.ts, scanPendingInputs already tracks ExitPlanMode tool_use ids and computes the boolean exitPlanModePending (lines ~153/282/382). Extend the scan to also capture the newest unresolved ExitPlanMode tool_use's payload as pendingProposedPlan: { toolUseId: string, plan: string } (plan text is the tool_use input.plan field). Thread it through computeAgentEnrichment output next to pendingAskUserQuestion, emit it on the agent.enrichment_changed event in agent-enrichment-service.ts, and reduce it onto agentsById in packages/contracts (define the shared PendingProposedPlan type in contracts so the conversation feed and frontend reuse it). Ephemeral enrichment state ONLY — do not add it to AgentState/state.json codec or the agents DB table (H2). Clear it when a matching tool_result arrives (same pairing logic as the existing boolean)."
+        },
+        "items": [
+          {
+            "id": "plan-payload-enrichment.ac1",
+            "title": "Given a session JSONL containing an ExitPlanMode tool_use with input.plan and no matching tool_result, computeAgentEnrichment returns pendingProposedPlan with that toolUseId and the plan markdown text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-payload-enrichment.ac2",
+            "title": "Given the same JSONL plus a later tool_result matching the ExitPlanMode tool_use id, computeAgentEnrichment returns pendingProposedPlan as null and drops exitPlanMode from pendingInputKinds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-payload-enrichment.ac3",
+            "title": "When the enrichment service emits agent.enrichment_changed, the contracts event reducer persists pendingProposedPlan onto agentsById[id] (unit test on the reducer proves the field survives a reduce round-trip)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-payload-enrichment.ac4",
+            "title": "packages/contracts exports the shared PendingProposedPlan type, and the diff contains no pendingProposedPlan addition to the AgentState state.json codec or the agents DB schema",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "plan-feed-conversations",
+        "title": "Include pendingProposedPlan in the GET /api/conversations/pending-input feed",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-13T06:22:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1520",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/conversations.ts",
+            "src/dashboard/server/services/conversation/parser.ts",
+            "src/dashboard/server/services/conversation/types.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "server conversation tests pass including a new pending-input feed case with a pending plan"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "getConversationsPendingInputFeed (defined/imported in src/dashboard/server/routes/conversations.ts, route at :236) currently returns rows only for conversations with pendingAskUserQuestion. Extend each row with pendingProposedPlan: PendingProposedPlan | null using the ProposedPlan already tracked by the conversation parser (src/dashboard/server/services/conversation/parser.ts:153, types.ts:28), and include rows where a plan is pending even if no AUQ is. Preserve the PAN-1705 performance contract: scan only tmux-alive conversations, no full-list enrichment (NFR-2). Reuse the contracts PendingProposedPlan type from the plan-payload-enrichment item."
+        },
+        "items": [
+          {
+            "id": "plan-feed-conversations.ac1",
+            "title": "Given a tmux-alive conversation whose JSONL has an unresolved ExitPlanMode tool_use, GET /api/conversations/pending-input returns a row for it carrying pendingProposedPlan with toolUseId and plan text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-feed-conversations.ac2",
+            "title": "Given the plan was answered in the terminal (matching tool_result present), the next feed response omits pendingProposedPlan for that conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-feed-conversations.ac3",
+            "title": "The feed handler preserves the tmux-alive-only scan: the diff contains no call that enumerates or enriches non-alive conversations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "plan-approval-dialog",
+        "title": "PlanApprovalDialog modal component reusing the chat PlanCard approval body",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-13T06:22:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-1520",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/PlanApprovalDialog.tsx",
+            "src/dashboard/frontend/src/components/chat/PlanCard.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix src/dashboard/frontend run test -- src/components/PlanApprovalDialog.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "PlanApprovalDialog.test.tsx passes (approve, reject-with-feedback, minimize)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/PlanApprovalDialog.tsx: a modal wrapper (mirror AskUserQuestionDialog's minimizable, non-blocking pattern — backdrop click and a Minimize button collapse to needs-you, never trap navigation) whose body reuses chat/PlanCard.tsx's plan-markdown + Approve / Request-Changes(feedback textarea) rendering. Extract the shared presentational body from chat/PlanCard.tsx into a subcomponent both use rather than duplicating it. Props: subject { id, kind: 'agent'|'conv', title, pendingProposedPlan }, isOpen, isSubmitting, onApprove(), onRejectWithFeedback(text), onMinimize(). Pure presentation — the wiring item owns data and mutations. Follow pan-style-guide (no decorative color; the dialog matches AskUserQuestionDialog's visual language). Add a component test with the three interactions."
+        },
+        "items": [
+          {
+            "id": "plan-approval-dialog.ac1",
+            "title": "Given a subject with plan markdown, the dialog renders the plan body and title, and clicking Approve invokes onApprove exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-approval-dialog.ac2",
+            "title": "Clicking Request Changes shows a feedback textarea; submitting sends the entered text through onRejectWithFeedback, and the dialog rejects empty feedback inline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-approval-dialog.ac3",
+            "title": "A backdrop click collapses the dialog via onMinimize (the Minimize button does the same), and dismissal never applies an approval or rejection",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-approval-dialog.ac4",
+            "title": "The plan/actions body is rendered via a subcomponent shared with chat/PlanCard.tsx (chat transcript rendering preserves its current appearance and tests keep passing)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-plan-action-route",
+        "title": "POST /api/agents/:id/plan-action — agent-scoped native plan-menu delivery",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-13T06:22:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-1520",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/permissions.ts",
+            "src/dashboard/server/routes/conversations.ts",
+            "src/lib/tmux.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "server route tests pass including new agent plan-action cases (approve, reject-feedback, stale plan -> 409)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add POST /api/agents/:id/plan-action next to postAgentAnswerQuestionRoute in src/dashboard/server/routes/agents/permissions.ts, mirroring handleConversationPlanAction (src/dashboard/server/routes/conversations.ts:830): body { action: 'approve-manual' | 'reject-feedback', feedback? }, delivering the native plan-menu keystrokes ('2', or '4' + feedback text) via the async sendRawKeystroke helper from src/lib/tmux.ts into the agent's tmux session, resolved through the same session-resolution helpers answer-question uses (never by name-prefix guessing — H5). Extract/reuse the conversation handler's shared keystroke logic instead of copying it. Before injecting, re-verify the plan is still pending (unresolved ExitPlanMode tool_use in the agent's JSONL via the enrichment scan) and return 409 { error: 'plan no longer pending' } when it is not (H4 stale-keystroke guard). Async only — no execSync, no sync tmux primitives; any delay-based tests use vi.useFakeTimers()."
+        },
+        "items": [
+          {
+            "id": "agent-plan-action-route.ac1",
+            "title": "Given an agent with a pending plan, POST /api/agents/:id/plan-action { action: 'approve-manual' } injects the '2' keystroke into that agent's session and returns success JSON",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-plan-action-route.ac2",
+            "title": "POST with { action: 'reject-feedback', feedback } injects '4' followed by the feedback text; missing/empty feedback for reject-feedback returns 400 without injecting anything",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-plan-action-route.ac3",
+            "title": "When no unresolved ExitPlanMode tool_use exists for the agent, the route returns 409 and injects no keystrokes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-plan-action-route.ac4",
+            "title": "The route sends keystrokes only through the async sendRawKeystroke primitive; the diff contains no execSync or sync sendKeys call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "plan-approval-wiring",
+        "title": "Promote pending plans to the PlanApprovalDialog modal (subjects, mutations, reconcile)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-13T06:22:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-1520",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App.tsx",
+            "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
+            "src/dashboard/frontend/src/lib/store.ts",
+            "src/dashboard/frontend/src/lib/askUserQuestionUiStore.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix src/dashboard/frontend run test -- src/App/hooks src/lib/store.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "frontend hook/selector tests pass including plan-subject promotion and priority ordering"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In usePendingInputDialogs.ts / store.ts, build plan subjects from both sources: agents with pendingProposedPlan on agentsById (store selector, sibling of selectAgentsWithPendingAskUserQuestion) and conversation rows from the pending-input feed poll (extend the existing 'conv-ask-user-question' query consumption to read pendingProposedPlan). Render <PlanApprovalDialog> from App.tsx with priority gating: open only when no channel permission request and no AUQ subject is current (D4). Submit mutations: kind 'conv' -> POST /api/conversations/:name/plan-action; kind 'agent' -> POST /api/agents/:id/plan-action; on mutate optimistically mark the toolUseId answered, on error unmark + toast the server error (mirror askUserQuestionAnswerMutation exactly, including the 409-stale message). Generalize askUserQuestionUiStore's answered/dismissed/reopen bookkeeping to plan subjects (rename to a pendingInputUiStore or add parallel maps — pick ONE store, do not fork a divergent copy). Reconcile: when the subject's pendingProposedPlan disappears from the store/feed (terminal-resolved or agent stopped), close the dialog and drop optimistic marks — FR-7."
+        },
+        "items": [
+          {
+            "id": "plan-approval-wiring.ac1",
+            "title": "Given an agent or conversation with a pending plan and no higher-priority dialog, App renders the PlanApprovalDialog with that plan's markdown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-approval-wiring.ac2",
+            "title": "Approve on a conversation subject POSTs to /api/conversations/:name/plan-action and Approve on an agent subject POSTs to /api/agents/:id/plan-action; a failed delivery unmarks the optimistic answered state and surfaces the error in a toast",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-approval-wiring.ac3",
+            "title": "When a channel permission request or AUQ subject is pending simultaneously, the plan dialog stays closed until they resolve (priority permission > AUQ > plan)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-approval-wiring.ac4",
+            "title": "When the pending plan resolves out-of-band (terminal approval or agent stop), the open dialog closes and its needs-you entry clears without operator action",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-approval-wiring.ac5",
+            "title": "Minimizing the dialog preserves the subject in the needs-you list (no auto-approve, no lost plan)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "plan-notify-reopen",
+        "title": "Notification + needs-you reopen for pending plan subjects",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-13T06:22:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-1520",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
+            "src/dashboard/frontend/src/lib/pipeline-helpers.ts",
+            "src/dashboard/frontend/src/lib/store.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix src/dashboard/frontend run test -- src/App/hooks"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "frontend tests pass including plan-subject notification dedup and reopen routing"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend the announce loop in usePendingInputDialogs.ts (lines ~195-230) to fire the same desktop/toast notification for pending plan subjects (keyed plan::<kind>::<id>::<toolUseId>, one per pending plan, cleared from the notified set when resolved — mirror the AUQ liveKeys sweep). Notification copy uses the issue/conversation title, body 'Plan awaiting your approval'. Extend the needs-you reopen path so clicking a plan subject's needs-you entry (or the notification) opens the PlanApprovalDialog — today the reopen effect only reopens AUQ and toasts 'blocked on a terminal dialog' for anything else; route exitPlanMode-kind subjects to the plan dialog instead of that fallback."
+        },
+        "items": [
+          {
+            "id": "plan-notify-reopen.ac1",
+            "title": "When a plan becomes pending, exactly one desktop/toast notification fires per toolUseId (re-polls do not re-announce), titled with the issue/conversation title",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-notify-reopen.ac2",
+            "title": "Clicking the notification or the needs-you entry for a plan subject opens the PlanApprovalDialog for that subject",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-notify-reopen.ac3",
+            "title": "A plan subject resolved out-of-band no longer produces the 'no longer waiting' misroute: its notification key is swept and reopen shows the already-resolved toast only when the plan is genuinely gone",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "card-permission-indicator",
+        "title": "Card-level indicator reflects pending channel permission requests via one shared selector",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-13T06:22:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-1520",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/store.ts",
+            "src/dashboard/frontend/src/lib/pendingInput.ts",
+            "src/dashboard/frontend/src/components/GodView/AgentCard.tsx",
+            "src/dashboard/frontend/src/components/Agents/FleetAgentsView.tsx",
+            "src/dashboard/frontend/src/components/drawer/DrawerActiveAgent.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix src/dashboard/frontend run test -- src/lib"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "selector tests pass: permission-only agent yields awaiting-input with kind permissionRequest"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "The read-time merge of channelPermissionRequests into pending kinds exists only inside selectPendingInputSubjects (store.ts), so cards using isAwaitingInput(agent) miss permission-only waits. Add one shared store selector (e.g. selectEffectivePendingInput(agentId) returning { awaiting: boolean, kinds: PendingInputKind[] } that merges the agent snapshot's pendingInputKinds/hasPendingQuestion with any live channel permission request for that agent — reuse the merge logic from selectPendingInputSubjects, do not duplicate it). Consume it in AgentCard, FleetAgentsView, DrawerActiveAgent, and SessionPanel so the AwaitingInputIndicator lights (with 'Permission pending' in the tooltip via describePendingInput) for a permission-only agent. Remove now-unneeded direct isAwaitingInput(agent) calls in those four components only (surgical — other callers untouched)."
+        },
+        "items": [
+          {
+            "id": "card-permission-indicator.ac1",
+            "title": "Given an agent with a pending channel permission request and empty pendingInputKinds, the shared selector returns awaiting=true with kinds containing permissionRequest",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "card-permission-indicator.ac2",
+            "title": "Each of AgentCard, FleetAgentsView, DrawerActiveAgent, and SessionPanel renders the AwaitingInputIndicator for that permission-only agent, with the tooltip 'Permission pending'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "card-permission-indicator.ac3",
+            "title": "When the permission request resolves, the selector returns awaiting=false and the card indicator disappears on the next store update",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-unified-pending-input",
+        "title": "Document the unified pending-input subsystem (supersede the AUQ-only field guide framing)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-13T06:22:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-1520",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ASKUSERQUESTION-DASHBOARD.md",
+            "docs/PENDING-INPUT.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Write docs/PENDING-INPUT.md documenting the unified subsystem end-to-end: the six PendingInputKind values and their native sources; detection paths (deny-hook JSONL for AUQ, ExitPlanMode payload scan, channel permission stream, pane detection); the indicator/notification/needs-you surfaces; the responders per kind (AUQ dialog -> answer-question, plan dialog -> plan-action conv+agent routes, permission modal, terminal-only for sessionResume/rateLimit); stale-state clearing rules; and the '(PAN-1520)' hook-marker contract warning. Update docs/ASKUSERQUESTION-DASHBOARD.md to link to it as the umbrella doc (keep the AUQ debugging guide content — additive, no-loss). Update the PAN-1520 issue inventory table via a closing comment at close-out (noted for the close-out ceremony, not a file in this repo)."
+        },
+        "items": [
+          {
+            "id": "docs-unified-pending-input.ac1",
+            "title": "docs/PENDING-INPUT.md covers all six PendingInputKind values, each with its detection source and responder, including the new plan-approval modal and agent plan-action route",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-unified-pending-input.ac2",
+            "title": "docs/ASKUSERQUESTION-DASHBOARD.md contains a link to the umbrella doc and preserves its existing AUQ debugging sections (no sections deleted)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "plan-payload-enrichment",
+        "to": "plan-feed-conversations",
+        "type": "blocks"
+      },
+      {
+        "from": "plan-payload-enrichment",
+        "to": "plan-approval-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "plan-feed-conversations",
+        "to": "plan-approval-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "plan-approval-dialog",
+        "to": "plan-approval-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-plan-action-route",
+        "to": "plan-approval-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "plan-approval-wiring",
+        "to": "plan-notify-reopen",
+        "type": "blocks"
+      },
+      {
+        "from": "plan-approval-wiring",
+        "to": "docs-unified-pending-input",
+        "type": "informs"
+      },
+      {
+        "from": "card-permission-indicator",
+        "to": "docs-unified-pending-input",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-13-PAN-1520-meta-unified-agent-awaiting-input-finish-askuserquestion-generalize-indicator-notification-across-all-blocking-surfaces.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

@@ -4,17 +4,17 @@
     "created": "2026-07-09T21:01:10.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2542: add GPT-5.6 (Sol/Terra/Luna) family, make gpt-5.6-sol the new OpenAI default",
-    "updated": "2026-07-09T21:52:25.997Z"
+    "updated": "2026-07-13T03:17:56.976Z"
   },
   "plan": {
     "id": "pan-2542",
     "title": "feat(models): add GPT-5.6 (Sol/Terra/Luna) family, make gpt-5.6-sol the new OpenAI default",
-    "status": "running",
+    "status": "completed",
     "uid": "f11093a1-e391-4136-8e8b-8a419cf7bd26",
     "author": "agent:claude-opus-4-8",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-09T21:01:10.000Z",
-    "updated": "2026-07-09T21:52:25.997Z",
+    "updated": "2026-07-13T03:17:56.976Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2542",
@@ -945,5 +945,5 @@
       "canonicalFilename": "2026-07-09-PAN-2542-feat-models-add-gpt-5-6-sol-terra-luna-family-make-gpt-5-6-sol-the-new-openai-default.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }

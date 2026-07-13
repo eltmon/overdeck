@@ -1,0 +1,651 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-12T22:45:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2607: chore(beads): PAN-2564 landing follow-ups — myn 4-store reconcile, server typecheck gate, comparator/report polish",
+    "updated": "2026-07-13T04:12:06.374Z"
+  },
+  "plan": {
+    "id": "pan-2607",
+    "title": "chore(beads): PAN-2564 landing follow-ups — myn 4-store reconcile, server typecheck gate, comparator/report polish",
+    "status": "proposed",
+    "uid": "bea20c3a-136d-4983-9a01-0cdcc761f9be",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-12T22:45:00.000Z",
+    "updated": "2026-07-13T04:12:06.374Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2607",
+        "label": "PAN-2607",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2564",
+        "label": "PAN-2564",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2602",
+        "label": "PAN-2602",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "beads",
+      "dolt",
+      "ci",
+      "quality-gates",
+      "flywheel",
+      "reconcile"
+    ],
+    "narratives": {
+      "Problem": "The PAN-2564 Dolt-native cutover shipped, but the landing exposed seven follow-up gaps: (1) mind-your-now has four bead stores (frontend/.beads=131 incl. live min-865, api/.beads=33, canonical state worktree=23, retired empty root DB) and the reconcile tool can only compare three fixed sources — myn cannot be safely consolidated or published; (2) src/dashboard/server is excluded from root typecheck AND root npm run build does not build the server bundle, so a yield*-outside-generator PARSE error shipped through green gates; (3) flywheel.ts:170/:328 and start.ts:621 still run execFileSync('bd') per issue/workspace instead of one bulk resolver read; (4) the reconcile comparator classified all 3253 records 'conflicting' because the v53 migration bumped updated_at on every row, making the report unreadable; (5) that same mass-reset pollutes every recency signal built on bead updated_at; (6) beads-cutover.json validation only accepts 40-hex git SHAs while local Dolt heads are 32-char base32.",
+      "Proposal": "Eight independent beads. Comparator: bucket updated_at-only diffs as 'metadata-drift' and add per-classification summary counts to the report. Multi-store: generalize reconcileBeads to N named sources via a repeatable --store <name>=<path> CLI flag and tolerate an unpublished refs/dolt/data remote. Then run the extended reconcile for mind-your-now (read-only) and write a merge-plan recommendation for operator review. Gate: add npm run build:dashboard:server:bundle to CI and to the live ~/.overdeck/projects.yaml quality gates (bundle build is green in ~2s; full server typecheck has 152 pre-existing errors — filed as follow-up debt, not fixed here). Flywheel/CLI: lift the existing issuesWithBeadsBounded bulk-read helper into a shared lib module and use it at flywheel.ts:170/:328; switch the start.ts spawn gate to the existing async retry resolver. Marker: widen localReconciledHead to also accept 32-char base32 Dolt heads (remoteDoltHead stays a git SHA — it is compared against git ls-remote). Docs: record the 2026-07-12 updated_at mass-reset in docs/BEADS.md and cross-reference it on PAN-2602.",
+      "NonGoals": "- Executing the myn merge plan, wiring the myn Dolt remote, publishing refs/dolt/data for mind-your-now, or writing a myn beads-cutover.json — all gated behind operator review of the reconcile report (approval.json approved:false)\n- Fixing the 152 pre-existing src/dashboard/server tsc errors — follow-up issue only\n- Changing the backlog routes' 8s-bound degraded mode under bd contention (issue item 7) — deferred to the PAN-2602 read-model rollup\n- Mutating, importing into, or deleting any of the four myn bead stores\n- Adding a full tsc typecheck gate for src/dashboard/server in this issue\n- Changing bd itself or the Dolt storage backend"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Server gate = bundle build (npm run build:dashboard:server:bundle), not full server typecheck.",
+        "rationale": "The issue offers both ('server typecheck (or build:dashboard:server)'). tsc -p src/dashboard/server has 152 pre-existing errors (verified during planning); the incident class was a parse error, which the tsdown bundle build catches; the bundle build is green today in ~2s. Debt is filed as a follow-up issue instead of ballooning this chore across ~20 files."
+      },
+      {
+        "summary": "myn deliverable stops at reviewed report + written recommendation; no publish/marker/merge execution.",
+        "rationale": "The issue mandates 'Do NOT publish refs/dolt/data for myn before this reconcile' and calls for review of the merge plan. The existing approval.json approved:false gate is the operator checkpoint; autonomous work must not cross it."
+      },
+      {
+        "summary": "Widen only localReconciledHead to accept Dolt-native 32-char base32 heads; keep remoteDoltHead 40-hex.",
+        "rationale": "validateBeadsCutoverMarker compares remoteDoltHead against git ls-remote refs/dolt/data output, which is always a git SHA; widening it would break validation semantics. Both schema-widening and documentation are delivered (the issue offered either)."
+      },
+      {
+        "summary": "Issue item 7 (backlog degraded mode) deferred to PAN-2602.",
+        "rationale": "The issue itself says the current degrade is 'fine for a hint surface' and names the PAN-2602 read-model rollup as the durable fix."
+      },
+      {
+        "summary": "Bulk beads presence is derived from bead labels via one canonical-store getAllBeads() read, reusing the issuesWithBeadsBounded pattern.",
+        "rationale": "That exact derivation already runs in production for the backlog routes (src/dashboard/server/routes/backlog.ts:53-66); post-PAN-2564 all workspace .beads redirect to the canonical home, so per-workspace reads are redundant."
+      },
+      {
+        "summary": "metadata-drift applies to records present in all sources whose serialized difference is confined to updated_at.",
+        "rationale": "The v53 migration bumped updated_at on every row; only-updated_at drift is provably migration noise, while any other field difference remains a real 'conflicting' record."
+      },
+      {
+        "summary": "The retired empty myn root DB is noted in the recommendation, not added as a reconcile source.",
+        "rationale": "The issue states it is empty and retired; an empty source adds no records to audit and would only pad the report."
+      }
+    ],
+    "items": [
+      {
+        "id": "comparator-metadata-drift",
+        "title": "Classify updated_at-only differences as metadata-drift and summarize the reconcile report",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T22:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2607",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/beads/reconcile.ts",
+            "tests/unit/lib/beads/reconcile.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/beads/reconcile.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "reconcile.test.ts passes including new metadata-drift cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready"
+        },
+        "narrative": {
+          "Action": "In src/lib/beads/reconcile.ts: (1) add 'metadata-drift' to the ReconcileDifference.classification union (line 16). (2) In compareBeadsSources (line 52-76), for records present in ALL sources whose stable() serializations differ, re-compare with the updated_at key stripped from each record; if the stripped serializations are identical, classify as 'metadata-drift', otherwise 'conflicting'. (3) In reportMarkdown (line 93-96), add a '## Summary by classification' section listing the count per classification (identical, metadata-drift, conflicting, one-sided, outside-export-scope) above the full inventory table, and add a one-line explanation that metadata-drift means the only differing field is updated_at (the v53 migration on 2026-07-12 bumped updated_at on every row). Keep the full no-loss table intact. Add test cases to tests/unit/lib/beads/reconcile.test.ts covering: updated_at-only diff => metadata-drift; updated_at + another field diff => conflicting; summary counts appear in the report markdown."
+        },
+        "items": [
+          {
+            "id": "comparator-metadata-drift.ac1",
+            "title": "Given two sources whose copies of a record differ only in updated_at, compareBeadsSources returns classification 'metadata-drift' for that record",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "comparator-metadata-drift.ac2",
+            "title": "Given copies that differ in updated_at AND any other field, compareBeadsSources returns 'conflicting' (metadata-drift never masks real conflicts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "comparator-metadata-drift.ac3",
+            "title": "reportMarkdown emits a 'Summary by classification' section with a count per classification before the full inventory table, and preserves the full per-record table",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reconcile-multi-store",
+        "title": "Extend beads reconcile to N named local stores via a repeatable --store flag",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T22:45:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2607",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "reconcile-run-myn"
+          ],
+          "files_scope": [
+            "src/lib/beads/reconcile.ts",
+            "src/cli/commands/admin/beads-reconcile.ts",
+            "tests/unit/lib/beads/reconcile.test.ts",
+            "docs/BEADS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/beads/reconcile.test.ts",
+            "npm run typecheck",
+            "npm run build && node dist/cli/index.js admin beads reconcile --help"
+          ],
+          "expected_outputs": [
+            "reconcile.test.ts passes including multi-store and absent-remote cases",
+            "typecheck completes without errors",
+            "help output lists a repeatable --store <name>=<path> option"
+          ],
+          "readiness": "sequential"
+        },
+        "narrative": {
+          "Action": "Generalize src/lib/beads/reconcile.ts from exactly three sources to three-plus-N: (1) add `extraStores?: Array<{ name: string; path: string }>` to ReconcileBeadsOptions — each path is a directory containing a .beads store, used as the cwd for `bd list --all --json --limit 0` (same read used at line 111). Reject the reserved names local-dolt/remote-dolt/state-jsonl. (2) Loosen compareBeadsSources and ReconcileDifference.presentIn from the fixed ReconcileSourceName union to string source names while keeping the three canonical names' semantics (outside-export-scope still keys off local-dolt/remote-dolt at lines 59-61; 'one-sided' means present in fewer than ALL compared sources — replace the hardcoded `presentIn.length < 3` at line 62 with the actual source count). counts becomes Record<string, number>. (3) Tolerate an unpublished remote: if `git fetch origin refs/dolt/data` (line 118) fails because the ref does not exist, record the remote-dolt source as 0 records with an explicit 'refs/dolt/data not published' note in the report instead of throwing; any other fetch/clone error still throws. (4) In src/cli/commands/admin/beads-reconcile.ts, add a repeatable `--store <name>=<path>` option parsed into extraStores and passed through runBeadsReconcile. (5) reportMarkdown lists a per-source record count for every source including extras. (6) Update the reconcile paragraph in docs/BEADS.md (around line 42) to document --store and the absent-remote behavior in the same commit as the CLI change. Add tests: extra store participates in comparison; absent refs/dolt/data degrades to 0-record remote with note; reserved-name rejection."
+        },
+        "items": [
+          {
+            "id": "reconcile-multi-store.ac1",
+            "title": "pan admin beads reconcile <project> accepts repeated --store <name>=<path> options and the produced report lists a record count for each named extra store",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-multi-store.ac2",
+            "title": "When origin has no refs/dolt/data ref, reconcileBeads completes and the report marks the remote-dolt source as not published with 0 records instead of throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-multi-store.ac3",
+            "title": "Given a record present in only some of the compared sources, compareBeadsSources returns 'one-sided' regardless of how many sources are compared (no hardcoded 3)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-multi-store.ac4",
+            "title": "reconcileBeads rejects an extraStores entry named local-dolt, remote-dolt, or state-jsonl with a clear error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-multi-store.ac5",
+            "title": "docs/BEADS.md's reconcile section contains --store flag usage and the absent-remote degrade behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion",
+              "acJustification": "Fifth AC is the docs requirement mandated by the PRD-authoring rule; the CLI change and its doc must land together per the skills/docs convention."
+            }
+          }
+        ]
+      },
+      {
+        "id": "reconcile-run-myn",
+        "title": "Run the extended 4-store reconcile for mind-your-now and write a merge-plan recommendation (read-only)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T22:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-2607",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "/home/eltmon/.overdeck/state/mind-your-now/notes/beads-reconcile-*.md",
+            "/home/eltmon/.overdeck/state/mind-your-now/notes/beads-reconcile-*.approval.json"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "ls /home/eltmon/.overdeck/state/mind-your-now/notes/",
+            "cat /home/eltmon/.overdeck/state/mind-your-now/notes/beads-reconcile-*.approval.json"
+          ],
+          "expected_outputs": [
+            "a beads-reconcile-<date>.md report covering canonical state, remote (not published), frontend, and api sources plus a companion recommendation note exists",
+            "approval.json exists with approved: false"
+          ],
+          "readiness": "sequential"
+        },
+        "narrative": {
+          "Action": "Using the bead reconcile-multi-store's extended CLI, run: `pan admin beads reconcile mind-your-now --store frontend=/home/eltmon/Projects/myn/frontend --store api=/home/eltmon/Projects/myn/api`. Expected source counts per the issue: frontend/.beads ~131 records (holds live min-865's beads), api/.beads ~33, canonical state worktree (/home/eltmon/.overdeck/state/mind-your-now) ~23, remote refs/dolt/data not published. Then write a companion recommendation note at /home/eltmon/.overdeck/state/mind-your-now/notes/beads-reconcile-<date>-recommendation.md that: (a) summarizes overlap/conflict findings from the report, (b) lays out the two merge-plan options from the issue — single canonical DB vs bd multi-repo routing — with the polyrepo context (13 workspace redirects were rewritten to the canonical path before the polyrepo topology was understood; the original per-workspace mapping for 11 inactive workspaces is gone; live min-865/min-874 point at frontend), (c) makes a concrete recommendation grounded in the observed record distribution, and (d) notes the retired empty root DB. STRICT READ-ONLY: this bead must not run bd migrate/bd sync/bd import, must not push or publish refs/dolt/data for mind-your-now, must not write a beads-cutover.json, and must not modify any of the four stores. The deliverable ends at the report + approval.json (approved: false, written by reconcileBeads) + recommendation; the operator reviews and executes the merge plan separately."
+        },
+        "items": [
+          {
+            "id": "reconcile-run-myn.ac1",
+            "title": "reconcileBeads produces a mind-your-now report under the state worktree notes/ directory listing per-source record counts for canonical state, remote (marked not published), frontend, and api",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-run-myn.ac2",
+            "title": "reconcileBeads creates an approval.json next to the report that contains approved: false and the report's sha256 (the operator gate stays closed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-run-myn.ac3",
+            "title": "A recommendation note records the single-canonical-DB vs bd multi-repo routing comparison and one recommended plan with rationale grounded in the report's counts and conflicts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-run-myn.ac4",
+            "title": "Given the run completes, all four myn stores remain byte-for-byte unmutated and no refs/dolt/data ref or beads-cutover.json is created for mind-your-now",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "server-bundle-ci-gate",
+        "title": "Gate CI and machine quality gates on the dashboard server bundle build",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T22:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-2607",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/ci.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:dashboard:server:bundle",
+            "grep -n 'build:dashboard:server' .github/workflows/ci.yml",
+            "grep -n 'server-bundle' /home/eltmon/.overdeck/projects.yaml"
+          ],
+          "expected_outputs": [
+            "server bundle build completes green",
+            "ci.yml build job contains a server bundle build step",
+            "the overdeck project's quality_gates contains a required server-bundle gate"
+          ],
+          "readiness": "ready"
+        },
+        "narrative": {
+          "Action": "Root `npm run build` does NOT include the dashboard server bundle (package.json:81 — contracts, pi/ohmypi extensions, CLI only), and root tsconfig excludes src/dashboard/** (tsconfig.json:19) — that is how the yield*-outside-generator parse error shipped through green gates. Fix in two places: (1) .github/workflows/ci.yml — in the build job, add a step `npm run build:dashboard:server:bundle` after the existing `npm run build` step (line ~64; contracts are already built by build). (2) The live machine config /home/eltmon/.overdeck/projects.yaml — under the overdeck project's quality_gates (alongside the existing typecheck/lint/build gates), add: `server-bundle: { command: npm run build:dashboard:server:bundle, required: true }`. This file is machine-local operator config, not in the repo — edit it directly and state in the PR body that the projects.yaml gate was applied live. (3) File a follow-up GitHub issue titled 'chore(server): pay down the 152-error src/dashboard/server typecheck debt' recording that `npx tsc --noEmit -p src/dashboard/server/tsconfig.json` fails with 152 errors (top offenders: routes/__tests__/conversations.test.ts 20, routes/workspaces.ts 14, services/__tests__/session-context-writer.test.ts 9, ws-rpc.ts 7) and that a real typecheck gate should replace/augment the bundle-build gate once clean. Do NOT fix the type errors in this issue."
+        },
+        "items": [
+          {
+            "id": "server-bundle-ci-gate.ac1",
+            "title": "ci.yml's build job runs npm run build:dashboard:server:bundle so a server-source parse error fails CI",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-bundle-ci-gate.ac2",
+            "title": "The overdeck project in ~/.overdeck/projects.yaml contains a required server-bundle quality gate whose command exits 0 from the workspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-bundle-ci-gate.ac3",
+            "title": "A follow-up GitHub issue records the 152-error server typecheck debt with per-file counts and the intent to upgrade the gate to a real typecheck",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "flywheel-bulk-presence",
+        "title": "Replace flywheel per-issue sync bd reads with one shared bulk presence read",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-12T22:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-2607",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/beads/presence.ts",
+            "src/dashboard/server/routes/backlog.ts",
+            "src/lib/cloister/flywheel.ts",
+            "tests/unit/lib/beads/presence.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/beads/ tests/unit/lib/cloister/",
+            "npm run typecheck",
+            "npm run build:dashboard:server:bundle"
+          ],
+          "expected_outputs": [
+            "beads and cloister unit suites pass",
+            "typecheck completes without errors",
+            "server bundle still builds"
+          ],
+          "readiness": "ready"
+        },
+        "narrative": {
+          "Action": "(1) Create src/lib/beads/presence.ts exporting `issuesWithBeadsBounded(projectRoot: string, boundMs = 8000): Promise<{ known: boolean; set: Set<string> }>` — move the implementation verbatim from src/dashboard/server/routes/backlog.ts:53-66 (one getAllBeads() bulk read raced against a bound; issue IDs derived from bead labels matching /^[a-z]+-\\d+$/i). (2) Update backlog.ts to import it from the new module and delete its local copy. (3) In src/lib/cloister/flywheel.ts's async flywheelRunConfigurationSection, before building the isReadyOrHasPrd closure (line 167-175), await one issuesWithBeadsBounded(projectRoot) call and replace the per-issue `createBeadsResolver(join(workspacesDir, ...)).getBeadsForIssueSync(id)` read at line 170 with membership in the resulting set (a not-known presence result means beads presence is unknown — fall through to the drafts check, do not treat as no-beads). (4) In spawnFlywheel at line 328, await the same helper and pass `{ issuesWithBeads: set }` into buildClassifyLookups(workspace, ...) so its sync per-workspace fallback (src/lib/backlog/lookups.ts:54-63) never runs in the flywheel path. (5) Add tests/unit/lib/beads/presence.test.ts: labeled bead yields its issue ID uppercased; resolver failure or bound expiry yields { known: false }; use vi.useFakeTimers for the bound (repo fake-timers rule). Keep existing cloister/backlog tests green."
+        },
+        "items": [
+          {
+            "id": "flywheel-bulk-presence.ac1",
+            "title": "flywheel.ts contains no getBeadsForIssueSync call: isReadyOrHasPrd derives beads presence from one bulk issuesWithBeadsBounded read",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-bulk-presence.ac2",
+            "title": "spawnFlywheel passes issuesWithBeads into buildClassifyLookups so the cohort snapshot performs no per-workspace sync bd reads",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-bulk-presence.ac3",
+            "title": "The backlog routes and the flywheel share one presence helper exported from src/lib/beads/presence.ts, and backlog.ts no longer contains a local copy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-bulk-presence.ac4",
+            "title": "When the bulk read fails or exceeds the bound, the helper returns known: false and isReadyOrHasPrd falls back to the drafts-file check instead of classifying issues as bead-less",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "start-gate-async",
+        "title": "Switch the pan start beads spawn gate to the async retry resolver",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-12T22:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2607",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/start.ts",
+            "tests/cli/commands/work/issue-beads-check.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/cli/commands/work/issue-beads-check.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "issue-beads-check.test.ts suite is green against the async variant",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready"
+        },
+        "narrative": {
+          "Action": "src/cli/commands/start.ts:619-624 countBeadsTasksDetailed uses resolver.getBeadsForIssueSync (execFileSync per call). The async variant countBeadsTasksDetailedWithRetry (line 630-641) already exists. Find every call site of countBeadsTasksDetailed / countBeadsTasks / hasBeadsTasks inside start.ts (no non-test callers exist outside start.ts — verified by grep during planning) and switch the spawn-gate path to await countBeadsTasksDetailedWithRetry. If the sync functions end up with no remaining production callers, delete them and update their tests to exercise the async variant; if a test-only export must remain, keep only what tests still need. Any test touching the retry/backoff path MUST use vi.useFakeTimers() + advanceTimersByTimeAsync per the repo fake-timers rule — never real setTimeout waits."
+        },
+        "items": [
+          {
+            "id": "start-gate-async.ac1",
+            "title": "When pan start gates on beads presence, it resolves the count through the async retry resolver and no execFileSync-backed getBeadsForIssueSync call remains on the spawn-gate path in start.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-gate-async.ac2",
+            "title": "Given sync count helpers with no remaining production callers, the bead deletes them and the surviving tests exercise the async variant with fake timers for retry delays",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cutover-marker-dolt-head",
+        "title": "Accept Dolt-native local heads in beads-cutover.json validation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-12T22:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2607",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/beads/cutover-marker.ts",
+            "tests/unit/lib/beads/cutover-marker.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/beads/cutover-marker.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "cutover-marker.test.ts passes including base32 local-head cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready"
+        },
+        "narrative": {
+          "Action": "src/lib/beads/cutover-marker.ts:25 validates both head fields with isSha (40-hex git SHA), but local Dolt heads from `bd vc status` are 32-char base32. Change parseBeadsCutoverMarker (line 27-36) so localReconciledHead accepts EITHER a 40-hex git SHA OR a 32-char base32 Dolt commit hash (/^[0-9a-v]{32}$/i). remoteDoltHead MUST stay 40-hex-only: validateBeadsCutoverMarker compares it against `git ls-remote <url> refs/dolt/data` output (lines 66-74), which is always a git SHA. Add JSDoc on the BeadsCutoverMarker interface documenting the convention: remoteDoltHead is the git SHA of refs/dolt/data; localReconciledHead may be either the same git SHA (the panopticon-cli convention, which stays valid) or the Dolt-native local head. Extend tests/unit/lib/beads/cutover-marker.test.ts: a marker with a base32 localReconciledHead parses; a base32 remoteDoltHead is rejected; existing git-SHA-for-both markers still parse."
+        },
+        "items": [
+          {
+            "id": "cutover-marker-dolt-head.ac1",
+            "title": "parseBeadsCutoverMarker accepts a marker whose localReconciledHead is a 32-char base32 Dolt hash and still accepts the existing git-SHA-for-both convention",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cutover-marker-dolt-head.ac2",
+            "title": "parseBeadsCutoverMarker rejects a marker whose remoteDoltHead is not a 40-hex git SHA (base32 there returns null)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cutover-marker-dolt-head.ac3",
+            "title": "The BeadsCutoverMarker interface JSDoc contains the accepted format for each head field and why remoteDoltHead must remain a git SHA",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-updated-at-reset",
+        "title": "Document the 2026-07-12 updated_at mass-reset and cross-reference PAN-2602",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-12T22:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2607",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/BEADS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'updated_at' docs/BEADS.md"
+          ],
+          "expected_outputs": [
+            "docs/BEADS.md contains a section on the v53 updated_at mass-reset dated 2026-07-12"
+          ],
+          "readiness": "ready"
+        },
+        "narrative": {
+          "Action": "Add a short section to docs/BEADS.md (near the reconcile/migration content around line 42) titled 'updated_at mass-reset (2026-07-12)': the v53 schema migration set every bead's updated_at to the migration time across all migrated projects, so any recency-based analysis on bead updated_at (e.g. PAN-2602's in-pipeline signal) must treat values at or before 2026-07-12 as migration noise, not activity; the reconcile comparator's metadata-drift classification exists for the same reason. Also post a comment on GitHub issue PAN-2602 (gh issue comment 2602) stating the same fact so the read-model rollup work inherits it."
+        },
+        "items": [
+          {
+            "id": "docs-updated-at-reset.ac1",
+            "title": "docs/BEADS.md contains an updated_at mass-reset section naming the 2026-07-12 v53 migration and the recency-signal caveat",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-updated-at-reset.ac2",
+            "title": "PAN-2602 receives a comment warning that bead updated_at was mass-reset on 2026-07-12 and must not be trusted as a recency signal at or before that date",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion",
+              "acJustification": "Two ACs suffice: the bead is a documentation propagation task with exactly two observable outputs (doc section + issue comment)."
+            }
+          }
+        ]
+      },
+      {
+        "id": "workspace-redirect-canonical",
+        "title": "Write new-workspace beads redirects to the resolved canonical home, never a chained redirect",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T22:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2607",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace-manager/worktree-ops.ts",
+            "src/lib/workspace-manager/create.ts",
+            "tests/unit/lib/workspace/worktree-beads-redirect.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspace/",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "worktree-beads-redirect.test.ts suite is green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready"
+        },
+        "narrative": {
+          "Action": "Bug discovered live during PAN-2607 planning: src/lib/workspace-manager/worktree-ops.ts:111-130 writes <worktree>/.beads/redirect pointing at <repoPath>/.beads, but post-PAN-2564 the repo-root .beads itself contains a redirect to the canonical home (the state worktree), and bd refuses redirect chains ('Warning: redirect chains not allowed'). Result: every workspace created after the cutover gets a broken beads store — bd operates on the repo-root .beads stub, `bd bootstrap` fails with 'Error 1007: can't create database overdeck; database exists', and every mutation batch (e.g. pan plan finalize bead creation) fails with 'The mutation batch failed before push'. Fix: in worktree-ops.ts, compute the redirect target via resolveCanonicalBeadsHome(repoPath) from src/lib/beads/home.ts (which returns the state-worktree .beads for a migrated project, or <project.path>/.beads otherwise); when it returns a non-null existing directory, write the redirect content as that ABSOLUTE path; only fall back to the current relative(targetPath, repoPath/.beads) form when the resolver returns null. Apply the same resolution to the polyrepo path in create.ts:258-273, which today silently SKIPS writing a redirect when the subrepo store itself holds a redirect (line 269's !existsSync(join(repoBeadsDir,'redirect')) guard) — leaving bd to spin up an empty database; instead resolve through that redirect and point the workspace at the final target. Never write a redirect whose target directory itself contains a redirect file. Add tests/unit/lib/workspace/worktree-beads-redirect.test.ts (fs fixtures in a temp dir, no real bd calls) covering: migrated project => redirect content is the canonical absolute path; unmigrated project => relative repo .beads path preserved; pre-existing redirect file untouched; polyrepo source store holding a redirect => workspace redirect points at the resolved final target."
+        },
+        "items": [
+          {
+            "id": "workspace-redirect-canonical.ac1",
+            "title": "Given a migrated project, worktree creation writes a .beads/redirect that contains the canonical beads home (state-worktree) absolute path rather than the repo-root .beads",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-redirect-canonical.ac2",
+            "title": "Given an unmigrated project, worktree creation preserves the existing relative repo .beads redirect behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-redirect-canonical.ac3",
+            "title": "Given a polyrepo subrepo whose .beads holds a redirect, workspace creation resolves through it and the workspace redirect contains the final target (no redirect chain is ever written)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-redirect-canonical.ac4",
+            "title": "When bd runs in a freshly created workspace of a migrated project, it emits no redirect-chain warning and bootstrap exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "comparator-metadata-drift",
+        "to": "reconcile-multi-store",
+        "type": "blocks"
+      },
+      {
+        "from": "reconcile-multi-store",
+        "to": "reconcile-run-myn",
+        "type": "blocks"
+      },
+      {
+        "from": "comparator-metadata-drift",
+        "to": "docs-updated-at-reset",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-13-PAN-2607-chore-beads-pan-2564-landing-follow-ups-myn-4-store-reconcile-server-typecheck-gate-comparator-report-polish.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

@@ -1,0 +1,467 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-12T21:05:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2603: feat(docs-rag): complete (or retire) the docs RAG integration — PAN-1203 shipped lib-only",
+    "updated": "2026-07-12T22:44:38.485Z"
+  },
+  "plan": {
+    "id": "pan-2603",
+    "title": "feat(docs-rag): complete the docs RAG integration (keep decision)",
+    "status": "completed",
+    "uid": "49762ea9-11fb-4409-bd1a-7e352b82e503",
+    "author": "agent:claude-fable-5",
+    "sequence": 7,
+    "created": "2026-07-12T21:05:00.000Z",
+    "updated": "2026-07-12T22:44:38.485Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2603",
+        "label": "PAN-2603",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1203",
+        "label": "PAN-1203 (origin PRD)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "docs-rag",
+      "hooks",
+      "cli",
+      "retrieval"
+    ],
+    "narratives": {
+      "Problem": "PAN-1203 shipped a complete docs-RAG library (src/lib/docs/: corpus, index-builder, query, gate/budget/telemetry state) plus the pan docs CLI, config schema, and build wiring — but the feature is dead end-to-end. Root defect: the index builder writes <packageRoot>/dist/docs-index.sqlite while the query layer reads ~/.overdeck/docs/index.sqlite (getDocsIndexPath), and nothing bridges them, so pan docs query silently returns nothing (queryDocsIndex swallows all errors). Additionally the UserPromptSubmit injection was never wired: evaluateDocsPromptGate/recordDocsInjection/recordDocsTelemetry have zero callers, and no ops doc exists. NOTE: the issue's claims 'zero callers' and 'build not wired' were verified WRONG — the pan docs CLI is registered (src/cli/index.ts:609) and npm run build runs build:docs-index via scripts/build-post-cli.mjs:18 unless SKIP_DOCS_INDEX=1.",
+      "Proposal": "KEEP and finish the integration with the smallest correct delta. (1) pan docs reindex builds the index in-process directly at the live path getDocsIndexPath(); (2) scripts/build-docs-index.mjs additionally copies its dist artifact to the live path; (3) new thin service src/lib/docs/injection.ts (buildDocsInjectionContext) composes gate → query → budget bump + telemetry → <overdeck-docs> markdown block; (4) POST /api/memory/inject (postMemoryInjectRoute in src/dashboard/server/routes/hooks.ts) calls the service in its fast synchronous path only and appends the block to the returned context — the existing UserPromptSubmit hook already prints that context to stdout, so no hook-script change is needed; (5) pan docs query prints a stderr hint when the index file is missing; (6) docs/DOCS-RAG.md ops doc + PAN-1203 PRD status update. Full implementation brief with before/after snippets: drafts/pan-2603.md on overdeck-state.",
+      "NonGoals": "- No Pi or codex harness injection — Claude Code UserPromptSubmit only\n- No 'pan docs status' subcommand (PAN-1203 wanted it; PAN-2603 does not)\n- No re-enabling the docs-index build in CI/release and no prebuilt index shipped in the npm package — SKIP_DOCS_INDEX posture in ci.yml, release.yml, and launcher-generator.ts stays exactly as is\n- No fallback read paths in queryDocsIndex (single canonical live index path; materialization is fixed at the writers)\n- No classifier fallback work (docs.classifier stays enabled:false) and no trigger-regex tuning\n- No corpus expansion, cross-repo RAG, or dashboard UI surface\n- No removal of the dist artifact path (DEFAULT_DOCS_INDEX_PATH) — packaging optionality is preserved"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Decision gate resolved as KEEP, not kill.",
+        "rationale": "The kill rationale in the issue ('lib has zero callers, so this is clean') is factually wrong — the pan docs CLI is registered, src/index.ts exports the lib, build wiring exists, and the agent briefing already advertises 'pan docs query'. The lib+gate+config+tests are complete; finishing costs ~5 small beads while killing would rip out a CLI command, config schema, briefing references, and skills."
+      },
+      {
+        "summary": "Injection wired server-side into the /api/memory/inject fast path rather than a hook-side 'pan docs query' shell call.",
+        "rationale": "The hook already POSTs there with the prompt and prints returned context to stdout (sync-sources/hooks/user-prompt-submit-hook:47-54); a hook-side CLI call would add Node cold-start latency to every prompt submit and violate the hook's 1s curl budget. Matches the established memory-injection pattern."
+      },
+      {
+        "summary": "Index materialization fixed at the writers (reindex + build script) targeting the existing live path ~/.overdeck/docs/index.sqlite; query layer untouched.",
+        "rationale": "Single source of truth for reads; adding a dist-path fallback in queryDocsIndex would be a bandaid chain, which the repo's no-bandaids rule forbids."
+      },
+      {
+        "summary": "SKIP_DOCS_INDEX posture unchanged; docs RAG remains a source-checkout-only feature.",
+        "rationale": "Release CI deliberately skips the heavy index build (PAN-1659) and the npm package ships neither docs/ nor skills/ corpus, so package-based installs cannot use docs RAG regardless. Re-litigating that costs release-pipeline weight this issue doesn't need."
+      },
+      {
+        "summary": "Empty query results do not consume injection budget.",
+        "rationale": "Budget exists to cap injected tokens; a no-op injection spends nothing and should not lock out the next genuinely useful injection within the rate window."
+      }
+    ],
+    "items": [
+      {
+        "id": "reindex-live-path",
+        "title": "pan docs reindex builds in-process to the live index path",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T21:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2603",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/docs.ts",
+            "src/cli/commands/__tests__/docs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/docs.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "docs.test.ts passes including the new reindex materialization test",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace the reindex action in src/cli/commands/docs.ts (currently spawns 'node scripts/build-docs-index.mjs', lines 52-62) with an in-process call: buildDocsIndex({ outputPath: getDocsIndexPath(), rootDir: packageRoot, maxIndexBytes: DEFAULT_DOCS_INDEX_MAX_BYTES }) importing from ../../lib/docs/index-builder.js and ../../lib/paths.js, then log the result path/chunkCount/sizeBytes. buildDocsIndex already does tmp-file + atomic rename. If the action closure is hard to test directly, extract an exported runDocsReindex(overrides?) helper and have the action call it. Tests MUST inject a fake embedding provider (copy the pattern in src/lib/docs/__tests__/index-builder.test.ts — never download the gte-small model) and use a temp docsDir/indexPath override. Exact before/after snippets: WI-1 in drafts/pan-2603.md on overdeck-state."
+        },
+        "items": [
+          {
+            "id": "reindex-live-path.ac1",
+            "title": "Given a temp OVERDECK_HOME/docs paths override and a fake embedding provider, running the reindex code path creates index.sqlite at the live docs index path (not dist/)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reindex-live-path.ac2",
+            "title": "After reindex, queryDocsIndex({ indexPath: <same live path>, query: 'harness' }) returns at least one result row from the fixture corpus",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reindex-live-path.ac3",
+            "title": "The reindex action builds in-process — it no longer spawns scripts/build-docs-index.mjs, and reindex succeeds in a checkout even when child_process.spawn is stubbed to throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "build-script-materialize",
+        "title": "build-docs-index.mjs also copies the built index to the live path",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-12T21:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-2603",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/build-docs-index.mjs"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"const s=require('fs').readFileSync('scripts/build-docs-index.mjs','utf8'); if(!/getDocsIndexPath/.test(s)) process.exit(1)\"",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "script references getDocsIndexPath and copies the artifact to it",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In scripts/build-docs-index.mjs, after buildDocsIndex succeeds (line 22-27), import getDocsIndexPath from the same dist/index.js dynamic import (already exported — src/index.ts:2 does 'export * from ./lib/paths.js'), mkdir -p its parent, copyFile the dist artifact to getDocsIndexPath(), and log both paths. SKIP_DOCS_INDEX=1 continues to exit before any work (line 9-12). A plain copyFile is acceptable because the source was just atomically renamed into place by buildDocsIndex. Exact spec: WI-2 in drafts/pan-2603.md on overdeck-state."
+        },
+        "items": [
+          {
+            "id": "build-script-materialize.ac1",
+            "title": "Given dist/ is built, running 'OVERDECK_HOME=<tmpdir> node scripts/build-docs-index.mjs' produces BOTH dist/docs-index.sqlite and <tmpdir>/docs/index.sqlite, and logs both paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "build-script-materialize.ac2",
+            "title": "With SKIP_DOCS_INDEX=1 the script exits 0 without creating or modifying either index file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-injection-service",
+        "title": "Thin injection service: buildDocsInjectionContext in src/lib/docs/injection.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T21:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2603",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "wire-hook-inject"
+          ],
+          "files_scope": [
+            "src/lib/docs/injection.ts",
+            "src/lib/docs/__tests__/injection.test.ts",
+            "src/index.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/docs/__tests__/injection.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "injection.test.ts passes with all six scenario tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/docs/injection.ts exporting buildDocsInjectionContext(options: { prompt; sessionId?; projectPath?; config?; paths?: DocsPathOverrides; now?: Date }): Promise<{ injected: boolean; context: string | null; reason?: DocsGateReason }>. Order: (1) evaluateDocsPromptGate (src/lib/docs/state.ts:95) — if shouldInject is false, return { injected:false, context:null, reason } with NO budget bump and NO telemetry; (2) queryDocsIndex({ query: prompt, config, indexPath: paths?.indexPath }) — if zero results, return { injected:false, context:null } with NO budget bump (empty injection must not consume the rate window); (3) otherwise recordDocsInjection (state.ts:133) + recordDocsTelemetry (state.ts:184), return { injected:true, context: formatDocsQueryMarkdown(result) }. Never throw: wrap the body in try/catch returning { injected:false, context:null } — the hook route must never 500 because of docs. Re-export the module from src/index.ts next to the other lib/docs exports (lines 10-13). API shape and test matrix: WI-3 in drafts/pan-2603.md on overdeck-state."
+        },
+        "items": [
+          {
+            "id": "docs-injection-service.ac1",
+            "title": "Given a fixture index (fake embeddings) and a trigger-matching prompt, buildDocsInjectionContext returns injected:true with context containing '<overdeck-docs>' and advances the budget state file exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-injection-service.ac2",
+            "title": "When docs are disabled (config enabled:false or a disable-scope entry) or the prompt matches no trigger regex, it returns injected:false with the gate's reason and writes no budget or telemetry entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-injection-service.ac3",
+            "title": "When the budget is exhausted for the session key, it returns injected:false with reason 'budget_exhausted' and does not query telemetry-bump",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-injection-service.ac4",
+            "title": "When the index file is missing or the query returns zero results, it returns injected:false without throwing and WITHOUT advancing budget state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-injection-service.ac5",
+            "title": "When an injection succeeds, the service records exactly one JSONL entry at the telemetry path override",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-hook-inject",
+        "title": "Wire docs injection into the /api/memory/inject fast path",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T21:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-2603",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/hooks.ts",
+            "src/dashboard/server/routes/__tests__/hooks-docs-inject.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/hooks-docs-inject.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "hooks-docs-inject.test.ts passes all four route-level scenarios",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/hooks.ts, inside postMemoryInjectRoute (line 259) ONLY: after warningResult is computed in the fast synchronous path (~line 276) and before the 202 jsonResponse (~line 293), call buildDocsInjectionContext({ prompt, sessionId, config: loadConfigSync().config.docs }) (loadConfigSync from src/lib/config-yaml/load.ts:417; prompt/sessionId already parsed from the request body) and join a non-null docs context onto the response context with '\\n\\n'. CRITICAL (H3 in continue.json): do NOT put docs logic inside handleMemoryInjectBody — that function runs a second time fire-and-forget at ~line 289 and would double-bump budget and double-write telemetry. Add a test seam for config/paths mirroring how the route already injects injectMemory/injectBriefing for tests. Model the new test file on src/dashboard/server/routes/__tests__/hooks-user-prompt.test.ts; fixture index built with fake embeddings (H2); assert the fixture returns rows via queryDocsIndex before asserting route behavior (H5). Full spec: WI-4 in drafts/pan-2603.md on overdeck-state."
+        },
+        "items": [
+          {
+            "id": "wire-hook-inject.ac1",
+            "title": "Given a fixture index and an Overdeck-trigger prompt, POST /api/memory/inject returns 202 with a context field containing '<overdeck-docs>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-hook-inject.ac2",
+            "title": "With docs.promptInjectionEnabled:false or a non-trigger prompt, the response context contains no '<overdeck-docs>' block and existing memory/compliance context is preserved unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-hook-inject.ac3",
+            "title": "With the index file missing, the route still returns { ok: true } at 202 with no docs block (docs failure never breaks the hook)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-hook-inject.ac4",
+            "title": "Given one injecting request, the docs budget state file records exactly one injection entry — proving the fire-and-forget second handleMemoryInjectBody call performs no docs work",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-missing-index-hint",
+        "title": "pan docs query prints a stderr hint when the index file is absent",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-12T21:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2603",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/docs.ts",
+            "src/cli/commands/__tests__/docs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/docs.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "docs.test.ts passes including the missing-index hint test",
+            "lint (including scripts/lint-skills.sh) completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In the query action of src/cli/commands/docs.ts, before calling queryDocsIndex, resolve the index path as options.indexPath ?? getDocsIndexPath() and, if the file does not exist (existsSync), print to stderr: \"No docs index found at <path>. Run 'pan docs reindex' to build it.\" Then continue to the normal empty-result output on stdout and exit 0 (stdout contract unchanged so scripted consumers are unaffected). Add no new flags — skills/pan-docs must not drift (scripts/lint-skills.sh runs in npm run lint). Shares a test file with reindex-live-path; sequenced after it to avoid same-file merge conflicts."
+        },
+        "items": [
+          {
+            "id": "cli-missing-index-hint.ac1",
+            "title": "With no index file at the resolved path, 'pan docs query x' writes the hint naming the resolved path and 'pan docs reindex' to stderr and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-missing-index-hint.ac2",
+            "title": "When an index is present, the command prints no hint to stderr and preserves the existing stdout output byte-for-byte",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ops-doc",
+        "title": "Ops doc docs/DOCS-RAG.md + PAN-1203 PRD status update",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-12T21:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2603",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DOCS-RAG.md",
+            "docs/prds/planned/PAN-1203-overdeck-docs-rag.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test -f docs/DOCS-RAG.md",
+            "grep -q 'PAN-2603' docs/prds/planned/PAN-1203-overdeck-docs-rag.md"
+          ],
+          "expected_outputs": [
+            "docs/DOCS-RAG.md exists with the required sections",
+            "PAN-1203 PRD status line references PAN-2603"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ],
+          "acJustification": "Docs-only bead: the two ACs cover file existence with named required sections and the PRD status update; content-level ACs beyond section presence would be subjective."
+        },
+        "narrative": {
+          "Action": "Write docs/DOCS-RAG.md covering, as named sections: what docs RAG is; corpus sources; the two index paths (dist artifact DEFAULT_DOCS_INDEX_PATH vs live ~/.overdeck/docs/index.sqlite) and which writer produces each; build & refresh (npm run build materializes via scripts/build-docs-index.mjs; pan docs reindex manual rebuild; SKIP_DOCS_INDEX skips in CI/release/workspace builds and why — PAN-1659/PAN-1678); consumption (pan docs query CLI, and the injection flow: UserPromptSubmit hook → POST /api/memory/inject → gate → query → <overdeck-docs> block appended to hook stdout); configuration (docs.* keys in config.yaml incl. trigger regexes and budget caps, defaults in src/lib/config-yaml/defaults.ts); pan docs enable/disable scopes; telemetry (~/.overdeck/docs/telemetry.jsonl); troubleshooting (silent-empty query output means missing index — run pan docs reindex). Also change the '**Status:** Planned' line in docs/prds/planned/PAN-1203-overdeck-docs-rag.md to '**Status:** Shipped — integration completed by PAN-2603'. Sequenced last so it documents the landed behavior."
+        },
+        "items": [
+          {
+            "id": "ops-doc.ac1",
+            "title": "docs/DOCS-RAG.md exists and contains sections covering corpus, index paths, build/refresh (incl. SKIP_DOCS_INDEX), hook injection flow, configuration, enable/disable scopes, telemetry, and troubleshooting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ops-doc.ac2",
+            "title": "The PAN-1203 PRD status header line contains 'Shipped' and references PAN-2603",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "docs-injection-service",
+        "to": "wire-hook-inject",
+        "type": "blocks"
+      },
+      {
+        "from": "reindex-live-path",
+        "to": "cli-missing-index-hint",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-hook-inject",
+        "to": "ops-doc",
+        "type": "blocks"
+      },
+      {
+        "from": "reindex-live-path",
+        "to": "ops-doc",
+        "type": "blocks"
+      },
+      {
+        "from": "build-script-materialize",
+        "to": "ops-doc",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-12-PAN-2603-feat-docs-rag-complete-the-docs-rag-integration-keep-decision.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

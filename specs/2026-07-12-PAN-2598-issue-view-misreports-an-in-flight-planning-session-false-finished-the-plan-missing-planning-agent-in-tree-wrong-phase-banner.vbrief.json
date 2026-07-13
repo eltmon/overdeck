@@ -1,0 +1,732 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-12T17:29:57Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2598: Issue view misreports an in-flight planning session: false \"finished the plan\", missing planning agent in tree, wrong phase banner",
+    "updated": "2026-07-13T04:53:08.861Z"
+  },
+  "plan": {
+    "id": "pan-2598",
+    "title": "Issue view misreports an in-flight planning session: false \"finished the plan\", missing planning agent in tree, wrong phase banner",
+    "status": "running",
+    "uid": "1f04872a-b849-49e2-a28a-d203efb1663f",
+    "author": "agent:claude-fable-5",
+    "sequence": 4,
+    "created": "2026-07-12T17:29:57Z",
+    "updated": "2026-07-13T04:53:08.861Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2598",
+        "label": "PAN-2598",
+        "type": "issue"
+      },
+      {
+        "uri": "drafts/pan-2598.md",
+        "label": "PRD (overdeck-state)",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "issue-view",
+      "planning",
+      "auq",
+      "needs-you",
+      "read-model"
+    ],
+    "narratives": {
+      "Problem": "A planning session that is alive but blocked on an operator question renders in the issue view as the exact inversion of the truth: the timeline says '<model> finished the plan' (gated on elapsed-time duration, not completion), the phase banner says 'The crew is writing code' (workRunning is derived from phase==='pending', which is what a planning-phase issue looks like), the AGENTS & STEPS tree omits the live planning agent (the session-trees pre-filter only recognizes work-agent dirs and the legacy .pan workspace dir, and the cockpit's non-null resource-allocated feature shadows the activity fallback), and the blocking question produces no AUQ modal or needs-you trip (commit 3d77214f55/PAN-2530 stripped the literal PAN-1520 marker from the deny hook's reason, so the JSONL detector classifies every hook-denied question as already answered). Root causes verified at file:line in the PRD (drafts/pan-2598.md on overdeck-state).",
+      "Proposal": "Four surgical fix clusters, all additive: (1) session builders populate a real endedAt terminal signal and a planningComplete flag (from plan.status via findSpecByIssue + PLANNING_FINISHED_STATUSES) and HappenedFeed gates its done-lines on those instead of duration!==null; (2) the phase banner derives workRunning from actual live work sections; (3) the session-trees pre-filter learns planning agent dirs, the agent-<issue>-plan naming, the .overdeck workspace dirname, and live tmux, both builders enumerate agent-<issue>-plan, a tmux-alive planning session without state synthesizes a node, and the cockpit falls back to activity-derived sessions when session-trees yields none; (4) the AUQ deny hook re-emits the PAN-1520 marker, the detector additionally accepts the stable phrase 'surfaced to the operator', and a contract test executes the real hook so the hook<->detector contract can never silently break again.",
+      "NonGoals": "- No redesign of the cockpit layout or AgentsLane visual structure\n- No change to the AUQ answer-delivery path (operator reply -> agent); detection/surfacing only\n- No removal of the AUQ deny hook and no switch to native AUQ menus (separate design fork)\n- No changes to src/lib/reconstruct/derive-phase.ts or the backend PipelinePhase read-model\n- No change to the existing duration field semantics (additive endedAt/planningComplete only)\n- No new polling loops or watchers; fixes ride existing queries/scans"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Add endedAt/planningComplete as new fields instead of changing duration semantics",
+        "rationale": "Other consumers render duration as elapsed time; the no-loss rule forbids silently repurposing an existing field."
+      },
+      {
+        "summary": "Detector robustness = restore PAN-1520 marker AND accept the stable phrase 'surfaced to the operator'; rejected 'any is_error tool_result counts as deny'",
+        "rationale": "A genuine AUQ tool error would otherwise be classified as a deny and wedge as forever-pending; two independent positive signals are safer than one negative heuristic."
+      },
+      {
+        "summary": "Cover the agent-<issue>-plan spawnRun naming even though the incident planner used planning-<issue>",
+        "rationale": "The gap is verified real (spawn-prep.ts:621-625 vs the candidate sets), cheap to close in the same files, and would otherwise reproduce the same invisible-planner symptom for Cloister-spawned planning."
+      },
+      {
+        "summary": "Fix the banner in the frontend derivation it actually uses; leave derive-phase.ts alone",
+        "rationale": "The banner never consults the backend PipelinePhase read-model; rewiring it is a larger refactor with no bearing on the reported defect."
+      }
+    ],
+    "items": [
+      {
+        "id": "activity-terminal-end-signal",
+        "title": "Session builders emit real endedAt and planningComplete instead of only elapsed duration",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T17:29:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2598",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "happened-feed-done-gate"
+          ],
+          "files_scope": [
+            "src/dashboard/server/routes/command-deck.ts",
+            "src/dashboard/server/routes/projects.ts",
+            "packages/contracts/src/types.ts",
+            "tests/unit/dashboard/server/routes/command-deck.test.ts",
+            "tests/unit/dashboard/server/routes/projects.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/server/routes/command-deck.test.ts tests/unit/dashboard/server/routes/projects.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both route test files pass, including new cases for endedAt-only-on-end and planningComplete"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In the activity section builder (src/dashboard/server/routes/command-deck.ts:335-359) and collectSessionTreeNodes (src/dashboard/server/routes/projects.ts:230-290): populate endedAt ONLY when the session has actually ended — rtState?.state === 'suspended', presence === 'ended', or state.stoppedAt is set while the tmux session is not alive — using state.stoppedAt (or lastActivity as fallback) as the timestamp; leave endedAt undefined for live sessions. Add planningComplete: boolean to planning-type sections, resolved once per request via findSpecByIssue + PLANNING_FINISHED_STATUSES (src/lib/vbrief/io.ts:353-379) — true only when a canonical spec exists with plan.status in the finished set. Do NOT change the existing duration computation (hazard H1). Extend the section/SessionNode type in packages/contracts/src/types.ts if the fields are missing there (endedAt already exists on SessionNode; planningComplete is new)."
+        },
+        "items": [
+          {
+            "id": "activity-terminal-end-signal.ac1",
+            "title": "Given a planning agent whose tmux session is alive (presence active or idle), when GET /api/command-deck/activity/:issueId builds its section, then the section carries no endedAt and planningComplete is false while no finished spec exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "activity-terminal-end-signal.ac2",
+            "title": "Given an agent state with stoppedAt set and no live tmux session, when either builder emits its section/node, then endedAt is populated with a valid ISO timestamp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "activity-terminal-end-signal.ac3",
+            "title": "Given a canonical spec for the issue with plan.status in PLANNING_FINISHED_STATUSES, when the planning section is built, then it emits planningComplete: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "activity-terminal-end-signal.ac4",
+            "title": "Given live and ended sessions, when either builder emits its sections, then the duration field preserves its existing elapsed-seconds value (regression assertion in both route tests)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "happened-feed-done-gate",
+        "title": "HappenedFeed renders done-lines only on real completion, and a waiting-on-you line for blocked sessions",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T17:29:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2598",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/HappenedFeed.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/HappenedFeed.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/cockpit/HappenedFeed.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "new HappenedFeed.test.tsx passes: no done-line for a live idle planning section; done-line renders for an ended+planningComplete section"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In HappenedFeed.tsx (currently lines 62-76): replace the `section.duration !== null` gate with `section.endedAt` presence for ALL section types, computing endMs from endedAt instead of startMs+duration. For sections of type 'planning', additionally require `section.planningComplete === true` before rendering the '<who> finished the plan' line; an ended-but-not-complete planning section renders a neutral line ('<who> stopped planning' tone info). When a live section has awaitingInput === true, push a 'waiting on you to answer a question' line with tone 'bad' (attention) so a blocked planner is visible in the feed. Create HappenedFeed.test.tsx following the PlanCard.test.tsx pattern in the same directory."
+        },
+        "items": [
+          {
+            "id": "happened-feed-done-gate.ac1",
+            "title": "Given a planning section with presence 'idle', no endedAt and status 'running', when the feed renders, then it produces no 'finished the plan' line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "happened-feed-done-gate.ac2",
+            "title": "Given a planning section with endedAt set and planningComplete true, when the feed renders, then it produces the '<model> finished the plan' line with tone ok",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "happened-feed-done-gate.ac3",
+            "title": "Given a live section with awaitingInput true, when the feed renders, then it produces a 'waiting on you' line with attention tone",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "happened-feed-done-gate.ac4",
+            "title": "Given a work section with endedAt set and non-failed status, when the feed renders, then the 'finished writing the code' line still renders (no regression for genuinely ended work sessions)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "phase-banner-work-signal",
+        "title": "Phase banner derives workRunning from live work sections, not phase === 'pending'",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T17:29:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2598",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/StatusNarrative.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "IssueMissionControl.test.tsx passes with new cases: planning-only issue renders the planning headline, not 'The crew is writing code'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "At IssueMissionControl.tsx:910, replace `workRunning={phase === 'pending'}` with a signal computed from the activity sections already fetched in that component: `sections.some(s => s.type === 'work' && s.status === 'running')` (the same shape NowPanel uses around line 727) — thread the sections (or a precomputed boolean) into the StatusNarrative call site. In StatusNarrative.tsx, no branch reordering is required once workRunning is truthful: with workRunning false, no beads, and hasPlan false, derivation falls through to the 'Planning what to build' branch (line 84). Add a defensive test that an issue with a live planning section, no work section, no plan and no review row renders 'Planning what to build' and never 'The crew is writing code'."
+        },
+        "items": [
+          {
+            "id": "phase-banner-work-signal.ac1",
+            "title": "Given an issue with a live planning section only (no work section, no review-status row, hasPlan false), when the banner derives, then it renders the 'Planning what to build' headline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phase-banner-work-signal.ac2",
+            "title": "Given an issue with a live work section (type 'work', status 'running'), when the banner derives, then it renders 'The crew is writing code'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phase-banner-work-signal.ac3",
+            "title": "Given an issue with no live sections and unfinished beads (plan.done < plan.total), when the banner derives, then the existing in-progress branch still renders (no regression to the beads-driven path)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "session-trees-prefilter-planning",
+        "title": "Session-trees feature pre-filter recognizes planning agents, .overdeck dirs, and live tmux",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T17:29:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2598",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/projects.ts",
+            "tests/unit/dashboard/server/routes/projects.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/server/routes/projects.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "projects.test.ts passes with a new case: a feature qualifies when only planning-<issue> agent dir + workspace .overdeck exist"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In the feature-candidate filter at src/dashboard/server/routes/projects.ts:533-539, extend the qualifying conditions so a feature is collected when ANY of the following exists: ~/.overdeck/agents/agent-<issue>/ (current), ~/.overdeck/agents/planning-<issue>/, ~/.overdeck/agents/agent-<issue>-plan/, <workspace>/.pan/ (current), <workspace>/.overdeck/, or the shared tmux session-name context contains a session for the issue (planning-<issue>, agent-<issue>, agent-<issue>-plan, or strike-<issue>). Keep the checks as parallel pathExists probes like the existing two. This is the incident fix: during PAN-2597's planning window only planning-pan-2597/ and .overdeck/ existed, and the filter returned null for the feature."
+        },
+        "items": [
+          {
+            "id": "session-trees-prefilter-planning.ac1",
+            "title": "Given only ~/.overdeck/agents/planning-<issue>/ exists (no work-agent dir, no .pan), when GET /api/session-trees runs, then the feature is included and its planning node is returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-trees-prefilter-planning.ac2",
+            "title": "Given only <workspace>/.overdeck/ exists, when the pre-filter evaluates the feature, then the feature qualifies (returns non-null)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-trees-prefilter-planning.ac3",
+            "title": "Given neither agent dirs, runtime dirs, nor issue tmux sessions exist, when the pre-filter evaluates, then the feature is still excluded (no debris regression)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "plan-run-candidate-naming",
+        "title": "Both session builders enumerate agent-<issue>-plan and classify planning by role",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-12T17:29:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2598",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/projects.ts",
+            "src/dashboard/server/routes/command-deck.ts",
+            "tests/unit/dashboard/server/routes/projects.test.ts",
+            "tests/unit/dashboard/server/routes/command-deck.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/server/routes/projects.test.ts tests/unit/dashboard/server/routes/command-deck.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both route tests pass with new agent-<issue>-plan fixtures classified as planning sections"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Add `agent-<issue>-plan` (the spawnRun(issueId,'plan') session name from src/lib/agents/spawn-prep.ts:621-625) to the candidate sets: candidateSessionIds in collectSessionTreeNodes (src/dashboard/server/routes/projects.ts:214) and the fixed candidate loop in the activity builder (src/dashboard/server/routes/command-deck.ts:277-283). Fix classification in both builders: a session is planning when its id starts with 'planning-' OR state.role === 'plan' (hazard H2: agent-<issue>-plan starts with 'agent-' and would otherwise classify as work). Sequenced after session-trees-prefilter-planning because both edit the same functions."
+        },
+        "items": [
+          {
+            "id": "plan-run-candidate-naming.ac1",
+            "title": "Given an agent dir agent-<issue>-plan with state role 'plan', when collectSessionTreeNodes runs, then it emits a node with type 'planning'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-run-candidate-naming.ac2",
+            "title": "Given the same fixture, when GET /api/command-deck/activity/:issueId runs, then it emits a section with type 'planning'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-run-candidate-naming.ac3",
+            "title": "Given a plain work agent (agent-<issue>, role 'work'), when either builder runs, then it still classifies as 'work' (no false planning classification)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tmux-live-planning-synthesis",
+        "title": "A tmux-alive planning session with no readable state still yields a planning node",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-12T17:29:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2598",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/projects.ts",
+            "tests/unit/dashboard/server/routes/projects.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/server/routes/projects.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "projects.test.ts passes with a new case: tmux-only planning session synthesizes a live planning node"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In collectSessionTreeNodes (src/dashboard/server/routes/projects.ts), after the candidate loop: if context.tmuxSessionNames contains planning-<issue> (or agent-<issue>-plan) but no planning node was emitted (hasPlanningSection false because the agent dir or state was missing/invalid at projects.ts:230-234), synthesize a planning SessionNode: sessionId = the tmux name, type 'planning', model 'unknown', startedAt now-ISO fallback, status 'running', presence derived from deriveSessionPresence, tmuxSession set so the terminal is openable. This guarantees the issue's expected behavior: a planning agent appears in the tree whenever its tmux session is alive. Sequenced after plan-run-candidate-naming (same function)."
+        },
+        "items": [
+          {
+            "id": "tmux-live-planning-synthesis.ac1",
+            "title": "Given tmux contains planning-<issue> but no agent state dir exists, when collectSessionTreeNodes runs, then it returns a planning node with presence not 'ended' and a tmuxSession id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tmux-live-planning-synthesis.ac2",
+            "title": "Given a normal registered planning agent, when collectSessionTreeNodes runs, then exactly one planning node is emitted (no duplicate synthesized row)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cockpit-session-fallback-merge",
+        "title": "Cockpit uses activity-derived sessions when session-trees yields none",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T17:29:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2598",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "IssueMissionControl.test.tsx passes: empty tree-sessions feature falls back to activity sessions"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In IssueTreeLane (src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx, around lines 462-463): when the resolved feature's sessions array is empty or absent while the activity-derived `sessions` memo (built at lines ~414-429) is non-empty, render the activity-derived sessions instead — e.g. `renderedSessions = feature.sessions?.length ? feature.sessions : sessions`. This closes the shadowing half of the incident: fetchCockpitProjectFeature returns a non-null resource-allocated feature with empty sessions, which currently suppresses the fallbackFeature whose activity sections DID contain the live planner. Preserve the deep-link path where the resource-allocated feature is null (hazard H5). Sequenced after phase-banner-work-signal (same file)."
+        },
+        "items": [
+          {
+            "id": "cockpit-session-fallback-merge.ac1",
+            "title": "Given projectFeature.data with an empty sessions array and activity sections containing a live planning section, when IssueTreeLane renders, then AgentsLane receives the planning session (Plan row renders)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cockpit-session-fallback-merge.ac2",
+            "title": "Given projectFeature.data with non-empty tree sessions, when IssueTreeLane renders, then the tree sessions win (no override by activity fallback)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cockpit-session-fallback-merge.ac3",
+            "title": "Given a deep-link (projectFeature.data null), when IssueTreeLane renders, then the existing fallbackFeature path still renders its activity-derived sessions unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "auq-deny-marker-contract",
+        "title": "AUQ deny hook re-emits the PAN-1520 marker; detector also accepts the stable phrase",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T17:29:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2598",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "auq-hook-detector-contract-test"
+          ],
+          "files_scope": [
+            "sync-sources/hooks/ask-user-question-hook*",
+            "src/lib/agent-enrichment.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/agent-enrichment-pending-inputs.test.ts",
+            "bash -n sync-sources/hooks/ask-user-question-hook"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "existing pending-input tests pass",
+            "hook script parses (bash -n exits 0) and its REASON string contains (PAN-1520)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "1) In sync-sources/hooks/ask-user-question-hook line 52, restore the marker inside the emitted reason: '...surfaced to the operator in the Overdeck dashboard (PAN-1520), where they answer it directly...' — string literal edit only; do not touch the script's control flow or its exit-0 error tolerance (hazard H6). 2) In src/lib/agent-enrichment.ts:253-270, extend isAskUserQuestionHookDenyToolResult to return true when the content includes EITHER the existing ASK_USER_QUESTION_HOOK_DENY_MARKER ('PAN-1520') OR a new secondary constant ASK_USER_QUESTION_HOOK_DENY_PHRASE = 'surfaced to the operator' (the hook's stable operative phrase), so a future copy-edit that drops one signal cannot silently flip denies to answered. Old transcripts with only 'PAN-1520' keep matching. Note in the PR: live sessions pick up the hook change only after pan sync re-provisions ~/.claude/settings.json hooks (hazard H3)."
+        },
+        "items": [
+          {
+            "id": "auq-deny-marker-contract.ac1",
+            "title": "The hook's emitted permissionDecisionReason contains the literal '(PAN-1520)' (grep on the script source and on its executed stdout)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auq-deny-marker-contract.ac2",
+            "title": "Given a tool_result containing 'surfaced to the operator' but no 'PAN-1520', when isAskUserQuestionHookDenyToolResult evaluates it, then it returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auq-deny-marker-contract.ac3",
+            "title": "Given a tool_result containing neither signal, when the detector evaluates it, then it returns false (real answers still classify as answered)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "auq-hook-detector-contract-test",
+        "title": "Contract test executes the real AUQ hook and asserts the detector recognizes its output",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T17:29:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-2598",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/lib/auq-hook-detector-contract.test.ts",
+            "tests/lib/agent-enrichment-pending-inputs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/auq-hook-detector-contract.test.ts tests/lib/agent-enrichment-pending-inputs.test.ts"
+          ],
+          "expected_outputs": [
+            "new contract test passes: hook stdout's permissionDecisionReason is recognized by isAskUserQuestionHookDenyToolResult",
+            "refit pending-input tests pass using the hook-derived fixture"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "New tests/lib/auq-hook-detector-contract.test.ts: spawn `bash sync-sources/hooks/ask-user-question-hook` (async spawn, not execSync) with a synthetic PreToolUse JSON payload on stdin ({ tool_name: 'AskUserQuestion', tool_input: { questions: [...] } }, plus whatever env the script reads — mirror its jq parsing at the top of the script); parse its stdout JSON; assert hookSpecificOutput.permissionDecision === 'deny' and that isAskUserQuestionHookDenyToolResult({ content: <permissionDecisionReason> }-shaped tool_result) returns true. Skip gracefully (test.skipIf) when jq is unavailable. Refit tests/lib/agent-enrichment-pending-inputs.test.ts:87-113 to build its deny-reason fixture from a shared helper that extracts the REASON string from the hook source file instead of a drifting hardcoded copy (hazard H4). No real timers/delays involved; if any waiting is added use fake timers per repo rule."
+        },
+        "items": [
+          {
+            "id": "auq-hook-detector-contract-test.ac1",
+            "title": "Given the repo hook script and a synthetic AskUserQuestion PreToolUse payload, when the test executes the hook, then stdout parses as JSON with permissionDecision 'deny'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auq-hook-detector-contract-test.ac2",
+            "title": "Given the hook's actual emitted reason, when isAskUserQuestionHookDenyToolResult evaluates a tool_result containing it, then it returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auq-hook-detector-contract-test.ac3",
+            "title": "Given the refit pending-input tests, when the suite runs, then it produces passing results using a fixture built from the hook source, and the test file contains no standalone hardcoded 'PAN-1520' fixture literal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-update",
+        "title": "Document the issue-view derivation contract and the AUQ marker contract",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-12T17:29:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2598",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ASKUSERQUESTION-DASHBOARD.md",
+            "docs/MISSION-CONTROL.md",
+            "sync-sources/hooks/ask-user-question-hook*"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -n 'PAN-1520' docs/ASKUSERQUESTION-DASHBOARD.md sync-sources/hooks/ask-user-question-hook",
+            "grep -n 'endedAt' docs/MISSION-CONTROL.md"
+          ],
+          "expected_outputs": [
+            "grep finds the marker-contract documentation in both the doc and the hook header comment",
+            "grep finds the completion-gating documentation in MISSION-CONTROL.md"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "docs/ASKUSERQUESTION-DASHBOARD.md: document the deny-marker contract — the hook's emitted reason MUST contain 'PAN-1520' and the stable phrase 'surfaced to the operator'; the detector accepts either; the contract test (tests/lib/auq-hook-detector-contract.test.ts) is the guard; cite the PAN-2530 regression as the why. Add a warning comment in the hook's header (lines 1-15 region) stating the reason string is a load-bearing contract with src/lib/agent-enrichment.ts. docs/MISSION-CONTROL.md: document what feeds the issue cockpit — session-trees primary + activity fallback + the new empty-sessions fallback rule, the endedAt/planningComplete gating for 'finished the plan', and that the phase banner's workRunning comes from live work sections. Update each doc's existing structure in place; do not restructure unrelated sections."
+        },
+        "items": [
+          {
+            "id": "docs-update.ac1",
+            "title": "docs/ASKUSERQUESTION-DASHBOARD.md contains the marker-contract section naming both signals and the contract test path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-update.ac2",
+            "title": "The hook source contains a header comment that declares the reason string a load-bearing contract with src/lib/agent-enrichment.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-update.ac3",
+            "title": "docs/MISSION-CONTROL.md contains sections that show the endedAt/planningComplete completion gating and the sessions fallback order for the cockpit tree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "activity-terminal-end-signal",
+        "to": "happened-feed-done-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "session-trees-prefilter-planning",
+        "to": "plan-run-candidate-naming",
+        "type": "blocks"
+      },
+      {
+        "from": "plan-run-candidate-naming",
+        "to": "tmux-live-planning-synthesis",
+        "type": "blocks"
+      },
+      {
+        "from": "phase-banner-work-signal",
+        "to": "cockpit-session-fallback-merge",
+        "type": "blocks"
+      },
+      {
+        "from": "auq-deny-marker-contract",
+        "to": "auq-hook-detector-contract-test",
+        "type": "blocks"
+      },
+      {
+        "from": "activity-terminal-end-signal",
+        "to": "docs-update",
+        "type": "informs"
+      },
+      {
+        "from": "auq-deny-marker-contract",
+        "to": "docs-update",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-12-PAN-2598-issue-view-misreports-an-in-flight-planning-session-false-finished-the-plan-missing-planning-agent-in-tree-wrong-phase-banner.vbrief.json"
+    }
+  },
+  "status": "active"
+}

@@ -1,0 +1,1135 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-12T22:42:27Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2602: feat(pipeline): union in-pipeline signal + bead↔issue state fidelity (visibility gap + orphaned-bead leak)",
+    "updated": "2026-07-13T05:46:05.328Z"
+  },
+  "plan": {
+    "id": "pan-2602",
+    "title": "feat(pipeline): union in-pipeline signal + bead↔issue state fidelity (visibility gap + orphaned-bead leak)",
+    "status": "running",
+    "uid": "438f004f-5e10-4436-9514-f440f20c97df",
+    "author": "agent:claude-fable-5",
+    "sequence": 7,
+    "created": "2026-07-12T22:42:27Z",
+    "updated": "2026-07-13T05:46:05.328Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2602",
+        "label": "PAN-2602",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "pipeline",
+      "dashboard",
+      "beads",
+      "resource-discovery",
+      "conversations",
+      "verification"
+    ],
+    "narratives": {
+      "Problem": "The Command Deck issue tree only shows issues with a live registered pipeline agent, so real in-flight work falls off the view: handoff/bypass conversations carry no issueId (PAN-2564 implemented by a conversation on bypass/pan-2564 was invisible), and work that lives in artifacts (branch ahead of main, open PR, partial beads) with no running agent is excluded by design at resource-discovery.ts:661-712. Separately, 36 GitHub-closed issues carry orphaned open beads because nothing reconciles beads when an issue goes terminal, which makes raw bead-progress ~95% noise and leaks state fidelity.",
+      "Proposal": "Extend computeResourceAllocatedIssues() with a union of cheap, cached work-artifact signals (branch/bypass ahead of main, issueId-linked conversation, gated partial-bead progress from a per-issue rollup, in_progress beads, recent spec activity) — all gated on GitHub-issue-OPEN so closed-orphan noise stays out. Feed the bead signals from a new rollup service that computes {total, closed, inProgress, lastUpdated} per issue from ONE bulk getAllBeads() call, refreshed on beads.freshness_changed (fixed to also fire on local writes). Let pan handoff declare/auto-detect an issue association (the issue_id column already exists end-to-end). Stop the leak at the source: sweep remaining open beads with a reason category at closeOut and postMergeLifecycle, add a one-shot pan beads sweep backfill for the 36 existing orphan carriers, and add an explicit no-open-beads check to the verification gate (fail-closed on timeout per PAN-1812). Surface stalled work (in-pipeline artifacts, no live agent, no recent activity) as its own Command Deck bucket.",
+      "NonGoals": "- No per-issue bd queries at render time; all bead signals come from the single bulk rollup (NFR).\n- No persisted domain event carrying the derived rollup payload; the rollup is an in-memory service cache (D2).\n- No new bead status value ('cancelled' stays a close reason, not a bd status; D5).\n- No changes to the PAN-2054 terminal-issue exclusion: GitHub-closed issues (except open-PR) must never re-enter the tree, even with the new signals (AC-6).\n- No auto-verification of WHAT orphaned beads represent during the sweep (done vs obsolete is carried as the close-reason text; the sweep does not re-audit functionality).\n- No removal of the Conversations section: issue-nested conversations are additive (D7).\n- No configuration surface for the 14-day recency window; it is a named constant.\n- No changes to review convoy mechanics or done-preflight behavior (FR-4 adds a verification-gate check alongside, not instead)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Rollup cache is a dashboard-server in-memory service (not a read-model reducer field fed by a persisted event).",
+        "rationale": "Its only consumer is resource discovery in the same process; persisting a ~400-issue derived rollup to the append-only event store on every bead write would bloat the log with derivable data. The NFR's intent (O(1) at render, event-driven refresh, one bulk list) is fully met."
+      },
+      {
+        "summary": "Recency window N = 14 days, hardcoded constant.",
+        "rationale": "Evidence: the two genuine stalled issues were ~51 days stale; 14 days separates active work from debris and adding config was not requested (simplicity-first)."
+      },
+      {
+        "summary": "beads.freshness_changed is fixed to fire on local writes by comparing against the previous poll's head, instead of adding a new write-door event.",
+        "rationale": "The NFR names 'the existing bead-write event'; the existing event's before/after-within-one-poll comparison provably misses local writes (beads-sync-service.ts:100-107). Fixing its detection is smaller and keeps one event type."
+      },
+      {
+        "summary": "Merge-time sweep reason is 'issue merged; remaining open beads swept'; close-out derives 'completed' vs 'not planned' phrasing from the close context.",
+        "rationale": "Issue comment requires an honest per-bead reason category (done/obsolete/abandoned); at automated terminals the tracker close state is the only mechanical category source."
+      },
+      {
+        "summary": "The stalled surface is a new Command Deck pipeline bucket in pipeline-helpers.ts, not a separate page.",
+        "rationale": "The needs-you grouping precedent (groupPipelineEntries) already re-buckets admitted issues; a bucket is the smallest change that surfaces the silent-drop set."
+      },
+      {
+        "summary": "Backfill verb is `pan beads sweep` under the existing beads command group.",
+        "rationale": "It operates on beads and follows the mutate-through-writer pattern already in src/cli/commands/beads.ts; admin/db is for DB-plane rebuilds, not tracker-state reconciliation."
+      }
+    ],
+    "items": [
+      {
+        "id": "sync-local-write-detection",
+        "title": "Fix beads.freshness_changed to fire on local writes (compare against previous poll head)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T22:42:27Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2602",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/beads-sync-service.ts",
+            "src/dashboard/server/services/__tests__/beads-sync-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/beads-sync-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "beads-sync-service tests pass including a new case where a head change without a pull delta emits beads.freshness_changed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/beads-sync-service.ts (syncOnce, lines ~95-107), the emit condition compares the head before and after `dolt pull` within one poll, so a local write via runMutationBatch (which advances the head before the poll) never fires beads.freshness_changed. Change the detection to compare the freshly observed head against the PREVIOUS poll's recorded head (track last-observed head per project, e.g. extend the healthByProject entry or the existing lastRemoteHead map): emit when observed != lastObserved, then record the new head. First poll (no previous head) records without emitting. Add/extend unit tests: (a) remote pull advances head → event emitted (existing behavior preserved); (b) head already advanced locally before poll, pull is a no-op → event NOW emitted; (c) no head movement → no event. Use fake timers for any interval logic per repo rule."
+        },
+        "items": [
+          {
+            "id": "sync-local-write-detection.ac1",
+            "title": "Given a local runMutationBatch write advanced the Dolt head before the poll, when syncOnce runs, then the service emits beads.freshness_changed with the new localHead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-local-write-detection.ac2",
+            "title": "Given no head movement since the previous poll, when syncOnce runs, then the service emits no beads.freshness_changed event",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-local-write-detection.ac3",
+            "title": "Given a remote change arrives via dolt pull, when syncOnce runs, then the service still emits beads.freshness_changed (existing behavior preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "beads-rollup-service",
+        "title": "Per-issue bead rollup service: one bulk getAllBeads() → {total, closed, inProgress, lastUpdated} cache refreshed on beads.freshness_changed",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T22:42:27Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2602",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "pipeline-signal-union",
+            "stalled-surface"
+          ],
+          "files_scope": [
+            "src/dashboard/server/services/beads-rollup-service.ts",
+            "src/dashboard/server/services/__tests__/beads-rollup-service.test.ts",
+            "src/dashboard/server/main.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/beads-rollup-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "beads-rollup-service tests pass: grouping by issue label, stale-on-failure, debounced event refresh (fake timers)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "readinessReason": "Foundation bead: pipeline-signal-union and stalled-surface consume its getter and rollup shape; inspect before dependents start.",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/beads-rollup-service.ts: a per-project in-memory cache mapping lowercase issue label (e.g. 'pan-2602') → { total: number, closed: number, inProgress: number, lastUpdated: string | null } plus a per-project staleness flag. Compute from ONE createBeadsResolver(project.beadsCwd).getAllBeads() call (resolver at src/lib/beads/resolver.ts:104; the 64MB maxBuffer and shared lock are already handled there; use a generous acquisitionTimeoutMs of several seconds — the 500ms starvation bug was just fixed in commit 4f6db409ef). Group beads by issue label reusing labelMatchesIssue semantics from src/lib/beads-query.ts:106-111 (accept bare 'pan-N' and 'workspace:pan-N' forms; a bead may carry several labels — count it under each issue label it carries). closed = status==='closed', inProgress = status==='in_progress', lastUpdated = max(updated_at) across the issue's beads. On a failed read ({ok:false} BeadsReadResult), KEEP the previous rollup and mark the project stale — never replace with empty (PAN-1812, hazard H1). Refresh triggers: one compute at service start, then recompute on each beads.freshness_changed event for that projectKey (subscribe via the event store like domain-services.ts:170-177), debounced trailing-edge ~2s to absorb bursts. Export a synchronous getter getBeadRollups(projectKey) → { rollups: Map, stale: boolean } | null for resource discovery. Wire service start in src/dashboard/server/main.ts next to createBeadsSyncService (~line 489). Tests use vi.useFakeTimers() for the debounce per repo rule and mock the resolver."
+        },
+        "items": [
+          {
+            "id": "beads-rollup-service.ac1",
+            "title": "Given 3 beads labeled pan-9001 (one closed, one in_progress, one open), when the service computes, then getBeadRollups returns {total:3, closed:1, inProgress:1} with lastUpdated equal to the max updated_at, computed from exactly one getAllBeads() call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "beads-rollup-service.ac2",
+            "title": "Given a beads.freshness_changed event for the project, when the 2s debounce elapses (fake timers), then the service recomputes the rollup exactly once for a burst of events",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "beads-rollup-service.ac3",
+            "title": "Given getAllBeads returns {ok:false} (timeout), when the refresh runs, then the getter preserves the previous rollup values and marks the project stale instead of returning empty counts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "beads-rollup-service.ac4",
+            "title": "Given a bead labeled 'workspace:pan-9001', when the service groups beads, then it counts under issue pan-9001 (labelMatchesIssue semantics preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "branch-ahead-signal",
+        "title": "Discovery computes branch-ahead-of-main for feature/* AND bypass/* branches",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T22:42:27Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2602",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/resource-discovery.ts",
+            "src/dashboard/server/services/__tests__/resource-discovery.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/resource-discovery.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "resource-discovery tests pass including bypass/* enumeration and branchAheadOfMain computation",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/resource-discovery.ts: (1) extend loadProjectBranches (lines ~363-377) to also enumerate refs/heads/bypass/* and refs/remotes/origin/bypass/* alongside the existing feature/* patterns, using the same execFileAsync + 10s timeout pattern (NEVER execSync — dashboard server rule, PAN-70); parse the issue id from bypass branch names with parseIssueIdFromTextSync (src/lib/resource-utils.ts:3) as the branch loop at :579-599 already does for feature branches. (2) For each issue that gained a 'branch' source, compute whether the branch has unmerged work: run `git merge-base --is-ancestor <branch> main` via execFileAsync (exit 0 ⇒ fully merged, non-zero exit 1 ⇒ ahead; reuse the pattern from src/lib/close-out.ts:73-119); record the boolean as resourceDetails.branchAheadOfMain and the branch name checked. Bound concurrency (e.g. sequential per project or a small pool) and keep it inside computeResourceAllocatedIssues() so the existing 30s TTL cache covers it. This bead computes and records data only — it must NOT change the membership filter (that is pipeline-signal-union). Update the ResourceDetails type and sanitizeResourceAllocatedIssues passthrough."
+        },
+        "items": [
+          {
+            "id": "branch-ahead-signal.ac1",
+            "title": "Given a repo with branch bypass/pan-9002 containing commits not on main, when discovery computes, then the issue PAN-9002 entry records resourceDetails.branchAheadOfMain === true and a 'branch' resource source",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "branch-ahead-signal.ac2",
+            "title": "Given a feature branch fully merged into main, when discovery computes, then the entry records branchAheadOfMain === false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "branch-ahead-signal.ac3",
+            "title": "Given this bead alone (no membership change), when the discovery filter runs, then the set of issues returned by GET /api/issues/resource-allocated is unchanged from before the bead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-signal",
+        "title": "Discovery tags issueId-linked conversations as a 'conversation' resource source",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T22:42:27Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2602",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/resource-discovery.ts",
+            "src/dashboard/server/services/__tests__/resource-discovery.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/resource-discovery.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "resource-discovery tests pass including a conversation-with-issueId producing a 'conversation' source",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "readinessReason": "Edits the same resource-discovery.ts/test files as branch-ahead-signal; deliberately serialized behind it to avoid merge conflicts.",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/resource-discovery.ts, add 'conversation' to the ResourceSource union (line 24) and, inside computeResourceAllocatedIssues(), load non-archived conversations with a non-null issueId through the conversations read door (src/lib/overdeck/conversation-reads.ts — do NOT query SQLite directly; single-source-of-truth rule). For each, call ensureIssue(conv.issueId) and push {id, name, title, status, tmuxSession} into a new resourceDetails.conversations array, mirroring the tmux loop at :505-517. Update sanitizeResourceAllocatedIssues and the public ResourceAllocatedIssue interface (:71-89). This bead computes and records data only — membership does not change until pipeline-signal-union. Add unit tests with a stubbed conversation reader."
+        },
+        "items": [
+          {
+            "id": "conversation-signal.ac1",
+            "title": "Given a live conversation whose record carries issueId PAN-9003, when discovery computes, then issue PAN-9003 contains resource source 'conversation' and resourceDetails.conversations lists that conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-signal.ac2",
+            "title": "Given a conversation with null issueId, when discovery computes, then it creates no issue entry and tags no source",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-signal.ac3",
+            "title": "Given an archived conversation with an issueId, when discovery computes, then it contributes no 'conversation' source (archived work is not live)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pipeline-signal-union",
+        "title": "Extend the discovery membership filter with the gated union of work-artifact signals",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T22:42:27Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2602",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/resource-discovery.ts",
+            "src/dashboard/server/services/__tests__/resource-discovery.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/resource-discovery.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "resource-discovery tests pass including: PAN-2564-shape admitted; closed issue with partial beads rejected; stale open issue with partial beads and recent activity admitted",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "sequential",
+          "readinessReason": "Consumes the rollup getter (beads-rollup-service), branchAheadOfMain (branch-ahead-signal), and the conversation source (conversation-signal); deliberately serialized after all three.",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In computeResourceAllocatedIssues() (src/dashboard/server/services/resource-discovery.ts), consume getBeadRollups(projectKey) from beads-rollup-service and extend the THIRD membership filter (lines ~671-675) with new admission clauses, each additionally gated on !isTerminalTrackerState(issue.trackerState) so the PAN-2054 terminal exclusion at :669 keeps winning (hazard H2): (a) resourceDetails.branchAheadOfMain === true; (b) resourceSources contains 'conversation'; (c) bead rollup shows partial completion (0 < closed < total) AND lastUpdated within RECENCY_DAYS = 14; (d) bead rollup shows inProgress > 0; (e) 'vbrief' source present AND the spec/PRD artifact mtime is within 14 days (reuse the existing scanWorkspace data at :548-577; if mtime is not already captured, capture it there). Define RECENCY_DAYS as a named exported constant. Also surface the rollup counts on the returned issue (e.g. beadTotals: {total, closed, inProgress, lastUpdated, stale}) so the frontend and the stalled bucket can render progress without any per-issue query (NFR-1). A stale rollup (beads read failing) must not admit or evict issues by itself — stale means 'use last-known values'. Regression tests REQUIRED: (1) GitHub-CLOSED issue with 10/22 beads closed and no open PR is NOT returned (AC-6); (2) open issue with bypass branch ahead of main and no tmux/docker/PR IS returned (AC-1, PAN-2564-shape); (3) open issue with partial beads updated 60 days ago is NOT admitted by clause (c); (4) open issue with an in_progress bead IS returned."
+        },
+        "items": [
+          {
+            "id": "pipeline-signal-union.ac1",
+            "title": "Given an open issue with a bypass branch ahead of main and no live agent/tmux/docker/PR, when GET /api/issues/resource-allocated resolves, then the response contains that issue (AC-1)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-signal-union.ac2",
+            "title": "Given a GitHub-closed issue carrying partial open beads and no open PR, when discovery filters, then the issue stays excluded from the response (AC-6)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-signal-union.ac3",
+            "title": "Given an open issue whose bead rollup shows 0<closed<total with lastUpdated older than 14 days and no other signal, when discovery filters, then the partial-bead clause admits nothing (recency gate applies)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-signal-union.ac4",
+            "title": "Given an open issue with an in_progress bead, when discovery computes, then the response contains the issue with its beadTotals rollup populated from the cached rollup (no per-issue bd query)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-signal-union.ac5",
+            "title": "Given the beads rollup is stale (read failure), when discovery filters, then membership derived from last-known rollup values persists and no issue flips solely due to staleness",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "handoff-issue-flag",
+        "title": "pan handoff --issue <id>: thread an explicit issue association to the spawned conversation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-12T22:42:27Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-2602",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/index.ts",
+            "src/cli/commands/handoff.ts",
+            "src/cli/commands/fork-client.ts",
+            "src/lib/overdeck/conversations.ts",
+            "src/lib/overdeck/conversation-forks.ts",
+            "src/dashboard/server/services/conversation-lifecycle.ts",
+            "skills/pan-handoff/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__ --silent",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "fork/handoff tests pass including issueId override and inheritance fallback",
+            "lint passes — scripts/lint-skills.sh validates the updated pan-handoff SKILL.md against pan handoff --help"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add `--issue <id>` to the pan handoff CLI: register the option on the handoff command in src/cli/index.ts (~line 488-495, next to --model/--cwd), add `issue?: string` to HandoffOptions (src/cli/commands/handoff.ts:8-15), normalize/validate via parseIssueIdSync (src/lib/issue-id.ts:41) and reject invalid ids with a clear error before forking. Thread it: handoffCommand passes issueId into forkConversationViaServer (handoff.ts:94-101) → fork-client request body → ForkRequest interface (src/lib/overdeck/conversations.ts:624-627, add issueId?: string) → conversation-lifecycle ForkRequest options (conversation-lifecycle.ts:111, threaded at :281) → conversation-forks.ts createConversation call (:704-708), where explicit issueId OVERRIDES the parent-inheritance default (`opts.issueId ?? conv.issueId ?? undefined` — hazard H5: forks without --issue keep inheriting). Repo rule: the CLI flag and skills/pan-handoff/SKILL.md change in the SAME commit (scripts/lint-skills.sh cross-checks flags). Tests: fork with explicit issueId persists it; fork without keeps parent's; invalid --issue exits non-zero without creating a conversation."
+        },
+        "items": [
+          {
+            "id": "handoff-issue-flag.ac1",
+            "title": "Given `pan handoff --issue PAN-9004 self \"focus\"`, when the fork completes, then the created conversation record persists issueId PAN-9004",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-issue-flag.ac2",
+            "title": "Given a handoff without --issue from a parent conversation carrying an issueId, when the fork completes, then the child preserves the parent's issueId (inheritance unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-issue-flag.ac3",
+            "title": "Given an invalid --issue value (e.g. 'not-an-id'), when the command runs, then it exits non-zero with a validation error and creates no conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-issue-flag.ac4",
+            "title": "Given the updated CLI, when npm run lint runs, then lint-skills.sh accepts skills/pan-handoff/SKILL.md documenting the --issue flag",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "handoff-issue-autodetect",
+        "title": "Auto-detect the handoff issue association from the target cwd's branch (feature/, strike/, bypass/)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-12T22:42:27Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2602",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/webhook-handlers.ts",
+            "src/lib/overdeck/conversation-forks.ts",
+            "src/cli/commands/handoff.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/webhook-handlers.test.ts src/lib/overdeck/__tests__ --silent",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests pass: issueIdFromBranch resolves bypass/pan-2564 to PAN-2564; handoff with no --issue and no parent issueId records the branch-derived id",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "readinessReason": "Rides the issueId parameter path introduced by handoff-issue-flag; serialized behind it.",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend issueIdFromBranch (src/lib/webhook-handlers.ts:54, regex currently /(?:feature|strike)\\/([a-z]+-\\d+)$/i) to include the bypass prefix: /(?:feature|strike|bypass)\\/([a-z]+-\\d+)$/i — export it if not already, and keep webhook behavior identical for feature/strike. In the handoff flow: when neither --issue nor a parent issueId is present, resolve the TARGET cwd's current branch (git rev-parse --abbrev-ref HEAD in the resolved handoff cwd, via the async exec pattern) and derive the issueId with issueIdFromBranch; if the branch matches, persist the derived id on the created conversation; if not (e.g. main, detached), leave issueId null (current behavior). Precedence order (D6/H5): explicit --issue > parent inheritance > branch auto-detect > null. Print the detected association in the handoff CLI output so the operator sees it. Tests: bypass/pan-2564 → PAN-2564; main → null; explicit flag beats detection."
+        },
+        "items": [
+          {
+            "id": "handoff-issue-autodetect.ac1",
+            "title": "Given a handoff into a cwd on branch bypass/pan-9005 with no --issue and no parent issueId, when the fork completes, then the conversation persists issueId PAN-9005",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-issue-autodetect.ac2",
+            "title": "Given the cwd branch is main, when the fork completes, then issueId stays null (no false association)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-issue-autodetect.ac3",
+            "title": "Given both --issue PAN-1 and a cwd branch bypass/pan-2, when the fork completes, then the explicit flag wins and the record persists PAN-1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-nesting-frontend",
+        "title": "Command Deck: render issueId-linked conversations as child rows under their issue node",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-12T22:42:27Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2602",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix src/dashboard/frontend test -- --run CommandDeck"
+          ],
+          "expected_outputs": [
+            "frontend tests pass; a feature row with resourceDetails.conversations renders a conversation child row linking to /conv/<id>",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "readinessReason": "Renders resourceDetails.conversations produced by conversation-signal; serialized behind it.",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In the Command Deck frontend, render conversations attached to an issue (from the new resourceDetails.conversations on ProjectFeature, delivered by GET /api/issues/resource-allocated) as child rows under the issue's feature node — visually alongside session rows, with a conversation glyph, the conversation title, and a click-through to the conversation view (/conv/<id> precedent: index.tsx:572-580 deep link handling). Extend the ProjectFeature type (ProjectTree/ProjectNode.tsx:48-70) with the conversations detail. Do NOT remove or filter the existing Conversations section — issue-nested rendering is additive (no-loss, D7); the same conversation may appear in both places. Follow /pan-style-guide: no pill badges, no decorative color, monospace-consistent typography. Component test: given a feature with one linked conversation, the tree renders the child row; given none, renders exactly as today."
+        },
+        "items": [
+          {
+            "id": "conversation-nesting-frontend.ac1",
+            "title": "Given an issue row whose resourceDetails.conversations lists one conversation, when the Command Deck tree renders, then a conversation child row displays under that issue with a link to /conv/<id> (AC-2)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-nesting-frontend.ac2",
+            "title": "Given the same conversation, when the Conversations section renders, then it still contains the conversation (additive, no-loss)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-nesting-frontend.ac3",
+            "title": "Given a feature with no linked conversations, when the tree renders, then the issue row renders unchanged from today",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "orphaned-beads-sweep-module",
+        "title": "sweepOrphanedBeads(): close remaining open/in_progress beads for a terminal issue with a reason category",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T22:42:27Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2602",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "closeout-sweep-hook",
+            "merge-sweep-hook",
+            "sweep-backfill-cmd"
+          ],
+          "files_scope": [
+            "src/lib/lifecycle/orphaned-beads-sweep.ts",
+            "src/lib/lifecycle/__tests__/orphaned-beads-sweep.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/lifecycle/__tests__/orphaned-beads-sweep.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sweep tests pass: closes open+in_progress with reason, no-ops on none, aborts on read failure",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "readinessReason": "Foundation bead: three dependents call its API; the signature and failure semantics must be inspected before they start.",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/lifecycle/orphaned-beads-sweep.ts exporting async sweepOrphanedBeads(opts: { beadsCwd: string; issueId: string; reason: string; dryRun?: boolean }): Promise<SweepResult> where SweepResult = { ok: boolean; closedIds: string[]; skipped: number; error?: string }. Steps: (1) read the issue's beads via createBeadsResolver(opts.beadsCwd).getBeadsForIssue(issueId) (src/lib/beads/resolver.ts:82); on {ok:false} return { ok:false, error } and close NOTHING (PAN-1812 / H1 — a failed read is unknown, not zero). (2) Filter status 'open' or 'in_progress'. (3) If none, return ok with empty closedIds (idempotent — safe to re-run, H3). (4) Unless dryRun, close each via the canonical writer: runMutationBatch (src/lib/beads/writer.ts:87) with bd.mutate(['close', id, '--reason', opts.reason]) exactly as src/cli/commands/beads.ts:265 does — never raw bd (bd-shim blocks it). One runMutationBatch for the whole batch. (5) Return the report. No lifecycle events, no tracker writes — callers own context. Unit tests with mocked resolver/writer covering all four ACs."
+        },
+        "items": [
+          {
+            "id": "orphaned-beads-sweep-module.ac1",
+            "title": "Given an issue with 2 open and 1 in_progress beads, when sweepOrphanedBeads runs, then it closes all 3 through runMutationBatch with the provided --reason and returns their ids in closedIds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orphaned-beads-sweep-module.ac2",
+            "title": "Given the beads read returns {ok:false} (timeout), when the sweep runs, then it returns ok:false with an error and closes zero beads (timeout is not proof of zero)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orphaned-beads-sweep-module.ac3",
+            "title": "Given an issue with only closed beads, when the sweep runs, then it returns ok:true with empty closedIds and performs no mutation (idempotent)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orphaned-beads-sweep-module.ac4",
+            "title": "Given dryRun:true, when the sweep runs, then it returns the would-close ids and invokes no writer mutation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "closeout-sweep-hook",
+        "title": "closeOut step: sweep orphaned beads after vBRIEF completion, before workspace teardown",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T22:42:27Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2602",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/workflows.ts",
+            "src/lib/lifecycle/__tests__/workflows.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/lifecycle/__tests__ --silent",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "lifecycle tests pass including the new sweep step ordering and non-fatal failure",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "readinessReason": "Calls sweepOrphanedBeads from the foundation bead; serialized behind it.",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In closeOut (src/lib/lifecycle/workflows.ts:159), insert a new step AFTER completeVBriefStep (~:186) and BEFORE teardownWorkspace (~:195) — the beads store must still exist (D9). The step calls sweepOrphanedBeads with the project's canonical beadsCwd and a reason derived from the close context: normal completion → 'issue closed (completed); orphaned bead swept'; a not-planned/cancelled close (when the close options indicate it) → 'issue closed (not planned); bead cancelled'. The step is NON-FATAL: on {ok:false} it logs the error into the close-out report and close-out continues (a bead sweep failure must never wedge close-out). Surface the sweep result (count closed / error) in the closeOut summary the operator sees, in complete sentences (operator-message rule). Test: step ordering (sweep observes beads before teardown), non-fatal path, reason selection."
+        },
+        "items": [
+          {
+            "id": "closeout-sweep-hook.ac1",
+            "title": "Given close-out of an issue with 3 remaining open beads, when closeOut completes, then all 3 beads close with the close-context reason and the summary reports the count (AC-3)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closeout-sweep-hook.ac2",
+            "title": "Given the sweep fails (beads read error), when closeOut runs, then close-out still completes and the summary records the sweep failure (non-fatal)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closeout-sweep-hook.ac3",
+            "title": "Given the step ordering, when closeOut executes, then the sweep runs after completeVBriefStep and before teardownWorkspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-sweep-hook",
+        "title": "postMergeLifecycle step: sweep remaining open beads at merge, adjacent to compactBeads",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-12T22:42:27Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2602",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/merge-agent.ts",
+            "tests/unit/lib/cloister/in-flight-guard.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/in-flight-guard.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "in-flight-guard test stays green (idempotency preserved); typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "readinessReason": "Calls sweepOrphanedBeads from the foundation bead; serialized behind it.",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In postMergeLifecycle (src/lib/cloister/merge-agent.ts:276), add a sweep step adjacent to the existing compactBeads step (~:437-448, the skipDeploy re-entry phase where beads work already happens), calling sweepOrphanedBeads with reason 'issue merged; remaining open beads swept'. NON-FATAL: failure logs and the lifecycle continues (docker cleanup etc. must still run). CRITICAL (H3): the step must not re-trigger the lifecycle or emit completion signals — it only mutates bead status through the canonical writer; the createInFlightGuard idempotency and its locked test (tests/unit/lib/cloister/in-flight-guard.test.ts) must stay green. Note FR-4's verification gate normally empties this set before merge — this hook is the backstop for bypass/admin merges that skip verification."
+        },
+        "items": [
+          {
+            "id": "merge-sweep-hook.ac1",
+            "title": "Given a merged issue with leftover open beads, when postMergeLifecycle runs its beads phase, then the sweep closes them with reason 'issue merged; remaining open beads swept'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-sweep-hook.ac2",
+            "title": "Given the sweep throws or fails, when postMergeLifecycle runs, then the remaining lifecycle steps (agent pause, docker cleanup) still execute (non-fatal)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-sweep-hook.ac3",
+            "title": "Given the new step, when the in-flight-guard idempotency suite runs, then it passes unchanged (no lifecycle re-trigger)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sweep-backfill-cmd",
+        "title": "pan beads sweep: one-shot backfill closing orphaned beads on GitHub-closed issues (--dry-run)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-12T22:42:27Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2602",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/beads.ts",
+            "src/lib/lifecycle/orphaned-beads-sweep.ts",
+            "src/cli/commands/__tests__/beads-sweep.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/beads-sweep.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "sweep command tests pass: dry-run prints per-issue report without mutating; open issues are skipped",
+            "npm run lint exits 0 with the new subcommand registered"
+          ],
+          "readiness": "sequential",
+          "readinessReason": "Wraps sweepOrphanedBeads from the foundation bead; serialized behind it.",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Register `pan beads sweep [issueIds...]` on the beads command group in src/cli/commands/beads.ts (near the existing close/reconcile registrations, ~:231-266) with options --all-closed (enumerate candidates automatically), --dry-run, and --reason <text> (override). Candidate enumeration for --all-closed: ONE createBeadsResolver(beadsCwd).getAllBeads() call, group by issue label (labelMatchesIssue), keep issues where any bead status is open/in_progress; then check tracker state per candidate through the existing tracker client used by the CLI (resolveProjectFromIssue + tracker close-state lookup — same door close-issue.ts uses; never raw store access) and keep only CLOSED issues. GitHub-OPEN issues with orphans are SKIPPED and listed separately as 'open with orphaned beads — route back into the pipeline instead' (they are the stalled-work set, not sweep targets). Reason default derives from the tracker close state: completed → 'issue closed (completed); orphaned bead swept'; not-planned → 'issue closed (not planned); bead cancelled'; --reason overrides both. For each swept issue call sweepOrphanedBeads (respecting --dry-run) and print a per-issue report {issue, closedCount, reason} plus totals {processed, skipped, failed} — the backfill-records report shape (src/cli/commands/db.ts:516-532). Explicit issueIds args sweep exactly those issues (still tracker-state-checked; refuse open issues without --force... no: refuse open issues, period — sweeping an open issue is FR-1's job to surface, not FR-3's to hide)."
+        },
+        "items": [
+          {
+            "id": "sweep-backfill-cmd.ac1",
+            "title": "Given --all-closed --dry-run on a project with closed issues carrying open beads, when the command runs, then it prints per-issue would-close counts and reasons and performs zero mutations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweep-backfill-cmd.ac2",
+            "title": "Given a GitHub-OPEN issue with orphaned beads, when the command enumerates, then it skips the issue and lists it under 'open with orphaned beads' instead of sweeping",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweep-backfill-cmd.ac3",
+            "title": "Given an issue closed as not-planned, when swept without --reason, then its beads close with the 'issue closed (not planned); bead cancelled' reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweep-backfill-cmd.ac4",
+            "title": "Given the run completes, when the report prints, then it contains totals {processed, skipped, failed} matching the per-issue lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verification-open-beads-gate",
+        "title": "Verification gate: explicit 'open-beads' check that blocks completion while the issue has open beads",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T22:42:27Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2602",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/verification-runner.ts",
+            "src/lib/cloister/__tests__/verification-runner.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/verification-runner.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "verification-runner tests pass: open beads fail the gate with failedCheck 'open-beads'; timeout fails closed; clean issue passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/verification-runner.ts, insert a new check between the vbrief-ac block (ends ~:648) and the success path (~:701): call checkOpenBeadsPromise(workspacePath, issueId) from src/lib/work/done-preflight.ts:55. If it returns blockers (open beads exist OR the read timed out — checkOpenBeadsPromise already fails closed on timeout per PAN-1812/D8), fail verification with failedCheck 'open-beads', following the exact failure pattern of the neighboring checks: setStateDerivedVerificationFailure/setReviewStatusSync, shouldEscalateVerificationFailure 3-strikes escalation, writeFeedbackFile + deliverVerificationFeedback with actionable feedback naming the open bead ids and instructing `pan beads close <id> --reason <r>` (the guidance text already at :623 becomes an enforced gate). A missing bd binary keeps passing (checkOpenBeadsPromise returns [] for that case — unchanged semantics). Tests mock done-preflight: (1) open beads → outcome 'failed', failedCheck 'open-beads', feedback contains bead ids; (2) timeout blocker → outcome 'failed' (fail-closed); (3) zero open beads → gate proceeds to pass; (4) third consecutive failure escalates via the existing needs-you path. Any delay-based test logic uses fake timers (repo rule)."
+        },
+        "items": [
+          {
+            "id": "verification-open-beads-gate.ac1",
+            "title": "Given an issue with open beads, when verification runs, then it returns outcome 'failed' with failedCheck 'open-beads' and the feedback names the open bead ids (AC-4)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verification-open-beads-gate.ac2",
+            "title": "Given the beads read times out, when verification runs, then the gate fails (timeout is not proof of zero open beads — PAN-1812)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verification-open-beads-gate.ac3",
+            "title": "Given zero open beads and all other checks green, when verification runs, then it returns outcome 'passed' (no regression)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verification-open-beads-gate.ac4",
+            "title": "Given three consecutive open-beads failures, when the third completes, then the existing escalation marks the issue needs-you instead of retrying forever",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stalled-surface",
+        "title": "Command Deck 'stalled' bucket: in-pipeline artifacts, no live agent, no recent activity",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-12T22:42:27Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2602",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/pipeline-helpers.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/pipeline-helpers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend test -- --run pipeline-helpers",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pipeline-helpers tests pass: stalled bucket contains artifact-bearing agent-less features; live-agent features stay out",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "readinessReason": "Consumes beadTotals and the new admission signals delivered by pipeline-signal-union; serialized behind it.",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/CommandDeck/pipeline-helpers.ts, add a 'stalled' group to groupPipelineEntries (:305-329) placed directly after 'needs-you': a feature belongs when it (a) was admitted by work-artifact signals (has beadTotals partial progress, branchAheadOfMain, or a linked conversation — fields delivered by pipeline-signal-union), (b) has no live agent session (reuse hasActiveAgentSignal, :47-50), and (c) shows no activity within 14 days (bead lastUpdated / lastActivity). Extend the PipelineIssuePhase | 'needs-you' union (:14, :302) with 'stalled'. Add a chip via pipelineChipFor (:94) reading 'stalled — has work, no live agent' (amber per style guide; no pill badges, no decorative color — /pan-style-guide). Group title: 'Stalled / fell off the pipeline — started work with nobody on it'. Unit tests for the bucketing predicate cover all three conditions and the exclusions (live session ⇒ not stalled; recent activity ⇒ not stalled)."
+        },
+        "items": [
+          {
+            "id": "stalled-surface.ac1",
+            "title": "Given an open issue with partial bead progress, no sessions, and lastUpdated 30 days ago, when groupPipelineEntries runs, then the issue lands in the 'stalled' group with the 'stalled — has work, no live agent' chip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stalled-surface.ac2",
+            "title": "Given the same issue but with a live agent session, when grouping runs, then it stays out of 'stalled' (bucketed by its phase as today)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stalled-surface.ac3",
+            "title": "Given an issue with bead activity 2 days ago and no live agent, when grouping runs, then it stays out of 'stalled' (recent activity wins)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-update",
+        "title": "Document the in-pipeline union signal, bead sweep, verification gate, and handoff --issue",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-12T22:42:27Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2602",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/BEADS.md",
+            "configuration/beads.mdx",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint passes; the named doc files contain the new sections"
+          ],
+          "readiness": "sequential",
+          "readinessReason": "Documents final behavior and flags from the CLI/gate beads; serialized last.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Update the docs the change touches: (1) docs/BEADS.md — add sections for the terminal-issue bead sweep (close-out + merge hooks, reason categories, the invariant 'a closed issue never carries open beads'), the `pan beads sweep` backfill (flags, dry-run, open-issue skip), and the verification gate's open-beads check with the PAN-1812 fail-closed rule. (2) configuration/beads.mdx (user-facing Mintlify) — document `pan beads sweep` and the handoff `--issue` association with the branch auto-detect precedence (explicit > parent > branch > null). (3) CLAUDE.md 'Beads Enforcement' section — one paragraph: verification now blocks on open beads; close/merge sweeps orphans. Note skills/pan-handoff/SKILL.md is already updated by the handoff-issue-flag bead (same-commit rule) — do not duplicate. Write in the repo's existing doc voice; complete sentences, terms defined on first use."
+        },
+        "items": [
+          {
+            "id": "docs-update.ac1",
+            "title": "Given the updated docs, when a reader opens docs/BEADS.md, then it contains the sweep reason categories and the 'closed issue never carries open beads' invariant",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-update.ac2",
+            "title": "Given configuration/beads.mdx, when rendered, then it documents `pan beads sweep` flags and the handoff --issue precedence chain",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-update.ac3",
+            "title": "Given CLAUDE.md, when read, then the Beads Enforcement section states the verification gate blocks on open beads",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "sync-local-write-detection",
+        "to": "beads-rollup-service",
+        "type": "informs"
+      },
+      {
+        "from": "beads-rollup-service",
+        "to": "pipeline-signal-union",
+        "type": "blocks"
+      },
+      {
+        "from": "branch-ahead-signal",
+        "to": "pipeline-signal-union",
+        "type": "blocks"
+      },
+      {
+        "from": "branch-ahead-signal",
+        "to": "conversation-signal",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-signal",
+        "to": "pipeline-signal-union",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-signal",
+        "to": "conversation-nesting-frontend",
+        "type": "blocks"
+      },
+      {
+        "from": "handoff-issue-flag",
+        "to": "handoff-issue-autodetect",
+        "type": "blocks"
+      },
+      {
+        "from": "orphaned-beads-sweep-module",
+        "to": "closeout-sweep-hook",
+        "type": "blocks"
+      },
+      {
+        "from": "orphaned-beads-sweep-module",
+        "to": "merge-sweep-hook",
+        "type": "blocks"
+      },
+      {
+        "from": "orphaned-beads-sweep-module",
+        "to": "sweep-backfill-cmd",
+        "type": "blocks"
+      },
+      {
+        "from": "pipeline-signal-union",
+        "to": "stalled-surface",
+        "type": "blocks"
+      },
+      {
+        "from": "handoff-issue-flag",
+        "to": "docs-update",
+        "type": "blocks"
+      },
+      {
+        "from": "sweep-backfill-cmd",
+        "to": "docs-update",
+        "type": "blocks"
+      },
+      {
+        "from": "verification-open-beads-gate",
+        "to": "docs-update",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-13-PAN-2602-feat-pipeline-union-in-pipeline-signal-bead-issue-state-fidelity-visibility-gap-orphaned-bead-leak.vbrief.json"
+    }
+  },
+  "status": "active"
+}

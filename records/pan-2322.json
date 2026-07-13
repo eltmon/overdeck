@@ -60,18 +60,17 @@
     "recordedAt": "2026-07-11T09:47:42.604Z"
   },
   "created": "2026-07-11T09:43:27.964Z",
-  "updated": "2026-07-12T20:51:30.457Z",
+  "updated": "2026-07-12T22:51:35.825Z",
   "pipeline": {
     "issueId": "PAN-2322",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-12T19:15:18.106Z",
-    "updatedAt": "2026-07-12T20:51:30.255Z",
+    "updatedAt": "2026-07-12T22:51:35.825Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues: scrubbed OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY from the pipeline-role refusal path message and ServerConfigError variable, and extended the refusal-message test to cover pipeline-role identities.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2574",
     "lastVerifiedCommit": "dc9386b3c6954a6e26fcb806c61f485f0cc1783b",
@@ -91,7 +90,9 @@
         "tests/unit/dashboard/config.test.ts"
       ],
       "recordedAt": "2026-07-11T09:47:42.604Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-12T22:51:35.825Z"
   },
   "closeOut": {
     "usage": {
@@ -173,8 +174,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "config-test-identity-mock": "completed",
     "config-test-identity-mock.ac1": "completed",

@@ -1,0 +1,349 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-13T09:05:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2633: bug(dashboard): pending-question payload wiped when an idle-alive asking agent flaps to 'stopped' — needs-you entry vanishes while the question is still live",
+    "updated": "2026-07-13T09:13:42.392Z"
+  },
+  "plan": {
+    "id": "pan-2633",
+    "title": "bug(dashboard): pending-question payload wiped when an idle-alive asking agent flaps to 'stopped' — needs-you entry vanishes while the question is still live",
+    "status": "running",
+    "uid": "3ae61340-244c-4591-99c2-cc3335074695",
+    "author": "agent:claude-fable-5",
+    "sequence": 6,
+    "created": "2026-07-13T09:05:00.000Z",
+    "updated": "2026-07-13T09:13:42.392Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2633",
+        "label": "PAN-2633",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1520",
+        "label": "PAN-1520 (origin of the wipe)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1591",
+        "label": "PAN-1591 (projection-time wipe)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "read-model",
+      "enrichment",
+      "needs-you",
+      "askuserquestion",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "The agent.status_changed fold (packages/contracts/src/event-reducers.ts:494-503, PAN-1520) deletes all pending-input fields (pendingAskUserQuestion, pendingInputKinds, pendingProposedPlan, …) for ANY non-running/starting status, ignoring the hasLiveTmuxSession boolean the payload already carries. An idle-alive agent — registry status 'stopped' while its tmux pane is alive and showing a live AskUserQuestion — loses its needs-you entry and modal on a status flap. Nothing restores the payload: the enrichment poller keeps scanning tmux-alive agents but dedups against its private lastEnrichment cache (agent-enrichment-service.ts:207), which cannot see the read-model wipe, so no agent.enrichment_changed is re-emitted. Operator recovery required a page refresh (incident: agent-pan-2568-slot-3, 2026-07-13).",
+      "Proposal": "Three independently mergeable slices. (1) Gate the reducer wipe on liveness: delete pending-input fields on a stop-shaped status_changed only when event.payload.hasLiveTmuxSession !== true (absent ⇒ still wipe, preserving PAN-1520 fail-safe). (2) Thread accurate hasLiveTmuxSession through every status_changed emitter that can emit non-running status (lifecycle-stop pause/unpause/untroubled via async sessionExists; main.ts/deacon-main.ts stopped-notifiers pass explicit false; deacon-auto-resume already explicit) with a git-grep audit. (3) Enrichment poller convergence: a pure helper shouldForceReemitPendingInput bypasses the dedup for tmux-alive agents whose registry status is non-running while enrichment carries a pending payload, so the read model converges within one 10s poll after any wipe — WITHOUT clearing lastEnrichment, keeping the PAN-1834 awaiting-input activity/TTS rising edge single-shot. Plus docs (PENDING-INPUT.md invariant). Full PRD with verified line references: drafts/pan-2633.md on overdeck-state.",
+      "NonGoals": "- No clickable deep-links for plain activity-log lines (PAN-1844)\n- No redesign of the enrichment dedup to diff against the read model instead of its private cache\n- No wiring or deleting the currently-uncalled projectPendingInput (read-model.ts:260)\n- No change to the agent.stopped fold (full row removal on true stop stays)\n- No change to deacon auto-resume/reconcile policy or the reconciledAgentIds once-guard\n- No re-fix of the dialog-wedged-until-refresh half of the report (already fixed in e2ea5b5a5c)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Wipe gate semantics: wipe unless hasLiveTmuxSession === true; absent field still wipes.",
+        "rationale": "Preserves the PAN-1520/PAN-1591 fail-safe (never phantom needs-you rows for dead sessions) for every emitter that doesn't know liveness, while fixing the idle-alive flap once emitters assert liveness. Fail direction is a missing entry that W3 restores within 10s, not a phantom entry that persists forever."
+      },
+      {
+        "summary": "Implement both issue Direction bullets (reducer gate + poller convergence) rather than choosing one.",
+        "rationale": "The emitter that flapped the incident agent was not pinned; the reducer gate fixes known emitters, the poller re-emit guarantees convergence for any missed or future emitter. Each slice is independently shippable."
+      },
+      {
+        "summary": "Poller re-emit via dedup bypass (new pure helper), not a lastEnrichment cache clear.",
+        "rationale": "Clearing the cache makes previousEnrichment undefined, so isAwaitingInputRisingEdge would re-fire the awaiting-input activity + TTS every 10s poll (TTS metronome). Bypass keeps rising-edge single-shot (NFR-1)."
+      }
+    ],
+    "items": [
+      {
+        "id": "reducer-liveness-gate",
+        "title": "Gate the status_changed pending-input wipe on hasLiveTmuxSession",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-13T09:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2633",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/event-reducers.ts",
+            "tests/dashboard/event-reducers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd packages/contracts && npm run build",
+            "npx vitest run tests/dashboard/event-reducers.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "contracts build completes without errors",
+            "tests/dashboard/event-reducers.test.ts passes including 4 new cases covering liveness true/false/absent and running status",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In packages/contracts/src/event-reducers.ts (agent.status_changed case, wipe block at lines 489-503): compute `const sessionAlive = event.payload.hasLiveTmuxSession === true` and change the wipe condition to `event.payload.status !== 'running' && event.payload.status !== 'starting' && !sessionAlive`. Extend the PAN-1520 comment to cite PAN-2633: an idle-alive agent (stopped-shaped status, live tmux pane) is the archetypal awaiting-operator state and must keep its pending-input payload. No schema change — hasLiveTmuxSession is already Schema.optional(Schema.Boolean) at packages/contracts/src/events.ts:123. Add 4 tests to the existing `describe('applyEvent — agent.status_changed')` block in tests/dashboard/event-reducers.test.ts, seeding an agent snapshot that carries pendingAskUserQuestion/pendingInputKinds/pendingProposedPlan. Rebuild contracts before running the test suite."
+        },
+        "items": [
+          {
+            "id": "reducer-liveness-gate.ac1",
+            "title": "Given an agent snapshot with pendingAskUserQuestion/pendingInputKinds/pendingProposedPlan, when agent.status_changed applies status 'stopped' with payload hasLiveTmuxSession: true, then the reducer preserves all eight pending-input fields on the snapshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reducer-liveness-gate.ac2",
+            "title": "Given the same seeded snapshot, when status 'stopped' applies with hasLiveTmuxSession: false, then the reducer deletes all eight pending-input fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reducer-liveness-gate.ac3",
+            "title": "Given the same seeded snapshot, when status 'stopped' applies with hasLiveTmuxSession absent from the payload, then the reducer deletes all eight pending-input fields (PAN-1520 default preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reducer-liveness-gate.ac4",
+            "title": "Given the same seeded snapshot, when status 'running' applies, then the reducer preserves the pending-input fields regardless of the hasLiveTmuxSession value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "emitter-liveness-threading",
+        "title": "Thread accurate hasLiveTmuxSession through every stop-shaped status_changed emitter",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-13T09:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2633",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/shared.ts",
+            "src/dashboard/server/routes/agents/lifecycle-stop.ts",
+            "src/dashboard/server/main.ts",
+            "src/dashboard/server/deacon-main.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "git grep -n \"type: 'agent.status_changed'\" -- src packages",
+            "npx vitest run tests/dashboard/event-reducers.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "grep output shows every emitter of a possibly non-running status uses a payload builder that includes hasLiveTmuxSession (list recorded in the commit message)",
+            "existing reducer tests still pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "(1) Add a required hasLiveTmuxSession: boolean parameter to buildAgentControlEventPayload (src/dashboard/server/routes/agents/shared.ts:273-291) and include it in the returned payload. (2) In src/dashboard/server/routes/agents/lifecycle-stop.ts, at the pause (line ~233), unpause (~280), and untroubled (~327) status_changed emissions, compute liveness with the async sessionExists(id) from src/lib/tmux.ts (NEVER sessionExistsSync — server code, async-tmux rule) and pass it to the builder. (3) In src/dashboard/server/main.ts (setAgentStoppedNotifier, lines ~393-397) and src/dashboard/server/deacon-main.ts (line ~81), pass hasLiveTmuxSession: false explicitly to buildAgentStatusChangedPayload — these fire when the deacon has determined the session is gone (they emit agent.heartbeat_dead alongside). (4) Verify, without changing, that all deps.notifyAgentStatusChanged calls in src/lib/cloister/deacon-auto-resume.ts (lines 219, 677, 778, 808, 820) already pass an explicit boolean. (5) Audit: run git grep -n \"type: 'agent.status_changed'\" and confirm each emitter either only emits running/starting status or includes hasLiveTmuxSession; record the emitter census in the commit message."
+        },
+        "items": [
+          {
+            "id": "emitter-liveness-threading.ac1",
+            "title": "When the unpause or untroubled route emits agent.status_changed for an agent whose tmux session is alive, the payload includes hasLiveTmuxSession: true (computed via async sessionExists), so the reducer preserves pending-input fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "emitter-liveness-threading.ac2",
+            "title": "buildAgentControlEventPayload returns a payload that includes the hasLiveTmuxSession value it was passed, and buildAgentStatusChangedPayload call sites in main.ts:393 and deacon-main.ts:81 pass an explicit false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "emitter-liveness-threading.ac3",
+            "title": "git grep -n \"type: 'agent.status_changed'\" over src and packages produces a census where every emitter of a possibly non-running status includes hasLiveTmuxSession in its payload; the census is recorded in the bead's commit message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "emitter-liveness-threading.ac4",
+            "title": "No sync tmux primitive is introduced: git grep of the changed files shows sessionExists (async) usage and zero new sessionExistsSync/sendKeys(sync) calls in route handlers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "enrichment-convergence-reemit",
+        "title": "Enrichment poller re-emits pending payload for idle-alive waiting agents (dedup bypass)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-13T09:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2633",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/agent-enrichment-service.ts",
+            "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "agent-enrichment-service.test.ts passes including new shouldForceReemitPendingInput cases and the rising-edge regression case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/agent-enrichment-service.ts: add an exported pure helper shouldForceReemitPendingInput(agentStatus: string, enrichment: AgentEnrichment): boolean that returns false when agentStatus is 'running' or 'starting', and otherwise returns true iff enrichment.pendingInputCount > 0 || enrichment.pendingAskUserQuestion != null || enrichment.pendingProposedPlan != null. In pollOnce, change the dedup early-return (currently line 207) to `if (!enrichmentChanged(previousEnrichment, enrichment) && !shouldForceReemitPendingInput(agent.status, enrichment)) { return }`. Add a PAN-2633 comment explaining: a stop-shaped status event can wipe the read model's pending payload and the private lastEnrichment cache cannot see that; while an idle-alive agent still owes the operator an answer, re-emit every poll (~10s) so the read model converges; previousEnrichment stays intact so the PAN-1834 rising edge does not re-fire. Do NOT clear state.lastEnrichment, do NOT touch reconciledAgentIds, do NOT modify the isAwaitingInputRisingEdge block. Tests are pure-helper tests — no timers needed (if any test does exercise the poll interval it MUST use vi.useFakeTimers per repo rule)."
+        },
+        "items": [
+          {
+            "id": "enrichment-convergence-reemit.ac1",
+            "title": "shouldForceReemitPendingInput returns true for agentStatus 'stopped' with an enrichment carrying pendingAskUserQuestion, pendingProposedPlan, or pendingInputCount > 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "enrichment-convergence-reemit.ac2",
+            "title": "shouldForceReemitPendingInput returns false for agentStatus 'running' or 'starting' regardless of pending payload, and false for 'stopped' with an empty enrichment (no pending fields)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "enrichment-convergence-reemit.ac3",
+            "title": "pollOnce emits agent.enrichment_changed when enrichmentChanged is false but shouldForceReemitPendingInput is true, so a wiped read model converges within one poll",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "enrichment-convergence-reemit.ac4",
+            "title": "isAwaitingInputRisingEdge(previous, current) returns false when previous equals current with pendingInputCount > 0 — the forced re-emission never re-triggers the awaiting-input activity entry or TTS (regression test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-pending-input-invariant",
+        "title": "Document the liveness-gated wipe + convergence invariant",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-13T09:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2633",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PENDING-INPUT.md",
+            "docs/ASKUSERQUESTION-DASHBOARD.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'hasLiveTmuxSession' docs/PENDING-INPUT.md"
+          ],
+          "expected_outputs": [
+            "docs/PENDING-INPUT.md Invariants section contains the PAN-2633 liveness-gated wipe invariant and the ≤10s convergence guarantee"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add to the Invariants section of docs/PENDING-INPUT.md: (a) pending-input payloads survive agent status flaps while the agent's tmux session is alive — the agent.status_changed reducer wipes them only when the stop-shaped event does not assert hasLiveTmuxSession: true (PAN-2633; wipe origin PAN-1520); (b) the enrichment poller re-emits for tmux-alive agents whose registry status is non-running while a pending payload exists, so the read model converges within one ~10s poll after any wipe. Search docs/ASKUSERQUESTION-DASHBOARD.md for its description of payload clearing on stop (grep for 'status_changed'/'stopped') and update it to match; if it contains no such description, state that explicitly in the commit message."
+        },
+        "items": [
+          {
+            "id": "docs-pending-input-invariant.ac1",
+            "title": "docs/PENDING-INPUT.md Invariants section states the liveness-gated wipe rule (wipe only when hasLiveTmuxSession is not asserted true) and cites PAN-2633",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pending-input-invariant.ac2",
+            "title": "docs/PENDING-INPUT.md contains the convergence guarantee: an idle-alive waiting agent's pending payload returns to the read model within one ~10s enrichment poll after any wipe",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion",
+              "acJustification": "Docs item — two criteria cover both documented behaviors; the ASKUSERQUESTION-DASHBOARD.md touch is conditional and verified via commit message."
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "reducer-liveness-gate",
+        "to": "emitter-liveness-threading",
+        "type": "informs"
+      },
+      {
+        "from": "reducer-liveness-gate",
+        "to": "docs-pending-input-invariant",
+        "type": "informs"
+      },
+      {
+        "from": "enrichment-convergence-reemit",
+        "to": "docs-pending-input-invariant",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-13-PAN-2633-bug-dashboard-pending-question-payload-wiped-when-an-idle-alive-asking-agent-flaps-to-stopped-needs-you-entry-vanishes-while-the-question-is-still-live.vbrief.json"
+    }
+  },
+  "status": "active"
+}

@@ -4,17 +4,17 @@
     "created": "2026-07-07T22:01:23Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2322: Harden host dashboard-port guard: a workspace/UAT agent can seize primary :3011 via OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY",
-    "updated": "2026-07-11T09:43:33.257Z"
+    "updated": "2026-07-12T22:51:01.665Z"
   },
   "plan": {
     "id": "pan-2322",
     "title": "Harden host dashboard-port guard: a workspace/UAT agent can seize primary :3011 via OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY",
-    "status": "running",
+    "status": "completed",
     "uid": "75d5cb97-4e9c-4851-b742-ed6ac6842fa6",
     "author": "agent:claude-fable-5",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-07T22:01:23Z",
-    "updated": "2026-07-11T09:43:33.257Z",
+    "updated": "2026-07-12T22:51:01.665Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2322",
@@ -273,5 +273,5 @@
       "canonicalFilename": "2026-07-07-PAN-2322-harden-host-dashboard-port-guard-a-workspace-uat-agent-can-seize-primary-3011-via-overdeck-workspace-dashboard-allow-primary.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }

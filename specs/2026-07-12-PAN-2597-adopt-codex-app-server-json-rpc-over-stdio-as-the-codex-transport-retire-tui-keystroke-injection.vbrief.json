@@ -1,0 +1,1203 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-12T16:59:51Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2597: Adopt `codex app-server` (JSON-RPC over stdio) as the Codex transport — retire TUI keystroke injection",
+    "updated": "2026-07-12T17:22:00.925Z"
+  },
+  "plan": {
+    "id": "pan-2597",
+    "title": "Adopt `codex app-server` (JSON-RPC over stdio) as the Codex transport — retire TUI keystroke injection",
+    "status": "running",
+    "uid": "0c40da89-7cf4-40b5-8b6d-ecb8906bb888",
+    "author": "agent:claude-fable-5",
+    "sequence": 4,
+    "created": "2026-07-12T16:59:51Z",
+    "updated": "2026-07-12T17:22:00.925Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2597",
+        "label": "PAN-2597",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-2597.md",
+        "label": "PRD (drafts/pan-2597.md on overdeck-state)",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "codex",
+      "app-server",
+      "transport",
+      "delivery",
+      "pty-supervisor",
+      "harness"
+    ],
+    "narratives": {
+      "Problem": "Codex sessions run the interactive TUI in a tmux pane wrapped by the PTY supervisor; every Overdeck->Codex interaction is keystroke emulation plus screen scraping. The conv-795 incident (2026-07-12) showed the failure class: a large composer paste hit a paste-placeholder confirmation regex that only knows Claude Code's format, triggering backspace-purge, full rewrite x2, a throw, and a tmux paste-buffer fallback that stacked a third copy — ending in a ~90% kernel-CPU zero-throughput spin recoverable only by SIGKILL (which kills the session, since the supervisor owns the PTY). Delivery, approvals, readiness, and idle detection are all render-speed-coupled and per-harness-format-fragile.",
+      "Proposal": "Adopt `codex app-server` (JSON-RPC over newline-delimited JSON on stdio) as the Codex transport, following the verified t3code reference implementation. A new Overdeck binary, dist/codex-app-server-host.js, runs inside the agent's tmux pane, owns the `codex app-server` child, exposes a token-authenticated per-agent unix socket (message/interrupt/approval/user-input/status ops), renders a readable event feed to the pane, and reads pane stdin as turn input. A message of any size is one turn/start request; approvals, readiness, completion, and interruption are structured protocol events. tmux remains the process/liveness plane, so deacon patrols, pause/kill, and the dashboard terminal work unchanged. Default transport is app-server with a `codex.transport: tui` escape hatch for one release. Conversations and work agents move together.",
+      "NonGoals": "- Do NOT delete or modify the existing Codex TUI path (codexMode 'tui'/'work-tui' branches, waitForCodexTuiReady, parseCodexApprovalPrompt, codex supervisor wiring) beyond adding the new dispatch — TUI-path retirement plus its no-loss audit test is the follow-up issue filed at finalize (PRD WI-9, operator-confirmed split)\n- No generic large-paste guard for the PTY-injection path (protects Claude Code too) — separate issue per the PRD\n- No web rendered-transcript UI replacing the terminal panel — the pane feed keeps the existing terminal surface\n- No `codex app-server daemon`/`proxy` shared-daemon modes — one child per agent\n- No changes to Pi/ohmypi or Claude Code transports\n- No dashboard frontend changes for pane visibility — the host's stdout IS the tmux pane"
+    },
+    "autoDecisions": [
+      {
+        "summary": "PRD checkpoint C2 (protocol-name reconciliation) runs as the first bead: commit the generated JSON schema as a fixture plus a protocol reference doc before any manager code.",
+        "rationale": "Cross-cutting protocol assumptions must be pinned before seven beads encode them; codex app-server is [experimental] and 0.144.x is the verified baseline."
+      },
+      {
+        "summary": "The manager splits into core (spawn/handshake/RPC plumbing) and threads (thread/turn/approval methods) beads; the host splits into core (socket/lifecycle/event log), ops, and pane beads.",
+        "rationale": "Independent reviewability per the decomposition rules; safe because nothing spawns the host until the launcher bead flips the default, so partial merges leave the tree working."
+      },
+      {
+        "summary": "Checkpoint C3 (per-turn model switching) is an acceptance criterion on the host-ops bead with the PRD's restart-with-thread/resume fallback as the stated decision rule.",
+        "rationale": "The PRD names the fallback explicitly; encoding it as a decision rule avoids a judgment call downstream."
+      },
+      {
+        "summary": "Checkpoint C1 (rollout JSONL under app-server) is a dedicated transcript/cost-continuity bead with the PRD's events-JSONL adapter fallback.",
+        "rationale": "FR-9 is user-observable behavior (transcripts, cost) and deserves its own verifiable slice with the fallback decision pre-made."
+      }
+    ],
+    "items": [
+      {
+        "id": "protocol-schema-spike",
+        "title": "Spike: pin the app-server protocol schema on codex-cli 0.144.x (checkpoint C2)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T16:59:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "spike",
+          "issueLabel": "pan-2597",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "appserver-manager-core",
+            "appserver-manager-threads",
+            "appserver-host-ops",
+            "structured-approvals"
+          ],
+          "files_scope": [
+            "src/lib/codex/__fixtures__/app-server-schema.json",
+            "docs/CODEX-APP-SERVER-PROTOCOL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test -s src/lib/codex/__fixtures__/app-server-schema.json",
+            "test -s docs/CODEX-APP-SERVER-PROTOCOL.md"
+          ],
+          "expected_outputs": [
+            "non-empty committed schema fixture",
+            "protocol reference doc listing verified method names"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Run `codex app-server generate-json-schema` on the installed codex-cli (0.144.1 verified present) and commit the output as a test fixture at src/lib/codex/__fixtures__/app-server-schema.json. Write docs/CODEX-APP-SERVER-PROTOCOL.md: the verified method table (initialize/initialized handshake, thread/start, thread/resume, turn/start, turn/interrupt, thread/read, account/read, the approval server-requests item/commandExecution/requestApproval, item/fileChange/requestApproval, item/fileRead/requestApproval, item/tool/requestUserInput, and the state notifications thread/started, turn/started, turn/completed, error), each reconciled against the t3code reference table in the PRD (drafts/pan-2597.md WI-2, t3code codexAppServerManager.ts citations). Record every divergence from the t3code names explicitly, or state 'none found'. Note the wire envelope: newline-delimited JSON, integer ids, NO jsonrpc:'2.0' field."
+        },
+        "items": [
+          {
+            "id": "protocol-schema-spike.ac1",
+            "title": "Given codex-cli >= 0.144.1, running `codex app-server generate-json-schema` produces output committed as a non-empty fixture at src/lib/codex/__fixtures__/app-server-schema.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "protocol-schema-spike.ac2",
+            "title": "docs/CODEX-APP-SERVER-PROTOCOL.md lists every method/notification/server-request name the plan uses and marks each as matching the t3code reference or as a named divergence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "protocol-schema-spike.ac3",
+            "title": "The doc records the wire envelope rules (newline-delimited JSON, integer id counter, no jsonrpc version field) as verified from the generated schema, not from memory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "contracts-transport-kinds",
+        "title": "Contracts: add codex app-server transport kinds",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-12T16:59:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-2597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/harness-behavior.ts",
+            "src/lib/runtimes/behavior.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd packages/contracts && npm run build"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "contracts build succeeds exporting the new union members"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "In packages/contracts/src/harness-behavior.ts (CODEX_BEHAVIOR at :80-100) and src/lib/runtimes/behavior.ts, add union members launchCommandKind: 'codex-app-server', deliveryKind: 'codex-app-server-rpc', readinessKind: 'codex-app-server-ready', workAgentMode: 'codex-app-server'. CODEX_BEHAVIOR keeps its CURRENT values — transport is chosen at spawn from config (launcher bead); the kinds exist so launcher/delivery/readiness dispatch is explicit. Flipping CODEX_BEHAVIOR to the new kinds belongs to the follow-up TUI-retirement issue, not this one. Rebuild contracts (cd packages/contracts && npm run build)."
+        },
+        "items": [
+          {
+            "id": "contracts-transport-kinds.ac1",
+            "title": "The contracts build produces exports containing the four new union members (codex-app-server, codex-app-server-rpc, codex-app-server-ready, workAgentMode codex-app-server) and npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-transport-kinds.ac2",
+            "title": "CODEX_BEHAVIOR preserves its existing kind values and the extended behavior test suite passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "appserver-manager-core",
+        "title": "app-server manager core: spawn, version gate, handshake, RPC plumbing",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T16:59:51Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2597",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "appserver-manager-threads",
+            "appserver-host-core",
+            "appserver-host-ops",
+            "delivery-appserver-tier",
+            "structured-approvals",
+            "appserver-resume-recovery"
+          ],
+          "files_scope": [
+            "src/lib/codex/app-server-manager.ts",
+            "src/lib/codex/__tests__/app-server-manager.test.ts",
+            "src/lib/codex/__tests__/fake-app-server.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/codex/__tests__/app-server-manager.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "manager unit suite passes (handshake, timeout via fake timers, invalid-JSON resilience, version gate, stderr filter)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/codex/app-server-manager.ts, a trimmed port of t3code's codexAppServerManager (reference: /home/eltmon/Projects/t3code/apps/server/src/codexAppServerManager.ts; all citations in PRD WI-2). This bead delivers: (1) child spawn — spawn(codexBinary, ['app-server'], {cwd, env: {...process.env, CODEX_HOME}, stdio:['pipe','pipe','pipe']}) with readline on stdout (t3code :467-476); (2) pre-spawn version gate — run `codexBinary --version` (4s timeout), semver-compare against 0.144.0, refuse with an actionable upgrade message below the floor (NFR-5); (3) handshake — `initialize` request with {clientInfo:{name:'overdeck',...}, capabilities:{experimentalApi:true}} then `initialized` notification (t3code :500-502); (4) request envelope — integer id counter, pending map keyed by String(id), default 20s timeout, reject on response.error.message (t3code :1191-1247); (5) message classification — server-request (method+id) vs notification (no id) vs response (t3code :1352-1382); invalid JSON lines warn and never crash (t3code :996-1035); (6) stderr handling — strip ANSI, drop non-ERROR lines and the benign 'state db missing rollout path for thread' / 'find_thread_path_by_id_str_in_subdir' messages (t3code :144-149, 397-417). Method/param names come from the spike's protocol doc, not from memory. Build a scripted fake child (a node script replaying canned NDJSON) at src/lib/codex/__tests__/fake-app-server.ts for this and later beads. Repo rules: all timeout tests use vi.useFakeTimers() + advanceTimersByTimeAsync; no execSync in server-reachable code."
+        },
+        "items": [
+          {
+            "id": "appserver-manager-core.ac1",
+            "title": "Given the fake child, the manager sends initialize then the initialized notification and resolves ready",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appserver-manager-core.ac2",
+            "title": "A request with no response rejects after the 20s default timeout, advanced via fake timers (vi.advanceTimersByTimeAsync), with no real setTimeout waits in the test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appserver-manager-core.ac3",
+            "title": "An invalid-JSON line from the child emits a warning and the manager continues processing subsequent valid messages",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appserver-manager-core.ac4",
+            "title": "With a binary reporting a version below 0.144.0 the manager refuses to start and the error message names the installed version and the required floor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appserver-manager-core.ac5",
+            "title": "The manager logs ERROR stderr lines with ANSI stripped and drops the benign rollout-path messages",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "appserver-manager-threads",
+        "title": "app-server manager: thread/turn methods, notifications state, approvals, resume fallback",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T16:59:51Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/codex/app-server-manager.ts",
+            "src/lib/codex/__tests__/app-server-manager.test.ts",
+            "src/lib/codex/__tests__/fake-app-server.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/codex/__tests__/app-server-manager.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "manager suite passes including 1MB turn/start, approval round-trip, resume fallback, interrupt",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend the manager with the protocol methods and state tracking (t3code :526-736, :817-890, :1072-1189): thread/start with params {model, cwd, approvalPolicy, sandbox, experimentalRawEvents:false}; thread/resume {..., threadId}; turn/start {threadId, input:[{type:'text', text, text_elements:[]}], model?, effort?}; turn/interrupt {threadId, turnId}; thread/read; account/read. Notification state: thread/started captures threadId; turn/started sets running + activeTurnId; turn/completed returns to idle (or error); error notifications use willRetry to distinguish retry from failure. Approvals: store the jsonRpcId of each incoming server request; answer {id, result:{decision}} for approvals and {id, result:{answers}} for user-input. Resume fallback predicate: error message contains 'thread/resume' AND one of 'not found'/'missing thread'/'no such thread'/'unknown thread'/'does not exist' -> thread/start fresh, logging the fallback (t3code :419-426, 562-593). approvalPolicy/sandbox mapping REUSES Overdeck's existing table (src/lib/agents/runtime-command.ts:190-198): full-access -> {approvalPolicy:'never', sandbox:'danger-full-access'}, read-only -> {approvalPolicy:'never', sandbox:'read-only'} pattern, default -> {approvalPolicy:'on-request', sandbox:'workspace-write'}. Model comes from the caller on every thread/turn call — no hardcoded model ID anywhere (NFR-4)."
+        },
+        "items": [
+          {
+            "id": "appserver-manager-threads.ac1",
+            "title": "When a 1MB turn/start payload is submitted, the fake child receives it as one JSON-RPC request and the manager returns to idle on turn/completed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appserver-manager-threads.ac2",
+            "title": "When the fake child rejects thread/resume with a not-found-class error, the manager falls back to thread/start and logs the fallback; a non-matching error class does NOT trigger the fallback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appserver-manager-threads.ac3",
+            "title": "An approval server-request round-trips: the manager surfaces it with its request id, and answering produces {id, result:{decision}} on the child's stdin",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appserver-manager-threads.ac4",
+            "title": "The manager sends turn/interrupt with the tracked activeTurnId and returns to idle on the subsequent turn/completed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appserver-manager-threads.ac5",
+            "title": "The manager records threadId from thread/started and activeTurnId from turn/started in observable state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "appserver-host-core",
+        "title": "app-server host binary: socket + token auth, status op, lifecycle, event log",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T16:59:51Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/codex/app-server-host.ts",
+            "src/lib/codex/__tests__/app-server-host.test.ts",
+            "tsdown.config.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/codex/__tests__/app-server-host.test.ts",
+            "npm run build",
+            "test -f dist/codex-app-server-host.js"
+          ],
+          "expected_outputs": [
+            "host suite passes (token auth 403, status op, SIGTERM interrupt flow with fake timers, event-log lines)",
+            "build emits dist/codex-app-server-host.js"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/codex/app-server-host.ts and register it as a tsdown entry alongside pty-supervisor in the root tsdown.config.ts, producing dist/codex-app-server-host.js (Node 22, same node resolution as the PTY supervisor — NFR-2). The host composes the manager and: (1) binds ${OVERDECK_HOME}/sockets/appserver-<agentId>.sock at mode 0600 with a token file ${OVERDECK_HOME}/agents/<id>/appserver-token, cloning the pty-token scheme (src/lib/pty-token.ts; socket-bind pattern pty-supervisor.ts:381-398); ops are HTTP-on-unix POSTs with JSON bodies; (2) implements {op:'status'} -> {state: starting|ready|running|awaiting-approval|error|closed, threadId, activeTurnId, pendingRequests:[...]}; (3) appends every protocol event as one JSONL line to ${OVERDECK_HOME}/agents/<id>/appserver-events.jsonl; (4) lifecycle — child exit: render the reason to stdout, close the socket, exit with the child's code (launcher/tmux semantics identical to the PTY supervisor: pane shows the session ended); SIGTERM: turn/interrupt if a turn is running (FR-6), then child SIGTERM, 5s grace, exit — mirror pty-supervisor.ts:455-474. No execSync, no sync tmux primitives anywhere in the host (NFR-1). Message/interrupt/approval ops and the pane feed arrive in the next two beads."
+        },
+        "items": [
+          {
+            "id": "appserver-host-core.ac1",
+            "title": "A POST with a missing or wrong token returns 403 and executes no op",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appserver-host-core.ac2",
+            "title": "The status op returns state, threadId, activeTurnId, and pendingRequests reflecting the fake child's current state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appserver-host-core.ac3",
+            "title": "On SIGTERM during a running turn, the event log shows turn/interrupt before the child SIGTERM, and the 5s grace is tested with fake timers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appserver-host-core.ac4",
+            "title": "The host persists every protocol event as one JSONL line to ${OVERDECK_HOME}/agents/<id>/appserver-events.jsonl",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appserver-host-core.ac5",
+            "title": "npm run build produces dist/codex-app-server-host.js from the new tsdown entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "appserver-host-ops",
+        "title": "Host ops: message/interrupt/approval/user-input, threadId persistence, per-turn model (checkpoint C3)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T16:59:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/codex/app-server-host.ts",
+            "src/lib/codex/__tests__/app-server-host.test.ts",
+            "src/lib/runtimes/codex.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/codex/__tests__/app-server-host.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "host op round-trips pass against the fake child; no-model message op errors loudly",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add the remaining socket ops: {op:'message', content, model?, effort?} -> turn/start; {op:'interrupt'} -> turn/interrupt on the active turn; {op:'approval', requestId, decision} and {op:'user-input', requestId, answers} -> the manager's server-request replies. Model resolution: the op's model wins; else the thread's established default; if neither resolves, return an error and start NO turn — never a hardcoded model (NFR-4). Persist threadId via the existing writeThreadId (src/lib/runtimes/codex.ts:67-91) as soon as thread/started arrives — this replaces the 120s rollout poll in spawn.ts:808-821 for app-server sessions (the poll remains only under transport: tui). Checkpoint C3 decision rule: verify live on codex 0.144.x whether a mid-thread turn/start {model} change takes effect; if yes, pass it through; if not, the host restarts the child and re-attaches with thread/resume under the new model (cursor preserved — t3code reactor pattern). Record which branch was taken in docs/CODEX-APP-SERVER-PROTOCOL.md."
+        },
+        "items": [
+          {
+            "id": "appserver-host-ops.ac1",
+            "title": "A message op starts a turn and the host logs the streamed assistant delta to the event log",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appserver-host-ops.ac2",
+            "title": "A message op with no resolvable model returns an error and starts no turn (no hardcoded default anywhere on the path)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appserver-host-ops.ac3",
+            "title": "An approval op with requestId and decision resolves the pending server request on the fake child",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appserver-host-ops.ac4",
+            "title": "thread/started persists the threadId via writeThreadId immediately, with no rollout poll on the app-server path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appserver-host-ops.ac5",
+            "title": "A message op carrying a different model applies that model to the turn — natively or via the restart-with-thread/resume fallback — and the bead records the verified branch in docs/CODEX-APP-SERVER-PROTOCOL.md (checkpoint C3)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "appserver-host-pane",
+        "title": "Host pane feed and stdin line input",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-12T16:59:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/codex/app-server-host.ts",
+            "src/lib/codex/__tests__/app-server-host.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/codex/__tests__/app-server-host.test.ts"
+          ],
+          "expected_outputs": [
+            "pane feed rendering and stdin-to-turn tests pass"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Render a compact, single-writer, plain-text event feed to the host's stdout — which IS the tmux pane: user turns, streamed assistant text, item started/completed lines, approval prompts in the form '[approval #N] command: <cmd> — reply via dashboard or type y/n', and errors. No cursor addressing — the pane is a log, not a UI. Read the host's own stdin with readline, line by line: while an approval is pending, 'y'/'n'/a digit answers it as a decision; any other line becomes a turn/start. This is what makes operator typing in the pane AND the tmux-paste delivery fallback work (FR-3 second leg, FR-7)."
+        },
+        "items": [
+          {
+            "id": "appserver-host-pane.ac1",
+            "title": "A message op renders the user turn and the assistant text to stdout as plain text lines with no cursor-addressing escape sequences",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appserver-host-pane.ac2",
+            "title": "A pending approval renders a prompt line naming the command and the y/n reply affordance",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appserver-host-pane.ac3",
+            "title": "A non-approval line typed on stdin starts a turn (the fake child receives turn/start with that text)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appserver-host-pane.ac4",
+            "title": "A 'y' on stdin while an approval is pending resolves the approval as a decision and does NOT start a turn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launcher-appserver-mode",
+        "title": "Launcher: codexMode 'app-server' + codex.transport config (default app-server, tui escape hatch)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T16:59:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/launcher-generator.ts",
+            "src/lib/agents/runtime-command.ts",
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/__tests__/launcher-generator.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/launcher-generator.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "launcher tests pass for both transports including the byte-for-byte tui reproduction",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-10",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/launcher-generator.ts (computeCodexCommandTokens:710-799, buildCommand:424-426, buildNonConversationCommand:513-515, wrapWithSupervisor:205-213): add codexMode 'app-server' whose command is `node <dist>/codex-app-server-host.js [--resume <threadId>]` — NOT wrapped with the PTY supervisor (wrapWithSupervisor must skip it; the host replaces it). In src/lib/agents/runtime-command.ts (getCodexLauncherFields:177-210) read loadYamlConfig().config.codex?.transport ?? 'app-server' and set codexMode to 'app-server' or the legacy 'work-tui'; in src/lib/overdeck/conversation-runtime.ts do the equivalent for conversations ('tui'). CODEX_HOME seeding via initCodexHome is unchanged. Model/effort travel per-turn via the socket, never argv. The launcher uses the same node resolution as the PTY supervisor entry (NFR-2). Note the exact before/after from the PRD: before `node <root>/dist/pty-supervisor.js codex resume 019... -m gpt-5.5`; after `node <root>/dist/codex-app-server-host.js --resume 019...`."
+        },
+        "items": [
+          {
+            "id": "launcher-appserver-mode.ac1",
+            "title": "The generated launcher for a codex conversation under default config contains codex-app-server-host.js and no pty-supervisor.js",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-appserver-mode.ac2",
+            "title": "With codex.transport: tui the generated command reproduces today's TUI command byte-for-byte (snapshot/equality test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-appserver-mode.ac3",
+            "title": "When a stored threadId exists the generated command includes --resume <threadId>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-appserver-mode.ac4",
+            "title": "getCodexLauncherFields returns codexMode 'app-server' by default and 'work-tui' under the escape hatch for work agents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "appserver-readiness",
+        "title": "Readiness + spawn wiring: status-op poll replaces pane scrape",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-12T16:59:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/spawn.ts",
+            "src/lib/agents/runtime-command.ts",
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/agents/__tests__/runtime-command.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/runtime-command.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "readiness dispatch test passes with no capturePane on the app-server path; poll timeout uses fake timers",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Readiness for app-server sessions = poll the host socket's status op until state is 'ready', dispatched on the new readinessKind 'codex-app-server-ready' (replaces the waitForCodexTuiReady pane scrape for this transport; the scrape stays for transport: tui). Wire the dispatch in src/lib/agents/runtime-command.ts (waitForPromptReady:300-303) and the spawn paths in src/lib/agents/spawn.ts (:255-256; the 808-821 rollout poll stays tui-only per the host-ops bead). shouldUseSupervisorForConversation (src/lib/overdeck/conversation-runtime.ts:292-294) returns false for app-server codex — the host replaces the supervisor."
+        },
+        "items": [
+          {
+            "id": "appserver-readiness.ac1",
+            "title": "Readiness for an app-server session resolves via the status op with no capturePane call on the path (unit dispatch test asserts the pane scrape is not invoked)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appserver-readiness.ac2",
+            "title": "The readiness poll timeout test advances time with fake timers and rejects with an actionable error when ready is never reached",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appserver-readiness.ac3",
+            "title": "shouldUseSupervisorForConversation returns false for a codex conversation under app-server transport and true/unchanged for other harnesses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delivery-appserver-tier",
+        "title": "Delivery door: app-server socket tier ahead of PTY supervisor",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T16:59:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/delivery.ts",
+            "src/lib/overdeck/conversation-delivery.ts",
+            "src/lib/agents/__tests__/delivery.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/delivery.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tier selection, 1MB round-trip, and fallback-ordering tests pass; 8s timeout via fake timers",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In deliverAgentMessage (src/lib/agents/delivery.ts:177-287) add a tier AHEAD of the PTY-supervisor tier: if ${OVERDECK_HOME}/sockets/appserver-<id>.sock exists, POST {op:'message', content} with the appserver-token; success returns path 'app-server'. 8s timeout like the supervisor tier (fake timers in tests). No size cap, no echo confirmation, no purge/rewrite on this tier. On failure fall through to the tmux paste tier — which the host's stdin line-reader converts to a turn/start (FR-3's second leg). Update resolveConversationDeliveryMethod (src/lib/overdeck/conversation-delivery.ts:224-228) accordingly. The PTY-injection path is never used for app-server sessions (hazard H3)."
+        },
+        "items": [
+          {
+            "id": "delivery-appserver-tier.ac1",
+            "title": "deliverAgentMessage returns path 'app-server' when the appserver socket exists and the message op succeeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delivery-appserver-tier.ac2",
+            "title": "The fake host receives a 1MB payload in one request with no purge or rewrite",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delivery-appserver-tier.ac3",
+            "title": "When the socket is absent or the POST fails, delivery falls back to the tmux paste tier in the documented order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delivery-appserver-tier.ac4",
+            "title": "The tier's 8s timeout test rejects via fake timers (vi.advanceTimersByTimeAsync) with no real waits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "structured-approvals",
+        "title": "Structured approvals: pending-input from status, answers via socket",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T16:59:51Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-delivery.ts",
+            "src/lib/agent-enrichment.ts",
+            "src/lib/agent-input-detection.ts",
+            "src/lib/overdeck/__tests__/conversation-delivery.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-delivery.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "approval end-to-end test passes: request surfaces from status.pendingRequests, decision op resolves it, reply shape asserted",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "For app-server sessions, awaiting-input state comes from the host's status.pendingRequests — NOT from detectAwaitingInputForAgent pane capture (src/lib/agent-input-detection.ts:277) or parseCodexApprovalPrompt (:348-377); those stay for transport: tui only. Wire the pending-input surfaces feeding the dashboard AUQ/approval popup (src/lib/agent-enrichment.ts around :471) to source from status for this transport. The approval answer route (handleConversationCodexApproval, src/lib/overdeck/conversation-delivery.ts:124-165) posts {op:'approval', requestId, decision} to the host socket instead of typing a digit. Map codex decisions onto the existing dashboard approval UI options. The pane y/n affordance from the host-pane bead remains for terminal operators."
+        },
+        "items": [
+          {
+            "id": "structured-approvals.ac1",
+            "title": "An approval server-request shows in the awaiting-input/pending-input surface sourced from status.pendingRequests, with no pane-capture call for app-server sessions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "structured-approvals.ac2",
+            "title": "Answering from the dashboard route posts the approval op and the fake child receives {id, result:{decision}}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "structured-approvals.ac3",
+            "title": "The dispatch unit test validates the digit-keystroke approval path never fires for app-server sessions and preserves it for transport: tui",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "appserver-resume-recovery",
+        "title": "Resume and deacon recovery via thread/resume",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-12T16:59:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/resume.ts",
+            "src/lib/agents/recovery.ts",
+            "src/lib/agents/__tests__/resume.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/resume.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "resume rebuild + fallback integration test passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Resume (src/lib/agents/resume.ts:439-445) and deacon recovery (src/lib/agents/recovery.ts:163-169) for app-server sessions rebuild the launcher with --resume <threadId> read via readThreadId; the host then runs thread/resume with the manager's not-found fallback to thread/start. The codex-continue prompt delivery (resume.ts:441-445) goes through the app-server delivery tier instead of PTY injection. Liveness and the deacon patrol unit remain the tmux session — no changes to the liveness oracle (FR-8)."
+        },
+        "items": [
+          {
+            "id": "appserver-resume-recovery.ac1",
+            "title": "Resume produces a launcher command containing --resume <threadId> sourced from readThreadId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appserver-resume-recovery.ac2",
+            "title": "The resume continue-prompt is delivered via the app-server tier (delivery returns path 'app-server')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appserver-resume-recovery.ac3",
+            "title": "When the fake child rejects thread/resume with a not-found-class error the session starts fresh and the fallback is logged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "appserver-kill-ladder",
+        "title": "Kill ladder: interrupt before SIGTERM, skip C-c keystroke",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-12T16:59:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/runtimes/codex.ts",
+            "src/lib/runtimes/__tests__/codex.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/runtimes/__tests__/codex.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "kill-ladder unit test passes: interrupt precedes SIGTERM, C-c skipped, thread files preserved",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "In killAgent (src/lib/runtimes/codex.ts:518-550), for app-server sessions: skip the C-c keystroke step; POST {op:'interrupt'} to the host socket, then SIGTERM the pane process group, then kill-session — the rest of the existing ladder unchanged. Rollout and threadId files are never deleted, so a later resume reuses the same thread. pan kill and the pause/troubled/yield gates keep operating on the tmux session as before (FR-8)."
+        },
+        "items": [
+          {
+            "id": "appserver-kill-ladder.ac1",
+            "title": "Killing during a running turn records turn/interrupt in the event log before the SIGTERM step",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appserver-kill-ladder.ac2",
+            "title": "The kill-ladder unit test validates the C-c keystroke step never fires for app-server sessions and preserves it for transport: tui",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appserver-kill-ladder.ac3",
+            "title": "The kill preserves the threadId and rollout files, and a subsequent resume returns the same threadId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "transcript-cost-continuity",
+        "title": "Transcript + cost continuity under app-server (checkpoint C1)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-12T16:59:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cost-parsers/codex-parser.ts",
+            "src/lib/conversations/conversation-reads.ts",
+            "src/lib/conversations/transcript-adapter.ts",
+            "docs/CODEX-APP-SERVER-PROTOCOL.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/cost-parsers",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "transcript/cost tests pass for an app-server session via rollout JSONL or the adapter",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Checkpoint C1 decision rule: run a live app-server session in a per-agent CODEX_HOME and check whether Codex writes sessions/YYYY/MM/DD/rollout-*.jsonl (expected — same core as the TUI; t3code's stderr filter references the rollout store). IF YES: assert the existing readers (src/lib/cost-parsers/codex-parser.ts, src/lib/conversations/conversation-reads.ts) work unchanged for an app-server session and record the verification in docs/CODEX-APP-SERVER-PROTOCOL.md. IF NO: implement a small adapter in src/lib/conversations/transcript-adapter.ts pointing transcriptKind consumers at the host's appserver-events.jsonl and derive usage/cost from turn/completed payloads. Either branch must leave transcript rendering and cost attribution working for app-server sessions."
+        },
+        "items": [
+          {
+            "id": "transcript-cost-continuity.ac1",
+            "title": "A live app-server session writes rollout-*.jsonl under the per-agent CODEX_HOME (verified and recorded in the protocol doc), or else the events-JSONL adapter produces transcripts and its tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcript-cost-continuity.ac2",
+            "title": "Conversation transcript rendering produces the session's turns for an app-server session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcript-cost-continuity.ac3",
+            "title": "Cost parsing returns attributed usage for an app-server session (rollout parser or turn/completed-derived)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-appserver",
+        "title": "Documentation: harness docs, state-planes note, module headers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-12T16:59:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2597",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "CLAUDE.md",
+            "configuration/harnesses.mdx",
+            "docs/AGENT-STATE-PLANES.md",
+            "docs/ROLES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint (including scripts/lint-skills.sh) completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Update in the same PR series: CLAUDE.md Harnesses section — replace 'work agents run as live TUI sessions via codexMode: work-tui' with the app-server description plus the codex.transport: tui escape hatch; configuration/harnesses.mdx — user-facing transport setting, 0.144.0 version floor, troubleshooting; docs/AGENT-STATE-PLANES.md — liveness note that the codex pane hosts the app-server host; docs/ROLES.md if it references codex TUI; module headers on src/lib/codex/app-server-manager.ts and app-server-host.ts. The bundled rule no-oneshot-agents.md is already updated (commit dfc75a3f44) — do not touch it."
+        },
+        "items": [
+          {
+            "id": "docs-appserver.ac1",
+            "title": "CLAUDE.md's Harnesses section contains the app-server transport description and the codex.transport: tui escape hatch, with no stale work-tui-as-default claim",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-appserver.ac2",
+            "title": "configuration/harnesses.mdx contains the transport setting and the 0.144.0 version floor with an actionable upgrade note",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-appserver.ac3",
+            "title": "docs/AGENT-STATE-PLANES.md contains a liveness note that for codex the tmux pane hosts the app-server host (liveness oracle unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-appserver.ac4",
+            "title": "npm run lint (including scripts/lint-skills.sh) exits 0 after the doc changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "protocol-schema-spike",
+        "to": "appserver-manager-core",
+        "type": "blocks"
+      },
+      {
+        "from": "appserver-manager-core",
+        "to": "appserver-manager-threads",
+        "type": "blocks"
+      },
+      {
+        "from": "appserver-manager-threads",
+        "to": "appserver-host-core",
+        "type": "blocks"
+      },
+      {
+        "from": "appserver-host-core",
+        "to": "appserver-host-ops",
+        "type": "blocks"
+      },
+      {
+        "from": "appserver-host-core",
+        "to": "appserver-host-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-transport-kinds",
+        "to": "launcher-appserver-mode",
+        "type": "blocks"
+      },
+      {
+        "from": "appserver-host-ops",
+        "to": "launcher-appserver-mode",
+        "type": "blocks"
+      },
+      {
+        "from": "appserver-host-pane",
+        "to": "launcher-appserver-mode",
+        "type": "blocks"
+      },
+      {
+        "from": "appserver-host-ops",
+        "to": "delivery-appserver-tier",
+        "type": "blocks"
+      },
+      {
+        "from": "appserver-host-ops",
+        "to": "structured-approvals",
+        "type": "blocks"
+      },
+      {
+        "from": "appserver-host-ops",
+        "to": "appserver-kill-ladder",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher-appserver-mode",
+        "to": "appserver-readiness",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher-appserver-mode",
+        "to": "appserver-resume-recovery",
+        "type": "blocks"
+      },
+      {
+        "from": "delivery-appserver-tier",
+        "to": "appserver-resume-recovery",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher-appserver-mode",
+        "to": "transcript-cost-continuity",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher-appserver-mode",
+        "to": "docs-appserver",
+        "type": "blocks"
+      },
+      {
+        "from": "protocol-schema-spike",
+        "to": "transcript-cost-continuity",
+        "type": "blocks"
+      },
+      {
+        "from": "appserver-host-ops",
+        "to": "appserver-host-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "delivery-appserver-tier",
+        "to": "structured-approvals",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-12-PAN-2597-adopt-codex-app-server-json-rpc-over-stdio-as-the-codex-transport-retire-tui-keystroke-injection.vbrief.json"
+    }
+  },
+  "status": "active"
+}

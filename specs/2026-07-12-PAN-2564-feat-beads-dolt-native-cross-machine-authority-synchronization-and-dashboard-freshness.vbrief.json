@@ -1,0 +1,1448 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-12T17:58:54.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2564: feat(beads): Dolt-native cross-machine authority, synchronization, and dashboard freshness",
+    "updated": "2026-07-12T18:09:02.771Z"
+  },
+  "plan": {
+    "id": "pan-2564",
+    "title": "feat(beads): Dolt-native cross-machine authority, synchronization, and dashboard freshness",
+    "status": "proposed",
+    "uid": "29d8320f-fb6c-4b0f-835d-cd8c4f2c6502",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-12T17:58:54.000Z",
+    "updated": "2026-07-12T18:09:02.771Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2564",
+        "label": "PAN-2564",
+        "type": "issue"
+      },
+      {
+        "uri": "overdeck-state:drafts/pan-2564.md",
+        "label": "PRD rev-2 (authoritative)",
+        "type": "spec"
+      },
+      {
+        "uri": "overdeck-state:drafts/pan-2564-FEEDBACK-gpt-5.md",
+        "label": "GPT-5 PRD review (incorporated in rev-2)",
+        "type": "review"
+      }
+    ],
+    "tags": [
+      "beads",
+      "dolt",
+      "sync",
+      "state-migration",
+      "dashboard",
+      "read-door",
+      "write-door"
+    ],
+    "narratives": {
+      "Problem": "Beads made Dolt the only storage backend and demoted .beads/issues.jsonl to a derived export, but Overdeck is still mixed-authority and split-brained: runtime paths parse issues.jsonl directly, agents mutate beads with raw bd shell commands, the Dolt DB never travels between machines (only the JSONL rides overdeck-state), and this machine already has two divergent 1.1G Dolt DBs for the same project. The Machine A creates → Machine B closes → Machine C sees flow is not guaranteed. The PRD at drafts/pan-2564.md (revision 2, reconciled against the GPT-5 review) is the authoritative design.",
+      "Proposal": "Dolt is canonical and travels on the project git remote at refs/dolt/data. One physical local Dolt home per project (state-worktree .beads, all checkouts redirect to it). One read door (resolver over bd --json) and one write door (runMutationBatch: lock once, pull once, mutate, commit once, export once, push once, typed conflict on rejection). Agents mutate only through pan beads verbs; a bd PATH shim mechanically rejects raw mutation verbs. A single-owner background synchronizer keeps the dashboard fresh with lastSyncedAt/stale surfaces. JSONL becomes a validated derived export. A cutover-marker state machine gates state migration; an isolated full-fidelity reconciliation report gates each project's operational cutover; this machine (panopticon-cli) cuts over inside this issue, including the designated-migrator bd >= 1.1.0 schema migration to v53.",
+      "NonGoals": "- No Dolt database bytes or runtime files ever committed to overdeck-state or any code branch\n- No cross-machine single-writer coordinator service (divergence resolved via bd 1.1.0 native pull merge + typed conflicts)\n- No unattended dolt.auto-push and no bd dolt push --force anywhere\n- No JSONL-seeded live authority for remote Fly workspaces (remote work is mechanically blocked for migrated projects until authenticated Dolt-remote routing exists)\n- Per-project operational cutovers for krux, lexerra, myn, myn-cli, tindra are operator-reviewed rollouts tracked outside this plan's beads (only panopticon-cli cutover is code-blocking)\n- No changes to the beads/bd upstream binary itself (no fork, no patches)\n- No beads UI redesign beyond the freshness/stale surfaces on the existing BeadsRail"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Adopted PRD rev-2 (overdeck-state drafts/pan-2564.md) as the authoritative design without re-litigating decisions D1-D8/D-HOME/D-MARKER.",
+        "rationale": "The PRD was authored today, revised specifically to resolve all 15 findings of the GPT-5 review, and every file reference was re-verified in this workspace during planning."
+      },
+      {
+        "summary": "Bead granularity: one bead per PRD work item, splitting WI-12 into cross-machine integration tests vs. this-machine cutover, and WI-13 into pan beads verbs vs. bd shim + prompt/skill enforcement.",
+        "rationale": "Each WI is already one focused, independently testable change with named tests; the two splits separate 'and'-joined deliverables with different risk profiles (test authoring vs. live data cutover; new CLI surface vs. enforcement sweep)."
+      },
+      {
+        "summary": "requiresInspection true only on beads-home (deep) and write-door (fast).",
+        "rationale": "These are the two foundations whose wrong implementation would force redoing most downstream beads (wrong physical DB resolved everywhere; wrong batch/push semantics baked into every mutation surface). All other beads fail loudly at typecheck/tests/review."
+      },
+      {
+        "summary": "The work agent implements in this pipeline workspace on feature/pan-2564; the PRD section-7 mention of a bypass/pan-2564 branch is superseded.",
+        "rationale": "That line described a bypass-mode execution plan; this issue now runs through the normal pipeline, and worktree discipline forbids checking out another branch inside the workspace."
+      },
+      {
+        "summary": "The bd >= 1.1.0 fleet upgrade and v32→v53 schema migration execute inside the cutover-panopticon bead as the designated migrator, after the home is unified; the version-policy bead only defines the minimum-version resolver.",
+        "rationale": "The 2026-07-12 1.1.0 trial proved upgrading before home unification breaks writes and risks schema forking; the PRD makes the safe ordering normative (unify home, migrate once, push, others bootstrap)."
+      }
+    ],
+    "items": [
+      {
+        "id": "migration-gate",
+        "title": "Migration gate: cutover-marker state machine in pan admin state migrate",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T17:58:54.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2564",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/admin/state-migrate.ts",
+            "src/lib/beads/dolt-layout.ts",
+            "src/lib/beads/cutover-marker.ts",
+            "tests/unit/lib/beads/dolt-layout.test.ts",
+            "tests/unit/lib/beads/cutover-marker.test.ts",
+            "tests/integration/state-branch-no-loss.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/beads/dolt-layout.test.ts tests/unit/lib/beads/cutover-marker.test.ts tests/integration/state-branch-no-loss.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "named vitest files pass including the no-marker refusal and valid-marker success fixtures",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1. Add detectLiveDoltLayout(beadsDir) in src/lib/beads/dolt-layout.ts (true if any of dolt/, embeddeddolt/, dolt-server.pid|lock|port|log, *.dolt exist). Add src/lib/beads/cutover-marker.ts reading/writing ${OVERDECK_HOME}/state/<project>/beads-cutover.json with { remoteUrl, remoteDoltHead, localReconciledHead, reconcileReport: {path, sha256}, completedAt }. In migrateProjectState: no valid marker AND live Dolt layout → refuse with a standalone operator error naming the detected markers and pointing at pan admin beads reconcile; valid marker AND remote refs/dolt/data resolves → migrate only derived/config files staging zero Dolt bytes. copyLegacyState/trackedManifest always exclude Dolt dirs+runtime."
+        },
+        "items": [
+          {
+            "id": "migration-gate.ac1",
+            "title": "Given a fixture .beads containing embeddeddolt/ and dolt-server.pid and no cutover marker, when pan admin state migrate runs, it refuses with an error naming the detected Dolt markers and stages zero files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migration-gate.ac2",
+            "title": "Given a valid beads-cutover.json marker and a resolvable remote refs/dolt/data, when migrate runs, it migrates the allowed derived/config files and stages zero bytes from dolt/, embeddeddolt/, or dolt-server runtime files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migration-gate.ac3",
+            "title": "detectLiveDoltLayout returns true for each marker class (dolt/, embeddeddolt/, dolt-server.pid|lock|port|log, *.dolt) and false for a JSONL-only fixture in the unit test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migration-gate.ac4",
+            "title": "cutover-marker round-trip test persists and re-reads remoteUrl, remoteDoltHead, localReconciledHead, reconcileReport path+sha256, and completedAt, and rejects a marker missing any required field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "beads-home",
+        "title": "One physical local Dolt home per project: home.ts, redirect map, doctor split-brain block",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T17:58:54.000Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-2564",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "readinessReason": "First foundation bead with no upstream dependencies; no other bead touches home resolution until it lands, so it is safe to dispatch immediately and alone.",
+          "foundationFor": [
+            "read-door",
+            "write-door",
+            "bootstrap",
+            "jsonl-export",
+            "bd-lock-serialization",
+            "cutover-panopticon"
+          ],
+          "files_scope": [
+            "src/lib/beads/home.ts",
+            "src/lib/bd-process-lock.ts",
+            "src/cli/commands/workspace-beads.ts",
+            "src/cli/commands/sync.ts",
+            "src/cli/commands/beads.ts",
+            "tests/unit/lib/beads/home.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/beads/home.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "home.test.ts passes: main + state worktree + feature worktree resolve one identical home; doctor blocks on two populated same-project_id DBs",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-14 (decision D-HOME). New src/lib/beads/home.ts is the single resolver of the canonical local .beads home per project: ${OVERDECK_HOME}/state/<project>/.beads for migrated projects, with the documented fallback for unmigrated projects. Main checkout, every feature worktree, and workspaces get a .beads/redirect file pointing at the canonical home; no other directory initializes its own DB. Route resolveSharedBeadsDir in src/lib/bd-process-lock.ts (and thereby all resolver/writer/sync/CLI/agent callers) through home.ts. pan beads doctor detects more than one populated .beads DB with the same project_id and blocks with an operator message naming both paths instead of choosing."
+        },
+        "items": [
+          {
+            "id": "beads-home.ac1",
+            "title": "home.test.ts proves the main checkout, the state worktree, and a feature worktree all resolve resolveSharedBeadsDir to the same canonical path and Dolt head",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "beads-home.ac2",
+            "title": "Given two populated .beads DBs with the same project_id, when pan beads doctor runs, it exits non-zero and prints both paths in a standalone operator sentence rather than selecting one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "beads-home.ac3",
+            "title": "Workspace/worktree setup creates a .beads/redirect pointing at the canonical home and never runs bd init in a non-canonical directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "beads-home.ac4",
+            "title": "For an unmigrated project (no overdeck-state marker), home.ts returns the documented legacy fallback path and the unit test pins that behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bd-lock-serialization",
+        "title": "Serialize all bd operations through the shared process lock keyed by the canonical home",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T17:58:54.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2564",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/bd-process-lock.ts",
+            "tests/unit/lib/bd-process-lock.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/bd-process-lock.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "lock tests pass including two simultaneous resolver reads serializing and a bounded background-pull hold (fake timers)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-9. Every resolver read, writer batch, and background pull acquires the shared bd lock from src/lib/bd-process-lock.ts keyed by resolveSharedBeadsDir (which now routes through home.ts). Background pulls hold the lock only for the bounded pull duration and never run on the request path. dolt.auto-push stays OFF. Tests use vi.useFakeTimers + advanceTimersByTimeAsync per the fake-timers repo rule — no real setTimeout, no maxForks reduction."
+        },
+        "items": [
+          {
+            "id": "bd-lock-serialization.ac1",
+            "title": "Given two simultaneous resolver reads against the same project, the second read blocks until the first releases the shared lock, and the serialization test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bd-lock-serialization.ac2",
+            "title": "A fake-timers test proves a background pull holding the lock releases within its bounded hold budget and a queued foreground read then proceeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bd-lock-serialization.ac3",
+            "title": "A config test validates that dolt.auto-push remains off in managed configs and that no Overdeck code path enables it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "read-door",
+        "title": "Canonical beads read door: resolver.ts over bd --json, replace direct JSONL reads",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T17:58:54.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2564",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/beads/resolver.ts",
+            "src/lib/beads-query.ts",
+            "src/cli/commands/start.ts",
+            "src/dashboard/server/routes/workspaces/merge-ops.ts",
+            "src/lib/work/done-preflight.ts",
+            "src/lib/cloister/orphan-proposed-reconciler.ts",
+            "src/lib/cloister/triggers.ts",
+            "src/lib/backlog/backlog-input.ts",
+            "src/lib/backlog/lookups.ts",
+            "src/dashboard/server/routes/backlog.ts",
+            "src/lib/cloister/flywheel.ts",
+            "src/lib/vbrief/beads.ts",
+            "tests/unit/lib/beads/resolver.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/beads/resolver.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "resolver tests pass: redirect-only workspace reports issueHasBeads=true, typed stale result on bd failure",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2. New src/lib/beads/resolver.ts exposes typed reads (getBeadsForIssue, getReadyBeads, countBeadsForIssue, getBeadById, issueHasBeads) running bd ... --json under the shared lock against the canonical home. Replace every direct issues.jsonl read listed in PRD section 5 with a resolver call; presence checks use issueHasBeads (Dolt-backed), never existsSync(issues.jsonl) — this also fixes the existing redirect-workspace bug in backlog-input.ts:139, lookups.ts:52, backlog.ts:86, flywheel.ts:165-174. On bd failure the resolver returns { ok:false, reason } and callers mark data stale — they never fabricate zero beads. JSONL reads survive only in the access-ci-guard allowlist modules (recovery/import/export-verification/diagnostics)."
+        },
+        "items": [
+          {
+            "id": "read-door.ac1",
+            "title": "Given a redirect-only workspace (no local issues.jsonl), the resolver returns issueHasBeads=true in the unit test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "read-door.ac2",
+            "title": "When bd exits non-zero, the resolver returns a typed { ok:false, reason } result and the beads-query callers propagate a stale marker instead of returning zero beads",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "read-door.ac3",
+            "title": "Every PRD section-5 class-(b) direct JSONL read site (beads-query, start.ts count, merge-ops, done-preflight, orphan-proposed-reconciler, triggers mtime cache, backlog trio, flywheel, vbrief/beads title fallback) now routes through the resolver, and the updated unit tests pass against the new signatures",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "read-door.ac4",
+            "title": "The pan done preflight and the start-agent 422 beads gate return the same results as before for a healthy Dolt-backed fixture (behavioral regression test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "jsonl-export",
+        "title": "Derived validated JSONL export: one --all universe, refuse-empty, source head, no union merge",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T17:58:54.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2564",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/beads/export.ts",
+            "src/lib/pan-dir/auto-commit.ts",
+            "src/lib/lifecycle/teardown-workspace.ts",
+            "src/lib/beads-restore.ts",
+            "tests/unit/lib/beads/export.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/beads/export.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "export tests pass: refuse-empty, source-head recording via bd vc status, count/ID verification over the --all universe, no union-merge path",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6 (decision D3). New src/lib/beads/export.ts is the ONLY production JSONL writer: exportBeadsJsonl() runs bd export --all -o <tmp> (the fixed record universe; the verify side uses the same --all via bd list --all --json), refuses to replace a non-empty tracked snapshot with an empty export, records the source Dolt head from bd vc status (NOT bd vc log, which does not exist) into export-state.json, verifies line count + ID set, then atomically replaces. Distinguish a genuinely-empty new project from corruption by confirming bd vc status returns a commit. Refactor auto-commit.ts:239-262 to consume this module; remove the manual line-append/line-union merge in teardown-workspace.ts:272-349 and the union assumption in beads-restore.ts (a phantom deletion is repaired by re-export from Dolt). Keep the PAN-1158 empty-export guard green in its new form."
+        },
+        "items": [
+          {
+            "id": "jsonl-export.ac1",
+            "title": "Given a non-empty tracked issues.jsonl and an unexpectedly empty bd export, exportBeadsJsonl refuses the replacement and returns a typed error naming both counts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jsonl-export.ac2",
+            "title": "A successful export records the source Dolt commit obtained from bd vc status into export-state.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jsonl-export.ac3",
+            "title": "Verification compares line count and ID set against bd list --all --json (same universe) and rejects the publish on any mismatch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jsonl-export.ac4",
+            "title": "grep finds no line-union merge or manual jsonl line-append path remaining in teardown-workspace.ts or beads-restore.ts, and the PAN-1158 refuse-empty guard test still passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "write-door",
+        "title": "Canonical beads write door: runMutationBatch (lock/pull/mutate/commit/export/push once, typed conflict)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T17:58:54.000Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-2564",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "pan-beads-verbs",
+            "bd-shim",
+            "cross-machine-tests",
+            "observability"
+          ],
+          "files_scope": [
+            "src/lib/beads/writer.ts",
+            "src/lib/vbrief/beads.ts",
+            "src/cli/commands/workspace-beads.ts",
+            "src/lib/work/done-preflight.ts",
+            "src/dashboard/server/routes/agents/spawn.ts",
+            "tests/unit/lib/beads/writer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/beads/writer.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "writer tests pass: lock-once/pull-once/commit-once/push-once ordering, atomic multi-op batch, revert-or-block on failure with nothing pushed, typed conflict on rejected push with no --force",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3 (decisions D6, C3). New src/lib/beads/writer.ts exposes runMutationBatch({ project, reason }, async (bd) => {...}): acquire the project lock once → ensureBootstrapped() → bd dolt pull once → run the callback operations → validate → commit once → export once (via jsonl-export module) → bd dolt push once → return { ok } | { conflict, localHead, remoteHead }. Single claim/close is a one-op batch. Failure atomicity: a failed op/validation reverts the Dolt working set, or if revert is unsafe returns typed needsOperatorRecovery — never commits or pushes a partial plan. On push rejection return the typed conflict with no --force; the next pull's bd 1.1.0 cascade-repair merge resolves. Route createBeadsFromVBrief, initializeWorkspaceBeads, the pan done close path, and label/status updates through the writer. pan done treats a close as durable ONLY after its batch push succeeds."
+        },
+        "items": [
+          {
+            "id": "write-door.ac1",
+            "title": "The writer test proves a multi-op batch acquires the lock once, pulls once, commits once, exports once, and pushes once, in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "write-door.ac2",
+            "title": "A batch whose mid-operation fails pushes nothing: the Dolt working set is reverted or the batch returns typed needsOperatorRecovery with the remote head unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "write-door.ac3",
+            "title": "A rejected push returns { conflict, localHead, remoteHead } and the test asserts no --force flag was ever passed to bd",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "write-door.ac4",
+            "title": "pan done exits non-zero (not durably complete) when a closed bead's batch push has not succeeded, and succeeds once the push lands",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "write-door.ac5",
+            "title": "createBeadsFromVBrief and initializeWorkspaceBeads each run inside a single runMutationBatch, and the call-ordering test validates that no per-command pull or push occurs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bootstrap",
+        "title": "Cross-machine bootstrap and Dolt remote wiring (bd bootstrap, refs/dolt/data hydration)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T17:58:54.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2564",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/beads/bootstrap.ts",
+            "src/cli/commands/sync.ts",
+            "src/lib/remote-workspace.ts",
+            "src/lib/remote/fly-provider.ts",
+            "tests/unit/lib/beads/bootstrap.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/beads/bootstrap.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "bootstrap tests pass including the empty-local + refs/dolt/data-present guard triggering bootstrap before reads",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4 (decisions D2, C2). New src/lib/beads/bootstrap.ts: on registration / pan sync, idempotently wire the Dolt remote (bd dolt remote add origin git+ssh://<project-remote>, validate sync.remote) then bd bootstrap --yes --json. Replace bare bd init with bootstrap wherever a remote exists (sync.ts:366-388,565-585). Resolver guard: canonical local DB absent/empty while refs/dolt/data exists on origin ⇒ bootstrap before trusting reads; a plain git checkout is never proof beads are current. Schema adoption: when bootstrap detects the remote schema is ahead, a non-migrator machine adopts by re-cloning via bd bootstrap, never local bd migrate. Per C2: remove the JSONL-seeded Fly fallback (fly-provider.ts:585-605,685 disabling sync.remote and bd init --from-jsonl) and mechanically block remote work for migrated projects until authenticated Dolt-remote routing exists."
+        },
+        "items": [
+          {
+            "id": "bootstrap.ac1",
+            "title": "Given an absent/empty canonical local DB and refs/dolt/data present on origin, the resolver guard invokes bd bootstrap before returning any read result (unit test with bd mock)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bootstrap.ac2",
+            "title": "pan sync wires the Dolt remote idempotently: a second run produces no duplicate remote and validates sync.remote points at the project remote",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bootstrap.ac3",
+            "title": "Given a remote schema ahead of local, when a non-migrator machine adopts, it re-clones via bd bootstrap and never invokes bd migrate, and the adoption test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bootstrap.ac4",
+            "title": "When a remote Fly workspace is requested for a migrated project, the CLI rejects it with a standalone operator message, and fly-provider.ts contains no bd init --from-jsonl path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sync-freshness",
+        "title": "Dashboard freshness: single-owner background Dolt sync, domain-event invalidation, BeadsRail freshness UI",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T17:58:54.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2564",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/beads-sync-service.ts",
+            "src/lib/overdeck/issue-reads.ts",
+            "packages/contracts/src/events.ts",
+            "src/dashboard/frontend/src/components/Stage/cockpit/BeadsRail.tsx",
+            "tests/dashboard/beads-freshness.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/dashboard/beads-freshness.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "fake-timer freshness tests pass: 10s poll issues no network pull; head-advancing background pull emits the domain event and invalidates the beads query; stale badge renders on sync error",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5. New src/dashboard/server/services/beads-sync-service.ts with ONE owner — the dashboard server process (not per-route, not per-tab) — running the background synchronizer with defined interval + jitter + backoff; it holds the project lock only for the bounded pull, off the request path, using execAsync/spawn (never execSync; delays via await new Promise). On a head-advancing pull it invalidates the issue's beads query server-side and emits a named domain event in the contracts schema over the existing /ws/rpc WebSocket; the frontend handler calls queryClient.invalidateQueries(['beads', issueId]). The 10-second UI poll triggers no network pull. BeadsRail renders lastSyncedAt, freshness age, and a stale/error badge. All interval/backoff tests use vi.useFakeTimers + advanceTimersByTimeAsync. Self-verify the rail rendering with a Playwright screenshot in an isolated browser instance — do not ask the operator to eyeball it."
+        },
+        "items": [
+          {
+            "id": "sync-freshness.ac1",
+            "title": "A fake-timers test validates that the 10-second beads poll produces zero network pulls while the background synchronizer syncs on its own interval with jitter and backoff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-freshness.ac2",
+            "title": "A head-advancing background pull emits the named beads-freshness domain event over /ws/rpc and the frontend handler invalidates the ['beads', issueId] query",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-freshness.ac3",
+            "title": "When the remote pull fails, the BeadsRail renders a stale/error badge with lastSyncedAt and freshness age, and existing progress numbers persist rather than dropping to zero",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-freshness.ac4",
+            "title": "grep confirms beads-sync-service.ts contains no execSync call, and a Playwright screenshot in an isolated browser session shows the freshness badge rendered on the issue view",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reconcile-audit",
+        "title": "pan admin beads reconcile: isolated full-fidelity no-loss audit across Dolt/remote/JSONL",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T17:58:54.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2564",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/admin/beads-reconcile.ts",
+            "src/lib/beads/reconcile.ts",
+            "tests/unit/lib/beads/reconcile.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/beads/reconcile.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "reconcile tests pass on a fixture with one-sided, conflicting, and scope-excluded records: every record accounted for, scope-excluded labeled distinctly, no source mutated",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-7 (decision D7). New pan admin beads reconcile <project>: (1) take independent safety exports/snapshots FIRST; (2) clone refs/dolt/data into an ISOLATED temp DB (git fetch the ref into a scratch clone + bd bootstrap there) — never bd dolt pull into the live DB; (3) inventory the exact Dolt tables/columns used by beads 1.1.0 + Overdeck and enumerate them in the report; (4) compare normalized issue rows + labels + dependencies + comments + non-issue/config records + Dolt heads across {live local Dolt, isolated ref clone, overdeck-state issues.jsonl}; (5) distinguish 'absent' from 'outside export scope' (issue-only vs --all); (6) verify counts + sample-resolve; (7) emit a deterministic report (--json option) to ${OVERDECK_HOME}/state/<project>/notes/beads-reconcile-<date>.md plus a review/approval artifact that, once approved, feeds the cutover marker. The command NEVER imports, pushes, deletes, or selects a winner."
+        },
+        "items": [
+          {
+            "id": "reconcile-audit.ac1",
+            "title": "On the divergence fixture, the report accounts for every record across all three sources, listing one-sided and conflicting records explicitly with their per-source versions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-audit.ac2",
+            "title": "Records missing only because of export scope (issue-only vs --all) are labeled as scope-excluded, distinct from genuinely absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-audit.ac3",
+            "title": "A reconcile run preserves all three sources unchanged: the live local Dolt head, the remote ref, and the tracked issues.jsonl remain byte-identical, and the no-mutation test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-audit.ac4",
+            "title": "Running with --json produces a deterministic report (stable ordering, no timestamps in comparison keys) that hashes identically across two runs on the same fixture",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "config-standardize",
+        "title": "Configuration standardization: remove no-db, validate sync.remote, gitignore Dolt runtime",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-12T17:58:54.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2564",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/beads.ts",
+            "src/cli/commands/workspace-beads.ts",
+            "tests/unit/lib/beads/config-standardize.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/beads/config-standardize.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "config-standardize tests pass: no-db removal, sync.remote validation, gitignore coverage",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-8 (decision D5). pan beads doctor (with bd doctor --fix where applicable) removes any legacy no-db key from managed .beads/config.yaml, validates sync.remote points at the project remote, and ensures gitignore coverage (project .gitignore and .beads/.gitignore) for dolt/, embeddeddolt/, dolt-server.*, *.dolt, and .beads/backup/. Overdeck code never writes a no-db key."
+        },
+        "items": [
+          {
+            "id": "config-standardize.ac1",
+            "title": "Doctor deletes a planted no-db: true key from a fixture config.yaml and prints the removal in its output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-standardize.ac2",
+            "title": "Doctor rejects a sync.remote that does not point at the project git remote with an actionable operator message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-standardize.ac3",
+            "title": "Doctor ensures dolt/, embeddeddolt/, dolt-server.*, *.dolt, and .beads/backup/ are gitignored, and git status on a fixture with those files present shows none of them as trackable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bd-version-policy",
+        "title": "bd version policy: one min-version resolver (>= 1.1.0) consulted by doctor and install",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-12T17:58:54.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2564",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/beads/version.ts",
+            "src/cli/commands/beads.ts",
+            "src/cli/commands/install.ts",
+            "src/cli/commands/doctor.ts",
+            "tests/unit/lib/beads/version.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/beads/version.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "version tests pass: all consumers read the single resolver; a below-min bd surfaces a clear error",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-16. Define the supported bd version as a POLICY — minimum compatible version >= 1.1.0 (required for the migration-fork guard and cascade-repair pull this design depends on) — resolved in exactly one place, src/lib/beads/version.ts. Find the existing version/install checks (beads.ts:263-357 upgrade path, install.ts, doctor.ts:745) and make them all consult the one resolver; do not add a second hardcoded literal beside the install script. Document the policy as min-version, not exact-pin. NOTE: this bead defines the policy only; the actual fleet upgrade + v32→v53 migration executes in cutover-panopticon as designated migrator."
+        },
+        "items": [
+          {
+            "id": "bd-version-policy.ac1",
+            "title": "All version consumers (doctor, install, beads upgrade path) read the minimum version from src/lib/beads/version.ts; the unit test passes and grep shows no second version literal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bd-version-policy.ac2",
+            "title": "With a mocked bd below the minimum, pan doctor surfaces a standalone error naming the installed and required versions and exits non-zero",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-beads-verbs",
+        "title": "Agent-facing mutation door: pan beads claim|update|close|create|dep|delete backed by the writer",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T17:58:54.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2564",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/beads.ts",
+            "tests/unit/cli/pan-beads-verbs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/pan-beads-verbs.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "verb tests pass: each verb routes through runMutationBatch; conflict results surface as actionable CLI errors",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement the CLI half of PRD WI-13. Add pan beads claim|update|close|create|dep|delete subcommands in src/cli/commands/beads.ts, each executing as a one-op (or multi-op where natural) runMutationBatch through the write door. A typed conflict from the writer surfaces as a standalone, actionable CLI error (naming localHead/remoteHead and the retry path), never a silent overwrite. Output supports --json for programmatic callers."
+        },
+        "items": [
+          {
+            "id": "pan-beads-verbs.ac1",
+            "title": "Each new verb (claim, update, close, create, dep, delete) routes through runMutationBatch exactly once per invocation, and the writer-mock test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-beads-verbs.ac2",
+            "title": "When the writer returns a conflict, the CLI exits non-zero and prints a standalone sentence naming local and remote heads and the retry action",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-beads-verbs.ac3",
+            "title": "pan beads close <id> --json emits a machine-readable result object including durablePush: true only after the batch push succeeded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bd-shim",
+        "title": "bd PATH shim + prompt/skill rewrite: mechanically reject raw bd mutation in agent environments",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T17:58:54.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2564",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/beads/bd-shim.ts",
+            "src/lib/cloister/prompts/work.md",
+            "src/lib/cloister/verification-runner.ts",
+            "sync-sources/skills/beads/SKILL.md",
+            "sync-sources/skills/beads-overdeck-guide/SKILL.md",
+            "sync-sources/skills/beads-completion-check/SKILL.md",
+            "tests/unit/lib/beads/bd-shim.test.ts",
+            "tests/integration/agent-mutation-door.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/beads/bd-shim.test.ts tests/integration/agent-mutation-door.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "shim tests pass: read verbs pass through, mutation verbs rejected with pan beads redirect; integration test proves raw bd close rejected in agent env while pan beads close performs the full batch",
+            "typecheck and lint (including lint-skills) complete without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement the enforcement half of PRD WI-13. New src/lib/beads/bd-shim.ts generates/installs a scoped bd wrapper placed on the agent PATH by the spawn path (workspace/agent env wiring): read verbs (list, show, ready, dep tree, count, export --dry-run style diagnostics) pass through; mutation verbs (create, update, close, dep add, delete, import, init, migrate, dolt push) are rejected with a message directing to pan beads .... The writer invokes the real bd binary by resolved absolute path, bypassing the shim. Rewrite src/lib/cloister/prompts/work.md (the bd update/bd close instructions) and verification-runner.ts's retry instruction to use pan beads update/close; update bundled beads skills that teach direct bd mutation. Per the skills convention, wrapper skill updates land in the same commit as the CLI change."
+        },
+        "items": [
+          {
+            "id": "bd-shim.ac1",
+            "title": "The shim passes through bd list/show/ready/dep tree unchanged and rejects bd create/update/close/dep add/delete/import/init/migrate/dolt push with a message naming the pan beads replacement",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bd-shim.ac2",
+            "title": "The integration test proves a raw bd close in an agent environment exits non-zero while pan beads close performs pull→mutate→commit→export→push via the writer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bd-shim.ac3",
+            "title": "grep shows no raw mutating bd instruction remaining in work.md, verification-runner.ts, or bundled beads skills; all direct-mutation guidance now names pan beads verbs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bd-shim.ac4",
+            "title": "The writer's real-binary adapter resolves bd by absolute path and functions correctly when the shim is first on PATH (test asserts the shim is bypassed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "observability",
+        "title": "Beads observability: heads, last pull/push, freshness age, schema version in health surface",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-12T17:58:54.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2564",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/beads/telemetry.ts",
+            "src/lib/beads/resolver.ts",
+            "src/lib/beads/writer.ts",
+            "src/dashboard/server/services/beads-sync-service.ts",
+            "tests/unit/lib/beads/telemetry.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/beads/telemetry.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "telemetry tests pass: health payload exposes heads, last pull/push, freshness age, last error, schema version + migrator status",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-10. New src/lib/beads/telemetry.ts wired into the resolver, writer, and sync service: log and expose (as a beads/health field on the existing health API surface) the local Dolt head, last pulled remote head, last successful pull/push timestamps, freshness age, last conflict/sync error, and schema version + designated-migrator status (so a v32-vs-v53 split is visible). Operator-facing messages are complete standalone sentences stating the consequence."
+        },
+        "items": [
+          {
+            "id": "observability.ac1",
+            "title": "The health payload contains localHead, lastPulledRemoteHead, lastSuccessfulPullAt, lastSuccessfulPushAt, freshnessAgeSeconds, lastError, and schemaVersion fields with the asserted shape",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "observability.ac2",
+            "title": "A simulated sync failure and a simulated schema mismatch each appear in the health payload and each produces a standalone operator-facing log sentence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "access-ci-guard",
+        "title": "Exhaustive no-loss access audit appendix + lint-beads-access CI guard",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T17:58:54.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "infra",
+          "issueLabel": "pan-2564",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-beads-access.sh",
+            "docs/BEADS.md",
+            "package.json",
+            "tests/unit/scripts/lint-beads-access.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run lint",
+            "npx vitest run tests/unit/scripts/lint-beads-access.test.ts"
+          ],
+          "expected_outputs": [
+            "lint passes on the refactored tree; the guard's fixture test fails each of the 3 planted violation classes and passes the allowlisted modules"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-15 (the additive-refactor no-loss audit gate). Author the classified inventory appendix in docs/BEADS.md enumerating EVERY production read, mutation, export/import, presence check, cache invalidation, prompt/skill instruction, remote path, and UI consumer (100+ issues.jsonl references plus raw bd call sites) with its destination under the new design. New scripts/lint-beads-access.sh wired into npm run lint rejects: (1) direct production JSONL reads outside the explicit recovery/diagnostic allowlist; (2) direct mutating bd invocations outside the writer + its real-binary adapter; (3) new issues.jsonl presence checks used as beads-existence truth. The guard fails the build on drift and has its own fixture test."
+        },
+        "items": [
+          {
+            "id": "access-ci-guard.ac1",
+            "title": "The guard's fixture test plants one violation of each of the 3 classes and the guard exits non-zero for each, while the allowlisted recovery/diagnostic modules pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "access-ci-guard.ac2",
+            "title": "npm run lint (including the new guard) passes on the fully refactored tree, proving zero unaccounted direct-access sites remain",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "access-ci-guard.ac3",
+            "title": "The docs/BEADS.md appendix table contains every inventoried site with its classification and new-design destination, and the guard's allowlist matches the appendix exactly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cross-machine-tests",
+        "title": "Multi-clone integration proof: two-clone sync, three-clone freshness, divergent-write convergence",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T17:58:54.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-2564",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/integration/beads-cross-machine.test.ts",
+            "docs/BEADS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/integration/beads-cross-machine.test.ts"
+          ],
+          "expected_outputs": [
+            "all three scenarios pass: A→B bootstrap read, B-closes-5→C-sees-5 after background sync, divergent writes converge with no lost row and genuine same-row conflict surfaces as typed"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-12 (a)-(c) as tests/integration/beads-cross-machine.test.ts using local scratch git repos as the shared remote: (a) two-clone test — clone A creates beads and pushes refs/dolt/data; clone B bootstraps, pulls, and reads the same beads. (b) three-clone test — B closes 5 beads and pushes; C's /api/issues/:id/beads endpoint reports those 5 closed after background synchronization. (c) divergent-write test pinning C1/D6 — A and B each mutate DIFFERENT beads without pulling, both push; assert bd 1.1.0 pull cascade-repair/timestamp merge converges both histories with no lost row; then a genuine same-row conflict surfaces as a typed conflict with no silent side-choice. Record the observed merge behavior in docs/BEADS.md as the pinned C1 outcome."
+        },
+        "items": [
+          {
+            "id": "cross-machine-tests.ac1",
+            "title": "Two-clone: A creates and pushes beads; B bootstraps from refs/dolt/data and reads the identical bead set (IDs and statuses match)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cross-machine-tests.ac2",
+            "title": "Three-clone: after B closes 5 beads and pushes, C's /api/issues/:id/beads response reports those 5 as closed following a background sync cycle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cross-machine-tests.ac3",
+            "title": "Each divergent non-overlapping write from A and B survives the pull merge with no lost row, and the test validates the converged bead set equals the union of both writes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cross-machine-tests.ac4",
+            "title": "A same-row concurrent update produces a typed conflict result preserving both histories, and the test asserts neither side was silently chosen",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cutover-panopticon",
+        "title": "This-machine cutover: reconcile panopticon-cli, unify split-brain, publish refs/dolt/data at v53, write marker",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-12T17:58:54.000Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "infra",
+          "issueLabel": "pan-2564",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/BEADS.md"
+          ],
+          "files_scope_confidence": "low",
+          "verify_commands": [
+            "pan admin beads reconcile panopticon-cli --json",
+            "bd vc status",
+            "pan beads doctor"
+          ],
+          "expected_outputs": [
+            "reconcile report accounts for every record and is reviewed/approved; bd vc status shows the unified canonical DB at the migrated schema; doctor reports exactly one populated DB; beads-cutover.json marker validates"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "FR-1",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-12 (d) — the one code-blocking operational cutover. Steps, in order, with independent safety snapshots taken FIRST (existing backup at ~/Backups/beads-preupgrade-20260712 plus fresh exports): (1) run pan admin beads reconcile on panopticon-cli and review the no-loss report (the operator reviews the approval artifact — surface it, do not self-approve silently); (2) unify the split-brain — redirect the code checkout's .beads to the canonical state-worktree DB via .beads/redirect, retiring the code-checkout DB only after backup (never bd migrate it: the v53-migrated attempt is preserved at ${OVERDECK_HOME}/state/panopticon-cli/.beads/embeddeddolt.v53-migrated.bak); (3) as designated migrator run BD_ALLOW_REMOTE_MIGRATE=1 bd migrate on the ONE canonical DB, validating issue counts are unchanged pre/post migration (the earlier 802-vs-50 anomaly means an unexplained count change aborts the cutover); (4) bd dolt push to publish refs/dolt/data at v53; (5) write the beads-cutover.json D-MARKER. Other projects (krux, lexerra, myn, myn-cli, tindra) are operator rollouts per D8 — explicitly NOT this bead."
+        },
+        "items": [
+          {
+            "id": "cutover-panopticon.ac1",
+            "title": "The reviewed reconcile report on overdeck-state covers every record across live Dolt, remote ref, and JSONL, and the cutover marker records its path and sha256",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cutover-panopticon.ac2",
+            "title": "After unification, pan beads doctor reports exactly one populated DB for panopticon-cli and the code checkout resolves it via .beads/redirect",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cutover-panopticon.ac3",
+            "title": "The designated-migrator migration preserves issue counts (pre/post bd list --all counts equal) and refs/dolt/data on origin advances to the migrated head",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cutover-panopticon.ac4",
+            "title": "A valid beads-cutover.json persists for panopticon-cli and pan admin state migrate then passes the Dolt gate staging zero Dolt bytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "beads-docs",
+        "title": "Documentation: BEADS.md, AGENT-STATE-PLANES.md, beads.mdx, CLAUDE.md sections, derived-JSONL rule",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-12T17:58:54.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-2564",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/BEADS.md",
+            "docs/AGENT-STATE-PLANES.md",
+            "configuration/beads.mdx",
+            "CLAUDE.md",
+            "sync-sources/rules/beads-derived-jsonl.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint (including lint-skills cross-check) passes; each named doc contains the required new sections"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-11. Update/create: docs/BEADS.md (embedded vs server mode, canonical-home/redirect model, designated-migrator + bd bootstrap schema-adoption procedure, Machine A→B→C lifecycle, recovery procedure, stale-state UI behavior); docs/AGENT-STATE-PLANES.md (beads plane = Dolt/refs/dolt/data, not overdeck-state); user-facing configuration/beads.mdx; the CLAUDE.md 'Beads Issue Tracker' and 'Session Completion' sections (agents use pan beads ..., not raw bd); and a bundled rule (sync-sources/rules/beads-derived-jsonl.md) stating issues.jsonl is derived-only and beads mutations go through pan beads. Wrapper-skill updates for changed CLI verbs land per the skills convention."
+        },
+        "items": [
+          {
+            "id": "beads-docs.ac1",
+            "title": "docs/AGENT-STATE-PLANES.md contains the statement that the beads plane travels on refs/dolt/data (not overdeck-state), and docs/BEADS.md covers the canonical-home/redirect model and the Machine A→B→C lifecycle with the bootstrap procedure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "beads-docs.ac2",
+            "title": "CLAUDE.md beads sections instruct pan beads mutations and no doc instructs raw mutating bd; grep for 'bd close'/'bd update' guidance in docs returns only the shim-rejection explanation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "beads-docs.ac3",
+            "title": "The new bundled rule ships in sync-sources/rules/ with scope frontmatter and renders into the harness context files after pan sync",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "beads-home",
+        "to": "bd-lock-serialization",
+        "type": "blocks"
+      },
+      {
+        "from": "beads-home",
+        "to": "read-door",
+        "type": "blocks"
+      },
+      {
+        "from": "beads-home",
+        "to": "jsonl-export",
+        "type": "blocks"
+      },
+      {
+        "from": "beads-home",
+        "to": "write-door",
+        "type": "blocks"
+      },
+      {
+        "from": "beads-home",
+        "to": "bootstrap",
+        "type": "blocks"
+      },
+      {
+        "from": "bd-lock-serialization",
+        "to": "write-door",
+        "type": "blocks"
+      },
+      {
+        "from": "bd-lock-serialization",
+        "to": "sync-freshness",
+        "type": "blocks"
+      },
+      {
+        "from": "jsonl-export",
+        "to": "write-door",
+        "type": "blocks"
+      },
+      {
+        "from": "read-door",
+        "to": "sync-freshness",
+        "type": "blocks"
+      },
+      {
+        "from": "write-door",
+        "to": "pan-beads-verbs",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-beads-verbs",
+        "to": "bd-shim",
+        "type": "blocks"
+      },
+      {
+        "from": "write-door",
+        "to": "observability",
+        "type": "blocks"
+      },
+      {
+        "from": "sync-freshness",
+        "to": "observability",
+        "type": "blocks"
+      },
+      {
+        "from": "read-door",
+        "to": "access-ci-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "bd-shim",
+        "to": "access-ci-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "migration-gate",
+        "to": "reconcile-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "write-door",
+        "to": "cross-machine-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "bootstrap",
+        "to": "cross-machine-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "sync-freshness",
+        "to": "cross-machine-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "reconcile-audit",
+        "to": "cutover-panopticon",
+        "type": "blocks"
+      },
+      {
+        "from": "cross-machine-tests",
+        "to": "cutover-panopticon",
+        "type": "blocks"
+      },
+      {
+        "from": "beads-home",
+        "to": "cutover-panopticon",
+        "type": "blocks"
+      },
+      {
+        "from": "bd-version-policy",
+        "to": "cutover-panopticon",
+        "type": "blocks"
+      },
+      {
+        "from": "bd-shim",
+        "to": "beads-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "sync-freshness",
+        "to": "beads-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "config-standardize",
+        "to": "cutover-panopticon",
+        "type": "informs"
+      },
+      {
+        "from": "observability",
+        "to": "beads-docs",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-12-PAN-2564-feat-beads-dolt-native-cross-machine-authority-synchronization-and-dashboard-freshness.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

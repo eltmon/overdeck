@@ -1,0 +1,560 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-13T07:45:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2596: feat(dashboard): generic file attachment in conversation composer (+ button and drag-and-drop)",
+    "updated": "2026-07-13T08:16:05.228Z"
+  },
+  "plan": {
+    "id": "pan-2596",
+    "title": "feat(dashboard): generic file attachment in conversation composer (+ button and drag-and-drop)",
+    "status": "running",
+    "uid": "c02d4ab0-78a0-4f4d-aaac-35b49d7cffb1",
+    "author": "agent:claude-fable-5",
+    "sequence": 9,
+    "created": "2026-07-13T07:45:00.000Z",
+    "updated": "2026-07-13T08:16:05.228Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2596",
+        "label": "PAN-2596",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-2596.md",
+        "label": "PRD draft (glossary, verified references, decisions D1-D13, FR-1..FR-7)",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "backend",
+      "composer",
+      "attachments"
+    ],
+    "narratives": {
+      "Problem": "The conversation composer supports only image attachment, via two undiscoverable paths (paste, drag-and-drop). Non-image files are silently ignored at three layers: the handleDrop image filter (ComposerFooter.tsx:304), the composerStore enqueue filter (composerStore.ts:288), and the server's four-image-MIME allowlist (conversation-message.ts:66-71). There is no visible attach affordance at all.",
+      "Proposal": "Add a Paperclip attach button (hidden multi-file input) and broaden drag-and-drop to a curated, extension-driven allowlist of text/code types plus PDF (operator-confirmed). Server validates text uploads as fatal-UTF-8 with no NUL bytes and PDFs by %PDF- magic, keeping the uniform 5 MiB cap and all image validation unchanged. Rename the composer's image-specific store/UI to attachment terminology with a kind:'image'|'file' field (operator-confirmed); non-image attachments render as a file chip (icon, name, size, remove). Keep the @<serverPath> send-token convention; make vision gating image-only at both the frontend enqueue gate and the server send-path strip so text/PDF deliver to any model. Full decisions D1-D13 and verified line references in .pan/drafts/PAN-2596.md.",
+      "NonGoals": "- No structured attachments field on ChatMessage or any packages/contracts/ change\n- No renaming/adding HTTP endpoints: /upload-image and /delete-image keep their paths\n- No per-type size caps; MAX_UPLOAD_BYTES and multipart route limits unchanged\n- No paste-semantics changes beyond mechanical renames (file-manager paste stays unsupported with its existing toast)\n- No support for extension-less files or dotfiles (.env, Makefile) — rejected with a named toast\n- No binary formats beyond PDF (no docx/xlsx/zip/audio/video)\n- No timeline-rendering changes for sent attachments (@path stays plain text)\n- No reload durability for pending attachments (#1592)\n- No changes to the rate limiter, path-containment checks, or attachment cleanup/reaper (already type-agnostic)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Non-image stored filenames embed a sanitized original basename: <uuid>-<sanitized-basename><ext>, lowercased, [a-z0-9._-] only, capped at 48 chars (D12). Images keep <uuid><ext>.",
+        "rationale": "An agent reading @/…/3f2a….log loses all semantic context under pure-UUID naming; embedding the sanitized name is one small helper, keeps UUID uniqueness, and stays within the allowlisted-extension safety envelope."
+      },
+      {
+        "summary": "Endpoint paths /upload-image and /delete-image are kept unchanged (D8).",
+        "rationale": "They are already generic multipart/JSON endpoints, the frontend is their only caller, and renaming would churn the conversations-no-loss route audit for zero behavior gain."
+      },
+      {
+        "summary": "Paste remains image-focused; the picker and drag-and-drop are the generic-file entry points.",
+        "rationale": "OS file-manager paste arrives as text/uri-list which web origins cannot read (existing handled case); broadening paste has no reachable new input."
+      }
+    ],
+    "items": [
+      {
+        "id": "server-upload-allowlist",
+        "title": "Server: extension-driven upload allowlist with UTF-8/PDF content validation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-13T07:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2596",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "send-path-image-only-gate",
+            "frontend-attachment-store"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/conversation-message.ts",
+            "tests/unit/lib/overdeck/conversation-upload-validation.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/lib/overdeck/conversation-upload-validation.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-upload-validation.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/overdeck/conversation-message.ts: (1) add exported ALLOWED_ATTACHMENT_EXTENSIONS covering .txt .md .markdown .json .jsonl .log .csv .tsv .yaml .yml .toml .xml .html .css .js .jsx .ts .tsx .py .sh .bash .sql .diff .patch .ini .conf .cfg plus .pdf, alongside the UNTOUCHED image ALLOWED_UPLOAD_MIME_TYPES map; (2) export IMAGE_ATTACHMENT_EXTENSIONS ('.png','.jpg','.jpeg','.gif','.webp') and isImageAttachmentPath(path) (lowercased-extension test); (3) extract the validation into an exported pure helper validateUploadPayload(filename, mimeType, bytes) used by handleConversationImageUpload: image MIME -> existing magic-byte path unchanged; else dispatch on extname(filename).toLowerCase(): '.pdf' -> bytes must start with %PDF- (0x25 0x50 0x44 0x46 0x2D); text extension -> new TextDecoder('utf-8',{fatal:true}) must decode and bytes must contain no 0x00; anything else -> 400 'Unsupported file type: <ext-or-mime>'; (4) safeUploadExtension returns the original lowercased extension for non-image allowlisted files; (5) non-image stored filename becomes `${randomUUID()}-${sanitize(basenameWithoutExt)}${ext}` with sanitize = lowercase, keep [a-z0-9._-], cap 48 chars, fallback 'file' (images keep `${randomUUID()}${ext}`). Uniform MAX_UPLOAD_BYTES (5 MiB) unchanged. New test file tests/unit/lib/overdeck/conversation-upload-validation.test.ts unit-tests the pure helper (no fs/db stubs needed). Repo rule: no execSync; pure/sync code only."
+        },
+        "items": [
+          {
+            "id": "server-upload-allowlist.ac1",
+            "title": "Given a .md file with valid UTF-8 bytes, validateUploadPayload accepts it and handleConversationImageUpload returns 200 with a path ending in -<sanitized-name>.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-upload-allowlist.ac2",
+            "title": "Given a .txt filename whose bytes are invalid UTF-8 or contain a NUL byte, the upload is rejected with a 400 naming the content mismatch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-upload-allowlist.ac3",
+            "title": "Given a .pdf whose bytes start with %PDF- the upload is accepted; given a .pdf without that prefix it is rejected with 400",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-upload-allowlist.ac4",
+            "title": "Given a disallowed extension (.exe) or an extension-less filename, the upload is rejected with a 400 that names the unsupported type",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-upload-allowlist.ac5",
+            "title": "Image upload behavior is preserved: each of the four image MIME types still validates its magic bytes, keeps <uuid><ext> naming, and the handler rejects a PNG-declared payload carrying JPEG bytes with 400",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "send-path-image-only-gate",
+        "title": "Server: strip only image attachments for non-vision models; generalize harness transform wording",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-13T07:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2596",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-message.ts",
+            "tests/unit/lib/overdeck/conversation-upload-validation.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/lib/overdeck/conversation-upload-validation.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "send-path gating tests pass in conversation-upload-validation.test.ts",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "In handleConversationMessage (src/lib/overdeck/conversation-message.ts:296-311): when modelSupportsImagesSync is false, partition managedAttachmentPaths with isImageAttachmentPath (from server-upload-allowlist); strip and count ONLY image paths as droppedImageCount; non-image paths stay in outboundMessage and effectiveAttachmentPaths. The 422 \"can't read images\" early-return fires only when stripping left neither text nor non-image attachment paths. In transformMessageForHarness (:229-243) change both message templates from 'attached image files' to 'attached files'. Add tests to the same test file: extract/exercise via exported functions (transformMessageForHarness is already exported; test the partition logic through it plus isImageAttachmentPath)."
+        },
+        "items": [
+          {
+            "id": "send-path-image-only-gate.ac1",
+            "title": "Given a non-vision model and a message referencing a managed .md attachment, the delivered message preserves the @path token (nothing stripped, no 422)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "send-path-image-only-gate.ac2",
+            "title": "Given a non-vision model and a message with one image and one .txt attachment, the response reports imagesDropped: 1 and the delivered message retains only the .txt @path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "send-path-image-only-gate.ac3",
+            "title": "transformMessageForHarness output for a non-claude-jsonl harness contains 'attached files' and no longer contains 'attached image files'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-attachment-store",
+        "title": "Frontend: attachment-terminology rename, kind field, generic enqueue, allowlist mirror module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-13T07:45:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-2596",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "composer-attach-button",
+            "composer-drop-and-gate",
+            "composer-file-chip"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/attachmentTypes.ts",
+            "src/dashboard/frontend/src/lib/composerStore.ts",
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/composerStore.test.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/composerStore.test.ts src/components/chat/__tests__/ComposerFooter.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "composerStore.test.ts and ComposerFooter.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "(1) Create src/dashboard/frontend/src/lib/attachmentTypes.ts mirroring the server allowlist from server-upload-allowlist (cross-reference comments both directions, precedent: modelSupportsImages mirrors modelSupportsImagesSync): export ALLOWED_ATTACHMENT_EXTENSIONS, classifyAttachmentKind(file): 'image'|'file'|null (image = file.type.startsWith('image/'); file = allowlisted extension; null = rejected), inferAttachmentMime(file): string (extension->MIME table because browsers report empty MIME for .log/.md/.toml and video/mp2t for .ts; default text/plain), ATTACHMENT_ACCEPT (comma-joined 'image/*' + extensions) for the picker. (2) In composerStore.ts rename PendingImage->PendingAttachment adding kind: 'image'|'file' and making previewUrl string|null (URL.createObjectURL only for kind 'image'); rename enqueueImages->enqueueAttachments, removeImage->removeAttachment, updateImage->updateAttachment, consumeImages->consumeAttachments, useConversationImages->useConversationAttachments, getConversationImages->getConversationAttachments, slice field images->attachments; enqueueAttachments(conversationName, files) classifies each file, enqueues allowed, and RETURNS { rejected: File[] }; the upload FormData uses inferAttachmentMime(file) for kind 'file' and file.type for images. Preserve upload-pump semantics exactly (3-concurrent, orphan-delete on remove-during-flight, consume-on-send does not delete server files). (3) In ComposerFooter.tsx apply mechanical renames only (gate/toast behavior changes belong to composer-drop-and-gate); guard the strip's <img> on previewUrl so kind:'file' renders without crashing until composer-file-chip lands. (4) Update both test files for the renames; add store tests for kind classification, inferred MIME, rejected return, and unchanged orphan-delete semantics. No-loss rule: every existing image affordance (queue, preview, remove, error-retry, unmount survival, send-splice) must still be exercised by tests after the rename."
+        },
+        "items": [
+          {
+            "id": "frontend-attachment-store.ac1",
+            "title": "Given a .md File, enqueueAttachments creates a PendingAttachment with kind 'file' and null previewUrl, and the upload POST sends MIME text/markdown inferred from the extension",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-attachment-store.ac2",
+            "title": "enqueueAttachments with a .exe File enqueues nothing and returns it in the rejected array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-attachment-store.ac3",
+            "title": "Image enqueue preserves existing behavior: kind 'image', object-URL preview, and removing an attachment mid-upload still deletes the server orphan when the upload completes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-attachment-store.ac4",
+            "title": "After the rename, composerStore.ts contains no exported identifier matching *Image*, and both existing frontend test suites pass against the renamed API",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-attach-button",
+        "title": "Frontend: Paperclip attach button opening a hidden multi-file picker",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-13T07:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2596",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/ComposerFooter.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ComposerFooter.test.tsx passes including new attach-button tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In ComposerFooter.tsx: import Paperclip from lucide-react; add an icon button in the toolbar right cluster immediately before the voice toggle (:616), using the styles.voiceToolbarButton class pattern, title and aria-label 'Attach files', disabled={isDisabled}; add a hidden <input type=\"file\" multiple accept={ATTACHMENT_ACCEPT} ref={fileInputRef} style={{display:'none'}} data-testid=\"composer-file-input\">; button onClick -> fileInputRef.current?.click(); input onChange -> pass Array.from(input.files ?? []) through the shared enqueue wrapper (the same one paste/drop use), then reset input.value = '' so re-picking the same file re-fires change. Tests: button renders with aria-label 'Attach files' and is disabled when sessionAlive is false; firing change on the hidden input with a .md file enqueues it; input value is reset after selection."
+        },
+        "items": [
+          {
+            "id": "composer-attach-button.ac1",
+            "title": "The toolbar renders a Paperclip button with aria-label 'Attach files' that is disabled when the session is not alive",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-attach-button.ac2",
+            "title": "When files are selected via the hidden input, they are enqueued into the conversation's attachment queue (visible in the strip) and the input value resets to empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-attach-button.ac3",
+            "title": "The hidden input contains the multiple attribute and an accept attribute derived from ATTACHMENT_ACCEPT (images + allowlisted extensions)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-drop-and-gate",
+        "title": "Frontend: generic drag-and-drop, rejection toasts, image-only vision gate",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-13T07:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2596",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/ComposerFooter.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ComposerFooter.test.tsx passes including drop/gate/toast tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In ComposerFooter.tsx: (1) rework the :130-140 enqueue wrapper into the single shared entry point for picker/drop/paste: when !modelSupportsImages(model), partition out kind-'image' files, fire the existing warning toast for them, and CONTINUE enqueueing the remaining files (today the whole batch is dropped); call the store's enqueueAttachments and toast.error naming each rejected file from the returned rejected array (D11: no silent drops); (2) in handleDrop (:301-307) remove the image/* filter and pass every dropped file to the wrapper (handleDragOver already accepts any file-kind drag and needs no change); (3) handlePaste keeps its image-harvest logic but routes through the same wrapper. Tests: dropping a .log queues it; dropping a .exe queues nothing and shows a toast naming it; with a non-vision model, dropping an image plus a .txt queues the .txt and warns only about the image."
+        },
+        "items": [
+          {
+            "id": "composer-drop-and-gate.ac1",
+            "title": "When an allowlisted non-image file (.log) is dropped onto the composer box, it renders in the attachment strip as a queued attachment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-drop-and-gate.ac2",
+            "title": "Dropping a disallowed file (.exe) queues nothing and renders a rejection toast that names the file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-drop-and-gate.ac3",
+            "title": "With a non-vision model, dropping an image and a .txt together queues the .txt, drops the image, and shows the image-specific warning toast",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-file-chip",
+        "title": "Frontend: file chip preview (icon, name, size, status, remove) for non-image attachments",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-13T07:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2596",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/ComposerFooter.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "ComposerFooter.test.tsx passes including file-chip tests",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In the attachment strip (ComposerFooter.tsx:515-546 area): branch on attachment.kind — 'image' keeps the existing thumbnail card exactly; 'file' renders a chip: FileText icon (lucide-react), filename, human-readable size from attachment.file.size (search src/dashboard/frontend/src for an existing formatBytes/humanSize helper first; add a local one only if none exists), the same status element (Loader2 spinner while uploading / 'Uploaded' / error text), and the same remove button wired to removeAttachment. Add composerFileChip (+ any needed) classes to command-deck.module.css following the /pan-style-guide skill: monospace-leaning typography, NO pill badges, color only as signal (error state red like composerImageError). Tests: a queued .md renders a chip showing name and size with a remove button; clicking remove calls the store removal; an image still renders an <img> thumbnail."
+        },
+        "items": [
+          {
+            "id": "composer-file-chip.ac1",
+            "title": "A queued .md attachment renders a chip with a file icon, the filename, a human-readable size, and its upload status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-file-chip.ac2",
+            "title": "When the chip's remove button is clicked, the attachment disappears from the strip and the store deletes the server-side upload",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-file-chip.ac3",
+            "title": "An image attachment still renders an <img> thumbnail card, not a file chip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-attachments",
+        "title": "Docs: attachments section in features/conversations.mdx + stale image-only header sweep",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-13T07:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2596",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx",
+            "src/dashboard/frontend/src/lib/composerStore.ts",
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/lib/overdeck/conversation-message.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'Attachments' features/conversations.mdx",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "grep returns at least 1 (Attachments section present)",
+            "lint completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-3"
+          ],
+          "acJustification": "Docs item: two observable outcomes (section exists with required content; stale comments gone) cover the whole change."
+        },
+        "narrative": {
+          "Action": "(1) Add an 'Attachments' section to features/conversations.mdx documenting: the Paperclip attach button, drag-and-drop onto the composer, image paste, the allowed types (list the extensions from ALLOWED_ATTACHMENT_EXTENSIONS plus the four image formats), the uniform 5 MiB cap, the rejection toasts, and that sent messages reference uploads as @<serverPath> tokens the agent reads with its Read tool. (2) Sweep the now-stale image-only comments: composerStore.ts module header (lines 1-25 mention pasted images), ComposerFooter.tsx comment block at lines 38-40, and the upload-section comments in conversation-message.ts — reword to attachment terminology. Do not restructure any other doc content."
+        },
+        "items": [
+          {
+            "id": "docs-attachments.ac1",
+            "title": "features/conversations.mdx contains an Attachments section that names the Paperclip button, drag-and-drop, the allowed extension list, the 5 MiB cap, and the @path delivery convention",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-attachments.ac2",
+            "title": "The module headers in composerStore.ts, ComposerFooter.tsx, and conversation-message.ts no longer describe the surface as image-only; each header contains attachment-generic wording",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "server-upload-allowlist",
+        "to": "send-path-image-only-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "server-upload-allowlist",
+        "to": "frontend-attachment-store",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-attachment-store",
+        "to": "composer-attach-button",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-attachment-store",
+        "to": "composer-drop-and-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-attachment-store",
+        "to": "composer-file-chip",
+        "type": "blocks"
+      },
+      {
+        "from": "composer-drop-and-gate",
+        "to": "docs-attachments",
+        "type": "informs"
+      },
+      {
+        "from": "composer-file-chip",
+        "to": "docs-attachments",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-13-PAN-2596-feat-dashboard-generic-file-attachment-in-conversation-composer-button-and-drag-and-drop.vbrief.json"
+    }
+  },
+  "status": "active"
+}

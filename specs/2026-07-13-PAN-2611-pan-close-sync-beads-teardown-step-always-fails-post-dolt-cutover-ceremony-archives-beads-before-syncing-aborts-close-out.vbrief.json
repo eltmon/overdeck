@@ -1,0 +1,391 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-13T03:26:05Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2611: pan close: sync-beads teardown step always fails post-Dolt-cutover — ceremony archives .beads/ before syncing, aborts close-out",
+    "updated": "2026-07-13T05:32:25.784Z"
+  },
+  "plan": {
+    "id": "pan-2611",
+    "title": "pan close: sync-beads teardown step always fails post-Dolt-cutover — ceremony archives .beads/ before syncing, aborts close-out",
+    "status": "running",
+    "uid": "6bae9409-5439-4fb2-9201-641a08dd5820",
+    "author": "agent:claude-fable-5",
+    "sequence": 9,
+    "created": "2026-07-13T03:26:05Z",
+    "updated": "2026-07-13T05:32:25.784Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2611",
+        "label": "PAN-2611",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2564",
+        "label": "PAN-2564 (Dolt cutover)",
+        "type": "issue"
+      },
+      {
+        "uri": "overdeck-state:drafts/pan-2611.md",
+        "label": "PRD draft (root cause + before/after snippets)",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "close-out",
+      "beads",
+      "dolt-cutover",
+      "lifecycle"
+    ],
+    "narratives": {
+      "Problem": "Every first `pan close <id> --force` on a migrated project fails at teardown:sync-beads and aborts the ceremony. Verified root cause (which corrects the issue body's analysis): the archive step only COPIES .beads/ and is not the cause. The real mechanism is a redirect chain — createWorktree writes the workspace .beads/redirect pointing at the project root (../../.beads), and post-Dolt-cutover the project root .beads is itself a redirect to the state worktree. bd refuses redirect chains, falls back to the project root's RETIRED Dolt store, `bd vc status` there reports no Commit line, and exportBeadsJsonl (src/lib/beads/export.ts:60) refuses. Teardown steps don't abort mid-sequence, so removeWorktree still deletes the worktree; the ceremony then aborts before closing the tracker issue, and a second run succeeds only because the workspace branch of teardown skips.",
+      "Proposal": "Two surgical fixes plus tests and docs. (1) syncWorkspaceBeadsImpl (src/lib/lifecycle/teardown-workspace.ts:261-279) resolves resolveCanonicalBeadsHome(workspacePath); when non-null it runs exportBeadsJsonl(dirname(canonicalHome), { beadsDir: canonicalHome }) so bd executes where the Dolt store actually lives; when null it keeps today's exportBeadsJsonl(workspacePath). The step's export/list record-count cross-check keeps running at close time — that is the no-loss guarantee. (2) createWorktree (src/lib/workspace-manager/worktree-ops.ts:111-130) writes the redirect as the absolute canonical beads home when resolvable (one hop, mirroring src/lib/vbrief/beads.ts:437-443), keeping the relative ../../.beads fallback only when resolution returns null. Exact before/after snippets are in the PRD draft (drafts/pan-2611.md on overdeck-state).",
+      "NonGoals": "- Repairing existing workspaces' chained redirect files (live stale-read hazard for running agents — deserves a follow-up issue; close-out no longer depends on workspace-side resolution after item 1)\n- Removing the retired project-root Dolt residue (embeddeddolt.retired-cutover-20260712) — operator-owned state\n- Retiring the teardown:sync-beads step — it stays as the close-time no-loss validation\n- Reordering the close-out ceremony or changing archive-planning — the archive step was exonerated\n- Anything in PAN-2613's scope (bd bootstrap re-clone failures inside runMutationBatch)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Re-route the sync-beads export to the canonical beads home instead of retiring the step or reordering the ceremony.",
+        "rationale": "The issue offered three options (run against state worktree, run before archive, retire). Reordering fixes nothing — verified that archive only copies .beads/. Retiring loses the close-time record-count validation. Re-routing preserves the no-loss check and fixes the failure; verified live that `bd vc status` at the state worktree reports Commit c7e4uovo while the workspace resolution does not."
+      },
+      {
+        "summary": "Also fix the redirect writer in worktree-ops.ts so new worktrees get a one-hop redirect to the canonical home.",
+        "rationale": "It is the source of the chain and violates the documented contract (docs/BEADS.md:16-18 says worktrees point at the canonical home). src/lib/vbrief/beads.ts:437-443 already writes the canonical path — this aligns the second writer with the first."
+      },
+      {
+        "summary": "Defer repairing existing workspaces' chained redirects to a follow-up issue.",
+        "rationale": "Different blast radius: it affects live agent bd reads (stale data), not close-out, and touching every existing workspace is beyond this issue's fix expectations. Recorded as hazard H3 in continue.json."
+      }
+    ],
+    "items": [
+      {
+        "id": "fix-sync-beads-canonical-home",
+        "title": "Re-route teardown:sync-beads export to the canonical beads home",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-13T03:26:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2611",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/teardown-workspace.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run build"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "build completes without circular-import errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In syncWorkspaceBeadsImpl (src/lib/lifecycle/teardown-workspace.ts:261-279): add `import { resolveCanonicalBeadsHome } from '../beads/home.js';` (dirname is already imported from path on line 3). Keep the existing existsSync(workspaceBeadsDir) skip guard unchanged. Before the try block, compute `const canonicalHome = resolveCanonicalBeadsHome(workspacePath);`. Inside the try, call `exportBeadsJsonl(dirname(canonicalHome), { beadsDir: canonicalHome })` when canonicalHome is non-null, otherwise keep `exportBeadsJsonl(workspacePath)` exactly as today. Success/failure messages unchanged. Exact before/after snippet in PRD WI-1 (drafts/pan-2611.md). Do NOT use execSync or add any new child_process call — exportBeadsJsonl already owns the async bd invocation."
+        },
+        "items": [
+          {
+            "id": "fix-sync-beads-canonical-home.ac1",
+            "title": "Given a workspace whose project resolves a canonical beads home, when teardown:sync-beads runs, then exportBeadsJsonl executes with cwd = dirname(canonicalHome) and options.beadsDir = canonicalHome, and the step returns ok",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-sync-beads-canonical-home.ac2",
+            "title": "Given resolveCanonicalBeadsHome returns null, when teardown:sync-beads runs, then exportBeadsJsonl executes with the workspace path and no beadsDir option (today's behavior preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-sync-beads-canonical-home.ac3",
+            "title": "Given the workspace has no .beads directory, when teardown:sync-beads runs, then the step returns skipped and exportBeadsJsonl is never invoked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-sync-beads-canonical-home.ac4",
+            "title": "npm run build exits 0 and produces the dist bundle without 'Cannot require() ES Module … in a cycle' errors after the new beads/home.js import",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fix-worktree-redirect-canonical",
+        "title": "createWorktree writes a one-hop redirect to the canonical beads home",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-13T03:26:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2611",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace-manager/worktree-ops.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run build"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "build completes without circular-import errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In createWorktree (src/lib/workspace-manager/worktree-ops.ts:111-130): add `import { resolveCanonicalBeadsHome } from '../beads/home.js';`. Compute `const canonicalHome = resolveCanonicalBeadsHome(targetPath);` and `const sourceBeadsDir = canonicalHome ?? join(repoPath, '.beads');`. Keep the existsSync(sourceBeadsDir) gate, the !existsSync(redirectPath) no-overwrite guard, and the non-fatal try/catch. Write `canonicalHome ?? relative(targetPath, sourceBeadsDir)` as the redirect content — the absolute canonical path when resolvable (mirrors src/lib/vbrief/beads.ts:437-443), the existing relative behavior when null. Update the surrounding comment to state the one-hop invariant (bd refuses redirect chains and falls back to the stale store). Exact before/after snippet in PRD WI-2 (drafts/pan-2611.md)."
+        },
+        "items": [
+          {
+            "id": "fix-worktree-redirect-canonical.ac1",
+            "title": "Given a project with a resolvable canonical beads home, when createWorktree materializes a new worktree, then .beads/redirect is created containing exactly the absolute canonical home path (one hop)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-worktree-redirect-canonical.ac2",
+            "title": "Given resolveCanonicalBeadsHome returns null and <repoPath>/.beads exists, when createWorktree runs, then .beads/redirect contains the relative path to the project-root .beads (today's behavior preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-worktree-redirect-canonical.ac3",
+            "title": "Given .beads/redirect already exists in the worktree, when createWorktree runs, then the existing redirect content is preserved unmodified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-sync-beads-routing",
+        "title": "Unit tests locking the sync-beads canonical-home routing",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-13T03:26:05Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-2611",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/lifecycle/teardown-workspace.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/teardown-workspace.test.ts"
+          ],
+          "expected_outputs": [
+            "teardown-workspace.test.ts passes including the four new sync-beads cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend tests/unit/lib/lifecycle/teardown-workspace.test.ts (it already vi.mocks child_process, util, tmux, paths, shadow-state). Add vi.mock for '../../../../src/lib/beads/export.js' (exportBeadsJsonl) and '../../../../src/lib/beads/home.js' (resolveCanonicalBeadsHome). Create the workspace under mkdtempSync temp dirs with a real .beads/redirect file so the existsSync guard passes without mocking fs. Drive through the exported teardownWorkspace with deleteWorkspace behavior enabled. Four cases: (1) home resolves to /state/proj/.beads → exportBeadsJsonl called with ('/state/proj', { beadsDir: '/state/proj/.beads' }), step ok; (2) home null → exportBeadsJsonl called with the workspace path and no beadsDir; (3) workspace .beads absent → step skipped, export never called; (4) exportBeadsJsonl rejects → step failed with the error text in the message. No timers are involved — do not add real delays; the fake-timers rule does not apply here."
+        },
+        "items": [
+          {
+            "id": "test-sync-beads-routing.ac1",
+            "title": "Test asserts exportBeadsJsonl receives dirname(canonicalHome) as cwd and { beadsDir: canonicalHome } when the canonical home resolves, and the suite passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-sync-beads-routing.ac2",
+            "title": "Test asserts the workspace-cwd fallback (no beadsDir) when resolveCanonicalBeadsHome returns null, and the suite passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-sync-beads-routing.ac3",
+            "title": "Tests assert the skip (no .beads) and failure (export rejects) paths produce skipped/failed step results respectively without invoking the real bd binary",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-worktree-redirect",
+        "title": "Unit tests locking the one-hop redirect writer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-13T03:26:05Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-2611",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/workspace-manager/worktree-ops.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspace-manager/worktree-ops.test.ts"
+          ],
+          "expected_outputs": [
+            "worktree-ops.test.ts passes with the three redirect cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create tests/unit/lib/workspace-manager/worktree-ops.test.ts. Mock child_process/util following the pattern at the top of tests/unit/lib/lifecycle/teardown-workspace.test.ts so createWorktree's execAsync git calls no-op successfully, and vi.mock '../../../../src/lib/beads/home.js'. Use mkdtempSync temp dirs for repoPath and targetPath (pre-create targetPath since the mocked `git worktree add` will not create it; create <repoPath>/.beads/ for the fallback case). Three cases: (1) canonical home resolvable and existing → redirect file content equals the absolute canonical path; (2) canonical null + <repoPath>/.beads exists → redirect content equals relative(targetPath, <repoPath>/.beads); (3) pre-existing redirect file → content unchanged after createWorktree. No timers involved — no fake-timers setup needed."
+        },
+        "items": [
+          {
+            "id": "test-worktree-redirect.ac1",
+            "title": "Test asserts the redirect file is created containing exactly the absolute canonical home path when resolution succeeds, and the suite passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-worktree-redirect.ac2",
+            "title": "Test asserts the relative project-root fallback content when resolution returns null, and the suite passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-worktree-redirect.ac3",
+            "title": "Test asserts a pre-existing redirect file survives createWorktree with its content unmodified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-beads-one-hop",
+        "title": "Document the one-hop redirect invariant and close-out export path in docs/BEADS.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-13T03:26:05Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-2611",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/BEADS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'one hop' docs/BEADS.md",
+            "grep -n 'sync-beads' docs/BEADS.md"
+          ],
+          "expected_outputs": [
+            "grep prints the new one-hop redirect sentence",
+            "grep prints the new close-out sync-beads sentence"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In docs/BEADS.md, 'Local topology' section (the paragraph around lines 14-19 describing .beads/redirect files): extend it to state that (a) redirects are always one hop — bd refuses redirect chains and falls back to the redirect target's own directory, so a redirect must never point at another redirecting directory; (b) worktree creation writes the canonical home path directly (never the project root, which is itself a redirect post-cutover); (c) the close-out teardown:sync-beads step validates and refreshes the recovery export from the canonical home, not from inside the workspace. Keep the section's existing terse style. No Mintlify configuration/ page documents redirect mechanics (verified during planning), so docs/BEADS.md is the only doc surface touched."
+        },
+        "items": [
+          {
+            "id": "docs-beads-one-hop.ac1",
+            "title": "docs/BEADS.md Local topology section contains the one-hop redirect invariant and records that worktree creation writes the canonical home path directly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-beads-one-hop.ac2",
+            "title": "docs/BEADS.md states that close-out's teardown:sync-beads validates/refreshes the recovery export from the canonical home",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion",
+              "acJustification": "Docs item covering two sentences in one section; two ACs map 1:1 to the two added statements."
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "fix-sync-beads-canonical-home",
+        "to": "test-sync-beads-routing",
+        "type": "blocks"
+      },
+      {
+        "from": "fix-worktree-redirect-canonical",
+        "to": "test-worktree-redirect",
+        "type": "blocks"
+      },
+      {
+        "from": "fix-sync-beads-canonical-home",
+        "to": "docs-beads-one-hop",
+        "type": "informs"
+      },
+      {
+        "from": "fix-worktree-redirect-canonical",
+        "to": "docs-beads-one-hop",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-13-PAN-2611-pan-close-sync-beads-teardown-step-always-fails-post-dolt-cutover-ceremony-archives-beads-before-syncing-aborts-close-out.vbrief.json"
+    }
+  },
+  "status": "active"
+}

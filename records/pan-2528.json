@@ -75,18 +75,17 @@
     "recordedAt": "2026-07-11T09:59:17.529Z"
   },
   "created": "2026-07-11T09:50:24.420Z",
-  "updated": "2026-07-12T20:05:34.128Z",
+  "updated": "2026-07-12T22:59:51.707Z",
   "pipeline": {
     "issueId": "PAN-2528",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-12T19:16:57.012Z",
-    "updatedAt": "2026-07-12T20:05:33.961Z",
+    "updatedAt": "2026-07-12T22:59:51.707Z",
     "reviewNotes": "Review reset by deacon: no active review session after 48min",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2575",
     "lastVerifiedCommit": "942917cdcc7c40ec843e24bb427ca41525673c96",
@@ -126,7 +125,9 @@
         "tests/unit/dashboard/server/routes/settings-harness-policy.test.ts"
       ],
       "recordedAt": "2026-07-11T09:59:17.529Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-12T22:59:51.707Z"
   },
   "closeOut": {
     "usage": {
@@ -226,8 +227,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "MiniMax-M3",
   "statusOverrides": {
     "disable-ohmypi-harness-select": "completed",
     "disable-ohmypi-harness-select.ac1": "completed",
