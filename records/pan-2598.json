@@ -160,17 +160,17 @@
     "recordedAt": "2026-07-13T08:53:00.165Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T08:55:02.415Z",
+  "updated": "2026-07-13T08:57:20.913Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T08:55:01.724Z",
+    "updatedAt": "2026-07-13T08:57:20.303Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-2598-review already running. Use 'pan tell' to message it.",
     "inspectNotes": "Bead phase-banner-work-signal ack: workRunning now derives from activity.data.sections.some(type===work && status===running) (IssueMissionControl.tsx:828), verified via deriveNarrative precedence in StatusNarrative.tsx and existing+new tests covering all 3 ACs (planning-only session, live work session, beads-driven regression path); change is additive per NFR-1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2631",
@@ -231,9 +231,9 @@
       "byStage": {
         "codex": {
           "openai/gpt-5.5": {
-            "input": 4864987,
-            "output": 20167,
-            "cacheRead": 4041344,
+            "input": 9207551,
+            "output": 35278,
+            "cacheRead": 8226560,
             "cacheWrite": 0
           }
         },
@@ -271,18 +271,18 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 2427442,
-            "output": 341506,
-            "cacheRead": 157066240,
+            "input": 2429176,
+            "output": 341602,
+            "cacheRead": 157341696,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 4864987,
-          "output": 20167,
-          "cacheRead": 4041344,
+          "input": 9207551,
+          "output": 35278,
+          "cacheRead": 8226560,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -304,15 +304,15 @@
           "cacheWrite": 346536
         },
         "custom/kimi-k2.7-code": {
-          "input": 2427442,
-          "output": 341506,
-          "cacheRead": 157066240,
+          "input": 2429176,
+          "output": 341602,
+          "cacheRead": 157341696,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 57.222004,
-        "pricingAsOf": "2026-07-13T08:55:02.400Z"
+        "usd": 60.60905,
+        "pricingAsOf": "2026-07-13T08:57:20.621Z"
       }
     },
     "merges": [
