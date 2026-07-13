@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T22:33:36.700Z",
-  "updated": "2026-07-13T12:17:56.583Z",
+  "updated": "2026-07-13T12:19:53.988Z",
   "pipeline": {
     "issueId": "PAN-2607",
     "reviewStatus": "pending",
@@ -81,13 +81,16 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "model": "claude-sonnet-5",
   "statusOverrides": {
     "comparator-metadata-drift": "completed",
     "comparator-metadata-drift.comparator-metadata-drift.ac1": "completed",
     "comparator-metadata-drift.comparator-metadata-drift.ac2": "completed",
     "comparator-metadata-drift.comparator-metadata-drift.ac3": "completed",
-    "server-bundle-ci-gate": "running"
+    "server-bundle-ci-gate": "completed",
+    "server-bundle-ci-gate.server-bundle-ci-gate.ac1": "completed",
+    "server-bundle-ci-gate.server-bundle-ci-gate.ac2": "completed",
+    "server-bundle-ci-gate.server-bundle-ci-gate.ac3": "completed"
   },
   "swarm": {
     "slotAssignments": [
@@ -99,12 +102,6 @@
         "assignedAt": "2026-07-13T10:58:25.721Z"
       }
     ],
-    "slotCompletions": {
-      "2": {
-        "slotIndex": 2,
-        "agentId": "agent-pan-2607-slot-2",
-        "completedAt": "2026-07-13T12:17:56.562Z"
-      }
-    }
+    "slotCompletions": {}
   }
 }
