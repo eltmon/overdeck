@@ -47,10 +47,20 @@ vi.mock('../../../../src/lib/shadow-state.js', () => ({
   removeShadowState: vi.fn().mockReturnValue({ success: true }),
 }));
 
+vi.mock('../../../../src/lib/beads/export.js', () => ({
+  exportBeadsJsonl: vi.fn(),
+}));
+
+vi.mock('../../../../src/lib/beads/home.js', () => ({
+  resolveCanonicalBeadsHome: vi.fn(),
+}));
+
 import { Effect } from 'effect';
 import { teardownWorkspace as teardownWorkspaceProgram } from '../../../../src/lib/lifecycle/teardown-workspace.js';
 import { sessionExists } from '../../../../src/lib/tmux.js';
 import { AGENTS_DIR } from '../../../../src/lib/paths.js';
+import { exportBeadsJsonl } from '../../../../src/lib/beads/export.js';
+import { resolveCanonicalBeadsHome } from '../../../../src/lib/beads/home.js';
 
 const teardownWorkspace = (...args: Parameters<typeof teardownWorkspaceProgram>) =>
   Effect.runPromise(teardownWorkspaceProgram(...args));
@@ -345,5 +355,88 @@ describe('teardown-workspace', () => {
     const content = readFileSync(join(beadsDir, 'issues.jsonl'), 'utf-8');
     expect(content).toContain('PAN-100');
     expect(content).toContain('PAN-200');
+  });
+
+  describe('sync-beads routing', () => {
+    beforeEach(() => {
+      vi.mocked(exportBeadsJsonl).mockReset();
+      vi.mocked(resolveCanonicalBeadsHome).mockReset();
+      vi.mocked(exportBeadsJsonl).mockResolvedValue({
+        path: '/state/overdeck/.beads/issues.jsonl',
+        statePath: '/state/overdeck/.beads/export-state.json',
+        state: {
+          universe: 'all',
+          sourceDoltHead: 'abc1234',
+          recordCount: 3,
+          exportedAt: new Date().toISOString(),
+        },
+      });
+    });
+
+    it('routes export to the canonical beads home when one resolves', async () => {
+      const wsPath = join(testDir, 'workspaces', 'pan-100');
+      mkdirSync(join(wsPath, '.beads'), { recursive: true });
+      vi.mocked(resolveCanonicalBeadsHome).mockReturnValue('/state/overdeck/.beads');
+
+      const results = await teardownWorkspace(
+        { issueId: 'PAN-100', projectPath: testDir },
+        { deleteWorkspace: true },
+      );
+
+      const syncResult = results.find(r => r.step === 'teardown:sync-beads');
+      expect(syncResult).toBeDefined();
+      expect(syncResult!.success).toBe(true);
+      expect(exportBeadsJsonl).toHaveBeenCalledWith('/state/overdeck', { beadsDir: '/state/overdeck/.beads' });
+    });
+
+    it('falls back to the workspace path when no canonical home resolves', async () => {
+      const wsPath = join(testDir, 'workspaces', 'pan-100');
+      mkdirSync(join(wsPath, '.beads'), { recursive: true });
+      vi.mocked(resolveCanonicalBeadsHome).mockReturnValue(null);
+
+      const results = await teardownWorkspace(
+        { issueId: 'PAN-100', projectPath: testDir },
+        { deleteWorkspace: true },
+      );
+
+      const syncResult = results.find(r => r.step === 'teardown:sync-beads');
+      expect(syncResult).toBeDefined();
+      expect(syncResult!.success).toBe(true);
+      expect(exportBeadsJsonl).toHaveBeenCalledWith(wsPath);
+      expect(exportBeadsJsonl).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips sync when the workspace has no .beads directory', async () => {
+      const wsPath = join(testDir, 'workspaces', 'pan-100');
+      mkdirSync(wsPath, { recursive: true });
+      vi.mocked(resolveCanonicalBeadsHome).mockReturnValue('/state/overdeck/.beads');
+
+      const results = await teardownWorkspace(
+        { issueId: 'PAN-100', projectPath: testDir },
+        { deleteWorkspace: true },
+      );
+
+      const syncResult = results.find(r => r.step === 'teardown:sync-beads');
+      expect(syncResult).toBeDefined();
+      expect(syncResult!.skipped).toBe(true);
+      expect(exportBeadsJsonl).not.toHaveBeenCalled();
+    });
+
+    it('fails the step when exportBeadsJsonl rejects', async () => {
+      const wsPath = join(testDir, 'workspaces', 'pan-100');
+      mkdirSync(join(wsPath, '.beads'), { recursive: true });
+      vi.mocked(resolveCanonicalBeadsHome).mockReturnValue('/state/overdeck/.beads');
+      vi.mocked(exportBeadsJsonl).mockRejectedValue(new Error('bd vc status did not report a Dolt commit.'));
+
+      const results = await teardownWorkspace(
+        { issueId: 'PAN-100', projectPath: testDir },
+        { deleteWorkspace: true },
+      );
+
+      const syncResult = results.find(r => r.step === 'teardown:sync-beads');
+      expect(syncResult).toBeDefined();
+      expect(syncResult!.success).toBe(false);
+      expect(syncResult!.error).toContain('bd vc status did not report a Dolt commit.');
+    });
   });
 });

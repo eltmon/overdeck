@@ -25,6 +25,7 @@ import { findAllWorkspacePaths, findWorkspacePath } from './archive-planning.js'
 import { getContainersReferencingWorkspacePath } from '../workspace-manager.js';
 import { DEVCONTAINER_DIRNAME } from '../workspace/devcontainer-renderer.js';
 import { exportBeadsJsonl } from '../beads/export.js';
+import { resolveCanonicalBeadsHome } from '../beads/home.js';
 import { createBeadsResolver } from '../beads/resolver.js';
 import { runMutationBatch } from '../beads/writer.js';
 
@@ -270,8 +271,12 @@ async function syncWorkspaceBeadsImpl(
     return stepSkipped(step, ['No .beads directory in workspace']);
   }
 
+  const canonicalHome = resolveCanonicalBeadsHome(workspacePath);
+
   try {
-    const result = await exportBeadsJsonl(workspacePath);
+    const result = canonicalHome
+      ? await exportBeadsJsonl(dirname(canonicalHome), { beadsDir: canonicalHome })
+      : await exportBeadsJsonl(workspacePath);
     return stepOk(step, [`Validated ${result.state.recordCount} canonical beads records for ${issueLower}`]);
   } catch (err) {
     return stepFailed(step, `Failed to sync workspace beads: ${(err as Error).message}`);

@@ -2690,3 +2690,47 @@ stale (written 2026-07-08); re-verified all order-book items against live GitHub
   SUGGEST next cut (v0.45.x patch, fixes-only). Operator tags, never me.
 - NEXT: report release readiness to operator + decide A9 spec re-promotion; then B9=PAN-2149
   (decompose cloister/service.ts) with PRD re-verify vs current main.
+
+## RUN-63 tick 1 (2026-07-13 ~14:15 local) — DRAIN phase 1. Main GREEN; merged PAN-2611; restarted 2 stalled review convoys
+
+**Config:** scope=all-tracked, minAgents=2, maxAgents=20, auto_pickup_backlog=false, require_uat_before_merge=false.
+Boot gate resume=off (I am the re-drive). Active agents 6/20 at tick start.
+
+- **MAIN GREEN.** HEAD 9352c87 (the RUN-63 brief doc commit) CI = success. Not a strike situation.
+- **DRAIN WIN #1: PAN-2611 MERGED** (PR #2624 squash → main `6ebbbe5d`, 14:13:35Z). Was fully green
+  (test 9m0s + review passed + overdeck/test verification gate) + CLEAN/MERGEABLE but auto-merge
+  never scheduled it (scheduler backlog is all STALE Jun29–Jul8 rate-limit/dirty failures — ignore).
+  Direct `gh pr merge 2624 --squash --delete-branch` (all required checks green → no admin bypass).
+  Deacon will run postMergeLifecycle → verifying-on-main; close out next tick after verify.
+- **REVIEW-SYNTHESIS WEDGE (root blocker for the drain).** PAN-2596 + PAN-2602 work agents idle
+  ~2–2.75h (lastActivity 11:20 / 12:01; tmux-alive but frozen at prompt). Their review convoy
+  sub-agents ALL wrote reports (`• Done.`, e.g. `.pan/review/agent-pan-2596-review-7cf60996/security.md`)
+  but the SYNTHESIS→verdict→readyForMerge step never landed — convoys dispatched 08:00, ~6h before
+  the 23m-ago server restart (pid 365722), so synthesis was lost across restart. Deacon log shows NO
+  synthesis attempts for either. This is the PAN-1864 deterministic synthesis wedge.
+  **Recovery applied:** `pan review restart PAN-2602` + `PAN-2596` → both "Convoy review resumed
+  (session preserved)". VERIFY NEXT TICK the verdicts actually land; if they re-wedge, it's a live
+  substrate bug (synthesis not landing post-restart) to root-cause + file/strike, NOT re-restart.
+- **NOTE — the stale-pane trap avoided:** 2596/2602 panes showed "MUST READ .overdeck/feedback/
+  002-verification-gate-failed.md" but that dir is EMPTY (mtime 07:20/07:58) = feedback was written,
+  consumed, and cleared normally at ~07:xx; the panes are OLD renders. NOT a missing-feedback bug.
+  Path note: workspaces use `.overdeck/feedback/` (post-rebrand); `.pan/feedback/` no longer exists.
+- **Healthy / leave alone:** PAN-2229 (last Lane A order-book item) actively committing+pushing+
+  linting (state.json read "starting" is stale — TRUST THE PANE: commit 6ffc3ea7f2 pushed). PAN-2616
+  running (`pan start` says already-running; deacon `checkOrphanedCompletions` recovered it — PR open,
+  review being dispatched). PAN-2607 swarm slot-3 done, waiting on Deacon swarm verify/merge of
+  `a7e2edb18f` (1/3 slots in use, no hold) — leave.
+- **NEEDS ACTION NEXT TICK:** **PAN-1232** — merge conflict in `src/dashboard/server/routes/backlog.ts`
+  (the backlog-sequence-pinning churn) + red GitHub `test` check on PR #2604; test agent done 8.6h ago
+  (kimi, idle). Deacon says "review/test passed" but CI is red + dirty → needs `pan sync-main 1232`
+  (resync if additive) else restart. It's the only current merge-blocker (`pan flywheel merge-blockers`).
+- **Swarm/review cohort to shepherd to verdict:** PAN-2598, PAN-2568, PAN-2564 (close-out), PAN-1520,
+  PAN-1491 (v1.0-required), PAN-1234, PAN-2597 — all "review=pending" per deacon (agents idle/gone).
+- **Out of scope, do NOT touch (NO new intake):** stray planning agents planning-pan-2499 (Fable5,
+  stuck at finalize on bd-lock — known 90s-abort pattern, self-resolves) and planning-pan-2633 — both
+  operator-started, not in drain inventory; leave. Old ~24-day Boot --no-resume zombies (agent-pan-1969,
+  agent-pan-1970-review-*) — leave, not in inventory.
+- **NOT committing this tick doc** (RUN-62 lesson: doc-only commits × flaky suite = red-main noise;
+  just landed a merge commit + green main — don't stack a doc commit). State durable on disk.
+- NEXT TICK: (1) verify 2596/2602 synthesis landed post-restart; (2) PAN-1232 sync-main-or-restart;
+  (3) close out PAN-2611 + PAN-2564; (4) shepherd swarm/review cohort verdicts; (5) re-check main green.
