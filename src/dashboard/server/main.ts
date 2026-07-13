@@ -16,6 +16,7 @@ import { startAgentEnrichmentService, stopAgentEnrichmentService } from './servi
 import { startMergeBlockerReconcileService } from './services/merge-blocker-reconcile-service.js';
 import { startAgentOutputService, stopAgentOutputService } from './services/agent-output-service.js';
 import { createBeadsSyncService } from './services/beads-sync-service.js';
+import { startBeadsRollupService, stopBeadsRollupService } from './services/beads-rollup-singleton.js';
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
 import { startRestartAnnouncer, stopRestartAnnouncer } from './services/restart-announcer.js';
 import { startSubstrateBugPoller, stopSubstrateBugPoller } from './services/substrate-bug-poller.js';
@@ -491,6 +492,12 @@ void (async () => {
   });
   void beadsSync.run().catch((err) => console.warn('[beads-sync] service stopped:', err?.message ?? err));
   console.log('[overdeck] BeadsSyncService started');
+
+  startBeadsRollupService({
+    subscribe: (listener) => store.subscribe((event) => listener(event as any)),
+  });
+  console.log('[overdeck] BeadsRollupService started');
+
   store.subscribe((event) => {
     if (event.type === 'agent.stopped' || event.type === 'agent.heartbeat_dead') {
       const agentId = typeof (event.payload as { agentId?: unknown }).agentId === 'string'
@@ -571,7 +578,8 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopTranscriptPoller();
   stopCostReconcileService();
   stopRestartAnnouncer();
-  await stopDeaconChild().catch((err) => console.warn('[deacon-supervisor] child shutdown failed:', err));
+  stopBeadsRollupService();
+  await stopDeaconChild().catch((err) => console.warn('[deacon-supervisor] child shutdown failed:', err?.message ?? err));
   await Effect.runPromise(flushAllPendingAutoCommits()).catch((err) => console.warn('[pan-dir/auto-commit] shutdown flush failed:', err));
   await stopConversationSearchWatcher().catch((err) => console.warn('[conversation-search] watcher shutdown failed:', err));
   closeConversationSearchService();

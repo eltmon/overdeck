@@ -23,6 +23,7 @@ const mockCreateResetMarker = vi.hoisted(() => vi.fn(async (input: unknown) => (
 const mockSetReviewStatusSync = vi.hoisted(() => vi.fn());
 const mockIsGitHubAppConfigured = vi.hoisted(() => vi.fn(() => false));
 const mockListPullRequestsForHead = vi.hoisted(() => vi.fn(() => Effect.succeed([])));
+const mockSweepOrphanedBeads = vi.hoisted(() => vi.fn().mockResolvedValue({ ok: true, closedIds: [], skipped: 0 }));
 const mockExec = vi.hoisted(() => vi.fn((cmd: string, optionsOrCb?: any, maybeCb?: any) => {
   const callback = typeof optionsOrCb === 'function' ? optionsOrCb : maybeCb;
   if (typeof callback === 'function') {
@@ -142,6 +143,10 @@ vi.mock('../../../../src/lib/git-utils.js', () => ({
 vi.mock('../../../../src/lib/github-app.js', () => ({
   isGitHubAppConfigured: mockIsGitHubAppConfigured,
   listPullRequestsForHead: mockListPullRequestsForHead,
+}));
+
+vi.mock('../../../../src/lib/lifecycle/orphaned-beads-sweep.js', () => ({
+  sweepOrphanedBeads: mockSweepOrphanedBeads,
 }));
 
 import { postMergeLifecycle, resetPostMergeState } from '../../../../src/lib/cloister/merge-agent.js';

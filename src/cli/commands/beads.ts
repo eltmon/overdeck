@@ -16,6 +16,11 @@ import { registerBeadsReconcileCommand } from './admin/beads-reconcile.js';
 import { standardizeBeadsConfig } from '../../lib/beads/config-standardize.js';
 import { formatMutationBatchFailure, runMutationBatch, type BdMutationClient } from '../../lib/beads/writer.js';
 import { assertSupportedBdVersion, readInstalledBdVersion } from '../../lib/beads/version.js';
+import { createBeadsResolver, type BeadRecord } from '../../lib/beads/resolver.js';
+import { sweepOrphanedBeads } from '../../lib/lifecycle/orphaned-beads-sweep.js';
+import { readGitHubCloseState } from '../commands/close.js';
+import { parseIssueIdSync, type ParsedIssueId } from '../../lib/issue-id.js';
+import { resolveProjectFromIssueSync, getProjectSync } from '../../lib/projects.js';
 
 const execAsync = promisify(exec);
 
@@ -40,6 +45,250 @@ interface CompactOptions {
   days?: number;
   dryRun?: boolean;
   json?: boolean;
+}
+
+interface SweepOptions {
+  allClosed?: boolean;
+  dryRun?: boolean;
+  reason?: string;
+}
+
+interface SweepIssueReport {
+  issue: string;
+  closedCount: number;
+  reason: string;
+}
+
+interface SweepReport {
+  processed: SweepIssueReport[];
+  skippedOpen: string[];
+  failed: { issue: string; reason: string }[];
+}
+
+const SWEEPABLE_STATUSES = new Set(['open', 'in_progress']);
+
+function isSweepable(status: string): boolean {
+  return SWEEPABLE_STATUSES.has(status);
+}
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
+function findIssueLabel(bead: BeadRecord): ParsedIssueId | null {
+  for (const label of bead.labels) {
+    const parsed = parseIssueIdSync(label);
+    if (parsed) return parsed;
+  }
+  return null;
+}
+
+function groupBeadsByIssue(beads: BeadRecord[]): Map<string, BeadRecord[]> {
+  const groups = new Map<string, BeadRecord[]>();
+  for (const bead of beads) {
+    const issue = findIssueLabel(bead);
+    if (!issue) continue;
+    const existing = groups.get(issue.raw);
+    if (existing) {
+      existing.push(bead);
+    } else {
+      groups.set(issue.raw, [bead]);
+    }
+  }
+  return groups;
+}
+
+function parseGitHubRepo(repo: string | undefined): { owner: string; repo: string } | null {
+  if (!repo) return null;
+  const parts = repo.split('/');
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return null;
+  return { owner: parts[0], repo: parts[1] };
+}
+
+function defaultSweepReason(closeReason: 'completed' | 'not_planned' | null): string {
+  if (closeReason === 'not_planned') {
+    return 'issue closed (not planned); bead cancelled';
+  }
+  return 'issue closed (completed); orphaned bead swept';
+}
+
+async function resolveGitHubCloseState(issueId: string): Promise<
+  | { ok: true; state: 'open' | 'closed'; reason: 'completed' | 'not_planned' | null }
+  | { ok: false; reason: string }
+> {
+  const resolved = resolveProjectFromIssueSync(issueId);
+  if (!resolved) {
+    return { ok: false, reason: 'could not resolve project from issue ID' };
+  }
+  const project = getProjectSync(resolved.projectKey);
+  const repo = parseGitHubRepo(project?.github_repo);
+  if (!repo) {
+    return { ok: false, reason: 'project does not have a github_repo configured' };
+  }
+  const parsed = parseIssueIdSync(issueId);
+  if (!parsed) {
+    return { ok: false, reason: 'could not parse issue ID' };
+  }
+  try {
+    const state = await readGitHubCloseState(repo.owner, repo.repo, parsed.number);
+    return { ok: true, ...state };
+  } catch (error: any) {
+    return { ok: false, reason: error.message ?? String(error) };
+  }
+}
+
+async function sweepIssue(issueId: string, options: SweepOptions): Promise<
+  | { kind: 'processed'; report: SweepIssueReport }
+  | { kind: 'skipped-open' }
+  | { kind: 'failed'; reason: string }
+> {
+  const trackerState = await resolveGitHubCloseState(issueId);
+  if (!trackerState.ok) {
+    return { kind: 'failed', reason: trackerState.reason };
+  }
+
+  if (trackerState.state === 'open') {
+    return { kind: 'skipped-open' };
+  }
+
+  const reason = options.reason ?? defaultSweepReason(trackerState.reason);
+  const result = await sweepOrphanedBeads({
+    beadsCwd: process.cwd(),
+    issueId,
+    reason,
+    dryRun: options.dryRun,
+  });
+
+  if (!result.ok) {
+    return { kind: 'failed', reason: result.error ?? 'sweep failed' };
+  }
+
+  return {
+    kind: 'processed',
+    report: { issue: issueId, closedCount: result.closedIds.length, reason },
+  };
+}
+
+async function enumerateClosedOrphanIssues(): Promise<
+  | { ok: true; issueIds: string[]; openWithOrphans: string[]; unresolved: string[] }
+  | { ok: false; reason: string }
+> {
+  const resolver = createBeadsResolver(process.cwd());
+  const readResult = await resolver.getAllBeads();
+  if (!readResult.ok) {
+    return { ok: false, reason: readResult.reason };
+  }
+
+  const groups = groupBeadsByIssue(readResult.value);
+  const issueIds: string[] = [];
+  const openWithOrphans: string[] = [];
+  const unresolved: string[] = [];
+
+  const candidates = [...groups.entries()].filter(([, beads]) =>
+    beads.some((bead) => isSweepable(bead.status)),
+  );
+
+  const trackerStates: Array<{
+    issueId: string;
+    trackerState: Awaited<ReturnType<typeof resolveGitHubCloseState>>;
+  }> = [];
+  for (const batch of chunk(candidates, 5)) {
+    const batchResults = await Promise.all(
+      batch.map(async ([issueId]) => ({
+        issueId,
+        trackerState: await resolveGitHubCloseState(issueId),
+      })),
+    );
+    trackerStates.push(...batchResults);
+  }
+
+  for (const { issueId, trackerState } of trackerStates) {
+    if (!trackerState.ok) {
+      // Surface tracker-resolution failures so they are not silently dropped.
+      unresolved.push(issueId);
+      continue;
+    }
+
+    if (trackerState.state === 'closed') {
+      issueIds.push(issueId);
+    } else {
+      openWithOrphans.push(issueId);
+    }
+  }
+
+  return { ok: true, issueIds, openWithOrphans, unresolved };
+}
+
+async function sweepCommand(issueIds: string[], options: SweepOptions): Promise<void> {
+  const report: SweepReport = { processed: [], skippedOpen: [], failed: [] };
+
+  if (issueIds.length === 0 && !options.allClosed) {
+    console.error(chalk.red('Error: pass issue IDs or use --all-closed to enumerate closed issues with orphaned beads'));
+    process.exitCode = 1;
+    return;
+  }
+
+  let targetIssueIds = issueIds;
+  if (options.allClosed) {
+    const spinner = ora('Enumerating issues with orphaned beads...').start();
+    const enumeration = await enumerateClosedOrphanIssues();
+    if (!enumeration.ok) {
+      spinner.fail(`Enumeration failed: ${enumeration.reason}`);
+      process.exitCode = 1;
+      return;
+    }
+    spinner.succeed(`Found ${enumeration.issueIds.length} closed issue(s) with orphaned beads`);
+    if (enumeration.openWithOrphans.length > 0) {
+      report.skippedOpen = enumeration.openWithOrphans;
+    }
+    if (enumeration.unresolved.length > 0) {
+      report.failed.push(...enumeration.unresolved.map((issue) => ({ issue, reason: 'could not resolve tracker state' })));
+    }
+    targetIssueIds = enumeration.issueIds;
+  }
+
+  for (const issueId of targetIssueIds) {
+    const outcome = await sweepIssue(issueId, options);
+    if (outcome.kind === 'processed') {
+      report.processed.push(outcome.report);
+    } else if (outcome.kind === 'skipped-open') {
+      report.skippedOpen.push(issueId);
+    } else {
+      report.failed.push({ issue: issueId, reason: outcome.reason });
+    }
+  }
+
+  // Per-issue report
+  for (const item of report.processed) {
+    const action = options.dryRun ? 'Would sweep' : 'Swept';
+    console.log(`${action} ${chalk.cyan(item.issue)}: ${item.closedCount} bead(s) — ${item.reason}`);
+  }
+  if (report.skippedOpen.length > 0) {
+    console.log(chalk.yellow(`\nOpen with orphaned beads (route back into pipeline): ${report.skippedOpen.join(', ')}`));
+  }
+  if (report.failed.length > 0) {
+    console.log(chalk.red('\nFailures:'));
+    for (const item of report.failed) {
+      console.log(chalk.red(`  ${item.issue}: ${item.reason}`));
+    }
+  }
+
+  // Totals
+  const totals = {
+    processed: report.processed.length,
+    skipped: report.skippedOpen.length,
+    failed: report.failed.length,
+  };
+  console.log('');
+  console.log(`Total: ${totals.processed} processed, ${totals.skipped} skipped, ${totals.failed} failed`);
+
+  if (report.failed.length > 0) {
+    process.exitCode = 1;
+  }
 }
 
 /**
@@ -299,6 +548,16 @@ export function registerBeadsCommands(program: Command): void {
     .action((ids: string[]) => mutate(`delete ${ids.join(', ')}`, async (bd) => {
       for (const id of ids) await bd.mutate(['delete', id, '--yes']);
     }));
+
+  beads
+    .command('sweep [issueIds...]')
+    .description('Sweep orphaned open beads on GitHub-closed issues')
+    .option('--all-closed', 'Enumerate all closed issues with orphaned beads')
+    .option('--dry-run', 'Show what would be swept without mutating beads')
+    .option('--reason <reason>', 'Override the default close reason')
+    .action(async (issueIds: string[], options: SweepOptions) => {
+      await sweepCommand(issueIds, options);
+    });
 
   beads
     .command('compact')

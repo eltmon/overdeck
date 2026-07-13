@@ -221,6 +221,7 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
                 hasVbrief: false,
                 hasBeads: false,
                 dockerContainerCount: 0,
+                conversations: [],
               },
             },
           ],

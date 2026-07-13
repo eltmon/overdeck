@@ -107,6 +107,19 @@ jobs:
       - name: Lint
         run: npm run lint
 
+  prompt-gate:
+    runs-on: ubuntu-latest
+    name: Prompt change trailer gate
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check Prompt-Change trailer for roles/ and docs/flywheel-brief.md
+        run: bash scripts/check-prompt-change-trailer.sh
+
   test:
     runs-on: ubuntu-latest
     # PAN-1651: this is the heaviest job (build + Playwright install + full

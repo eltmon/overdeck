@@ -21,6 +21,12 @@ vi.mock('../../../../lib/activity-logger.js', () => ({
 
 vi.mock('../../../../lib/beads/resolver.js', () => ({
   createBeadsResolver: (workspacePath: string) => ({
+    getAllBeads: async () => {
+      try {
+        const raw = readFileSync(join(workspacePath, '.beads', 'issues.jsonl'), 'utf8');
+        return { ok: true, value: raw.split('\n').filter(Boolean).map((line) => JSON.parse(line)) };
+      } catch { return { ok: true, value: [] }; }
+    },
     countBeadsForIssue: async (issueId: string) => {
       try {
         const raw = readFileSync(join(workspacePath, '.beads', 'issues.jsonl'), 'utf8');

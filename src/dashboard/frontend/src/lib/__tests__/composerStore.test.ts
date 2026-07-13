@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { waitFor } from '@testing-library/react';
 import { useComposerStore, resetComposerStore } from '../composerStore';
 
 const CONV = 'conv-test';
@@ -118,5 +119,90 @@ describe('composerStore retryFailed — a retry never loses the text', () => {
       '/api/agents/agent-pan-42/message',
       expect.objectContaining({ method: 'POST' }),
     );
+  });
+});
+
+describe('composerStore attachments', () => {
+  beforeEach(() => {
+    resetComposerStore();
+    vi.stubGlobal('fetch', vi.fn());
+    vi.stubGlobal('URL', {
+      createObjectURL: vi.fn(() => 'blob:preview-url'),
+      revokeObjectURL: vi.fn(),
+    });
+    vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('attachment-1');
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('classifies images with a preview URL', () => {
+    const file = new File(['png-bytes'], 'paste.png', { type: 'image/png' });
+    const { rejected } = useComposerStore.getState().enqueueAttachments(CONV, [file]);
+
+    expect(rejected).toEqual([]);
+    const attachments = useComposerStore.getState().byConversation[CONV]?.attachments ?? [];
+    expect(attachments).toHaveLength(1);
+    expect(attachments[0]).toMatchObject({
+      kind: 'image',
+      file,
+      previewUrl: 'blob:preview-url',
+      serverPath: null,
+      error: null,
+    });
+  });
+
+  it('classifies text/code files without a preview URL', () => {
+    const file = new File(['console.log("hi")'], 'script.ts', { type: '' });
+    const { rejected } = useComposerStore.getState().enqueueAttachments(CONV, [file]);
+
+    expect(rejected).toEqual([]);
+    const attachments = useComposerStore.getState().byConversation[CONV]?.attachments ?? [];
+    expect(attachments).toHaveLength(1);
+    expect(attachments[0]).toMatchObject({
+      kind: 'file',
+      file,
+      previewUrl: null,
+      serverPath: null,
+      error: null,
+    });
+  });
+
+  it('rejects files with unsupported extensions', () => {
+    const image = new File(['png-bytes'], 'ok.png', { type: 'image/png' });
+    const bad = new File(['binary'], 'app.exe', { type: 'application/octet-stream' });
+    const { rejected } = useComposerStore.getState().enqueueAttachments(CONV, [image, bad]);
+
+    expect(rejected).toEqual([bad]);
+    const attachments = useComposerStore.getState().byConversation[CONV]?.attachments ?? [];
+    expect(attachments).toHaveLength(1);
+    expect(attachments[0].file.name).toBe('ok.png');
+  });
+
+  it('infers a MIME type for files the browser reports as empty', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ path: '/tmp/script.ts' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    const file = new File(['const x = 1;'], 'script.ts', { type: '' });
+    useComposerStore.getState().enqueueAttachments(CONV, [file]);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        `/api/conversations/${CONV}/upload-image`,
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.any(FormData),
+        }),
+      );
+    });
+
+    const formData = fetchMock.mock.calls[0]![1]!.body as FormData;
+    expect(formData.get('mimeType')).toBe('text/typescript');
   });
 });

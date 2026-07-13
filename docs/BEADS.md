@@ -99,3 +99,78 @@ in `src/lib/beads/resolver.ts`; new mutations belong in
 The CI allowlist is intentionally identical to the recovery/diagnostic and
 legacy-unmigrated rows above. `npm run lint:beads-access` plants no behavioral
 exceptions for application reads or agent mutations.
+
+## Terminal-issue bead sweep
+
+A terminal issue — one that is merged or closed on the tracker — must never carry
+open beads. Overdeck enforces this invariant in two places:
+
+- **Merge time:** `postMergeLifecycle` sweeps any remaining `open` or
+  `in_progress` beads with the reason `issue merged; remaining open beads swept`.
+- **Close-out time:** `closeOut` sweeps orphaned beads before workspace teardown.
+
+The sweep reasons are categorical. A reason ending in `...orphaned bead swept`
+denotes work that was overtaken by the issue's terminal transition; a reason
+ending in `...bead cancelled` denotes work that is no longer planned.
+
+For backfills and ad-hoc cleanup, use `pan beads sweep`:
+
+```bash
+pan beads sweep --all-closed              # enumerate and sweep closed issues
+pan beads sweep --all-closed --dry-run    # preview, do not mutate
+pan beads sweep PAN-1234 PAN-1235         # sweep specific issues
+pan beads sweep PAN-1234 --reason "custom reason"
+```
+
+`--all-closed` performs exactly one `getAllBeads()` read, groups beads by issue
+label, checks tracker state through the same `gh issue view` door used by
+`pan close`, and sweeps only GitHub-closed issues. GitHub-open issues with
+orphaned beads are skipped and listed as `Open with orphaned beads` so they can
+be routed back into the pipeline rather than silently closed.
+
+The default close reason derives from the GitHub close state:
+
+| Tracker close state | Default reason |
+| --- | --- |
+| completed | `issue closed (completed); orphaned bead swept` |
+| not_planned | `issue closed (not planned); bead cancelled` |
+
+## Verification gate open-beads check
+
+Before a work agent can advance to review, the verification gate reads the
+issue's open beads through the canonical resolver. If any open beads remain, or
+if the resolver cannot answer within its timeout, verification fails with
+`failedCheck: 'open-beads'`. The feedback names the open bead ids and instructs
+the agent to close each one with `pan beads close <id> --reason <reason>` before
+re-requesting review.
+
+This check is intentionally placed **after** the vBRIEF acceptance-criteria gate
+and **before** the empty-changeset guard. A timeout is treated as unknown, not
+proof of zero open beads, so the gate fails closed per PAN-1812.
+
+## Dashboard bead signals
+
+The Command Deck surfaces beads as resource signals alongside branches, workspaces,
+and sessions. The dashboard does not read beads directly from Dolt; it consumes
+the same resolver through a background rollup service.
+
+- **`beadTotals`** — `BeadsRollupService` computes a per-project snapshot of total,
+  closed, and in-progress bead counts and caches it in memory. Resource discovery
+  attaches the relevant row to each issue. `BeadsRail` and the issue resource strip
+  display this as a `beads` icon plus counts.
+- **`branchAheadOfMain`** — When a `feature/*` or `bypass/*` branch is not an
+  ancestor of `main`, resource discovery sets `branchAheadOfMain: true`. This is
+  one of the artifact signals used to decide whether an issue has unmerged work.
+- **`conversation` resource source** — Non-archived conversations linked to an issue
+  (`loadConversations`) are treated as a live resource signal independent of tmux
+  or agent sessions. They keep an issue visible in the Command Deck even when no
+  agent is running.
+- **`stalled` bucket** — Pipeline grouping uses the artifact signals above (ahead
+  branch, linked conversations, in-progress beads, or partially-closed beads) plus
+  the absence of a live agent and 14 days of inactivity to place an issue in the
+  `stalled` bucket. Stalled issues are shown after `needs-you` and are excluded
+  from ordinary phase buckets.
+
+The rollup service refreshes on a background interval and on `beads.freshness_changed`
+events, so the Command Deck stays consistent with the canonical Dolt state without
+issuing a resolver call per rendered issue.

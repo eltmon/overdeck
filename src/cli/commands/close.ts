@@ -53,12 +53,43 @@ async function readGitHubCanonicalState(owner: string, repo: string, number: num
     `${owner}/${repo}`,
     '--json',
     'state,labels',
-  ], { encoding: 'utf-8' });
+  ], { encoding: 'utf-8', timeout: 10000 });
   const parsed = JSON.parse(stdout) as { state?: string; labels?: Array<string | { name?: string }> };
   const labels = (parsed.labels ?? [])
     .map(label => typeof label === 'string' ? label : label.name)
     .filter((label): label is string => typeof label === 'string');
   return mapGitHubStateToCanonical(parsed.state ?? 'open', labels);
+}
+
+export interface GitHubCloseState {
+  state: 'open' | 'closed';
+  reason: 'completed' | 'not_planned' | null;
+}
+
+/**
+ * Read the raw close state of a GitHub issue, including its close reason.
+ *
+ * This is the same `gh issue view` door used by closeOutCommand; it is exported
+ * so other CLI commands (e.g. `pan beads sweep`) can look up tracker state
+ * without reaching past the tracker door.
+ */
+export async function readGitHubCloseState(owner: string, repo: string, number: number): Promise<GitHubCloseState> {
+  const { stdout } = await execFileAsync('gh', [
+    'issue',
+    'view',
+    String(number),
+    '--repo',
+    `${owner}/${repo}`,
+    '--json',
+    'state,stateReason',
+  ], { encoding: 'utf-8', timeout: 10000 });
+  const parsed = JSON.parse(stdout) as { state?: string; stateReason?: string | null };
+  const stateLower = (parsed.state ?? 'open').toLowerCase();
+  const reasonLower = parsed.stateReason?.toLowerCase();
+  return {
+    state: stateLower === 'closed' ? 'closed' : 'open',
+    reason: reasonLower === 'not_planned' ? 'not_planned' : reasonLower === 'completed' ? 'completed' : null,
+  };
 }
 
 export async function closeOutCommand(id: string, options: CloseOutOptions): Promise<void> {
