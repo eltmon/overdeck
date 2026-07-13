@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T06:13:10.077Z",
+  "updated": "2026-07-13T06:56:16.144Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "pending",
@@ -31,8 +31,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T06:13:09.557Z",
-    "inspectNotes": "Bead activity-terminal-end-signal ack: duration regression assertions added to all three command-deck.test.ts tests, closing the AC4 gap from the prior BLOCKED verdict; both route test files now assert duration is preserved alongside endedAt/planningComplete. AC1-AC4 all satisfied."
+    "updatedAt": "2026-07-13T06:56:16.070Z",
+    "inspectNotes": "Bead auq-deny-marker-contract ack: hook re-emits literal (PAN-1520) in permissionDecisionReason (verified via live execution), detector OR-matches marker or stable phrase 'surfaced to the operator' (new test covers phrase-only deny), and pre-existing non-hook real-answer test confirms no-signal case still classifies as answered. All 3 ACs satisfied."
   },
   "closeOut": {
     "usage": {
@@ -47,8 +47,8 @@
         },
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 271,
-            "output": 200,
+            "input": 542,
+            "output": 400,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -63,17 +63,17 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 15824,
-            "output": 7925,
-            "cacheRead": 1008341,
-            "cacheWrite": 108817
+            "input": 32982,
+            "output": 10539,
+            "cacheRead": 1638849,
+            "cacheWrite": 205657
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 970122,
-            "output": 129309,
-            "cacheRead": 46145024,
+            "input": 1168169,
+            "output": 174176,
+            "cacheRead": 69632512,
             "cacheWrite": 0
           }
         }
@@ -86,27 +86,27 @@
           "cacheWrite": 204721
         },
         "anthropic/claude-haiku-4-5": {
-          "input": 271,
-          "output": 200,
+          "input": 542,
+          "output": 400,
           "cacheRead": 0,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 15824,
-          "output": 7925,
-          "cacheRead": 1008341,
-          "cacheWrite": 108817
+          "input": 32982,
+          "output": 10539,
+          "cacheRead": 1638849,
+          "cacheWrite": 205657
         },
         "custom/kimi-k2.7-code": {
-          "input": 970122,
-          "output": 129309,
-          "cacheRead": 46145024,
+          "input": 1168169,
+          "output": 174176,
+          "cacheRead": 69632512,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 24.973641,
-        "pricingAsOf": "2026-07-13T06:13:09.905Z"
+        "usd": 30.233804,
+        "pricingAsOf": "2026-07-13T06:56:16.141Z"
       }
     },
     "merges": [],
