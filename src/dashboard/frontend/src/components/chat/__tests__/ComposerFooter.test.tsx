@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { ComposerFooter } from '../ComposerFooter';
 import { resetComposerStore } from '../../../lib/composerStore';
+import { modelSupportsImages, findModelDef } from '../../Settings/modelCatalog';
 
 const { editorState, mockFocus, mockToastError, mockToastWarning, mockSaveStoredModel, voiceWidgetRenders } = vi.hoisted(() => ({
   editorState: { text: '' },
@@ -77,6 +78,11 @@ vi.mock('sonner', () => ({
     success: vi.fn(),
     warning: (...args: unknown[]) => mockToastWarning(...args),
   },
+}));
+
+vi.mock('../../Settings/modelCatalog', () => ({
+  modelSupportsImages: vi.fn(() => true),
+  findModelDef: vi.fn(() => ({ name: 'Claude Sonnet 4.6' })),
 }));
 
 vi.mock('../../CommandDeck/styles/command-deck.module.css', () => ({
@@ -802,5 +808,78 @@ describe('ComposerFooter attachments', () => {
     await waitFor(() => {
       expect(mockToastWarning).toHaveBeenCalledWith('1 file not supported.');
     });
+  });
+
+  it('drops images on non-vision models while still allowing text attachments', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/upload-image')) {
+        return new Response(JSON.stringify({ path: '/tmp/overdeck-dropped.md' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.includes('/api/settings/claude-auth')) {
+        return Promise.resolve(new Response(JSON.stringify({ loggedIn: true, hasAnthropicApiKey: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }));
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    vi.mocked(modelSupportsImages).mockReturnValue(false);
+    vi.mocked(findModelDef).mockReturnValue({ name: 'MiMo V2.5 Pro' } as ReturnType<typeof findModelDef>);
+
+    render(<ComposerFooter conversation={conversation} />);
+
+    const image = new File(['png-bytes'], 'drop-image.png', { type: 'image/png' });
+    const text = new File(['# notes'], 'drop-notes.md', { type: 'text/markdown' });
+
+    fireEvent.drop(screen.getByTestId('composer-editor'), {
+      dataTransfer: { files: [image, text], items: [{ kind: 'file' }] },
+    });
+
+    await waitFor(() => {
+      expect(mockToastWarning).toHaveBeenCalledWith(
+        "MiMo V2.5 Pro can't read images — image not attached. Switch to a vision-capable model (e.g. MiMo V2.5) to send images.",
+      );
+    });
+
+    expect(await screen.findByText('drop-notes.md')).toBeInTheDocument();
+    expect(screen.queryByText('drop-image.png')).not.toBeInTheDocument();
+  });
+
+  it('accepts all allowed file kinds on vision models', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/upload-image')) {
+        return new Response(JSON.stringify({ path: '/tmp/overdeck-mixed.png' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.includes('/api/settings/claude-auth')) {
+        return Promise.resolve(new Response(JSON.stringify({ loggedIn: true, hasAnthropicApiKey: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }));
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    vi.mocked(modelSupportsImages).mockReturnValue(true);
+
+    render(<ComposerFooter conversation={conversation} />);
+
+    const image = new File(['png-bytes'], 'drop-image.png', { type: 'image/png' });
+
+    fireEvent.drop(screen.getByTestId('composer-editor'), {
+      dataTransfer: { files: [image], items: [{ kind: 'file' }] },
+    });
+
+    expect(await screen.findByText('drop-image.png')).toBeInTheDocument();
   });
 });

@@ -124,12 +124,35 @@ export function ComposerFooter({
   // Attachments are pasted/dropped into the active composer, so conversation.name is
   // the owning conversation. The store stamps it onto each attachment for async
   // upload attribution.
+  //
+  // Vision gating: non-vision models can't read images, but text/PDF/code files
+  // are still useful. Filter image files out client-side for those models so the
+  // user gets a clear toast instead of a server-side silent drop.
   const enqueueAttachments = useCallback((files: File[]) => {
-    const { rejected } = enqueueAttachmentsForConversation(conversation.name, files);
+    const imageFiles: File[] = [];
+    const nonImageFiles: File[] = [];
+    for (const file of files) {
+      if (file.type.startsWith('image/')) {
+        imageFiles.push(file);
+      } else {
+        nonImageFiles.push(file);
+      }
+    }
+
+    if (imageFiles.length > 0 && !modelSupportsImages(model)) {
+      const def = findModelDef(model);
+      toast.warning(
+        `${def?.name ?? model} can't read images — image${imageFiles.length === 1 ? '' : 's'} not attached. ` +
+        `Switch to a vision-capable model (e.g. MiMo V2.5) to send images.`,
+      );
+    }
+
+    const filesToEnqueue = modelSupportsImages(model) ? files : nonImageFiles;
+    const { rejected } = enqueueAttachmentsForConversation(conversation.name, filesToEnqueue);
     if (rejected.length > 0) {
       toast.warning(`${rejected.length} file${rejected.length === 1 ? '' : 's'} not supported.`);
     }
-  }, [enqueueAttachmentsForConversation, conversation.name]);
+  }, [enqueueAttachmentsForConversation, conversation.name, model]);
 
   const handleAttachClick = useCallback(() => {
     fileInputRef.current?.click();
