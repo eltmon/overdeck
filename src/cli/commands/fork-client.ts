@@ -50,6 +50,7 @@ export interface ForkResultConv {
   handoffDocPath?: string | null;
   sessionAlive?: boolean;
   status?: string;
+  issueId?: string | null;
 }
 
 export class ForkServerError extends Error {}

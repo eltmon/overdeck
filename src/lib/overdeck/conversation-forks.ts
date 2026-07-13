@@ -9,6 +9,12 @@ import { HttpServerResponse } from 'effect/unstable/http';
 
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { parseIssueIdSync } from '../issue-id.js';
+import { issueIdFromBranch } from '../webhook-handlers.js';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
+
 import {
   createConversation,
   getConversationByName,
@@ -597,6 +603,18 @@ export async function recoverStuckForks(): Promise<number> {
   return recovered;
 }
 
+async function detectIssueIdFromBranch(cwd: string): Promise<string | undefined> {
+  try {
+    const { stdout } = await execFileAsync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+      cwd,
+      encoding: 'utf-8',
+    });
+    return issueIdFromBranch(stdout.trim()) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function handleConversationSummaryFork(
   name: string,
   body: Record<string, unknown>,
@@ -689,6 +707,10 @@ export async function handleConversationSummaryFork(
         error: `Handoff cwd is not inside a git repository: ${effectiveCwd}. Run the handoff from a git working tree.`,
       }, { status: 400 });
     }
+    const branchIssueId =
+      explicitIssueId === undefined && conv.issueId == null
+        ? await detectIssueIdFromBranch(effectiveCwd)
+        : undefined;
     const { sessionId } = await Effect.runPromise(reserveSummaryForkSession(effectiveCwd));
     const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const suffix = randomUUID().slice(0, 4);
@@ -715,7 +737,7 @@ export async function handleConversationSummaryFork(
       name: newName,
       tmuxSession: newTmux,
       cwd: cwd || conv.cwd || process.cwd(),
-      issueId: explicitIssueId ?? conv.issueId ?? undefined,
+      issueId: explicitIssueId ?? conv.issueId ?? branchIssueId ?? undefined,
       title: customTitle || defaultTitle,
       titleSource: 'manual',
       titleSeed: forkMode === 'plain'
