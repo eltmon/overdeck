@@ -7,11 +7,12 @@
  * periodic manual "chore: sync workspace state" passes from the operator and
  * making the project repo stay perpetually dirty.
  *
- * This module exposes a fire-and-forget commit primitive that the pan-dir
+ * This module exposes a serialized write-through commit primitive that pan-dir
  * writers call after they update a file. Commits are:
- *   - fixed-window coalesced (default 10m) so a burst of writes becomes one commit
+ *   - scheduled immediately by default so every state update reaches git + origin
+ *   - optionally fixed-window coalesced when OVERDECK_STATE_FLUSH_WINDOW_MS is set
  *   - serialized within a process so the git index is never contested
- *   - best-effort: failures are logged and never thrown back to the caller
+ *   - best-effort for synchronous callers: failures are logged and reported by flushes
  *   - main-only: feature branches have their own commit cadence owned by agents
  *
  * Cross-machine concern: when an agent's state is canonical on `main`, moving
@@ -36,14 +37,14 @@ const spawnerLayer = NodeChildProcessSpawner.layer.pipe(
   Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer))
 );
 
-const DEFAULT_STATE_FLUSH_WINDOW_MS = 10 * 60 * 1_000;
+const DEFAULT_STATE_FLUSH_WINDOW_MS = 0;
 const STATE_FLUSH_WINDOW_MS = parseStateFlushWindowMs(process.env.OVERDECK_STATE_FLUSH_WINDOW_MS);
 const DEFAULT_STATE_PUSH_TIMEOUT_MS = 30_000;
 
 function parseStateFlushWindowMs(value: string | undefined): number {
   if (!value) return DEFAULT_STATE_FLUSH_WINDOW_MS;
   const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_STATE_FLUSH_WINDOW_MS;
+  if (!Number.isFinite(parsed) || parsed < 0) return DEFAULT_STATE_FLUSH_WINDOW_MS;
   return parsed;
 }
 
@@ -97,6 +98,8 @@ function isAutoCommitExcludedPath(relativePath: string): boolean {
 
 export interface FlushResult {
   committed: boolean;
+  /** True only when the new commit is confirmed on origin. */
+  pushed?: boolean;
   reason?: string;
 }
 
@@ -182,9 +185,10 @@ function isGitError(value: unknown): value is GitError {
 }
 
 /**
- * Queue an auto-commit for one or more files. Returns immediately; the actual
- * git commit happens at the end of the fixed flush window. Multiple calls for
- * the same project root inside the window coalesce without extending it.
+ * Queue an auto-commit for one or more files. Returns immediately; by default
+ * the serialized commit starts on the next timer turn. An explicit positive
+ * OVERDECK_STATE_FLUSH_WINDOW_MS retains fixed-window coalescing for operators
+ * who knowingly trade durability latency for fewer commits.
  *
  * PAN-1908: `repoRoot` allows committing files to a different git checkout
  * than the project root (e.g., a declared infra repo for per-issue permanent
@@ -412,18 +416,26 @@ function doCommit(
     );
     if (typeof commitOk !== 'boolean') return commitOk;
 
-    yield* maybePushStateCommit(gitRoot, branch);
+    const push = yield* maybePushStateCommit(gitRoot, branch);
+    if (push && !push.pushed) {
+      return { committed: true, pushed: false, reason: push.reason };
+    }
 
     return { committed: true };
   });
 }
 
+interface PushResult {
+  pushed: boolean;
+  reason?: string;
+}
+
 function maybePushStateCommit(
   gitRoot: string,
   branch: string,
-): Effect.Effect<void, never> {
+): Effect.Effect<PushResult | null, never> {
   if (process.env.OVERDECK_STATE_AUTOPUSH === '0') {
-    return Effect.void;
+    return Effect.succeed(null);
   }
 
   return pushStateBranch(gitRoot, branch);
@@ -432,7 +444,7 @@ function maybePushStateCommit(
 function pushStateBranch(
   gitRoot: string,
   branch: string,
-): Effect.Effect<void, never> {
+): Effect.Effect<PushResult, never> {
   if (branch === 'main') return pushOriginMain(gitRoot, branch, false);
   const timeoutMs = parsePositiveInteger(
     process.env.OVERDECK_STATE_PUSH_TIMEOUT_MS,
@@ -441,49 +453,52 @@ function pushStateBranch(
 
   return runGitWithTimeout(['push', 'origin', branch], gitRoot, timeoutMs).pipe(
     Effect.matchEffect({
-      onSuccess: () => Effect.void,
+      onSuccess: () => Effect.succeed({ pushed: true }),
       onFailure: (err) => {
         const message = err.stderr || err._tag;
         // The paths-only queue has no mutation intent and must never replay or
         // rebase. Domain writers resolve non-fast-forward conflicts before
         // enqueuing a new concrete file version (PAN-2541 D10).
         warnAutoPush(branch, `push failed: ${message}`);
-        return Effect.void;
+        return Effect.succeed({ pushed: false, reason: `push failed: ${message}` });
       },
     }),
   );
 }
 
-function pushOriginMain(gitRoot: string, branch: string, retry: boolean): Effect.Effect<void, never> {
+function pushOriginMain(gitRoot: string, branch: string, retry: boolean): Effect.Effect<PushResult, never> {
   const timeoutMs = parsePositiveInteger(process.env.OVERDECK_STATE_PUSH_TIMEOUT_MS, DEFAULT_STATE_PUSH_TIMEOUT_MS);
   return runGitWithTimeout(['push', 'origin', 'main'], gitRoot, timeoutMs).pipe(
     Effect.matchEffect({
-      onSuccess: () => Effect.void,
+      onSuccess: () => Effect.succeed({ pushed: true }),
       onFailure: (err) => {
         const message = err.stderr || err._tag;
         if (!retry && isNonFastForwardPushError(message)) return rebaseLegacyMainAndRetry(gitRoot, branch);
         warnAutoPush(branch, `push failed: ${message}`);
-        return Effect.void;
+        return Effect.succeed({ pushed: false, reason: `push failed: ${message}` });
       },
     }),
   );
 }
 
-function rebaseLegacyMainAndRetry(gitRoot: string, branch: string): Effect.Effect<void, never> {
+function rebaseLegacyMainAndRetry(gitRoot: string, branch: string): Effect.Effect<PushResult, never> {
   const timeoutMs = parsePositiveInteger(process.env.OVERDECK_STATE_PUSH_TIMEOUT_MS, DEFAULT_STATE_PUSH_TIMEOUT_MS);
   return Effect.gen(function* () {
     const fetched = yield* runGitWithTimeout(['fetch', 'origin', 'main'], gitRoot, timeoutMs).pipe(
       Effect.match({ onSuccess: () => true, onFailure: () => false }),
     );
-    if (!fetched || !(yield* isWorkingTreeClean(gitRoot, branch))) return;
+    if (!fetched || !(yield* isWorkingTreeClean(gitRoot, branch))) {
+      return { pushed: false, reason: 'push rejected and reconciliation preconditions failed' };
+    }
     if (!(yield* areLocalAheadCommitsStatePlaneOnly(gitRoot, branch))) {
       warnAutoPush(branch, 'non-fast-forward push rejected and at least one local-ahead commit is not state-plane-only; leaving local main ahead of origin/main');
-      return;
+      return { pushed: false, reason: 'push rejected with non-state local commits' };
     }
     const rebased = yield* runGitWithTimeout(['rebase', 'origin/main'], gitRoot, timeoutMs).pipe(
       Effect.match({ onSuccess: () => true, onFailure: () => false }),
     );
-    if (rebased) yield* pushOriginMain(gitRoot, branch, true);
+    if (rebased) return yield* pushOriginMain(gitRoot, branch, true);
+    return { pushed: false, reason: 'push rejected and state rebase failed' };
   });
 }
 
