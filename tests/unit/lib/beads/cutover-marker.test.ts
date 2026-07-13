@@ -43,4 +43,38 @@ describe('beads cutover marker', () => {
   it('rejects malformed data', () => {
     expect(parseBeadsCutoverMarker({ remoteUrl: 'x' })).toBeNull();
   });
+
+  it('accepts a base32 Dolt-native local head', () => {
+    const marker = parseBeadsCutoverMarker({
+      remoteUrl: 'https://github.com/eltmon/overdeck.git',
+      remoteDoltHead: '0'.repeat(40),
+      localReconciledHead: '0123456789abcdefghijklmnopqrstuv',
+      reconcileReport: { path: 'report.md', sha256: '0'.repeat(64) },
+      completedAt: new Date().toISOString(),
+    });
+    expect(marker).not.toBeNull();
+    expect(marker?.localReconciledHead).toBe('0123456789abcdefghijklmnopqrstuv');
+  });
+
+  it('still accepts the git-SHA-for-both convention', () => {
+    const marker = parseBeadsCutoverMarker({
+      remoteUrl: 'https://github.com/eltmon/overdeck.git',
+      remoteDoltHead: '0'.repeat(40),
+      localReconciledHead: '0'.repeat(40),
+      reconcileReport: { path: 'report.md', sha256: '0'.repeat(64) },
+      completedAt: new Date().toISOString(),
+    });
+    expect(marker).not.toBeNull();
+  });
+
+  it('rejects a base32 remoteDoltHead', () => {
+    const marker = parseBeadsCutoverMarker({
+      remoteUrl: 'https://github.com/eltmon/overdeck.git',
+      remoteDoltHead: '0123456789abcdefghijklmnopqrstuv',
+      localReconciledHead: '0'.repeat(40),
+      reconcileReport: { path: 'report.md', sha256: '0'.repeat(64) },
+      completedAt: new Date().toISOString(),
+    });
+    expect(marker).toBeNull();
+  });
 });
