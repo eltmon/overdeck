@@ -242,7 +242,7 @@
     "recordedAt": "2026-07-13T11:20:10.124Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T12:00:15.613Z",
+  "updated": "2026-07-13T12:00:22.070Z",
   "pipeline": {
     "issueId": "PAN-2596",
     "reviewStatus": "reviewing",
@@ -253,7 +253,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T11:21:55.959Z",
-    "updatedAt": "2026-07-13T12:00:07.332Z",
+    "updatedAt": "2026-07-13T12:00:21.943Z",
     "reviewNotes": "Agent re-review request (2/25): Restarting review after partial run; correctness already passed.",
     "inspectNotes": "Bead server-upload-allowlist ack: validateUploadPayload correctly gates UTF-8 text extensions, PDF %PDF- magic prefix, and disallowed/extension-less types with 400s naming the mismatch, while preserving image magic-byte validation and <uuid><ext> naming; non-image files get <uuid>-<sanitized-name><ext>. All 5 ACs verified against diff + accompanying unit tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2634",
@@ -308,9 +308,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 22758471,
-            "output": 81047,
-            "cacheRead": 19897728,
+            "input": 22964294,
+            "output": 82812,
+            "cacheRead": 20086528,
             "cacheWrite": 0
           }
         },
@@ -355,9 +355,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 22758471,
-          "output": 81047,
-          "cacheRead": 19897728,
+          "input": 22964294,
+          "output": 82812,
+          "cacheRead": 20086528,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -386,8 +386,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 63.832118,
-        "pricingAsOf": "2026-07-13T12:00:07.538Z"
+        "usd": 64.064583,
+        "pricingAsOf": "2026-07-13T12:00:22.055Z"
       }
     },
     "merges": [
