@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-2499",
   "schemaVersion": 2,
-  "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-13T13:51:27.507Z",
-  "pipeline": {
-    "issueId": "PAN-2499",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-13T13:51:25.019Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -26,6 +9,61 @@
       "timestamp": "2026-07-13T13:51:25.019Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-13T13:51:25.019Z",
+  "updated": "2026-07-13T15:06:16.159Z",
+  "pipeline": {
+    "issueId": "PAN-2499",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-13T15:06:16.118Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 25971,
+            "output": 55437,
+            "cacheRead": 6213852,
+            "cacheWrite": 404469
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-fable-5": {
+          "input": 25971,
+          "output": 55437,
+          "cacheRead": 6213852,
+          "cacheWrite": 404469
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 14.301283,
+        "pricingAsOf": "2026-07-13T15:06:16.155Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
-  "model": "claude-fable-5"
+  "model": "glm-5.2",
+  "statusOverrides": {
+    "no-loss-manifest": "running"
+  },
+  "swarm": {
+    "slotAssignments": [
+      {
+        "slotIndex": 1,
+        "itemId": "no-loss-manifest",
+        "agentId": "agent-pan-2499-slot-1",
+        "branch": "feature/pan-2499-slot-1",
+        "assignedAt": "2026-07-13T15:06:15.340Z"
+      }
+    ]
+  }
 }
