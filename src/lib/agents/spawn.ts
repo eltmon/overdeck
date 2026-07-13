@@ -465,13 +465,16 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // see roles/strike.md. The beads gate is the only thing we skip; everything
   // else (workspace health, supervisor wiring, launcher) is identical.
   if (role !== 'strike' && role !== 'knowledge' && options.slotItemId === undefined) {
-    // Use a short lock timeout when spawning from HTTP handlers so dashboard
-    // requests fail fast to the JSONL fallback instead of blocking behind CLI
-    // processes that hold the cross-process bd lock. The CLI `pan start` path
-    // already performs a long-timeout live query before reaching spawnAgent.
+    // Spawning is a deliberate operator/orchestrator action — wait for the
+    // cross-process bd lock rather than failing the whole spawn. The old
+    // 500ms "fail fast to the JSONL fallback" timeout predates the removal of
+    // that fallback: with the deacon's continuous bead sweeps holding the
+    // lock, 500ms lost essentially every time and stranded starts for hours
+    // (observed repeatedly on 2026-07-13). The wait is async — it does not
+    // block the server event loop.
     try {
       await Effect.runPromise(
-        assertIssueHasBeads(options.workspace, options.issueId, { acquisitionTimeoutMs: 500 }),
+        assertIssueHasBeads(options.workspace, options.issueId, { acquisitionTimeoutMs: 30_000 }),
       );
     } catch (error) {
       if (error instanceof BeadsMissingError && error.transientFailure !== undefined) {

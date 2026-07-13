@@ -1038,7 +1038,9 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(getAgentStateSync('agent-pan-nobeads-1')).toBeNull();
     });
 
-    it('uses a short beads assertion timeout for dashboard-style spawn calls', async () => {
+    it('waits patiently for the bd lock on the spawn beads assertion (not the old 500ms fail-fast)', async () => {
+      // A 500ms acquisition timeout lost to the deacon's continuous bead
+      // sweeps essentially every time and stranded starts (2026-07-13).
       const beadsQuery = await import('../../src/lib/beads-query.js');
 
       await spawnAgent({
@@ -1050,7 +1052,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(vi.mocked(beadsQuery.assertIssueHasBeads)).toHaveBeenCalledWith(
         testWorkspace,
         'PAN-SHORT-BEADS',
-        { acquisitionTimeoutMs: 500 },
+        { acquisitionTimeoutMs: 30_000 },
       );
     });
 
