@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T07:18:41.270Z",
+  "updated": "2026-07-13T07:42:29.290Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "pending",
@@ -31,8 +31,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T06:56:16.070Z",
-    "inspectNotes": "Bead auq-deny-marker-contract ack: hook re-emits literal (PAN-1520) in permissionDecisionReason (verified via live execution), detector OR-matches marker or stable phrase 'surfaced to the operator' (new test covers phrase-only deny), and pre-existing non-hook real-answer test confirms no-signal case still classifies as answered. All 3 ACs satisfied."
+    "updatedAt": "2026-07-13T07:39:10.889Z",
+    "inspectNotes": "Bead activity-terminal-end-signal ack: cc670d98 is a no-conflict merge; the actual implementation (ba17147d0b) and the AC4 duration-regression test commit (db866ee897) are both ancestors. command-deck.ts and projects.ts now compute sessionEnded from rtState.suspended / presence ended / (stoppedAt && !tmuxAlive), set endedAt only then (AC1/AC2 verified live-alive->undefined, stoppedAt+no-tmux->ISO stoppedAt), planningComplete derives from isPlanningCompleteSync (PLANNING_FINISHED_STATUSES, false when no spec) only on planning sections (AC3), and duration computation is untouched with explicit typeof/Number.isFinite regression assertions in both command-deck.test.ts and projects.test.ts (AC4). All 4 ACs satisfied."
   },
   "closeOut": {
     "usage": {
@@ -63,17 +63,17 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 32982,
-            "output": 10539,
-            "cacheRead": 1638849,
-            "cacheWrite": 205657
+            "input": 35776,
+            "output": 16146,
+            "cacheRead": 3695047,
+            "cacheWrite": 230501
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1168169,
-            "output": 174176,
-            "cacheRead": 69632512,
+            "input": 1860978,
+            "output": 261113,
+            "cacheRead": 112055808,
             "cacheWrite": 0
           }
         }
@@ -92,30 +92,35 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 32982,
-          "output": 10539,
-          "cacheRead": 1638849,
-          "cacheWrite": 205657
+          "input": 35776,
+          "output": 16146,
+          "cacheRead": 3695047,
+          "cacheWrite": 230501
         },
         "custom/kimi-k2.7-code": {
-          "input": 1168169,
-          "output": 174176,
-          "cacheRead": 69632512,
+          "input": 1860978,
+          "output": 261113,
+          "cacheRead": 112055808,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 30.233804,
-        "pricingAsOf": "2026-07-13T06:56:16.141Z"
+        "usd": 39.835153,
+        "pricingAsOf": "2026-07-13T07:39:10.979Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "model": "claude-sonnet-5",
   "statusOverrides": {
-    "activity-terminal-end-signal": "running"
+    "activity-terminal-end-signal": "completed",
+    "activity-terminal-end-signal.activity-terminal-end-signal.ac1": "completed",
+    "activity-terminal-end-signal.activity-terminal-end-signal.ac2": "completed",
+    "activity-terminal-end-signal.activity-terminal-end-signal.ac3": "completed",
+    "activity-terminal-end-signal.activity-terminal-end-signal.ac4": "completed",
+    "phase-banner-work-signal": "running"
   },
   "swarm": {
     "slotAssignments": [
@@ -125,7 +130,15 @@
         "agentId": "agent-pan-2598-slot-1",
         "branch": "feature/pan-2598-slot-1",
         "assignedAt": "2026-07-13T07:18:40.414Z"
+      },
+      {
+        "slotIndex": 2,
+        "itemId": "phase-banner-work-signal",
+        "agentId": "agent-pan-2598-slot-2",
+        "branch": "feature/pan-2598-slot-2",
+        "assignedAt": "2026-07-13T07:37:38.386Z"
       }
-    ]
+    ],
+    "slotCompletions": {}
   }
 }
