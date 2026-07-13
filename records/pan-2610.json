@@ -166,7 +166,7 @@
     }
   ],
   "created": "2026-07-12T22:50:33.242Z",
-  "updated": "2026-07-13T11:04:13.588Z",
+  "updated": "2026-07-13T11:19:23.330Z",
   "pipeline": {
     "issueId": "PAN-2610",
     "reviewStatus": "failed",
@@ -175,7 +175,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T11:04:13.540Z",
+    "updatedAt": "2026-07-13T11:19:23.201Z",
     "reviewNotes": "Verification failed at typecheck",
     "verificationNotes": "Verification FAILED at typecheck (112ms):\n\nnpm error code ENOENT\nnpm error syscall open\nnpm error path /home/eltmon/Projects/overdeck/workspaces/package.json\nnpm error errno -2\nnpm error enoent Could not read package.json: Error: ENOENT: no such file or directory, open '/home/eltmon/Projects/overdeck/workspaces/package.json'\nnpm error enoent This is related to npm not being able to find a file.\nnpm error enoent\nnpm error A complete log of this run can be found in: /home/eltmon/.npm/_logs/2026-07-13T02_52_19_616Z-debug-0.log\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2620",
@@ -228,7 +228,7 @@
       },
       "costAtCloseOut": {
         "usd": 21.095178,
-        "pricingAsOf": "2026-07-13T11:04:13.577Z"
+        "pricingAsOf": "2026-07-13T11:19:23.274Z"
       }
     },
     "merges": [
