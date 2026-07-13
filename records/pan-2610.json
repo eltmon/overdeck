@@ -23,7 +23,7 @@
     }
   ],
   "created": "2026-07-12T22:50:33.242Z",
-  "updated": "2026-07-13T02:25:15.158Z",
+  "updated": "2026-07-13T02:38:00.853Z",
   "pipeline": {
     "issueId": "PAN-2610",
     "reviewStatus": "blocked",
@@ -32,7 +32,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T02:25:15.127Z",
+    "updatedAt": "2026-07-13T02:38:00.820Z",
     "reviewNotes": "Relative .beads/redirect targets resolve against process cwd",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2620",
     "reviewRequestedAt": "2026-07-13T00:46:26.136Z",
@@ -84,7 +84,7 @@
       },
       "costAtCloseOut": {
         "usd": 18.750556,
-        "pricingAsOf": "2026-07-13T02:25:15.157Z"
+        "pricingAsOf": "2026-07-13T02:38:00.853Z"
       }
     },
     "merges": [
