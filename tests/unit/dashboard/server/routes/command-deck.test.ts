@@ -3,6 +3,8 @@ import { Effect } from 'effect';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 
+const homeDir = homedir();
+
 vi.mock('../../../../../src/lib/agents.js', () => ({
   getAgentRuntimeState: vi.fn((id: string) => Effect.succeed(mockRuntimeStates.get(id) ?? null)),
   getAgentStateSync: vi.fn((id: string) => mockAgentStates.get(id) ?? null),
@@ -54,7 +56,7 @@ vi.mock('node:fs/promises', async () => {
   return {
     ...actual,
     access: vi.fn((p: string) => {
-      if (p.startsWith(join(homedir(), '.overdeck', 'agents'))) return Promise.resolve(undefined);
+      if (p.startsWith(join(homeDir, '.overdeck', 'agents'))) return Promise.resolve(undefined);
       const err = new Error('ENOENT') as NodeJS.ErrnoException;
       err.code = 'ENOENT';
       return Promise.reject(err);
