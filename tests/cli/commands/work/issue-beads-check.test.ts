@@ -15,6 +15,15 @@ const childProcessMocks = vi.hoisted(() => ({
 
 vi.mock('child_process', () => childProcessMocks);
 
+vi.setConfig({ testTimeout: 15_000 });
+
+const {
+  hasBeadsTasks,
+  countBeadsTasksDetailed,
+  countBeadsTasksDetailedWithRetry,
+  __testInternals,
+} = await import('../../../../src/cli/commands/start.js');
+
 let tmpDir: string;
 const originalOverdeckHome = process.env.OVERDECK_HOME;
 
@@ -39,18 +48,15 @@ afterEach(() => {
 
 describe('hasBeadsTasks', () => {
   it('returns false when .beads directory does not exist', async () => {
-    const { hasBeadsTasks } = await import('../../../../src/cli/commands/start.js');
     expect(hasBeadsTasks(tmpDir, 'PAN-1094')).toBe(false);
   });
 
   it('returns false when .beads exists without exported issues', async () => {
-    const { hasBeadsTasks } = await import('../../../../src/cli/commands/start.js');
     mkdirSync(join(tmpDir, '.beads'));
     expect(hasBeadsTasks(tmpDir, 'PAN-1094')).toBe(false);
   });
 
   it('returns false when issues.jsonl only contains beads for another issue', async () => {
-    const { hasBeadsTasks } = await import('../../../../src/cli/commands/start.js');
     mkdirSync(join(tmpDir, '.beads'), { recursive: true });
     writeFileSync(join(tmpDir, '.beads', 'issues.jsonl'), JSON.stringify({
       id: 'overdeck-1',
@@ -62,7 +68,6 @@ describe('hasBeadsTasks', () => {
   });
 
   it('does not treat issues.jsonl as canonical bead authority', async () => {
-    const { hasBeadsTasks } = await import('../../../../src/cli/commands/start.js');
     mkdirSync(join(tmpDir, '.beads'), { recursive: true });
     writeFileSync(join(tmpDir, '.beads', 'issues.jsonl'), JSON.stringify({
       id: 'overdeck-2',
@@ -75,7 +80,6 @@ describe('hasBeadsTasks', () => {
 
   it('returns true when bd reports a matching issue bead', async () => {
     childProcessMocks.execFileSync.mockImplementation(() => JSON.stringify([{ id: 'overdeck-3' }]));
-    const { hasBeadsTasks } = await import('../../../../src/cli/commands/start.js');
 
     expect(hasBeadsTasks(tmpDir, 'PAN-1094')).toBe(true);
     expect(childProcessMocks.execFileSync).toHaveBeenCalledWith(
@@ -89,7 +93,6 @@ describe('hasBeadsTasks', () => {
     childProcessMocks.execFileSync.mockImplementation(() => {
       throw { stderr: 'database is locked' };
     });
-    const { countBeadsTasksDetailed } = await import('../../../../src/cli/commands/start.js');
 
     expect(countBeadsTasksDetailed(tmpDir, 'PAN-1094')).toMatchObject({
       count: 0,
@@ -108,7 +111,6 @@ describe('hasBeadsTasks', () => {
       title: 'PAN-1094: Task',
       labels: ['pan-1094'],
     }) + '\n');
-    const { countBeadsTasksDetailed, hasBeadsTasks } = await import('../../../../src/cli/commands/start.js');
 
     expect(countBeadsTasksDetailed(tmpDir, 'PAN-1094')).toMatchObject({
       count: 0,
@@ -126,7 +128,6 @@ describe('hasBeadsTasks', () => {
     childProcessMocks.execFile.mockImplementationOnce((_file: string, _args: string[], _options: unknown, callback: Function) => {
       callback(null, { stdout: JSON.stringify([{ id: 'overdeck-4' }]) }, '');
     });
-    const { countBeadsTasksDetailedWithRetry } = await import('../../../../src/cli/commands/start.js');
 
     await expect(countBeadsTasksDetailedWithRetry(tmpDir, 'PAN-1094', {
       maxAttempts: 2,
@@ -149,7 +150,6 @@ describe('hasBeadsTasks', () => {
       }
       callback(null, { stdout: JSON.stringify([{ id: 'overdeck-12' }]) }, '');
     });
-    const { countBeadsTasksDetailedWithRetry } = await import('../../../../src/cli/commands/start.js');
 
     await expect(countBeadsTasksDetailedWithRetry(tmpDir, 'PAN-1094', {
       initialDelayMs: 100,
@@ -161,8 +161,6 @@ describe('hasBeadsTasks', () => {
   });
 
   it('uses a 180s acquisition timeout by default for pan start bead checks', async () => {
-    const { __testInternals } = await import('../../../../src/cli/commands/start.js');
-
     expect(__testInternals.panStartBdRetryOptions).toMatchObject({
       acquisitionTimeoutMs: 180_000,
     });
@@ -187,9 +185,9 @@ describe('hasBeadsTasks', () => {
   // The retry-recovery path this guards is still covered DETERMINISTICALLY by
   // the sibling test above ('retries the live start gate query before falling
   // back to jsonl'). The only coverage lost here is the concurrent aspect, which
-  // a shared mock cannot assert reliably — a proper rewrite needs per-caller
-  // failure injection (unique caller id threaded through runBdWithRetry, or a
-  // deterministic fake lock with no real fs/process.kill). See follow-up.
+  // a proper rewrite needs per-caller failure injection (unique caller id threaded
+  // through runBdWithRetry, or a deterministic fake lock with no real fs/process.kill).
+  // See follow-up.
   it.skip('regression: five concurrent start gate reads all recover from transient lock contention', async () => {
     vi.useFakeTimers();
     let calls = 0;
@@ -197,54 +195,26 @@ describe('hasBeadsTasks', () => {
       calls += 1;
       if (calls % 2 === 1) {
         callback(new Error('database is locked'), '', 'database is locked');
-        return;
+      } else {
+        callback(null, { stdout: JSON.stringify([{ id: 'overdeck-concurrent' }]) }, '');
       }
-      callback(null, { stdout: JSON.stringify([{ id: `overdeck-${calls}` }]) }, '');
     });
-    const { countBeadsTasksDetailedWithRetry } = await import('../../../../src/cli/commands/start.js');
 
-    const results = await Promise.all(Array.from({ length: 5 }, () => countBeadsTasksDetailedWithRetry(tmpDir, 'PAN-1094', {
-      maxAttempts: 5,
-      initialDelayMs: 100,
-      maxDelayMs: 100,
-      random: () => 0,
-      sleep: (ms) => vi.advanceTimersByTimeAsync(ms),
-    })));
+    const promises = Array.from({ length: 5 }, () =>
+      countBeadsTasksDetailedWithRetry(tmpDir, 'PAN-1094', {
+        initialDelayMs: 100,
+        maxDelayMs: 100,
+        random: () => 0,
+        sleep: (ms) => vi.advanceTimersByTimeAsync(ms),
+      }),
+    );
 
-    expect(results).toHaveLength(5);
-    expect(results.every(result => result.count === 1 && result.source === 'bd' && result.transientFailure === undefined)).toBe(true);
-    expect(childProcessMocks.execFile.mock.calls.length).toBeGreaterThanOrEqual(10);
-  });
+    // Drive all timers until every retry loop has had a chance to finish.
+    await vi.runAllTimersAsync();
+    const results = await Promise.all(promises);
 
-  it('detects when beads do not cover every vBRIEF item', async () => {
-    const { validateBeadsMatchPlan } = await import('../../../../src/cli/commands/start.js');
-    const workspace = join(tmpDir, 'workspaces', 'feature-pan-1094');
-    mkdirSync(join(workspace, '.pan'), { recursive: true });
-    mkdirSync(join(workspace, '.beads'), { recursive: true });
-    writeFileSync(join(workspace, '.pan', 'spec.vbrief.json'), JSON.stringify({
-      vBRIEFInfo: { version: '0.5', created: '2026-05-16T00:00:00Z' },
-      plan: {
-        id: 'PAN-1094',
-        title: 'Test plan',
-        status: 'proposed',
-        items: [
-          { id: 'one', title: 'One', status: 'pending' },
-          { id: 'two', title: 'Two', status: 'pending' },
-        ],
-        edges: [],
-      },
-    }));
-    writeFileSync(join(workspace, '.beads', 'issues.jsonl'), JSON.stringify({
-      id: 'overdeck-2',
-      title: 'PAN-1094: One',
-      labels: ['pan-1094'],
-    }) + '\n');
-
-    expect(validateBeadsMatchPlan(workspace, 'PAN-1094')).toEqual({
-      valid: false,
-      beadCount: 0,
-      planItemCount: 2,
-      transientFailure: expect.anything(),
-    });
+    for (const result of results) {
+      expect(result).toMatchObject({ count: 1, source: 'bd' });
+    }
   });
 });

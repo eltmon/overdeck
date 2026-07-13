@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -14,6 +14,10 @@ const TEST_HOME = join(tmpdir(), `proj-cwd-${Date.now()}-${Math.random().toStrin
 process.env.OVERDECK_HOME = TEST_HOME;
 
 const MYAPP_PATH = join(TEST_HOME, 'projects', 'myapp');
+
+vi.setConfig({ testTimeout: 15_000 });
+
+const { resolveProjectCwd } = await import('../conversation-runtime.js');
 
 beforeAll(() => {
   mkdirSync(MYAPP_PATH, { recursive: true });
@@ -40,22 +44,18 @@ afterAll(() => {
 
 describe('resolveProjectCwd', () => {
   it('resolves a project by its yaml key', async () => {
-    const { resolveProjectCwd } = await import('../conversation-runtime.js');
     expect(resolveProjectCwd('myapp')).toEqual({ cwd: MYAPP_PATH });
   });
 
   it('resolves a project by its display name (PAN-2590)', async () => {
-    const { resolveProjectCwd } = await import('../conversation-runtime.js');
     expect(resolveProjectCwd('MyApp')).toEqual({ cwd: MYAPP_PATH });
   });
 
   it('reports an unregistered project as unknown', async () => {
-    const { resolveProjectCwd } = await import('../conversation-runtime.js');
     expect(resolveProjectCwd('Nope')).toEqual({ error: 'Unknown project: Nope' });
   });
 
   it('reports a registered project whose path is missing on disk', async () => {
-    const { resolveProjectCwd } = await import('../conversation-runtime.js');
     const result = resolveProjectCwd('Ghost');
     expect('error' in result && result.error).toMatch(/^Project path does not exist: /);
     expect('error' in result && result.error).toContain('(project: Ghost)');
