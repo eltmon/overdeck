@@ -4,7 +4,7 @@ import { join } from 'path';
 import { promisify } from 'util';
 import { findProjectByPathSync, type ProjectConfig } from '../../lib/projects.js';
 import { ensureStateWorktree, resolveStateHome } from '../../lib/state-home.js';
-import { runMutationBatch } from '../../lib/beads/writer.js';
+import { formatMutationBatchFailure, runMutationBatch } from '../../lib/beads/writer.js';
 import { resolveCanonicalBeadsHome } from '../../lib/beads/home.js';
 import { assertSupportedBdVersion, readInstalledBdVersion } from '../../lib/beads/version.js';
 
@@ -71,7 +71,7 @@ export async function initializeWorkspaceBeads(workspacePath: string, issueId: s
         { project: { workspacePath }, reason: `create implementation bead for ${issueId.toUpperCase()}` },
         (bd) => bd.mutate(['create', '--title', title, '--priority', '1', '--type', 'task', '--labels', issueLabel]),
       );
-      if (!batch.ok) return { success: false, error: batch.message };
+      if (!batch.ok) return { success: false, error: formatMutationBatchFailure(batch) };
       const stdout = batch.value;
 
       // Parse the created bead ID
