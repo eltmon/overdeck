@@ -53,7 +53,9 @@
       "package.json",
       "tests/unit/evals/lib/prompt-harness.test.ts",
       "tests/unit/evals/prompt-rails.test.ts",
-      "tests/unit/scripts/check-prompt-change-trailer.test.ts"
+      "tests/unit/scripts/check-prompt-change-trailer.test.ts",
+      "tests/unit/vitest-config.test.ts",
+      "vitest.config.ts"
     ],
     "declaredScopeUntouched": [
       "evals/fixtures/flywheel/board-auto-pickup-off.json",
@@ -101,12 +103,14 @@
       "tests/unit/evals/lib/prompt-harness.test.ts",
       "tests/unit/evals/prompt-rails.test.ts",
       "tests/unit/prompts/prompt-invariants.test.ts",
-      "tests/unit/scripts/check-prompt-change-trailer.test.ts"
+      "tests/unit/scripts/check-prompt-change-trailer.test.ts",
+      "tests/unit/vitest-config.test.ts",
+      "vitest.config.ts"
     ],
-    "recordedAt": "2026-07-13T14:19:02.691Z"
+    "recordedAt": "2026-07-13T15:33:26.736Z"
   },
   "created": "2026-07-10T21:05:49.847Z",
-  "updated": "2026-07-13T15:09:56.222Z",
+  "updated": "2026-07-13T15:33:26.737Z",
   "pipeline": {
     "issueId": "PAN-2229",
     "reviewStatus": "pending",
@@ -116,7 +120,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-07-13T14:20:36.574Z",
     "updatedAt": "2026-07-13T15:09:56.178Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2638",
     "reviewRequestedAt": "2026-07-13T14:20:36.574Z",
