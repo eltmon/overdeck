@@ -63,6 +63,12 @@ vi.mock('../../shared/ModelPicker/ModelPicker', () => ({
   useAvailableModels: () => ({ groups: [] }),
 }));
 
+vi.mock('../ZoneCOverviewTabs/queries', () => ({
+  useIssueCostsQuery: () => ({ data: { sessions: [] } }),
+  useReviewStatusQuery: () => ({ data: null }),
+  useWorkspaceQuery: () => ({ data: null }),
+}));
+
 vi.mock('../../shared/ContextMenu', () => ({
   ContextMenuRoot: ({ children }: { children: ReactNode }) => <>{children}</>,
   ContextMenuTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,

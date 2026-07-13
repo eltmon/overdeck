@@ -1,15 +1,15 @@
 import { useState } from 'react'
 import {
-  Compass, Code2, Eye, FlaskConical, GitMerge, Zap, Archive,
-  ShieldCheck, Lock, Gauge, ClipboardList, Layers, BadgeCheck,
+  Compass, FlaskConical, BadgeCheck,
   ChevronRight, ChevronDown, GitPullRequest, GitBranch,
-  CircleCheck, CircleX, Circle, Loader2, Brain, type LucideIcon,
+  CircleCheck, CircleX, Circle, Loader2, type LucideIcon,
 } from 'lucide-react'
 import { useIssueCostsQuery, useReviewStatusQuery, useWorkspaceQuery, type ReviewStatusData } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import { useIssueActions, type IssueActionView } from '../../IssueActionMenu/useIssueActions'
 import { UatStackStatus, getUatStackSummary } from '../../CommandDeck/UatStackStatus'
 import type { ProjectFeature } from '../../CommandDeck/ProjectTree/ProjectNode'
 import type { SessionNode } from '@overdeck/contracts'
+import { AgentStepRow } from '../../issue-view/AgentStepRow'
 import styles from './agentsLane.module.css'
 
 /**
@@ -23,80 +23,7 @@ import styles from './agentsLane.module.css'
 
 type Tone = 'info' | 'ok' | 'bad' | 'muted'
 
-const REVIEWER_ROLE_ICON: Record<string, LucideIcon> = {
-  correctness: ShieldCheck, security: Lock, performance: Gauge,
-  requirements: ClipboardList, synthesis: Layers,
-}
-
-function typeIcon(session: SessionNode): LucideIcon {
-  switch (session.type) {
-    case 'work': return Code2
-    case 'strike': return Zap
-    case 'planning': return Compass
-    case 'legacy': return Archive
-    case 'knowledge': return Brain
-    case 'review': return Eye
-    case 'reviewer': return (session.role && REVIEWER_ROLE_ICON[session.role]) || ShieldCheck
-    case 'test': return FlaskConical
-    case 'ship':
-    case 'merge': return GitMerge
-    default: return Code2
-  }
-}
-
 const cap = (s: string) => (s ? s[0]!.toUpperCase() + s.slice(1) : s)
-
-function sessionLabel(session: SessionNode): string {
-  switch (session.type) {
-    case 'planning':
-    case 'legacy': return 'Plan'
-    case 'knowledge': return 'Knowledge'
-    case 'work': return 'Work'
-    case 'strike': return 'Strike'
-    case 'review': return 'Review'
-    case 'reviewer': return session.role ? cap(session.role) : 'Reviewer'
-    case 'test': return 'Test'
-    case 'ship':
-    case 'merge': return 'Ship'
-    default: return cap(session.type)
-  }
-}
-
-// Some session sources report a role/placeholder ("specialist", "unknown",
-// "planning") instead of a real model id. Don't render those as a model.
-const MODEL_PLACEHOLDERS = new Set(['', 'unknown', 'specialist', 'planning', 'idle', 'none'])
-function shortModel(m: string | undefined): string {
-  const v = (m ?? '').trim()
-  if (MODEL_PLACEHOLDERS.has(v.toLowerCase())) return ''
-  return v.replace(/^claude-/, '')
-}
-
-function formatDur(seconds: number | null | undefined): string {
-  if (!seconds || !Number.isFinite(seconds) || seconds <= 0) return ''
-  const m = Math.round(seconds / 60)
-  if (m < 60) return `${m}m`
-  const h = Math.round(m / 60)
-  if (h < 48) return `${h}h`
-  return `${Math.round(h / 24)}d`
-}
-
-const RUNNING = new Set(['running', 'starting', 'working', 'thinking'])
-
-function sessionStatus(session: SessionNode): { label: string; tone: Tone } {
-  if (RUNNING.has(session.status)) return { label: 'running', tone: 'info' }
-  if (session.status === 'error') return { label: 'error', tone: 'bad' }
-  return { label: 'done', tone: 'muted' }
-}
-
-function reviewerVerdict(session: SessionNode): { label: string; tone: Tone } {
-  const { latestReviewResult, latestStatus } = session.roundMetadata ?? {}
-  if (latestReviewResult === 'APPROVED') return { label: 'approved', tone: 'ok' }
-  if (latestReviewResult === 'CHANGES_REQUESTED' || latestStatus === 'failed' || session.status === 'error') {
-    return { label: 'changes', tone: 'bad' }
-  }
-  if (RUNNING.has(session.status)) return { label: 'reviewing', tone: 'info' }
-  return { label: 'done', tone: 'muted' }
-}
 
 const VERIFICATION_TONE: Record<string, { label: string; tone: Tone }> = {
   pending: { label: 'not run', tone: 'muted' },
@@ -131,7 +58,15 @@ function deriveFailedGates(rs: ReviewStatusData | undefined): { id: string; tone
   })
 }
 
-function Row({
+function sessionStatus(session: SessionNode): { label: string; tone: Tone } {
+  const RUNNING = new Set(['running', 'starting', 'working', 'thinking'])
+  if (RUNNING.has(session.status)) return { label: 'running', tone: 'info' }
+  if (session.status === 'error') return { label: 'error', tone: 'bad' }
+  return { label: 'done', tone: 'muted' }
+}
+
+/** Non-agent lane step (Verification, synthetic Test) — no context menu. */
+function InfoRow({
   icon: Icon, tileClass, name, status, model, sub, indent, selected, expandable, expanded,
   onToggle, onClick, verdictTile,
 }: {
@@ -299,7 +234,7 @@ function StackDrawer({ issueId, feature, branch }: { issueId: string; feature?: 
 /** PAN-2393: per-session cost lookup — every line item shows what IT cost.
  * Sourced from the same per-issue cost data the Costs page uses (one read
  * door, no parallel rollup). Matches by sessionId, falling back to agentId
- * ~ tmux session name. */
+ * ~ tmux session name. Used here for non-agent InfoRow steps. */
 function useSessionCostLookup(issueId: string): (session: SessionNode) => string | undefined {
   const costs = useIssueCostsQuery(issueId)
   const sessions = costs.data?.sessions ?? []
@@ -340,7 +275,6 @@ export function AgentsLane({
   const testSession = sessions.find((s) => s.type === 'test')
   const ships = sessions.filter((s) => s.type === 'ship' || s.type === 'merge')
 
-  const changesCount = reviewers.filter((r) => reviewerVerdict(r).tone === 'bad').length
   const verState = VERIFICATION_TONE[rs?.verificationStatus ?? 'pending'] ?? VERIFICATION_TONE.pending
   const verFailed = rs?.verificationStatus === 'failed'
 
@@ -352,63 +286,104 @@ export function AgentsLane({
       <div className={styles.header}>Agents &amp; steps <span className="n">{count}</span></div>
 
       {plan && (
-        <Row icon={typeIcon(plan)} verdictTile={plan.status === 'error' ? 'bad' : 'ok'}
-          name="Plan" status={sessionStatus(plan)} model={shortModel(plan.model)} sub={[formatDur(plan.duration), costOf(plan)].filter(Boolean).join(' · ')}
+        <InfoRow icon={Compass} verdictTile={plan.status === 'error' ? 'bad' : 'ok'}
+          name="Plan" status={sessionStatus(plan)} model={plan.model}
+          sub={[plan.duration ? `${Math.round(plan.duration / 60)}m` : '', costOf(plan)].filter(Boolean).join(' · ')}
           selected={plan.sessionId === selectedSessionId} onClick={() => onSelectSession(plan)} />
       )}
 
       {works.map((w) => (
-        <Row key={w.sessionId} icon={typeIcon(w)} tileClass={styles.work}
-          name={sessionLabel(w)} status={sessionStatus(w)} model={shortModel(w.model)} sub={[formatDur(w.duration), costOf(w)].filter(Boolean).join(' · ')}
-          selected={w.sessionId === selectedSessionId} onClick={() => onSelectSession(w)} />
+        <AgentStepRow
+          key={w.sessionId}
+          session={w}
+          issueId={issueId}
+          density="cockpit"
+          isSelected={w.sessionId === selectedSessionId}
+          onClick={() => onSelectSession(w)}
+          showMenu={false}
+          onAction={() => {}}
+        />
       ))}
 
       {knowledges.map((k) => (
-        <Row key={k.sessionId} icon={typeIcon(k)} tileClass={styles.work}
-          name={sessionLabel(k)} status={sessionStatus(k)} model={shortModel(k.model)} sub={[formatDur(k.duration), costOf(k)].filter(Boolean).join(' · ')}
-          selected={k.sessionId === selectedSessionId} onClick={() => onSelectSession(k)} />
+        <AgentStepRow
+          key={k.sessionId}
+          session={k}
+          issueId={issueId}
+          density="cockpit"
+          isSelected={k.sessionId === selectedSessionId}
+          onClick={() => onSelectSession(k)}
+          showMenu={false}
+          onAction={() => {}}
+        />
       ))}
 
       {reviewParent && (
-        <Row icon={Eye} tileClass={styles.review}
-          name="Review"
-          status={reviewers.length ? { label: `${reviewers.length} reviewers`, tone: 'muted' } : sessionStatus(reviewParent)}
-          model={shortModel(reviewParent.model)}
-          sub={reviewers.length ? `convoy · ${changesCount} changes` : formatDur(reviewParent.duration)}
-          expandable={reviewers.length > 0} expanded={reviewExpanded} onToggle={() => setReviewExpanded((v) => !v)}
-          selected={reviewParent.sessionId === selectedSessionId} onClick={() => onSelectSession(reviewParent)} />
+        <AgentStepRow
+          session={reviewParent}
+          issueId={issueId}
+          density="cockpit"
+          isSelected={reviewParent.sessionId === selectedSessionId}
+          expandable={reviewers.length > 0}
+          expanded={reviewExpanded}
+          onToggleExpand={() => setReviewExpanded((v) => !v)}
+          onClick={() => onSelectSession(reviewParent)}
+          showMenu={false}
+          onAction={() => {}}
+        />
       )}
       {reviewParent && reviewExpanded && reviewers.map((r) => (
-        <Row key={r.sessionId} icon={typeIcon(r)} indent
-          name={sessionLabel(r)} status={reviewerVerdict(r)} model={shortModel(r.model)}
-          selected={r.sessionId === selectedSessionId} onClick={() => onSelectSession(r)} />
+        <AgentStepRow
+          key={r.sessionId}
+          session={r}
+          issueId={issueId}
+          density="cockpit"
+          isSelected={r.sessionId === selectedSessionId}
+          onClick={() => onSelectSession(r)}
+          showMenu={false}
+          onAction={() => {}}
+        />
       ))}
 
       {/* Verification — a step, not a session. Aggregate status; on failure expands to the gates. */}
-      <Row icon={BadgeCheck} tileClass={styles.ver}
+      <InfoRow icon={BadgeCheck} tileClass={styles.ver}
         name="Verification" status={verState} model="build gate"
         sub={rs?.verificationCycleCount ? `cycle ${rs.verificationCycleCount}${rs.verificationMaxCycles ? `/${rs.verificationMaxCycles}` : ''}` : undefined}
         expandable={verFailed} expanded={verExpanded} onToggle={() => setVerExpanded((v) => !v)}
         onClick={onOpenVerification} />
       {verFailed && verExpanded && deriveFailedGates(rs).map((g) => (
-        <Row key={g.id} icon={Circle} indent name={cap(g.id)} status={{ label: g.label, tone: g.tone }}
+        <InfoRow key={g.id} icon={Circle} indent name={cap(g.id)} status={{ label: g.label, tone: g.tone }}
           verdictTile={g.tone === 'ok' ? 'ok' : g.tone === 'bad' ? 'bad' : undefined}
           onClick={onOpenVerification} />
       ))}
 
       {/* Test — its session if dispatched (click → its terminal/output), else a synthetic step. */}
       {testSession ? (
-        <Row icon={FlaskConical} name="Test" status={sessionStatus(testSession)} model={shortModel(testSession.model)}
-          sub={[formatDur(testSession.duration), costOf(testSession)].filter(Boolean).join(' · ')} selected={testSession.sessionId === selectedSessionId}
-          onClick={() => onSelectSession(testSession)} />
+        <AgentStepRow
+          session={testSession}
+          issueId={issueId}
+          density="cockpit"
+          isSelected={testSession.sessionId === selectedSessionId}
+          onClick={() => onSelectSession(testSession)}
+          showMenu={false}
+          onAction={() => {}}
+        />
       ) : (
-        <Row icon={FlaskConical} name="Test" status={TEST_TONE[rs?.testStatus ?? 'pending'] ?? TEST_TONE.pending}
+        <InfoRow icon={FlaskConical} name="Test" status={TEST_TONE[rs?.testStatus ?? 'pending'] ?? TEST_TONE.pending}
           model="pipeline" onClick={onOpenVerification} />
       )}
 
       {ships.map((s) => (
-        <Row key={s.sessionId} icon={typeIcon(s)} name="Ship" status={sessionStatus(s)} model={shortModel(s.model)}
-          sub={[formatDur(s.duration), costOf(s)].filter(Boolean).join(' · ')} selected={s.sessionId === selectedSessionId} onClick={() => onSelectSession(s)} />
+        <AgentStepRow
+          key={s.sessionId}
+          session={s}
+          issueId={issueId}
+          density="cockpit"
+          isSelected={s.sessionId === selectedSessionId}
+          onClick={() => onSelectSession(s)}
+          showMenu={false}
+          onAction={() => {}}
+        />
       ))}
 
       <StackDrawer issueId={issueId} feature={feature} branch={branch} />
