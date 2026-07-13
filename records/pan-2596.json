@@ -217,10 +217,10 @@
     "recordedAt": "2026-07-13T11:20:10.124Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T11:51:53.207Z",
+  "updated": "2026-07-13T11:53:32.761Z",
   "pipeline": {
     "issueId": "PAN-2596",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -228,12 +228,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T11:21:55.959Z",
-    "updatedAt": "2026-07-13T11:51:53.081Z",
+    "updatedAt": "2026-07-13T11:53:32.687Z",
     "inspectNotes": "Bead server-upload-allowlist ack: validateUploadPayload correctly gates UTF-8 text extensions, PDF %PDF- magic prefix, and disallowed/extension-less types with 400s naming the mismatch, while preserving image magic-byte validation and <uuid><ext> naming; non-image files get <uuid>-<sanitized-name><ext>. All 5 ACs verified against diff + accompanying unit tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2634",
     "lastVerifiedCommit": "7cf60996f8e5ae5da607fc6ae51272764c107143",
     "reviewRequestedAt": "2026-07-13T11:21:55.959Z",
-    "reviewSpawnedAt": "2026-07-13T11:28:59.679Z",
+    "reviewSpawnedAt": "2026-07-13T11:53:32.686Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/frontend/src/App.test.tsx",
@@ -361,7 +361,7 @@
       },
       "costAtCloseOut": {
         "usd": 59.703305,
-        "pricingAsOf": "2026-07-13T11:51:53.190Z"
+        "pricingAsOf": "2026-07-13T11:53:32.746Z"
       }
     },
     "merges": [
