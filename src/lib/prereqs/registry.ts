@@ -4,7 +4,7 @@
  * requiring a heavy `pan install` step before first use.
  */
 
-import { exec, execSync } from "node:child_process";
+import { exec, execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
@@ -15,6 +15,7 @@ import { Effect } from "effect";
 import { detectPlatform } from "../platform.js";
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export const PREREQ_REGISTRY = {
   addGitHubProject: ["gh"],
@@ -41,9 +42,9 @@ export const INSTALLABLE_TOOLS: readonly PrereqTool[] = [
   "ox",
 ];
 
-function checkCommand(cmd: string): boolean {
+async function checkCommand(cmd: string, args: string[] = ["--version"]): Promise<boolean> {
   try {
-    execSync(`which ${cmd}`, { stdio: "pipe" });
+    await execFileAsync(cmd, args, { timeout: 10_000 });
     return true;
   } catch {
     return false;
@@ -51,13 +52,24 @@ function checkCommand(cmd: string): boolean {
 }
 
 export async function isToolInstalled(tool: PrereqTool): Promise<boolean> {
+  if (tool === "docker") {
+    return checkCommand("docker", ["info"]);
+  }
   if (tool === "traefik") {
-    // Traefik is Docker-based; we check for the Docker network instead
-    return checkCommand("docker");
+    try {
+      const { stdout } = await execFileAsync(
+        "docker",
+        ["inspect", "--format", "{{.State.Running}}", "overdeck-traefik"],
+        { timeout: 10_000 },
+      );
+      return stdout.trim() === "true";
+    } catch {
+      return false;
+    }
   }
   if (tool === "ttyd") {
     return (
-      checkCommand("ttyd") || existsSync(join(homedir(), "bin", "ttyd"))
+      await checkCommand("ttyd", ["--version"]) || existsSync(join(homedir(), "bin", "ttyd"))
     );
   }
   return checkCommand(tool);
