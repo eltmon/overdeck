@@ -45,7 +45,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T22:50:33.242Z",
-  "updated": "2026-07-13T02:52:22.316Z",
+  "updated": "2026-07-13T03:04:03.248Z",
   "pipeline": {
     "issueId": "PAN-2610",
     "reviewStatus": "failed",
@@ -54,7 +54,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T02:52:19.779Z",
+    "updatedAt": "2026-07-13T03:04:03.222Z",
     "reviewNotes": "Verification failed at typecheck",
     "verificationNotes": "Verification FAILED at typecheck (112ms):\n\nnpm error code ENOENT\nnpm error syscall open\nnpm error path /home/eltmon/Projects/overdeck/workspaces/package.json\nnpm error errno -2\nnpm error enoent Could not read package.json: Error: ENOENT: no such file or directory, open '/home/eltmon/Projects/overdeck/workspaces/package.json'\nnpm error enoent This is related to npm not being able to find a file.\nnpm error enoent\nnpm error A complete log of this run can be found in: /home/eltmon/.npm/_logs/2026-07-13T02_52_19_616Z-debug-0.log\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2620",
@@ -66,48 +66,48 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 3304071,
-            "output": 4621,
-            "cacheRead": 3012096,
+            "input": 3455102,
+            "output": 5700,
+            "cacheRead": 3030528,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 22606801,
-            "output": 52255,
-            "cacheRead": 21457152,
+            "input": 23805527,
+            "output": 56566,
+            "cacheRead": 22354816,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 569935,
-            "output": 1507,
-            "cacheRead": 486400,
+            "input": 710185,
+            "output": 2037,
+            "cacheRead": 623616,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 3304071,
-          "output": 4621,
-          "cacheRead": 3012096,
+          "input": 3455102,
+          "output": 5700,
+          "cacheRead": 3030528,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 22606801,
-          "output": 52255,
-          "cacheRead": 21457152,
+          "input": 23805527,
+          "output": 56566,
+          "cacheRead": 22354816,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 569935,
-          "output": 1507,
-          "cacheRead": 486400,
+          "input": 710185,
+          "output": 2037,
+          "cacheRead": 623616,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 18.750556,
-        "pricingAsOf": "2026-07-13T02:52:19.828Z"
+        "usd": 20.933706,
+        "pricingAsOf": "2026-07-13T03:04:03.248Z"
       }
     },
     "merges": [
