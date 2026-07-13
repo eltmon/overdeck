@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T22:33:37.108Z",
-  "updated": "2026-07-13T08:14:59.328Z",
+  "updated": "2026-07-13T08:39:46.284Z",
   "pipeline": {
     "issueId": "PAN-2602",
     "reviewStatus": "pending",
@@ -102,7 +102,8 @@
   "harness": "claude-code",
   "model": "kimi-k2.7-code",
   "statusOverrides": {
-    "sync-local-write-detection": "running"
+    "sync-local-write-detection": "running",
+    "branch-ahead-signal": "running"
   },
   "swarm": {
     "slotAssignments": [
@@ -112,6 +113,13 @@
         "agentId": "agent-pan-2602-slot-1",
         "branch": "feature/pan-2602-slot-1",
         "assignedAt": "2026-07-13T08:14:58.449Z"
+      },
+      {
+        "slotIndex": 2,
+        "itemId": "branch-ahead-signal",
+        "agentId": "agent-pan-2602-slot-2",
+        "branch": "feature/pan-2602-slot-2",
+        "assignedAt": "2026-07-13T08:39:46.284Z"
       }
     ]
   }
