@@ -5,6 +5,11 @@ import type { PaneType } from '../../../lib/panesStore'
 
 const actionInvoke = vi.fn()
 
+const uiState = vi.hoisted(() => ({
+  hasPlan: true,
+  hasBeads: true,
+}))
+
 const queryMocks = vi.hoisted(() => {
   const activityQuery = {
     data: {
@@ -75,7 +80,7 @@ vi.mock('../../IssueActionMenu/useIssueActions', () => ({
       primary: all.slice(0, 2),
       secondary: all.slice(2, 4),
       overflow: all.slice(4),
-      state: { hasPlan: true, hasBeads: true },
+      state: { hasPlan: uiState.hasPlan, hasBeads: uiState.hasBeads },
       activeDialog: null,
     }
   },
@@ -268,6 +273,39 @@ describe('IssueMissionControl', () => {
 
     globalThis.fetch = originalFetch
     queryMocks.activityQuery.data.sections = originalSections
+  })
+
+  it('renders the planning banner when only a planning session is live (PAN-2598)', async () => {
+    const originalSections = queryMocks.activityQuery.data.sections
+    const originalReview = queryMocks.reviewStatusQuery.data
+    const originalHasPlan = uiState.hasPlan
+    const originalHasBeads = uiState.hasBeads
+
+    queryMocks.activityQuery.data.sections = [
+      {
+        type: 'planning',
+        sessionId: 'planning-pan-1661',
+        model: 'claude-sonnet-5',
+        status: 'running',
+        startedAt: '2026-06-07T00:00:00Z',
+        duration: null,
+      },
+    ]
+    queryMocks.reviewStatusQuery.data = undefined
+    uiState.hasPlan = false
+    uiState.hasBeads = false
+
+    renderMissionControl()
+
+    await waitFor(() => {
+      expect(screen.getByText('Planning what to build')).toBeTruthy()
+    })
+    expect(screen.queryByText('The crew is writing code')).toBeNull()
+
+    queryMocks.activityQuery.data.sections = originalSections
+    queryMocks.reviewStatusQuery.data = originalReview
+    uiState.hasPlan = originalHasPlan
+    uiState.hasBeads = originalHasBeads
   })
 
   it('groups all issue actions in the mega-menu', () => {
