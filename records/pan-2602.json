@@ -159,15 +159,7 @@
       "timestamp": "2026-07-13T15:45:51.189Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-13T15:45:51Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2602\n\n# Review Synthesis — PAN-2602 — 2026-07-13T15:45:10.000Z\n\n## Verdict: CHANGES REQUESTED — the cycle-3 fix that parallelized branch-ahead git probes and GitHub tracker-state lookups replaced unbounded serial spawns with unbounded concurrent spawns (`src/dashboard/server/services/resource-discovery.ts:682`, `src/cli/commands/beads.ts:187`)\n\n## Context\n- Manifest: `.pan/review/agent-pan-2602-review-bb30aafb/context.json`\n- Branch: feature/pan-2602\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2602\n- HEAD reviewed: bb30aafb0e303ebbae5ff26b8360d848127e07be\n- Cycle number: 4\n- Prior cycle SHA: 5f631201aa29a44211498a768fb1489e950af455\n- Cycle diff (5f631201..HEAD): 7 commits, but only one (`da1335f41d fix(dashboard): address PAN-2602 review findings`) touches PAN-2602 code — the merge commit (`bb30aafb0e`) also pulled in unrelated `origin/main` work (a bd-lock spawn-gate fix, PAN-2611, docs snapshots) that does not touch any file in this PR's diff. PAN-2602-relevant files changed this cycle: `docs/BEADS.md`, `src/cli/commands/beads.ts`, `src/cli/commands/close.ts`, `FeatureItem.test.tsx`, `src/dashboard/server/main.ts`, `src/dashboard/server/services/resource-discovery.ts`, `src/lib/lifecycle/workflows.ts`, `resource-discovery.test.ts`.\n\n## Progress since cycle 3\n\nAll three of cycle 3's blockers were fixed and I independently re-verified each during discovery (not just trusting the reviewer text):\n\n1. **`main.ts` duplicate `stopBeadsRollupService` declaration** — fixed. I re-ran `tsc --noEmit -p src/dashboard/server/tsconfig.json`; the prior `TS2440`/`TS2722` errors are gone (only one unrelated, pre-existing error remains at `main.ts:670`, outside this PR's diff hunks). `git diff` confirms the local `let` was removed and the shutdown handler now calls the imported singleton directly.\n2. **Serial `git merge-base` branch-ahead probes** — addressed (see below: the fix introduced a new, different performance issue).\n3. **`closeOut()` bead sweep not actually non-fatal** — fixed with `.catch()` wrapping `sweepOrphanedBeads(...)` into the same `{ ok: false, ... }` shape `SweepResult` expects, verified against `orphaned-beads-sweep.ts`'s actual return type.\n\nAlso landed: docs for the dashboard bead signals (`docs/BEADS.md`), `gh issue view` timeouts in `close.ts`, restored cleanup-affordance test coverage, and surfaced tracker-resolution failures in `pan beads sweep --all-closed`.\n\n## Convergence-Gate / Verification Analysis (cycle 4)\n\nThis is cycle 4, so the mandatory convergence gate applies: only block on findings whose cited file:line falls inside the **cycle diff** (the PAN-2602-relevant files listed above), unless the finding was never actually reviewed-and-passed by a prior cycle. Two contested findings needed independent verification before I could apply the gate correctly:\n\n1. **`verification-runner.ts:653` ignores `in_progress` beads (correctness, `!`) — GATED, demoted to non-blocking.** `verification-runner.ts` is untouched in this cycle's diff. Both cycle 2 and cycle 3's requirements reports explicitly reviewed this exact gate and marked it \"Implemented\"/\"Honored\"; cycle 3's correctness report explicitly called it \"logically sound\" and traced through the escalation/feedback wiring. This is a genuine saw-and-passed case, not a miss — the finding has real technical merit (the sweep path treats `in_progress` as sweepable/unfinished but the verification gate only checks literal `open`), so it is kept as a non-blocking note with a follow-up recommendation, but it cannot block this cycle.\n\n2. **NonGoal 8 violation claim re: `done-preflight.ts` (requirements, `⊗`) — REJECTED as a false positive, not merely demoted.** The requirements reviewer claims `done-preflight.ts:63`/`:177` \"now treats an open-beads resolver timeout as a blocking failure string\" as new PAN-2602-introduced behavior. I checked this directly: `git diff $(git merge-base origin/main HEAD)..HEAD -- src/lib/work/done-preflight.ts` shows the **entire** diff to this file is (a) inserting a missing blank line and (b) adding the `export` keyword to `checkOpenBeadsPromise`'s signature so `verification-runner.ts` can reuse it. I then diffed the function body against `origin/main` directly (`git show origin/main:src/lib/work/done-preflight.ts`) — the `isTimeout(error)` → blocking-string branch is byte-for-byte identical on both sides, and its own comment cites `PAN-1812`, a pre-existing, unrelated decision predating this PR. This finding misattributes pre-existing code to this PR and is rejected outright, not carried forward as a demoted item.\n\n## Blocking Findings\n\n### [performance ⊗, new-this-cycle] Dashboard discovery spawns unbounded concurrent git probes per branch — `src/dashboard/server/services/resource-discovery.ts:682`\nThe cycle-3 fix replaced the sequential `for` loop over `isBranchAheadOfMain` with `Promise.all(branches.local.map(...))` / `Promise.all(branches.remote.map(...))`, each spawning a `git merge-base --is-ancestor` subprocess with a 10s timeout. This removes the serial-latency problem but introduces an unbounded-concurrency one: on a discovery refresh, this project alone can have dozens-to-hundreds of `feature/*`/`bypass/*` refs (many merged-but-undeleted, given 2600+ historical issues), all launched as concurrent subprocesses on every 30s cache refresh of a background dashboard service. This matches this review dimension's own documented `⊗` MUST-NOT criterion verbatim (\"unbounded `Promise.all` over user input\").\n\n**Fix:** replace the per-branch probe with a bulk `git for-each-ref --no-merged=main` (or equivalent) call per project — turns O(branches) subprocess spawns into O(1) — or bound the `Promise.all` with a small concurrency pool if per-branch probing must remain.\n\n### [performance ⊗, new-this-cycle] `pan beads sweep --all-closed` launches unbounded concurrent GitHub lookups — `src/cli/commands/beads.ts:187`\nThe cycle-3 fix for the \"silently dropped enumeration failures\" note (cycle 3's demoted-then-fixed non-blocking finding) changed `enumerateClosedOrphanIssues()` from a sequential `for...of` loop to `Promise.all(candidates.map(... resolveGitHubCloseState(issueId)))`. Candidate count is proportional to the closed-issue backlog with orphaned beads, so a large backfill now launches that many concurrent `gh issue view` subprocesses at once, before any throttling applies — increasing local process pressure and GitHub API rate-limit risk. Same `⊗` MUST-NOT criterion as above; lower urgency (operator-invoked CLI backfill, not a recurring background daemon) but still in scope this cycle since the code changed here.\n\n**Fix:** bound the lookups with a small concurrency limit (e.g. chunks of 5-10), or batch via a bulk GitHub query for candidate issue numbers, while preserving the existing `unresolved`/`failed` reporting this cycle already added.\n\n## Non-blocking Findings\n\n### correctness\n- `[demoted: previously reviewed]` **`!` Verification gate ignores `in_progress` beads — `src/lib/cloister/verification-runner.ts:653`.** The gate calls `checkOpenBeadsPromise` which only checks literal `open` status, but this PR's own sweep path (`orphaned-beads-sweep.ts:18`) treats both `open` and `in_progress` as sweepable/unfinished. An issue with only `in_progress` beads can pass verification and later have those beads swept as \"orphaned\" rather than finished. Demoted per the cycle-4 convergence gate (cycle 2 and cycle 3 both explicitly reviewed and passed this exact gate; the file is untouched this cycle). Worth a follow-up issue: align the verification gate's status set with the sweep path's `isSweepable` definition.\n\n### requirements\n- `[rejected: false positive]` NonGoal 8 \"violation\" re: `done-preflight.ts` timeout handling — see Convergence-Gate analysis above. The cited behavior is byte-identical to `origin/main` and predates this PR (PAN-1812). No action needed.\n\n## Clean Sub-roles\n- security (0 findings this cycle, consistent with all three prior cycles)\n\n## Scope Note\nThe proportionality check does not fire (2 blocking findings against an 18-commit PR diff, well under the 3×-commits threshold). No demotion beyond the two gated/rejected items above was needed.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2602/.pan/review/agent-pan-2602-review-bb30aafb/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2602 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
@@ -290,24 +282,24 @@
     "recordedAt": "2026-07-13T11:57:13.297Z"
   },
   "created": "2026-07-12T22:33:37.108Z",
-  "updated": "2026-07-13T15:57:06.630Z",
+  "updated": "2026-07-13T16:00:58.830Z",
   "pipeline": {
     "issueId": "PAN-2602",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T12:03:05.509Z",
-    "updatedAt": "2026-07-13T15:57:06.584Z",
-    "reviewNotes": "cycle-3 fix parallelized branch-ahead/gh-lookup probes with unbounded Promise.all — MUST-NOT unbounded fan-out on both a dashboard hot path and a CLI backfill",
+    "updatedAt": "2026-07-13T16:00:58.714Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "Bead beads-rollup-service ack: extractIssueLabels() now gates bare word-number labels through project.issuePrefixes, preventing phase-N labels from creating spurious rollups; tests cover phase exclusion and workspace: label mapping.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2636",
-    "lastVerifiedCommit": "bb30aafb0e303ebbae5ff26b8360d848127e07be",
+    "lastVerifiedCommit": "d1bc4dfb119ca34e40f2ed0014ff3296b2a05eed",
     "reviewRequestedAt": "2026-07-13T12:03:05.509Z",
-    "reviewSpawnedAt": "2026-07-13T15:34:46.894Z",
+    "reviewSpawnedAt": "2026-07-13T16:00:58.713Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -519,9 +511,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 3969550,
-            "output": 584686,
-            "cacheRead": 282634752,
+            "input": 3971332,
+            "output": 584902,
+            "cacheRead": 283087872,
             "cacheWrite": 0
           }
         }
@@ -564,15 +556,15 @@
           "cacheWrite": 1118309
         },
         "custom/kimi-k2.7-code": {
-          "input": 3969550,
-          "output": 584686,
-          "cacheRead": 282634752,
+          "input": 3971332,
+          "output": 584902,
+          "cacheRead": 283087872,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 140.391478,
-        "pricingAsOf": "2026-07-13T15:57:06.628Z"
+        "usd": 140.480128,
+        "pricingAsOf": "2026-07-13T16:00:58.816Z"
       }
     },
     "merges": [
