@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-13T06:19:13.017Z",
+  "updated": "2026-07-13T06:58:01.009Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "pending",
@@ -73,6 +73,18 @@
         "branch": "feature/pan-2568-slot-3",
         "assignedAt": "2026-07-13T06:19:12.063Z"
       }
-    ]
+    ],
+    "slotCompletions": {
+      "2": {
+        "slotIndex": 2,
+        "agentId": "agent-pan-2568-slot-2",
+        "completedAt": "2026-07-13T06:58:00.986Z"
+      },
+      "3": {
+        "slotIndex": 3,
+        "agentId": "agent-pan-2568-slot-3",
+        "completedAt": "2026-07-13T06:56:58.582Z"
+      }
+    }
   }
 }
