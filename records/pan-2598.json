@@ -57,13 +57,34 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-13T08:44:01.104Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T08:44:08.869Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T08:44:08.871Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T08:44:08.872Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T08:44:08.873Z"
     }
   ],
   "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
-      "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts"
+      "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
+      "src/lib/channels/__tests__/overdeck-bridge.test.ts"
     ],
     "declaredScopeUntouched": [
       "src/dashboard/frontend/src/components/Stage/cockpit/StatusNarrative.tsx"
@@ -99,16 +120,17 @@
       "src/dashboard/server/routes/command-deck.ts",
       "src/dashboard/server/routes/projects.ts",
       "src/lib/agent-enrichment.ts",
+      "src/lib/channels/__tests__/overdeck-bridge.test.ts",
       "sync-sources/hooks/ask-user-question-hook",
       "tests/lib/agent-enrichment-pending-inputs.test.ts",
       "tests/lib/auq-hook-detector-contract.test.ts",
       "tests/unit/dashboard/server/routes/command-deck.test.ts",
       "tests/unit/dashboard/server/routes/projects.test.ts"
     ],
-    "recordedAt": "2026-07-13T08:17:44.938Z"
+    "recordedAt": "2026-07-13T08:53:00.165Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T08:44:01.805Z",
+  "updated": "2026-07-13T08:53:00.166Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "reviewing",
@@ -118,7 +140,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-07-13T08:43:09.504Z",
     "updatedAt": "2026-07-13T08:43:57.989Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-2598-review already running. Use 'pan tell' to message it.",
     "verificationNotes": "Verification FAILED at test (150828ms):\n\nr' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n- Spawning knowledge agent for PAN-2468...\n✔ Knowledge agent spawned: agent-pan-2468-knowledge\n- Spawning knowledge agent for PAN-2468...\n✖ Knowledge agent for PAN-2468 failed: No OKF bundle is configured for Overdeck. Run `/okf init` in this workspace to create or connect a knowledge bundle, then retry `pan knowledge PAN-2468`.\n- Spawning knowledge agent for PAN-2468...\n⚠ mnemos unavailable; spawning knowledge agent with built-in OKF search: release fetch failed\n- Spawning knowledge agent for PAN-2468...\n✔ Knowledge agent spawned: agent-pan-2468-knowledge\n",
