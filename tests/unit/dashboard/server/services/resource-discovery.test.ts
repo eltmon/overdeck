@@ -3,7 +3,9 @@ import { Effect } from 'effect';
 
 const mocks = vi.hoisted(() => ({
   execFile: vi.fn(),
+  findSpecByIssue: vi.fn(),
   getAgentRuntimeState: vi.fn(),
+  getBeadsRollupService: vi.fn(),
   getGitHubConfig: vi.fn(),
   issueService: {
     getIssues: vi.fn(),
@@ -13,16 +15,27 @@ const mocks = vi.hoisted(() => ({
   listConversations: vi.fn(),
   loadReadyForMergeFlags: vi.fn(),
   openPullRequests: [] as unknown[],
+  readdir: vi.fn(),
   resolveAgentGitInfo: vi.fn(),
   resolveProjectFromIssueSync: vi.fn(),
+  stat: vi.fn(),
 }));
 
 vi.mock('node:child_process', () => ({
   execFile: mocks.execFile,
 }));
 
+vi.mock('node:fs/promises', () => ({
+  readdir: mocks.readdir,
+  stat: mocks.stat,
+}));
+
 vi.mock('../../../../../src/lib/agents.js', () => ({
   getAgentRuntimeState: mocks.getAgentRuntimeState,
+}));
+
+vi.mock('../../../../../src/dashboard/server/services/beads-rollup-singleton.js', () => ({
+  getBeadsRollupService: mocks.getBeadsRollupService,
 }));
 
 vi.mock('../../../../../src/lib/projects.js', () => ({
@@ -48,6 +61,10 @@ vi.mock('../../../../../src/dashboard/server/services/tracker-config.js', () => 
 
 vi.mock('../../../../../src/lib/overdeck/conversations.js', () => ({
   listConversations: mocks.listConversations,
+}));
+
+vi.mock('../../../../../src/lib/pan-dir/specs.js', () => ({
+  findSpecByIssue: mocks.findSpecByIssue,
 }));
 
 vi.mock('../../../../../src/dashboard/server/services/issue-service-singleton.js', () => ({
@@ -79,6 +96,10 @@ beforeEach(() => {
   mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
   mocks.listConversations.mockReturnValue([]);
   mocks.openPullRequests = [];
+  mocks.getBeadsRollupService.mockReturnValue({ getProjectRollups: () => null });
+  mocks.readdir.mockResolvedValue([]);
+  mocks.stat.mockRejectedValue(new Error('no such file'));
+  mocks.findSpecByIssue.mockReturnValue(Effect.fail('no spec'));
   mocks.resolveAgentGitInfo.mockResolvedValue({
     actualBranch: null,
     branchDrifted: false,
@@ -134,6 +155,7 @@ describe('resource-discovery grouping', () => {
           branchAheadOfMain: false,
           conversations: [],
         },
+        beadTotals: null,
       },
       {
         issueId: 'AAA-1',
@@ -170,6 +192,7 @@ describe('resource-discovery grouping', () => {
           branchAheadOfMain: false,
           conversations: [],
         },
+        beadTotals: null,
       },
       {
         issueId: 'PAN-100',
@@ -211,6 +234,7 @@ describe('resource-discovery grouping', () => {
           branchAheadOfMain: false,
           conversations: [],
         },
+        beadTotals: null,
       },
     ];
 
@@ -264,6 +288,7 @@ describe('resource-discovery sanitization', () => {
           branchAheadOfMain: false,
           conversations: [],
         },
+        beadTotals: null,
       },
     ]);
 
@@ -406,7 +431,7 @@ describe('resource-discovery branch-ahead signal', () => {
       if (command === 'git' && args[0] === 'for-each-ref') {
         const ref = args[1] ?? '';
         if (ref.includes('feature/*')) {
-          callback(null, { stdout: 'feature/pan-9001\nfeature/pan-9002\n' });
+          callback(null, { stdout: 'feature/pan-9001\nfeature/pan-9002\nfeature/pan-9003\n' });
         } else if (ref.includes('bypass/*')) {
           callback(null, { stdout: 'bypass/pan-9002\n' });
         } else {
@@ -459,7 +484,7 @@ describe('resource-discovery branch-ahead signal', () => {
     expect(issue!.resourceDetails.branchAheadOfMain).toBe(false);
   });
 
-  it('does not change the membership filter when only branch details change', async () => {
+  it('admits an inactive issue when a branch is ahead of main (PAN-2602)', async () => {
     resetResourceAllocatedIssuesCacheForTests();
     // Re-use the branch mock but give the issue a non-active tracker state.
     mocks.issueService.getIssues.mockReturnValue([
@@ -467,7 +492,11 @@ describe('resource-discovery branch-ahead signal', () => {
     ]);
 
     const discovered = await discoverResourceAllocatedIssues();
-    expect(discovered.map((entry) => entry.issueId)).toEqual([]);
+    const issue = discovered.find((entry) => entry.issueId === 'PAN-9003');
+
+    expect(issue).toBeDefined();
+    expect(issue!.resourceSources).toContain('branch');
+    expect(issue!.resourceDetails.branchAheadOfMain).toBe(true);
   });
 });
 
@@ -534,18 +563,132 @@ describe('resource-discovery conversation signal', () => {
     expect(discovered.map((entry) => entry.issueId)).toEqual([]);
   });
 
-  it('ignores archived conversations even when they carry an issueId', async () => {
+  it('admits an inactive issue when it has a linked conversation (PAN-2602)', async () => {
     mocks.issueService.getIssues.mockReturnValue([
-      { identifier: 'PAN-9003', title: 'Conv issue', state: 'in_progress', rawTrackerState: 'In Progress' },
+      { identifier: 'PAN-9003', title: 'Conv issue inactive', state: 'open', rawTrackerState: 'OPEN' },
     ]);
-    mocks.listConversations.mockReturnValue([makeConversation({ archivedAt: '2026-07-10T00:00:00Z' })]);
+    mocks.listConversations.mockReturnValue([makeConversation({})]);
 
     const discovered = await discoverResourceAllocatedIssues();
-    const issue = discovered.find((entry) => entry.issueId === 'PAN-9003');
 
-    expect(issue).toBeDefined();
-    expect(issue!.resourceSources).not.toContain('conversation');
-    expect(issue!.resourceDetails.conversations).toEqual([]);
+    expect(discovered.map((entry) => entry.issueId)).toEqual(['PAN-9003']);
+    expect(discovered[0]?.resourceSources).toContain('conversation');
+  });
+});
+
+describe('resource-discovery bead rollup signal', () => {
+  beforeEach(() => {
+    resetResourceAllocatedIssuesCacheForTests();
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-9004', title: 'Bead rollup issue', state: 'open', rawTrackerState: 'OPEN' },
+    ]);
+  });
+
+  function setBeadRollups(
+    rollups: Record<string, { total: number; closed: number; inProgress: number; lastUpdated: string | null }>,
+  ) {
+    mocks.getBeadsRollupService.mockReturnValue({
+      getProjectRollups: () => ({ rollups: new Map(Object.entries(rollups)), stale: false }),
+    });
+  }
+
+  it('admits an inactive issue with recent partial bead completion', async () => {
+    setBeadRollups({
+      'pan-9004': { total: 3, closed: 1, inProgress: 0, lastUpdated: '2026-07-12T00:00:00Z' },
+    });
+
+    const discovered = await discoverResourceAllocatedIssues();
+
+    expect(discovered.map((entry) => entry.issueId)).toEqual(['PAN-9004']);
+    expect(discovered[0]?.beadTotals).toEqual({
+      total: 3,
+      closed: 1,
+      inProgress: 0,
+      lastUpdated: '2026-07-12T00:00:00Z',
+    });
+  });
+
+  it('excludes an inactive issue when beads are fully closed', async () => {
+    setBeadRollups({
+      'pan-9004': { total: 3, closed: 3, inProgress: 0, lastUpdated: '2026-07-12T00:00:00Z' },
+    });
+
+    const discovered = await discoverResourceAllocatedIssues();
+
+    expect(discovered.map((entry) => entry.issueId)).toEqual([]);
+  });
+
+  it('excludes an inactive issue when partial bead completion is stale', async () => {
+    setBeadRollups({
+      'pan-9004': { total: 3, closed: 1, inProgress: 0, lastUpdated: '2026-06-20T00:00:00Z' },
+    });
+
+    const discovered = await discoverResourceAllocatedIssues();
+
+    expect(discovered.map((entry) => entry.issueId)).toEqual([]);
+  });
+
+  it('admits an inactive issue with in-progress beads', async () => {
+    setBeadRollups({
+      'pan-9004': { total: 2, closed: 0, inProgress: 1, lastUpdated: '2026-06-20T00:00:00Z' },
+    });
+
+    const discovered = await discoverResourceAllocatedIssues();
+
+    expect(discovered.map((entry) => entry.issueId)).toEqual(['PAN-9004']);
+    expect(discovered[0]?.beadTotals?.inProgress).toBe(1);
+  });
+
+  it('does not admit a terminal issue even with recent partial bead completion', async () => {
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-9004', title: 'Bead rollup issue', state: 'closed', rawTrackerState: 'CLOSED' },
+    ]);
+    setBeadRollups({
+      'pan-9004': { total: 3, closed: 1, inProgress: 0, lastUpdated: '2026-07-12T00:00:00Z' },
+    });
+
+    const discovered = await discoverResourceAllocatedIssues();
+
+    expect(discovered.map((entry) => entry.issueId)).toEqual([]);
+  });
+});
+
+describe('resource-discovery vbrief recency signal', () => {
+  beforeEach(() => {
+    resetResourceAllocatedIssuesCacheForTests();
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-9005', title: 'Vbrief recency issue', state: 'open', rawTrackerState: 'OPEN' },
+    ]);
+    mocks.findSpecByIssue.mockReturnValue(Effect.succeed({ path: '/state/specs/pan-9005.vbrief.json' }));
+  });
+
+  it('admits an inactive issue when its vBRIEF spec was touched recently', async () => {
+    mocks.readdir.mockImplementation(async (path: string, options?: { withFileTypes?: boolean }) => {
+      if (typeof path === 'string' && path.endsWith('/workspaces') && options?.withFileTypes) {
+        return [{ name: 'feature-pan-9005', isDirectory: () => true }];
+      }
+      return [];
+    });
+    mocks.stat.mockResolvedValue({ mtimeMs: Date.parse('2026-07-12T00:00:00Z') } as any);
+
+    const discovered = await discoverResourceAllocatedIssues();
+
+    expect(discovered.map((entry) => entry.issueId)).toEqual(['PAN-9005']);
+    expect(discovered[0]?.resourceSources).toContain('vbrief');
+  });
+
+  it('excludes an inactive issue when its vBRIEF spec is stale', async () => {
+    mocks.readdir.mockImplementation(async (path: string, options?: { withFileTypes?: boolean }) => {
+      if (typeof path === 'string' && path.endsWith('/workspaces') && options?.withFileTypes) {
+        return [{ name: 'feature-pan-9005', isDirectory: () => true }];
+      }
+      return [];
+    });
+    mocks.stat.mockResolvedValue({ mtimeMs: Date.parse('2026-06-20T00:00:00Z') } as any);
+
+    const discovered = await discoverResourceAllocatedIssues();
+
+    expect(discovered.map((entry) => entry.issueId)).toEqual([]);
   });
 });
 
