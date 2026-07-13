@@ -391,11 +391,16 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-13T17:06:38.763Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T17:55:05.167Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-12T20:45:31.659Z",
-  "updated": "2026-07-13T17:55:04.013Z",
+  "updated": "2026-07-13T17:55:05.167Z",
   "pipeline": {
     "issueId": "PAN-1232",
     "reviewStatus": "reviewing",
