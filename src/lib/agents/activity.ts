@@ -14,6 +14,7 @@ import { findLatestRollout, extractThreadIdFromRollout } from '../runtimes/codex
 import { resolveLatestOhmypiSessionId } from '../runtimes/ohmypi.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { FsError } from '../errors.js';
+import { persistCurrentSessionId } from '../session-history.js';
 
 /** Activity log entry (still written by heartbeat-hook as a forensic artifact). */
 export interface ActivityEntry {
@@ -76,10 +77,7 @@ export function getActivity(agentId: string, limit = 100): ActivityEntry[] {
  * Save Claude session ID for later resume
  */
 export function saveSessionId(agentId: string, sessionId: string): void {
-  const dir = getAgentDir(agentId);
-  mkdirSync(dir, { recursive: true });
-
-  writeFileSync(join(dir, 'session.id'), sessionId);
+  persistCurrentSessionId(agentId, sessionId);
 }
 
 /**
@@ -159,7 +157,8 @@ export function getLatestSessionIdSync(agentId: string): string | null {
   const codexThreadId = resolveCodexThreadIdSync(agentId);
   if (codexThreadId) return codexThreadId;
 
-  // 1. session.id (written by auto-suspend) — the real id for claude-code.
+  // 1. session.id (pinned before fresh launch and updated by suspend/resume) —
+  //    the real id for claude-code.
   const fromSessionFile = getSessionId(agentId);
   if (fromSessionFile) return fromSessionFile;
 

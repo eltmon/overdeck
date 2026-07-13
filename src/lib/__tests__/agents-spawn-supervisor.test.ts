@@ -312,6 +312,42 @@ describe('spawnAgent PTY supervisor wiring', () => {
     );
   });
 
+  it('pins and persists a fresh Claude work-agent session before hooks run', async () => {
+    writeSupervisorArtifact();
+    const { spawnAgent } = await import('../agents.js');
+
+    const state = await spawnAgent({
+      issueId: 'PAN-1409',
+      workspace,
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+    });
+
+    const agentDir = join(tmpHome, 'agents', 'agent-pan-1409');
+    const persisted = JSON.parse(readFileSync(join(agentDir, 'state.json'), 'utf8')) as AgentState;
+    const sessionId = readFileSync(join(agentDir, 'session.id'), 'utf8').trim();
+    const history = JSON.parse(readFileSync(join(agentDir, 'sessions.json'), 'utf8')) as string[];
+    const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
+    const lifecycle = readFileSync(join(agentDir, 'lifecycle.log'), 'utf8');
+
+    expect(sessionId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(state.sessionId).toBe(sessionId);
+    expect(persisted.sessionId).toBe(sessionId);
+    expect(history).toEqual([sessionId]);
+    expect(launcher).toContain(`--session-id '${sessionId}'`);
+    expect(lifecycle).toContain(`session identity allocated: harness=claude-code sessionId=${sessionId}`);
+    expect(lifecycle).toContain('pointerPersisted=true historyPersisted=true');
+    expect(lifecycle).toContain(`launcher session pinned: sessionId=${sessionId}`);
+    expect(emitAgentEventMock).toHaveBeenCalledWith(
+      'agent-pan-1409',
+      expect.objectContaining({
+        kind: 'model_set',
+        claudeSessionId: sessionId,
+        sessionHarness: 'claude-code',
+      }),
+    );
+  });
+
   it('persists provider-default harnesses from resolveHarness for OpenAI and Kimi work agents', async () => {
     writeSupervisorArtifact();
     process.env.KIMI_API_KEY = 'test-kimi-key';

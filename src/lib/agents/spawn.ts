@@ -78,9 +78,8 @@ import {
 } from './supervisor-channels.js';
 import { stopAgent } from './termination.js';
 import { resolveBdAgentShimPath } from '../beads/bd-shim.js';
-
+import { createFreshSessionIdentity, logLauncherSessionPinned } from '../session-history.js';
 const execAsync = promisify(exec);
-
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions = {}): Promise<AgentState> {
   const workspace = options.workspace ?? defaultRunWorkspace(issueId);
   const modelSpawnKey = `${role}:${issueId}`;
@@ -125,7 +124,6 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   }
 
   const flywheelEnv = resolveFlywheelSpawnEnv(role, options.flywheelRunId);
-
   const agentId = options.agentId ?? runAgentId(issueId, role, options.subRole);
   if (await Effect.runPromise(sessionExists(agentId))) {
     // PAN-2579 (warm-by-default lifecycle): advancing-role sessions are no longer
@@ -159,7 +157,6 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   }
 
   await assertWorkspaceStackHealthyForSpawn(issueId, role, options.allowHost, workspace);
-
   initHookSync(agentId);
 
   const resolvedHarness: RuntimeName = await resolveHarness({
@@ -521,7 +518,6 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     role,
     model: selectedModel,
   });
-
   // Create state
   const state: AgentState = {
     id: agentId,
@@ -535,6 +531,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     startedAt: new Date().toISOString(),
     costSoFar: 0,
     hostOverride: options.allowHost || undefined,
+    sessionId: createFreshSessionIdentity(agentId, resolvedHarness),
   };
 
   const supervisorLaunch = await prepareSupervisorForFreshLaunch(agentId, options, state);
@@ -697,12 +694,14 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     useSupervisor: supervisorLaunch.useSupervisor,
     supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
     harness: state.harness ?? 'claude-code',
+    sessionId: state.sessionId,
     extraEnvExports: flywheelEnvExports(flywheelEnv),
     effort: options.effort,
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
   await writeLauncherScriptAtomic(launcherScript, launcherContent);
+  if (state.sessionId) logLauncherSessionPinned(agentId, state.sessionId, launcherScript);
   const claudeCmd = `bash ${launcherScript}`;
   console.log(`[claude-invoke] purpose=work-agent | model=${state.model} | source=agents.ts:spawnAgent | session=${agentId} | command="${claudeCmd}"`);
 
@@ -749,6 +748,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     }
   }));
   await saveAgentRuntimeState(agentId, {
+    claudeSessionId: state.sessionId,
     sessionModel: selectedModel,
     sessionHarness: resolvedHarness,
   });

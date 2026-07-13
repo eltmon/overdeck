@@ -28,6 +28,10 @@ The global registry is the single source of truth for `PreToolUse`, `PostToolUse
 
 Users upgrading across PAN-1402 should re-run `pan install` (or `pan admin hooks install`) after pulling the fixed version. Any work agent that was already running before the reinstall must be stopped and restarted before it can pick up the restored hook registration.
 
+Fresh Claude Code work agents do not depend on these hooks for transcript identity. Overdeck allocates the Claude session UUID before launch, writes it to `state.json`, `session.id`, and `sessions.json`, and pins the same UUID in `launcher.sh`. Missing hooks can still degrade readiness/activity reporting, but they must not make a healthy Terminal session disappear from the Conversation view.
+
+For a Conversation/Terminal mismatch, inspect the agent's append-only `~/.overdeck/agents/<agent-id>/lifecycle.log`. The relevant lines begin with `session identity allocated`, `launcher session pinned`, and `transcript resolution`. Resolution failures state whether no session pointer exists or the expected JSONL path is missing, including the workspace and absolute expected path.
+
 ### History
 
 PAN-982 attempted to move `PreToolUse`, `PostToolUse`, and `Stop` into per-agent frontmatter to avoid double-firing. PAN-1402 reverted that migration because Claude Code did not honor those frontmatter hooks when Overdeck launched agents with path-form `--agent roles/<role>.md`; the observable result was missing heartbeats, missing `sessions.json`, and `claudeSessionId: null`.
