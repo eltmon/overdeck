@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T03:17:01.668Z",
-  "updated": "2026-07-13T13:40:05.819Z",
+  "updated": "2026-07-13T14:03:36.990Z",
   "pipeline": {
     "issueId": "PAN-2616",
     "reviewStatus": "pending",
@@ -56,5 +56,21 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "glm-5.2"
+  "model": "glm-5.2",
+  "statusOverrides": {
+    "linear-closed-tests": "completed",
+    "linear-closed-tests.ac1": "completed",
+    "linear-closed-tests.ac2": "completed",
+    "linear-closed-tests.ac3": "completed",
+    "linear-closed-tests.ac4": "completed",
+    "reaper-docs-linear": "completed",
+    "reaper-docs-linear.ac1": "completed",
+    "reaper-docs-linear.ac2": "completed",
+    "linear-closed-check": "completed",
+    "linear-closed-check.ac1": "completed",
+    "linear-closed-check.ac2": "completed",
+    "linear-closed-check.ac3": "completed",
+    "linear-closed-check.ac4": "completed",
+    "linear-closed-check.ac5": "completed"
+  }
 }
