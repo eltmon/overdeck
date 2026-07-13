@@ -11,7 +11,7 @@ import { getAgentDir, spawnRun, stopAgent } from '../agents.js';
 import { parseSequenceMd } from '../backlog/sequence-io.js';
 import { computePredictedConflictSignals, declaredIssueFootprint, pickFromSequence, type IssueFileFootprint } from '../flywheel-merge-order.js';
 import { findProjectByPathSync, getProjectSwarmHotspots } from '../projects.js';
-import { createBeadsResolver } from '../beads/resolver.js';
+import { issuesWithBeadsBounded } from '../beads/presence.js';
 import type { VBriefDocument } from '../vbrief/types.js';
 import {
   getFlywheelActiveRunId,
@@ -164,11 +164,11 @@ async function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions
           const predictedConflictSignals = computePredictedConflictSignals(declaredFootprints, {
             hotspots: getProjectSwarmHotspots(findProjectByPathSync(projectRoot)),
           });
+          const beadsPresence = await issuesWithBeadsBounded(projectRoot);
           const isReadyOrHasPrd = (issueId: string): boolean => {
             const id = issueId.toUpperCase();
             // ready = spec AND beads exist in the workspace
-            const beads = createBeadsResolver(join(workspacesDir, `feature-${id.toLowerCase()}`)).getBeadsForIssueSync(id);
-            if (issuesWithSpecs.has(id) && beads.ok && beads.value.length > 0) {
+            if (issuesWithSpecs.has(id) && beadsPresence.known && beadsPresence.set.has(id)) {
               return true;
             }
             return existsSync(join(projectRoot, '.pan', 'drafts', `${id}.md`));
@@ -325,7 +325,8 @@ export async function spawnFlywheel(options: FlywheelLifecycleOptions = {}): Pro
     if (existsSync(seqPath)) {
       const parsed = parseSequenceMd(readFileSync(seqPath, 'utf-8'));
       if (parsed.ok) {
-        saveRunCohort(runId, computeCohort(parsed.doc.nodes, buildClassifyLookups(workspace), options.maxAgents ?? 5, options.autoPickupBacklog ?? isFlywheelAutoPickupBacklog()));
+        const issuesWithBeads = await issuesWithBeadsBounded(workspace);
+        saveRunCohort(runId, computeCohort(parsed.doc.nodes, buildClassifyLookups(workspace, issuesWithBeads.known ? { issuesWithBeads: issuesWithBeads.set } : {}), options.maxAgents ?? 5, options.autoPickupBacklog ?? isFlywheelAutoPickupBacklog()));
       }
     }
   } catch { /* cohort snapshot is best-effort */ }

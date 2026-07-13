@@ -22,6 +22,7 @@ import {
 } from '../../../lib/backlog/pickup.js';
 import { buildClassifyLookups } from '../../../lib/backlog/lookups.js';
 import { createBeadsResolver } from '../../../lib/beads/resolver.js';
+import { issuesWithBeadsBounded } from '../../../lib/beads/presence.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { getBacklogSequenceForRoot, clearBacklogSequence } from '../../../lib/overdeck/backlog.js';
 import { isFlywheelAutoPickupBacklog } from '../../../lib/overdeck/control-settings.js';
@@ -43,27 +44,6 @@ const readJsonBody = Effect.gen(function* () {
     return {} as Record<string, unknown>;
   }
 });
-
-/**
- * Bounded, event-loop-safe beads-presence snapshot shared by the backlog
- * routes. One bulk resolver read (never per-workspace sync bd calls — those
- * block the event loop ~2s × ~30 dirs). Under bd lock contention the 8s bound
- * returns { known: false } so routes degrade instead of hanging (NFR-2).
- */
-async function issuesWithBeadsBounded(projectRoot: string): Promise<{ known: boolean; set: Set<string> }> {
-  const set = new Set<string>();
-  const all = await Promise.race([
-    createBeadsResolver(projectRoot).getAllBeads(),
-    new Promise<{ ok: false }>((resolve) => { setTimeout(() => resolve({ ok: false }), 8_000).unref?.(); }),
-  ]);
-  if (!all.ok) return { known: false, set };
-  for (const bead of all.value) {
-    for (const label of bead.labels ?? []) {
-      if (/^[a-z]+-\d+$/i.test(label)) set.add(label.toUpperCase());
-    }
-  }
-  return { known: true, set };
-}
 
 // ─── Route: GET /api/backlog/sequence ────────────────────────────────────────
 

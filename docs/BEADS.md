@@ -45,11 +45,34 @@ temporary database, and compares local Dolt, remote Dolt, and derived JSONL. It
 does not import, push, delete, or select a winner. Review and approve the report
 before writing `beads-cutover.json`.
 
+You may include additional local `.beads` stores with a repeatable `--store
+<name>=<path>` flag — for example, `--store frontend=/path/to/frontend --store
+api=/path/to/api`. Each named store is read with `bd list --all --json` from the
+given path and compared as an additional source. Reserved names (`local-dolt`,
+`remote-dolt`, `state-jsonl`) are rejected.
+
+If `refs/dolt/data` has not been published for the project, the remote Dolt
+source is recorded as 0 records with a `refs/dolt/data not published` note
+instead of failing the reconcile. This lets you audit local and extra stores
+before the first push.
+
 For the schema transition, unify the local home first. On exactly one designated
 migrator run `BD_ALLOW_REMOTE_MIGRATE=1 bd migrate`, then publish the reviewed
 result with `bd dolt push`. Other machines adopt the remote schema with
 `bd bootstrap`; they never migrate independent clones. This operational step is
 operator-run and is not part of application installation or tests.
+
+### `updated_at` mass-reset (2026-07-12)
+
+The v53 schema migration executed on 2026-07-12 rewrote every migrated bead's
+`updated_at` field to the migration timestamp. Recency-based analysis on bead
+`updated_at` — for example, signals that infer "active in pipeline" from the
+most recent bead update — must treat values at or before 2026-07-12 as
+migration noise, not as activity. The reconcile comparator's `metadata-drift`
+classification exists for the same reason: a record whose only difference across
+sources is `updated_at` is reported as metadata drift, not a real conflict. See
+[PAN-2602](https://github.com/eltmon/overdeck/issues/2602) for the read-model
+rollup work that consumes this caveat.
 
 ### Scratch multi-clone proof
 

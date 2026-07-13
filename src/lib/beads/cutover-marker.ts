@@ -10,7 +10,17 @@ export const BEADS_CUTOVER_MARKER = 'beads-cutover.json';
 
 export interface BeadsCutoverMarker {
   remoteUrl: string;
+  /**
+   * The git SHA of the published `refs/dolt/data` ref on the remote. This is
+   * always a 40-character hex SHA because it is compared against `git ls-remote`
+   * output.
+   */
   remoteDoltHead: string;
+  /**
+   * The reconciled local Dolt head. This may be the same 40-character git SHA as
+   * `remoteDoltHead` (the pre-Dolt-native convention) or a 32-character base32
+   * Dolt-native commit hash produced by `bd vc status` after PAN-2564.
+   */
   localReconciledHead: string;
   reconcileReport: { path: string; sha256: string };
   completedAt: string;
@@ -23,12 +33,14 @@ export interface CutoverMarkerValidation {
 }
 
 const isSha = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{40}$/i.test(value);
+const isBase32DoltHead = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-v]{32}$/i.test(value);
 
 export function parseBeadsCutoverMarker(value: unknown): BeadsCutoverMarker | null {
   if (!value || typeof value !== 'object') return null;
   const marker = value as Partial<BeadsCutoverMarker>;
   if (typeof marker.remoteUrl !== 'string' || marker.remoteUrl.length === 0) return null;
-  if (!isSha(marker.remoteDoltHead) || !isSha(marker.localReconciledHead)) return null;
+  if (!isSha(marker.remoteDoltHead)) return null;
+  if (!isSha(marker.localReconciledHead) && !isBase32DoltHead(marker.localReconciledHead)) return null;
   if (typeof marker.completedAt !== 'string' || !Number.isFinite(Date.parse(marker.completedAt))) return null;
   if (!marker.reconcileReport || typeof marker.reconcileReport.path !== 'string') return null;
   if (!/^[0-9a-f]{64}$/i.test(marker.reconcileReport.sha256 ?? '')) return null;

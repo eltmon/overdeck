@@ -616,17 +616,6 @@ export type BeadsTaskCountResult = {
  * Uses `bd list` to query the beads database directly (storage-backend agnostic).
  * Exported for testing.
  */
-export function countBeadsTasksDetailed(workspacePath: string, issueId?: string): BeadsTaskCountResult {
-  const resolver = createBeadsResolver(workspacePath);
-  const result = issueId ? resolver.getBeadsForIssueSync(issueId) : null;
-  if (result?.ok) return { count: result.value.length, source: 'bd' };
-  return { count: 0, source: 'stale', transientFailure: result && !result.ok ? result.error : undefined };
-}
-
-export function countBeadsTasks(workspacePath: string, issueId?: string): number {
-  return countBeadsTasksDetailed(workspacePath, issueId).count;
-}
-
 export async function countBeadsTasksDetailedWithRetry(
   workspacePath: string,
   issueId?: string,
@@ -638,10 +627,6 @@ export async function countBeadsTasksDetailedWithRetry(
   return result.ok
     ? { count: result.value.length, source: 'bd' }
     : { count: 0, source: 'stale', transientFailure: result.error };
-}
-
-export function hasBeadsTasks(workspacePath: string, issueId?: string): boolean {
-  return countBeadsTasks(workspacePath, issueId) > 0;
 }
 
 /**
@@ -693,11 +678,7 @@ function validateBeadsMatchPlanFromCount(workspacePath: string, beadCountResult:
   }
 }
 
-export function validateBeadsMatchPlan(workspacePath: string, issueId: string): BeadsPlanValidation {
-  return validateBeadsMatchPlanFromCount(workspacePath, countBeadsTasksDetailed(workspacePath, issueId));
-}
-
-async function validateBeadsMatchPlanWithRetry(
+export async function validateBeadsMatchPlanWithRetry(
   workspacePath: string,
   issueId: string,
 ): Promise<BeadsPlanValidation> {
