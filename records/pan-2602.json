@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T22:33:37.108Z",
-  "updated": "2026-07-13T08:39:46.284Z",
+  "updated": "2026-07-13T08:48:37.213Z",
   "pipeline": {
     "issueId": "PAN-2602",
     "reviewStatus": "pending",
@@ -121,6 +121,13 @@
         "branch": "feature/pan-2602-slot-2",
         "assignedAt": "2026-07-13T08:39:46.284Z"
       }
-    ]
+    ],
+    "slotCompletions": {
+      "2": {
+        "slotIndex": 2,
+        "agentId": "agent-pan-2602-slot-2",
+        "completedAt": "2026-07-13T08:48:37.179Z"
+      }
+    }
   }
 }
