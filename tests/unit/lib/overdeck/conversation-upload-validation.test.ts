@@ -3,6 +3,8 @@ import {
   validateUploadPayload,
   safeUploadExtension,
   isImageAttachmentPath,
+  transformMessageForHarness,
+  partitionAttachmentsForModel,
   ALLOWED_ATTACHMENT_EXTENSIONS,
   IMAGE_ATTACHMENT_EXTENSIONS,
 } from '../../../../src/lib/overdeck/conversation-message.js';
@@ -190,5 +192,72 @@ describe('attachment extension exports', () => {
     expect(IMAGE_ATTACHMENT_EXTENSIONS).toContain('.jpeg');
     expect(IMAGE_ATTACHMENT_EXTENSIONS).toContain('.gif');
     expect(IMAGE_ATTACHMENT_EXTENSIONS).toContain('.webp');
+  });
+});
+
+describe('transformMessageForHarness', () => {
+  it('uses attachment-generic wording for a non-claude-jsonl harness', () => {
+    const message = 'Please review';
+    const paths = ['/attachments/conv/uuid.md'];
+    const result = transformMessageForHarness(message, 'codex', paths);
+    expect(result).toContain('attached files');
+    expect(result).not.toContain('attached image files');
+    expect(result).toContain('- /attachments/conv/uuid.md');
+    expect(result).toContain('Message:\nPlease review');
+  });
+
+  it('uses attachment-generic wording when only attachments are present', () => {
+    const paths = ['/attachments/conv/uuid.txt'];
+    const result = transformMessageForHarness('', 'codex', paths);
+    expect(result).toContain('attached files');
+    expect(result).not.toContain('attached image files');
+    expect(result).toContain('- /attachments/conv/uuid.txt');
+  });
+
+  it('passes the message through unchanged for claude-jsonl harnesses', () => {
+    const message = 'hello @/attachments/conv/uuid.md';
+    expect(transformMessageForHarness(message, 'claude-code', ['/attachments/conv/uuid.md'])).toBe(message);
+  });
+});
+
+describe('partitionAttachmentsForModel', () => {
+  it('keeps all attachments for a vision-capable model', () => {
+    const message = 'hello @/a.png and @/b.md';
+    const result = partitionAttachmentsForModel(message, ['/a.png', '/b.md'], true);
+    expect(result.outboundMessage).toBe(message);
+    expect(result.effectiveAttachmentPaths).toEqual(['/a.png', '/b.md']);
+    expect(result.droppedImageCount).toBe(0);
+  });
+
+  it('strips only image attachments for a non-vision model', () => {
+    const message = 'hello @/a.png and @/b.md';
+    const result = partitionAttachmentsForModel(message, ['/a.png', '/b.md'], false);
+    expect(result.outboundMessage).toBe('hello  and @/b.md');
+    expect(result.effectiveAttachmentPaths).toEqual(['/b.md']);
+    expect(result.droppedImageCount).toBe(1);
+  });
+
+  it('preserves non-image attachment tokens when images are dropped', () => {
+    const message = 'check @/notes.md';
+    const result = partitionAttachmentsForModel(message, ['/notes.md'], false);
+    expect(result.outboundMessage).toBe(message);
+    expect(result.effectiveAttachmentPaths).toEqual(['/notes.md']);
+    expect(result.droppedImageCount).toBe(0);
+  });
+
+  it('reports zero dropped images when there are no images', () => {
+    const message = 'check @/a.md @/b.txt';
+    const result = partitionAttachmentsForModel(message, ['/a.md', '/b.txt'], false);
+    expect(result.outboundMessage).toBe(message);
+    expect(result.effectiveAttachmentPaths).toEqual(['/a.md', '/b.txt']);
+    expect(result.droppedImageCount).toBe(0);
+  });
+
+  it('strips all attachments and returns an empty outbound message for image-only non-vision input', () => {
+    const message = '@/a.png @/b.jpg';
+    const result = partitionAttachmentsForModel(message, ['/a.png', '/b.jpg'], false);
+    expect(result.outboundMessage).toBe('');
+    expect(result.effectiveAttachmentPaths).toEqual([]);
+    expect(result.droppedImageCount).toBe(2);
   });
 });

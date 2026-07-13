@@ -343,9 +343,34 @@ export function transformMessageForHarness(message: string, harness: RuntimeName
   userText = userText.trim();
   const attachments = attachmentPaths.map((path) => `- ${path}`).join('\n');
   if (!userText) {
-    return `Use the Read tool to inspect these attached image files, then describe what you see:\n${attachments}`;
+    return `Use the Read tool to inspect these attached files, then describe what you see:\n${attachments}`;
   }
-  return `Use the Read tool to inspect these attached image files:\n${attachments}\n\nMessage:\n${userText}`;
+  return `Use the Read tool to inspect these attached files:\n${attachments}\n\nMessage:\n${userText}`;
+}
+
+export function partitionAttachmentsForModel(
+  message: string,
+  attachmentPaths: string[],
+  supportsImages: boolean,
+): { outboundMessage: string; effectiveAttachmentPaths: string[]; droppedImageCount: number } {
+  if (attachmentPaths.length === 0 || supportsImages) {
+    return { outboundMessage: message, effectiveAttachmentPaths: attachmentPaths, droppedImageCount: 0 };
+  }
+
+  const imagePaths = attachmentPaths.filter((p) => isImageAttachmentPath(p));
+  const nonImagePaths = attachmentPaths.filter((p) => !isImageAttachmentPath(p));
+
+  let outboundMessage = message;
+  for (const p of imagePaths) {
+    outboundMessage = outboundMessage.split(`@${p}`).join('');
+  }
+  outboundMessage = outboundMessage.trim();
+
+  return {
+    outboundMessage,
+    effectiveAttachmentPaths: nonImagePaths,
+    droppedImageCount: imagePaths.length,
+  };
 }
 
 export async function handleConversationMessage(
@@ -398,22 +423,17 @@ export async function handleConversationMessage(
 
   const harness: RuntimeName = conv.harness ?? 'claude-code';
   const behavior = getHarnessBehavior(harness);
-  let outboundMessage = message;
-  let effectiveAttachmentPaths = managedAttachmentPaths;
-  let droppedImageCount = 0;
-  if (managedAttachmentPaths.length > 0 && !modelSupportsImagesSync(conv.model ?? '')) {
-    for (const p of managedAttachmentPaths) {
-      outboundMessage = outboundMessage.split(`@${p}`).join('');
-    }
-    outboundMessage = outboundMessage.trim();
-    droppedImageCount = managedAttachmentPaths.length;
-    effectiveAttachmentPaths = [];
-    if (!outboundMessage) {
-      return jsonResponse(
-        { error: `${conv.model ?? 'This model'} can't read images. Switch to a vision-capable model (e.g. mimo-v2.5) to send images.` },
-        { status: 422 },
-      );
-    }
+  const supportsImages = modelSupportsImagesSync(conv.model ?? '');
+  const partition = partitionAttachmentsForModel(message, managedAttachmentPaths, supportsImages);
+  const outboundMessage = partition.outboundMessage;
+  const effectiveAttachmentPaths = partition.effectiveAttachmentPaths;
+  const droppedImageCount = partition.droppedImageCount;
+
+  if (droppedImageCount > 0 && !outboundMessage && effectiveAttachmentPaths.length === 0) {
+    return jsonResponse(
+      { error: `${conv.model ?? 'This model'} can't read images. Switch to a vision-capable model (e.g. mimo-v2.5) to send images.` },
+      { status: 422 },
+    );
   }
 
   let deliveredMessage = transformMessageForHarness(outboundMessage, harness, effectiveAttachmentPaths);
