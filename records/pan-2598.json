@@ -12,11 +12,16 @@
       "reason": "resume",
       "agentModel": "kimi-k2.7-code",
       "timestamp": "2026-07-13T05:16:10.834Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-13T05:41:52.596Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T05:16:10.835Z",
+  "updated": "2026-07-13T05:41:52.596Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "pending",
