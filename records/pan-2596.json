@@ -302,7 +302,7 @@
     "recordedAt": "2026-07-13T11:20:10.124Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T14:58:53.384Z",
+  "updated": "2026-07-13T14:58:57.271Z",
   "pipeline": {
     "issueId": "PAN-2596",
     "reviewStatus": "reviewing",
@@ -313,7 +313,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T11:21:55.959Z",
-    "updatedAt": "2026-07-13T14:58:51.884Z",
+    "updatedAt": "2026-07-13T14:58:57.188Z",
     "reviewNotes": "Agent re-review request (3/25): Fixed rejection toasts to name the rejected file(s).",
     "inspectNotes": "Bead server-upload-allowlist ack: validateUploadPayload correctly gates UTF-8 text extensions, PDF %PDF- magic prefix, and disallowed/extension-less types with 400s naming the mismatch, while preserving image magic-byte validation and <uuid><ext> naming; non-image files get <uuid>-<sanitized-name><ext>. All 5 ACs verified against diff + accompanying unit tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2634",
@@ -487,7 +487,7 @@
       },
       "costAtCloseOut": {
         "usd": 72.17282,
-        "pricingAsOf": "2026-07-13T14:58:52.023Z"
+        "pricingAsOf": "2026-07-13T14:58:57.238Z"
       }
     },
     "merges": [
