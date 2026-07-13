@@ -183,10 +183,10 @@
     "recordedAt": "2026-07-13T11:42:15.994Z"
   },
   "created": "2026-07-12T22:33:37.108Z",
-  "updated": "2026-07-13T11:48:25.463Z",
+  "updated": "2026-07-13T11:48:31.126Z",
   "pipeline": {
     "issueId": "PAN-2602",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
@@ -194,8 +194,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T11:43:50.864Z",
-    "updatedAt": "2026-07-13T11:48:25.385Z",
-    "reviewNotes": "[performance] Branch-ahead discovery shells out serially for every feature/bypass branch — `src/dashboard/server/services/resource-discovery.ts:687`",
+    "updatedAt": "2026-07-13T11:48:31.076Z",
+    "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (116121ms):\n\n'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n- Spawning knowledge agent for PAN-2468...\n✔ Knowledge agent spawned: agent-pan-2468-knowledge\n- Spawning knowledge agent for PAN-2468...\n✖ Knowledge agent for PAN-2468 failed: No OKF bundle is configured for Overdeck. Run `/okf init` in this workspace to create or connect a knowledge bundle, then retry `pan knowledge PAN-2468`.\n- Spawning knowledge agent for PAN-2468...\n⚠ mnemos unavailable; spawning knowledge agent with built-in OKF search: release fetch failed\n- Spawning knowledge agent for PAN-2468...\n✔ Knowledge agent spawned: agent-pan-2468-knowledge\n- Enumerating issues with orphaned beads...\n✔ Found 1 closed issue(s) with orphaned beads\n- Enumerating issues with orphaned beads...\n✔ Found 0 closed issue(s) with orphaned beads\n- Enumerating issues with orphaned beads...\n✔ Found 1 closed issue(s) with orphaned beads\n- Enumerating issues with orphaned beads...\n✔ Found 1 closed issue(s) with orphaned beads\n",
     "inspectNotes": "Bead beads-rollup-service ack: extractIssueLabels() now gates bare word-number labels through project.issuePrefixes, preventing phase-N labels from creating spurious rollups; tests cover phase exclusion and workspace: label mapping.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2636",
@@ -423,7 +423,7 @@
       },
       "costAtCloseOut": {
         "usd": 114.59446,
-        "pricingAsOf": "2026-07-13T11:48:25.451Z"
+        "pricingAsOf": "2026-07-13T11:48:31.125Z"
       }
     },
     "merges": [
