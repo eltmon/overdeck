@@ -342,21 +342,22 @@
     "recordedAt": "2026-07-13T11:20:10.124Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T16:05:33.183Z",
+  "updated": "2026-07-13T19:28:29.883Z",
   "pipeline": {
     "issueId": "PAN-2596",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T11:21:55.959Z",
-    "updatedAt": "2026-07-13T15:56:04.326Z",
+    "updatedAt": "2026-07-13T19:28:29.806Z",
     "reviewNotes": "Agent re-review request (1/25): Reset review cycles after dashboard boot gate; please run full convoy.",
     "inspectNotes": "Bead server-upload-allowlist ack: validateUploadPayload correctly gates UTF-8 text extensions, PDF %PDF- magic prefix, and disallowed/extension-less types with 400s naming the mismatch, while preserving image magic-byte validation and <uuid><ext> naming; non-image files get <uuid>-<sanitized-name><ext>. All 5 ACs verified against diff + accompanying unit tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2634",
+    "reviewedAtCommit": "66452d513cbf7e447bc977d03567c84a4f807c7f",
     "lastVerifiedCommit": "66452d513cbf7e447bc977d03567c84a4f807c7f",
     "reviewRequestedAt": "2026-07-13T11:21:55.959Z",
     "reviewSpawnedAt": "2026-07-13T15:55:57.809Z",
@@ -408,9 +409,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 24495307,
-            "output": 86825,
-            "cacheRead": 21271040,
+            "input": 28103064,
+            "output": 108322,
+            "cacheRead": 24455680,
             "cacheWrite": 0
           }
         },
@@ -432,10 +433,10 @@
         },
         "review": {
           "anthropic/claude-sonnet-5": {
-            "input": 23575,
-            "output": 13017,
-            "cacheRead": 3524623,
-            "cacheWrite": 626381
+            "input": 30059,
+            "output": 23003,
+            "cacheRead": 5978014,
+            "cacheWrite": 1008645
           }
         },
         "review.correctness": {
@@ -480,9 +481,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 2616542,
-            "output": 237169,
-            "cacheRead": 112626944,
+            "input": 2629578,
+            "output": 239327,
+            "cacheRead": 116460800,
             "cacheWrite": 0
           }
         }
@@ -495,9 +496,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 24495307,
-          "output": 86825,
-          "cacheRead": 21271040,
+          "input": 28103064,
+          "output": 108322,
+          "cacheRead": 24455680,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
@@ -513,21 +514,21 @@
           "cacheWrite": 213933
         },
         "anthropic/claude-sonnet-5": {
-          "input": 123690,
-          "output": 66032,
-          "cacheRead": 13787517,
-          "cacheWrite": 1299474
+          "input": 130174,
+          "output": 76018,
+          "cacheRead": 16240908,
+          "cacheWrite": 1681738
         },
         "custom/kimi-k2.7-code": {
-          "input": 2616542,
-          "output": 237169,
-          "cacheRead": 112626944,
+          "input": 2629578,
+          "output": 239327,
+          "cacheRead": 116460800,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 76.152141,
-        "pricingAsOf": "2026-07-13T15:56:04.374Z"
+        "usd": 82.813573,
+        "pricingAsOf": "2026-07-13T19:28:29.869Z"
       }
     },
     "merges": [
