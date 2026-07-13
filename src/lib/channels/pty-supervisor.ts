@@ -33,14 +33,14 @@ import {
   INPUT_ECHO_CONFIRM_PREFIX_CHARS,
   echoConfirmTimeoutMs,
   inputSettleMs,
+  INPUT_PURGE_MAX_CHARS,
+  purgeSettleMs,
 } from './injection-budget.js';
 
 const DEFAULT_COLS = 80;
 const DEFAULT_ROWS = 24;
 const SHUTDOWN_GRACE_MS = 2_000;
 const MAX_REQUEST_BYTES = 1024 * 1024;
-const INPUT_PURGE_MAX_CHARS = 8_192;
-const INPUT_PURGE_SETTLE_MS = 150;
 
 export interface PtySupervisorPayload {
   content: string;
@@ -111,6 +111,7 @@ function parsePayload(value: unknown): PtySupervisorPayload | null {
   if (value === null || typeof value !== 'object') return null;
   const payload = value as Partial<PtySupervisorPayload>;
   if (typeof payload.content !== 'string' || payload.content.length === 0) return null;
+  if (payload.content.length > INPUT_PURGE_MAX_CHARS) return null;
   if (payload.echo !== undefined && typeof payload.echo !== 'boolean') return null;
   if (payload.caller !== undefined && typeof payload.caller !== 'string') return null;
   if (payload.meta !== undefined) {
@@ -262,12 +263,14 @@ async function waitForPtyEcho(readOutput: () => string, prefix: string, timeoutM
  * composer are no-ops, and a collapsed `[Pasted text]` placeholder is deleted
  * atomically by the first DEL. Without this, an unconfirmed-but-landed write
  * stacks with the retry write and the caller's tmux fallback, submitting the
- * same message two or three times (PAN-1769).
+ * same message two or three times (PAN-1769). This invariant holds for payloads
+ * up to INPUT_PURGE_MAX_CHARS; larger payloads are rejected by parsePayload so
+ * "accepted" always implies "purgeable".
  */
 async function purgePtyInput(child: pty.IPty, charCount: number): Promise<void> {
   const count = Math.min(charCount, INPUT_PURGE_MAX_CHARS) + 8;
   child.write('\x7f'.repeat(count));
-  await sleep(INPUT_PURGE_SETTLE_MS);
+  await sleep(purgeSettleMs(count));
 }
 
 export async function injectPtyMessage(
