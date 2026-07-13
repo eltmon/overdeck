@@ -997,7 +997,7 @@ export function ConversationPanel({
       )}
 
       {/* Body — conversation + optional diff panel */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
         <div className={styles.conversationTerminalBody}>
           {/* Terminal: only mounted when actively viewing (xterm.js crashes with visibility:hidden) */}
           {showTerminal && effectiveViewMode === 'terminal' && (

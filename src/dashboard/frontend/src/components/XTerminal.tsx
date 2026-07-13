@@ -764,7 +764,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
   };
 
   return (
-    <div className="relative w-full h-full">
+    <div className="relative h-full min-h-0 w-full min-w-0 overflow-hidden">
       {/* Top-right controls. The theme toggle is always available (PAN-1520);
           the settings gear is hidden when embedded (the host owns the chrome). */}
       <div className="absolute top-2 right-2 z-10 flex gap-2">
@@ -818,11 +818,10 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       {/* Terminal container */}
       <div
         ref={terminalRef}
-        className="absolute inset-0"
+        className="absolute inset-2"
         onClick={handleClick}
         tabIndex={0}
         style={{
-          padding: '8px',
           backgroundColor: effectiveIsDark ? XTERM_BG.dark : XTERM_BG.light,
           overflow: 'hidden',
           outline: 'none',

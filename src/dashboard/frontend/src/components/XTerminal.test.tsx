@@ -171,6 +171,15 @@ describe('XTerminal', () => {
     });
   });
 
+  it('allows the terminal frame to shrink inside constrained flex layouts (PAN-2619)', () => {
+    const { container } = render(<XTerminal sessionName="test-session" />);
+    const frame = container.firstElementChild;
+    const terminalSurface = container.querySelector('.absolute.inset-2');
+
+    expect(frame).toHaveClass('min-w-0', 'min-h-0', 'overflow-hidden');
+    expect(terminalSurface).not.toHaveStyle({ padding: '8px' });
+  });
+
   it('loads auto-copy setting from localStorage', async () => {
     vi.mocked(localStorageMock.getItem).mockReturnValue('false');
 
@@ -325,7 +334,7 @@ describe('XTerminal', () => {
       expect(MockWebSocket.instances).toHaveLength(1);
     });
 
-    const terminalSurface = container.querySelector('.absolute.inset-0') as HTMLDivElement | null;
+    const terminalSurface = container.querySelector('.absolute.inset-2') as HTMLDivElement | null;
     expect(terminalSurface).toBeTruthy();
 
     fireEvent.contextMenu(terminalSurface!, { clientX: 32, clientY: 64 });
@@ -349,7 +358,7 @@ describe('XTerminal', () => {
       expect(MockWebSocket.instances).toHaveLength(1);
     });
 
-    const terminalSurface = container.querySelector('.absolute.inset-0') as HTMLDivElement | null;
+    const terminalSurface = container.querySelector('.absolute.inset-2') as HTMLDivElement | null;
     fireEvent.contextMenu(terminalSurface!, { clientX: 32, clientY: 64 });
     fireEvent.click(await screen.findByText('Paste'));
 
