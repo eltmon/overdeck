@@ -1,0 +1,40 @@
+---
+title: Hygiene Check
+description: Audit commit, push, PR, agent, session, branch, workspace, and disk state
+---
+
+# `pan hygiene`
+
+`pan hygiene` answers whether orchestration work has reached its durable and
+reviewable destination. Run it before a release, after a large merge drain, or
+whenever an agent claims everything is pushed but the repository still looks
+unclean.
+
+```bash
+pan hygiene
+pan hygiene --json
+pan hygiene --strict
+```
+
+The report covers local commits ahead of `origin/main`, unexpected working-tree
+changes and backup files, open pull-request blockers, troubled or paused agents,
+tmux sessions whose agent is stopped, merged feature branches that remain, stale
+terminal worktrees, and available disk space. The default stale threshold is
+four weeks; override it with `--since 7d`.
+
+## Safe remediation
+
+```bash
+pan hygiene --fix-safe
+pan hygiene --fix-safe --fix-disk-pressure-floor 25
+```
+
+`--fix-safe` deletes a feature branch only after GitHub reports its pull request
+merged. When disk is below the configured floor, it may also remove an oldest
+terminal worktree only when the branch is gone and the worktree has no open PR,
+live session, or uncommitted changes. It never stashes, force-deletes, resets,
+force-pushes, or tears down a workspace whose contents may be recoverable.
+
+By default findings are informational and the command exits successfully. Add
+`--strict` to exit with status 1 whenever anything needs attention. Use
+`--skip push tree` to omit named checks in constrained environments.

@@ -118,6 +118,7 @@ import { registerRolloutCommands } from './commands/rollout.js';
 import { isNoResumeCliOptionEnabled } from '../lib/cloister/no-resume-mode.js';
 import { applyBootGateEnv, formatBootGateState, resolveBootGates } from '../lib/boot-gates.js';
 import { resourcesCommand } from './commands/resources.js';
+import { hygieneCommand } from './commands/hygiene.js';
 import { devCommand } from './commands/dev.js';
 import { registerScopeCommands } from './commands/scope.js';
 import { openCommand } from './commands/open.js';
@@ -1367,6 +1368,17 @@ program
   .description('Show RAM usage by agents, conversations, and system processes')
   .option('--json', 'Output as JSON')
   .action(resourcesCommand);
+
+program
+  .command('hygiene')
+  .description('Audit push, worktree, PR, agent, session, branch, workspace, and disk hygiene')
+  .option('--json', 'Emit a schema-validated JSON report')
+  .option('--strict', 'Exit 1 when any finding needs attention')
+  .option('--skip <check...>', 'Skip checks: push tree prs agents sessions branches workspaces')
+  .option('--since <duration>', 'Age threshold for stale branches/workspaces', '4w')
+  .option('--fix-safe', 'Delete only confirmed merged branches; under disk pressure remove independently verified clean terminal workspaces')
+  .option('--fix-disk-pressure-floor <GB>', 'Override the disk cleanup floor used with --fix-safe')
+  .action(hygieneCommand);
 
 // Update command
 program
