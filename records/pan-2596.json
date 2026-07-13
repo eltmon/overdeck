@@ -99,21 +99,21 @@
     "recordedAt": "2026-07-13T09:57:24.734Z"
   },
   "created": "2026-07-13T07:30:26.810Z",
-  "updated": "2026-07-13T10:43:32.484Z",
+  "updated": "2026-07-13T10:48:26.236Z",
   "pipeline": {
     "issueId": "PAN-2596",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T10:43:32.314Z",
+    "updatedAt": "2026-07-13T10:48:25.714Z",
     "reviewNotes": "Dotfile and extensionless filenames bypass rejection when declared as images",
     "inspectNotes": "Bead server-upload-allowlist ack: validateUploadPayload correctly gates UTF-8 text extensions, PDF %PDF- magic prefix, and disallowed/extension-less types with 400s naming the mismatch, while preserving image magic-byte validation and <uuid><ext> naming; non-image files get <uuid>-<sanitized-name><ext>. All 5 ACs verified against diff + accompanying unit tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2634",
-    "lastVerifiedCommit": "6963ab31309ae138d5532a7150447e95fcc1bcaa",
+    "lastVerifiedCommit": "aa5085397e4c1e61dc76f80c7ec0b3d58b8bd537",
     "reviewRequestedAt": "2026-07-13T09:48:06.907Z",
     "reviewSpawnedAt": "2026-07-13T10:18:05.010Z",
     "scopeDrift": {
@@ -187,9 +187,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1340082,
-            "output": 191645,
-            "cacheRead": 83164928,
+            "input": 1351820,
+            "output": 195313,
+            "cacheRead": 85155072,
             "cacheWrite": 0
           }
         }
@@ -226,15 +226,15 @@
           "cacheWrite": 85508
         },
         "custom/kimi-k2.7-code": {
-          "input": 1340082,
-          "output": 191645,
-          "cacheRead": 83164928,
+          "input": 1351820,
+          "output": 195313,
+          "cacheRead": 85155072,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 43.365318,
-        "pricingAsOf": "2026-07-13T10:43:32.458Z"
+        "usd": 43.76927,
+        "pricingAsOf": "2026-07-13T10:48:25.934Z"
       }
     },
     "merges": [
